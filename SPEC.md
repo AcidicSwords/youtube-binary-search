@@ -1,143 +1,113 @@
-# Binary YouTube Reader — Implementation Contract
+# Binary YouTube Reader — Interaction Contract
 
 ## 1. Product
 
-The application accepts a YouTube URL and adds a lightweight control panel for traversing
-the video as one traverses a written guide: bound a passage, move approximately, narrow,
-reverse, back out, and retain useful passages.
+The application makes a long video navigable like a written guide. Its small set of primitives
+must combine naturally: bound the material, move backward or forward, skim, replay a passage,
+split deliberately, undo, and save.
 
-The application must not analyze or restructure the content. Its value comes from temporal
-navigation alone.
+The interface must not require users to understand a separate focus model or visible recursion
+machinery.
 
-## 2. Minimal state
+## 2. State
 
 ```text
 videoId
 duration
-scope = [A, B]
+range = [A, B]
 stack = [F0, F1, ..., Fn]
-frame Fn = [L, C, R]
+active frame Fn = [L, C, R]
 optional split P
-direction = earlier | later
-saved regions
+optional lastPassage = [S, E]
+optional repeat
+optional skim
+saved passages
 ```
 
-Invariants:
+`C` is the current place when playback is stopped. The stack is navigation history.
 
 ```text
 0 <= A < B <= duration
 A <= L <= C <= R <= B
 ```
 
-## 3. Outer scope
+## 3. Range and passage
 
-The outer scope `[A, B]` is placed with two timeline handles or by setting either endpoint
-at the playhead.
+The outer range `[A, B]` bounds the part of the video being studied. The active frame `[L, C, R]`
+is the current passage at the current resolution.
 
-- Video outside the scope is excluded from app traversal.
-- Ordinary playback loops from `B` to `A`.
-- Editing the scope clears recursive depth.
-- The full-video command restores `[0, duration]`.
+- Editing the range starts a new root frame.
+- Ordinary playback stays inside the active passage.
+- Loading a saved passage makes it the new outer range.
 
-## 4. Recursive interval
-
-The active frame is `[L, C, R]`.
-
-Without a custom split:
+## 4. Automatic points and split
 
 ```text
-earlierTarget = (L + C) / 2
-laterTarget   = (C + R) / 2
+backPoint    = (L + C) / 2
+forwardPoint = (C + R) / 2
 ```
 
-A temporary split `P` replaces the target on its own side:
+A split `P` may be placed anywhere inside the outer range except on `C`.
 
 ```text
-P < C -> earlierTarget = P
-P > C -> laterTarget   = P
+P < C -> backPoint = P
+P > C -> forwardPoint = P
 ```
 
-Placing a split does not move the player or alter the bounds. Placing another split replaces it.
-Using any traversal clears it.
+Using a split clears it. If a split is outside the active passage, the movement deliberately
+escapes toward the corresponding outer-range boundary. Undo still restores the exact parent.
 
-## 5. Descending
+## 5. Movement
 
-Earlier:
+There is no direction mode.
 
-```text
-[L, C, R] -> [L, earlierTarget, C]
-```
+- **Back** jumps to the back point and pushes an earlier child frame.
+- **Forward** jumps to the forward point and pushes a later child frame.
+- **Skim** plays fast-to-normal to the forward point and pushes the same child as Forward.
+- A direct timeline click moves to that time and pushes an undoable child frame.
+- **Undo Last Move** restores the exact parent frame.
 
-Later:
+Each movement records the span between its departure and arrival as `lastPassage`.
 
-```text
-[L, C, R] -> [C, laterTarget, R]
-```
+## 6. Playback and repetition
 
-Each descent pushes one frame. There is no Down command because traversal itself descends.
+- **Play/Pause** always plays at `1×`.
+- While playing, the passage bounds and automatic points remain still.
+- When forward playback stops, its departure becomes `L` and its actual position becomes `C`.
+  The next Back action therefore bisects exactly the passage just played.
+- The played span becomes `lastPassage`.
+- **Repeat Last Passage** loops `lastPassage` at `1×`.
+- Stopping repetition returns to `C` and does not add navigation history.
 
-## 6. Actions
+This lets one Repeat action reread whatever the user just jumped across, skimmed through, or
+played normally.
 
-### Earlier
+## 7. Skim curve
 
-Supported action:
-
-- Jump Earlier
-
-Backward playback is not simulated.
-
-### Later
-
-Supported actions:
-
-- Jump Later
-- Play Forward
-
-Jump and Play Forward must commit the same child frame when they use the same target.
-
-## 7. Forward playback curve
-
-Let:
+For departure `D`, destination `Q`, and progress `u`:
 
 ```text
-D = departure
-Q = target
 u = (currentTime - D) / (Q - D)
-```
-
-The desired logarithmic curve is:
-
-```text
 desiredRate(u) = maxRate ^ (1 - u)
 ```
 
-The YouTube player accepts only rates reported by `getAvailablePlaybackRates()`.
-At each update, choose the greatest supported rate not exceeding `desiredRate`.
+Choose the greatest YouTube-supported rate that does not exceed the desired rate. On arrival,
+pause exactly at `Q`, restore `1×`, and push the child frame. Stopping after meaningful progress
+uses the actual stopping position; stopping immediately retains the parent.
 
-The resulting curve is a descending staircase through actual YouTube playback rates and reaches
-`1x` at the target.
+## 8. Timeline
 
-On arrival:
+- blue handles and fill: outer range;
+- green band and edge markers: active passage;
+- white line: current playhead;
+- lower grey markers: automatic back and forward points;
+- upper gold flag: split.
 
-- pause;
-- seek exactly to the target;
-- set playback rate to `1x`;
-- push the child frame.
+When a split replaces an automatic point, the automatic marker on that side is hidden.
 
-If the user stops early, use the actual stopping position as the child current position.
+## 9. Saved passages
 
-## 8. Depth
-
-- Up removes one child frame and restores the exact parent.
-- The depth selector may restore any ancestor.
-- Restoring an ancestor discards deeper frames.
-- There is no redo or Down operation.
-
-## 9. Saved regions
-
-Save the current active recursive interval `[L, R]`, not only the outer scope.
-
-A saved region contains:
+Save active passage `[L, R]` with:
 
 ```text
 id
@@ -148,97 +118,31 @@ end
 createdAt
 ```
 
-Storage is local to the browser and separated by YouTube video ID.
+Storage is local to each browser and separated by video ID.
 
-Clicking a saved region:
+## 10. Keyboard
 
-1. sets the outer scope to `[start, end]`;
-2. clears recursive depth;
-3. places the playhead at `(start + end) / 2`;
-4. establishes root frame `[start, midpoint, end]`;
-5. pauses playback.
+- Left Arrow: Back
+- Right Arrow: Forward
+- Shift + Right Arrow: Skim
+- Backspace: Undo Last Move
+- Shift + Backspace: restore level zero
+- S: Place Split
+- R: Repeat Last Passage
+- Space: Play/Pause at `1×`
+- Escape: clear split
 
-Deletion requires one visible delete control. Renaming after save is not required in v1.
+## 11. Acceptance criteria
 
-## 10. Interface
+- Back and Forward are always directly available.
+- Play is always `1×`.
+- Playback does not move passage bounds or automatic points while it is running.
+- Repeat replays the span of the immediately preceding movement or playback.
+- A split can be placed anywhere inside the outer range.
+- Split and automatic markers never overlap.
+- Forward and a completed Skim produce the same child frame.
+- Undo restores the exact parent.
+- No separate direction, focus, or playback-mode selection is required.
 
-The interface is a control panel outside the YouTube player.
-
-Primary controls:
-
-- Load URL
-- Scope start handle
-- Scope end handle
-- Start at playhead
-- End at playhead
-- Centre
-- Full video
-- Place split
-- Clear split
-- Earlier / Later direction
-- Jump
-- Play Forward
-- Play/Pause
-- Up one level
-- Ancestor depth selector
-- Maximum forward speed
-- Region label
-- Save interval
-- Saved-region list
-
-The saved-region list is beside the player on wide screens and below it on narrow screens.
-
-## 11. User rhythm
-
-```text
-BOUND -> SPLIT -> TRAVERSE -> UP OR SAVE
-```
-
-A successful interface should make that rhythm apparent without requiring the user to understand
-the underlying equations.
-
-## 12. Acceptance tests
-
-Given frame `[0, 60, 180]`:
-
-- Earlier target is `30`.
-- Later target is `120`.
-- Jump Earlier produces `[0, 30, 60]`.
-- Jump Later produces `[60, 120, 180]`.
-
-Given frame `[90, 150, 180]` and split `120`:
-
-- Earlier target is `120`.
-- Jump Earlier produces `[90, 120, 150]`.
-- New targets are `105` and `135`.
-
-Given stack:
-
-```text
-[0, 60, 180]
-[60, 120, 180]
-[120, 150, 180]
-```
-
-Up restores `[60, 120, 180]`.
-
-Saving active frame `[120, 150, 180]` stores region `[120, 180]`.
-Loading it produces root frame `[120, 150, 180]`.
-
-## 13. Explicit exclusions
-
-Do not add:
-
-- transcripts
-- annotations
-- content analysis
-- generated chapters
-- visible recursion trees
-- multiple active players
-- reverse seek-stepping animation
-- virtual speeds above rates exposed by YouTube
-- accounts or backend storage
-- collaborative features
-- AI features
-
-The project is complete when the traversal rhythm is fast, predictable, and comfortable.
+The project succeeds when these primitives feel like a small vocabulary rather than a control
+panel full of unrelated features.

@@ -5,6 +5,7 @@ import {
   getTargets,
   descend,
   intervalMidpoint,
+  settlePlayback,
   logSpeed,
   chooseSupportedRate
 } from "./traversal.js";
@@ -27,8 +28,10 @@ const state = {
   stack: [],
   split: null,
   splitMode: false,
-  direction: "earlier",
   traversal: null,
+  repeat: null,
+  playStart: null,
+  lastPassage: null,
   availableRates: [1],
   savedRegions: [],
   dragHandle: null,
@@ -86,6 +89,7 @@ function resetRootAt(current, seek = true) {
   state.stack = [createRoot(state.scope.start, C, state.scope.end)];
   state.split = null;
   state.splitMode = false;
+  state.lastPassage = null;
 
   if (seek && player && state.playerReady) {
     player.seekTo(C, true);
@@ -94,18 +98,20 @@ function resetRootAt(current, seek = true) {
   updateUI();
 }
 
-function setScope(start, end, current = null, message = "Scope updated.") {
+function setScope(start, end, current = null, message = "Range updated.") {
   if (!state.videoLoaded) return false;
 
   const A = clamp(start, 0, state.duration);
   const B = clamp(end, 0, state.duration);
 
   if (!(B - A >= MIN_SCOPE_SECONDS)) {
-    setStatus("The scope must have a positive duration.", true);
+    setStatus("The range must have a positive duration.", true);
     return false;
   }
 
   stopTraversal(false);
+  stopRepeat();
+  finishOrdinaryPlayback(false);
 
   state.scope = { start: A, end: B };
   const C = current === null
@@ -115,6 +121,7 @@ function setScope(start, end, current = null, message = "Scope updated.") {
   state.stack = [createRoot(A, C, B)];
   state.split = null;
   state.splitMode = false;
+  state.lastPassage = null;
 
   player.pauseVideo();
   player.setPlaybackRate(1);
@@ -127,30 +134,24 @@ function setScope(start, end, current = null, message = "Scope updated.") {
 
 function activeTargets() {
   const frame = currentFrame();
-  return frame ? getTargets(frame, state.split) : { earlier: null, later: null };
+  return frame ? getTargets(frame, state.split, state.scope) : { earlier: null, later: null };
 }
 
-function selectedTarget() {
-  const targets = activeTargets();
-  return state.direction === "earlier" ? targets.earlier : targets.later;
-}
-
-function setDirection(direction) {
-  state.direction = direction;
-  elements["direction-earlier"].classList.toggle("selected", direction === "earlier");
-  elements["direction-later"].classList.toggle("selected", direction === "later");
-  updateUI();
-}
-
-function jumpSelected() {
+function go(direction) {
   if (!state.videoLoaded || state.traversal) return;
 
+  prepareForNavigation();
   const frame = currentFrame();
-  const target = selectedTarget();
+  const target = activeTargets()[direction];
   if (target === null) return;
 
-  const child = descend(frame, state.direction, target);
+  const departure = frame.C;
+  const child = descend(frame, direction, target, state.scope);
   state.stack.push(child);
+  state.lastPassage = {
+    start: Math.min(departure, target),
+    end: Math.max(departure, target)
+  };
   state.split = null;
   state.splitMode = false;
 
@@ -158,8 +159,69 @@ function jumpSelected() {
   player.setPlaybackRate(1);
   player.seekTo(target, true);
 
-  setStatus(`Jumped ${state.direction} to ${formatTime(target)}.`);
+  setStatus(`Moved ${direction === "earlier" ? "back" : "forward"} to ${formatTime(target)}.`);
   updateUI();
+}
+
+function stopRepeat(message = null, returnToCurrent = false, pause = true) {
+  if (!state.repeat) return;
+  state.repeat = null;
+  if (pause) player.pauseVideo();
+  if (returnToCurrent) player.seekTo(currentFrame().C, true);
+  player.setPlaybackRate(1);
+  if (message) setStatus(message);
+}
+
+function startRepeat() {
+  if (!state.videoLoaded || state.traversal || !state.lastPassage) return;
+
+  if (state.repeat) {
+    stopRepeat("Repeat stopped.", true);
+    updateUI();
+    return;
+  }
+
+  finishOrdinaryPlayback(false);
+  const { start, end } = state.lastPassage;
+  if (end <= start + EPSILON) return;
+
+  state.repeat = { start, end };
+  player.setPlaybackRate(1);
+  player.seekTo(start, true);
+  player.playVideo();
+  setStatus(`Repeating ${formatTime(start)}–${formatTime(end)} at 1×.`);
+  updateUI();
+}
+
+function finishOrdinaryPlayback(pause = true) {
+  if (state.playStart === null) return false;
+
+  const start = state.playStart;
+  state.playStart = null;
+  const frame = currentFrame();
+  if (!frame) return false;
+
+  const settled = settlePlayback(frame, start, safeCurrentTime());
+  Object.assign(frame, settled);
+  const current = frame.C;
+  if (state.split !== null && Math.abs(state.split - current) <= EPSILON) {
+    state.split = null;
+  }
+  if (Math.abs(current - start) > EPSILON) {
+    state.lastPassage = {
+      start: Math.min(start, current),
+      end: Math.max(start, current)
+    };
+  }
+
+  if (pause) player.pauseVideo();
+  player.setPlaybackRate(1);
+  return true;
+}
+
+function prepareForNavigation() {
+  stopRepeat(null, true);
+  finishOrdinaryPlayback();
 }
 
 function stopTraversal(commitActual) {
@@ -179,13 +241,14 @@ function stopTraversal(commitActual) {
     );
 
     if (actual > traversal.departure + EPSILON) {
-      const child = descend(traversal.parent, "later", actual);
+      const child = descend(traversal.parent, "later", actual, state.scope);
       state.stack.push(child);
+      state.lastPassage = { start: traversal.departure, end: actual };
       player.seekTo(actual, true);
-      setStatus(`Forward scan stopped at ${formatTime(actual)}.`);
+      setStatus(`Skim stopped at ${formatTime(actual)}.`);
     } else {
       player.seekTo(traversal.departure, true);
-      setStatus("Forward scan stopped before it advanced.");
+      setStatus("Skim stopped before it advanced.");
     }
   }
 
@@ -206,21 +269,27 @@ function finishTraversal() {
   player.setPlaybackRate(1);
   player.seekTo(traversal.target, true);
 
-  state.stack.push(descend(traversal.parent, "later", traversal.target));
+  state.stack.push(descend(traversal.parent, "later", traversal.target, state.scope));
+  state.lastPassage = {
+    start: traversal.departure,
+    end: traversal.target
+  };
 
   queueMicrotask(() => {
     state.internalPause = false;
   });
 
-  setStatus(`Reached ${formatTime(traversal.target)} at normal speed.`);
+  setStatus(`Skim reached ${formatTime(traversal.target)} at normal speed.`);
   updateUI();
 }
 
 function startForwardTraversal() {
-  if (!state.videoLoaded || state.traversal || state.direction !== "later") return;
+  if (!state.videoLoaded || state.traversal) return;
 
+  stopRepeat(null, true, false);
+  finishOrdinaryPlayback(false);
   const parent = { ...currentFrame() };
-  const target = selectedTarget();
+  const target = activeTargets().later;
   if (target === null || target <= parent.C + EPSILON) return;
 
   state.split = null;
@@ -236,7 +305,7 @@ function startForwardTraversal() {
 
   player.seekTo(parent.C, true);
   player.playVideo();
-  setStatus(`Playing forward to ${formatTime(target)}, fast to normal.`);
+  setStatus(`Skimming to ${formatTime(target)}, fast to normal.`);
   updateUI();
 }
 
@@ -248,13 +317,31 @@ function ordinaryPlayPause() {
     return;
   }
 
-  if (state.playerState === 1) {
+  if (state.repeat) {
+    stopRepeat("Repeat stopped.", true);
+    updateUI();
+    return;
+  }
+
+  if (state.playStart !== null) {
+    finishOrdinaryPlayback();
+    setStatus("Paused. Repeat is ready for the passage just played.");
+  } else if (state.playerState === 1) {
     player.pauseVideo();
+    player.setPlaybackRate(1);
+    setStatus("Paused.");
   } else {
-    state.split = null;
-    state.splitMode = false;
+    const frame = currentFrame();
+    const current = clamp(safeCurrentTime(), frame.L, frame.R);
+    if (Math.abs(current - safeCurrentTime()) > EPSILON) {
+      player.seekTo(frame.C, true);
+      state.playStart = frame.C;
+    } else {
+      state.playStart = current;
+    }
     player.setPlaybackRate(1);
     player.playVideo();
+    setStatus("Playing at 1×.");
   }
 
   updateUI();
@@ -263,6 +350,7 @@ function ordinaryPlayPause() {
 function goToDepth(depth) {
   if (!Number.isInteger(depth) || depth < 0 || depth >= state.stack.length || state.traversal) return;
 
+  prepareForNavigation();
   state.stack = state.stack.slice(0, depth + 1);
   state.split = null;
   state.splitMode = false;
@@ -272,7 +360,7 @@ function goToDepth(depth) {
   player.setPlaybackRate(1);
   player.seekTo(frame.C, true);
 
-  setStatus(`Restored depth ${depth}.`);
+  setStatus(`Undid movement to level ${depth}.`);
   updateUI();
 }
 
@@ -290,32 +378,52 @@ function handleTimelineClick(event) {
   const frame = currentFrame();
 
   if (state.splitMode) {
-    if (time <= frame.L + EPSILON || time >= frame.R - EPSILON || Math.abs(time - frame.C) <= EPSILON) {
-      setStatus("Place the split inside the current recursive interval and away from the playhead.", true);
+    if (
+      time <= state.scope.start + EPSILON
+      || time >= state.scope.end - EPSILON
+      || Math.abs(time - frame.C) <= EPSILON
+    ) {
+      setStatus("Place the split inside the range and away from the current point.", true);
       return;
     }
 
     state.split = time;
     state.splitMode = false;
-    setDirection(time < frame.C ? "earlier" : "later");
     setStatus(`Split placed at ${formatTime(time)}.`);
     updateUI();
     return;
   }
 
   if (time < state.scope.start || time > state.scope.end) {
-    setStatus("That position is outside the active scope.", true);
+      setStatus("That position is outside the range.", true);
     return;
   }
 
+  prepareForNavigation();
+  const active = currentFrame();
+  if (Math.abs(time - active.C) <= EPSILON) {
+    player.seekTo(active.C, true);
+    return;
+  }
+
+  const direction = time < active.C ? "earlier" : "later";
+  state.stack.push(descend(active, direction, time, state.scope));
+  state.lastPassage = {
+    start: Math.min(active.C, time),
+    end: Math.max(active.C, time)
+  };
+  state.split = null;
+  state.splitMode = false;
   player.pauseVideo();
   player.setPlaybackRate(1);
-  resetRootAt(time);
-  setStatus(`Search origin moved to ${formatTime(time)}.`);
+  player.seekTo(time, true);
+  setStatus(`Moved directly to ${formatTime(time)}.`);
+  updateUI();
 }
 
 function beginScopeDrag(kind, event) {
   if (!state.videoLoaded || state.traversal) return;
+  prepareForNavigation();
   event.preventDefault();
   event.stopPropagation();
   state.dragHandle = kind;
@@ -345,6 +453,7 @@ function updateScopeDrag(event) {
   const C = clamp(current, state.scope.start, state.scope.end);
   state.stack = [createRoot(state.scope.start, C, state.scope.end)];
   state.split = null;
+  state.lastPassage = null;
   updateUI();
 }
 
@@ -356,7 +465,8 @@ function finishScopeDrag() {
   player.pauseVideo();
   player.seekTo(C, true);
   state.stack = [createRoot(state.scope.start, C, state.scope.end)];
-  setStatus(`Scope set to ${formatTime(state.scope.start)}–${formatTime(state.scope.end)}.`);
+  state.lastPassage = null;
+  setStatus(`Range set to ${formatTime(state.scope.start)}–${formatTime(state.scope.end)}.`);
   updateUI();
 }
 
@@ -411,7 +521,7 @@ function persistSavedRegions() {
   try {
     localStorage.setItem(storageKey(), JSON.stringify(state.savedRegions));
   } catch (error) {
-    setStatus("The browser could not save this region locally.", true);
+    setStatus("The browser could not save this passage locally.", true);
   }
 }
 
@@ -419,7 +529,7 @@ function saveCurrentInterval() {
   if (!state.videoLoaded) return;
 
   const frame = currentFrame();
-  const label = elements["region-label"].value.trim() || `Region ${state.savedRegions.length + 1}`;
+  const label = elements["region-label"].value.trim() || `Passage ${state.savedRegions.length + 1}`;
 
   const region = {
     id: crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -465,8 +575,8 @@ function renderSavedRegions() {
     const empty = document.createElement("p");
     empty.className = "empty-state";
     empty.textContent = state.videoLoaded
-      ? "No saved regions for this video."
-      : "Load a video to see its saved regions.";
+      ? "No saved passages for this video."
+      : "Load a video to see its saved passages.";
     elements["saved-regions"].appendChild(empty);
     return;
   }
@@ -537,10 +647,10 @@ function updateUI() {
   const loaded = state.videoLoaded;
   const frame = currentFrame();
   const targets = frame ? activeTargets() : { earlier: null, later: null };
-  const current = state.traversal ? safeCurrentTime() : (loaded ? safeCurrentTime() : 0);
+  const current = loaded ? safeCurrentTime() : 0;
   const depth = Math.max(0, state.stack.length - 1);
-  const target = loaded ? selectedTarget() : null;
   const traversalActive = Boolean(state.traversal);
+  const repeatActive = Boolean(state.repeat);
 
   elements["current-time"].textContent = formatTime(current);
   elements["duration-time"].textContent = formatTime(state.duration);
@@ -551,8 +661,7 @@ function updateUI() {
 
   const basicControls = [
     "set-start", "set-end", "centre-scope", "full-video", "place-split",
-    "direction-earlier", "direction-later", "ordinary-play", "save-region",
-    "speed-select"
+    "ordinary-play", "save-region", "speed-select"
   ];
 
   for (const id of basicControls) {
@@ -560,23 +669,19 @@ function updateUI() {
   }
 
   elements["clear-split"].disabled = !loaded || state.split === null || traversalActive;
-  elements.jump.disabled = !loaded || traversalActive || target === null;
-  elements["search-play"].disabled =
-    !loaded || (traversalActive ? false : (state.direction !== "later" || target === null));
+  elements["go-earlier"].disabled = !loaded || traversalActive || targets.earlier === null;
+  elements["go-later"].disabled = !loaded || traversalActive || targets.later === null;
+  elements["repeat-passage"].disabled = !loaded || traversalActive || !state.lastPassage;
+  elements["search-play"].disabled = !loaded || (traversalActive ? false : targets.later === null);
   elements["up-level"].disabled = !loaded || traversalActive || depth === 0;
   elements["depth-select"].disabled = !loaded || traversalActive || depth === 0;
 
   elements["place-split"].classList.toggle("selected", state.splitMode);
-  elements["ordinary-play"].textContent = traversalActive
-    ? "Stop scan"
-    : (state.playerState === 1 ? "Pause" : "Play");
-
-  elements.jump.textContent = state.direction === "earlier" ? "Jump earlier" : "Jump later";
-  elements["search-play"].textContent = traversalActive ? "Stop scan" : "Play forward";
-
-  elements["direction-note"].textContent = state.direction === "earlier"
-    ? "Earlier traversal is jump-only within the YouTube IFrame API."
-    : "Forward playback slows through the rates available for this video until it reaches 1×.";
+  elements["ordinary-play"].textContent =
+    state.playStart !== null && !traversalActive && !repeatActive ? "Pause" : "Play 1×";
+  elements["search-play"].textContent = traversalActive ? "Stop skimming" : "Skim →";
+  elements["repeat-passage"].textContent =
+    repeatActive ? "Stop repeating" : "Repeat last passage";
 
   populateDepthOptions();
 
@@ -587,9 +692,9 @@ function updateUI() {
       "current-marker", "split-marker"
     ].forEach(id => elements[id].hidden = true);
 
-    elements["scope-label"].textContent = "Scope —";
-    elements["frame-label"].textContent = "Interval —";
-    elements["target-label"].textContent = "Target —";
+    elements["scope-label"].textContent = "Range —";
+    elements["frame-label"].textContent = "Passage —";
+    elements["target-label"].textContent = "Back — · Forward —";
     return;
   }
 
@@ -606,8 +711,10 @@ function updateUI() {
   setMarkerPosition(elements["frame-right-marker"], frame.R);
   setMarkerPosition(elements["current-marker"], current);
 
-  elements["earlier-target-marker"].hidden = targets.earlier === null;
-  elements["later-target-marker"].hidden = targets.later === null;
+  const customEarlier = state.split !== null && state.split < frame.C;
+  const customLater = state.split !== null && state.split > frame.C;
+  elements["earlier-target-marker"].hidden = targets.earlier === null || customEarlier;
+  elements["later-target-marker"].hidden = targets.later === null || customLater;
   if (targets.earlier !== null) setMarkerPosition(elements["earlier-target-marker"], targets.earlier);
   if (targets.later !== null) setMarkerPosition(elements["later-target-marker"], targets.later);
 
@@ -615,11 +722,11 @@ function updateUI() {
   if (state.split !== null) setMarkerPosition(elements["split-marker"], state.split);
 
   elements["scope-label"].textContent =
-    `Scope ${formatTime(state.scope.start)}–${formatTime(state.scope.end)}`;
+    `Range ${formatTime(state.scope.start)}–${formatTime(state.scope.end)}`;
   elements["frame-label"].textContent =
-    `Interval ${formatTime(frame.L)}–${formatTime(frame.R)}`;
+    `Passage ${formatTime(frame.L)}–${formatTime(frame.R)}`;
   elements["target-label"].textContent =
-    `${state.direction === "earlier" ? "Earlier" : "Later"} target ${formatTime(target)}`;
+    `Back ${formatTime(targets.earlier)} · Forward ${formatTime(targets.later)}`;
 
   elements["scope-start-handle"].setAttribute("aria-valuenow", String(state.scope.start));
   elements["scope-end-handle"].setAttribute("aria-valuenow", String(state.scope.end));
@@ -646,8 +753,11 @@ function initializeVideo() {
   state.stack = [createRoot(0, requestedStart, duration)];
   state.split = null;
   state.splitMode = false;
-  state.direction = "earlier";
-    state.availableRates = player.getAvailablePlaybackRates?.() || [1];
+  state.traversal = null;
+  state.repeat = null;
+  state.playStart = null;
+  state.lastPassage = null;
+  state.availableRates = player.getAvailablePlaybackRates?.() || [1];
 
   player.pauseVideo();
   player.seekTo(requestedStart, true);
@@ -655,7 +765,6 @@ function initializeVideo() {
   loadSavedRegions();
   populateSpeedOptions();
   renderSavedRegions();
-  setDirection("earlier");
   setStatus(`Loaded ${formatTime(duration)} video.`);
   updateUI();
 }
@@ -663,8 +772,17 @@ function initializeVideo() {
 function cuePendingVideo() {
   if (!state.playerReady || !pendingLoad) return;
 
+  stopTraversal(false);
+  stopRepeat();
+  finishOrdinaryPlayback(false);
   state.videoLoaded = false;
   state.stack = [];
+  state.traversal = null;
+  state.repeat = null;
+  state.playStart = null;
+  state.lastPassage = null;
+  state.split = null;
+  state.splitMode = false;
   state.savedRegions = [];
   renderSavedRegions();
   updateUI();
@@ -689,11 +807,26 @@ function handlePlayerStateChange(event) {
     return;
   }
 
-  if (event.data === 2 && state.videoLoaded && !state.traversal && !state.internalPause) {
-    const now = clamp(safeCurrentTime(), state.scope.start, state.scope.end);
-    if (Math.abs(now - currentFrame().C) > EPSILON) {
-      resetRootAt(now, false);
+  if (event.data === 1 && state.videoLoaded && !state.traversal && !state.repeat && state.playStart === null) {
+    const frame = currentFrame();
+    const current = safeCurrentTime();
+    if (current < frame.L - EPSILON || current > frame.R + EPSILON) {
+      player.seekTo(frame.C, true);
+      state.playStart = frame.C;
+    } else {
+      state.playStart = current;
     }
+  }
+
+  if (event.data === 2 && state.videoLoaded && state.repeat) {
+    state.repeat = null;
+    player.seekTo(currentFrame().C, true);
+    setStatus("Repeat stopped.");
+  } else if (event.data === 2 && state.videoLoaded && state.playStart !== null) {
+    finishOrdinaryPlayback(false);
+    setStatus("Paused. Repeat is ready for the passage just played.");
+  } else if (event.data === 0 && state.videoLoaded && state.playStart !== null) {
+    finishOrdinaryPlayback(false);
   }
 
   updateUI();
@@ -736,17 +869,23 @@ function pollPlayer() {
       finishTraversal();
       return;
     }
-  } else if (state.playerState === 1) {
-    if (now < state.scope.start - EPSILON) {
-      player.seekTo(state.scope.start, true);
-    } else if (now >= state.scope.end - EPSILON) {
-      player.seekTo(state.scope.start, true);
-      resetRootAt(state.scope.start, false);
+  } else if (state.repeat) {
+    if (now < state.repeat.start - EPSILON || now >= state.repeat.end - EPSILON) {
+      player.seekTo(state.repeat.start, true);
+      player.setPlaybackRate(1);
+      player.playVideo();
+    }
+  } else if (state.playStart !== null && state.playerState === 1) {
+    const frame = currentFrame();
+    if (now < frame.L - EPSILON) {
+      player.seekTo(frame.L, true);
+    } else if (now >= frame.R - EPSILON) {
+      finishOrdinaryPlayback();
+      setStatus("Reached the end of the current passage.");
     }
   } else if (now < state.scope.start - EPSILON || now > state.scope.end + EPSILON) {
     const clamped = clamp(now, state.scope.start, state.scope.end);
     player.seekTo(clamped, true);
-    resetRootAt(clamped, false);
   }
 
   updateUI();
@@ -831,26 +970,27 @@ for (const [id, kind] of [
 elements["set-start"].addEventListener("click", () => {
   const current = safeCurrentTime();
   if (current >= state.scope.end - MIN_SCOPE_SECONDS) {
-    setStatus("Move the playhead earlier than the scope end.", true);
+    setStatus("Move the playhead earlier than the range end.", true);
     return;
   }
-  setScope(current, state.scope.end, current, `Scope start set to ${formatTime(current)}.`);
+  setScope(current, state.scope.end, current, `Range starts at ${formatTime(current)}.`);
 });
 
 elements["set-end"].addEventListener("click", () => {
   const current = safeCurrentTime();
   if (current <= state.scope.start + MIN_SCOPE_SECONDS) {
-    setStatus("Move the playhead later than the scope start.", true);
+    setStatus("Move the playhead later than the range start.", true);
     return;
   }
-  setScope(state.scope.start, current, current, `Scope end set to ${formatTime(current)}.`);
+  setScope(state.scope.start, current, current, `Range ends at ${formatTime(current)}.`);
 });
 
 elements["centre-scope"].addEventListener("click", () => {
+  prepareForNavigation();
   const middle = intervalMidpoint(state.scope.start, state.scope.end);
   player.pauseVideo();
   resetRootAt(middle);
-  setStatus(`Centred at ${formatTime(middle)}.`);
+  setStatus(`Moved to the middle at ${formatTime(middle)}.`);
 });
 
 elements["full-video"].addEventListener("click", () => {
@@ -859,25 +999,26 @@ elements["full-video"].addEventListener("click", () => {
 });
 
 elements["place-split"].addEventListener("click", () => {
+  prepareForNavigation();
   state.splitMode = !state.splitMode;
   setStatus(
     state.splitMode
-      ? "Click inside the current interval to place the next split."
+      ? "Click anywhere inside the range to place the next split."
       : "Split placement cancelled."
   );
   updateUI();
 });
 
 elements["clear-split"].addEventListener("click", () => {
+  prepareForNavigation();
   state.split = null;
   state.splitMode = false;
-  setStatus("Split cleared; automatic midpoint restored.");
+  setStatus("Split cleared; automatic points restored.");
   updateUI();
 });
 
-elements["direction-earlier"].addEventListener("click", () => setDirection("earlier"));
-elements["direction-later"].addEventListener("click", () => setDirection("later"));
-elements.jump.addEventListener("click", jumpSelected);
+elements["go-earlier"].addEventListener("click", () => go("earlier"));
+elements["go-later"].addEventListener("click", () => go("later"));
 
 elements["search-play"].addEventListener("click", () => {
   if (state.traversal) stopTraversal(true);
@@ -885,6 +1026,7 @@ elements["search-play"].addEventListener("click", () => {
 });
 
 elements["ordinary-play"].addEventListener("click", ordinaryPlayPause);
+elements["repeat-passage"].addEventListener("click", startRepeat);
 
 elements["up-level"].addEventListener("click", () => {
   const depth = state.stack.length - 1;
@@ -918,15 +1060,12 @@ document.addEventListener("keydown", event => {
 
   if (event.key === "ArrowLeft") {
     event.preventDefault();
-    setDirection("earlier");
-    jumpSelected();
+    go("earlier");
   } else if (event.key === "ArrowRight" && !event.shiftKey) {
     event.preventDefault();
-    setDirection("later");
-    jumpSelected();
+    go("later");
   } else if (event.key === "ArrowRight" && event.shiftKey) {
     event.preventDefault();
-    setDirection("later");
     startForwardTraversal();
   } else if (event.key === "Backspace") {
     event.preventDefault();
@@ -939,11 +1078,14 @@ document.addEventListener("keydown", event => {
   } else if (event.key === "Escape") {
     state.split = null;
     state.splitMode = false;
-    setStatus("Split cancelled.");
+    setStatus("Split cleared.");
     updateUI();
   } else if (event.key === " ") {
     event.preventDefault();
     ordinaryPlayPause();
+  } else if (event.key.toLowerCase() === "r") {
+    event.preventDefault();
+    startRepeat();
   }
 });
 

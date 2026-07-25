@@ -19,13 +19,15 @@ export function assertFrame(frame) {
   return frame;
 }
 
-export function getTargets(frame, split = null) {
+export function getTargets(frame, split = null, scope = null) {
   assertFrame(frame);
 
   let earlier = frame.L < frame.C - EPSILON ? (frame.L + frame.C) / 2 : null;
   let later = frame.C < frame.R - EPSILON ? (frame.C + frame.R) / 2 : null;
 
-  if (Number.isFinite(split) && split > frame.L + EPSILON && split < frame.R - EPSILON) {
+  const splitStart = scope?.start ?? frame.L;
+  const splitEnd = scope?.end ?? frame.R;
+  if (Number.isFinite(split) && split > splitStart + EPSILON && split < splitEnd - EPSILON) {
     if (split < frame.C - EPSILON) earlier = split;
     if (split > frame.C + EPSILON) later = split;
   }
@@ -33,7 +35,7 @@ export function getTargets(frame, split = null) {
   return { earlier, later };
 }
 
-export function descend(frame, direction, target) {
+export function descend(frame, direction, target, scope = null) {
   assertFrame(frame);
 
   if (!Number.isFinite(target)) {
@@ -41,17 +43,27 @@ export function descend(frame, direction, target) {
   }
 
   if (direction === "earlier") {
-    if (!(target >= frame.L && target < frame.C)) {
-      throw new RangeError("Earlier target must be inside [L, C).");
+    const minimum = scope?.start ?? frame.L;
+    if (!(target >= minimum && target < frame.C)) {
+      throw new RangeError("Earlier target must be before C and inside the active scope.");
     }
-    return assertFrame({ L: frame.L, C: target, R: frame.C });
+    return assertFrame({
+      L: target < frame.L ? minimum : frame.L,
+      C: target,
+      R: frame.C
+    });
   }
 
   if (direction === "later") {
-    if (!(target > frame.C && target <= frame.R)) {
-      throw new RangeError("Later target must be inside (C, R].");
+    const maximum = scope?.end ?? frame.R;
+    if (!(target > frame.C && target <= maximum)) {
+      throw new RangeError("Later target must be after C and inside the active scope.");
     }
-    return assertFrame({ L: frame.C, C: target, R: frame.R });
+    return assertFrame({
+      L: frame.C,
+      C: target,
+      R: target > frame.R ? maximum : frame.R
+    });
   }
 
   throw new TypeError(`Unknown direction: ${direction}`);
@@ -59,6 +71,22 @@ export function descend(frame, direction, target) {
 
 export function intervalMidpoint(start, end) {
   return start + (end - start) / 2;
+}
+
+export function settlePlayback(frame, departure, current) {
+  assertFrame(frame);
+  if (!Number.isFinite(departure) || !Number.isFinite(current)) {
+    throw new TypeError("Playback positions must be finite numbers.");
+  }
+
+  const start = clamp(departure, frame.L, frame.R);
+  const C = clamp(current, frame.L, frame.R);
+  const next = { ...frame, C };
+
+  if (C > start + EPSILON) next.L = Math.max(frame.L, start);
+  if (C < start - EPSILON) next.R = Math.min(frame.R, start);
+
+  return assertFrame(next);
 }
 
 export function logSpeed(maxRate, progress) {

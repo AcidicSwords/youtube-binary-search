@@ -15,7 +15,7 @@
     <header class="load-bar">
       <div>
         <h1>Binary YouTube Reader</h1>
-        <p>Bound a passage, split it, then move through it recursively.</p>
+        <p>Move through long videos like a guide: jump, skim, repeat, and narrow.</p>
       </div>
       <div class="url-row">
         <label class="sr-only" for="youtube-url">YouTube URL</label>
@@ -48,9 +48,9 @@
             </div>
 
             <button id="scope-start-handle" class="marker scope-handle" type="button"
-              role="slider" aria-label="Scope start" aria-valuemin="0" aria-valuenow="0"></button>
+              role="slider" aria-label="Range start" aria-valuemin="0" aria-valuenow="0"></button>
             <button id="scope-end-handle" class="marker scope-handle" type="button"
-              role="slider" aria-label="Scope end" aria-valuemin="0" aria-valuenow="0"></button>
+              role="slider" aria-label="Range end" aria-valuemin="0" aria-valuenow="0"></button>
 
             <span id="frame-left-marker" class="marker frame-marker" aria-hidden="true"></span>
             <span id="frame-right-marker" class="marker frame-marker" aria-hidden="true"></span>
@@ -61,66 +61,46 @@
           </div>
 
           <div class="timeline-labels">
-            <span id="scope-label">Scope —</span>
-            <span id="frame-label">Interval —</span>
-            <span id="target-label">Target —</span>
+            <span id="scope-label">Range —</span>
+            <span id="frame-label">Passage —</span>
+            <span id="target-label">Back — · Forward —</span>
+          </div>
+          <div class="transport-bar" aria-label="Video navigation">
+            <button id="go-earlier" class="primary" type="button" disabled>← Back</button>
+            <button id="go-later" class="primary" type="button" disabled>Forward →</button>
+            <button id="search-play" type="button" disabled>Skim →</button>
+            <button id="ordinary-play" type="button" disabled>Play 1×</button>
+            <button id="repeat-passage" type="button" disabled>Repeat</button>
+            <button id="up-level" type="button" disabled>Undo</button>
           </div>
           <p class="microcopy">
-            Click to seek. Activate <strong>Place split</strong>, then click to replace the next midpoint.
-            Drag the two blue scope handles to place the outer bounds.
+            Click to move directly. Place a split anywhere in the blue range to replace the next
+            automatic point on that side. Every move can be undone.
           </p>
         </section>
 
         <section class="panel controls-panel" aria-label="Control panel">
-          <div class="rhythm" aria-label="Workflow">
-            <span><b>1</b> Bound</span>
-            <span><b>2</b> Split</span>
-            <span><b>3</b> Traverse</span>
-            <span><b>4</b> Up or save</span>
-          </div>
-
           <div class="control-section">
-            <h2>Region</h2>
+            <h2>Range</h2>
             <div class="button-row">
-              <button id="set-start" type="button" disabled>Start at playhead</button>
-              <button id="set-end" type="button" disabled>End at playhead</button>
-              <button id="centre-scope" type="button" disabled>Centre</button>
-              <button id="full-video" type="button" disabled>Full video</button>
+              <button id="set-start" type="button" disabled>Set range start</button>
+              <button id="set-end" type="button" disabled>Set range end</button>
+              <button id="centre-scope" type="button" disabled>Start in middle</button>
+              <button id="full-video" type="button" disabled>Use full video</button>
             </div>
           </div>
 
-          <div class="control-section">
-            <h2>Split</h2>
-            <div class="button-row">
-              <button id="place-split" type="button" disabled>Place split</button>
-              <button id="clear-split" type="button" disabled>Clear</button>
-            </div>
-          </div>
-
-          <div class="control-section traverse-grid">
+          <div class="control-section setup-grid">
             <div>
-              <h2>Direction</h2>
-              <div class="segmented" role="group" aria-label="Traversal direction">
-                <button id="direction-earlier" type="button" class="selected" disabled>Earlier</button>
-                <button id="direction-later" type="button" disabled>Later</button>
+              <h2>Split</h2>
+              <div class="button-row">
+                <button id="place-split" type="button" disabled>Place split</button>
+                <button id="clear-split" type="button" disabled>Clear split</button>
               </div>
             </div>
-
             <div>
-              <h2>Action</h2>
+              <h2>History</h2>
               <div class="button-row">
-                <button id="jump" class="primary" type="button" disabled>Jump</button>
-                <button id="search-play" type="button" disabled>Play forward</button>
-                <button id="ordinary-play" type="button" disabled>Play</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="control-section depth-row">
-            <div>
-              <h2>Depth</h2>
-              <div class="button-row">
-                <button id="up-level" type="button" disabled>Up one level</button>
                 <label class="inline-label" for="depth-select">Level</label>
                 <select id="depth-select" disabled>
                   <option value="0">0</option>
@@ -138,21 +118,21 @@
 
           <div class="state-strip">
             <span><small>Current</small><strong id="current-stat">—</strong></span>
-            <span><small>Earlier</small><strong id="earlier-stat">—</strong></span>
-            <span><small>Later</small><strong id="later-stat">—</strong></span>
-            <span><small>Depth</small><strong id="depth-stat">0</strong></span>
+            <span><small>Back</small><strong id="earlier-stat">—</strong></span>
+            <span><small>Forward</small><strong id="later-stat">—</strong></span>
+            <span><small>Level</small><strong id="depth-stat">0</strong></span>
           </div>
 
-          <p id="direction-note" class="microcopy">
-            Earlier traversal is jump-only. Later traversal can jump or play fast-to-normal.
+          <p class="microcopy">
+            Repeat loops the last jump, skim, or played span. Undo returns to the previous passage.
           </p>
         </section>
       </section>
 
-      <aside class="panel saved-panel" aria-label="Saved regions">
+      <aside class="panel saved-panel" aria-label="Saved passages">
         <div class="saved-heading">
           <div>
-            <h2>Saved regions</h2>
+            <h2>Saved passages</h2>
             <p>Saved per YouTube video.</p>
           </div>
           <span id="saved-count" class="count">0</span>
@@ -161,14 +141,14 @@
         <label for="region-label">Label</label>
         <div class="save-row">
           <input id="region-label" type="text" maxlength="80" placeholder="e.g. Compressor setup">
-          <button id="save-region" class="primary" type="button" disabled>Save interval</button>
+          <button id="save-region" class="primary" type="button" disabled>Save passage</button>
         </div>
         <p class="microcopy">
-          Saves the current recursive interval. Loading it makes that interval the new scope and starts in its middle.
+          Saves the current passage. Loading it makes that passage the new range.
         </p>
 
         <div id="saved-regions" class="saved-list">
-          <p class="empty-state">No saved regions for this video.</p>
+          <p class="empty-state">No saved passages for this video.</p>
         </div>
       </aside>
     </div>

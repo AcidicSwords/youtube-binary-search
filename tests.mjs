@@ -4,6 +4,7 @@ import {
   getTargets,
   descend,
   intervalMidpoint,
+  settlePlayback,
   logSpeed,
   chooseSupportedRate
 } from "./traversal.js";
@@ -20,6 +21,26 @@ const custom = { L: 90, C: 150, R: 180 };
 assert.deepEqual(getTargets(custom, 120), { earlier: 120, later: 165 });
 assert.deepEqual(descend(custom, "earlier", 120), { L: 90, C: 120, R: 150 });
 assert.deepEqual(getTargets({ L: 90, C: 120, R: 150 }), { earlier: 105, later: 135 });
+assert.deepEqual(
+  getTargets({ L: 90, C: 120, R: 150 }, 40, { start: 0, end: 180 }),
+  { earlier: 40, later: 135 }
+);
+assert.deepEqual(
+  descend({ L: 90, C: 120, R: 150 }, "earlier", 40, { start: 0, end: 180 }),
+  { L: 0, C: 40, R: 120 }
+);
+assert.deepEqual(
+  descend({ L: 30, C: 60, R: 90 }, "later", 150, { start: 0, end: 180 }),
+  { L: 60, C: 150, R: 180 }
+);
+assert.deepEqual(
+  settlePlayback({ L: 0, C: 300, R: 600 }, 300, 350),
+  { L: 300, C: 350, R: 600 }
+);
+assert.deepEqual(
+  getTargets(settlePlayback({ L: 0, C: 300, R: 600 }, 300, 350)),
+  { earlier: 325, later: 475 }
+);
 
 assert.equal(intervalMidpoint(120, 180), 150);
 assert.equal(logSpeed(8, 0), 8);
@@ -46,4 +67,4 @@ assert.deepEqual(
 assert.equal(parseYouTubeUrl("https://notyoutube.com/watch?v=dQw4w9WgXcQ"), null);
 assert.equal(parseYouTubeUrl("javascript:alert(1)"), null);
 
-console.log("All traversal tests passed.");
+console.log("All logic tests passed.");

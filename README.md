@@ -4,19 +4,17 @@ A lightweight static web implementation of recursive binary traversal for YouTub
 
 The intended rhythm is:
 
-1. Define an outer region.
-2. Place an optional split point.
-3. Choose a direction.
-4. Jump, or play forward fast-to-normal.
-5. Move up a recursion level when more context is needed.
-6. Save a useful interval and label it.
+1. Set a range.
+2. Move earlier or later with one action.
+3. Skim forward fast-to-normal, or repeat the passage just traversed.
+4. Undo the last move when more context is needed.
+5. Save and label a useful passage.
 
 ## Run locally
 
 The project must be served over HTTP or HTTPS so the YouTube embedded player receives a referrer.
 
 ```bash
-cd youtube-binary-reader
 python -m http.server 8080
 ```
 
@@ -30,14 +28,14 @@ No build step or API key is required.
 
 ## Deploy to GitHub Pages
 
-The repository includes `.github/workflows/deploy-pages.yml`. Every push to `main` checks the
-JavaScript, runs the tests, and deploys this folder through GitHub Pages.
+The repository includes `.github/workflows/deploy-pages.yml`. Every push to `main` or `master`
+checks the JavaScript, runs the tests, and deploys the repository through GitHub Pages.
 
 After pushing the repository to GitHub, open **Settings → Pages** and set **Source** to
-**GitHub Actions**. The next push to `main`, or a manual run from the Actions tab, publishes
-the site over HTTPS.
+**GitHub Actions**. The next push to the default branch, or a manual run from the Actions tab,
+publishes the site over HTTPS.
 
-No YouTube API key, backend, secrets, or build output are required. Saved regions use browser
+No YouTube API key, backend, secrets, or build output are required. Saved passages use browser
 local storage, so they remain private to each browser and do not automatically synchronize
 between devices.
 
@@ -45,30 +43,28 @@ between devices.
 
 - YouTube URL parsing for watch, youtu.be, Shorts, live, and embed links
 - Native embedded YouTube player with normal controls
-- Two draggable outer-scope handles
-- Set scope start/end at the playhead
-- Centre playhead in scope
-- Current recursive interval and depth stack
-- Temporary split point placed by clicking the custom timeline
-- Earlier jump
-- Later jump
-- Forward fast-to-normal playback
-- Up one level and direct ancestor-depth selection
-- Scope looping
-- Saved labelled intervals stored locally per YouTube video
-- Clicking a saved interval loads it as the new scope and starts at its midpoint
+- Two draggable study-range handles
+- Direct one-press earlier and later movement
+- Forward fast-to-normal skimming
+- Normal-speed playback that advances the current place when paused
+- One-button repetition of the last jump, skim, or played passage
+- Split placement anywhere inside the range
+- Undoable moves and direct history-level selection
+- Saved labelled passages stored locally per YouTube video
+- Clicking a saved passage loads it as the new range and starts at its midpoint
 - Keyboard shortcuts
 
 ## Keyboard
 
-- Left Arrow: jump earlier
-- Right Arrow: jump later
-- Shift + Right Arrow: play forward to the later target
-- Backspace: up one level
-- Shift + Backspace: return to depth zero
+- Left Arrow: go earlier
+- Right Arrow: go later
+- Shift + Right Arrow: skim to the later point
+- Backspace: undo the last move
+- Shift + Backspace: return to level zero
 - S: place split mode
-- Space: play/pause
-- Escape: clear split
+- Space: play/pause at 1×
+- R: repeat the last passage
+- Escape: clear the split
 
 ## API-constrained behaviour
 
