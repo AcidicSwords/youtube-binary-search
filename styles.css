@@ -404,6 +404,26 @@ p { color: var(--muted); }
   white-space: nowrap;
 }
 
+.hotkey-label {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 5px;
+  align-items: center;
+}
+
+.hotkey-label kbd {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+  font: 700 0.68rem/1 system-ui, sans-serif;
+  opacity: 0.72;
+}
+
 .action-meta {
   color: var(--muted);
   font-size: 0.72rem;
@@ -564,6 +584,11 @@ p { color: var(--muted); }
 
   .resolution-actions {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .resolution-actions .hotkey-label {
+    flex-direction: column;
+    gap: 3px;
   }
 
   .family-heading {

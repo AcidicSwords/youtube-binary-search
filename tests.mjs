@@ -4,8 +4,7 @@ import {
   getTargets,
   descend,
   intervalMidpoint,
-  widenAtCurrent,
-  widenStackAtCurrent,
+  widenToRange,
   pointAfterUndo,
   getActionRanges,
   settlePlayback,
@@ -54,93 +53,18 @@ assert.deepEqual(
   { earlier: 325, later: 475 }
 );
 assert.deepEqual(
-  widenAtCurrent(
-    { L: 0, C: 90, R: 180 },
-    135
-  ),
+  widenToRange(135, { start: 0, end: 180 }),
   { L: 0, C: 135, R: 180 }
 );
-assert.deepEqual(getTargets(widenAtCurrent({ L: 0, C: 90, R: 180 }, 135)), {
+assert.deepEqual(getTargets(widenToRange(135, { start: 0, end: 180 })), {
   earlier: 67.5,
   later: 157.5
 });
-assert.throws(
-  () => widenAtCurrent({ L: 0, C: 90, R: 180 }, 181),
-  /inside the widened passage/
-);
 assert.deepEqual(
-  widenStackAtCurrent(
-    [
-      { L: 0, C: 90, R: 180 },
-      { L: 0, C: 45, R: 90 },
-      { L: 0, C: 22.5, R: 45 }
-    ],
-    50,
-    { start: 0, end: 180 }
-  ),
-  {
-    stack: [
-      { L: 0, C: 90, R: 180 },
-      { L: 0, C: 50, R: 90 }
-    ],
-    levels: 1
-  }
+  widenToRange(240, { start: 60, end: 180 }),
+  { L: 60, C: 180, R: 180 }
 );
-assert.deepEqual(
-  widenStackAtCurrent(
-    [
-      { L: 0, C: 90, R: 180 },
-      { L: 90, C: 135, R: 180 },
-      { L: 135, C: 150, R: 180, returnPoint: 150 }
-    ],
-    130,
-    { start: 0, end: 180 }
-  ),
-  {
-    stack: [
-      { L: 0, C: 90, R: 180 },
-      { L: 90, C: 130, R: 180, returnPoint: 150 }
-    ],
-    levels: 1
-  }
-);
-assert.deepEqual(
-  widenStackAtCurrent(
-    [
-      { L: 0, C: 90, R: 180 },
-      { L: 0, C: 45, R: 90 },
-      { L: 0, C: 22.5, R: 45 }
-    ],
-    100,
-    { start: 0, end: 180 }
-  ),
-  {
-    stack: [{ L: 0, C: 100, R: 180 }],
-    levels: 2
-  }
-);
-assert.deepEqual(
-  widenStackAtCurrent(
-    [{ L: 60, C: 90, R: 180 }],
-    50,
-    { start: 0, end: 180 }
-  ),
-  {
-    stack: [{ L: 0, C: 50, R: 180 }],
-    levels: 1
-  }
-);
-assert.deepEqual(
-  widenStackAtCurrent(
-    [{ L: 0, C: 22.5, R: 45 }],
-    30,
-    { start: 0, end: 180 }
-  ),
-  {
-    stack: [{ L: 0, C: 22.5, R: 45 }],
-    levels: 0
-  }
-);
+assert.throws(() => widenToRange(90, null), /outer Range/);
 
 const actionRanges = getActionRanges(
   { L: 60, C: 120, R: 180 },
@@ -160,10 +84,10 @@ assert.deepEqual(actionRanges.undo, {
 });
 assert.deepEqual(actionRanges.widen, {
   start: 0,
-  end: 180,
+  end: 240,
   current: 120,
   earlier: 60,
-  later: 150
+  later: 180
 });
 assert.deepEqual(actionRanges.skim, { start: 120, end: 150 });
 assert.deepEqual(actionRanges.repeat, { start: 60, end: 120 });
@@ -239,6 +163,28 @@ assert.deepEqual(
     30
   ).earlier,
   { start: 0, end: 120 }
+);
+assert.equal(
+  getActionRanges(
+    { L: 0, C: 90, R: 180 },
+    { start: 0, end: 180 }
+  ).widen,
+  null
+);
+assert.deepEqual(
+  getActionRanges(
+    { L: 135, C: 157.5, R: 180 },
+    { start: 0, end: 180 },
+    null,
+    { L: 90, C: 135, R: 180 }
+  ).widen,
+  {
+    start: 0,
+    end: 180,
+    current: 157.5,
+    earlier: 78.75,
+    later: 168.75
+  }
 );
 
 const pointHistory = [

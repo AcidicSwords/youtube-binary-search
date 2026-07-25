@@ -5,8 +5,7 @@ import {
   getTargets,
   descend,
   intervalMidpoint,
-  widenAtCurrent,
-  widenStackAtCurrent,
+  widenToRange,
   pointAfterUndo,
   getActionRanges,
   settlePlayback,
@@ -258,10 +257,13 @@ function startRepeat() {
 }
 
 function refactorPassageForCurrent(current) {
-  const result = widenStackAtCurrent(state.stack, current, state.scope);
-  if (!result.levels) return false;
+  const frame = currentFrame();
+  if (
+    current >= frame.L - EPSILON
+    && current <= frame.R + EPSILON
+  ) return false;
 
-  state.stack = result.stack;
+  state.stack = [widenToRange(current, state.scope)];
   state.playWidened = true;
   return true;
 }
@@ -451,32 +453,21 @@ function undoToRoot() {
   if (state.stack.length > 1) restoreDepth(0);
 }
 
-function widenOneLevel() {
+function widenFully() {
   if (state.traversal) return;
 
   const initialFrame = currentFrame();
-  const initialParent = parentFrame();
-  const rootCanWiden = !initialParent
-    && (
-      initialFrame.L > state.scope.start + EPSILON
-      || initialFrame.R < state.scope.end - EPSILON
-    );
-  if (!initialParent && !rootCanWiden) return;
+  const canWiden = state.stack.length > 1
+    || initialFrame.L > state.scope.start + EPSILON
+    || initialFrame.R < state.scope.end - EPSILON;
+  if (!canWiden) return;
 
   prepareForNavigation();
   const frame = currentFrame();
   const current = frame.C;
-  const parent = parentFrame();
+  const widened = widenToRange(current, state.scope);
 
-  const base = parent || createRoot(state.scope.start, current, state.scope.end);
-  const widened = { ...base, ...widenAtCurrent(base, current) };
-  if (Number.isFinite(frame.returnPoint)) {
-    widened.returnPoint = frame.returnPoint;
-  }
-
-  state.stack = parent
-    ? [...state.stack.slice(0, -2), widened]
-    : [widened];
+  state.stack = [widened];
   state.playWidened = false;
 
   player.pauseVideo();
@@ -484,7 +475,7 @@ function widenOneLevel() {
   player.seekTo(widened.C, true);
 
   setStatus(
-    `Widened to ${formatTime(widened.L)}–${formatTime(widened.R)}; stayed at ${formatTime(widened.C)}.`
+    `Widened fully to ${formatTime(widened.L)}–${formatTime(widened.R)}; stayed at ${formatTime(widened.C)}.`
   );
   updateUI();
 }
@@ -1014,7 +1005,7 @@ function pollPlayer() {
     if (refactorPassageForCurrent(now)) {
       const widened = currentFrame();
       setStatus(
-        `Play Widened to ${formatTime(widened.L)}–${formatTime(widened.R)}`
+        `Play Widened fully to ${formatTime(widened.L)}–${formatTime(widened.R)}`
         + ` and kept ${formatTime(widened.C)}.`
       );
     }
@@ -1154,7 +1145,7 @@ elements["speed-select"].addEventListener("change", updateUI);
 
 elements["undo-move"].addEventListener("click", undoOneLevel);
 
-elements["widen-passage"].addEventListener("click", widenOneLevel);
+elements["widen-passage"].addEventListener("click", widenFully);
 
 for (const control of document.querySelectorAll("[data-preview-action]")) {
   const action = control.dataset.previewAction;
@@ -1185,7 +1176,22 @@ document.addEventListener("keydown", event => {
   if (["INPUT", "SELECT", "TEXTAREA"].includes(tag)) return;
   if (!state.videoLoaded) return;
 
-  if (event.key === "ArrowLeft") {
+  const key = event.key.toLowerCase();
+  const coreShortcut = !event.ctrlKey && !event.metaKey && !event.altKey;
+
+  if (coreShortcut && key === "q") {
+    event.preventDefault();
+    narrow("earlier");
+  } else if (coreShortcut && key === "w") {
+    event.preventDefault();
+    widenFully();
+  } else if (coreShortcut && key === "e") {
+    event.preventDefault();
+    narrow("later");
+  } else if (coreShortcut && key === "r") {
+    event.preventDefault();
+    undoOneLevel();
+  } else if (event.key === "ArrowLeft") {
     event.preventDefault();
     narrow("earlier");
   } else if (event.key === "ArrowRight" && !event.shiftKey) {
@@ -1197,7 +1203,7 @@ document.addEventListener("keydown", event => {
   } else if (event.key === "Backspace") {
     event.preventDefault();
     if (event.ctrlKey || event.metaKey) undoToRoot();
-    else if (event.shiftKey) widenOneLevel();
+    else if (event.shiftKey) widenFully();
     else undoOneLevel();
   } else if (event.key === "Escape") {
     state.point = null;
@@ -1206,9 +1212,6 @@ document.addEventListener("keydown", event => {
   } else if (event.key === " ") {
     event.preventDefault();
     ordinaryPlayPause();
-  } else if (event.key.toLowerCase() === "r") {
-    event.preventDefault();
-    startRepeat();
   }
 });
 

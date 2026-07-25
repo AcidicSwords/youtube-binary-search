@@ -77,65 +77,20 @@ export function intervalMidpoint(start, end) {
   return start + (end - start) / 2;
 }
 
-export function widenAtCurrent(parent, current) {
-  assertFrame(parent);
+export function widenToRange(current, scope) {
   if (!Number.isFinite(current)) {
     throw new TypeError("A finite current position is required.");
   }
-  if (current < parent.L - EPSILON || current > parent.R + EPSILON) {
-    throw new RangeError("The current position must be inside the widened passage.");
-  }
-
-  return assertFrame({
-    L: parent.L,
-    C: clamp(current, parent.L, parent.R),
-    R: parent.R
-  });
-}
-
-export function widenStackAtCurrent(stack, current, scope) {
-  if (!Array.isArray(stack) || !stack.length) {
-    throw new TypeError("A non-empty frame stack is required.");
-  }
-  stack.forEach(assertFrame);
-  if (!Number.isFinite(current)) {
-    throw new TypeError("A finite current position is required.");
-  }
-
-  const C = clamp(current, scope.start, scope.end);
-  const active = stack.at(-1);
-  if (C >= active.L - EPSILON && C <= active.R + EPSILON) {
-    return { stack: stack.map(frame => ({ ...frame })), levels: 0 };
-  }
-
-  let baseIndex = stack.length - 2;
-  while (
-    baseIndex >= 0
-    && (C < stack[baseIndex].L - EPSILON || C > stack[baseIndex].R + EPSILON)
+  if (
+    !scope
+    || !Number.isFinite(scope.start)
+    || !Number.isFinite(scope.end)
+    || scope.start > scope.end
   ) {
-    baseIndex -= 1;
+    throw new TypeError("A valid outer Range is required.");
   }
 
-  let widened;
-  if (baseIndex >= 0) {
-    const base = stack[baseIndex];
-    widened = { ...base, ...widenAtCurrent(base, C) };
-    const returnPoint = Number.isFinite(active.returnPoint)
-      ? active.returnPoint
-      : base.returnPoint;
-    if (Number.isFinite(returnPoint)) widened.returnPoint = returnPoint;
-  } else {
-    widened = createRoot(scope.start, C, scope.end);
-  }
-
-  const next = baseIndex >= 0
-    ? [...stack.slice(0, baseIndex), widened]
-    : [widened];
-
-  return {
-    stack: next,
-    levels: Math.max(1, stack.length - next.length)
-  };
+  return createRoot(scope.start, current, scope.end);
 }
 
 export function pointAfterUndo(stack, depth, currentPoint = null) {
@@ -170,16 +125,10 @@ export function getActionRanges(
     : descend(frame, "later", targets.later, scope);
 
   if (parent) assertFrame(parent);
-  const rootCanWiden = !parent
-    && (frame.L > scope.start + EPSILON || frame.R < scope.end - EPSILON);
-  const widenBase = parent || (
-    rootCanWiden
-      ? { L: scope.start, C: frame.C, R: scope.end }
-      : null
-  );
-  const widened = widenBase
-    ? widenAtCurrent(widenBase, clamp(current, widenBase.L, widenBase.R))
-    : null;
+  const canWiden = Boolean(parent)
+    || frame.L > scope.start + EPSILON
+    || frame.R < scope.end - EPSILON;
+  const widened = canWiden ? widenToRange(current, scope) : null;
   const undoPoint = parent
     ? pointAfterUndo([parent, frame], 0, point)
     : null;

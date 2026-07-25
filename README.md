@@ -7,7 +7,7 @@ The intended rhythm is:
 1. Set a range.
 2. Narrow Earlier or Narrow Later to increase resolution, or tap a precise Point.
 3. Skim fast-to-normal and continue at `1×`, or Repeat the passage just traversed.
-4. Undo to restore the prior place, or Widen to restore context without moving.
+4. Undo to restore the prior state, or Widen fully to the Range without moving.
 5. Save and label a useful passage.
 
 ## Run locally
@@ -45,15 +45,16 @@ between devices.
 - Native embedded YouTube player with normal controls
 - Two draggable study-range handles
 - One-press Narrow Earlier and Narrow Later operations
-- Widen as their inverse: decrease resolution while retaining the current place
+- Widen as their inverse: return directly to the lowest resolution while retaining the current
+  place
 - Fast-to-normal Skim playback that continues at `1×` after its destination
 - Normal-speed playback that automatically Widens at crossed passage boundaries
 - One-button repetition of the last jump, skim, or played passage
 - Timeline Point selection composed with an immediate Narrow Earlier or Narrow Later operation
 - Undo of a Point move restores that Point so it can be reused by Earlier, Later, or Skim
 - One-step Undo to the previous passage and place
-- One-step Widen to parent boundaries while keeping the current place
-- Undo restores the wider level's old playhead; Widen recomputes that level around the live one
+- One-step Widen from any recursion depth to the full Range while keeping the current place
+- Undo restores one prior level and its old playhead; Widen exits all levels around the live one
 - Visible destinations and affected ranges on every primary control
 - Timeline previews and separate non-overlapping marker lanes
 - Saved labelled passages stored locally per YouTube video
@@ -62,14 +63,17 @@ between devices.
 
 ## Keyboard
 
+- Q: Narrow Earlier
+- W: Widen
+- E: Narrow Later
+- R: Undo
 - Left Arrow: Narrow Earlier
 - Right Arrow: Narrow Later
 - Shift + Right Arrow: skim to the Later destination
 - Backspace: undo to the previous passage and place
-- Shift + Backspace: widen to parent boundaries while staying in place
+- Shift + Backspace: Widen fully to the Range while staying in place
 - Control/Command + Backspace: undo to the root passage
 - Space: play/pause at 1×
-- R: repeat the last passage
 - Escape: clear the selected Point
 
 ## API-constrained behaviour

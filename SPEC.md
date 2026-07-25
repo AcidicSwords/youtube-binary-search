@@ -38,8 +38,8 @@ is the current passage at the current resolution.
 
 - Editing the range starts a new root frame.
 - Play may cross the active passage, but remains inside the outer range.
-- Crossing a passage edge performs Widen at the current playhead. Repeated crossings consume
-  additional resolution levels; the outer range is the final boundary.
+- Crossing a passage edge performs Widen at the current playhead, immediately returning to the
+  outer Range.
 - Loading a saved passage makes it the new outer range.
 
 ## 4. Destinations and Point
@@ -74,8 +74,8 @@ There is no direction mode.
 
 - **Narrow Earlier** jumps to the Earlier destination and pushes an Earlier child frame.
 - **Narrow Later** jumps to the Later destination and pushes a Later child frame.
-- **Widen** restores the parent boundaries but keeps the current place, then recomputes Earlier
-  and Later destinations around that place.
+- **Widen** exits every recursion level, restores the full outer Range, keeps the current place,
+  and recomputes Earlier and Later destinations around that place.
 - **Skim** plays fast-to-normal to the Later destination, pushes the same child as Narrow Later,
   and then continues at `1×`.
 - A timeline tap selects a Point and immediately performs Narrow Earlier or Narrow Later to it.
@@ -86,22 +86,21 @@ If the movement consumed a Point, Undo restores that Point independently of rest
 parent place. Widen preserves any already-selected Point but does not reverse movement history.
 
 Narrow Earlier and Narrow Later increase resolution in opposite directions. Widen is their
-resolution inverse: it decreases resolution while retaining the current place. Together these
-three operations form the core loop: Narrow toward information, Widen for context, then Narrow
-again. Undo is distinct history: it restores the exact previous passage and previous place rather
-than refactoring around the current one. At the root, Widen restores the outer-range boundaries
-if playback previously narrowed the root passage.
+resolution inverse: it returns directly to the lowest resolution while retaining the current
+place. Together these three operations form the core loop: Narrow toward information, Widen
+fully for context, then Narrow back quickly. Undo is distinct history: it restores exactly one
+previous passage and previous place rather than exiting the recursion. At the root, Widen
+restores the outer-Range boundaries if playback previously narrowed the root passage.
 
 ## 6. Playback and repetition
 
 - **Play/Pause** always plays at `1×`.
-- Play continues across active-passage edges. Each crossed edge performs the same resolution
-  decrease as Widen without interrupting playback.
+- Play continues across active-passage edges. Crossing an edge performs the same full Widen
+  without interrupting playback.
 - If Play pauses without crossing an edge, the played span refines the current passage.
-- If Play crossed an edge, pausing keeps the widened boundaries and refactors Earlier and Later
+- If Play crossed an edge, pausing keeps the full Range and refactors Earlier and Later
   destinations around the pause position.
-- If one player update crosses more than one nested passage, Play consumes every crossed level
-  until the playhead is contained again.
+- Because Widen exits all recursion levels, one edge crossing is enough to restore the full Range.
 - Playback stops only at the outer-range boundary or when the user pauses.
 - The played span becomes `lastPassage`.
 - **Repeat** loops `lastPassage` at `1×`.
@@ -147,14 +146,14 @@ Primary controls are grouped into two families:
 Undo is a secondary History action beneath Resolution. Point is selected directly on the
 timeline, not through another mode or button. Every action shows its destination or affected
 range as persistent secondary text. Undo shows the restored range, place, and resulting
-destinations. Widen shows the same information while identifying the place it keeps. Repeat
-shows `lastPassage`, and Skim shows its destination and maximum-to-normal handoff. The timeline
-labels any selected Point. Internal recursion depth is not exposed as a selector.
+destinations. Widen shows the full Range and identifies the place it keeps. Repeat shows
+`lastPassage`, and Skim shows its destination and maximum-to-normal handoff. The timeline labels
+any selected Point. Internal recursion depth is not exposed as a selector.
 
 The lexicon is deliberately algebraic:
 
 - Narrow Earlier/Later: move and increase resolution in opposite directions.
-- Widen: decrease resolution around the current place without reversing the move.
+- Widen: return to the full Range around the current place without reversing the move.
 - Undo: restore the previous state, including the Point consumed by that movement.
 - Point: replace one automatic destination.
 - Skim: approach Later quickly, then become Play.
@@ -178,13 +177,16 @@ Storage is local to each browser and separated by video ID.
 
 ## 11. Keyboard
 
+- Q: Narrow Earlier
+- W: Widen
+- E: Narrow Later
+- R: Undo
 - Left Arrow: Narrow Earlier
 - Right Arrow: Narrow Later
 - Shift + Right Arrow: Skim
 - Backspace: Undo
 - Shift + Backspace: Widen
 - Control/Command + Backspace: Undo to the root
-- R: Repeat
 - Space: Play/Pause at `1×`
 - Escape: clear the selected Point
 
@@ -201,7 +203,8 @@ Storage is local to each browser and separated by video ID.
 - Every timeline marker type occupies a separate vertical lane.
 - Narrow Later and the destination handoff of Skim produce the same child frame.
 - Undo restores the parent passage and place.
-- Widen restores parent boundaries, retains the current place, and recomputes both destinations.
+- Widen exits every recursion level, restores the full Range, retains the current place, and
+  recomputes both destinations.
 - At `0:00–3:00`, Undoing `[1:30, 2:15, 3:00]` restores `C=1:30` with destinations
   `0:45/2:15`; Widening it keeps `C=2:15` with destinations `1:07.5/2:37.5`.
 - Repeat displays its loop range before activation.

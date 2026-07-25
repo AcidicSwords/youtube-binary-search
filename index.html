@@ -73,31 +73,39 @@
               <div class="family-heading">
                 <div>
                   <h2 id="resolution-heading">Resolution</h2>
-                  <p>Narrow in either direction. Widen out around this place.</p>
+                  <p>Narrow in either direction. Widen fully to the Range.</p>
                 </div>
               </div>
               <div class="action-grid resolution-actions">
                 <button id="go-earlier" class="action-card primary" type="button"
-                  data-preview-action="earlier" disabled>
-                  <span class="action-name">Narrow Earlier</span>
+                  data-preview-action="earlier" aria-keyshortcuts="Q" disabled>
+                  <span class="action-name hotkey-label">
+                    <kbd>Q</kbd><span>Narrow Earlier</span>
+                  </span>
                   <span id="earlier-action-meta" class="action-meta">—</span>
                 </button>
                 <button id="widen-passage" class="action-card primary" type="button"
-                  data-preview-action="widen" disabled>
-                  <span class="action-name">Widen</span>
+                  data-preview-action="widen" aria-keyshortcuts="W" disabled>
+                  <span class="action-name hotkey-label">
+                    <kbd>W</kbd><span>Widen</span>
+                  </span>
                   <span id="widen-action-meta" class="action-meta">—</span>
                 </button>
                 <button id="go-later" class="action-card primary" type="button"
-                  data-preview-action="later" disabled>
-                  <span class="action-name">Narrow Later</span>
+                  data-preview-action="later" aria-keyshortcuts="E" disabled>
+                  <span class="action-name hotkey-label">
+                    <kbd>E</kbd><span>Narrow Later</span>
+                  </span>
                   <span id="later-action-meta" class="action-meta">—</span>
                 </button>
               </div>
               <div class="history-action">
                 <span class="history-label">History</span>
                 <button id="undo-move" class="action-card compact" type="button"
-                  data-preview-action="undo" disabled>
-                  <span class="action-name">Undo</span>
+                  data-preview-action="undo" aria-keyshortcuts="R" disabled>
+                  <span class="action-name hotkey-label">
+                    <kbd>R</kbd><span>Undo</span>
+                  </span>
                   <span id="undo-action-meta" class="action-meta">—</span>
                 </button>
               </div>
@@ -132,11 +140,12 @@
             </section>
           </div>
           <p class="microcopy">
-            Narrow increases resolution Earlier or Later; Widen decreases it around this place.
+            Narrow increases resolution Earlier or Later; Widen returns to the full Range around
+            this place.
             Undo restores the previous passage and place. Tap the timeline to choose a Point and
             Narrow to it; Undo reveals that Point for reuse. Skim accelerates to the Later
-            destination and becomes Play; Play Widens at crossed passage edges; Repeat loops the
-            last start-to-pause span.
+            destination and becomes Play; Play Widens fully at crossed passage edges; Repeat
+            loops the last start-to-pause span.
           </p>
         </section>
 
