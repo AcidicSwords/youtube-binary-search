@@ -5,9 +5,9 @@ A lightweight static web implementation of recursive binary traversal for YouTub
 The intended rhythm is:
 
 1. Set a range.
-2. Move earlier or later with one action.
-3. Skim forward fast-to-normal, or repeat the passage just traversed.
-4. Undo the last move when more context is needed.
+2. Narrow Earlier or Narrow Later to increase resolution, or tap a precise Point.
+3. Skim fast-to-normal and continue at `1×`, or Repeat the passage just traversed.
+4. Undo to restore the prior place, or Widen to restore context without moving.
 5. Save and label a useful passage.
 
 ## Run locally
@@ -44,31 +44,37 @@ between devices.
 - YouTube URL parsing for watch, youtu.be, Shorts, live, and embed links
 - Native embedded YouTube player with normal controls
 - Two draggable study-range handles
-- Direct one-press earlier and later movement
-- Forward fast-to-normal skimming
-- Normal-speed playback that advances the current place when paused
+- One-press Narrow Earlier and Narrow Later operations
+- Widen as their inverse: decrease resolution while retaining the current place
+- Fast-to-normal Skim playback that continues at `1×` after its destination
+- Normal-speed playback that automatically Widens at crossed passage boundaries
 - One-button repetition of the last jump, skim, or played passage
-- Split placement anywhere inside the range
-- Undoable moves and direct history-level selection
+- Timeline Point selection composed with an immediate Narrow Earlier or Narrow Later operation
+- Undo of a Point move restores that Point so it can be reused by Earlier, Later, or Skim
+- One-step Undo to the previous passage and place
+- One-step Widen to parent boundaries while keeping the current place
+- Undo restores the wider level's old playhead; Widen recomputes that level around the live one
+- Visible destinations and affected ranges on every primary control
+- Timeline previews and separate non-overlapping marker lanes
 - Saved labelled passages stored locally per YouTube video
 - Clicking a saved passage loads it as the new range and starts at its midpoint
 - Keyboard shortcuts
 
 ## Keyboard
 
-- Left Arrow: go earlier
-- Right Arrow: go later
-- Shift + Right Arrow: skim to the later point
-- Backspace: undo the last move
-- Shift + Backspace: return to level zero
-- S: place split mode
+- Left Arrow: Narrow Earlier
+- Right Arrow: Narrow Later
+- Shift + Right Arrow: skim to the Later destination
+- Backspace: undo to the previous passage and place
+- Shift + Backspace: widen to parent boundaries while staying in place
+- Control/Command + Backspace: undo to the root passage
 - Space: play/pause at 1×
 - R: repeat the last passage
-- Escape: clear the split
+- Escape: clear the selected Point
 
 ## API-constrained behaviour
 
-The YouTube IFrame API exposes a video's available playback rates. The forward traversal
+The YouTube IFrame API exposes a video's available playback rates. Skim
 uses only those rates and chooses a descending staircase that approximates a logarithmic
 fast-to-normal curve.
 

@@ -3,8 +3,8 @@
 ## 1. Product
 
 The application makes a long video navigable like a written guide. Its small set of primitives
-must combine naturally: bound the material, move backward or forward, skim, replay a passage,
-split deliberately, undo, and save.
+must combine naturally: Narrow Earlier or Later, Widen, choose a precise Point, Undo, Skim,
+Play, Repeat, and save.
 
 The interface must not require users to understand a separate focus model or visible recursion
 machinery.
@@ -16,8 +16,8 @@ videoId
 duration
 range = [A, B]
 stack = [F0, F1, ..., Fn]
-active frame Fn = [L, C, R]
-optional split P
+active frame Fn = [L, C, R, optional returnPoint]
+optional selected Point P
 optional lastPassage = [S, E]
 optional repeat
 optional skim
@@ -37,46 +37,74 @@ The outer range `[A, B]` bounds the part of the video being studied. The active 
 is the current passage at the current resolution.
 
 - Editing the range starts a new root frame.
-- Ordinary playback stays inside the active passage.
+- Play may cross the active passage, but remains inside the outer range.
+- Crossing a passage edge performs Widen at the current playhead. Repeated crossings consume
+  additional resolution levels; the outer range is the final boundary.
 - Loading a saved passage makes it the new outer range.
 
-## 4. Automatic points and split
+## 4. Destinations and Point
 
 ```text
-backPoint    = (L + C) / 2
-forwardPoint = (C + R) / 2
+earlierDestination = (L + C) / 2
+laterDestination   = (C + R) / 2
 ```
 
-A split `P` may be placed anywhere inside the outer range except on `C`.
+A Point `P` may be selected anywhere in the outer range except on `C`.
 
 ```text
-P < C -> backPoint = P
-P > C -> forwardPoint = P
+P < C -> earlierDestination = P
+P > C -> laterDestination = P
 ```
 
-Using a split clears it. If a split is outside the active passage, the movement deliberately
-escapes toward the corresponding outer-range boundary. Undo still restores the exact parent.
+Point is not a separate movement. A timeline tap is the composition:
 
-## 5. Movement
+```text
+Timeline(P) = select Point(P) + Narrow Earlier/Later to P
+```
+
+Arriving consumes the selected Point into the child frame as `returnPoint`. Undoing that
+movement restores `P` as the selected Point, so it can be approached again with Narrow Earlier,
+Narrow Later, or Skim. If `P` is outside the active passage, movement deliberately extends
+toward the corresponding outer-range boundary. A newly selected Point replaces an older one;
+Escape clears it.
+
+## 5. Resolution and history
 
 There is no direction mode.
 
-- **Back** jumps to the back point and pushes an earlier child frame.
-- **Forward** jumps to the forward point and pushes a later child frame.
-- **Skim** plays fast-to-normal to the forward point and pushes the same child as Forward.
-- A direct timeline click moves to that time and pushes an undoable child frame.
-- **Undo Last Move** restores the exact parent frame.
+- **Narrow Earlier** jumps to the Earlier destination and pushes an Earlier child frame.
+- **Narrow Later** jumps to the Later destination and pushes a Later child frame.
+- **Widen** restores the parent boundaries but keeps the current place, then recomputes Earlier
+  and Later destinations around that place.
+- **Skim** plays fast-to-normal to the Later destination, pushes the same child as Narrow Later,
+  and then continues at `1×`.
+- A timeline tap selects a Point and immediately performs Narrow Earlier or Narrow Later to it.
+- **Undo** restores the parent passage and its prior current place.
 
 Each movement records the span between its departure and arrival as `lastPassage`.
+If the movement consumed a Point, Undo restores that Point independently of restoring the
+parent place. Widen preserves any already-selected Point but does not reverse movement history.
+
+Narrow Earlier and Narrow Later increase resolution in opposite directions. Widen is their
+resolution inverse: it decreases resolution while retaining the current place. Together these
+three operations form the core loop: Narrow toward information, Widen for context, then Narrow
+again. Undo is distinct history: it restores the exact previous passage and previous place rather
+than refactoring around the current one. At the root, Widen restores the outer-range boundaries
+if playback previously narrowed the root passage.
 
 ## 6. Playback and repetition
 
 - **Play/Pause** always plays at `1×`.
-- While playing, the passage bounds and automatic points remain still.
-- When forward playback stops, its departure becomes `L` and its actual position becomes `C`.
-  The next Back action therefore bisects exactly the passage just played.
+- Play continues across active-passage edges. Each crossed edge performs the same resolution
+  decrease as Widen without interrupting playback.
+- If Play pauses without crossing an edge, the played span refines the current passage.
+- If Play crossed an edge, pausing keeps the widened boundaries and refactors Earlier and Later
+  destinations around the pause position.
+- If one player update crosses more than one nested passage, Play consumes every crossed level
+  until the playhead is contained again.
+- Playback stops only at the outer-range boundary or when the user pauses.
 - The played span becomes `lastPassage`.
-- **Repeat Last Passage** loops `lastPassage` at `1×`.
+- **Repeat** loops `lastPassage` at `1×`.
 - Stopping repetition returns to `C` and does not add navigation history.
 
 This lets one Repeat action reread whatever the user just jumped across, skimmed through, or
@@ -92,20 +120,48 @@ desiredRate(u) = maxRate ^ (1 - u)
 ```
 
 Choose the greatest YouTube-supported rate that does not exceed the desired rate. On arrival,
-pause exactly at `Q`, restore `1×`, and push the child frame. Stopping after meaningful progress
-uses the actual stopping position; stopping immediately retains the parent.
+restore `1×`, push the child frame, and keep playing. The eventual pause settles the full span
+from the Skim departure through the `1×` continuation. Stopping Skim before its destination uses
+the actual stopping position; stopping immediately retains the parent.
 
 ## 8. Timeline
 
-- blue handles and fill: outer range;
-- green band and edge markers: active passage;
-- white line: current playhead;
-- lower grey markers: automatic back and forward points;
-- upper gold flag: split.
+- top blue circles: outer-range handles;
+- upper gold flag: selected Point;
+- white line: current playhead and track;
+- lower green diamonds: active-passage edges;
+- bottom grey dots: automatic Earlier and Later destinations.
 
-When a split replaces an automatic point, the automatic marker on that side is hidden.
+When a Point replaces an automatic destination, the automatic marker on that side is hidden.
+A single temporary preview band shows the passage affected by the focused or hovered Narrow
+Earlier, Widen, Narrow Later, Undo, Skim, or Repeat control. Each permanent marker type has its
+own vertical lane, and permanent handles and markers always remain visible.
 
-## 9. Saved passages
+## 9. Controls
+
+Primary controls are grouped into two families:
+
+- **Resolution:** Narrow Earlier, Widen, Narrow Later
+- **Playback:** Skim, Play, Repeat
+
+Undo is a secondary History action beneath Resolution. Point is selected directly on the
+timeline, not through another mode or button. Every action shows its destination or affected
+range as persistent secondary text. Undo shows the restored range, place, and resulting
+destinations. Widen shows the same information while identifying the place it keeps. Repeat
+shows `lastPassage`, and Skim shows its destination and maximum-to-normal handoff. The timeline
+labels any selected Point. Internal recursion depth is not exposed as a selector.
+
+The lexicon is deliberately algebraic:
+
+- Narrow Earlier/Later: move and increase resolution in opposite directions.
+- Widen: decrease resolution around the current place without reversing the move.
+- Undo: restore the previous state, including the Point consumed by that movement.
+- Point: replace one automatic destination.
+- Skim: approach Later quickly, then become Play.
+- Play: move at `1×`, Widening as passage edges are crossed.
+- Repeat: reread the last traversed or played span without changing resolution.
+
+## 10. Saved passages
 
 Save active passage `[L, R]` with:
 
@@ -120,28 +176,35 @@ createdAt
 
 Storage is local to each browser and separated by video ID.
 
-## 10. Keyboard
+## 11. Keyboard
 
-- Left Arrow: Back
-- Right Arrow: Forward
+- Left Arrow: Narrow Earlier
+- Right Arrow: Narrow Later
 - Shift + Right Arrow: Skim
-- Backspace: Undo Last Move
-- Shift + Backspace: restore level zero
-- S: Place Split
-- R: Repeat Last Passage
+- Backspace: Undo
+- Shift + Backspace: Widen
+- Control/Command + Backspace: Undo to the root
+- R: Repeat
 - Space: Play/Pause at `1×`
-- Escape: clear split
+- Escape: clear the selected Point
 
-## 11. Acceptance criteria
+## 12. Acceptance criteria
 
-- Back and Forward are always directly available.
+- Narrow Earlier, Widen, and Narrow Later are presented as the three core Resolution controls.
+- Narrow Earlier and Narrow Later are always directly available when their destinations exist.
 - Play is always `1×`.
-- Playback does not move passage bounds or automatic points while it is running.
+- Play continues past passage edges by performing Widen at the live playhead.
 - Repeat replays the span of the immediately preceding movement or playback.
-- A split can be placed anywhere inside the outer range.
-- Split and automatic markers never overlap.
-- Forward and a completed Skim produce the same child frame.
-- Undo restores the exact parent.
+- Tapping anywhere in the outer range selects that Point and immediately Narrows Earlier or
+  Later to it.
+- Undoing a timeline Point move restores the Point, and Skim can then approach it.
+- Every timeline marker type occupies a separate vertical lane.
+- Narrow Later and the destination handoff of Skim produce the same child frame.
+- Undo restores the parent passage and place.
+- Widen restores parent boundaries, retains the current place, and recomputes both destinations.
+- At `0:00–3:00`, Undoing `[1:30, 2:15, 3:00]` restores `C=1:30` with destinations
+  `0:45/2:15`; Widening it keeps `C=2:15` with destinations `1:07.5/2:37.5`.
+- Repeat displays its loop range before activation.
 - No separate direction, focus, or playback-mode selection is required.
 
 The project succeeds when these primitives feel like a small vocabulary rather than a control

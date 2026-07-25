@@ -5,6 +5,10 @@ import {
   getTargets,
   descend,
   intervalMidpoint,
+  widenAtCurrent,
+  widenStackAtCurrent,
+  pointAfterUndo,
+  getActionRanges,
   settlePlayback,
   logSpeed,
   chooseSupportedRate
@@ -26,12 +30,13 @@ const state = {
   duration: 0,
   scope: { start: 0, end: 0 },
   stack: [],
-  split: null,
-  splitMode: false,
+  point: null,
   traversal: null,
   repeat: null,
   playStart: null,
+  playWidened: false,
   lastPassage: null,
+  previewAction: null,
   availableRates: [1],
   savedRegions: [],
   dragHandle: null,
@@ -87,8 +92,7 @@ function setSegment(element, start, end) {
 function resetRootAt(current, seek = true) {
   const C = clamp(current, state.scope.start, state.scope.end);
   state.stack = [createRoot(state.scope.start, C, state.scope.end)];
-  state.split = null;
-  state.splitMode = false;
+  state.point = null;
   state.lastPassage = null;
 
   if (seek && player && state.playerReady) {
@@ -119,8 +123,7 @@ function setScope(start, end, current = null, message = "Range updated.") {
     : clamp(current, A, B);
 
   state.stack = [createRoot(A, C, B)];
-  state.split = null;
-  state.splitMode = false;
+  state.point = null;
   state.lastPassage = null;
 
   player.pauseVideo();
@@ -134,10 +137,63 @@ function setScope(start, end, current = null, message = "Range updated.") {
 
 function activeTargets() {
   const frame = currentFrame();
-  return frame ? getTargets(frame, state.split, state.scope) : { earlier: null, later: null };
+  return frame ? getTargets(frame, state.point, state.scope) : { earlier: null, later: null };
 }
 
-function go(direction) {
+function parentFrame() {
+  return state.stack.length > 1 ? state.stack[state.stack.length - 2] : null;
+}
+
+function actionPresentation(current = null) {
+  const frame = currentFrame();
+  const position = current ?? (
+    state.traversal || state.repeat || state.playStart !== null
+      ? safeCurrentTime()
+      : frame?.C
+  );
+  return frame
+    ? getActionRanges(
+      frame,
+      state.scope,
+      state.point,
+      parentFrame(),
+      state.lastPassage,
+      position
+    )
+    : null;
+}
+
+function formatRange(range) {
+  return range ? `${formatTime(range.start)}–${formatTime(range.end)}` : "—";
+}
+
+function formatResolution(action, placeVerb) {
+  return action
+    ? `${formatRange(action)} · ${placeVerb} ${formatTime(action.current)}`
+      + (Number.isFinite(action.point) ? ` · Point ${formatTime(action.point)}` : "")
+      + ` · Earlier ${formatTime(action.earlier)} · Later ${formatTime(action.later)}`
+    : "Root passage";
+}
+
+function renderActionPreview(model = actionPresentation()) {
+  const range = state.previewAction && model ? model[state.previewAction] : null;
+  elements["action-preview-fill"].hidden = !range;
+
+  if (!range) {
+    elements["action-preview-fill"].removeAttribute("data-kind");
+    return;
+  }
+
+  elements["action-preview-fill"].dataset.kind = state.previewAction;
+  setSegment(elements["action-preview-fill"], range.start, range.end);
+}
+
+function setPreviewAction(action) {
+  state.previewAction = action;
+  renderActionPreview();
+}
+
+function narrow(direction, source = "control") {
   if (!state.videoLoaded || state.traversal) return;
 
   prepareForNavigation();
@@ -146,20 +202,28 @@ function go(direction) {
   if (target === null) return;
 
   const departure = frame.C;
+  const directionLabel = direction === "earlier" ? "Earlier" : "Later";
   const child = descend(frame, direction, target, state.scope);
+  const usesPoint = Number.isFinite(state.point)
+    && Math.abs(target - state.point) <= EPSILON;
+  if (usesPoint) child.returnPoint = state.point;
+
   state.stack.push(child);
   state.lastPassage = {
     start: Math.min(departure, target),
     end: Math.max(departure, target)
   };
-  state.split = null;
-  state.splitMode = false;
+  if (usesPoint) state.point = null;
 
   player.pauseVideo();
   player.setPlaybackRate(1);
   player.seekTo(target, true);
 
-  setStatus(`Moved ${direction === "earlier" ? "back" : "forward"} to ${formatTime(target)}.`);
+  setStatus(
+    source === "timeline"
+      ? `Point selected at ${formatTime(target)}. Narrowed ${directionLabel} to it.`
+      : `Narrowed ${directionLabel} to ${formatTime(target)}.`
+  );
   updateUI();
 }
 
@@ -193,24 +257,36 @@ function startRepeat() {
   updateUI();
 }
 
+function refactorPassageForCurrent(current) {
+  const result = widenStackAtCurrent(state.stack, current, state.scope);
+  if (!result.levels) return false;
+
+  state.stack = result.stack;
+  state.playWidened = true;
+  return true;
+}
+
 function finishOrdinaryPlayback(pause = true) {
   if (state.playStart === null) return false;
 
   const start = state.playStart;
+  const current = clamp(safeCurrentTime(), state.scope.start, state.scope.end);
+  refactorPassageForCurrent(current);
+  const widened = state.playWidened;
   state.playStart = null;
+  state.playWidened = false;
   const frame = currentFrame();
   if (!frame) return false;
 
-  const settled = settlePlayback(frame, start, safeCurrentTime());
+  const settled = widened
+    ? { ...frame, C: clamp(current, frame.L, frame.R) }
+    : settlePlayback(frame, start, current);
   Object.assign(frame, settled);
-  const current = frame.C;
-  if (state.split !== null && Math.abs(state.split - current) <= EPSILON) {
-    state.split = null;
-  }
-  if (Math.abs(current - start) > EPSILON) {
+  const place = frame.C;
+  if (Math.abs(place - start) > EPSILON) {
     state.lastPassage = {
-      start: Math.min(start, current),
-      end: Math.max(start, current)
+      start: Math.min(start, place),
+      end: Math.max(start, place)
     };
   }
 
@@ -229,6 +305,7 @@ function stopTraversal(commitActual) {
   if (!traversal) return;
 
   state.traversal = null;
+  state.playWidened = false;
   state.internalPause = true;
   player.pauseVideo();
   player.setPlaybackRate(1);
@@ -264,22 +341,22 @@ function finishTraversal() {
   if (!traversal) return;
 
   state.traversal = null;
-  state.internalPause = true;
-  player.pauseVideo();
   player.setPlaybackRate(1);
-  player.seekTo(traversal.target, true);
 
-  state.stack.push(descend(traversal.parent, "later", traversal.target, state.scope));
+  const child = descend(traversal.parent, "later", traversal.target, state.scope);
+  if (Number.isFinite(traversal.point)) {
+    child.returnPoint = traversal.point;
+    state.point = null;
+  }
+  state.stack.push(child);
+  state.playStart = traversal.departure;
+  state.playWidened = false;
   state.lastPassage = {
     start: traversal.departure,
     end: traversal.target
   };
 
-  queueMicrotask(() => {
-    state.internalPause = false;
-  });
-
-  setStatus(`Skim reached ${formatTime(traversal.target)} at normal speed.`);
+  setStatus(`Skim reached ${formatTime(traversal.target)}. Continuing at 1×.`);
   updateUI();
 }
 
@@ -292,13 +369,13 @@ function startForwardTraversal() {
   const target = activeTargets().later;
   if (target === null || target <= parent.C + EPSILON) return;
 
-  state.split = null;
-  state.splitMode = false;
-
   state.traversal = {
     parent,
     departure: parent.C,
     target,
+    point: Number.isFinite(state.point) && Math.abs(target - state.point) <= EPSILON
+      ? state.point
+      : null,
     maxRate: Number(elements["speed-select"].value || 1),
     lastDesiredRate: Number(elements["speed-select"].value || 1)
   };
@@ -331,36 +408,84 @@ function ordinaryPlayPause() {
     player.setPlaybackRate(1);
     setStatus("Paused.");
   } else {
-    const frame = currentFrame();
-    const current = clamp(safeCurrentTime(), frame.L, frame.R);
-    if (Math.abs(current - safeCurrentTime()) > EPSILON) {
-      player.seekTo(frame.C, true);
-      state.playStart = frame.C;
-    } else {
-      state.playStart = current;
-    }
+    const current = clamp(safeCurrentTime(), state.scope.start, state.scope.end);
+    refactorPassageForCurrent(current);
+    state.playStart = current;
+    state.playWidened = false;
     player.setPlaybackRate(1);
     player.playVideo();
-    setStatus("Playing at 1×.");
+    setStatus("Playing at 1×. Crossing a passage edge will Widen.");
   }
 
   updateUI();
 }
 
-function goToDepth(depth) {
-  if (!Number.isInteger(depth) || depth < 0 || depth >= state.stack.length || state.traversal) return;
+function restoreDepth(depth) {
+  if (!Number.isInteger(depth) || depth < 0 || depth >= state.stack.length) return;
 
-  prepareForNavigation();
+  const restored = state.stack[depth];
+  state.point = pointAfterUndo(state.stack, depth, state.point);
   state.stack = state.stack.slice(0, depth + 1);
-  state.split = null;
-  state.splitMode = false;
 
   const frame = currentFrame();
   player.pauseVideo();
   player.setPlaybackRate(1);
   player.seekTo(frame.C, true);
 
-  setStatus(`Undid movement to level ${depth}.`);
+  setStatus(
+    `Undid to ${formatTime(restored.C)} in ${formatTime(restored.L)}–${formatTime(restored.R)}.`
+  );
+  updateUI();
+}
+
+function undoOneLevel() {
+  if (state.traversal || state.stack.length < 2) return;
+  prepareForNavigation();
+  const depth = state.stack.length - 1;
+  if (depth > 0) restoreDepth(depth - 1);
+}
+
+function undoToRoot() {
+  if (state.traversal || state.stack.length < 2) return;
+  prepareForNavigation();
+  if (state.stack.length > 1) restoreDepth(0);
+}
+
+function widenOneLevel() {
+  if (state.traversal) return;
+
+  const initialFrame = currentFrame();
+  const initialParent = parentFrame();
+  const rootCanWiden = !initialParent
+    && (
+      initialFrame.L > state.scope.start + EPSILON
+      || initialFrame.R < state.scope.end - EPSILON
+    );
+  if (!initialParent && !rootCanWiden) return;
+
+  prepareForNavigation();
+  const frame = currentFrame();
+  const current = frame.C;
+  const parent = parentFrame();
+
+  const base = parent || createRoot(state.scope.start, current, state.scope.end);
+  const widened = { ...base, ...widenAtCurrent(base, current) };
+  if (Number.isFinite(frame.returnPoint)) {
+    widened.returnPoint = frame.returnPoint;
+  }
+
+  state.stack = parent
+    ? [...state.stack.slice(0, -2), widened]
+    : [widened];
+  state.playWidened = false;
+
+  player.pauseVideo();
+  player.setPlaybackRate(1);
+  player.seekTo(widened.C, true);
+
+  setStatus(
+    `Widened to ${formatTime(widened.L)}–${formatTime(widened.R)}; stayed at ${formatTime(widened.C)}.`
+  );
   updateUI();
 }
 
@@ -375,27 +500,9 @@ function handleTimelineClick(event) {
   if (event.target.classList.contains("scope-handle")) return;
 
   const time = timeFromPointer(event);
-  const frame = currentFrame();
-
-  if (state.splitMode) {
-    if (
-      time <= state.scope.start + EPSILON
-      || time >= state.scope.end - EPSILON
-      || Math.abs(time - frame.C) <= EPSILON
-    ) {
-      setStatus("Place the split inside the range and away from the current point.", true);
-      return;
-    }
-
-    state.split = time;
-    state.splitMode = false;
-    setStatus(`Split placed at ${formatTime(time)}.`);
-    updateUI();
-    return;
-  }
 
   if (time < state.scope.start || time > state.scope.end) {
-      setStatus("That position is outside the range.", true);
+    setStatus("That Point is outside the range.", true);
     return;
   }
 
@@ -403,22 +510,13 @@ function handleTimelineClick(event) {
   const active = currentFrame();
   if (Math.abs(time - active.C) <= EPSILON) {
     player.seekTo(active.C, true);
+    setStatus(`Already at ${formatTime(active.C)}.`);
     return;
   }
 
   const direction = time < active.C ? "earlier" : "later";
-  state.stack.push(descend(active, direction, time, state.scope));
-  state.lastPassage = {
-    start: Math.min(active.C, time),
-    end: Math.max(active.C, time)
-  };
-  state.split = null;
-  state.splitMode = false;
-  player.pauseVideo();
-  player.setPlaybackRate(1);
-  player.seekTo(time, true);
-  setStatus(`Moved directly to ${formatTime(time)}.`);
-  updateUI();
+  state.point = time;
+  narrow(direction, "timeline");
 }
 
 function beginScopeDrag(kind, event) {
@@ -452,7 +550,7 @@ function updateScopeDrag(event) {
 
   const C = clamp(current, state.scope.start, state.scope.end);
   state.stack = [createRoot(state.scope.start, C, state.scope.end)];
-  state.split = null;
+  state.point = null;
   state.lastPassage = null;
   updateUI();
 }
@@ -629,38 +727,37 @@ function populateSpeedOptions() {
   elements["speed-select"].value = String((rates.length ? rates : [1]).at(-1));
 }
 
-function populateDepthOptions() {
-  const depth = state.stack.length - 1;
-  elements["depth-select"].replaceChildren();
-
-  state.stack.forEach((_, index) => {
-    const option = document.createElement("option");
-    option.value = String(index);
-    option.textContent = String(index);
-    elements["depth-select"].appendChild(option);
-  });
-
-  elements["depth-select"].value = String(Math.max(0, depth));
+function setActionMeta(buttonId, metaId, label, meta) {
+  elements[metaId].textContent = meta;
+  elements[buttonId].setAttribute("aria-label", `${label}: ${meta}`);
 }
 
 function updateUI() {
   const loaded = state.videoLoaded;
   const frame = currentFrame();
   const targets = frame ? activeTargets() : { earlier: null, later: null };
-  const current = loaded ? safeCurrentTime() : 0;
   const depth = Math.max(0, state.stack.length - 1);
   const traversalActive = Boolean(state.traversal);
   const repeatActive = Boolean(state.repeat);
+  const actualCurrent = loaded ? safeCurrentTime() : 0;
+  const current = loaded && (
+    traversalActive
+    || repeatActive
+    || state.playStart !== null
+    || state.playerState === 1
+  )
+    ? actualCurrent
+    : (frame?.C ?? actualCurrent);
+  const presentationCurrent = state.playStart !== null
+    ? actualCurrent
+    : (frame?.C ?? actualCurrent);
+  const model = frame ? actionPresentation(presentationCurrent) : null;
 
   elements["current-time"].textContent = formatTime(current);
   elements["duration-time"].textContent = formatTime(state.duration);
-  elements["current-stat"].textContent = formatTime(current);
-  elements["earlier-stat"].textContent = formatTime(targets.earlier);
-  elements["later-stat"].textContent = formatTime(targets.later);
-  elements["depth-stat"].textContent = String(depth);
 
   const basicControls = [
-    "set-start", "set-end", "centre-scope", "full-video", "place-split",
+    "set-start", "set-end", "centre-scope", "full-video",
     "ordinary-play", "save-region", "speed-select"
   ];
 
@@ -668,33 +765,72 @@ function updateUI() {
     elements[id].disabled = !loaded || traversalActive;
   }
 
-  elements["clear-split"].disabled = !loaded || state.split === null || traversalActive;
   elements["go-earlier"].disabled = !loaded || traversalActive || targets.earlier === null;
   elements["go-later"].disabled = !loaded || traversalActive || targets.later === null;
+  elements["ordinary-play"].disabled = !loaded || traversalActive || repeatActive;
   elements["repeat-passage"].disabled = !loaded || traversalActive || !state.lastPassage;
   elements["search-play"].disabled = !loaded || (traversalActive ? false : targets.later === null);
-  elements["up-level"].disabled = !loaded || traversalActive || depth === 0;
-  elements["depth-select"].disabled = !loaded || traversalActive || depth === 0;
+  elements["undo-move"].disabled = !loaded || traversalActive || depth === 0;
+  elements["widen-passage"].disabled = !loaded || traversalActive || !model?.widen;
 
-  elements["place-split"].classList.toggle("selected", state.splitMode);
-  elements["ordinary-play"].textContent =
-    state.playStart !== null && !traversalActive && !repeatActive ? "Pause" : "Play 1×";
-  elements["search-play"].textContent = traversalActive ? "Stop skimming" : "Skim →";
-  elements["repeat-passage"].textContent =
-    repeatActive ? "Stop repeating" : "Repeat last passage";
+  elements["skim-action-name"].textContent = traversalActive ? "Stop skim" : "Skim";
+  elements["play-action-name"].textContent =
+    state.playStart !== null && !traversalActive && !repeatActive ? "Pause" : "Play";
+  elements["repeat-action-name"].textContent = repeatActive ? "Stop repeat" : "Repeat";
 
-  populateDepthOptions();
+  const maxRate = Number(elements["speed-select"].value || 1);
+  const earlierMeta = targets.earlier === null
+    ? "No Earlier destination"
+    : `to ${formatTime(targets.earlier)}`;
+  const laterMeta = targets.later === null
+    ? "No Later destination"
+    : `to ${formatTime(targets.later)}`;
+  const undoMeta = formatResolution(model?.undo, "to");
+  const widenMeta = formatResolution(model?.widen, "stay");
+  const skimMeta = targets.later === null
+    ? "No Later destination"
+    : `to ${formatTime(targets.later)} · ${maxRate}×→1× onward`;
+  const playFrom = state.playStart ?? frame?.C;
+  const playMeta = playFrom === undefined ? "1× onward" : `1× onward from ${formatTime(playFrom)}`;
+  const repeatMeta = model?.repeat ? formatRange(model.repeat) : "No passage yet";
+
+  setActionMeta("go-earlier", "earlier-action-meta", "Narrow Earlier", earlierMeta);
+  setActionMeta("go-later", "later-action-meta", "Narrow Later", laterMeta);
+  elements["undo-move"].setAttribute("aria-label", `Undo: ${undoMeta}`);
+  elements["undo-action-meta"].textContent = undoMeta;
+  elements["widen-passage"].setAttribute("aria-label", `Widen: ${widenMeta}`);
+  elements["widen-action-meta"].textContent = widenMeta;
+  setActionMeta(
+    "search-play",
+    "skim-action-meta",
+    traversalActive ? "Stop skim" : "Skim",
+    skimMeta
+  );
+  setActionMeta(
+    "ordinary-play",
+    "play-action-meta",
+    state.playStart !== null ? "Pause" : "Play",
+    playMeta
+  );
+  setActionMeta(
+    "repeat-passage",
+    "repeat-action-meta",
+    repeatActive ? "Stop repeat" : "Repeat",
+    repeatMeta
+  );
 
   if (!loaded || !frame) {
     [
       "scope-start-handle", "scope-end-handle", "frame-left-marker",
       "frame-right-marker", "earlier-target-marker", "later-target-marker",
-      "current-marker", "split-marker"
+      "current-marker", "point-marker"
     ].forEach(id => elements[id].hidden = true);
 
     elements["scope-label"].textContent = "Range —";
     elements["frame-label"].textContent = "Passage —";
-    elements["target-label"].textContent = "Back — · Forward —";
+    elements["target-label"].textContent = "Earlier — · Later —";
+    elements["point-label"].textContent = "Point —";
+    renderActionPreview(null);
     return;
   }
 
@@ -711,22 +847,24 @@ function updateUI() {
   setMarkerPosition(elements["frame-right-marker"], frame.R);
   setMarkerPosition(elements["current-marker"], current);
 
-  const customEarlier = state.split !== null && state.split < frame.C;
-  const customLater = state.split !== null && state.split > frame.C;
+  const customEarlier = state.point !== null && state.point < frame.C;
+  const customLater = state.point !== null && state.point > frame.C;
   elements["earlier-target-marker"].hidden = targets.earlier === null || customEarlier;
   elements["later-target-marker"].hidden = targets.later === null || customLater;
   if (targets.earlier !== null) setMarkerPosition(elements["earlier-target-marker"], targets.earlier);
   if (targets.later !== null) setMarkerPosition(elements["later-target-marker"], targets.later);
 
-  elements["split-marker"].hidden = state.split === null;
-  if (state.split !== null) setMarkerPosition(elements["split-marker"], state.split);
+  elements["point-marker"].hidden = state.point === null;
+  if (state.point !== null) setMarkerPosition(elements["point-marker"], state.point);
 
   elements["scope-label"].textContent =
     `Range ${formatTime(state.scope.start)}–${formatTime(state.scope.end)}`;
   elements["frame-label"].textContent =
     `Passage ${formatTime(frame.L)}–${formatTime(frame.R)}`;
   elements["target-label"].textContent =
-    `Back ${formatTime(targets.earlier)} · Forward ${formatTime(targets.later)}`;
+    `Earlier ${formatTime(targets.earlier)} · Later ${formatTime(targets.later)}`;
+  elements["point-label"].textContent =
+    state.point === null ? "Point —" : `Point ${formatTime(state.point)}`;
 
   elements["scope-start-handle"].setAttribute("aria-valuenow", String(state.scope.start));
   elements["scope-end-handle"].setAttribute("aria-valuenow", String(state.scope.end));
@@ -734,6 +872,7 @@ function updateUI() {
   elements["scope-end-handle"].setAttribute("aria-valuemax", String(state.duration));
   elements["scope-start-handle"].setAttribute("aria-valuetext", formatTime(state.scope.start));
   elements["scope-end-handle"].setAttribute("aria-valuetext", formatTime(state.scope.end));
+  renderActionPreview(model);
 }
 
 function initializeVideo() {
@@ -751,11 +890,11 @@ function initializeVideo() {
   state.duration = duration;
   state.scope = { start: 0, end: duration };
   state.stack = [createRoot(0, requestedStart, duration)];
-  state.split = null;
-  state.splitMode = false;
+  state.point = null;
   state.traversal = null;
   state.repeat = null;
   state.playStart = null;
+  state.playWidened = false;
   state.lastPassage = null;
   state.availableRates = player.getAvailablePlaybackRates?.() || [1];
 
@@ -780,9 +919,9 @@ function cuePendingVideo() {
   state.traversal = null;
   state.repeat = null;
   state.playStart = null;
+  state.playWidened = false;
   state.lastPassage = null;
-  state.split = null;
-  state.splitMode = false;
+  state.point = null;
   state.savedRegions = [];
   renderSavedRegions();
   updateUI();
@@ -808,14 +947,10 @@ function handlePlayerStateChange(event) {
   }
 
   if (event.data === 1 && state.videoLoaded && !state.traversal && !state.repeat && state.playStart === null) {
-    const frame = currentFrame();
-    const current = safeCurrentTime();
-    if (current < frame.L - EPSILON || current > frame.R + EPSILON) {
-      player.seekTo(frame.C, true);
-      state.playStart = frame.C;
-    } else {
-      state.playStart = current;
-    }
+    const current = clamp(safeCurrentTime(), state.scope.start, state.scope.end);
+    refactorPassageForCurrent(current);
+    state.playStart = current;
+    state.playWidened = false;
   }
 
   if (event.data === 2 && state.videoLoaded && state.repeat) {
@@ -876,12 +1011,19 @@ function pollPlayer() {
       player.playVideo();
     }
   } else if (state.playStart !== null && state.playerState === 1) {
-    const frame = currentFrame();
-    if (now < frame.L - EPSILON) {
-      player.seekTo(frame.L, true);
-    } else if (now >= frame.R - EPSILON) {
+    if (refactorPassageForCurrent(now)) {
+      const widened = currentFrame();
+      setStatus(
+        `Play Widened to ${formatTime(widened.L)}–${formatTime(widened.R)}`
+        + ` and kept ${formatTime(widened.C)}.`
+      );
+    }
+
+    if (now < state.scope.start - EPSILON) {
+      player.seekTo(state.scope.start, true);
+    } else if (now >= state.scope.end - EPSILON) {
       finishOrdinaryPlayback();
-      setStatus("Reached the end of the current passage.");
+      setStatus("Reached the end of the range.");
     }
   } else if (now < state.scope.start - EPSILON || now > state.scope.end + EPSILON) {
     const clamped = clamp(now, state.scope.start, state.scope.end);
@@ -998,27 +1140,8 @@ elements["full-video"].addEventListener("click", () => {
   setScope(0, state.duration, middle, "Restored the full video and centred the playhead.");
 });
 
-elements["place-split"].addEventListener("click", () => {
-  prepareForNavigation();
-  state.splitMode = !state.splitMode;
-  setStatus(
-    state.splitMode
-      ? "Click anywhere inside the range to place the next split."
-      : "Split placement cancelled."
-  );
-  updateUI();
-});
-
-elements["clear-split"].addEventListener("click", () => {
-  prepareForNavigation();
-  state.split = null;
-  state.splitMode = false;
-  setStatus("Split cleared; automatic points restored.");
-  updateUI();
-});
-
-elements["go-earlier"].addEventListener("click", () => go("earlier"));
-elements["go-later"].addEventListener("click", () => go("later"));
+elements["go-earlier"].addEventListener("click", () => narrow("earlier"));
+elements["go-later"].addEventListener("click", () => narrow("later"));
 
 elements["search-play"].addEventListener("click", () => {
   if (state.traversal) stopTraversal(true);
@@ -1027,15 +1150,19 @@ elements["search-play"].addEventListener("click", () => {
 
 elements["ordinary-play"].addEventListener("click", ordinaryPlayPause);
 elements["repeat-passage"].addEventListener("click", startRepeat);
+elements["speed-select"].addEventListener("change", updateUI);
 
-elements["up-level"].addEventListener("click", () => {
-  const depth = state.stack.length - 1;
-  if (depth > 0) goToDepth(depth - 1);
-});
+elements["undo-move"].addEventListener("click", undoOneLevel);
 
-elements["depth-select"].addEventListener("change", () => {
-  goToDepth(Number(elements["depth-select"].value));
-});
+elements["widen-passage"].addEventListener("click", widenOneLevel);
+
+for (const control of document.querySelectorAll("[data-preview-action]")) {
+  const action = control.dataset.previewAction;
+  control.addEventListener("pointerenter", () => setPreviewAction(action));
+  control.addEventListener("pointerleave", () => setPreviewAction(null));
+  control.addEventListener("focus", () => setPreviewAction(action));
+  control.addEventListener("blur", () => setPreviewAction(null));
+}
 
 elements["save-region"].addEventListener("click", saveCurrentInterval);
 elements["region-label"].addEventListener("keydown", event => {
@@ -1060,25 +1187,21 @@ document.addEventListener("keydown", event => {
 
   if (event.key === "ArrowLeft") {
     event.preventDefault();
-    go("earlier");
+    narrow("earlier");
   } else if (event.key === "ArrowRight" && !event.shiftKey) {
     event.preventDefault();
-    go("later");
+    narrow("later");
   } else if (event.key === "ArrowRight" && event.shiftKey) {
     event.preventDefault();
     startForwardTraversal();
   } else if (event.key === "Backspace") {
     event.preventDefault();
-    const depth = state.stack.length - 1;
-    if (event.shiftKey) goToDepth(0);
-    else if (depth > 0) goToDepth(depth - 1);
-  } else if (event.key.toLowerCase() === "s") {
-    event.preventDefault();
-    elements["place-split"].click();
+    if (event.ctrlKey || event.metaKey) undoToRoot();
+    else if (event.shiftKey) widenOneLevel();
+    else undoOneLevel();
   } else if (event.key === "Escape") {
-    state.split = null;
-    state.splitMode = false;
-    setStatus("Split cleared.");
+    state.point = null;
+    setStatus("Point cleared; automatic destinations restored.");
     updateUI();
   } else if (event.key === " ") {
     event.preventDefault();

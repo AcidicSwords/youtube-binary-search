@@ -15,7 +15,7 @@
     <header class="load-bar">
       <div>
         <h1>Binary YouTube Reader</h1>
-        <p>Move through long videos like a guide: jump, skim, repeat, and narrow.</p>
+        <p>Move through long videos like a guide: narrow, widen, skim, and repeat.</p>
       </div>
       <div class="url-row">
         <label class="sr-only" for="youtube-url">YouTube URL</label>
@@ -26,7 +26,7 @@
     </header>
 
     <div class="workspace">
-      <section class="main-column" aria-label="Video and traversal controls">
+      <section class="main-column" aria-label="Video resolution and playback controls">
         <div class="player-wrap">
           <div id="player"></div>
         </div>
@@ -41,10 +41,12 @@
             <span id="duration-time">0:00.000</span>
           </div>
 
-          <div id="timeline" class="timeline" aria-label="Traversal timeline">
+          <div id="timeline" class="timeline"
+            aria-label="Video timeline. Tap within the Range to choose a Point and Narrow to it.">
             <div class="track">
               <div id="scope-fill" class="scope-fill"></div>
               <div id="frame-fill" class="frame-fill"></div>
+              <div id="action-preview-fill" class="action-preview-fill" hidden></div>
             </div>
 
             <button id="scope-start-handle" class="marker scope-handle" type="button"
@@ -57,29 +59,88 @@
             <span id="earlier-target-marker" class="marker target-marker" aria-hidden="true"></span>
             <span id="later-target-marker" class="marker target-marker" aria-hidden="true"></span>
             <span id="current-marker" class="marker current-marker" aria-hidden="true"></span>
-            <span id="split-marker" class="marker split-marker" aria-hidden="true" hidden></span>
+            <span id="point-marker" class="marker point-marker" aria-hidden="true" hidden></span>
           </div>
 
           <div class="timeline-labels">
             <span id="scope-label">Range —</span>
             <span id="frame-label">Passage —</span>
-            <span id="target-label">Back — · Forward —</span>
+            <span id="target-label">Earlier — · Later —</span>
+            <span id="point-label">Point —</span>
           </div>
-          <div class="transport-bar" aria-label="Video navigation">
-            <button id="go-earlier" class="primary" type="button" disabled>← Back</button>
-            <button id="go-later" class="primary" type="button" disabled>Forward →</button>
-            <button id="search-play" type="button" disabled>Skim →</button>
-            <button id="ordinary-play" type="button" disabled>Play 1×</button>
-            <button id="repeat-passage" type="button" disabled>Repeat</button>
-            <button id="up-level" type="button" disabled>Undo</button>
+          <div class="primary-control-groups">
+            <section class="action-family resolution-family" aria-labelledby="resolution-heading">
+              <div class="family-heading">
+                <div>
+                  <h2 id="resolution-heading">Resolution</h2>
+                  <p>Narrow in either direction. Widen out around this place.</p>
+                </div>
+              </div>
+              <div class="action-grid resolution-actions">
+                <button id="go-earlier" class="action-card primary" type="button"
+                  data-preview-action="earlier" disabled>
+                  <span class="action-name">Narrow Earlier</span>
+                  <span id="earlier-action-meta" class="action-meta">—</span>
+                </button>
+                <button id="widen-passage" class="action-card primary" type="button"
+                  data-preview-action="widen" disabled>
+                  <span class="action-name">Widen</span>
+                  <span id="widen-action-meta" class="action-meta">—</span>
+                </button>
+                <button id="go-later" class="action-card primary" type="button"
+                  data-preview-action="later" disabled>
+                  <span class="action-name">Narrow Later</span>
+                  <span id="later-action-meta" class="action-meta">—</span>
+                </button>
+              </div>
+              <div class="history-action">
+                <span class="history-label">History</span>
+                <button id="undo-move" class="action-card compact" type="button"
+                  data-preview-action="undo" disabled>
+                  <span class="action-name">Undo</span>
+                  <span id="undo-action-meta" class="action-meta">—</span>
+                </button>
+              </div>
+            </section>
+
+            <section class="action-family" aria-labelledby="playback-heading">
+              <div class="family-heading">
+                <h2 id="playback-heading">Playback</h2>
+                <label class="speed-setting" for="speed-select">
+                  Skim max
+                  <select id="speed-select" disabled>
+                    <option value="1">1×</option>
+                  </select>
+                </label>
+              </div>
+              <div class="action-grid playback-actions">
+                <button id="search-play" class="action-card" type="button"
+                  data-preview-action="skim" disabled>
+                  <span id="skim-action-name" class="action-name">Skim</span>
+                  <span id="skim-action-meta" class="action-meta">—</span>
+                </button>
+                <button id="ordinary-play" class="action-card" type="button" disabled>
+                  <span id="play-action-name" class="action-name">Play</span>
+                  <span id="play-action-meta" class="action-meta">1×</span>
+                </button>
+                <button id="repeat-passage" class="action-card" type="button"
+                  data-preview-action="repeat" disabled>
+                  <span id="repeat-action-name" class="action-name">Repeat</span>
+                  <span id="repeat-action-meta" class="action-meta">—</span>
+                </button>
+              </div>
+            </section>
           </div>
           <p class="microcopy">
-            Click to move directly. Place a split anywhere in the blue range to replace the next
-            automatic point on that side. Every move can be undone.
+            Narrow increases resolution Earlier or Later; Widen decreases it around this place.
+            Undo restores the previous passage and place. Tap the timeline to choose a Point and
+            Narrow to it; Undo reveals that Point for reuse. Skim accelerates to the Later
+            destination and becomes Play; Play Widens at crossed passage edges; Repeat loops the
+            last start-to-pause span.
           </p>
         </section>
 
-        <section class="panel controls-panel" aria-label="Control panel">
+        <section class="panel controls-panel" aria-label="Range controls">
           <div class="control-section">
             <h2>Range</h2>
             <div class="button-row">
@@ -89,43 +150,6 @@
               <button id="full-video" type="button" disabled>Use full video</button>
             </div>
           </div>
-
-          <div class="control-section setup-grid">
-            <div>
-              <h2>Split</h2>
-              <div class="button-row">
-                <button id="place-split" type="button" disabled>Place split</button>
-                <button id="clear-split" type="button" disabled>Clear split</button>
-              </div>
-            </div>
-            <div>
-              <h2>History</h2>
-              <div class="button-row">
-                <label class="inline-label" for="depth-select">Level</label>
-                <select id="depth-select" disabled>
-                  <option value="0">0</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <h2>Forward speed</h2>
-              <select id="speed-select" disabled>
-                <option value="1">1×</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="state-strip">
-            <span><small>Current</small><strong id="current-stat">—</strong></span>
-            <span><small>Back</small><strong id="earlier-stat">—</strong></span>
-            <span><small>Forward</small><strong id="later-stat">—</strong></span>
-            <span><small>Level</small><strong id="depth-stat">0</strong></span>
-          </div>
-
-          <p class="microcopy">
-            Repeat loops the last jump, skim, or played span. Undo returns to the previous passage.
-          </p>
         </section>
       </section>
 
