@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="theme-color" content="#0e1116">
-  <meta name="description" content="Navigate long YouTube videos by recursively narrowing a time interval.">
+  <meta name="description" content="Traverse, mark, and organize long YouTube videos as addressable temporal spaces.">
   <title>Binary YouTube Reader</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
@@ -15,178 +15,226 @@
     <header class="load-bar">
       <div>
         <h1>Binary YouTube Reader</h1>
-        <p>Move through long videos like a guide: narrow, widen, skim, and repeat.</p>
+        <p>Traverse, mark, and enter video passages without scrubbing.</p>
       </div>
       <div class="url-row">
         <label class="sr-only" for="youtube-url">YouTube URL</label>
-        <input id="youtube-url" type="url" inputmode="url" autocomplete="off"
-          placeholder="Paste a YouTube link">
+        <input id="youtube-url" type="url" inputmode="url" autocomplete="off" placeholder="Paste a YouTube link">
         <button id="load-video" class="primary" type="button">Load</button>
       </div>
     </header>
 
     <div class="workspace">
-      <section class="main-column" aria-label="Video resolution and playback controls">
-        <div class="player-wrap">
-          <div id="player"></div>
-        </div>
+      <section class="main-column" aria-label="Video traversal controls">
+        <div class="player-wrap"><div id="player"></div></div>
+        <div id="status" class="status" role="status" aria-live="polite">Load a YouTube video to begin.</div>
 
-        <div id="status" class="status" role="status" aria-live="polite">
-          Load a YouTube video to begin.
-        </div>
-
-        <section class="panel timeline-panel" aria-label="Video timeline">
+        <section class="panel timeline-panel" aria-label="Temporal map and traversal">
           <div class="timeline-header">
             <span id="current-time">0:00.000</span>
             <span id="duration-time">0:00.000</span>
           </div>
 
-          <div id="timeline" class="timeline"
-            aria-label="Video timeline. Tap within the Range to choose a Point and Narrow to it.">
+          <div id="timeline" class="timeline" aria-label="Temporal map. Tap within the Range to choose a Point and Narrow to it.">
             <div class="track">
-              <div id="scope-fill" class="scope-fill"></div>
-              <div id="frame-fill" class="frame-fill"></div>
+              <div id="range-fill" class="range-fill"></div>
+              <div id="passage-fill" class="passage-fill"></div>
+              <div id="selection-fill" class="selection-fill" hidden></div>
               <div id="action-preview-fill" class="action-preview-fill" hidden></div>
             </div>
+            <div id="mark-lane" class="mark-lane" aria-label="Marks"></div>
 
-            <button id="scope-start-handle" class="marker scope-handle" type="button"
-              role="slider" aria-label="Range start" aria-valuemin="0" aria-valuenow="0"></button>
-            <button id="scope-end-handle" class="marker scope-handle" type="button"
-              role="slider" aria-label="Range end" aria-valuemin="0" aria-valuenow="0"></button>
-
-            <span id="frame-left-marker" class="marker frame-marker" aria-hidden="true"></span>
-            <span id="frame-right-marker" class="marker frame-marker" aria-hidden="true"></span>
+            <button id="range-start-handle" class="marker range-handle" type="button" role="slider" aria-label="Range Start" aria-valuemin="0" aria-valuenow="0"></button>
+            <button id="range-end-handle" class="marker range-handle" type="button" role="slider" aria-label="Range End" aria-valuemin="0" aria-valuenow="0"></button>
+            <span id="passage-left-marker" class="marker passage-marker" aria-hidden="true"></span>
+            <span id="passage-right-marker" class="marker passage-marker" aria-hidden="true"></span>
             <span id="earlier-target-marker" class="marker target-marker" aria-hidden="true"></span>
             <span id="later-target-marker" class="marker target-marker" aria-hidden="true"></span>
             <span id="current-marker" class="marker current-marker" aria-hidden="true"></span>
             <span id="point-marker" class="marker point-marker" aria-hidden="true" hidden></span>
           </div>
 
-          <div class="timeline-labels">
-            <span id="scope-label">Range —</span>
-            <span id="frame-label">Passage —</span>
-            <span id="target-label">Earlier — · Later —</span>
-            <span id="point-label">Point —</span>
+          <div class="state-grid" aria-label="Current traversal state">
+            <span class="state-name">Range</span><span id="range-label">—</span>
+            <span class="state-name">Passage</span><span id="passage-label">—</span>
+            <span class="state-name">Current</span><span id="current-label">—</span>
+            <span class="state-name">Point</span><span id="point-label">—</span>
+            <span class="state-name">Last</span><span id="last-label">—</span>
+            <span class="state-name">Context</span><span id="context-label">Full video</span>
           </div>
-          <div class="primary-control-groups">
-            <section class="action-family resolution-family" aria-labelledby="resolution-heading">
-              <div class="family-heading">
-                <div>
-                  <h2 id="resolution-heading">Resolution</h2>
-                  <p>Narrow in either direction. Widen fully to the Range.</p>
-                </div>
-              </div>
-              <div class="action-grid resolution-actions">
-                <button id="go-earlier" class="action-card primary" type="button"
-                  data-preview-action="earlier" aria-keyshortcuts="Q" disabled>
-                  <span class="action-name hotkey-label">
-                    <kbd>Q</kbd><span>Narrow Earlier</span>
-                  </span>
-                  <span id="earlier-action-meta" class="action-meta">—</span>
-                </button>
-                <button id="widen-passage" class="action-card primary" type="button"
-                  data-preview-action="widen" aria-keyshortcuts="W" disabled>
-                  <span class="action-name hotkey-label">
-                    <kbd>W</kbd><span>Widen</span>
-                  </span>
-                  <span id="widen-action-meta" class="action-meta">—</span>
-                </button>
-                <button id="go-later" class="action-card primary" type="button"
-                  data-preview-action="later" aria-keyshortcuts="E" disabled>
-                  <span class="action-name hotkey-label">
-                    <kbd>E</kbd><span>Narrow Later</span>
-                  </span>
-                  <span id="later-action-meta" class="action-meta">—</span>
-                </button>
-              </div>
-              <div class="history-action">
-                <span class="history-label">History</span>
-                <button id="undo-move" class="action-card compact" type="button"
-                  data-preview-action="undo" aria-keyshortcuts="R" disabled>
-                  <span class="action-name hotkey-label">
-                    <kbd>R</kbd><span>Undo</span>
-                  </span>
-                  <span id="undo-action-meta" class="action-meta">—</span>
-                </button>
-              </div>
-            </section>
 
-            <section class="action-family" aria-labelledby="playback-heading">
-              <div class="family-heading">
-                <h2 id="playback-heading">Playback</h2>
-                <label class="speed-setting" for="speed-select">
-                  Skim max
-                  <select id="speed-select" disabled>
-                    <option value="1">1×</option>
-                  </select>
-                </label>
+          <section class="action-family motion-family" aria-labelledby="traversal-heading">
+            <div class="family-heading">
+              <div>
+                <h2 id="traversal-heading">Traversal</h2>
+                <p>Move by resolution, exact distance, or authored structure.</p>
               </div>
-              <div class="action-grid playback-actions">
-                <button id="search-play" class="action-card" type="button"
-                  data-preview-action="skim" disabled>
-                  <span id="skim-action-name" class="action-name">Skim</span>
-                  <span id="skim-action-meta" class="action-meta">—</span>
-                </button>
-                <button id="ordinary-play" class="action-card" type="button" disabled>
-                  <span id="play-action-name" class="action-name">Play</span>
-                  <span id="play-action-meta" class="action-meta">1×</span>
-                </button>
-                <button id="repeat-passage" class="action-card" type="button"
-                  data-preview-action="repeat" disabled>
-                  <span id="repeat-action-name" class="action-name">Repeat</span>
-                  <span id="repeat-action-meta" class="action-meta">—</span>
-                </button>
-              </div>
-            </section>
-          </div>
-          <p class="microcopy">
-            Narrow increases resolution Earlier or Later; Widen returns to the full Range around
-            this place.
-            Undo restores the previous passage and place. Tap the timeline to choose a Point and
-            Narrow to it; Undo reveals that Point for reuse. Skim accelerates to the Later
-            destination and becomes Play; Play Widens fully at crossed passage edges; Repeat
-            loops the last start-to-pause span.
-          </p>
-        </section>
-
-        <section class="panel controls-panel" aria-label="Range controls">
-          <div class="control-section">
-            <h2>Range</h2>
-            <div class="button-row">
-              <button id="set-start" type="button" disabled>Set range start</button>
-              <button id="set-end" type="button" disabled>Set range end</button>
-              <button id="centre-scope" type="button" disabled>Start in middle</button>
-              <button id="full-video" type="button" disabled>Use full video</button>
             </div>
-          </div>
+
+            <div class="motion-matrix">
+              <div class="motion-row-label">Resolution</div>
+              <button id="narrow-earlier" class="action-card primary" type="button" data-preview-action="earlier" aria-keyshortcuts="Q" disabled>
+                <span class="action-name hotkey-label"><kbd>Q</kbd><span>Narrow Earlier</span></span>
+                <span id="earlier-meta" class="action-meta">—</span>
+              </button>
+              <button id="widen" class="action-card primary" type="button" data-preview-action="widen" aria-keyshortcuts="W" disabled>
+                <span class="action-name hotkey-label"><kbd>W</kbd><span>Widen</span></span>
+                <span id="widen-meta" class="action-meta">—</span>
+              </button>
+              <button id="narrow-later" class="action-card primary" type="button" data-preview-action="later" aria-keyshortcuts="E" disabled>
+                <span class="action-name hotkey-label"><kbd>E</kbd><span>Narrow Later</span></span>
+                <span id="later-meta" class="action-meta">—</span>
+              </button>
+
+              <div class="motion-row-label">Linear</div>
+              <button id="step-earlier" class="action-card compact" type="button" data-preview-action="stepEarlier" aria-keyshortcuts="ArrowLeft" disabled>
+                <span class="action-name hotkey-label"><kbd>←</kbd><span>Step Earlier</span></span>
+                <span id="step-earlier-meta" class="action-meta">—</span>
+              </button>
+              <label class="step-setting" for="step-slider">
+                <span>Step size</span>
+                <input id="step-slider" type="range" min="0.25" max="60" step="0.25" value="10" disabled>
+                <span class="step-value"><input id="step-seconds" type="number" min="0.25" max="300" step="0.25" value="10" disabled> s</span>
+              </label>
+              <button id="step-later" class="action-card compact" type="button" data-preview-action="stepLater" aria-keyshortcuts="ArrowRight" disabled>
+                <span class="action-name hotkey-label"><kbd>→</kbd><span>Step Later</span></span>
+                <span id="step-later-meta" class="action-meta">—</span>
+              </button>
+
+              <div class="motion-row-label">Marks</div>
+              <button id="previous-mark" class="action-card compact" type="button" data-preview-action="previousMark" aria-keyshortcuts="," disabled>
+                <span class="action-name hotkey-label"><kbd>,</kbd><span>Previous Mark</span></span>
+                <span id="previous-mark-meta" class="action-meta">—</span>
+              </button>
+              <button id="mark-current" class="action-card compact" type="button" aria-keyshortcuts="M" disabled>
+                <span class="action-name hotkey-label"><kbd>M</kbd><span>Mark Current</span></span>
+                <span id="mark-current-meta" class="action-meta">—</span>
+              </button>
+              <button id="next-mark" class="action-card compact" type="button" data-preview-action="nextMark" aria-keyshortcuts="." disabled>
+                <span class="action-name hotkey-label"><kbd>.</kbd><span>Next Mark</span></span>
+                <span id="next-mark-meta" class="action-meta">—</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="action-family playback-family" aria-labelledby="playback-heading">
+            <div class="family-heading">
+              <div><h2 id="playback-heading">Playback</h2><p>Traverse perceptibly or replay the last extent.</p></div>
+              <label class="speed-setting" for="speed-select">Skim max <select id="speed-select" disabled><option value="1">1×</option></select></label>
+            </div>
+            <div class="action-grid playback-actions">
+              <button id="skim" class="action-card" type="button" data-preview-action="skim" aria-keyshortcuts="S" disabled>
+                <span id="skim-name" class="action-name">Skim</span><span id="skim-meta" class="action-meta">—</span>
+              </button>
+              <button id="play" class="action-card" type="button" aria-keyshortcuts="Space" disabled>
+                <span id="play-name" class="action-name">Play</span><span id="play-meta" class="action-meta">1×</span>
+              </button>
+              <button id="repeat-last" class="action-card" type="button" data-preview-action="repeat" aria-keyshortcuts="T" disabled>
+                <span id="repeat-name" class="action-name">Repeat</span><span id="repeat-meta" class="action-meta">—</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="compact-strip return-strip" aria-labelledby="return-heading">
+            <h2 id="return-heading">Return</h2>
+            <div class="return-actions">
+              <button id="undo" class="history-button" type="button" data-preview-action="undo" aria-keyshortcuts="R Backspace" disabled>
+                <span class="hotkey-label"><kbd>R</kbd><span>Undo</span></span>
+                <span id="undo-meta" class="action-meta">—</span>
+              </button>
+              <button id="exit-context" class="history-button" type="button" aria-keyshortcuts="Alt+ArrowUp" disabled>
+                <span class="hotkey-label"><kbd>⌥↑</kbd><span>Exit</span></span>
+                <span id="exit-meta" class="action-meta">Root Context</span>
+              </button>
+            </div>
+          </section>
+
+          <details class="range-tools">
+            <summary>
+              <span>Range tools</span>
+              <span id="range-tools-value">—</span>
+            </summary>
+            <div class="compact-actions">
+              <button id="range-start-here" type="button" disabled>Start Here</button>
+              <button id="range-midpoint" type="button" disabled>Midpoint</button>
+              <button id="range-end-here" type="button" disabled>End Here</button>
+              <button id="full-video-range" type="button" disabled>Full Video</button>
+            </div>
+          </details>
+
+          <details class="help">
+            <summary>How traversal works</summary>
+            <p>The three traversal rows share one directional grammar: Earlier on the left, the axis control in the centre, and Later on the right. Narrow changes resolution, Step moves by exact seconds, and Previous or Next Mark moves through authored structure. Playback remains continuous. Widen returns in resolution, Undo returns in navigation history, and Exit returns to the parent Context.</p>
+          </details>
         </section>
       </section>
 
-      <aside class="panel saved-panel" aria-label="Saved passages">
-        <div class="saved-heading">
-          <div>
-            <h2>Saved passages</h2>
-            <p>Saved per YouTube video.</p>
+      <aside class="panel structure-panel" aria-label="Structure">
+        <div class="structure-heading">
+          <div><h2>Structure</h2><p>Marks preserve Addresses. Spans relate them.</p></div>
+          <div class="structure-counts"><span id="mark-count" class="count">0</span><span id="span-count" class="count">0</span></div>
+        </div>
+        <button id="undo-edit" class="subtle full-button" type="button" disabled>Undo Edit</button>
+
+        <section class="structure-section" aria-labelledby="capture-heading">
+          <h3 id="capture-heading">Create Mark</h3>
+          <label for="address-source">Address</label>
+          <select id="address-source" disabled>
+            <option value="current">Current</option>
+            <option value="point">Point</option>
+            <option value="earlier">Earlier Destination</option>
+            <option value="later">Later Destination</option>
+            <option value="passageStart">Passage Start</option>
+            <option value="passageEnd">Passage End</option>
+            <option value="rangeStart">Range Start</option>
+            <option value="rangeEnd">Range End</option>
+            <option value="lastStart">Last Traversal Start</option>
+            <option value="lastEnd">Last Traversal End</option>
+          </select>
+          <label for="mark-label">Label</label>
+          <input id="mark-label" type="text" maxlength="100" placeholder="e.g. Compression begins" disabled>
+          <button id="create-mark" class="primary full-button" type="button" disabled>Create Mark</button>
+        </section>
+
+        <section class="structure-section" aria-labelledby="quick-span-heading">
+          <h3 id="quick-span-heading">Save as Span</h3>
+          <label for="span-label">Label</label>
+          <input id="span-label" type="text" maxlength="100" placeholder="e.g. Compressor setup" disabled>
+          <div class="quick-span-actions">
+            <button id="save-passage" type="button" disabled>Passage</button>
+            <button id="save-last" type="button" disabled>Last Traversal</button>
+            <button id="save-range" type="button" disabled>Range</button>
           </div>
-          <span id="saved-count" class="count">0</span>
-        </div>
+        </section>
 
-        <label for="region-label">Label</label>
-        <div class="save-row">
-          <input id="region-label" type="text" maxlength="80" placeholder="e.g. Compressor setup">
-          <button id="save-region" class="primary" type="button" disabled>Save passage</button>
-        </div>
-        <p class="microcopy">
-          Saves the current passage. Loading it makes that passage the new range.
-        </p>
+        <section id="selection-inspector" class="structure-section selection-inspector" aria-labelledby="selection-heading" hidden>
+          <h3 id="selection-heading">Selected</h3>
+          <div id="selection-summary"></div>
+          <label for="selection-label">Label</label>
+          <div class="inline-edit"><input id="selection-label" type="text" maxlength="100"><button id="apply-selection-label" type="button">Apply</button></div>
+          <div id="selection-roles" class="role-chips"></div>
+          <div id="selection-relations" class="relations"></div>
+          <button id="delete-selection" class="danger-text full-button" type="button">Delete</button>
+        </section>
 
-        <div id="saved-regions" class="saved-list">
-          <p class="empty-state">No saved passages for this video.</p>
-        </div>
+        <section id="span-draft" class="structure-section draft-section" aria-labelledby="draft-heading" hidden>
+          <h3 id="draft-heading">New Span</h3>
+          <div id="draft-summary"></div>
+          <div class="quick-span-actions"><button id="save-draft" class="primary" type="button">Save</button><button id="clear-draft" type="button">Clear</button></div>
+        </section>
+
+        <section class="structure-section list-section" aria-labelledby="marks-list-heading">
+          <div class="list-heading"><h3 id="marks-list-heading">Marks</h3><span id="marks-list-count">0</span></div>
+          <div id="marks-list" class="structure-list"><p class="empty-state">No Marks for this video.</p></div>
+        </section>
+
+        <section class="structure-section list-section" aria-labelledby="spans-list-heading">
+          <div class="list-heading"><h3 id="spans-list-heading">Spans</h3><span id="spans-list-count">0</span></div>
+          <div id="spans-list" class="structure-list"><p class="empty-state">No Spans for this video.</p></div>
+        </section>
       </aside>
     </div>
   </main>
-
   <script type="module" src="app.js"></script>
 </body>
 </html>

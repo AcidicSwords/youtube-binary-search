@@ -1,14 +1,42 @@
 # Binary YouTube Reader
 
-A lightweight static web implementation of recursive binary traversal for YouTube videos.
+A lightweight static web application for treating long YouTube videos as addressable temporal spaces.
 
-The intended rhythm is:
+The reader combines four movement geometries:
 
-1. Set a range.
-2. Narrow Earlier or Narrow Later to increase resolution, or tap a precise Point.
-3. Skim fast-to-normal and continue at `1×`, or Repeat the passage just traversed.
-4. Undo to restore the prior state, or Widen fully to the Range without moving.
-5. Save and label a useful passage.
+- **Resolution:** Narrow Earlier, Widen, Narrow Later.
+- **Linear:** Step Earlier or Later by an exact number of seconds.
+- **Structural:** Previous Mark, Mark Current, Next Mark, and Go to a selected Mark.
+- **Continuous:** Skim, Play, Repeat Last Traversal, and Loop a saved Span.
+
+The three directional families share one visible and keyboard rhythm:
+
+```text
+Narrow Earlier | Widen        | Narrow Later
+Step Earlier   | Step size    | Step Later
+Previous Mark  | Mark Current | Next Mark
+```
+
+Earlier is always left, Later is always right, and the centre holds that row's own control.
+
+Traversal and organization use the same temporal objects:
+
+- An **Address** is an exact position in the video.
+- A **Mark** is an Address given persistent identity.
+- A **Span** is an ordered relation between two Marks.
+- A **Passage** is the active working Span.
+- A **Range** bounds the active Context.
+
+## Intended rhythm
+
+1. Load or establish a Range.
+2. Narrow logarithmically, Step linearly, or choose a precise Point.
+3. Skim, Play, or Repeat the resulting traversal.
+4. Mark meaningful Addresses.
+5. Move through Marks with Previous Mark and Next Mark.
+6. Relate Marks into saved Spans.
+7. Enter or Focus a Span and continue traversing within it.
+8. Return through Widen, Undo, or Exit according to whether the displaced relation is resolution, navigation history, or Context.
 
 ## Run locally
 
@@ -18,93 +46,70 @@ The project must be served over HTTP or HTTPS so the YouTube embedded player rec
 python -m http.server 8080
 ```
 
-Open:
+Open `http://localhost:8080`.
 
-```text
-http://localhost:8080
-```
+No build step, dependency installation, API key, backend, or secret is required.
 
-No build step or API key is required.
+## Persistence
 
-## Deploy to GitHub Pages
+Marks and Spans are stored locally per YouTube video in browser `localStorage`.
 
-The repository includes `.github/workflows/deploy-pages.yml`. Every push to `main` or `master`
-checks the JavaScript, runs the tests, and deploys the repository through GitHub Pages.
+Version 2 automatically migrates version 1 saved passages into:
 
-After pushing the repository to GitHub, open **Settings → Pages** and set **Source** to
-**GitHub Actions**. The next push to the default branch, or a manual run from the Actions tab,
-publishes the site over HTTPS.
+- shared endpoint Marks;
+- saved Spans referencing those Marks.
 
-No YouTube API key, backend, secrets, or build output are required. Saved passages use browser
-local storage, so they remain private to each browser and do not automatically synchronize
-between devices.
-
-## Implemented
-
-- YouTube URL parsing for watch, youtu.be, Shorts, live, and embed links
-- Native embedded YouTube player with normal controls
-- Two draggable study-range handles
-- One-press Narrow Earlier and Narrow Later operations
-- Widen as their inverse: return directly to the lowest resolution while retaining the current
-  place
-- Fast-to-normal Skim playback that continues at `1×` after its destination
-- Normal-speed playback that automatically Widens at crossed passage boundaries
-- One-button repetition of the last jump, skim, or played passage
-- Timeline Point selection composed with an immediate Narrow Earlier or Narrow Later operation
-- Undo of a Point move restores that Point so it can be reused by Earlier, Later, or Skim
-- One-step Undo to the previous passage and place
-- One-step Widen from any recursion depth to the full Range while keeping the current place
-- Undo restores one prior level and its old playhead; Widen exits all levels around the live one
-- Visible destinations and affected ranges on every primary control
-- Timeline previews and separate non-overlapping marker lanes
-- Saved labelled passages stored locally per YouTube video
-- Clicking a saved passage loads it as the new range and starts at its midpoint
-- Keyboard shortcuts
+The data remains private to the current browser and does not synchronize between devices.
 
 ## Keyboard
 
-- Q: Narrow Earlier
-- W: Widen
-- E: Narrow Later
-- R: Undo
-- Left Arrow: Narrow Earlier
-- Right Arrow: Narrow Later
-- Shift + Right Arrow: skim to the Later destination
-- Backspace: undo to the previous passage and place
-- Shift + Backspace: Widen fully to the Range while staying in place
-- Control/Command + Backspace: undo to the root passage
-- Space: play/pause at 1×
-- Escape: clear the selected Point
+### Resolution
 
-## API-constrained behaviour
+- `Q`: Narrow Earlier
+- `W`: Widen
+- `E`: Narrow Later
+- `R` or `Backspace`: Undo
+- `Shift + Backspace`: Widen
+- `Control/Command + Backspace`: restore the active Context root
 
-The YouTube IFrame API exposes a video's available playback rates. Skim
-uses only those rates and chooses a descending staircase that approximates a logarithmic
-fast-to-normal curve.
+### Linear
 
-The IFrame API does not expose reverse playback, so earlier traversal is implemented as a
-jump. This is deliberate rather than simulated.
+- `Left Arrow`: Step Earlier
+- `Right Arrow`: Step Later
+- `[`: decrease Step size
+- `]`: increase Step size
 
-The custom controls remain outside the embedded YouTube player.
+### Marks
+
+- `,`: Previous Mark
+- `.`: Next Mark
+- `M`: Mark Current
+
+### Playback
+
+- `S`: Skim
+- `Space`: Play/Pause
+- `T`: Repeat Last Traversal
+
+### Context and selection
+
+- `Alt/Option + Up`: Exit Context
+- `Escape`: clear Point, Span draft, or structural selection
 
 ## Files
 
-- `index.html` — application shell
-- `styles.css` — responsive control-panel UI
-- `traversal.js` — pure interval and recursion logic
+- `index.html` — application shell and control placement
+- `styles.css` — responsive temporal map and Structure panel
+- `traversal.js` — pure Frame, destination, Widen, Step, and playback geometry
+- `structure.js` — pure Mark and Span model, relations, and migration
 - `youtube.js` — YouTube URL and timestamp parsing
-- `app.js` — YouTube API integration and interactions
-- `SPEC.md` — implementation contract and acceptance criteria
-- `tests.mjs` — dependency-free state-transition tests
+- `app.js` — YouTube API integration, state transitions, persistence, and UI orchestration
+- `SPEC.md` — canonical interaction and implementation contract
+- `tests.mjs` — dependency-free model tests
 
-## Test the recursion model
+## Test
 
 ```bash
 npm test
-```
-
-Run all syntax checks and tests with:
-
-```bash
 npm run check
 ```
