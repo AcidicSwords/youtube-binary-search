@@ -1,120 +1,135 @@
-# Populate `feature/marked-traversal-v2` and merge it
+# Manual Branch Installation and Merge
 
-This archive is a complete replacement source set for the repository root. It intentionally does not include `.git`, `.github`, or the existing favicon. Copy the files over the repository; do not delete unlisted repository files.
+## 1. Create a safety branch
 
-## 1. Prepare the existing branch
-
-```bash
-git clone https://github.com/AcidicSwords/youtube-binary-search.git
-cd youtube-binary-search
-git fetch origin
-git switch feature/marked-traversal-v2
-```
-
-The branch already exists and currently matches `main`. Confirm the working tree is clean:
+From the repository root:
 
 ```bash
-git status --short
+git switch main
+git pull --ff-only
+git switch -c feature/guide-v3
 ```
 
-It should print nothing.
+## 2. Extract the replacement package
 
-## 2. Copy the package into the repository root
-
-Extract the archive into a temporary directory, then copy these files over the repository root:
+Extract the archive into a temporary directory, then copy these files into the repository root:
 
 ```text
+app.js
+index.html
+styles.css
+structure.js
+traversal.js
+youtube.js
+package.json
+tests.mjs
+integration-check.mjs
+startup-smoke.mjs
 README.md
 SPEC.md
 IMPLEMENTATION.md
 BRANCH_INSTALL.md
-app.js
-index.html
-package.json
-structure.js
-styles.css
-tests.mjs
-traversal.js
-youtube.js
 ```
 
-On macOS or Linux, from the extracted package directory:
+`youtube.js` is included for a complete drop-in set but is functionally unchanged.
+
+Do not delete:
+
+```text
+favicon.svg
+.github/
+```
+
+The replacement uses the existing `structure.js` filename, so no source file needs to be removed.
+
+## 3. Inspect the replacement
 
 ```bash
-cp README.md SPEC.md IMPLEMENTATION.md BRANCH_INSTALL.md \
-  app.js index.html package.json structure.js styles.css \
-  tests.mjs traversal.js youtube.js /path/to/youtube-binary-search/
+git status --short
+git diff --stat
+git diff -- app.js index.html styles.css structure.js traversal.js
 ```
 
-Do not remove `.github/workflows/deploy-pages.yml` or `favicon.svg` from the repository.
+Expected conceptual removals include:
 
-## 3. Verify before committing
+```text
+selectedMarkId
+selectedSpanId
+draftStartMarkId
+draftEndMarkId
+contextStack
+anchorMarkId
+bindPassageStart
+bindPassageEnd
+```
 
-From the repository root:
+## 4. Run automated checks
 
 ```bash
 npm run check
 ```
 
-Expected final line:
+Expected output:
 
 ```text
 All logic tests passed.
+Integration check passed: 74 DOM references, 0 missing.
+Startup smoke passed.
 ```
 
-Run a local smoke test:
+## 5. Run a browser smoke test
+
+Serve the repository:
 
 ```bash
 python -m http.server 8080
 ```
 
-Open `http://localhost:8080` and verify:
+Open `http://localhost:8080` and verify this exact sequence:
 
-1. Narrow twice, Widen, then Undo; the exact pre-Widen Frame returns.
-2. Set Step to 5 seconds and verify Left/Right move exactly 5 seconds.
-3. Press `M` at three positions; use `,` and `.` to traverse them.
-4. Passage displays `Level n`.
-5. Last Traversal displays `jumped` or `played`.
-6. Hovering a timeline Mark shows its label and time.
-7. Save Passage as a Span; Enter it, Widen inside it, then Exit.
-8. Reload and confirm Marks and Spans persist.
+1. Load a YouTube video.
+2. Click two timeline Addresses in succession.
+3. Confirm Repeat Window shows only the second Traversal.
+4. Press Repeat and confirm that extent loops.
+5. Press Widen and confirm Current and Repeat Window remain unchanged.
+6. Narrow Earlier and Later.
+7. Step inside and outside Resolution.
+8. Add Marks at both endpoints.
+9. Save Repeat Window as a titled Section.
+10. Click the Section and confirm Current moves to its midpoint.
+11. Click its Start endpoint and confirm the first half becomes Repeat Window.
+12. Focus the Section and confirm Range snaps to its bounds.
+13. Press Play and confirm Range loops.
+14. Unfocus and confirm the preceding Range returns.
+15. Undo navigation, Focus, Range, Mark creation, and Section creation.
+16. Add enough nearby Marks to confirm timeline clustering.
+17. Reload the page and confirm Guide persistence.
+18. Load a video with existing v2 data and confirm Sections migrate.
 
-## 4. Commit and push the feature branch
+## 6. Commit and push
 
 ```bash
-git add README.md SPEC.md IMPLEMENTATION.md BRANCH_INSTALL.md \
-  app.js index.html package.json structure.js styles.css \
-  tests.mjs traversal.js youtube.js
+git add app.js index.html styles.css structure.js traversal.js youtube.js \
+  package.json tests.mjs integration-check.mjs startup-smoke.mjs \
+  README.md SPEC.md IMPLEMENTATION.md BRANCH_INSTALL.md
 
-git commit -m "Add unified marked traversal system"
-git push -u origin feature/marked-traversal-v2
+git commit -m "Refactor guide around composable temporal operations"
+git push -u origin feature/guide-v3
 ```
 
-Confirm the branch differs from `main`:
+## 7. Merge
 
-```bash
-git log --oneline main..feature/marked-traversal-v2
-git diff --stat main...feature/marked-traversal-v2
-```
-
-## 5. Merge through a pull request
-
-Create a pull request from `feature/marked-traversal-v2` into `main`. The suggested title is:
-
-```text
-Add unified marked traversal system
-```
-
-Before merging, confirm the repository check passes and complete the smoke test above. Use a squash merge or merge commit; either is valid for this single coherent change set.
-
-## 6. Direct local merge alternative
+Create a pull request from `feature/guide-v3` to `main`. After checks and the browser smoke test pass:
 
 ```bash
 git switch main
-git pull --ff-only origin main
-git merge --no-ff feature/marked-traversal-v2
-npm run check
+git pull --ff-only
+git merge --ff-only feature/guide-v3
 git push origin main
 ```
 
-The GitHub Pages workflow runs only on `main` or `master`, so deployment begins after the merge to `main`.
+Use the pull-request merge button instead when branch protection requires it.
+
+## Rollback
+
+Version 3 writes a new local-storage key and does not delete the previous v2 key. Reverting the Git commit restores the prior application and its v2 data remains available.

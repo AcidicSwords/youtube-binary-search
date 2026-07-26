@@ -1,46 +1,126 @@
 # Binary YouTube Reader
 
-A lightweight static web application for treating long YouTube videos as addressable temporal spaces.
+A lightweight static interface for traversing and organizing long YouTube videos as addressable temporal spaces.
 
-The reader combines four movement geometries:
+The system is built around one primitive—an exact temporal **Address**—and a small set of tightly composed operations.
 
-- **Resolution:** Narrow Earlier, Widen, Narrow Later.
-- **Linear:** Step Earlier or Later by an exact number of seconds.
-- **Structural:** Previous Mark, Mark Current, Next Mark, and Go to a selected Mark.
-- **Continuous:** Skim, Play, Repeat Last Traversal, and Loop a saved Span.
+## Core objects
 
-The three directional families share one visible and keyboard rhythm:
+- **Current** — the active Address.
+- **Range** — the one active bounded workspace. Normal Play loops it.
+- **Resolution** — the current binary refinement inside Range.
+- **Traversal** — movement from one Address to another.
+- **Repeat Window** — the extent of the latest Traversal. Repeat loops it.
+- **Mark** — a saved Address.
+- **Section** — a named persistent relation between two Marks.
+- **Focused Section** — the Section currently supplying Range.
+
+`Interval`, `Frame`, `extent`, and endpoint identity remain implementation terms. The interface does not expose Passage, Span, Point, Context, Anchor, endpoint roles, or structural drafts.
+
+## Operator grammar
+
+Every movement operator resolves or retrieves a destination Address and produces the same consequence:
 
 ```text
-Narrow Earlier | Widen        | Narrow Later
-Step Earlier   | Step size    | Step Later
-Previous Mark  | Mark Current | Next Mark
+choose or derive destination
+→ traverse
+→ Current changes
+→ Repeat Window becomes departure–arrival
+→ Undo becomes available
 ```
 
-Earlier is always left, Later is always right, and the centre holds that row's own control.
+Destination sources:
 
-Traversal and organization use the same temporal objects:
+- timeline click — direct Address;
+- Narrow Earlier/Later — logarithmic destination;
+- Step Earlier/Later — fixed linear destination;
+- Previous/Next Mark — adjacent saved Address;
+- Mark click — exact saved Address;
+- Section click — derived midpoint;
+- Skim and Play — actual playback arrival.
 
-- An **Address** is an exact position in the video.
-- A **Mark** is an Address given persistent identity.
-- A **Span** is an ordered relation between two Marks.
-- A **Passage** is the active working Span.
-- A **Range** bounds the active Context.
+Nonmovement deformations:
 
-## Intended rhythm
+- **Widen** — restore Range-level Resolution without moving or replacing Repeat Window.
+- **Focus** — apply a Section as Range.
+- **Unfocus** — restore the Range that preceded Focus.
+- **Undo** — restore the complete state preceding the last committed operator, including Guide edits.
 
-1. Load or establish a Range.
-2. Narrow logarithmically, Step linearly, or choose a precise Point.
-3. Skim, Play, or Repeat the resulting traversal.
-4. Mark meaningful Addresses.
-5. Move through Marks with Previous Mark and Next Mark.
-6. Relate Marks into saved Spans.
-7. Enter or Focus a Span and continue traversing within it.
-8. Return through Widen, Undo, or Exit according to whether the displaced relation is resolution, navigation history, or Context.
+## Primary rhythm
 
-## Run locally
+```text
+click or Narrow
+→ Repeat when useful
+→ Widen for context
+→ click, Narrow, or Step again
 
-The project must be served over HTTP or HTTPS so the YouTube embedded player receives a referrer.
+Current → Add Mark
+Repeat Window → Save Section
+Section → Focus → Range
+```
+
+Clicking a Section moves to its midpoint. Clicking either endpoint Mark then makes that half of the Section the new Repeat Window without requiring a dedicated half-section command.
+
+## Playback
+
+- **Play Range** loops the active Range continuously.
+- **Repeat** loops the Repeat Window.
+- **Skim** approaches the Later destination fast-to-normal and continues at `1×`.
+- When Play wraps Range, it preserves the prior Repeat Window because a wrapped cyclic path is not one ordinary interval.
+
+## Guide and visual density
+
+The sidebar is a Guide rather than a structural editor:
+
+- add a Mark at Current;
+- save the Repeat Window as a Section;
+- click Marks and Sections to navigate;
+- Focus or Unfocus Sections;
+- rename or delete Guide objects.
+
+Sections retain linked endpoint Marks internally. Automatically generated unnamed endpoints are not projected into the global Mark lane or Marks list. Explicit or named Marks are clustered by screen position when they would overlap. Only the hovered Section receives a temporary timeline preview; all Section extents are not drawn simultaneously.
+
+## Keyboard
+
+### Resolution
+
+- `Q` — Narrow Earlier
+- `W` — Widen
+- `E` — Narrow Later
+
+### Linear
+
+- `Left Arrow` — Step Earlier
+- `Right Arrow` — Step Later
+- `[` / `]` — decrease/increase Step size
+
+### Marks
+
+- `,` — Previous Mark
+- `.` — Next Mark
+- `M` — focus the Mark title field
+
+### Playback and history
+
+- `S` — Skim
+- `Space` — Play/Pause Range
+- `T` — Repeat/Stop Repeat
+- `R` or `Backspace` — Undo
+- `Escape` — close transient menus or previews
+
+## Persistence
+
+Guide data is stored locally per video at:
+
+```text
+binary-youtube-reader:v3:<videoId>
+```
+
+Version 3 reads and migrates existing version 2 Marks and Spans into Marks and Sections. The version 2 key is left untouched as a rollback copy. Version 1 saved passages also migrate.
+
+## Run
+
+Serve the directory over HTTP or HTTPS so the YouTube embed receives a referrer:
 
 ```bash
 python -m http.server 8080
@@ -50,66 +130,16 @@ Open `http://localhost:8080`.
 
 No build step, dependency installation, API key, backend, or secret is required.
 
-## Persistence
-
-Marks and Spans are stored locally per YouTube video in browser `localStorage`.
-
-Version 2 automatically migrates version 1 saved passages into:
-
-- shared endpoint Marks;
-- saved Spans referencing those Marks.
-
-The data remains private to the current browser and does not synchronize between devices.
-
-## Keyboard
-
-### Resolution
-
-- `Q`: Narrow Earlier
-- `W`: Widen
-- `E`: Narrow Later
-- `R` or `Backspace`: Undo
-- `Shift + Backspace`: Widen
-- `Control/Command + Backspace`: restore the active Context root
-
-### Linear
-
-- `Left Arrow`: Step Earlier
-- `Right Arrow`: Step Later
-- `[`: decrease Step size
-- `]`: increase Step size
-
-### Marks
-
-- `,`: Previous Mark
-- `.`: Next Mark
-- `M`: Mark Current
-
-### Playback
-
-- `S`: Skim
-- `Space`: Play/Pause
-- `T`: Repeat Last Traversal
-
-### Context and selection
-
-- `Alt/Option + Up`: Exit Context
-- `Escape`: clear Point, Span draft, or structural selection
-
-## Files
-
-- `index.html` — application shell and control placement
-- `styles.css` — responsive temporal map and Structure panel
-- `traversal.js` — pure Frame, destination, Widen, Step, and playback geometry
-- `structure.js` — pure Mark and Span model, relations, and migration
-- `youtube.js` — YouTube URL and timestamp parsing
-- `app.js` — YouTube API integration, state transitions, persistence, and UI orchestration
-- `SPEC.md` — canonical interaction and implementation contract
-- `tests.mjs` — dependency-free model tests
-
-## Test
+## Verification
 
 ```bash
-npm test
 npm run check
 ```
+
+The check runs:
+
+- JavaScript syntax validation;
+- traversal and Guide model tests;
+- DOM-binding validation;
+- obsolete-state validation;
+- startup smoke under a minimal DOM.

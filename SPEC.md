@@ -1,395 +1,353 @@
-# Binary YouTube Reader — Unified Marked Traversal Contract
+# Binary YouTube Reader — Guide v3 Canonical Specification
 
-## 1. Product
+## 1. Purpose
 
-Binary YouTube Reader turns a transient video stream into a persistent, navigable temporal topology.
+The application converts a transient video stream into an addressable, repeatable, and lightly organized temporal workspace.
 
-The system must remain lightweight and compositional. It has no editing mode and no separate navigation mode. Traversal creates structure, and structure becomes traversable.
+The design requirement is compositional closure: a small set of operators act on shared temporal attributes, and useful compound manoeuvres emerge from their sequence rather than from dedicated feature buttons.
 
-The project succeeds when its controls feel like one small vocabulary rather than unrelated video-player features.
+## 2. Primitive
 
-## 2. Primitive objects
-
-### Address
-
-An exact temporal position:
+An **Address** is a finite timestamp:
 
 ```text
-0 <= t <= duration
+Address = t, 0 ≤ t ≤ Duration
 ```
 
-Current, Point, Destination, Bound, Anchor, midpoint, and Mark are Address roles or forms.
+Address is internal vocabulary. The interface presents Address roles such as Current and Mark.
 
-### Mark
+## 3. User-facing state
 
-A persistent Address:
+### 3.1 Current
+
+The active Address.
+
+### 3.2 Range
+
+The one active bounded workspace:
 
 ```text
-{id, videoId, t, label, note, provenance, createdAt, updatedAt}
+Range = [A, B], A < B
 ```
 
-A Mark has no permanent role. It may become Point, Passage Start, Passage End, Range Start, Range End, Span Start, Span End, or Anchor.
+Range constrains direct timeline traversal, Step, Narrow, Skim, and playback. Normal Play loops Range.
 
-### Span
+### 3.3 Resolution
 
-An ordered relation between two Marks:
+The current binary refinement inside Range. Internally:
 
 ```text
-startMark.t < endMark.t
+Frame = {L, C, R, level}
+A ≤ L ≤ C ≤ R ≤ B
 ```
 
-Persistent schema:
+The interface calls `[L,R]` Resolution, not Passage.
+
+### 3.4 Traversal
+
+An ordered movement event:
 
 ```text
-{id, videoId, startMarkId, endMarkId, anchorMarkId|null,
- label, summary, provenance, createdAt, updatedAt}
+Traversal = {
+  departure,
+  arrival,
+  start = min(departure, arrival),
+  end = max(departure, arrival),
+  operator,
+  medium
+}
 ```
 
-### Frame
+### 3.5 Repeat Window
 
-The active Passage, Current, and Narrow depth:
+The extent of the latest Traversal:
 
 ```text
-{L, C, R, level, optional returnPoint}
+Repeat Window = [Traversal.start, Traversal.end]
 ```
 
-Invariant:
+Repeat loops this interval.
+
+### 3.6 Mark
+
+A persistent saved Address:
 
 ```text
-Range.start <= L <= C <= R <= Range.end
-level >= 0
+Mark = {id, t, label, provenance, createdAt, updatedAt}
 ```
 
-### Context
+Clicking a Mark traverses to `Mark.t`.
 
-A Range plus its Frame history, Point, Last Traversal, and structural selection.
+### 3.7 Section
 
-Entered Spans create child Contexts. Exit restores the exact parent Context.
-
-## 3. Lexicon
-
-- **Current:** active Address `C`.
-- **Point:** temporary exact Destination replacing automatic Earlier or Later.
-- **Destination:** Address toward which an operation moves.
-- **Bound:** Address used as an edge.
-- **Midpoint:** arithmetic midpoint only.
-- **Anchor:** preferred entry Address of a saved Span.
-- **Passage:** active working Span `[L,R]`.
-- **Range:** outer Span bounding the active Context `[A,B]`.
-- **Level:** number of binary Narrows from the Context root.
-- **Last Traversal:** actual last movement extent plus operator and medium.
-- **Narrow:** move and increase Level.
-- **Widen:** restore the active Range around Current and set Level to zero.
-- **Step:** move by a fixed duration without intentionally increasing Level.
-- **Target:** use an Address as Point without moving.
-- **Go:** Target a Mark and Narrow toward it.
-- **Enter:** use a Span as a child Context Range.
-- **Exit:** restore the parent Context.
-- **Focus:** use a Span as Passage without changing Range.
-- **Undo:** restore the preceding navigation Frame.
-- **Undo Edit:** restore the preceding structural mutation.
-
-Avoid `scope`, `region`, `clip`, `bookmark`, `cursor`, and `focus mode` in product language.
-
-## 4. State
+A persistent named relation between two Marks:
 
 ```text
-videoId
-duration
-
-range = {start, end, sourceSpanId|null}
-stack = [Frame0, Frame1, ... FrameN]
-contextStack = [ContextSnapshot...]
-point = Address|null
-lastTraversal = Traversal|null
-
-structure = {marks[], spans[]}
-selectedMarkId|null
-selectedSpanId|null
-draftStartMarkId|null
-draftEndMarkId|null
-structuralHistory[]
-
-stepSeconds
-skimSession|null
-repeatSession|null
-playbackStart|null
-playWidened
+Section = {
+  id,
+  startMarkId,
+  endMarkId,
+  label,
+  createdAt,
+  updatedAt
+}
 ```
 
-`stack` is navigation history. `frame.level` is resolution depth. They are not interchangeable.
-
-## 5. Resolution
-
-### Narrow Earlier
+Section geometry is derived through linked Marks:
 
 ```text
-automatic = (L + C) / 2
-Point < C => destination = Point
+start(Section) = startMark.t
+end(Section)   = endMark.t
+mid(Section)   = (start + end) / 2
 ```
 
-Push an Earlier child Frame at `level + 1`, record Last Traversal, and consume Point when used.
+A Mark may be referenced by any number of Sections.
 
-### Narrow Later
+Clicking a Section traverses to its midpoint. Clicking either endpoint control traverses to that Mark.
+
+### 3.8 Focused Section
+
+A Section is Focused when its bounds supply Range.
+
+Only one Section can be Focused. The Range preceding the first Focus is retained for Unfocus. Switching directly between Focused Sections retains that original return Range.
+
+## 4. Movement operators
+
+All movement operators commit the same state relation:
 
 ```text
-automatic = (C + R) / 2
-Point > C => destination = Point
+resolve destination
+→ Current := destination
+→ update Resolution according to movement geometry
+→ Repeat Window := departure–arrival
+→ record one Undo snapshot
 ```
 
-Push a Later child Frame at `level + 1`, record Last Traversal, and consume Point when used.
+### 4.1 Timeline Click
 
-### Widen
+A click inside Range supplies an exact destination and performs direct refinement through the same binary descent used by Narrow.
+
+A click outside Range is rejected.
+
+### 4.2 Narrow Earlier / Narrow Later
+
+Automatic logarithmic destinations:
 
 ```text
-[L,C,R,level] -> [Range.start,C,Range.end,0]
+Earlier = (L + C) / 2
+Later   = (C + R) / 2
 ```
 
-Widen is available only when Passage differs geometrically from Range. Widen pushes history, preserves Point, and is reversible by Undo. Widen never exits a Context.
+Narrow increments Level and replaces one side of Resolution.
 
-## 6. Linear movement
+### 4.3 Step Earlier / Step Later
 
-Step size is a positive duration. Default: 10 seconds.
-
-### Step Earlier
+Fixed linear movement:
 
 ```text
-C' = max(Range.start, C - stepSeconds)
+Destination = clamp(C ± stepSeconds, Range)
 ```
 
-### Step Later
+If Destination remains inside Resolution, Resolution is translated only through Current. If it leaves Resolution, Resolution resets to Range at Destination.
+
+Rapid Steps coalesce into one Traversal and one Undo entry.
+
+### 4.4 Previous Mark / Next Mark
+
+Move to the closest visible Mark earlier or later inside Range.
+
+Visible Marks are explicit Marks or Marks with nonempty labels. Anonymous Section endpoints are not global navigation landmarks.
+
+### 4.5 Mark click
+
+Move directly to the Mark Address. If the Mark lies outside a Focused Section, Focus is removed and the preceding Range is restored within the same undoable action. If the Address remains outside a manually restricted Range, Range expands to Full Video for that action.
+
+### 4.6 Section click
+
+Move directly to the Section midpoint under the same availability rules as Mark click.
+
+## 5. Nonmovement operators
+
+### 5.1 Widen
 
 ```text
-C' = min(Range.end, C + stepSeconds)
+{L,C,R,level} → {Range.start,C,Range.end,0}
 ```
 
-If `C'` remains inside Passage, preserve Passage bounds and Level. If it crosses a Passage edge, Widen at `C'`.
+Widen does not move Current, alter Range, or replace Repeat Window. It records one Undo entry.
 
-Rapid Steps inside 120 ms form one history transaction and one final YouTube seek.
-
-Step records Last Traversal and does not snap to Marks.
-
-## 7. Structural movement
-
-### Previous Mark
-
-Select the nearest Mark earlier than Current inside Range, instantiate it as Point, and Narrow Earlier.
-
-### Next Mark
-
-Select the nearest Mark later than Current inside Range, instantiate it as Point, and Narrow Later.
-
-### Target
-
-Assign a selected Mark as Point without moving. Valid only inside the active Range.
-
-### Go
-
-Inside Range, Go is Target plus Narrow. Outside Range, preserve the present Context, establish a containing Range, then Target and Narrow. Exit returns to the displaced Context.
-
-## 8. Playback
-
-### Skim
-
-Approach the Later or Point Destination using supported fast-to-normal rates, create the same child as Narrow Later, then continue at 1×.
-
-### Play
-
-Play at 1×. Crossing a Passage edge Widens at live Current without interrupting playback. Pausing records Last Traversal.
-
-### Repeat
-
-Loop Last Traversal at 1×. The display identifies both the operator and medium: seek-based Traversals are shown as `jumped`; Skim and Play Traversals are shown as `played`.
-
-### Loop Span
-
-Loop a selected saved Span without replacing Last Traversal.
-
-## 9. Marks and roles
-
-Creating a Mark at a coincident Address reuses the existing Mark.
-
-Available Mark roles:
+### 5.2 Focus
 
 ```text
-Go
-Target
-Passage Start
-Passage End
-Range Start
-Range End
-Span Start
-Span End
-Anchor
+Section bounds → Range
 ```
 
-Internally these are typed role assignments. The interface retains specific verbs because their consequences differ.
+Focus:
 
-Referenced Marks cannot be silently deleted. Removing a referenced Mark anonymizes it while preserving its Address.
+1. stores the preceding Range if no Section is currently Focused;
+2. applies Section Start and End as Range;
+3. retains Current if it lies inside the Section;
+4. otherwise moves Current to the Section midpoint and records that movement as the latest Traversal;
+5. resets Resolution to the new Range;
+6. records one Undo entry.
 
-## 10. Saved Spans
+### 5.3 Unfocus
 
-Immediate constructors:
+Unfocus restores the Range retained before Focus, retains or clamps Current, resets Resolution to restored Range, preserves Repeat Window, and records one Undo entry.
+
+### 5.4 Manual Range deformation
+
+Dragging a Range handle or using Start Here, End Here, or Full Video:
+
+- clears Focus;
+- applies the new Range;
+- resets Resolution;
+- preserves Repeat Window;
+- records one Undo entry.
+
+Go to Midpoint is movement, not Range deformation, and therefore replaces Repeat Window.
+
+## 6. Playback
+
+### 6.1 Play Range
+
+Play begins at Current at `1×`.
+
+At Range End, playback seeks to Range Start and continues. Range is therefore the normal playback loop.
+
+If Play pauses before wrapping, its departure-to-arrival extent becomes Repeat Window. If Play wraps Range at least once, the previous Repeat Window is retained because the cyclic route cannot be represented by one ordinary interval.
+
+Crossing a Resolution boundary during Play Widens Resolution to Range without interrupting playback.
+
+### 6.2 Repeat
+
+Repeat loops Repeat Window at `1×`. Stopping Repeat returns playback to Current. Repeat does not alter Range, Resolution, Guide, or history.
+
+### 6.3 Skim
+
+Skim moves toward the Later destination through supported playback rates from selected maximum toward `1×`. Actual movement becomes Repeat Window. Reaching the destination continues as normal Play.
+
+## 7. Persistence operators
+
+### 7.1 Add Mark
+
+The only Mark constructor is:
 
 ```text
-Save Passage
-Save Last Traversal
-Save Range
+Current → Mark
 ```
 
-Each creates or reuses endpoint Marks.
+The title is optional. Adding at an existing Section endpoint promotes that endpoint into an explicit global Mark instead of creating a duplicate.
 
-Two selected Marks may also define a Span draft.
+### 7.2 Save Section
 
-Available Span roles:
+The only primary Section constructor is:
 
 ```text
-Enter
-Enter Here
-Focus
-Loop
-Target Start
-Target End
-Target Anchor or Midpoint
+Repeat Window → Section
 ```
 
-Spans may overlap, nest, and share Marks.
+The operation creates or reuses Marks at Repeat Window Start and End, links them, and requires a Section title.
 
-## 11. Contexts and Range
+The operation does not modify Repeat Window, Range, Resolution, or Current.
 
-Every Range mutation leaves a return path.
+### 7.3 Rename and delete
 
-- Enter Span creates a child Context.
-- Range Start Here and Range End Here create returnable Range contexts.
-- Dragging a Range handle captures one parent snapshot at drag start and commits one child Context at drag end.
-- Full Video may create a returnable full-video Context.
-- Exit restores the exact parent Context.
-- Widen remains inside the active Context.
+Marks and Sections can be renamed.
 
-## 12. History
+A referenced Mark cannot be deleted. Its Sections must be removed first.
 
-Navigation history and structural history are separate.
+Deleting a Section removes orphan unnamed automatic endpoint Marks but retains explicit or named Marks.
 
-Undo reverses Frame-producing navigation, including Narrow, Widen, Step, structural movement, Focus, and bound establishment.
+## 8. Undo
 
-Undo Edit reverses Mark and Span mutations.
+Undo uses one history across:
 
-Context nesting is reversed by Exit.
+- timeline clicks;
+- Narrow;
+- Step;
+- Mark and Section navigation;
+- Widen;
+- Focus and Unfocus;
+- Range deformation;
+- Mark and Section creation;
+- rename and deletion;
+- completed Play and Skim movement.
 
-## 13. Interface placement
-
-Main order:
+Each history entry restores:
 
 ```text
-Player
-Status
-Temporal map and state
-Traversal motion matrix
-Playback
-Return
-Range tools disclosure
-Help
+Range
+Resolution Frame
+Focused Section and return Range
+Repeat Window
+Guide data
 ```
 
-The motion matrix is one aligned three-row grammar:
+Repeat playback itself is transient and does not create history.
+
+## 9. Guide projection
+
+The sidebar contains only:
+
+1. Mark Current composer;
+2. Save Repeat Window as Section composer;
+3. Focused Section state with Unfocus;
+4. chronological Sections list;
+5. collapsed Marks list.
+
+No persistent object selection, role chips, endpoint draft, Anchor, Enter, Exit, or separate structural Undo appears.
+
+## 10. Visual density
+
+### 10.1 Timeline Marks
+
+Only explicit or named Marks are globally projected.
+
+Marks are clustered by rendered pixel distance. A cluster displays a count; activating it opens a compact list of its Marks.
+
+### 10.2 Sections
+
+All Section intervals are never drawn simultaneously.
+
+A temporary Section preview is shown only while its Guide row is hovered or focused. A Focused Section is already represented by Range.
+
+### 10.3 Repeat Window
+
+Repeat Window remains persistently visible because it is immediately actionable through Repeat and Save Section.
+
+## 11. Storage and migration
+
+Version 3 storage:
 
 ```text
-Resolution  Narrow Earlier | Widen        | Narrow Later
-Linear      Step Earlier   | Step size    | Step Later
-Marks       Previous Mark  | Mark Current | Next Mark
+binary-youtube-reader:v3:<videoId>
 ```
 
-Left always moves Earlier, right always moves Later, and the centre holds the row's own control. Playback remains separate because Skim, Play, and Repeat are not a directional axis.
+Load order:
 
-Return pairs:
+1. valid v3 Guide;
+2. migrate v2 `{marks, spans}` to `{marks, sections}`;
+3. migrate v1 saved regions.
 
-```text
-Undo  restore navigation history
-Exit  restore the parent Context
-```
+Earlier keys are not deleted.
 
-Range Start Here, Midpoint, Range End Here, and Full Video are setup controls and remain behind a disclosure below Return. Range itself remains continuously visible in the timeline and state readout.
+## 12. Acceptance conditions
 
-Right-side Structure panel:
-
-```text
-Create Mark
-Save as Span
-Selected object roles
-Temporary Span draft
-Marks list
-Spans list
-```
-
-The Passage readout appends `Level n`. Last Traversal appends `jumped` or `played`. Timeline Mark controls expose the same label through both `aria-label` and sighted hover `title`.
-
-The timeline displays:
-
-```text
-Range — blue
-Marks — violet
-Point — gold
-Current — white
-Passage — green
-Destinations — grey
-```
-
-The Structure panel supplies labels and survey. The timeline supplies metric orientation.
-
-## 14. Keyboard
-
-```text
-Q / W / E       Narrow Earlier / Widen / Narrow Later
-R / Backspace   Undo
-Left / Right    Step Earlier / Step Later
-[ / ]           decrease / increase Step size
-, / .           Previous Mark / Next Mark
-M               Mark Current
-S               Skim
-Space           Play/Pause
-T               Repeat Last Traversal
-Shift+Backspace Widen
-Ctrl/Cmd+Backspace restore Context root
-Alt/Option+Up   Exit Context
-Escape          clear transient selection
-```
-
-## 15. Persistence
-
-Version 2 key:
-
-```text
-binary-youtube-reader:v2:<videoId>
-```
-
-Version 1 saved passages migrate into shared endpoint Marks and saved Spans. Migration is idempotent and version 1 data is retained until version 2 persistence succeeds.
-
-## 16. Implementation sequence
-
-1. Add Frame Level and make Widen undoable.
-2. Rename Last Passage to Last Traversal and add provenance.
-3. Add exact Step geometry, controls, previews, keyboard, history, and coalesced seeking.
-4. Add the Mark/Span model and versioned persistence migration.
-5. Add Mark Current, Previous Mark, Next Mark, Target, and Go.
-6. Add Span creation and selected-object role chips.
-7. Add Enter, Exit, Focus, and returnable Range establishment.
-8. Align Resolution, Linear, and Marks into one motion matrix; pair Undo and Exit as Return; demote Range setup to a disclosure.
-9. Surface Level and Last Traversal medium, add sighted Mark hover labels, expand mutation tests, and update documentation.
-
-## 17. Acceptance
-
-The project is complete when:
-
-- Widen can be undone exactly.
-- Level is independent of history length.
-- Step moves by exactly the configured duration and remains undoable.
-- Previous and Next Mark traverse authored structure through Point and Narrow.
-- Marks are reusable Addresses, not isolated bookmarks.
-- Spans reference shared Marks and may overlap or nest.
-- Saved structure can become Passage, Range, Point, or Loop.
-- Every Range change leaves a return path.
-- every primary operation previews its destination or affected Span.
-- the interface remains useful before any Marks exist and becomes faster as structure is authored.
-- no separate organization or traversal mode is required.
-- Passage visibly reports Level, Last Traversal visibly reports medium, and timeline Marks are readable on hover.
-- Span rename and deletion preserve their documented referential behaviour under test.
+- A timeline click immediately moves and creates Repeat Window.
+- Two successive clicks make the second movement the Repeat Window.
+- Narrow and Step create Repeat Window through their respective geometries.
+- Widen preserves Current and Repeat Window.
+- Play loops Range.
+- Repeat loops Repeat Window.
+- Add Mark saves only Current.
+- Save Section uses only Repeat Window.
+- Clicking a Mark moves to it.
+- Clicking a Section moves to its midpoint.
+- Clicking a Section endpoint moves to its bound and makes the traversed half repeatable.
+- Focus applies Section bounds as Range.
+- Unfocus restores the preceding Range.
+- Undo reverses the last committed operator regardless of whether it was navigation, Range, Focus, or Guide mutation.
+- Automatic unnamed Section endpoints do not clutter the global Mark lane.
+- Dense visible Marks cluster without overlap.
+- Existing v2 data migrates without deleting the v2 key.

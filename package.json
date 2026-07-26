@@ -1,11 +1,11 @@
 {
   "name": "binary-youtube-reader",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node tests.mjs",
-    "check": "node --check app.js && node --check traversal.js && node --check structure.js && node --check youtube.js && node tests.mjs"
+    "check": "node --check app.js && node --check traversal.js && node --check structure.js && node --check youtube.js && node tests.mjs && node integration-check.mjs && node startup-smoke.mjs"
   },
   "engines": {
     "node": ">=20"

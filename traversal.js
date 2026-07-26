@@ -24,24 +24,12 @@ export function assertFrame(frame) {
   return frame;
 }
 
-export function getTargets(frame, point = null, range = null) {
+export function getTargets(frame) {
   assertFrame(frame);
-
-  let earlier = frame.L < frame.C - EPSILON ? (frame.L + frame.C) / 2 : null;
-  let later = frame.C < frame.R - EPSILON ? (frame.C + frame.R) / 2 : null;
-
-  const pointStart = range?.start ?? frame.L;
-  const pointEnd = range?.end ?? frame.R;
-  if (
-    Number.isFinite(point)
-    && point >= pointStart - EPSILON
-    && point <= pointEnd + EPSILON
-  ) {
-    if (point < frame.C - EPSILON) earlier = point;
-    if (point > frame.C + EPSILON) later = point;
-  }
-
-  return { earlier, later };
+  return {
+    earlier: frame.L < frame.C - EPSILON ? (frame.L + frame.C) / 2 : null,
+    later: frame.C < frame.R - EPSILON ? (frame.C + frame.R) / 2 : null
+  };
 }
 
 export function descend(frame, direction, target, range = null) {
@@ -82,18 +70,10 @@ export function spanMidpoint(start, end) {
   return start + (end - start) / 2;
 }
 
-// Compatibility during the v1 -> v2 transition.
-export const intervalMidpoint = spanMidpoint;
-
 export function widenToRange(current, range) {
   if (!Number.isFinite(current)) throw new TypeError("A finite Current is required.");
-  if (
-    !range
-    || !Number.isFinite(range.start)
-    || !Number.isFinite(range.end)
-    || range.start > range.end
-  ) {
-    throw new TypeError("A valid outer Range is required.");
+  if (!range || !Number.isFinite(range.start) || !Number.isFinite(range.end) || range.start > range.end) {
+    throw new TypeError("A valid Range is required.");
   }
   return createRoot(range.start, current, range.end, 0);
 }
@@ -101,18 +81,6 @@ export function widenToRange(current, range) {
 export function canWiden(frame, range) {
   assertFrame(frame);
   return frame.L > range.start + EPSILON || frame.R < range.end - EPSILON;
-}
-
-export function pointAfterUndo(stack, depth, currentPoint = null) {
-  if (!Array.isArray(stack) || !Number.isInteger(depth) || depth < 0 || depth >= stack.length) {
-    throw new TypeError("Undo requires a frame history and a valid destination depth.");
-  }
-
-  let point = Number.isFinite(currentPoint) ? currentPoint : null;
-  for (let index = stack.length - 1; index > depth; index -= 1) {
-    if (Number.isFinite(stack[index].returnPoint)) point = stack[index].returnPoint;
-  }
-  return point;
 }
 
 export function stepTarget(current, seconds, direction, range) {
@@ -132,47 +100,17 @@ export function stepFrame(frame, target, range) {
   if (!Number.isFinite(target)) throw new TypeError("Step target must be finite.");
   const C = clamp(target, range.start, range.end);
   if (C >= frame.L - EPSILON && C <= frame.R + EPSILON) {
-    const next = { L: frame.L, C, R: frame.R, level: frame.level ?? 0 };
-    return assertFrame(next);
+    return assertFrame({ L: frame.L, C, R: frame.R, level: frame.level ?? 0 });
   }
   return widenToRange(C, range);
 }
 
-export function bindPassageStart(frame, address) {
+export function getActionRanges(frame, range, lastTraversal = null, current = frame.C, stepSeconds = 10) {
   assertFrame(frame);
-  if (!Number.isFinite(address) || !(address < frame.C - EPSILON)) {
-    throw new RangeError("Passage Start must be earlier than Current.");
-  }
-  return assertFrame({ L: address, C: frame.C, R: frame.R, level: frame.level ?? 0 });
-}
-
-export function bindPassageEnd(frame, address) {
-  assertFrame(frame);
-  if (!Number.isFinite(address) || !(address > frame.C + EPSILON)) {
-    throw new RangeError("Passage End must be later than Current.");
-  }
-  return assertFrame({ L: frame.L, C: frame.C, R: address, level: frame.level ?? 0 });
-}
-
-export function getActionRanges(
-  frame,
-  range,
-  point = null,
-  parent = null,
-  lastTraversal = null,
-  current = frame.C,
-  stepSeconds = 10
-) {
-  assertFrame(frame);
-  const targets = getTargets(frame, point, range);
+  const targets = getTargets(frame);
   const earlierChild = targets.earlier === null ? null : descend(frame, "earlier", targets.earlier, range);
   const laterChild = targets.later === null ? null : descend(frame, "later", targets.later, range);
-
-  if (parent) assertFrame(parent);
   const widened = canWiden(frame, range) ? widenToRange(current, range) : null;
-  const undoPoint = parent ? pointAfterUndo([parent, frame], 0, point) : null;
-  const undoTargets = parent ? getTargets(parent, undoPoint, range) : null;
-  const widenTargets = widened ? getTargets(widened, point, range) : null;
 
   const repeat = lastTraversal
     && Number.isFinite(lastTraversal.start)
@@ -181,24 +119,6 @@ export function getActionRanges(
     ? { start: lastTraversal.start, end: lastTraversal.end }
     : null;
 
-  const undo = parent ? {
-    start: parent.L,
-    end: parent.R,
-    current: parent.C,
-    earlier: undoTargets.earlier,
-    later: undoTargets.later
-  } : null;
-  if (undo && Number.isFinite(undoPoint)) undo.point = undoPoint;
-
-  const widen = widened ? {
-    start: widened.L,
-    end: widened.R,
-    current: widened.C,
-    earlier: widenTargets.earlier,
-    later: widenTargets.later
-  } : null;
-  if (widen && Number.isFinite(point)) widen.point = point;
-
   const stepEarlierTarget = stepTarget(frame.C, stepSeconds, "earlier", range);
   const stepLaterTarget = stepTarget(frame.C, stepSeconds, "later", range);
 
@@ -206,8 +126,7 @@ export function getActionRanges(
     targets,
     earlier: earlierChild ? { start: earlierChild.L, end: earlierChild.R } : null,
     later: laterChild ? { start: laterChild.L, end: laterChild.R } : null,
-    undo,
-    widen,
+    widen: widened ? { start: widened.L, end: widened.R, current: widened.C } : null,
     stepEarlier: stepEarlierTarget < frame.C - EPSILON
       ? { start: stepEarlierTarget, end: frame.C, destination: stepEarlierTarget }
       : null,

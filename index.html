@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="theme-color" content="#0e1116">
-  <meta name="description" content="Traverse, mark, and organize long YouTube videos as addressable temporal spaces.">
+  <meta name="description" content="Traverse and organize long YouTube videos through composable temporal operations.">
   <title>Binary YouTube Reader</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
@@ -15,7 +15,7 @@
     <header class="load-bar">
       <div>
         <h1>Binary YouTube Reader</h1>
-        <p>Traverse, mark, and enter video passages without scrubbing.</p>
+        <p>Traverse, repeat, mark, and focus a video through one temporal grammar.</p>
       </div>
       <div class="url-row">
         <label class="sr-only" for="youtube-url">YouTube URL</label>
@@ -35,39 +35,39 @@
             <span id="duration-time">0:00.000</span>
           </div>
 
-          <div id="timeline" class="timeline" aria-label="Temporal map. Tap within the Range to choose a Point and Narrow to it.">
+          <div id="timeline" class="timeline" aria-label="Temporal map. Click inside the Range to traverse directly to an Address.">
             <div class="track">
               <div id="range-fill" class="range-fill"></div>
-              <div id="passage-fill" class="passage-fill"></div>
-              <div id="selection-fill" class="selection-fill" hidden></div>
+              <div id="resolution-fill" class="resolution-fill"></div>
+              <div id="repeat-fill" class="repeat-fill" hidden></div>
+              <div id="section-preview-fill" class="section-preview-fill" hidden></div>
               <div id="action-preview-fill" class="action-preview-fill" hidden></div>
             </div>
-            <div id="mark-lane" class="mark-lane" aria-label="Marks"></div>
+            <div id="mark-lane" class="mark-lane" aria-label="Guide Marks"></div>
+            <div id="mark-cluster-menu" class="mark-cluster-menu" hidden></div>
 
             <button id="range-start-handle" class="marker range-handle" type="button" role="slider" aria-label="Range Start" aria-valuemin="0" aria-valuenow="0"></button>
             <button id="range-end-handle" class="marker range-handle" type="button" role="slider" aria-label="Range End" aria-valuemin="0" aria-valuenow="0"></button>
-            <span id="passage-left-marker" class="marker passage-marker" aria-hidden="true"></span>
-            <span id="passage-right-marker" class="marker passage-marker" aria-hidden="true"></span>
+            <span id="resolution-left-marker" class="marker resolution-marker" aria-hidden="true"></span>
+            <span id="resolution-right-marker" class="marker resolution-marker" aria-hidden="true"></span>
             <span id="earlier-target-marker" class="marker target-marker" aria-hidden="true"></span>
             <span id="later-target-marker" class="marker target-marker" aria-hidden="true"></span>
             <span id="current-marker" class="marker current-marker" aria-hidden="true"></span>
-            <span id="point-marker" class="marker point-marker" aria-hidden="true" hidden></span>
           </div>
 
-          <div class="state-grid" aria-label="Current traversal state">
+          <div class="state-grid" aria-label="Current temporal state">
             <span class="state-name">Range</span><span id="range-label">—</span>
-            <span class="state-name">Passage</span><span id="passage-label">—</span>
+            <span class="state-name">Resolution</span><span id="resolution-label">—</span>
             <span class="state-name">Current</span><span id="current-label">—</span>
-            <span class="state-name">Point</span><span id="point-label">—</span>
-            <span class="state-name">Last</span><span id="last-label">—</span>
-            <span class="state-name">Context</span><span id="context-label">Full video</span>
+            <span class="state-name">Repeat Window</span><span id="repeat-label">—</span>
+            <span class="state-name">Focused Section</span><span id="focused-label">—</span>
           </div>
 
           <section class="action-family motion-family" aria-labelledby="traversal-heading">
             <div class="family-heading">
               <div>
                 <h2 id="traversal-heading">Traversal</h2>
-                <p>Move by resolution, exact distance, or authored structure.</p>
+                <p>Direct clicks, logarithmic refinement, fixed movement, and saved Addresses all produce Traversals.</p>
               </div>
             </div>
 
@@ -107,7 +107,7 @@
                 <span id="previous-mark-meta" class="action-meta">—</span>
               </button>
               <button id="mark-current" class="action-card compact" type="button" aria-keyshortcuts="M" disabled>
-                <span class="action-name hotkey-label"><kbd>M</kbd><span>Mark Current</span></span>
+                <span class="action-name hotkey-label"><kbd>M</kbd><span>Add Mark</span></span>
                 <span id="mark-current-meta" class="action-meta">—</span>
               </button>
               <button id="next-mark" class="action-card compact" type="button" data-preview-action="nextMark" aria-keyshortcuts="." disabled>
@@ -119,7 +119,7 @@
 
           <section class="action-family playback-family" aria-labelledby="playback-heading">
             <div class="family-heading">
-              <div><h2 id="playback-heading">Playback</h2><p>Traverse perceptibly or replay the last extent.</p></div>
+              <div><h2 id="playback-heading">Playback</h2><p>Play loops Range. Repeat loops the latest Traversal extent.</p></div>
               <label class="speed-setting" for="speed-select">Skim max <select id="speed-select" disabled><option value="1">1×</option></select></label>
             </div>
             <div class="action-grid playback-actions">
@@ -127,7 +127,7 @@
                 <span id="skim-name" class="action-name">Skim</span><span id="skim-meta" class="action-meta">—</span>
               </button>
               <button id="play" class="action-card" type="button" aria-keyshortcuts="Space" disabled>
-                <span id="play-name" class="action-name">Play</span><span id="play-meta" class="action-meta">1×</span>
+                <span id="play-name" class="action-name">Play Range</span><span id="play-meta" class="action-meta">—</span>
               </button>
               <button id="repeat-last" class="action-card" type="button" data-preview-action="repeat" aria-keyshortcuts="T" disabled>
                 <span id="repeat-name" class="action-name">Repeat</span><span id="repeat-meta" class="action-meta">—</span>
@@ -135,103 +135,73 @@
             </div>
           </section>
 
-          <section class="compact-strip return-strip" aria-labelledby="return-heading">
-            <h2 id="return-heading">Return</h2>
-            <div class="return-actions">
-              <button id="undo" class="history-button" type="button" data-preview-action="undo" aria-keyshortcuts="R Backspace" disabled>
-                <span class="hotkey-label"><kbd>R</kbd><span>Undo</span></span>
-                <span id="undo-meta" class="action-meta">—</span>
-              </button>
-              <button id="exit-context" class="history-button" type="button" aria-keyshortcuts="Alt+ArrowUp" disabled>
-                <span class="hotkey-label"><kbd>⌥↑</kbd><span>Exit</span></span>
-                <span id="exit-meta" class="action-meta">Root Context</span>
-              </button>
-            </div>
+          <section class="compact-strip undo-strip" aria-labelledby="undo-heading">
+            <h2 id="undo-heading">History</h2>
+            <button id="undo" class="history-button" type="button" aria-keyshortcuts="R Backspace" disabled>
+              <span class="hotkey-label"><kbd>R</kbd><span>Undo</span></span>
+              <span id="undo-meta" class="action-meta">Nothing to undo</span>
+            </button>
           </section>
 
           <details class="range-tools">
-            <summary>
-              <span>Range tools</span>
-              <span id="range-tools-value">—</span>
-            </summary>
+            <summary><span>Range tools</span><span id="range-tools-value">—</span></summary>
             <div class="compact-actions">
               <button id="range-start-here" type="button" disabled>Start Here</button>
-              <button id="range-midpoint" type="button" disabled>Midpoint</button>
+              <button id="range-midpoint" type="button" disabled>Go to Midpoint</button>
               <button id="range-end-here" type="button" disabled>End Here</button>
               <button id="full-video-range" type="button" disabled>Full Video</button>
             </div>
           </details>
 
           <details class="help">
-            <summary>How traversal works</summary>
-            <p>The three traversal rows share one directional grammar: Earlier on the left, the axis control in the centre, and Later on the right. Narrow changes resolution, Step moves by exact seconds, and Previous or Next Mark moves through authored structure. Playback remains continuous. Widen returns in resolution, Undo returns in navigation history, and Exit returns to the parent Context.</p>
+            <summary>How the system composes</summary>
+            <p>Clicking the timeline, Narrowing, Stepping, and selecting a Mark or Section all traverse to an Address and replace the Repeat Window. Widen changes Resolution without moving. A Mark saves Current. A Section saves the Repeat Window through two linked Marks. Focus applies a Section as Range; Unfocus restores the preceding Range.</p>
           </details>
         </section>
       </section>
 
-      <aside class="panel structure-panel" aria-label="Structure">
-        <div class="structure-heading">
-          <div><h2>Structure</h2><p>Marks preserve Addresses. Spans relate them.</p></div>
-          <div class="structure-counts"><span id="mark-count" class="count">0</span><span id="span-count" class="count">0</span></div>
+      <aside class="panel guide-panel" aria-label="Guide">
+        <div class="guide-heading">
+          <div><h2>Guide</h2><p>Marks save places. Sections link two Marks.</p></div>
+          <div class="guide-counts"><span id="mark-count" class="count">0</span><span id="section-count" class="count">0</span></div>
         </div>
-        <button id="undo-edit" class="subtle full-button" type="button" disabled>Undo Edit</button>
 
-        <section class="structure-section" aria-labelledby="capture-heading">
-          <h3 id="capture-heading">Create Mark</h3>
-          <label for="address-source">Address</label>
-          <select id="address-source" disabled>
-            <option value="current">Current</option>
-            <option value="point">Point</option>
-            <option value="earlier">Earlier Destination</option>
-            <option value="later">Later Destination</option>
-            <option value="passageStart">Passage Start</option>
-            <option value="passageEnd">Passage End</option>
-            <option value="rangeStart">Range Start</option>
-            <option value="rangeEnd">Range End</option>
-            <option value="lastStart">Last Traversal Start</option>
-            <option value="lastEnd">Last Traversal End</option>
-          </select>
-          <label for="mark-label">Label</label>
-          <input id="mark-label" type="text" maxlength="100" placeholder="e.g. Compression begins" disabled>
-          <button id="create-mark" class="primary full-button" type="button" disabled>Create Mark</button>
-        </section>
-
-        <section class="structure-section" aria-labelledby="quick-span-heading">
-          <h3 id="quick-span-heading">Save as Span</h3>
-          <label for="span-label">Label</label>
-          <input id="span-label" type="text" maxlength="100" placeholder="e.g. Compressor setup" disabled>
-          <div class="quick-span-actions">
-            <button id="save-passage" type="button" disabled>Passage</button>
-            <button id="save-last" type="button" disabled>Last Traversal</button>
-            <button id="save-range" type="button" disabled>Range</button>
+        <section class="guide-composer" aria-labelledby="mark-composer-heading">
+          <div class="composer-heading">
+            <div><h3 id="mark-composer-heading">Mark Current</h3><span id="mark-address">—</span></div>
+          </div>
+          <div class="composer-row">
+            <label class="sr-only" for="mark-label">Mark title</label>
+            <input id="mark-label" type="text" maxlength="100" placeholder="Optional title" disabled>
+            <button id="add-mark" class="primary" type="button" disabled>Add</button>
           </div>
         </section>
 
-        <section id="selection-inspector" class="structure-section selection-inspector" aria-labelledby="selection-heading" hidden>
-          <h3 id="selection-heading">Selected</h3>
-          <div id="selection-summary"></div>
-          <label for="selection-label">Label</label>
-          <div class="inline-edit"><input id="selection-label" type="text" maxlength="100"><button id="apply-selection-label" type="button">Apply</button></div>
-          <div id="selection-roles" class="role-chips"></div>
-          <div id="selection-relations" class="relations"></div>
-          <button id="delete-selection" class="danger-text full-button" type="button">Delete</button>
+        <section class="guide-composer" aria-labelledby="section-composer-heading">
+          <div class="composer-heading">
+            <div><h3 id="section-composer-heading">Save Repeat Window</h3><span id="section-window">—</span></div>
+          </div>
+          <div class="composer-row">
+            <label class="sr-only" for="section-label">Section title</label>
+            <input id="section-label" type="text" maxlength="100" placeholder="Section title" disabled>
+            <button id="save-section" class="primary" type="button" disabled>Save</button>
+          </div>
         </section>
 
-        <section id="span-draft" class="structure-section draft-section" aria-labelledby="draft-heading" hidden>
-          <h3 id="draft-heading">New Span</h3>
-          <div id="draft-summary"></div>
-          <div class="quick-span-actions"><button id="save-draft" class="primary" type="button">Save</button><button id="clear-draft" type="button">Clear</button></div>
+        <section id="focused-section" class="focused-section" hidden>
+          <div><span class="eyebrow">Focused Section</span><strong id="focused-section-title">—</strong><span id="focused-section-range">—</span></div>
+          <button id="unfocus-section" type="button">Unfocus</button>
         </section>
 
-        <section class="structure-section list-section" aria-labelledby="marks-list-heading">
-          <div class="list-heading"><h3 id="marks-list-heading">Marks</h3><span id="marks-list-count">0</span></div>
-          <div id="marks-list" class="structure-list"><p class="empty-state">No Marks for this video.</p></div>
+        <section class="guide-list-section" aria-labelledby="sections-heading">
+          <div class="list-heading"><h3 id="sections-heading">Sections</h3><span id="sections-list-count">0</span></div>
+          <div id="sections-list" class="guide-list"><p class="empty-state">No Sections for this video.</p></div>
         </section>
 
-        <section class="structure-section list-section" aria-labelledby="spans-list-heading">
-          <div class="list-heading"><h3 id="spans-list-heading">Spans</h3><span id="spans-list-count">0</span></div>
-          <div id="spans-list" class="structure-list"><p class="empty-state">No Spans for this video.</p></div>
-        </section>
+        <details class="guide-list-section marks-disclosure">
+          <summary><span>Marks</span><span id="marks-list-count">0</span></summary>
+          <div id="marks-list" class="guide-list"><p class="empty-state">No Marks for this video.</p></div>
+        </details>
       </aside>
     </div>
   </main>

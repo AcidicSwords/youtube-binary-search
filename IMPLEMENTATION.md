@@ -1,208 +1,149 @@
-# Marked Traversal v2 — Implementation Sequence
+# Guide v3 Implementation and Replacement Map
 
-This package is a complete replacement source set for the current repository. Apply the files together on a feature branch; do not merge partially completed phases into `main`.
+## Baseline
 
-## 1. Replace the traversal foundation
-
-Replace `traversal.js` first and run `npm test`.
-
-Changes:
-
-- Frames become `{L, C, R, level, returnPoint?}`.
-- `level` records Narrow depth; history length no longer represents resolution.
-- `descend()` increments `level`.
-- `widenToRange()` returns Level 0.
-- `canWiden()` is geometric.
-- Widen is represented as a normal history frame and can be undone.
-- Add pure Step geometry: `stepTarget()` and `stepFrame()`.
-- Add pure bound operations: `bindPassageStart()` and `bindPassageEnd()`.
-- Extend `getActionRanges()` with Step previews.
-
-Required invariant:
+This replacement was built from the exact current `main` blobs:
 
 ```text
-resolution level != navigation history length
+app.js       138b3426a5393122e8020722d4383fd60ff71ae3
+index.html   82ed47e4882512c9812487e013989884008e223c
+styles.css   b3cafa5e7f652330b16d2256694b1bf4f6704f8e
+structure.js f27711e320634524b891f4d67dba07d86640487b
+traversal.js e536495befefe60cf8cb97004557ed2378778a34
 ```
 
-## 2. Add the persistent structural model
+## Preserved mechanisms
 
-Add `structure.js` and update `package.json` checks.
+The following working relationships remain:
 
-The model is deliberately small:
+- binary `Frame` geometry and Level;
+- direct timeline click through binary descent;
+- logarithmic Narrow Earlier/Later;
+- fixed Step with rapid-action coalescing;
+- Widen to Range while retaining Current;
+- Skim fast-to-normal;
+- Last Traversal provenance and Repeat looping;
+- linked endpoint Marks for persistent bounded regions;
+- per-video local persistence;
+- v1 and v2 migration;
+- static deployment with no dependencies or build step.
+
+## Refactored mechanisms
+
+### Resolution state
+
+`state.stack` and Passage-level navigation history are replaced by one current `state.frame`. A single full-state Undo history now restores prior Frames and all other committed state.
+
+### Direct traversal
+
+Timeline clicks, Narrow, Mark navigation, Section midpoint navigation, Range midpoint, and adjacent Marks all converge on `commitSeekTraversal()`.
+
+### Guide model
+
+`structure.js` remains the replacement filename, but its internal contract is now:
 
 ```text
-Address = exact time
-Mark    = persistent Address
-Span    = ordered relation between two Marks
+Guide = {version: 3, videoId, marks, sections}
 ```
 
-`structure.js` provides:
+Existing v2 Spans migrate to Sections. Sections continue to reference shared Marks.
 
-- coincident Mark reuse;
-- shared Span endpoints;
-- overlapping and nested Spans;
-- optional Span Anchor;
-- Previous/Next Mark lookup;
-- safe deletion of referenced Marks;
-- v1 saved-passage migration;
-- validation and deterministic ordering.
+### Focus
 
-Run `npm test` again before UI work.
-
-## 3. Replace application state and orchestration
-
-Replace `app.js` as one file. Do not layer it over the old `savedRegions` and `scope` paths.
-
-Canonical state divisions:
+The former Context stack, Enter, Enter Here, Focus, and Exit system is replaced by:
 
 ```text
-Frame level       binary resolution
-stack             reversible Frame history
-contextStack      entered Range history
-structuralHistory Mark/Span edit history
+focusedSectionId
+focusReturnRange
 ```
 
-The application adds:
+Focus snaps Section bounds to Range. Unfocus restores the prior Range.
 
-- undoable Widen;
-- Last Traversal provenance;
-- exact Step Earlier/Later;
-- 120 ms rapid-Step coalescing;
-- Mark Current;
-- Previous/Next Mark through Point + Narrow;
-- Target and Go;
-- Passage/Range bound assignment from Marks;
-- Save Passage, Last Traversal, or Range as Span;
-- Span drafting from two Marks;
-- Enter, Enter Here, Focus, Loop, and Exit;
-- returnable Range edits and handle drags;
-- v2 local-storage persistence and v1 migration;
-- separate navigation and structural Undo.
+### Unified Undo
 
-## 4. Replace the interface together
-
-Replace `index.html` and `styles.css` in the same commit as `app.js`.
-
-Main-column order:
+Every committed operator records the same snapshot:
 
 ```text
-Player
-Status
-Temporal map and state
-Traversal motion matrix
-Playback
-Return
-Range tools disclosure
-Help
+Range
+Frame
+Focus state
+Repeat Window
+Guide
 ```
 
-The motion matrix uses shared columns:
+Rapid Step and continuous playback coalesce into one entry.
 
-```text
-Resolution  Narrow Earlier | Widen        | Narrow Later
-Linear      Step Earlier   | Step size    | Step Later
-Marks       Previous Mark  | Mark Current | Next Mark
-```
+### Playback
 
-Undo and Exit share the Return strip. Range mutation controls are behind a disclosure because they are setup rather than frequent traversal.
+Play loops Range instead of stopping at Range End. Repeat remains independent and loops Repeat Window.
 
-Structure-panel order:
+## Removed interface and state
 
-```text
-Create Mark
-Save as Span
-Selected-object roles
-Temporary Span draft
-Marks
-Spans
-```
+- Point row and marker;
+- Passage terminology;
+- Context and Exit;
+- Span terminology;
+- Anchor;
+- Address-source selector;
+- Save Passage / Save Range / Save Last Traversal split;
+- selected Mark and selected Span state;
+- role chips;
+- Span endpoint draft;
+- separate structural Undo button;
+- Passage-bound mutation functions.
 
-The interface has no organization mode. Selecting an object reveals only valid role applications.
+## New sidebar
 
-## 5. Replace terminology everywhere
+The old Structure editor is replaced by Guide:
 
-Use:
+1. Add Mark at Current.
+2. Save Repeat Window as Section.
+3. Focused Section state and Unfocus.
+4. Sections list with midpoint navigation, endpoint navigation, Focus, Rename, Delete.
+5. Collapsed explicit/named Marks list with navigation, Rename, Delete.
 
-```text
-Address, Mark, Span, Passage, Range, Frame, Current, Point,
-Destination, Bound, Anchor, Level, Last Traversal,
-Narrow, Widen, Step, Target, Go, Enter, Exit, Focus, Repeat
-```
+## Visual clutter strategy
 
-Remove product-facing uses of:
+- automatic unnamed Section endpoints remain internal;
+- only explicit or named Marks are shown globally;
+- visible Marks cluster according to screen pixels;
+- Section intervals are previewed only on row hover/focus;
+- Repeat Window is always shown because it is immediately actionable;
+- Focused Section needs no extra persistent bar because it is Range.
 
-```text
-scope, region, clip, bookmark, cursor, lastPassage, savedRegions
-```
+## File changes
 
-## 6. Keyboard rhythm
+### Replaced
 
-```text
-Q W E           Narrow Earlier / Widen / Narrow Later
-Left Right      Step Earlier / Step Later
-[ ]             Step-size preset down / up
-, .             Previous Mark / Next Mark
-M               Mark Current
-S               Skim
-Space           Play/Pause
-T               Repeat Last Traversal
-R / Backspace   Undo
-Shift+Backspace Widen
-Alt/Option+Up   Exit Context
-Escape          clear transient state
-```
+- `app.js`
+- `index.html`
+- `styles.css`
+- `structure.js`
+- `traversal.js`
+- `tests.mjs`
+- `package.json`
+- `README.md`
+- `SPEC.md`
 
-## 7. Persistence migration
+### Added
 
-The first load of a video checks:
+- `integration-check.mjs`
+- `startup-smoke.mjs`
+- `IMPLEMENTATION.md`
+- `BRANCH_INSTALL.md`
 
-```text
-binary-youtube-reader:v2:<videoId>
-```
+### Unchanged
 
-If absent, it reads:
+- `youtube.js`
+- `favicon.svg`
+- GitHub Pages workflow
 
-```text
-binary-youtube-reader:v1:<videoId>
-```
-
-Each old passage creates or reuses two endpoint Marks and creates one Span. Shared timestamps become shared Marks. The v1 record remains untouched after successful v2 persistence.
-
-## 8. Final presentation patch
-
-The branch-ready package also:
-
-- appends `Level n` to Passage;
-- appends `jumped` or `played` to Last Traversal;
-- adds sighted hover titles to timeline Marks;
-- tests Span rename and deletion;
-- keeps Skim constrained to supported rates at or above 1×.
-
-## 9. Verification
-
-Automated:
-
-```bash
-npm run check
-```
-
-Expected output:
+## Verification
 
 ```text
 All logic tests passed.
+Integration check passed: 74 DOM references, 0 missing.
+Startup smoke passed.
 ```
 
-Manual smoke test:
-
-1. Load a YouTube video.
-2. Narrow twice, Widen, then Undo; the exact pre-Widen Frame returns.
-3. Set Step to 5 seconds and verify Left/Right move exactly 5 seconds.
-4. Press `M` at three positions; use `,` and `.` to traverse them.
-5. Save Passage as a Span; Enter it, Widen inside it, then Exit.
-6. Assign two Marks as Span Start and End and save the draft.
-7. Reload the page and confirm Marks/Spans persist.
-8. Load a video with v1 saved passages and confirm migration.
-
-## 10. Deployment
-
-No build step or backend is added. The existing Pages workflow remains valid. Merge only after `npm run check` and the smoke test pass on the feature branch.
+A real YouTube IFrame browser test is still required after copying because this environment cannot reliably complete an external embedded-player session.
