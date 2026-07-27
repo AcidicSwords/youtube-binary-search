@@ -1,4 +1,4 @@
-name: Mobile Field rates v5.5.2
+name: Verify mobile Field rates v5.5.2
 
 on:
   pull_request:
@@ -12,11 +12,11 @@ permissions:
   contents: write
 
 concurrency:
-  group: mobile-field-rates-v5.5.2
+  group: mobile-field-rates-v5.5.2-verification
   cancel-in-progress: false
 
 jobs:
-  apply-test-commit:
+  verify-clean:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -29,30 +29,17 @@ jobs:
         with:
           node-version: 20
 
-      - name: Apply mobile Field rate correction
-        shell: bash
-        run: |
-          set -o pipefail
-          python3 .github/mobile-field-rates-v5.5.2.py 2>&1 | tee mobile-field-rates-apply.log
-
-      - name: Upload applicator diagnostic
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mobile-field-rates-apply-log
-          path: mobile-field-rates-apply.log
-          retention-days: 1
-
       - name: Run complete repository checks
         run: npm run check
 
-      - name: Commit verified correction
+      - name: Remove temporary workflow and commit verified tree
         shell: bash
         run: |
           set -euo pipefail
+          rm .github/workflows/mobile-field-rates-v5.5.2.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git diff --cached --check
-          git commit -m "Fix mobile Tail and Lead rate controls"
+          git commit -m "Verify mobile Field rate controls"
           git push origin HEAD:fix/mobile-field-rates-v5.5.2
