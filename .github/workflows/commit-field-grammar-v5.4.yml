@@ -6,6 +6,11 @@ on:
       - feature/field-grammar-v5.4
     paths:
       - .github/workflows/commit-field-grammar-v5.4.yml
+  pull_request:
+    branches:
+      - feature/step-field-v5.3-final
+    paths:
+      - .github/workflows/commit-field-grammar-v5.4.yml
   workflow_dispatch:
 
 permissions:
@@ -82,7 +87,7 @@ jobs:
             package.json session.js step-field-geometry.js step-field.js transport.js view.js
           )
           changed="$(git diff --name-only origin/feature/step-field-v5.3-final --)"
-          printf '%s\n' "$changed"
+          printf '%s\n' "$changed" | tee field-grammar-integration-files.log
           for path in "${required[@]}"; do
             grep -Fxq "$path" <<< "$changed" || {
               echo "Required v5.4 change missing: $path" >&2
@@ -96,10 +101,23 @@ jobs:
       - name: Run complete repository checks
         run: npm run check
 
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: complete-field-grammar-v5.4-evidence
+          path: |
+            field-grammar-integration-files.log
+            package.json
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Commit verified implementation
+        if: github.event_name == 'push'
         shell: bash
         run: |
           set -euo pipefail
+          rm -f field-grammar-integration-files.log
           rm -f apply-field-grammar-v5.4.py
           rm -f apply-field-grammar-v5.4-transport-fix.py
           rm -f install-field-grammar-v5.4.py
