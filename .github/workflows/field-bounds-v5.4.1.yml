@@ -1,6 +1,8 @@
 name: Apply and verify Field bounds v5.4.1
 
 on:
+  push:
+    branches: [feature/field-bounds-v5.4.1]
   pull_request:
     branches: [main]
     paths:
@@ -17,12 +19,12 @@ permissions:
 
 jobs:
   apply-and-verify:
-    if: github.head_ref == 'feature/field-bounds-v5.4.1'
+    if: github.ref_name == 'feature/field-bounds-v5.4.1' || github.head_ref == 'feature/field-bounds-v5.4.1'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
+          ref: feature/field-bounds-v5.4.1
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -126,4 +128,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app.js .github/workflows/field-bounds-v5.4.1.yml
           git commit -m "Complete Field bounds v5.4.1 integration"
-          git push origin "HEAD:${GITHUB_HEAD_REF}"
+          git push origin HEAD:feature/field-bounds-v5.4.1
