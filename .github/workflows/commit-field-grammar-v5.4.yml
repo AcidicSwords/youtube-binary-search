@@ -108,7 +108,7 @@ jobs:
           if (!pkg.scripts.check.includes('step-field-geometry.js')) fail('geometry syntax check is not wired');
           if (!app.includes('saveExtentAsSection')) fail('app lacks generic Extent retention');
           if (!/onSelect:\s*selectFieldSide/.test(app)) fail('app lacks phase-sensitive Field side routing');
-          if (!app.includes('source: "field-span"')) fail('app lacks Field Span Loop source');
+          if (!/startLoopExtent\(heldFieldSpan\(\),\s*"field-span"/.test(app)) fail('app lacks Field Span Loop composition');
           if (!field.includes('from "./step-field-geometry.js"')) fail('Field controller lacks pure geometry import');
           if (!field.includes('chooseDirectionalRate')) fail('Field controller lacks direction-preserving rates');
           if (!view.includes('field-span-label')) fail('View lacks Field Span projection');
