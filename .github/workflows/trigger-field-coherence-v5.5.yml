@@ -1,0 +1,79 @@
+name: Trigger Field coherence v5.5
+
+on:
+  pull_request:
+    branches:
+      - feature/field-bounds-v5.4.1
+    paths:
+      - .github/workflows/apply-field-coherence-v5.5.yml
+      - .github/workflows/trigger-field-coherence-v5.5.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: field-coherence-v5.5
+  cancel-in-progress: false
+
+jobs:
+  apply-test-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/field-coherence-v5.5
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Decode applicator
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, gzip
+          source = Path('.github/workflows/apply-field-coherence-v5.5.yml').read_text()
+          start = source.index("<<'B64'\n") + len("<<'B64'\n")
+          end = source.index('\n          B64', start)
+          payload = ''.join(line.strip() for line in source[start:end].splitlines())
+          Path('/tmp/apply-field-coherence-v5.5.py').write_bytes(gzip.decompress(base64.b64decode(payload)))
+          PY
+
+      - name: Apply and verify complete revision
+        id: apply
+        shell: bash
+        run: |
+          set +e
+          python3 /tmp/apply-field-coherence-v5.5.py > field-coherence-v5.5-check.log 2>&1
+          status=$?
+          cat field-coherence-v5.5-check.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Commit implementation or diagnostics
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/apply-field-coherence-v5.5.yml
+          rm -f .github/workflows/trigger-field-coherence-v5.5.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if [ "${{ steps.apply.outputs.status }}" = "0" ]; then
+            rm -f field-coherence-v5.5-check.log
+            git add -A
+            git diff --cached --check
+            git commit -m "Complete Field coherence v5.5"
+          else
+            git commit -m "Apply Field coherence v5.5 with failing check log"
+          fi
+          git push origin HEAD:feature/field-coherence-v5.5
+
+      - name: Fail unsuccessful validation
+        if: steps.apply.outputs.status != '0'
+        run: exit 1
