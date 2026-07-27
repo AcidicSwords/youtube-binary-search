@@ -5,6 +5,7 @@ import {
   FIELD_REACH_TOLERANCE,
   deriveFieldBounds,
   deriveStepField,
+  normalizeFieldReach,
   chooseNearestRate,
   chooseDirectionalRate,
   hasCenterDiscontinuity,
@@ -17,6 +18,7 @@ export {
   STEP_FIELD_PHASE,
   deriveFieldBounds,
   deriveStepField,
+  normalizeFieldReach,
   chooseNearestRate,
   chooseDirectionalRate,
   hasCenterDiscontinuity,
@@ -82,7 +84,8 @@ export function createStepFieldController({
       "step-field", "step-field-toggle", "step-field-meta",
       "tail-pane", "tail-meta", "tail-step", "tail-collapse", "tail-restore",
       "lead-pane", "lead-meta", "lead-step", "lead-collapse", "lead-restore",
-      "center-meta"
+      "center-meta", "tail-rate-select", "lead-rate-select",
+      "field-transport-state", "field-rate-state"
     ].map(id => [id, document?.getElementById?.(id) || null])
   );
 
@@ -90,7 +93,9 @@ export function createStepFieldController({
     tail: {
       role: "tail",
       elementId: "player-tail",
-      requestedRate: TAIL_RATE,
+      requestedRate: 0.5,
+      actualRate: 1,
+      playback: "idle",
       adapter: null,
       ready: false,
       videoId: null,
@@ -102,7 +107,9 @@ export function createStepFieldController({
     lead: {
       role: "lead",
       elementId: "player-lead",
-      requestedRate: LEAD_RATE,
+      requestedRate: 2,
+      actualRate: 1,
+      playback: "idle",
       adapter: null,
       ready: false,
       videoId: null,
@@ -153,6 +160,12 @@ export function createStepFieldController({
     });
     elements["tail-step"]?.addEventListener?.("click", () => selectSide("tail"));
     elements["lead-step"]?.addEventListener?.("click", () => selectSide("lead"));
+    elements["tail-rate-select"]?.addEventListener?.("change", event => {
+      changePreferences({ tailRate: Number(event.target.value) });
+    });
+    elements["lead-rate-select"]?.addEventListener?.("change", event => {
+      changePreferences({ leadRate: Number(event.target.value) });
+    });
   }
 
   function createSide(role) {
@@ -175,9 +188,16 @@ export function createStepFieldController({
           iframe?.setAttribute?.("aria-hidden", "true");
           runtime.forceEstablish = true;
         },
-        onStateChange: () => {},
-        onPlaybackRateChange: () => {},
-        onAutoplayBlocked: () => side.adapter?.pause?.(),
+        onStateChange: name => {
+          side.playback = name;
+        },
+        onPlaybackRateChange: rate => {
+          if (Number.isFinite(Number(rate))) side.actualRate = Number(rate);
+        },
+        onAutoplayBlocked: () => {
+          side.playback = "blocked";
+          side.adapter?.pause?.();
+        },
         onError: () => {
           side.error = true;
           side.ready = false;
@@ -195,6 +215,8 @@ export function createStepFieldController({
   function pauseSide(side) {
     side.adapter?.pause?.();
     side.adapter?.setRate?.(1);
+    side.actualRate = 1;
+    if (side.playback !== "blocked" && side.playback !== "error") side.playback = "idle";
   }
 
   function pauseSides() {
@@ -232,7 +254,9 @@ export function createStepFieldController({
 
   function setSideRate(side, requestedRate) {
     side.adapter?.mute?.();
+    side.requestedRate = requestedRate;
     const snapshot = readSide(side);
+    side.actualRate = snapshot.rate;
     const rate = requestedRate === 1
       ? 1
       : chooseDirectionalRate(snapshot.availableRates, requestedRate, side.role);
@@ -242,12 +266,72 @@ export function createStepFieldController({
       return false;
     }
     if (Math.abs(snapshot.rate - rate) > 0.001) side.adapter?.setRate?.(rate);
+    side.actualRate = readSide(side).rate;
     return true;
   }
 
   function ensureSidePlaying(side) {
     const state = readSide(side).state;
-    if (![YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(state)) side.adapter?.play?.();
+    side.playback = state;
+    if (![YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(state)) {
+      side.playback = "starting";
+      side.adapter?.play?.();
+    }
+  }
+
+  function directionalRates(side) {
+    return [...new Set(readSide(side).availableRates || [])]
+      .filter(rate => Number.isFinite(rate) && (side.role === "tail" ? rate < 1 : rate > 1))
+      .sort((a, b) => a - b);
+  }
+
+  function populateRateControl(role, prefs) {
+    const side = sides[role];
+    const select = elements[`${role}-rate-select`];
+    if (!select || !side.ready) return;
+    const rates = directionalRates(side);
+    const key = rates.join("|");
+    if (select.dataset.rates !== key) {
+      select.replaceChildren();
+      if (!rates.length) {
+        const option = document.createElement("option");
+        option.value = "1";
+        option.textContent = "Unavailable";
+        select.appendChild(option);
+      } else {
+        for (const rate of rates) {
+          const option = document.createElement("option");
+          option.value = String(rate);
+          option.textContent = `${rate}×`;
+          select.appendChild(option);
+        }
+      }
+      select.dataset.rates = key;
+    }
+    select.disabled = !rates.length;
+    const requested = Number(prefs[`${role}Rate`]);
+    const resolved = rates.length ? chooseNearestRate(rates, requested) : 1;
+    select.value = String(resolved);
+    select.dataset.requested = String(requested);
+  }
+
+  function playSides() {
+    const prefs = preferences();
+    const snapshot = getSnapshot?.();
+    if (!snapshot?.videoLoaded || !prefs.stepFieldEnabled) return false;
+    ensurePlayers(prefs);
+    syncVideo(snapshot);
+    let started = false;
+    for (const role of ["tail", "lead"]) {
+      const visible = prefs[`${role}Visible`];
+      const side = sides[role];
+      if (!visible || !side.ready || side.error) continue;
+      const requested = Number(prefs[`${role}Rate`]);
+      if (!setSideRate(side, requested)) continue;
+      ensureSidePlaying(side);
+      started = true;
+    }
+    return started;
   }
 
   function syncVideo(snapshot) {
@@ -256,6 +340,8 @@ export function createStepFieldController({
       if (!side.ready || side.videoId === snapshot.videoId) continue;
       side.videoId = snapshot.videoId;
       side.error = false;
+      side.playback = "idle";
+      side.actualRate = 1;
       side.held = false;
       side.heldDistance = 0;
       side.adapter.mute?.();
@@ -360,6 +446,12 @@ export function createStepFieldController({
       tailHeld: sideStates?.tail?.held,
       leadHeld: sideStates?.lead?.held
     });
+    observed.tail.requestedRate = Number(prefs.tailRate);
+    observed.tail.actualRate = sides.tail.actualRate;
+    observed.tail.playback = sides.tail.playback;
+    observed.lead.requestedRate = Number(prefs.leadRate);
+    observed.lead.actualRate = sides.lead.actualRate;
+    observed.lead.playback = sides.lead.playback;
     const key = JSON.stringify({
       phase: observed.phase,
       constraint: observed.constraint,
@@ -367,6 +459,8 @@ export function createStepFieldController({
       lead: Number(observed.lead.address.toFixed(2)),
       tailHeld: observed.tail.held,
       leadHeld: observed.lead.held,
+      rates: [observed.tail.actualRate, observed.lead.actualRate],
+      playback: [observed.tail.playback, observed.lead.playback],
       visible: [observed.tail.visible, observed.lead.visible]
     });
     runtime.field = observed;
@@ -399,16 +493,21 @@ export function createStepFieldController({
 
   function sideMetadata(role, target, sideState) {
     if (runtime.phase === STEP_FIELD_PHASE.SUSPENDED) return "Suspended";
+    const runtimeSide = sides[role];
+    if (runtimeSide.playback === "blocked") return "Playback blocked";
+    if (runtimeSide.error) return "Player unavailable";
     const prefix = role === "tail" ? "−" : "+";
     const boundary = target.constrained
       ? role === "tail" ? "Range start" : "Range end"
       : null;
+    const rate = Number.isFinite(runtimeSide.actualRate) ? ` · ${runtimeSide.actualRate}×` : "";
     if (!target.available) return boundary || (role === "tail" ? "Range start" : "Range end");
-    if (sideState.held) return `${prefix}${formatOffset(target.distance)} · ${boundary || "Held"}`;
+    if (!runtimeSide.rateAvailable) return `${prefix}${formatOffset(target.distance)} · Rate unavailable`;
+    if (sideState.held) return `${prefix}${formatOffset(target.distance)} · ${boundary || "Held"}${rate}`;
     if (sideState.offset > REACH_TOLERANCE) {
-      return `${prefix}${formatOffset(sideState.offset)} / ${formatOffset(target.distance)}${boundary ? ` · ${boundary}` : ""}`;
+      return `${prefix}${formatOffset(sideState.offset)} / ${formatOffset(target.distance)}${boundary ? ` · ${boundary}` : ""}${rate}`;
     }
-    return `${prefix}${formatOffset(target.distance)} · ${boundary || "Ready"}`;
+    return `${prefix}${formatOffset(target.distance)} · ${boundary || "Ready"}${rate}`;
   }
 
   function render(snapshot = getSnapshot?.(), live = null, sideStates = null) {
@@ -417,7 +516,7 @@ export function createStepFieldController({
     const loaded = Boolean(snapshot.videoLoaded);
     const field = live || deriveStepField(
       Number(snapshot.center?.time ?? snapshot.current ?? 0),
-      Number(snapshot.stepSeconds || 10),
+      snapshotReach(snapshot),
       snapshot.range || { start: 0, end: 0 }
     );
     const states = sideStates || {
@@ -489,13 +588,17 @@ export function createStepFieldController({
     if (!snapshot || !snapshot.range) return;
     if (snapshot.videoLoaded) ensurePlayers(prefs);
     syncVideo(snapshot);
+    populateRateControl("tail", prefs);
+    populateRateControl("lead", prefs);
+    sides.tail.requestedRate = Number(prefs.tailRate);
+    sides.lead.requestedRate = Number(prefs.leadRate);
 
     if (!snapshot.videoLoaded || !snapshot.videoId) {
       pauseSides();
       runtime.semanticKey = null;
       runtime.lastCenterTime = null;
       runtime.phase = prefs.stepFieldEnabled ? STEP_FIELD_PHASE.COINCIDENT : STEP_FIELD_PHASE.OFF;
-      const targets = deriveStepField(snapshot.current || 0, snapshot.stepSeconds || 10, snapshot.range);
+      const targets = deriveStepField(snapshot.current || 0, snapshotReach(snapshot), snapshot.range);
       publishField(targets, null, snapshot.current || 0, prefs, runtime.phase);
       render(snapshot);
       return;
