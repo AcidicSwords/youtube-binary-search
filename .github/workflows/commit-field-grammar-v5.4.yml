@@ -43,7 +43,7 @@ jobs:
           git fetch origin feature/step-field-v5.3-final
           git checkout origin/feature/step-field-v5.3-final -- \
             index.html transport.js session.js step-field.js app.js view.js \
-            package.json README.md IMPLEMENTATION.md
+            package.json README.md IMPLEMENTATION.md interaction-smoke.mjs
           git checkout 61e2a7efa8960f21e5a10e9d407e6703142df985 -- \
             apply-field-grammar-v5.4.py \
             apply-field-grammar-v5.4-transport-fix.py
@@ -83,6 +83,7 @@ jobs:
             set -e
             python3 apply-field-grammar-v5.4.py
             python3 apply-field-grammar-v5.4-transport-fix.py
+            python3 repair-field-grammar-v5.4-regressions.py
           ) >> field-grammar-apply.log 2>&1
           status=$?
           cat field-grammar-apply.log
@@ -119,7 +120,8 @@ jobs:
 
           required=(
             README.md app.js field-grammar-tests.mjs field-grammar.css index.html
-            package.json session.js step-field-geometry.js step-field.js transport.js view.js
+            interaction-smoke.mjs package.json session.js step-field-geometry.js
+            step-field-tests.mjs step-field.js transport.js view.js
           )
           changed="$(git diff --name-only origin/feature/step-field-v5.3-final --)"
           printf '%s\n' "$changed" | tee field-grammar-integration-files.log
@@ -177,6 +179,7 @@ jobs:
           rm -f field-grammar-integration-files.log
           rm -f apply-field-grammar-v5.4.py
           rm -f apply-field-grammar-v5.4-transport-fix.py
+          rm -f repair-field-grammar-v5.4-regressions.py
           rm -f install-field-grammar-v5.4.py
           rm -f manifest.json
           rm -f .github/workflows/commit-field-grammar-v5.4.yml
