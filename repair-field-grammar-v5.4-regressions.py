@@ -73,4 +73,100 @@ replace_once(
     "Loop start smoke",
 )
 
-print("Updated interaction smoke for one-pass Continue.")
+replace_once(
+    "context-smoke.mjs",
+    '''fakePlayer.deferNextPlacement = true;
+byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 500 });
+assert.equal(byId.get("current-label").textContent, "0:50.000", "Direct placement must commit semantic Current immediately.");
+assert.equal(fakePlayer.currentTime, 0, "A delayed player placement may temporarily leave the physical Cursor behind.");
+assert.equal(fakePlayer.pendingPlacement, 49, "Five-second Context should request one second of pre-roll.");
+await delay();
+assert.equal(byId.get("context-state").textContent, "0:49.000–0:54.000");
+assert.equal(byId.get("context-label").textContent, "Stop Context");
+assert.equal(byId.get("current-marker").style.left, "50%", "Semantic Current must remain fixed during Context.");
+assert.equal(byId.get("cursor-marker").hidden, false);
+
+intervalCallbacks[0]();
+await delay();
+assert.notEqual(byId.get("context-state").textContent, "5 s", "Context must not terminate against a stale pre-placement Cursor.");
+fakePlayer.applyPendingPlacement();
+intervalCallbacks[0]();
+fakePlayer.currentTime = 54;
+intervalCallbacks[0]();
+await delay();
+assert.equal(fakePlayer.currentTime, 50, "Context must return the physical playhead to semantic Current.");
+assert.equal(byId.get("current-label").textContent, "0:50.000");
+assert.equal(byId.get("cursor-marker").hidden, true, "Observation Cursor collapses back into Current when Context ends.");
+assert.match(byId.get("interval-label").textContent, /0:00\\.000–0:50\\.000/, "Context must preserve the movement Interval.");''',
+    '''fakePlayer.deferNextPlacement = true;
+byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 500 });
+assert.equal(byId.get("current-label").textContent, "0:50.000", "Direct placement must commit semantic Current immediately.");
+assert.equal(fakePlayer.currentTime, 0, "A delayed player placement may temporarily leave the physical Cursor behind.");
+assert.equal(fakePlayer.pendingPlacement, 50, "A visible Field must suppress automatic Context and place the destination itself.");
+assert.equal(byId.get("context-state").textContent, "5 s");
+assert.equal(byId.get("context-label").textContent, "Context");
+fakePlayer.applyPendingPlacement();
+intervalCallbacks[0]();
+await delay();
+assert.equal(fakePlayer.currentTime, 50);
+
+fakePlayer.deferNextPlacement = true;
+byId.get("context-action").click();
+assert.equal(fakePlayer.pendingPlacement, 49, "Explicit five-second Context should request one second of pre-roll.");
+await delay();
+assert.equal(byId.get("context-state").textContent, "0:49.000–0:54.000");
+assert.equal(byId.get("context-label").textContent, "Stop Context");
+assert.equal(byId.get("current-marker").style.left, "50%", "Semantic Current must remain fixed during Context.");
+assert.equal(byId.get("cursor-marker").hidden, false);
+
+intervalCallbacks[0]();
+await delay();
+assert.notEqual(byId.get("context-state").textContent, "5 s", "Context must not terminate against a stale pre-placement Cursor.");
+fakePlayer.applyPendingPlacement();
+intervalCallbacks[0]();
+fakePlayer.currentTime = 54;
+intervalCallbacks[0]();
+await delay();
+assert.equal(fakePlayer.currentTime, 50, "Context must return the physical playhead to semantic Current.");
+assert.equal(byId.get("current-label").textContent, "0:50.000");
+assert.equal(byId.get("cursor-marker").hidden, true, "Observation Cursor collapses back into Current when Context ends.");
+assert.match(byId.get("interval-label").textContent, /0:00\\.000–0:50\\.000/, "Context must preserve the movement Interval.");''',
+    "Field-visible explicit Context smoke",
+)
+
+replace_once(
+    "context-smoke.mjs",
+    '''byId.get("context-select").value = "5";
+byId.get("context-select").dispatch("change");
+byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 250 });
+byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 750 });
+assert.equal(byId.get("current-label").textContent, "1:15.000");
+assert.equal(fakePlayer.currentTime, 74, "A new move must replace the previous Context without returning to the old anchor.");
+await delay();
+await delay();
+assert.equal(byId.get("context-state").textContent, "1:14.000–1:19.000", "Delayed internal PAUSED events must not stop the replacement Context.");''',
+    '''byId.get("context-select").value = "5";
+byId.get("context-select").dispatch("change");
+byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 250 });
+byId.get("context-action").click();
+await delay();
+byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 750 });
+assert.equal(byId.get("current-label").textContent, "1:15.000");
+assert.equal(fakePlayer.currentTime, 75, "A new move must stop explicit Context without returning to the old anchor.");
+assert.equal(byId.get("context-label").textContent, "Context");
+byId.get("context-action").click();
+assert.equal(fakePlayer.currentTime, 74, "Explicit replacement Context must begin at its pre-roll Address.");
+await delay();
+await delay();
+assert.equal(byId.get("context-state").textContent, "1:14.000–1:19.000", "Delayed internal PAUSED events must not stop explicit replacement Context.");''',
+    "explicit Context replacement smoke",
+)
+
+replace_once(
+    "context-smoke.mjs",
+    'console.log("Context smoke passed: automatic observation, restoration, interruption, Return isolation, Off preference, delayed Loop startup, and startup Pause.");',
+    'console.log("Context smoke passed: Field-visible suppression, explicit observation, restoration, interruption, Return isolation, Off preference, delayed Loop startup, and startup Pause.");',
+    "Context smoke completion text",
+)
+
+print("Updated v5.4 interaction and Context regressions.")
