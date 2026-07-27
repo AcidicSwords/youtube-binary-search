@@ -66,4 +66,11 @@ assert.match(byId.get("interval-label").textContent, /0:37\\.500–0:50\\.000/);
     "post-Continue Interval smoke",
 )
 
+replace_once(
+    "interaction-smoke.mjs",
+    'assert.equal(fakePlayer.currentTime, 25, "Loop must restore the Interval start.");',
+    'assert.equal(fakePlayer.currentTime, 37.5, "Loop must restore the active Interval start.");',
+    "Loop start smoke",
+)
+
 print("Updated interaction smoke for one-pass Continue.")
