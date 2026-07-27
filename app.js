@@ -2217,7 +2217,6 @@ window.addEventListener("resize", () => {
 });
 
 syncGuideLayout();
-syncStepControls();
 syncContextControl();
 view.renderGuide();
 view.render();
