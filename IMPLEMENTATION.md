@@ -302,4 +302,27 @@ View          existing semantic and timeline projection
 The Center player remains authoritative. Side-player events cannot create Go, settle Transport, or update Current. The Field uses fixed conservative rates, exposes no separate distance setting, and adds only one Center-level toggle plus one collapse control per side.
 
 
+
+## v5.4 Field grammar
+
+The Step Field is now a physical Address-and-Extent projection rather than a second playback grammar.
+
+```text
+Coincident → Unfolding → Partially Held → Held
+```
+
+During Unfolding, a side pane exposes an actual Cursor and selects through `Go`. At Held, that Cursor equals the existing Step Target and selects through `Step`. Actual Tail and Lead Cursors derive `Field Span`; it may supply `Loop` or `Save Section`, but it never enters Session as Current, Interval, or physical history.
+
+Observation controls are attached to their operands:
+
+```text
+Current        → Context
+Forward Target → Skim
+Interval       → Loop / Save Section
+Field Span     → Loop / Save Section
+Center         → Continue / Pause
+```
+
+`step-field-geometry.js` owns pure derivation. `step-field.js` owns side-player execution. Directional rate selection cannot silently round Tail or Lead to `1×`, side mute is reasserted continuously, and Continue stops at Range End rather than wrapping the Field across a discontinuity.
+
 Native YouTube play/pause is the sole visible Continue/Pause authority. The hidden application control remains only as a programmatic and test surface; native PLAYING and PAUSED events continue through the same transport settlement path.

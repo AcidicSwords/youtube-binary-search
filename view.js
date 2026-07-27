@@ -378,6 +378,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const activeRange = range();
     const currentResolution = resolution();
     const currentInterval = interval();
+    const field = currentState.field;
+    const fieldSpan = field?.span?.held && field.span.available
+      ? { start: field.span.start, end: field.span.end }
+      : null;
     const skimActive = transportIs(TRANSPORT_KIND.SKIM);
     const loopActive = transportIs(TRANSPORT_KIND.LOOP);
     const contextActive = transportIs(TRANSPORT_KIND.CONTEXT);
@@ -422,9 +426,14 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : "—";
     elements["current-label"].textContent = currentResolution ? formatTime(semanticCurrent) : "—";
     elements["interval-label"].textContent = currentInterval ? formatRange(currentInterval) : "—";
+    elements["field-span-label"].textContent = fieldSpan ? formatRange(fieldSpan) : "—";
+    elements["field-span-state"].hidden = !fieldSpan;
     elements["focused-label"].textContent = focused ? focused.label : "None";
     elements["range-tools-value"].textContent = loaded ? formatRange(activeRange) : "—";
-    elements["section-window"].textContent = currentInterval ? formatRange(currentInterval) : "—";
+    const captureExtent = currentState.captureExtent || currentInterval;
+    const captureKind = currentState.captureExtentKind || "interval";
+    elements["section-source-label"].textContent = captureKind === "field-span" ? "Retain Field Span" : "Retain Interval";
+    elements["section-window"].textContent = captureExtent ? formatRange(captureExtent) : "—";
     elements["step-setting-value"].textContent = formatDuration(currentState.stepSeconds);
 
     elements["focused-section"].hidden = !focused;
@@ -464,7 +473,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const alreadyPinned = currentPin?.kind === PIN_KIND.EXPLICIT;
     elements["pin-current"].disabled = interactionLocked || alreadyPinned;
     elements.continue.disabled = interactionLocked;
-    elements.loop.disabled = interactionLocked || !currentInterval;
+    const loopSource = currentState.transport.source || "interval";
+    const intervalLoopActive = loopActive && loopSource === "interval";
+    const fieldLoopActive = loopActive && loopSource === "field-span";
+    elements.loop.disabled = interactionLocked || (!currentInterval && !intervalLoopActive) || fieldLoopActive;
+    elements["field-span-loop"].disabled = interactionLocked || (!fieldSpan && !fieldLoopActive) || intervalLoopActive;
+    elements["field-span-retain"].disabled = interactionLocked || !fieldSpan;
     elements.skim.disabled = interactionLocked
       || (skimActive ? false : targets.forward === null || !skimAvailable);
 
@@ -495,7 +509,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["context-label"].textContent = contextActive ? "Stop Context" : "Context";
     elements["skim-label"].textContent = skimActive ? "Stop Skim" : "Skim";
     elements["continue-label"].textContent = transportActive ? "Pause" : "Continue";
-    elements["loop-label"].textContent = loopActive ? "Stop Loop" : "Loop";
+    elements["loop-label"].textContent = intervalLoopActive ? "Stop Loop" : "Loop";
+    elements["field-span-loop-label"].textContent = fieldLoopActive ? "Stop Loop" : "Loop";
     elements["continue-meta"].textContent = transportActive
       ? `${activeKindLabel} active`
       : loaded ? formatRange(activeRange) : "—";
@@ -503,7 +518,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ["context-action", contextActive],
       ["continue", transportActive],
       ["skim", skimActive],
-      ["loop", loopActive]
+      ["loop", intervalLoopActive],
+      ["field-span-loop", fieldLoopActive]
     ]) {
       elements[id].classList.toggle("is-active", active);
       elements[id].setAttribute("aria-pressed", String(active));
@@ -562,6 +578,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         "resolution-end-marker", "backward-target-marker", "forward-target-marker", "current-marker", "cursor-marker"
       ]) elements[id].hidden = true;
       elements["interval-fill"].hidden = true;
+      elements["field-span-fill"].hidden = true;
       elements["section-preview-fill"].hidden = true;
       elements["action-preview-fill"].hidden = true;
       renderTimelinePins();
@@ -597,6 +614,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
     elements["interval-fill"].hidden = !currentInterval;
     if (currentInterval) setSegment(elements["interval-fill"], currentInterval.start, currentInterval.end);
+    elements["field-span-fill"].hidden = !fieldSpan;
+    if (fieldSpan) setSegment(elements["field-span-fill"], fieldSpan.start, fieldSpan.end);
     renderSectionPreview();
     renderActionPreview(actionModel, structuralPresentation);
     renderTimelinePins();

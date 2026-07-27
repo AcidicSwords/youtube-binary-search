@@ -38,6 +38,7 @@ import {
   reachSkimDestination,
   pinCurrent as pinSessionCurrent,
   saveIntervalAsSection,
+  saveExtentAsSection,
   renameGuidePin,
   deleteGuidePin,
   renameGuideSection,
@@ -129,7 +130,10 @@ const state = {
   guideReturnFocus: null,
   nativeGo: null,
   programmaticPlacement: null,
-  guideDialog: null
+  guideDialog: null,
+  field: null,
+  captureExtent: null,
+  captureExtentKind: null
 };
 
 let player = null;
@@ -371,6 +375,7 @@ function applyPlayerEffect(result, options = {}) {
   if (
     observe
     && state.contextSeconds > 0
+    && !(state.stepFieldEnabled && (state.tailVisible || state.leadVisible))
     && result?.interval?.medium === "direct"
     && Number.isFinite(destination)
   ) {
@@ -614,6 +619,20 @@ function performStep(direction) {
   view.render();
 }
 
+
+function selectFieldSide(selection) {
+  if (!state.videoLoaded || !selection || !Number.isFinite(selection.address)) return;
+  if (selection.mode === "step") {
+    performStep(selection.direction);
+    return;
+  }
+  moveToAddress(selection.address, {
+    operator: selection.role === "tail" ? "fieldTail" : "fieldLead",
+    label: selection.role === "tail" ? "Go to Tail" : "Go to Lead",
+    status: destination => `Current moved to visible ${selection.role === "tail" ? "Tail" : "Lead"} at ${formatTime(destination)}.`
+  });
+}
+
 function startSkim() {
   if (!state.videoLoaded) return;
   if (transportIs(TRANSPORT_KIND.SKIM)) {
@@ -759,30 +778,46 @@ function continuePause() {
   startContinueSession(true);
 }
 
-function startLoop() {
-  const loop = currentInterval();
-  if (!loop) {
-    setStatus("Establish an Interval before starting Loop.");
+function startLoopExtent(extent, source = "interval", label = "Interval") {
+  if (!extent || !(extent.end - extent.start > EPSILON)) {
+    setStatus(`Establish a ${label} before starting Loop.`);
     return;
   }
   if (transportIs(TRANSPORT_KIND.LOOP)) {
+    const sameSource = state.transport.source === source;
     settleTransport();
-    setStatus("Loop stopped.");
-    return;
+    if (sameSource) {
+      setStatus("Loop stopped.");
+      return;
+    }
   }
 
   settleBeforeAction();
   state.transport = createLoopTransport({
     anchor: currentResolution().C,
-    start: loop.start,
-    end: loop.end
+    start: extent.start,
+    end: extent.end,
+    source
   });
   player.setRate(1);
-  placePlayer(loop.start);
-  if (Math.abs(safeCurrentTime() - loop.start) <= 0.25) state.transport.enteredWindow = true;
+  placePlayer(extent.start);
+  if (Math.abs(safeCurrentTime() - extent.start) <= 0.25) state.transport.enteredWindow = true;
   player.play();
-  setStatus(`Looping ${formatRange(loop)}.`);
+  setStatus(`Looping ${label} ${formatRange(extent)}.`);
   view.render();
+}
+
+function startLoop() {
+  startLoopExtent(currentInterval(), "interval", "Interval");
+}
+
+function heldFieldSpan() {
+  const span = state.field?.span;
+  return span?.held && span.available ? { start: span.start, end: span.end } : null;
+}
+
+function startFieldSpanLoop() {
+  startLoopExtent(heldFieldSpan(), "field-span", "Field Span");
 }
 
 function setRange(start, end, current, label, status) {
@@ -838,14 +873,18 @@ function pinCurrent() {
 function saveCurrentIntervalAsSection(event = null) {
   event?.preventDefault?.();
   const label = elements["section-label"].value.trim();
-  if (!currentInterval()) return setStatus("Establish an Interval before saving a Section.", true);
+  const extent = state.captureExtent || currentInterval();
+  const kind = state.captureExtentKind || "interval";
+  if (!extent) return setStatus("Establish an Extent before saving a Section.", true);
   if (!label) return setStatus("A Section requires a title.", true);
   settleBeforeAction();
-  const result = saveIntervalAsSection(state.session, label);
+  const result = kind === "interval"
+    ? saveIntervalAsSection(state.session, label)
+    : saveExtentAsSection(state.session, extent, label, "field-span");
   if (!result.changed) {
     setStatus(
       result.reason === "duplicate-section"
-        ? `Section “${label}” already exists for this Interval.`
+        ? `Section “${label}” already exists for this Extent.`
         : "The Section could not be saved.",
       result.reason !== "duplicate-section"
     );
@@ -1105,6 +1144,9 @@ function initializeVideo() {
   state.videoLoaded = true;
   state.transport = idleTransport();
   state.pendingStep = null;
+  state.field = null;
+  state.captureExtent = null;
+  state.captureExtentKind = null;
   state.availableRates = snapshot.availableRates;
   state.playerState = snapshot.state;
   view.invalidateTimelinePins();
@@ -1186,13 +1228,8 @@ function handlePlayerStateChange(name, _rawState, metadata = {}) {
   }
 
   if (name === YOUTUBE_STATE.ENDED && transportIs(TRANSPORT_KIND.CONTINUE)) {
-    state.transport.wrapped = true;
-    state.transport.crossedResolution = true;
-    const preview = previewReopen(state.session, activeRange().start);
-    if (preview.changed) state.session = preview.session;
-    placePlayer(activeRange().start);
-    player.play();
-    setStatus(`Continued from the start of Range ${formatRange(activeRange())}.`);
+    settleTransport({ issuePause: false });
+    setStatus("Continue reached Range End.");
   }
 
   view.render();
@@ -1319,17 +1356,9 @@ function pollPlayer() {
     if (now < activeRange().start - EPSILON) {
       placePlayer(activeRange().start);
     } else if (now >= activeRange().end - EPSILON) {
-      transport.wrapped = true;
-      transport.crossedResolution = true;
-      const preview = previewReopen(state.session, activeRange().start);
-      if (preview.changed) {
-        state.session = preview.session;
-        semanticChanged = true;
-      }
-      placePlayer(activeRange().start);
-      player.setRate(1);
-      player.play();
-      setStatus(`Continued from the start of Range ${formatRange(activeRange())}.`);
+      settleTransport();
+      setStatus("Continue reached Range End.");
+      return;
     }
     if (semanticChanged) view.render();
   } else if (
@@ -1507,13 +1536,16 @@ function replayContext() {
   view.render();
 }
 
-function openSectionCapture() {
-  if (!currentInterval()) {
-    setStatus("Establish an Interval before saving a Section.");
+function openSectionCapture(kind = "interval") {
+  const extent = kind === "field-span" ? heldFieldSpan() : currentInterval();
+  if (!extent) {
+    setStatus(`Establish a ${kind === "field-span" ? "Held Field Span" : "movement Interval"} before saving a Section.`);
     return false;
   }
+  state.captureExtent = { start: extent.start, end: extent.end };
+  state.captureExtentKind = kind;
   elements["section-capture"].hidden = false;
-  elements["interval-state"].setAttribute("aria-expanded", "true");
+  elements["interval-state"].setAttribute("aria-expanded", String(kind === "interval"));
   elements["section-label"].disabled = false;
   elements["section-label"].focus();
   view.render();
@@ -1524,6 +1556,8 @@ function closeSectionCapture() {
   elements["section-capture"].hidden = true;
   elements["interval-state"].setAttribute("aria-expanded", "false");
   elements["section-label"].value = "";
+  state.captureExtent = null;
+  state.captureExtentKind = null;
   view.render();
 }
 
@@ -1691,7 +1725,11 @@ function initializePlayerApi() {
       if (Object.hasOwn(patch, "leadVisible")) state.leadVisible = Boolean(patch.leadVisible);
       persistPreferences();
     },
-    onStep: performStep,
+    onSelect: selectFieldSide,
+    onChange: fieldState => {
+      state.field = fieldState;
+      view.render();
+    },
     formatTime
   });
   if (pollTimer === null) pollTimer = window.setInterval(pollPlayer, POLL_MS);
@@ -1845,6 +1883,8 @@ elements["context-action"].addEventListener("click", replayContext);
 elements.continue.addEventListener("click", continuePause);
 elements.skim.addEventListener("click", startSkim);
 elements.loop.addEventListener("click", startLoop);
+elements["field-span-loop"].addEventListener("click", startFieldSpanLoop);
+elements["field-span-retain"].addEventListener("click", () => openSectionCapture("field-span"));
 elements["speed-select"].addEventListener("change", view.render);
 elements["context-select"].addEventListener("change", event => {
   state.contextSeconds = Number(event.target.value || 0);
@@ -1869,7 +1909,7 @@ elements["step-slider"].addEventListener("input", event => { syncStepControls(ev
 elements["step-seconds"].addEventListener("change", event => { syncStepControls(event.target); view.render(); });
 
 // Interval and Range affordances
-elements["interval-state"].addEventListener("click", openSectionCapture);
+elements["interval-state"].addEventListener("click", () => openSectionCapture("interval"));
 elements["section-capture"].addEventListener("submit", saveCurrentIntervalAsSection);
 elements["section-label"].addEventListener("input", view.render);
 elements["cancel-section"].addEventListener("click", closeSectionCapture);

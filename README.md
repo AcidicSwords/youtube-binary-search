@@ -1,6 +1,6 @@
 # Binary YouTube Reader
 
-Version 5.3 adds the audited Step Field projection to the spatial reader.
+Version 5.4 integrates the Step Field as a complete Address-and-Extent grammar rather than a parallel playback system.
 
 Binary YouTube Reader presents a YouTube video as an ordered spatial Range rather than only as mutually exclusive linear presentation.
 
@@ -154,9 +154,9 @@ The optional Step Field projects the existing local Step relation through three 
 Tail | Center | Lead
 ```
 
-Center remains the sole authoritative player and the only audible pane. Tail and Lead are smaller, muted, independently collapsible projections. They begin coincident with Current, unfold through differential playback while Continue is active, and hold at the existing Step distance. Selecting Tail or Lead executes the existing Step Backward or Step Forward operator; the Field creates no new Current, Interval, history, Pin, or Section semantics.
+Center remains the sole authoritative player and the only audible pane. Tail and Lead are smaller, muted, independently collapsible projections. They begin coincident with Current, unfold through differential playback while Continue is active, and hold at the existing Step distance. Once Held, all active panes continue at `1×`, so the completed relation slides through the source as one field.
 
-Context, Loop, Skim, pending Step gestures, and Range dragging suspend the side projections. Visibility is a presentation preference and does not enter Return history.
+A forming side is an actual visible Cursor and selects through Go. A Held side coincides with its Step Target and selects through Step. The actual Tail-to-Lead relation is Field Span: a transient Extent that may be looped or retained as a Section without becoming another Current, Interval, or Return history. Native Center play/pause remains the sole visible transport authority. Context belongs to Current, Skim to the Forward Target, and Loop to an explicit Extent. Context, Loop, Skim, pending Step gestures, and Range dragging suspend the side projections. Visibility is a presentation preference and does not enter Return history.
 
 ## Architecture
 
@@ -164,8 +164,9 @@ Context, Loop, Skim, pending Step gestures, and Range dragging suspend the side 
 range-geometry.js  pure Range, Neighborhood, Resolution, Refine, Reopen, and Step geometry
 guide.js           persistent Pins and Sections plus storage migration
 session.js         immutable semantic state, transactions, and Return history
-transport.js       transient Context, Continue, Skim, and Loop execution
-step-field.js      transient Tail/Center/Lead projection and side-player synchronization
+transport.js       transient Context, Continue, Skim, and Extent-driven Loop execution
+step-field-geometry.js pure Field targets, actual offsets, Span, phases, and side-selection mode
+step-field.js      transient Tail/Center/Lead player synchronization
 youtube.js         sole raw YouTube IFrame adapter
 source-field.js    optional chapter/transcript candidate records
 view.js            DOM projection, timeline Pins, previews, formatting, and control state

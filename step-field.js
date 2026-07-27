@@ -1,72 +1,32 @@
-import { EPSILON, clamp, stepTarget } from "./range-geometry.js";
+import { clamp } from "./range-geometry.js";
 import { YOUTUBE_STATE, createYouTubePlayer } from "./youtube.js";
+import {
+  STEP_FIELD_PHASE,
+  FIELD_REACH_TOLERANCE,
+  deriveStepField,
+  chooseNearestRate,
+  chooseDirectionalRate,
+  hasCenterDiscontinuity,
+  resolveFieldPhase,
+  sideActivationMode,
+  deriveObservedField
+} from "./step-field-geometry.js";
 
-export const STEP_FIELD_PHASE = Object.freeze({
-  OFF: "off",
-  COINCIDENT: "coincident",
-  UNFOLDING: "unfolding",
-  PARTIAL: "partially-held",
-  HELD: "held",
-  SUSPENDED: "suspended"
-});
+export {
+  STEP_FIELD_PHASE,
+  deriveStepField,
+  chooseNearestRate,
+  chooseDirectionalRate,
+  hasCenterDiscontinuity,
+  resolveFieldPhase,
+  sideActivationMode,
+  deriveObservedField
+} from "./step-field-geometry.js";
 
-const REACH_TOLERANCE = 0.16;
+const REACH_TOLERANCE = FIELD_REACH_TOLERANCE;
 const DRIFT_TOLERANCE = 0.42;
-const DISCONTINUITY_TOLERANCE = 2.5;
 const TAIL_RATE = 0.5;
 const LEAD_RATE = 2;
-
-export function deriveStepField(current, stepSeconds, range) {
-  if (!Number.isFinite(current) || !Number.isFinite(stepSeconds) || stepSeconds <= 0) {
-    throw new TypeError("Step Field requires a finite Current and positive Step size.");
-  }
-  if (!range || !Number.isFinite(range.start) || !Number.isFinite(range.end)) {
-    throw new TypeError("Step Field requires a valid Range.");
-  }
-  const center = clamp(current, range.start, range.end);
-  const tailTarget = stepTarget(center, stepSeconds, "backward", range);
-  const leadTarget = stepTarget(center, stepSeconds, "forward", range);
-  return {
-    center,
-    tail: {
-      target: tailTarget,
-      distance: center - tailTarget,
-      available: tailTarget < center - EPSILON
-    },
-    lead: {
-      target: leadTarget,
-      distance: leadTarget - center,
-      available: leadTarget > center + EPSILON
-    }
-  };
-}
-
-export function chooseNearestRate(availableRates, requestedRate) {
-  const rates = [...new Set(availableRates || [])]
-    .filter(rate => Number.isFinite(rate) && rate > 0)
-    .sort((a, b) => a - b);
-  if (!rates.length) return 1;
-  return rates.reduce((best, rate) => (
-    Math.abs(rate - requestedRate) < Math.abs(best - requestedRate) ? rate : best
-  ), rates[0]);
-}
-
-export function hasCenterDiscontinuity(previous, current) {
-  if (!Number.isFinite(previous) || !Number.isFinite(current)) return false;
-  return current < previous - 0.75 || Math.abs(current - previous) > DISCONTINUITY_TOLERANCE;
-}
-
-export function resolveFieldPhase({ enabled, suspended, sides }) {
-  if (!enabled) return STEP_FIELD_PHASE.OFF;
-  if (suspended) return STEP_FIELD_PHASE.SUSPENDED;
-  const active = (sides || []).filter(side => side.visible && side.available);
-  if (!active.length) return STEP_FIELD_PHASE.COINCIDENT;
-  const held = active.filter(side => side.held).length;
-  if (held === active.length) return STEP_FIELD_PHASE.HELD;
-  if (held > 0) return STEP_FIELD_PHASE.PARTIAL;
-  if (active.some(side => side.offset > REACH_TOLERANCE)) return STEP_FIELD_PHASE.UNFOLDING;
-  return STEP_FIELD_PHASE.COINCIDENT;
-}
 
 function defaultPreferences() {
   return {
@@ -93,6 +53,8 @@ export function createStepFieldController({
   getPreferences = defaultPreferences,
   setPreferences = () => {},
   onStep = () => {},
+  onSelect = null,
+  onChange = () => {},
   formatTime = value => String(value),
   createPlayer = createYouTubePlayer
 }) {
@@ -115,6 +77,7 @@ export function createStepFieldController({
       videoId: null,
       held: false,
       heldDistance: 0,
+      rateAvailable: true,
       error: false
     },
     lead: {
@@ -126,6 +89,7 @@ export function createStepFieldController({
       videoId: null,
       held: false,
       heldDistance: 0,
+      rateAvailable: true,
       error: false
     }
   };
@@ -135,7 +99,9 @@ export function createStepFieldController({
     semanticKey: null,
     lastCenterTime: null,
     suspended: false,
-    forceEstablish: true
+    forceEstablish: true,
+    field: null,
+    fieldKey: ""
   };
 
   function preferences() {
@@ -166,8 +132,8 @@ export function createStepFieldController({
     elements["lead-restore"]?.addEventListener?.("click", () => {
       changePreferences({ leadVisible: true, stepFieldEnabled: true });
     });
-    elements["tail-step"]?.addEventListener?.("click", () => onStep("backward"));
-    elements["lead-step"]?.addEventListener?.("click", () => onStep("forward"));
+    elements["tail-step"]?.addEventListener?.("click", () => selectSide("tail"));
+    elements["lead-step"]?.addEventListener?.("click", () => selectSide("lead"));
   }
 
   function createSide(role) {
@@ -227,9 +193,18 @@ export function createStepFieldController({
   }
 
   function setSideRate(side, requestedRate) {
+    side.adapter?.mute?.();
     const snapshot = readSide(side);
-    const rate = chooseNearestRate(snapshot.availableRates, requestedRate);
+    const rate = requestedRate === 1
+      ? 1
+      : chooseDirectionalRate(snapshot.availableRates, requestedRate, side.role);
+    side.rateAvailable = rate !== null;
+    if (rate === null) {
+      pauseSide(side);
+      return false;
+    }
     if (Math.abs(snapshot.rate - rate) > 0.001) side.adapter?.setRate?.(rate);
+    return true;
   }
 
   function ensureSidePlaying(side) {
@@ -280,6 +255,7 @@ export function createStepFieldController({
 
   function updateSide(side, centerTime, targetDistance, range) {
     if (!side.ready || side.error) return { available: false, held: false, offset: 0 };
+    side.adapter?.mute?.();
     const snapshot = readSide(side);
     const rawOffset = side.role === "tail" ? centerTime - snapshot.time : snapshot.time - centerTime;
     const offset = Math.max(0, rawOffset);
@@ -316,7 +292,9 @@ export function createStepFieldController({
       return { available: true, held: true, offset: targetDistance };
     }
 
-    setSideRate(side, side.requestedRate);
+    if (!setSideRate(side, side.requestedRate)) {
+      return { available: false, held: false, offset, rateUnavailable: true };
+    }
     ensureSidePlaying(side);
     return { available: true, held: false, offset };
   }
@@ -329,6 +307,57 @@ export function createStepFieldController({
     if (!Number.isFinite(value)) return "—";
     const rounded = value >= 10 ? value.toFixed(0) : value.toFixed(1).replace(/\.0$/, "");
     return `${rounded}s`;
+  }
+
+
+  function publishField(targets, sideStates, centerTime, prefs, phase = runtime.phase) {
+    const tailRead = readSide(sides.tail);
+    const leadRead = readSide(sides.lead);
+    const observed = deriveObservedField({
+      targets,
+      phase,
+      centerAddress: centerTime,
+      tailAddress: prefs.tailVisible && sides.tail.ready ? tailRead.time : centerTime,
+      leadAddress: prefs.leadVisible && sides.lead.ready ? leadRead.time : centerTime,
+      tailVisible: prefs.tailVisible,
+      leadVisible: prefs.leadVisible,
+      tailHeld: sideStates?.tail?.held,
+      leadHeld: sideStates?.lead?.held
+    });
+    const key = JSON.stringify({
+      phase: observed.phase,
+      tail: Number(observed.tail.address.toFixed(2)),
+      lead: Number(observed.lead.address.toFixed(2)),
+      tailHeld: observed.tail.held,
+      leadHeld: observed.lead.held,
+      visible: [observed.tail.visible, observed.lead.visible]
+    });
+    runtime.field = observed;
+    if (key !== runtime.fieldKey) {
+      runtime.fieldKey = key;
+      onChange?.(observed);
+    }
+    return observed;
+  }
+
+  function selectSide(role) {
+    const observed = runtime.field;
+    const side = observed?.[role];
+    const mode = sideActivationMode(side, observed?.phase);
+    if (!mode) return;
+    const payload = {
+      role,
+      direction: role === "tail" ? "backward" : "forward",
+      mode,
+      phase: observed.phase,
+      held: side.held,
+      address: side.address,
+      target: side.target,
+      offset: side.offset,
+      span: observed.span
+    };
+    if (typeof onSelect === "function") onSelect(payload);
+    else onStep(payload.direction);
   }
 
   function render(snapshot = getSnapshot?.(), live = null, sideStates = null) {
@@ -392,8 +421,22 @@ export function createStepFieldController({
       setText(elements[`${role}-meta`], meta);
       const button = elements[`${role}-step`];
       if (button) {
-        button.disabled = !loaded || !prefs.stepFieldEnabled || !prefs[`${role}Visible`] || !target.available;
-        button.setAttribute("aria-label", `${role === "tail" ? "Step Backward" : "Step Forward"} to ${formatTime(target.target)}. ${meta}.`);
+        const observedSide = runtime.field?.[role] || {
+          ...sideState,
+          address: centerTime,
+          visible: prefs[`${role}Visible`],
+          available: target.available
+        };
+        const mode = sideActivationMode(observedSide, runtime.phase);
+        const action = mode === "step"
+          ? role === "tail" ? "Step Backward" : "Step Forward"
+          : mode === "go"
+            ? role === "tail" ? "Go to visible Tail" : "Go to visible Lead"
+            : role === "tail" ? "Tail is coincident" : "Lead is coincident";
+        const destination = mode === "step" ? target.target : observedSide.address;
+        button.disabled = !loaded || !prefs.stepFieldEnabled || !mode;
+        button.dataset.action = mode || "none";
+        button.setAttribute("aria-label", `${action}${Number.isFinite(destination) ? ` at ${formatTime(destination)}` : ""}. ${meta}.`);
       }
     }
   }
@@ -409,6 +452,8 @@ export function createStepFieldController({
       runtime.semanticKey = null;
       runtime.lastCenterTime = null;
       runtime.phase = prefs.stepFieldEnabled ? STEP_FIELD_PHASE.COINCIDENT : STEP_FIELD_PHASE.OFF;
+      const targets = deriveStepField(snapshot.current || 0, snapshot.stepSeconds || 10, snapshot.range);
+      publishField(targets, null, snapshot.current || 0, prefs, runtime.phase);
       render(snapshot);
       return;
     }
@@ -424,6 +469,9 @@ export function createStepFieldController({
       pauseSides();
       runtime.phase = STEP_FIELD_PHASE.OFF;
       runtime.suspended = false;
+      const centerTime = clamp(Number(snapshot.center?.time ?? snapshot.current), snapshot.range.start, snapshot.range.end);
+      const targets = deriveStepField(centerTime, snapshot.stepSeconds, snapshot.range);
+      publishField(targets, null, centerTime, prefs, runtime.phase);
       render(snapshot);
       return;
     }
@@ -432,6 +480,9 @@ export function createStepFieldController({
       pauseSides();
       runtime.phase = STEP_FIELD_PHASE.SUSPENDED;
       runtime.suspended = true;
+      const centerTime = clamp(Number(snapshot.center?.time ?? snapshot.current), snapshot.range.start, snapshot.range.end);
+      const targets = deriveStepField(centerTime, snapshot.stepSeconds, snapshot.range);
+      publishField(targets, null, centerTime, prefs, runtime.phase);
       render(snapshot);
       return;
     }
@@ -484,6 +535,7 @@ export function createStepFieldController({
         { ...sideStates.lead, visible: prefs.leadVisible }
       ]
     });
+    publishField(live, sideStates, centerTime, prefs, runtime.phase);
     render(snapshot, live, sideStates);
   }
 
@@ -500,6 +552,7 @@ export function createStepFieldController({
     },
     snapshot() {
       return {
+        ...(runtime.field || {}),
         phase: runtime.phase,
         tailHeld: sides.tail.held,
         leadHeld: sides.lead.held,

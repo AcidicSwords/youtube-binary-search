@@ -211,7 +211,17 @@ fakePlayer.deferNextPlacement = true;
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 500 });
 assert.equal(byId.get("current-label").textContent, "0:50.000", "Direct placement must commit semantic Current immediately.");
 assert.equal(fakePlayer.currentTime, 0, "A delayed player placement may temporarily leave the physical Cursor behind.");
-assert.equal(fakePlayer.pendingPlacement, 49, "Five-second Context should request one second of pre-roll.");
+assert.equal(fakePlayer.pendingPlacement, 50, "A visible Field must suppress automatic Context and place the destination itself.");
+assert.equal(byId.get("context-state").textContent, "5 s");
+assert.equal(byId.get("context-label").textContent, "Context");
+fakePlayer.applyPendingPlacement();
+intervalCallbacks[0]();
+await delay();
+assert.equal(fakePlayer.currentTime, 50);
+
+fakePlayer.deferNextPlacement = true;
+byId.get("context-action").click();
+assert.equal(fakePlayer.pendingPlacement, 49, "Explicit five-second Context should request one second of pre-roll.");
 await delay();
 assert.equal(byId.get("context-state").textContent, "0:49.000–0:54.000");
 assert.equal(byId.get("context-label").textContent, "Stop Context");
@@ -238,12 +248,17 @@ assert.equal(byId.get("current-label").textContent, "0:00.000", "Context must no
 byId.get("context-select").value = "5";
 byId.get("context-select").dispatch("change");
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 250 });
+byId.get("context-action").click();
+await delay();
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 750 });
 assert.equal(byId.get("current-label").textContent, "1:15.000");
-assert.equal(fakePlayer.currentTime, 74, "A new move must replace the previous Context without returning to the old anchor.");
+assert.equal(fakePlayer.currentTime, 75, "A new move must stop explicit Context without returning to the old anchor.");
+assert.equal(byId.get("context-label").textContent, "Context");
+byId.get("context-action").click();
+assert.equal(fakePlayer.currentTime, 74, "Explicit replacement Context must begin at its pre-roll Address.");
 await delay();
 await delay();
-assert.equal(byId.get("context-state").textContent, "1:14.000–1:19.000", "Delayed internal PAUSED events must not stop the replacement Context.");
+assert.equal(byId.get("context-state").textContent, "1:14.000–1:19.000", "Delayed internal PAUSED events must not stop explicit replacement Context.");
 
 const playsBeforeOff = fakePlayer.commands.filter(command => command[0] === "play").length;
 byId.get("context-select").value = "0";
@@ -289,4 +304,4 @@ await delay();
 assert.equal(byId.get("continue-label").textContent, "Continue");
 assert.match(byId.get("status").textContent, /Continue paused/i);
 
-console.log("Context smoke passed: automatic observation, restoration, interruption, Return isolation, Off preference, delayed Loop startup, and startup Pause.");
+console.log("Context smoke passed: Field-visible suppression, explicit observation, restoration, interruption, Return isolation, Off preference, delayed Loop startup, and startup Pause.");
