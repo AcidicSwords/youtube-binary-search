@@ -135,8 +135,16 @@ jobs:
         run: node field-grammar-tests.mjs
 
       - name: Run complete repository checks
+        id: check
         if: steps.apply.outputs.status == '0'
-        run: npm run check
+        shell: bash
+        run: |
+          set +e
+          npm run check > field-grammar-check.log 2>&1
+          status=$?
+          cat field-grammar-check.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Upload validation evidence
         if: always()
@@ -145,6 +153,7 @@ jobs:
           name: complete-field-grammar-v5.4-evidence
           path: |
             field-grammar-apply.log
+            field-grammar-check.log
             field-grammar-integration-files.log
             package.json
           if-no-files-found: warn
@@ -154,12 +163,17 @@ jobs:
         if: steps.apply.outputs.status != '0'
         run: exit 1
 
+      - name: Fail repository check
+        if: steps.apply.outputs.status == '0' && steps.check.outputs.status != '0'
+        run: exit 1
+
       - name: Commit verified implementation
-        if: github.event_name == 'push' && steps.apply.outputs.status == '0'
+        if: github.event_name == 'push' && steps.apply.outputs.status == '0' && steps.check.outputs.status == '0'
         shell: bash
         run: |
           set -euo pipefail
           rm -f field-grammar-apply.log
+          rm -f field-grammar-check.log
           rm -f field-grammar-integration-files.log
           rm -f apply-field-grammar-v5.4.py
           rm -f apply-field-grammar-v5.4-transport-fix.py
