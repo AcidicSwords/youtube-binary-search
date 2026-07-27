@@ -61,9 +61,6 @@
                 <button id="step-field-toggle" class="field-toggle" type="button" aria-pressed="true" aria-label="Hide Step Field">
                   <span>Field</span><span id="step-field-meta">Ready</span>
                 </button>
-                <button id="continue" class="sr-only" type="button" aria-keyshortcuts="Space" disabled>
-                  <span id="continue-label">Continue</span><span id="continue-meta">—</span>
-                </button>
               </div>
               <div class="player-wrap"><div id="player"></div></div>
             </section>
@@ -82,6 +79,15 @@
                 <span>Lead</span><span aria-hidden="true">→</span>
               </button>
             </section>
+          </div>
+
+          <div class="field-transport-bar" aria-label="Field transport">
+            <button id="continue" class="field-transport" type="button" aria-keyshortcuts="Space" disabled>
+              <span id="continue-label">Continue</span>
+              <span id="continue-meta" class="control-meta">—</span>
+            </button>
+            <span id="field-transport-state" class="field-transport-state">Off</span>
+            <span id="field-rate-state" class="field-rate-state">Tail — · Center 1× · Lead —</span>
           </div>
 
           <div id="status" class="status" role="status" aria-live="polite">Load a YouTube video to begin.</div>
@@ -211,17 +217,38 @@
 
               <details id="step-settings" class="step-settings spine">
                 <summary>
-                  <span>Step</span>
-                  <strong id="step-setting-value">10s</strong>
+                  <span>Step Field</span>
+                  <strong id="step-setting-value">← 10s | 10s →</strong>
                   <kbd>[ ]</kbd>
                 </summary>
-                <div class="settings-popover">
-                  <label for="step-slider">Step size</label>
-                  <input id="step-slider" type="range" min="0.25" max="60" step="0.25" value="10" disabled>
-                  <label class="number-setting" for="step-seconds">
-                    <input id="step-seconds" type="number" min="0.25" max="300" step="0.25" value="10" disabled>
-                    <span>seconds</span>
-                  </label>
+                <div class="settings-popover step-field-settings">
+                  <fieldset>
+                    <legend>Geometry</legend>
+                    <label class="link-setting" for="step-link">
+                      <input id="step-link" type="checkbox" checked disabled>
+                      <span>Link directional Reach</span>
+                    </label>
+                    <label class="number-setting" for="step-backward-seconds">
+                      <span>Backward Reach</span>
+                      <span><input id="step-backward-seconds" type="number" min="0.25" max="300" step="0.25" value="10" disabled> seconds</span>
+                    </label>
+                    <label class="number-setting" for="step-forward-seconds">
+                      <span>Forward Reach</span>
+                      <span><input id="step-forward-seconds" type="number" min="0.25" max="300" step="0.25" value="10" disabled> seconds</span>
+                    </label>
+                  </fieldset>
+                  <fieldset>
+                    <legend>Response</legend>
+                    <label class="rate-setting" for="tail-rate-select">
+                      <span>Tail rate</span>
+                      <select id="tail-rate-select" disabled><option value="0.5">0.5×</option></select>
+                    </label>
+                    <div class="fixed-rate"><span>Center rate</span><strong>1×</strong></div>
+                    <label class="rate-setting" for="lead-rate-select">
+                      <span>Lead rate</span>
+                      <select id="lead-rate-select" disabled><option value="2">2×</option></select>
+                    </label>
+                  </fieldset>
                 </div>
               </details>
 

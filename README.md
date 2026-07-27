@@ -238,3 +238,7 @@ Return restores the complete preceding semantic state.
 ```
 
 A direct Go at Current is a no-op. Range changes preserve an Interval only while the complete Interval remains inside the new Range. A wrapped Continue clears Interval because the resulting path is not one contiguous bounded extent.
+
+### Directional Step Field
+
+Step Backward and Step Forward may use linked or independent Reach values. Those values determine both semantic Step destinations and the terminal Tail/Lead Field geometry. Tail and Lead playback rates are selected independently from the rates actually available to each YouTube player. The visible Continue control composes the three physical players while Center remains the sole audible and semantic authority.

@@ -17,7 +17,7 @@ import {
   });
   assert.deepEqual(bounds, {
     current: 50,
-    requestedReach: 10,
+    requestedReach: { backward: 10, forward: 10, linked: true },
     tail: { target: 40, reach: 10, constrained: false },
     lead: { target: 60, reach: 10, constrained: false },
     envelope: { start: 40, end: 60 },

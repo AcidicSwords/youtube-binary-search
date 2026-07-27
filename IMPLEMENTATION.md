@@ -326,3 +326,18 @@ Center         → Continue / Pause
 `step-field-geometry.js` owns pure derivation. `step-field.js` owns side-player execution. Directional rate selection cannot silently round Tail or Lead to `1×`, side mute is reasserted continuously, and Continue stops at Range End rather than wrapping the Field across a discontinuity.
 
 Native YouTube play/pause is the sole visible Continue/Pause authority. The hidden application control remains only as a programmatic and test surface; native PLAYING and PAUSED events continue through the same transport settlement path.
+
+## v5.5 — Directional Step Field coherence
+
+v5.5 preserves the settled Range, Resolution, Current, Interval, Guide, and transport grammar while completing the Step Field relation.
+
+- Step Reach is semantic Session state: `{ backward, forward, linked }`.
+- Step Backward, Step Forward, action previews, and Held Tail/Lead targets use their corresponding directional Reach.
+- Return restores Step Reach with the rest of the semantic model.
+- Tail and Lead response rates are persistent physical preferences, populated from each player's actual available rates.
+- Runtime records requested rate, actual rate, playback state, and unavailable or blocked response truthfully.
+- The visible application Continue control starts Center, Tail, and Lead in the same direct interaction; native Center playback remains supported.
+- Center remains the only audible and semantic transport authority.
+- Range remains the sole hard spatial boundary. Resolution does not clip the Field.
+- Context, Skim, Loop, pending Step, and Range manipulation suspend the Field.
+- Existing Guide retention and explicit Extent operations are unchanged.

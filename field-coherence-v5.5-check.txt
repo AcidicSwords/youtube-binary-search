@@ -1,6 +1,29 @@
-Traceback (most recent call last):
-  File "/tmp/apply-field-coherence-v5.5.py", line 1166, in <module>
-    replace_once(
-  File "/tmp/apply-field-coherence-v5.5.py", line 25, in replace_once
-    raise RuntimeError(f"{label or name}: expected one literal match, found {count}")
-RuntimeError: Field response preferences: expected one literal match, found 2
+
+> binary-youtube-reader@5.5.0 check
+> node --check app.js && node --check step-field.js && node --check step-field-geometry.js && node --check session.js && node --check guide.js && node --check range-geometry.js && node --check transport.js && node --check source-field.js && node --check youtube.js && node --check view.js && npm test && node integration-check.mjs && node startup-smoke.mjs && node interaction-smoke.mjs && node context-smoke.mjs && node metadata-smoke.mjs
+
+
+> binary-youtube-reader@5.5.0 test
+> node tests.mjs && node transport-tests.mjs && node source-field-tests.mjs && node fuzz-tests.mjs && node v5.2-regression-tests.mjs && node step-field-tests.mjs && node field-grammar-tests.mjs && node field-bounds-tests.mjs && node field-coherence-tests.mjs
+
+All geometry, Guide, and Session tests passed.
+Transport tests passed: Context windows, observation/commit classes, and Skim rate.
+Source-field tests passed: chapters and transcripts remain normalized potential temporal records.
+Invariant fuzz passed: 25000 deterministic semantic operations.
+v5.2 comprehensive regression tests passed: direct scale, Refine, Step, Continue, Skim, Range, Focus, Guide, and Return.
+All Step Field tests passed.
+Field grammar tests passed.
+file:///home/runner/work/youtube-binary-search/youtube-binary-search/step-field.js:295
+      select.replaceChildren();
+             ^
+
+TypeError: select.replaceChildren is not a function
+    at populateRateControl (file:///home/runner/work/youtube-binary-search/youtube-binary-search/step-field.js:295:14)
+    at Object.tick (file:///home/runner/work/youtube-binary-search/youtube-binary-search/step-field.js:591:5)
+    at file:///home/runner/work/youtube-binary-search/youtube-binary-search/field-bounds-tests.mjs:157:24
+    at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+    at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+
+Node.js v20.20.2
+

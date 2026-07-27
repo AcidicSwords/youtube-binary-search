@@ -230,7 +230,9 @@ function persistPreferences() {
       fieldResponse: { ...state.fieldResponse },
       stepFieldEnabled: state.stepFieldEnabled,
       tailVisible: state.tailVisible,
-      leadVisible: state.leadVisible
+      leadVisible: state.leadVisible,
+      tailRate: state.fieldResponse.tailRate,
+      leadRate: state.fieldResponse.leadRate
     }));
   } catch (error) {
     console.warn("Could not save preferences:", error);
@@ -856,7 +858,9 @@ function setRange(start, end, current, label, status) {
     else setStatus("Range must remain within the video and have positive duration.", true);
     return false;
   }
-  return accept(result, { renderGuide: true, status, observe: false });
+  const accepted = accept(result, { renderGuide: true, status, observe: false });
+  stepField?.invalidate();
+  return accepted;
 }
 
 function focusSection(sectionId) {
@@ -869,6 +873,7 @@ function focusSection(sectionId) {
     return;
   }
   accept(result, { renderGuide: true, status: `Focused “${section.label}” as Range.` });
+  stepField?.invalidate();
   closeCompactGuideAfterSelection();
 }
 
@@ -881,6 +886,7 @@ function leaveSection() {
     observe: false,
     status: `Restored Range ${formatRange(result.session.model.range)}.`
   });
+  stepField?.invalidate();
 }
 
 function pinCurrent() {
@@ -1477,6 +1483,7 @@ function finishRangeDrag() {
     state.session = checkpoint(state.session, "Adjust Range", origin).session;
     locateAddress(currentResolution().C);
     view.renderGuide();
+    stepField?.invalidate();
     setStatus(`Range set to ${formatRange(activeRange())}.`);
   } else if (origin) {
     state.session = { model: origin, history: state.session.history };
@@ -1795,6 +1802,12 @@ function initializePlayerApi() {
       if (Object.hasOwn(patch, "stepFieldEnabled")) state.stepFieldEnabled = Boolean(patch.stepFieldEnabled);
       if (Object.hasOwn(patch, "tailVisible")) state.tailVisible = Boolean(patch.tailVisible);
       if (Object.hasOwn(patch, "leadVisible")) state.leadVisible = Boolean(patch.leadVisible);
+      if (Object.hasOwn(patch, "tailRate") && Number.isFinite(Number(patch.tailRate))) {
+        state.fieldResponse.tailRate = Number(patch.tailRate);
+      }
+      if (Object.hasOwn(patch, "leadRate") && Number.isFinite(Number(patch.leadRate))) {
+        state.fieldResponse.leadRate = Number(patch.leadRate);
+      }
       persistPreferences();
     },
     onSelect: selectFieldSide,
@@ -1976,9 +1989,16 @@ for (const control of document.querySelectorAll("[data-preview-action]")) {
   control.addEventListener("blur", () => { view.setPreviewAction(null); view.render(); });
 }
 
-// Step size
-elements["step-slider"].addEventListener("input", event => { syncStepControls(event.target); view.render(); });
-elements["step-seconds"].addEventListener("change", event => { syncStepControls(event.target); view.render(); });
+// Step Field geometry
+elements["step-backward-seconds"].addEventListener("change", event => {
+  changeDirectionalReach("backward", event.target.value);
+});
+elements["step-forward-seconds"].addEventListener("change", event => {
+  changeDirectionalReach("forward", event.target.value);
+});
+elements["step-link"].addEventListener("change", event => {
+  changeReachLink(event.target.checked);
+});
 
 // Interval and Range affordances
 elements["interval-state"].addEventListener("click", () => openSectionCapture("interval"));
