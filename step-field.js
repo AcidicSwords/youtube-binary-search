@@ -611,7 +611,7 @@ export function createStepFieldController({
       runtime.phase = STEP_FIELD_PHASE.OFF;
       runtime.suspended = false;
       const centerTime = clamp(Number(snapshot.center?.time ?? snapshot.current), snapshot.range.start, snapshot.range.end);
-      const targets = deriveStepField(centerTime, snapshot.stepSeconds, snapshot.range);
+      const targets = deriveStepField(centerTime, snapshotReach(snapshot), snapshot.range);
       publishField(targets, null, centerTime, prefs, runtime.phase);
       render(snapshot);
       return;
@@ -622,7 +622,7 @@ export function createStepFieldController({
       runtime.phase = STEP_FIELD_PHASE.SUSPENDED;
       runtime.suspended = true;
       const centerTime = clamp(Number(snapshot.center?.time ?? snapshot.current), snapshot.range.start, snapshot.range.end);
-      const targets = deriveStepField(centerTime, snapshot.stepSeconds, snapshot.range);
+      const targets = deriveStepField(centerTime, snapshotReach(snapshot), snapshot.range);
       publishField(targets, null, centerTime, prefs, runtime.phase);
       render(snapshot);
       return;
@@ -643,7 +643,7 @@ export function createStepFieldController({
     if (hasCenterDiscontinuity(runtime.lastCenterTime, centerTime)) establish(snapshot, centerTime);
     runtime.lastCenterTime = centerTime;
 
-    const live = deriveStepField(centerTime, snapshot.stepSeconds, snapshot.range);
+    const live = deriveStepField(centerTime, snapshotReach(snapshot), snapshot.range);
     const centerPlaying = snapshot.center?.state === YOUTUBE_STATE.PLAYING && snapshot.transportKind === "continue";
 
     const sideStates = {
@@ -662,9 +662,15 @@ export function createStepFieldController({
     if (!centerPlaying) {
       pauseSides();
     } else {
-      if (prefs.tailVisible) sideStates.tail = updateSide(sides.tail, centerTime, live.tail.distance, snapshot.range);
+      if (prefs.tailVisible) {
+        sides.tail.requestedRate = Number(prefs.tailRate);
+        sideStates.tail = updateSide(sides.tail, centerTime, live.tail.distance, snapshot.range);
+      }
       else pauseSide(sides.tail);
-      if (prefs.leadVisible) sideStates.lead = updateSide(sides.lead, centerTime, live.lead.distance, snapshot.range);
+      if (prefs.leadVisible) {
+        sides.lead.requestedRate = Number(prefs.leadRate);
+        sideStates.lead = updateSide(sides.lead, centerTime, live.lead.distance, snapshot.range);
+      }
       else pauseSide(sides.lead);
     }
 
@@ -677,6 +683,14 @@ export function createStepFieldController({
       ]
     });
     publishField(live, sideStates, centerTime, prefs, runtime.phase);
+    if (elements["field-transport-state"]) {
+      elements["field-transport-state"].textContent = runtime.phase === STEP_FIELD_PHASE.PARTIAL
+        ? "Partially Held"
+        : runtime.phase.charAt(0).toUpperCase() + runtime.phase.slice(1);
+    }
+    if (elements["field-rate-state"]) {
+      elements["field-rate-state"].textContent = `Tail ${sides.tail.actualRate}× · Center 1× · Lead ${sides.lead.actualRate}×`;
+    }
     render(snapshot, live, sideStates);
   }
 
@@ -686,6 +700,7 @@ export function createStepFieldController({
   return {
     tick,
     render,
+    play: playSides,
     pause: pauseSides,
     invalidate,
     establish() {
@@ -698,6 +713,18 @@ export function createStepFieldController({
         phase: runtime.phase,
         tailHeld: sides.tail.held,
         leadHeld: sides.lead.held,
+        tailRuntime: {
+          requestedRate: sides.tail.requestedRate,
+          actualRate: sides.tail.actualRate,
+          playback: sides.tail.playback,
+          rateAvailable: sides.tail.rateAvailable
+        },
+        leadRuntime: {
+          requestedRate: sides.lead.requestedRate,
+          actualRate: sides.lead.actualRate,
+          playback: sides.lead.playback,
+          rateAvailable: sides.lead.rateAvailable
+        },
         preferences: preferences()
       };
     }
