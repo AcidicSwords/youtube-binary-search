@@ -277,13 +277,3 @@ Guide mutations deliberately restore focus to the recreated rename action or the
 ### Persistence salvage
 
 `sanitizeGuide()` now canonicalizes reversed Section endpoints, merges coincident Pins, rejects invalid references, and deduplicates equivalent labelled Sections while retaining every independent valid record.
-
-## v5.2 comprehensive interaction patch
-
-The v5.2 kernel adds `resolutionBasis: "range" | "movement"` to Session state without changing the Neighborhood object shape. This preserves geometry consumers and existing persisted Guide data.
-
-`range-geometry.js` adds movement seeding and makes an out-of-Neighborhood Step derive a new local scale. `session.js` owns same-address null semantics, path-independent Step settlement, Interval containment under Range changes, administrative Focus relocation, wrapped-Continue clearing, stale-Focus reconciliation, and composite scope labels. `transport.js` keeps Skim at one selected supported rate.
-
-`app.js` passes the origin Resolution through coalesced Step sequences, carries Resolution basis through Continue and Skim, and discloses implicit scope transitions in status text. `view.js` distinguishes Range and movement scale, disables Skim without a boosted rate, clears stale focused-Section presentation, and shows fixed-rate Skim metadata.
-
-The new `v5.2-regression-tests.mjs` is part of `npm test`. Installation is transactional: the applicator verifies the exact v5.1 checksums, creates backups, runs the complete existing `npm run check`, and restores the original tree automatically on failure.

@@ -404,29 +404,3 @@ binary-youtube-reader:v5:<videoId>
 ```
 
 Legacy v4, v3, v2, and v1 records are read and migrated. Their original keys remain untouched.
-
-## v5.2 canonical interaction invariants
-
-### Movement and scale
-
-A direct movement from departure `A` to arrival `B` establishes Current at `B`, Interval `min(A,B)…max(A,B)`, and a movement-seeded Neighborhood. The crossed Interval occupies one side of Current; an equal-scale extent is generated on the opposite side and clipped to Range.
-
-A same-address Go is null. It does not alter Resolution, Interval, Range, Focus, Guide, or Return history.
-
-### Step
-
-Step is evaluated from the origin of a coalesced Step sequence and its final destination. Inside the origin Neighborhood it preserves that Neighborhood. Outside it, the net Step movement establishes a new movement-seeded Neighborhood. A net-zero sequence restores the exact origin state and records nothing.
-
-### Continue and Skim
-
-Continue leaves semantic Current fixed while Cursor unfolds. Settlement inside the parent Neighborhood preserves its basis and partitions the remaining extent. Settlement after crossing the Neighborhood reopens Resolution to Range. A wrapped Continue clears Interval.
-
-Skim holds one supported boosted rate to the Forward refinement target. Reaching that target applies the same semantic Resolution as Refine Forward and hands off to Continue at `1×` without creating another Return checkpoint.
-
-### Range, Focus, and Interval
-
-Only explicit Range operations change Range. Range changes preserve Interval only when the complete Interval is contained by the new Range; otherwise Interval becomes null. Focus relocation is administrative and creates no Interval. A direct Go outside a focused Section is recorded as the composite `Leave Section + Go`, expanding to Full Video when the containing Range cannot contain both departure and destination.
-
-### Guide integrity
-
-Focus is valid only while its referenced Section resolves in Guide. Every Guide mutation reconciles this invariant. Deleting the focused Section restores its containing Range, clears Focus, removes orphan endpoint Pins, and remains completely Returnable.

@@ -314,22 +314,6 @@ intervalCallbacks[0]();
 assert.equal(fakePlayer.currentTime, 25, "Continue must wrap Range End to Range Start.");
 byId.get("continue").click();
 assert.equal(byId.get("continue-label").textContent, "Continue");
-assert.equal(
-  byId.get("interval-label").textContent,
-  "—",
-  "Wrapped Continue must clear its non-contiguous Interval."
-);
-assert.equal(
-  byId.get("loop").disabled,
-  true,
-  "Loop must be unavailable until a new contiguous Interval exists."
-);
-
-// Establish a new contiguous Interval before testing Loop independently.
-byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 375 });
-assert.equal(byId.get("current-label").textContent, "0:37.500");
-assert.match(byId.get("interval-label").textContent, /0:25\.000–0:37\.500/);
-assert.equal(byId.get("loop").disabled, false);
 
 byId.get("loop").click();
 assert.equal(byId.get("loop-label").textContent, "Stop Loop");
@@ -470,7 +454,7 @@ fakePlayer.currentTime = 40;
 fakePlayer.playVideo();
 await tick();
 assert.equal(byId.get("current-label").textContent, "0:40.000");
-assert.match(byId.get("resolution-label").textContent, /20s · Movement scale/);
+assert.match(byId.get("resolution-label").textContent, /25s · Range/);
 byId.get("continue").click();
 keydown("s");
 assert.equal(byId.get("current-label").textContent, "0:50.000");

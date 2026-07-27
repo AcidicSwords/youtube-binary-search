@@ -131,10 +131,6 @@ assert.equal(/\bseek\s*:/.test(sessionSource), false, "Semantic transaction effe
 assert.match(sessionSource, /medium = "direct"/, "Direct movement must use canonical Interval vocabulary.");
 assert.match(youtubeSource, /place\(address, allowSeekAhead = true\)/, "The YouTube adapter must expose placement rather than seek vocabulary.");
 assert.match(app, /compactGuideLayout\(\) && state\.guideOpen/, "Compact Guide must suspend background reader shortcuts.");
-assert.match(
-  sessionSource,
-  /Direct Go abandons the preceding recursive path while retaining the scale/,
-  "Direct Go must discard recursive Resolution while retaining movement scale."
-);
+assert.match(sessionSource, /Direct placement is scale-independent/, "Direct Go must explicitly escape recursive Resolution.");
 
 console.log(`Integration check passed: ${references.size} DOM references, canonical vocabulary, accessibility contracts, and spatial control geometry.`);

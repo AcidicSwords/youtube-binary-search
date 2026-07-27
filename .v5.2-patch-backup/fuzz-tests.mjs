@@ -23,7 +23,7 @@ function random() {
 
 function assertSessionInvariant(session) {
   const { model, history } = session;
-  const { duration, range, resolution, resolutionBasis, interval, guide, focus } = model;
+  const { duration, range, resolution, interval, guide, focus } = model;
   assert.ok(Number.isFinite(duration) && duration >= 0);
   assert.ok(range.start >= -EPSILON);
   assert.ok(range.end <= duration + EPSILON);
@@ -32,7 +32,6 @@ function assertSessionInvariant(session) {
   assert.ok(resolution.R <= range.end + EPSILON);
   assert.ok(resolution.L <= resolution.C && resolution.C <= resolution.R);
   assert.ok(Number.isInteger(resolution.level) && resolution.level >= 0);
-  assert.ok(["range", "movement"].includes(resolutionBasis));
   assert.ok(history.length <= 100);
   assert.equal(validateGuide(guide, duration), true);
 
@@ -40,8 +39,6 @@ function assertSessionInvariant(session) {
     assert.ok(interval.start >= -EPSILON);
     assert.ok(interval.end <= duration + EPSILON);
     assert.ok(interval.start < interval.end);
-    assert.ok(interval.start >= range.start - EPSILON);
-    assert.ok(interval.end <= range.end + EPSILON);
   }
 
   if (focus) {

@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import {
   EPSILON,
-  RESOLUTION_BASIS,
   clamp,
   contains,
   midpoint,
@@ -9,8 +8,6 @@ import {
   getTargets,
   descend,
   refineNeighborhood,
-  seedNeighborhoodFromMovement,
-  isRangeNeighborhood,
   reopenToRange,
   canReopen,
   stepTarget,
@@ -80,15 +77,6 @@ assert.equal(contains({ start: 10, end: 20 }, 15), true);
 assert.equal(contains({ start: 10, end: 20 }, 30), false);
 assert.equal(midpoint(120, 180), 150);
 assert.equal(clamp(12, 0, 10), 10);
-assert.deepEqual(
-  seedNeighborhoodFromMovement(60, 90, { start: 0, end: 180 }),
-  { L: 60, C: 90, R: 120, level: 0 }
-);
-assert.deepEqual(
-  seedNeighborhoodFromMovement(90, 60, { start: 0, end: 180 }),
-  { L: 30, C: 60, R: 90, level: 0 }
-);
-assert.equal(isRangeNeighborhood(createRoot(0, 60, 180), { start: 0, end: 180 }), true);
 assert.throws(() => descend(root, "forward", 30), /follow Current/);
 
 assert.deepEqual(reopenToRange(135, { start: 0, end: 180 }), { L: 0, C: 135, R: 180, level: 0 });
@@ -103,7 +91,7 @@ assert.deepEqual(
 );
 assert.deepEqual(
   stepNeighborhood({ L: 30, C: 60, R: 90, level: 2 }, 100, { start: 0, end: 180 }),
-  { L: 60, C: 100, R: 140, level: 0 }
+  { L: 0, C: 100, R: 180, level: 0 }
 );
 assert.deepEqual(
   settleContinuous({ L: 0, C: 300, R: 600, level: 2 }, 300, 350),
@@ -256,11 +244,9 @@ assert.equal(session.model.guide, guideBeforeNavigation, "Navigation must not cl
 assert.equal(session.model.resolution.C, 20);
 assert.deepEqual(
   session.model.resolution,
-  { L: 0, C: 20, R: 50, level: 0 },
-  "Direct Go must establish Current independently of recursive Resolution and retain movement scale."
+  { L: session.model.range.start, C: 20, R: session.model.range.end, level: 0 },
+  "Direct Go must establish Current independently of recursive Resolution."
 );
-assert.equal(session.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
-assert.deepEqual(getTargets(session.model.resolution), { backward: 10, forward: 35 });
 assert.deepEqual(
   { start: session.model.interval.start, end: session.model.interval.end },
   { start: 20, end: 50 }
@@ -273,13 +259,9 @@ assert.equal(directFromRefined.model.resolution.level, 2);
 directFromRefined = goTo(directFromRefined, 10, { operator: "timeline", label: "Timeline Click" }).session;
 assert.deepEqual(
   directFromRefined.model.resolution,
-  { L: 0, C: 10, R: 87.5, level: 0 },
-  "Direct Go must discard the preceding recursive path while retaining the scale of the new movement."
+  { L: 0, C: 10, R: 100, level: 0 },
+  "Direct Go must be the scale-independent escape from a deeply refined Neighborhood."
 );
-assert.equal(directFromRefined.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
-const reopenedDirect = reopen(directFromRefined).session;
-assert.deepEqual(reopenedDirect.model.resolution, { L: 0, C: 10, R: 100, level: 0 });
-assert.equal(reopenedDirect.model.resolutionBasis, RESOLUTION_BASIS.RANGE);
 
 let directAtSameAddress = createSession({ duration: 100, current: 50 });
 directAtSameAddress = refine(directAtSameAddress, "forward").session;
@@ -287,18 +269,12 @@ const sameAddressGo = goTo(directAtSameAddress, directAtSameAddress.model.resolu
   operator: "timeline",
   label: "Timeline Click"
 });
-assert.equal(sameAddressGo.changed, false, "Direct Go at Current is a true no-op; Reopen owns scale reset.");
-assert.equal(sameAddressGo.reason, "same-address");
-assert.equal(sameAddressGo.session, directAtSameAddress);
+assert.equal(sameAddressGo.changed, true, "Direct Go at Current must still escape recursive Resolution.");
 assert.deepEqual(
   sameAddressGo.session.model.resolution,
-  directAtSameAddress.model.resolution
+  { L: 0, C: 75, R: 100, level: 0 }
 );
-assert.deepEqual(
-  sameAddressGo.session.model.interval,
-  directAtSameAddress.model.interval,
-  "Same-address Go must preserve the existing Interval without inventing movement."
-);
+assert.deepEqual(sameAddressGo.session.model.interval, directAtSameAddress.model.interval, "Scale-only direct Go must preserve the existing Interval rather than invent movement.");
 
 // Rapid Step is one history entry and one interval from the initial departure.
 let stepped = createSession({ duration: 100, current: 50 });
@@ -322,8 +298,6 @@ const loopBeforeRange = copy(ranged.model.interval);
 ranged = setRange(ranged, 20, 80, 70, "Set Range").session;
 assert.deepEqual(ranged.model.interval, loopBeforeRange);
 assert.deepEqual(ranged.model.range, { start: 20, end: 80 });
-ranged = setRange(ranged, 60, 80, 70, "Narrow Range").session;
-assert.equal(ranged.model.interval, null, "Range changes clear Intervals they no longer contain.");
 
 // Focus maps a linked Section onto Range, and global movement unsnaps it.
 const focusGuide = createGuide("video");
@@ -334,7 +308,6 @@ focused = focusSection(focused, focusSectionRecord.id).session;
 assert.deepEqual(focused.model.range, { start: 10, end: 30 });
 assert.equal(focused.model.resolution.C, 20);
 assert.equal(focused.model.focus.sectionId, focusSectionRecord.id);
-assert.equal(focused.model.interval, null, "Focus relocation is administrative and must not create an Interval.");
 
 const focusWithoutMovementSource = createSession({ duration: 100, current: 20, guide: focusGuide });
 const focusWithoutMovement = focusSection(focusWithoutMovementSource, focusSectionRecord.id);
@@ -421,7 +394,7 @@ playback = completeContinue(playback, {
   returnModel: playbackUndo,
   label: "Continue"
 }).session;
-assert.equal(playback.model.interval, null, "Wrapped Continue is not one contiguous Interval.");
+assert.deepEqual(playback.model.interval, loopBeforePlay);
 assert.equal(playback.model.resolution.level, 0);
 
 // A complete Range cycle can end at its departure while still changing Resolution.

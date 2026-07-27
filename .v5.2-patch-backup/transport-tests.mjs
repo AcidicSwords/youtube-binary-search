@@ -43,8 +43,6 @@ assert.equal(isObservationalTransport(context), true);
 assert.equal(isObservationalTransport(loop), true);
 assert.equal(isObservationalTransport(continuation), false);
 assert.equal(desiredSkimRate(skim, 50, [1, 1.5, 2]), 2);
-assert.equal(desiredSkimRate(skim, 62.5, [1, 1.5, 2]), 2);
-assert.equal(desiredSkimRate(skim, 75, [1, 1.5, 2]), 2);
-assert.equal(desiredSkimRate(skim, 75, [1]), 1);
+assert.equal(desiredSkimRate(skim, 75, [1, 1.5, 2]), 1);
 
 console.log("Transport tests passed: Context windows, observation/commit classes, and Skim rate.");

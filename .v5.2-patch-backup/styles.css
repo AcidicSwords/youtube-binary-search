@@ -24,9 +24,6 @@
 
 * { box-sizing: border-box; }
 
-/* hidden is a state contract; component display rules must never override it. */
-[hidden] { display: none !important; }
-
 html {
   background: var(--bg);
   -webkit-text-size-adjust: 100%;

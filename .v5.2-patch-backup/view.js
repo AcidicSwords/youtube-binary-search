@@ -4,9 +4,7 @@ import {
   contains,
   midpoint,
   getTargets,
-  getActionRanges,
-  chooseSupportedRate,
-  RESOLUTION_BASIS
+  getActionRanges
 } from "./range-geometry.js";
 import {
   PIN_KIND,
@@ -401,23 +399,14 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       continue: activeRange
     } : null;
     const focused = resolveSection(guide(), focusedSectionId());
-    const requestedSkimRate = Number(elements["speed-select"].value || 1);
-    const skimRate = chooseSupportedRate(currentState.availableRates, requestedSkimRate);
-    const skimAvailable = skimRate > 1;
 
     elements["duration-time"].textContent = formatTime(model().duration);
     elements["range-label"].textContent = loaded ? formatRange(activeRange) : "—";
     elements["resolution-label"].textContent = currentResolution
       ? `${formatDuration(currentResolution.R - currentResolution.L)} · ${
           (currentResolution.level ?? 0) === 0
-            ? currentState.session.model.resolutionBasis === RESOLUTION_BASIS.MOVEMENT
-              ? "Movement scale"
-              : "Range"
-            : `${currentResolution.level} refinement${currentResolution.level === 1 ? "" : "s"} · ${
-                currentState.session.model.resolutionBasis === RESOLUTION_BASIS.MOVEMENT
-                  ? "movement scale"
-                  : "Range"
-              }`
+            ? "Range"
+            : `${currentResolution.level} refinement${currentResolution.level === 1 ? "" : "s"}`
         }`
       : "—";
     elements["current-label"].textContent = currentResolution ? formatTime(semanticCurrent) : "—";
@@ -431,9 +420,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     if (focused) {
       elements["focused-section-title"].textContent = focused.label;
       elements["focused-section-range"].textContent = formatRange(focused);
-    } else {
-      elements["focused-section-title"].textContent = "—";
-      elements["focused-section-range"].textContent = "—";
     }
 
     const interactionLocked = !loaded;
@@ -465,8 +451,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["pin-current"].disabled = interactionLocked || alreadyPinned;
     elements.continue.disabled = interactionLocked;
     elements.loop.disabled = interactionLocked || !currentInterval;
-    elements.skim.disabled = interactionLocked
-      || (skimActive ? false : targets.forward === null || !skimAvailable);
+    elements.skim.disabled = interactionLocked || (skimActive ? false : targets.forward === null);
 
     const atFullVideo = loaded
       && Math.abs(activeRange.start) <= EPSILON
@@ -517,6 +502,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? currentState.session.history.at(-1).label
       : "Nothing to return to";
 
+    const maxRate = Number(elements["speed-select"].value || 1);
     setActionMeta(
       "refine-backward",
       "backward-meta",
@@ -534,9 +520,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : "Range-level resolution";
     elements["skim-meta"].textContent = targets.forward === null
       ? "No forward destination"
-      : !skimAvailable
-        ? "No boosted rate available"
-        : `to ${formatTime(targets.forward)} · ${skimRate}×`;
+      : `to ${formatTime(targets.forward)} · ${maxRate}×→1×`;
     elements["loop-meta"].textContent = currentInterval ? formatRange(currentInterval) : "No Interval";
     elements["step-backward-meta"].textContent = actionModel?.stepBackward
       ? `to ${formatTime(actionModel.stepBackward.destination)}`

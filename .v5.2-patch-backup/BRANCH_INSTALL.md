@@ -100,20 +100,3 @@ A Git rollback restores the previous application while leaving saved records int
 7. Rename a Pin or Section by keyboard; focus should return to its recreated Rename action. Delete one; focus should return to the relevant Guide tab.
 8. Simulate blocked local storage; the status must report that the change is only retained for the current page.
 9. Load a video whose duration is initially unavailable; the reader should retry metadata rather than construct a zero-length Range.
-
-## Apply the comprehensive v5.2 patch
-
-From the repository root at v5.1 commit `672227a63c48f599d237500346e46df23e2424de`:
-
-```bash
-node apply-v5.2-patches.mjs --check-only
-node apply-v5.2-patches.mjs
-```
-
-The first command verifies the exact v5.1 base and every narrow patch context without writing. The second creates `.v5.2-patch-backup`, applies the complete patch, runs `npm run check`, and automatically restores v5.1 if any check fails.
-
-To revert a successful application:
-
-```bash
-node revert-v5.2-patches.mjs
-```

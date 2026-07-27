@@ -398,7 +398,6 @@ function settleTransport(options = {}) {
       current,
       departure: active.departure,
       parentNeighborhood: active.parentNeighborhood,
-      parentResolutionBasis: active.parentResolutionBasis,
       crossedResolution: active.crossedResolution,
       wrapped: active.wrapped,
       returnModel: active.returnModel,
@@ -415,7 +414,6 @@ function settleTransport(options = {}) {
       current,
       departure: active.departure,
       parentNeighborhood: active.parentNeighborhood,
-      parentResolutionBasis: active.parentResolutionBasis,
       returnModel: active.returnModel
     });
     if (result.changed) accept(result, { effect: false, renderGuide: false });
@@ -434,8 +432,7 @@ function sameSpatialModel(first, second) {
   const sameResolution = Math.abs(first.resolution.L - second.resolution.L) <= EPSILON
     && Math.abs(first.resolution.C - second.resolution.C) <= EPSILON
     && Math.abs(first.resolution.R - second.resolution.R) <= EPSILON
-    && (first.resolution.level ?? 0) === (second.resolution.level ?? 0)
-    && (first.resolutionBasis || "range") === (second.resolutionBasis || "range");
+    && (first.resolution.level ?? 0) === (second.resolution.level ?? 0);
   const firstFocus = first.focus;
   const secondFocus = second.focus;
   const sameFocus = (!firstFocus && !secondFocus) || Boolean(
@@ -499,20 +496,9 @@ function moveToAddress(destination, options = {}) {
     view.render();
     return false;
   }
-  const resolvedDestination = result.destination;
-  const baseStatus = options.status
-    ? options.status(resolvedDestination, result)
-    : `Moved to ${formatTime(resolvedDestination)}.`;
-  const scopePrefix = result.leftFocus && result.openedFullVideo
-    ? "Left the focused Section and opened Full Video. "
-    : result.leftFocus
-      ? "Left the focused Section. "
-      : result.openedFullVideo
-        ? "Opened Full Video. "
-        : "";
   return accept(result, {
     renderGuide: result.rangeChanged,
-    status: `${scopePrefix}${baseStatus}`
+    status: options.status ? options.status(destination) : `Moved to ${formatTime(destination)}.`
   });
 }
 
@@ -572,8 +558,6 @@ function performStep(direction) {
 
   const result = stepSession(state.session, direction, state.stepSeconds, {
     departure: state.pendingStep.departure,
-    originResolution: state.pendingStep.originModel.resolution,
-    originResolutionBasis: state.pendingStep.originModel.resolutionBasis,
     amend: state.pendingStep.started
   });
   if (!result.changed) {
@@ -612,32 +596,18 @@ function startSkim() {
     return;
   }
 
-  const requestedRate = Number(elements["speed-select"].value || 1);
-  const rate = desiredSkimRate(
-    { kind: TRANSPORT_KIND.SKIM, maxRate: requestedRate, rate: requestedRate },
-    currentResolution().C,
-    state.availableRates
-  );
-  if (!(rate > 1)) {
-    setStatus("Skim requires a supported playback rate above 1×.", true);
-    view.render();
-    return;
-  }
-
   state.transport = createSkimTransport({
     parentNeighborhood: copy(currentResolution()),
-    parentResolutionBasis: model().resolutionBasis,
     departure: currentResolution().C,
     target,
-    maxRate: rate,
-    rate,
+    maxRate: Number(elements["speed-select"].value || 1),
     returnModel: snapshotModel(model())
   });
-  player.setRate(rate);
+  player.setRate(1);
   placePlayer(currentResolution().C);
   if (Math.abs(safeCurrentTime() - state.transport.departure) <= 0.25) state.transport.enteredPath = true;
   player.play();
-  setStatus(`Skimming at ${rate}× to ${formatTime(target)}.`);
+  setStatus(`Skimming to ${formatTime(target)}, fast to normal.`);
   view.render();
 }
 
@@ -647,7 +617,6 @@ function finishSkimDestination() {
 
   const result = reachSkimDestination(state.session, {
     parentNeighborhood: skim.parentNeighborhood,
-    parentResolutionBasis: skim.parentResolutionBasis,
     departure: skim.departure,
     destination: skim.target
   });
@@ -656,7 +625,6 @@ function finishSkimDestination() {
   state.transport = createContinueTransport({
     departure: skim.departure,
     parentNeighborhood: copy(currentResolution()),
-    parentResolutionBasis: model().resolutionBasis,
     returnModel: skim.returnModel,
     crossedResolution: false,
     wrapped: false,
@@ -693,7 +661,6 @@ function startContinueSession(playNow = true) {
   state.transport = createContinueTransport({
     departure: current,
     parentNeighborhood: copy(currentResolution()),
-    parentResolutionBasis: model().resolutionBasis,
     returnModel: snapshotModel(model()),
     label: "Continue",
     operator: "continue"
@@ -1260,7 +1227,7 @@ function pollPlayer() {
       else if (Date.now() - transport.startedAt > TRANSPORT_START_GRACE_MS) {
         transport.startedAt = Date.now();
         placePlayer(transport.departure);
-        player.setRate(desiredSkimRate(transport, transport.departure, state.availableRates));
+        player.setRate(1);
         player.play();
       }
     } else {
