@@ -10,6 +10,7 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="step-field.css">
+  <link rel="stylesheet" href="field-grammar.css">
 </head>
 <body>
   <main class="app-shell">
@@ -60,6 +61,9 @@
                 <button id="step-field-toggle" class="field-toggle" type="button" aria-pressed="true" aria-label="Hide Step Field">
                   <span>Field</span><span id="step-field-meta">Ready</span>
                 </button>
+                <button id="continue" class="sr-only" type="button" aria-keyshortcuts="Space" disabled>
+                  <span id="continue-label">Continue</span><span id="continue-meta">—</span>
+                </button>
               </div>
               <div class="player-wrap"><div id="player"></div></div>
             </section>
@@ -78,44 +82,6 @@
                 <span>Lead</span><span aria-hidden="true">→</span>
               </button>
             </section>
-          </div>
-
-          <div class="observation-dock" aria-label="Observation controls">
-            <div class="context-control">
-              <button id="context-action" class="observation-button" type="button" data-preview-action="context" aria-keyshortcuts="C" disabled>
-                <span class="control-title"><kbd>C</kbd> <span id="context-label">Context</span></span>
-                <span id="context-state" class="control-meta">5 s</span>
-              </button>
-              <label class="compact-select" for="context-select">
-                <span class="sr-only">Automatic Context duration</span>
-                <select id="context-select" disabled>
-                  <option value="0">Off</option>
-                  <option value="3">3 s</option>
-                  <option value="5" selected>5 s</option>
-                  <option value="10">10 s</option>
-                </select>
-              </label>
-            </div>
-
-            <button id="continue" class="observation-button primary" type="button" data-preview-action="continue" aria-keyshortcuts="Space" disabled>
-              <span id="continue-name" class="control-title"><kbd>Space</kbd> <span id="continue-label">Continue</span></span>
-              <span id="continue-meta" class="control-meta">—</span>
-            </button>
-
-            <button id="skim" class="observation-button" type="button" data-preview-action="skim" aria-keyshortcuts="F" disabled>
-              <span id="skim-name" class="control-title"><kbd>F</kbd> <span id="skim-label">Skim</span></span>
-              <span id="skim-meta" class="control-meta">—</span>
-            </button>
-
-            <button id="loop" class="observation-button" type="button" data-preview-action="loop" aria-keyshortcuts="L" disabled>
-              <span id="loop-name" class="control-title"><kbd>L</kbd> <span id="loop-label">Loop</span></span>
-              <span id="loop-meta" class="control-meta">—</span>
-            </button>
-
-            <label class="skim-speed" for="speed-select">
-              <span>Skim speed</span>
-              <select id="speed-select" disabled><option value="1">1×</option></select>
-            </label>
           </div>
 
           <div id="status" class="status" role="status" aria-live="polite">Load a YouTube video to begin.</div>
@@ -141,6 +107,7 @@
                 <div id="interval-fill" class="interval-fill" hidden></div>
                 <div id="section-preview-fill" class="section-preview-fill" hidden></div>
                 <div id="action-preview-fill" class="action-preview-fill" hidden></div>
+                <div id="field-span-fill" class="field-span-fill" hidden></div>
               </div>
               <div id="pin-lane" class="pin-lane" aria-label="Pins"></div>
               <div id="pin-cluster-menu" class="pin-cluster-menu" role="menu" aria-label="Nearby Pins" hidden></div>
@@ -159,11 +126,42 @@
               <button id="range-state" class="state-chip state-button" type="button" aria-controls="range-tools" aria-expanded="false">
                 <span>Range</span><strong id="range-label">—</strong>
               </button>
-              <div class="state-chip"><span>Resolution</span><strong id="resolution-label">—</strong></div>
-              <div class="state-chip current-state"><span>Current</span><strong id="current-label">—</strong></div>
-              <button id="interval-state" class="state-chip state-button" type="button" aria-controls="section-capture" aria-expanded="false" aria-keyshortcuts="Shift+P" disabled>
-                <span>Interval</span><strong id="interval-label">—</strong>
-              </button>
+
+              <div class="state-chip object-state resolution-state">
+                <div><span>Resolution</span><strong id="resolution-label">—</strong></div>
+                <button id="skim" class="object-action" type="button" data-preview-action="skim" aria-keyshortcuts="F" disabled>
+                  <span id="skim-label">Skim</span><span id="skim-meta" class="sr-only">—</span>
+                </button>
+              </div>
+
+              <div class="state-chip object-state current-state">
+                <div><span>Current</span><strong id="current-label">—</strong></div>
+                <button id="context-action" class="object-action" type="button" data-preview-action="context" aria-keyshortcuts="C" disabled>
+                  <span id="context-label">Context</span><span id="context-state" class="sr-only">5 s</span>
+                </button>
+              </div>
+
+              <div class="state-chip object-state extent-state interval-state-group">
+                <button id="interval-state" class="extent-value" type="button" aria-controls="section-capture" aria-expanded="false" aria-keyshortcuts="Shift+P" disabled>
+                  <span>Interval</span><strong id="interval-label">—</strong>
+                </button>
+                <div class="extent-actions">
+                  <button id="loop" class="extent-action" type="button" data-preview-action="loop" aria-keyshortcuts="L" disabled>
+                    <span id="loop-label">Loop</span><span id="loop-meta" class="sr-only">—</span>
+                  </button>
+                </div>
+              </div>
+
+              <div id="field-span-state" class="state-chip object-state extent-state field-span-state" hidden>
+                <div class="extent-value">
+                  <span>Field Span</span><strong id="field-span-label">—</strong>
+                </div>
+                <div class="extent-actions">
+                  <button id="field-span-loop" class="extent-action" type="button" disabled><span id="field-span-loop-label">Loop</span></button>
+                  <button id="field-span-retain" class="extent-action" type="button" disabled>Retain</button>
+                </div>
+              </div>
+
               <button id="focused-state" class="state-chip state-button" type="button" aria-controls="guide-panel" disabled>
                 <span>Section</span><strong id="focused-label">—</strong>
               </button>
@@ -171,7 +169,7 @@
 
             <form id="section-capture" class="capture-bar" hidden>
               <div>
-                <span class="eyebrow">Retain Interval</span>
+                <span id="section-source-label" class="eyebrow capture-source">Retain Interval</span>
                 <strong id="section-window">—</strong>
               </div>
               <label class="sr-only" for="section-label">Section title</label>
@@ -268,6 +266,26 @@
               <button id="range-midpoint" type="button" disabled>Go to Midpoint</button>
               <button id="range-end-here" type="button" disabled>End at Current</button>
               <button id="full-video-range" type="button" disabled>Full Video</button>
+            </div>
+          </details>
+
+
+          <details id="observation-settings" class="tool-disclosure observation-settings">
+            <summary><span>Observation settings</span><span>Context · Skim</span></summary>
+            <div class="compact-settings">
+              <label class="compact-setting" for="context-select">
+                <span>Context duration</span>
+                <select id="context-select" disabled>
+                  <option value="0">Off</option>
+                  <option value="3">3 s</option>
+                  <option value="5" selected>5 s</option>
+                  <option value="10">10 s</option>
+                </select>
+              </label>
+              <label class="compact-setting" for="speed-select">
+                <span>Skim rate</span>
+                <select id="speed-select" disabled><option value="1">1×</option></select>
+              </label>
             </div>
           </details>
 

@@ -301,3 +301,5 @@ View          existing semantic and timeline projection
 
 The Center player remains authoritative. Side-player events cannot create Go, settle Transport, or update Current. The Field uses fixed conservative rates, exposes no separate distance setting, and adds only one Center-level toggle plus one collapse control per side.
 
+
+Native YouTube play/pause is the sole visible Continue/Pause authority. The hidden application control remains only as a programmatic and test surface; native PLAYING and PAUSED events continue through the same transport settlement path.

@@ -56,7 +56,7 @@ export function createContextTransport({ anchor, range, seconds, preRollSeconds 
   };
 }
 
-export function createLoopTransport({ anchor, start, end }) {
+export function createLoopTransport({ anchor, start, end, source = "interval" }) {
   if (
     !Number.isFinite(anchor)
     || !Number.isFinite(start)
@@ -67,6 +67,7 @@ export function createLoopTransport({ anchor, start, end }) {
   return {
     kind: TRANSPORT_KIND.LOOP,
     phase: "starting",
+    source,
     anchor: clamp(anchor, start, end),
     start,
     end,
