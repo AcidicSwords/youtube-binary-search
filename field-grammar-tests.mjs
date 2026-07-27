@@ -96,7 +96,7 @@ for (const id of [
 assert.match(app, /onSelect:\s*selectFieldSide/);
 assert.match(app, /operator:\s*selection\.role === "tail" \? "fieldTail" : "fieldLead"/);
 assert.match(app, /saveExtentAsSection/);
-assert.match(app, /source:\s*"field-span"/);
+assert.match(app, /startLoopExtent\(heldFieldSpan\(\),\s*"field-span"/);
 assert.doesNotMatch(app, /transport\.wrapped = true/, "Continue must not wrap the Field across Range boundaries.");
 assert.match(fieldSource, /from "\.\/step-field-geometry\.js"/);
 assert.match(fieldSource, /chooseDirectionalRate/);
@@ -108,4 +108,3 @@ assert.match(packageJson.scripts.test, /field-grammar-tests\.mjs/);
 assert.match(packageJson.scripts.check, /step-field-geometry\.js/);
 
 console.log("Field grammar tests passed.");
-// Workflow trigger: v5.4 grammar integration.
