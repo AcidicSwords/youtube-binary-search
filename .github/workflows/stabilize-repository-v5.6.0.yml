@@ -37,6 +37,7 @@ jobs:
           python3 .github/stabilize-repository-v5.6.0-fix.py 2>&1 | tee -a stabilization-apply.log
           python3 .github/stabilize-repository-v5.6.0-fix2.py 2>&1 | tee -a stabilization-apply.log
           python3 .github/stabilize-repository-v5.6.0-fix3.py 2>&1 | tee -a stabilization-apply.log
+          python3 .github/stabilize-repository-v5.6.0-fix4.py 2>&1 | tee -a stabilization-apply.log
 
       - name: Run complete repository gate
         shell: bash
