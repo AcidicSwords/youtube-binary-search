@@ -42,6 +42,37 @@ jobs:
           rm -f field-coherence-v5.5-check.txt
           rm -f field-coherence-v5.5-failure.log
 
+      - name: Extend the existing DOM test double
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('field-bounds-tests.mjs')
+          text = path.read_text()
+          old = '''    classList: { toggle() {} },
+              addEventListener() {},
+              setAttribute() {}
+            };'''
+          new = '''    classList: { toggle() {} },
+              children: [],
+              addEventListener() {},
+              setAttribute() {},
+              replaceChildren(...nodes) { this.children = [...nodes]; },
+              appendChild(node) { this.children.push(node); return node; }
+            };'''
+          if old not in text:
+              raise SystemExit('Could not extend Field-bounds fake element.')
+          text = text.replace(old, new, 1)
+          old_doc = '''    hidden: false,
+              getElementById(id) {'''
+          new_doc = '''    hidden: false,
+              createElement() { return fakeElement(); },
+              getElementById(id) {'''
+          if old_doc not in text:
+              raise SystemExit('Could not extend Field-bounds fake document.')
+          path.write_text(text.replace(old_doc, new_doc, 1))
+          PY
+
       - name: Recover and decode applicator
         shell: bash
         run: |
