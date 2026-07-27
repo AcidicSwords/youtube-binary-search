@@ -49,13 +49,23 @@ jobs:
             apply-field-grammar-v5.4-transport-fix.py
 
       - name: Apply coherent Field grammar
+        id: apply
         shell: bash
         run: |
-          set -euo pipefail
-          python3 apply-field-grammar-v5.4.py
-          python3 apply-field-grammar-v5.4-transport-fix.py
+          set +e
+          : > field-grammar-apply.log
+          (
+            set -e
+            python3 apply-field-grammar-v5.4.py
+            python3 apply-field-grammar-v5.4-transport-fix.py
+          ) >> field-grammar-apply.log 2>&1
+          status=$?
+          cat field-grammar-apply.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Assert complete integration
+        if: steps.apply.outputs.status == '0'
         shell: bash
         run: |
           set -euo pipefail
@@ -96,9 +106,11 @@ jobs:
           done
 
       - name: Run Field grammar tests directly
+        if: steps.apply.outputs.status == '0'
         run: node field-grammar-tests.mjs
 
       - name: Run complete repository checks
+        if: steps.apply.outputs.status == '0'
         run: npm run check
 
       - name: Upload validation evidence
@@ -107,16 +119,22 @@ jobs:
         with:
           name: complete-field-grammar-v5.4-evidence
           path: |
+            field-grammar-apply.log
             field-grammar-integration-files.log
             package.json
           if-no-files-found: warn
           retention-days: 7
 
+      - name: Fail applicator error
+        if: steps.apply.outputs.status != '0'
+        run: exit 1
+
       - name: Commit verified implementation
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && steps.apply.outputs.status == '0'
         shell: bash
         run: |
           set -euo pipefail
+          rm -f field-grammar-apply.log
           rm -f field-grammar-integration-files.log
           rm -f apply-field-grammar-v5.4.py
           rm -f apply-field-grammar-v5.4-transport-fix.py
