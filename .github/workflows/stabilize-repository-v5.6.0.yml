@@ -1,0 +1,58 @@
+name: Stabilize repository v5.6.0
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/stabilize-repository-v5.6.0.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stabilize-repository-v5.6.0
+  cancel-in-progress: false
+
+jobs:
+  apply-audit-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: stabilize/repository-v5.6.0
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply stabilization audit
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 .github/stabilize-repository-v5.6.0.py 2>&1 | tee stabilization-apply.log
+
+      - name: Run complete repository gate
+        run: npm run check
+
+      - name: Commit verified stabilized tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Stabilize UI, code boundaries, and canonical documentation"
+          git push origin HEAD:stabilize/repository-v5.6.0
+
+      - name: Upload diagnostic on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repository-stabilization-diagnostic
+          path: stabilization-apply.log
+          retention-days: 1
