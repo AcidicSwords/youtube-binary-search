@@ -70,8 +70,11 @@ function fakeElement() {
     textContent: "",
     dataset: {},
     classList: { toggle() {} },
+    children: [],
     addEventListener() {},
-    setAttribute() {}
+    setAttribute() {},
+    replaceChildren(...nodes) { this.children = [...nodes]; },
+    appendChild(node) { this.children.push(node); return node; }
   };
 }
 
@@ -79,6 +82,7 @@ function makeControllerHarness() {
   const elements = new Map();
   const document = {
     hidden: false,
+    createElement() { return fakeElement(); },
     getElementById(id) {
       if (!elements.has(id)) elements.set(id, fakeElement());
       return elements.get(id);
