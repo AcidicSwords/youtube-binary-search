@@ -90,12 +90,22 @@ jobs:
           fi
           cat field-grammar-workflow.log
 
+      - name: Upload transaction log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: field-grammar-v5.4-transaction-log
+          path: field-grammar-workflow.log
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Commit verified implementation
-        if: steps.transaction.outputs.ok == 'true'
+        if: steps.transaction.outputs.ok == 'true' && github.event_name == 'push'
         shell: bash
         run: |
           rm -f field-grammar-workflow.log
           rm -f FIELD_GRAMMAR_WORKFLOW_ERROR.log
+          rm -f VALIDATION_PR.md
           rm -f apply-field-grammar-v5.4.py
           rm -f apply-field-grammar-v5.4-transport-fix.py
           rm -f install-field-grammar-v5.4.py
@@ -108,16 +118,6 @@ jobs:
           git commit -m "Repair and integrate coherent Field grammar v5.4"
           git push origin HEAD:feature/field-grammar-v5.4
 
-      - name: Restore branch and commit diagnostic
+      - name: Fail invalid transaction
         if: steps.transaction.outputs.ok != 'true'
-        shell: bash
-        run: |
-          cp field-grammar-workflow.log /tmp/FIELD_GRAMMAR_WORKFLOW_ERROR.log
-          git reset --hard HEAD
-          cp /tmp/FIELD_GRAMMAR_WORKFLOW_ERROR.log FIELD_GRAMMAR_WORKFLOW_ERROR.log
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add FIELD_GRAMMAR_WORKFLOW_ERROR.log
-          git commit -m "Record exact Field grammar repair failure"
-          git push origin HEAD:feature/field-grammar-v5.4
-          exit 1
+        run: exit 1
