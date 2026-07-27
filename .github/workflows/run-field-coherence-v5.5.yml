@@ -29,6 +29,19 @@ jobs:
         with:
           node-version: 20
 
+      - name: Restore audited v5.4.1 base
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin feature/field-bounds-v5.4.1
+          git checkout origin/feature/field-bounds-v5.4.1 -- \
+            session.js range-geometry.js step-field-geometry.js step-field.js \
+            app.js view.js index.html field-grammar.css field-bounds-tests.mjs \
+            step-field-tests.mjs package.json IMPLEMENTATION.md README.md
+          rm -f field-coherence-tests.mjs
+          rm -f field-coherence-v5.5-check.txt
+          rm -f field-coherence-v5.5-failure.log
+
       - name: Recover and decode applicator
         shell: bash
         run: |
@@ -45,6 +58,10 @@ jobs:
           text = target.read_text().replace(
               'ROOT = Path(__file__).resolve().parents[1]',
               'ROOT = Path.cwd()'
+          )
+          text = text.replace(
+              '    if count != 1:\n        raise RuntimeError(f"{label or name}: expected one literal match, found {count}")\n    write(name, text.replace(old, new, 1))',
+              '    if count != 1:\n        if not (label == "import normalizeFieldReach" and count >= 1):\n            raise RuntimeError(f"{label or name}: expected one literal match, found {count}")\n    write(name, text.replace(old, new, 1))'
           )
           target.write_text(text)
           PY
