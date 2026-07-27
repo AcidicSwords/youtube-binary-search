@@ -118,6 +118,7 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   assert.doesNotMatch(html, /id=["']continue["'][^>]*sr-only/);
   assert.match(app, /setStepReach as setSessionStepReach/);
   assert.match(app, /stepReach: currentStepReach\(\)/);
+  assert.match(app, /getPreferences:[\s\S]*tailRate: state\.fieldResponse\.tailRate[\s\S]*leadRate: state\.fieldResponse\.leadRate/);
   assert.match(app, /stepField\?\.play\(\)/);
   assert.match(field, /tailRate: 0\.5/);
   assert.match(field, /leadRate: 2/);

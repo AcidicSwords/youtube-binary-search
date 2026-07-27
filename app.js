@@ -1796,7 +1796,9 @@ function initializePlayerApi() {
     getPreferences: () => ({
       stepFieldEnabled: state.stepFieldEnabled,
       tailVisible: state.tailVisible,
-      leadVisible: state.leadVisible
+      leadVisible: state.leadVisible,
+      tailRate: state.fieldResponse.tailRate,
+      leadRate: state.fieldResponse.leadRate
     }),
     setPreferences: patch => {
       if (Object.hasOwn(patch, "stepFieldEnabled")) state.stepFieldEnabled = Boolean(patch.stepFieldEnabled);
