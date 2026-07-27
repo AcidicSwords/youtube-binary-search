@@ -40,7 +40,13 @@ jobs:
           start = source.index("<<'B64'\n") + len("<<'B64'\n")
           end = source.index('\n          B64', start)
           payload = ''.join(line.strip() for line in source[start:end].splitlines())
-          Path('/tmp/apply-field-coherence-v5.5.py').write_bytes(gzip.decompress(base64.b64decode(payload)))
+          target = Path('/tmp/apply-field-coherence-v5.5.py')
+          target.write_bytes(gzip.decompress(base64.b64decode(payload)))
+          text = target.read_text().replace(
+              'ROOT = Path(__file__).resolve().parents[1]',
+              'ROOT = Path.cwd()'
+          )
+          target.write_text(text)
           PY
 
       - name: Apply and verify complete revision
