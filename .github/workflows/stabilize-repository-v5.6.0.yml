@@ -36,7 +36,10 @@ jobs:
           python3 .github/stabilize-repository-v5.6.0.py 2>&1 | tee stabilization-apply.log
 
       - name: Run complete repository gate
-        run: npm run check
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check 2>&1 | tee stabilization-check.log
 
       - name: Commit verified stabilized tree
         shell: bash
@@ -54,5 +57,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: repository-stabilization-diagnostic
-          path: stabilization-apply.log
+          path: |
+            stabilization-apply.log
+            stabilization-check.log
           retention-days: 1
