@@ -68,6 +68,23 @@
   white-space: nowrap;
 }
 
+.pane-rate-setting {
+  display: inline-flex;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.pane-rate-setting select {
+  width: 74px;
+  min-width: 74px;
+  min-height: 25px;
+  height: 25px;
+  padding: 0 1.3rem 0 0.42rem;
+  border-color: rgba(116, 134, 157, 0.62);
+  background: rgba(17, 23, 32, 0.9);
+  font-size: 0.65rem;
+}
+
 .pane-collapse,
 .field-toggle {
   min-height: 25px;
@@ -202,21 +219,36 @@
   .step-field.tail-collapsed,
   .step-field.lead-collapsed,
   .step-field.tail-collapsed.lead-collapsed {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 6px;
     padding: 6px;
   }
 
   .step-pane-center {
-    grid-column: 1 / -1;
+    grid-column: 1;
     grid-row: 1;
   }
 
   .tail-pane { grid-column: 1; grid-row: 2; }
-  .lead-pane { grid-column: 2; grid-row: 2; }
+  .lead-pane { grid-column: 1; grid-row: 3; }
+  .step-pane-side .player-wrap {
+    min-height: 200px;
+    aspect-ratio: auto;
+  }
   .step-field.field-off { grid-template-columns: minmax(0, 1fr); }
   .step-pane.is-collapsed { min-height: 62px; }
   .step-pane-restore { writing-mode: horizontal-tb; }
   .step-pane-role { font-size: 0.6rem; }
   .step-pane-meta { font-size: 0.58rem; }
+}
+
+@media (pointer: coarse) {
+  .step-pane-bar { min-height: 52px; }
+  .pane-rate-setting select {
+    width: 84px;
+    min-width: 84px;
+    min-height: 44px;
+    height: 44px;
+    font-size: 16px;
+  }
 }

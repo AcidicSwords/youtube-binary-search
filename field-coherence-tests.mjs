@@ -172,6 +172,7 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   const html = readFileSync("index.html", "utf8");
   const app = readFileSync("app.js", "utf8");
   const field = readFileSync("step-field.js", "utf8");
+  const fieldCss = readFileSync("step-field.css", "utf8");
   const view = readFileSync("view.js", "utf8");
   const implementation = readFileSync("IMPLEMENTATION.md", "utf8");
   const readme = readFileSync("README.md", "utf8");
@@ -187,6 +188,13 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   ]) assert.match(html, new RegExp(`id=["']${id}["']`));
 
   assert.doesNotMatch(html, /id=["']continue["'][^>]*sr-only/);
+  assert.equal((html.match(/id=["']tail-rate-select["']/g) || []).length, 1);
+  assert.equal((html.match(/id=["']lead-rate-select["']/g) || []).length, 1);
+  assert.match(html, /id=["']tail-pane["'][\s\S]*id=["']tail-rate-select["'][\s\S]*id=["']tail-collapse["']/);
+  assert.match(html, /id=["']lead-pane["'][\s\S]*id=["']lead-rate-select["'][\s\S]*id=["']lead-collapse["']/);
+  assert.match(fieldCss, /\.pane-rate-setting[\s\S]*pointer-events: auto/);
+  assert.match(fieldCss, /@media \(max-width: 680px\)[\s\S]*\.tail-pane \{ grid-column: 1; grid-row: 2; \}[\s\S]*\.lead-pane \{ grid-column: 1; grid-row: 3; \}[\s\S]*\.step-pane-side \.player-wrap \{[\s\S]*min-height: 200px/);
+  assert.match(fieldCss, /@media \(pointer: coarse\)[\s\S]*\.pane-rate-setting select[\s\S]*min-height: 44px/);
   assert.match(app, /setStepReach as setSessionStepReach/);
   assert.match(app, /stepReach: currentStepReach\(\)/);
   assert.match(app, /getPreferences:[\s\S]*tailRate: state\.fieldResponse\.tailRate[\s\S]*leadRate: state\.fieldResponse\.leadRate/);
@@ -197,11 +205,11 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   assert.match(view, /session\.model\.stepReach/);
   assert.match(app, /stepReachLastEdited: preferences\.stepReachLastEdited/);
   assert.match(app, /preferences\.stepReach = normalizeStepReach/);
-  assert.match(implementation, /^# Binary YouTube Reader v5\.5\.1/m);
+  assert.match(implementation, /^# Binary YouTube Reader v5\.5\.2/m);
   assert.doesNotMatch(implementation, /sole visible Continue\/Pause authority/);
   assert.doesNotMatch(implementation, /^# Binary YouTube Reader v5\.1/m);
   assert.doesNotMatch(readme, /Step Size/);
   assert.match(readme, /Application Continue/);
 }
 
-console.log("Field coherence v5.5 tests passed.");
+console.log("Field coherence v5.5.2 tests passed.");

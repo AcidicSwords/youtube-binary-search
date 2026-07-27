@@ -1,4 +1,4 @@
-# Binary YouTube Reader v5.5.1 — Canonical Implementation
+# Binary YouTube Reader v5.5.2 — Canonical Implementation
 
 ## 1. Design rule
 
@@ -126,7 +126,7 @@ A forming side resolves through Go to its observed Cursor. A Held side resolves 
 
 Each side reads its own available rate set. Tail accepts rates below 1×; Lead accepts rates above 1×. Requested and actual rates remain distinct. Missing directional rates produce an unavailable side; autoplay rejection produces a blocked side.
 
-Changing a rate is kinetic: it preserves Field geometry and changes subsequent motion. Visibility and Field-enabled changes are structural and re-establish the projection.
+Changing a rate is kinetic: it preserves Field geometry and changes subsequent motion. Visibility and Field-enabled changes are structural and re-establish the projection. Tail and Lead rate controls are object-local in their pane headers. On narrow coarse-pointer layouts, the side panes stack and retain a minimum 200 × 200 IFrame viewport so rate capability remains available to the player API.
 
 ## 6. Transport authority
 
