@@ -21,6 +21,7 @@ concurrency:
 jobs:
   apply-and-verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Check out feature branch
         uses: actions/checkout@v4
@@ -33,35 +34,76 @@ jobs:
         with:
           node-version: 22
 
-      - name: Confirm untouched base
+      - name: Apply and test transaction
+        id: transaction
+        shell: bash
         run: |
-          test "$(node -p "require('./package.json').version")" = "5.3.0"
-          test -f step-field.js
-          test -f step-field.css
-          test -f apply-field-grammar-v5.4.py
-          test -f apply-field-grammar-v5.4-transport-fix.py
+          set +e
+          : > field-grammar-workflow.log
 
-      - name: Apply coherent Field grammar
+          {
+            echo "## Base verification"
+            echo "Version: $(node -p "require('./package.json').version")"
+            test "$(node -p "require('./package.json').version")" = "5.3.0"
+            test -f step-field.js
+            test -f step-field.css
+            test -f apply-field-grammar-v5.4.py
+            test -f apply-field-grammar-v5.4-transport-fix.py
+            echo
+            echo "## Apply coherent Field grammar"
+            python3 apply-field-grammar-v5.4.py
+            python3 apply-field-grammar-v5.4-transport-fix.py
+          } >> field-grammar-workflow.log 2>&1
+          apply_status=$?
+
+          check_status=1
+          if [ "$apply_status" -eq 0 ]; then
+            {
+              echo
+              echo "## Complete repository checks"
+              npm run check
+            } >> field-grammar-workflow.log 2>&1
+            check_status=$?
+          fi
+
+          echo "apply_status=$apply_status" >> "$GITHUB_OUTPUT"
+          echo "check_status=$check_status" >> "$GITHUB_OUTPUT"
+          if [ "$apply_status" -eq 0 ] && [ "$check_status" -eq 0 ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+          cat field-grammar-workflow.log
+          exit 0
+
+      - name: Commit verified implementation
+        if: steps.transaction.outputs.ok == 'true'
+        shell: bash
         run: |
-          python3 apply-field-grammar-v5.4.py
-          python3 apply-field-grammar-v5.4-transport-fix.py
-
-      - name: Run complete repository checks
-        run: npm run check
-
-      - name: Remove one-use installer scaffolding
-        run: |
+          rm -f field-grammar-workflow.log
+          rm -f FIELD_GRAMMAR_WORKFLOW_ERROR.log
           rm -f apply-field-grammar-v5.4.py
           rm -f apply-field-grammar-v5.4-transport-fix.py
           rm -f install-field-grammar-v5.4.py
           rm -f manifest.json
           rm -f .github/workflows/apply-field-grammar-v5.4.yml
-
-      - name: Commit verified implementation
-        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git diff --cached --check
           git commit -m "Integrate coherent Field grammar v5.4"
           git push origin HEAD:feature/field-grammar-v5.4
+
+      - name: Restore branch and commit diagnostic
+        if: steps.transaction.outputs.ok != 'true'
+        shell: bash
+        run: |
+          cp field-grammar-workflow.log /tmp/FIELD_GRAMMAR_WORKFLOW_ERROR.log
+          git reset --hard HEAD
+          cp /tmp/FIELD_GRAMMAR_WORKFLOW_ERROR.log FIELD_GRAMMAR_WORKFLOW_ERROR.log
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add FIELD_GRAMMAR_WORKFLOW_ERROR.log
+          git commit -m "Record Field grammar workflow failure"
+          git push origin HEAD:feature/field-grammar-v5.4
+          exit 1
