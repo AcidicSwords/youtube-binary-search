@@ -12,7 +12,7 @@ import {
 {
   const bounds = deriveFieldBounds({
     current: 50,
-    stepSeconds: 10,
+    stepReach: { backward: 10, forward: 10, linked: true },
     range: { start: 0, end: 100 }
   });
   assert.deepEqual(bounds, {
@@ -24,7 +24,7 @@ import {
     constraint: "none"
   });
 
-  const field = deriveStepField(50, 10, { start: 0, end: 100 });
+  const field = deriveStepField(50, { backward: 10, forward: 10, linked: true }, { start: 0, end: 100 });
   assert.equal(field.center, 50);
   assert.equal(field.tail.target, 40);
   assert.equal(field.tail.distance, 10);
@@ -36,7 +36,7 @@ import {
 }
 
 {
-  const field = deriveStepField(4, 10, { start: 0, end: 12 });
+  const field = deriveStepField(4, { backward: 10, forward: 10, linked: true }, { start: 0, end: 12 });
   assert.equal(field.tail.target, 0);
   assert.equal(field.tail.distance, 4);
   assert.equal(field.tail.constrained, true);
@@ -84,6 +84,7 @@ assert.equal(resolveFieldPhase({
 {
   const html = readFileSync("index.html", "utf8");
   const css = readFileSync("step-field.css", "utf8");
+  const layoutCss = readFileSync("styles.css", "utf8");
   const app = readFileSync("app.js", "utf8");
   const fieldSource = readFileSync("step-field.js", "utf8");
   const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
@@ -108,7 +109,8 @@ assert.equal(resolveFieldPhase({
   assert.match(css, /tail-collapsed/);
   assert.match(css, /lead-collapsed/);
   assert.match(css, /@media \(max-width: 680px\)/);
-  assert.match(css, /@media \(min-width: 1221px\)/);
+  assert.doesNotMatch(css, /@media \(min-width: 1221px\)/);
+  assert.match(layoutCss, /@media \(min-width: 1221px\)/);
   assert.match(packageJson.scripts.check, /step-field\.js/);
   assert.match(packageJson.scripts.test, /step-field-tests\.mjs/);
 }

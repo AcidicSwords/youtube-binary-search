@@ -1,3 +1,4 @@
+// Pure Step Field geometry, phase, and response-policy helpers.
 import { EPSILON, clamp } from "./range-geometry.js";
 
 export const STEP_FIELD_PHASE = Object.freeze({
@@ -10,18 +11,35 @@ export const STEP_FIELD_PHASE = Object.freeze({
 });
 
 export const FIELD_REACH_TOLERANCE = 0.16;
+export const DEFAULT_FIELD_RESPONSE = Object.freeze({ tailRate: 0.5, leadRate: 2 });
+
+export function normalizeFieldResponse(value = DEFAULT_FIELD_RESPONSE) {
+  const tailRate = Number(value?.tailRate);
+  const leadRate = Number(value?.leadRate);
+  return {
+    tailRate: Number.isFinite(tailRate) && tailRate > 0 && tailRate < 1
+      ? tailRate
+      : DEFAULT_FIELD_RESPONSE.tailRate,
+    leadRate: Number.isFinite(leadRate) && leadRate > 1
+      ? leadRate
+      : DEFAULT_FIELD_RESPONSE.leadRate
+  };
+}
 
 export function normalizeFieldReach(value) {
-  if (Number.isFinite(Number(value)) && Number(value) > 0) {
-    const reach = Number(value);
-    return { backward: reach, forward: reach, linked: true };
+  if (!value || typeof value !== "object") {
+    throw new TypeError("Step Field requires directional Reach.");
   }
-  const backward = Number(value?.backward);
-  const forward = Number(value?.forward);
+  const backward = Number(value.backward);
+  const forward = Number(value.forward);
+  const linked = value.linked !== false;
   if (!(Number.isFinite(backward) && backward > 0 && Number.isFinite(forward) && forward > 0)) {
     throw new TypeError("Step Field requires positive backward and forward Reach.");
   }
-  return { backward, forward, linked: value?.linked !== false };
+  if (linked && Math.abs(backward - forward) > EPSILON) {
+    throw new TypeError("Linked Step Field Reach must be equal in both directions.");
+  }
+  return { backward, forward, linked };
 }
 
 function validateFieldInputs(current, stepReach, range) {
@@ -39,8 +57,8 @@ function validateFieldInputs(current, stepReach, range) {
   }
 }
 
-export function deriveFieldBounds({ current, stepSeconds = null, stepReach = null, range }) {
-  const requested = normalizeFieldReach(stepReach ?? stepSeconds);
+export function deriveFieldBounds({ current, stepReach, range }) {
+  const requested = normalizeFieldReach(stepReach);
   validateFieldInputs(current, requested, range);
 
   const center = clamp(current, range.start, range.end);

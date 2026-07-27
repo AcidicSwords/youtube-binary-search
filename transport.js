@@ -1,3 +1,4 @@
+// Transient observation and traversal values. Transport state never enters Return history directly.
 import {
   EPSILON,
   clamp,

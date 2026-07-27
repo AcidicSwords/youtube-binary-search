@@ -1,8 +1,11 @@
+// Step Field execution controller. Tail and Lead remain muted physical projections of Session state.
 import { EPSILON, clamp } from "./range-geometry.js";
-import { YOUTUBE_STATE, createYouTubePlayer } from "./youtube.js";
+import { YOUTUBE_STATE, createYouTubePlayer, isYouTubeApiReady } from "./youtube.js";
 import {
   STEP_FIELD_PHASE,
   FIELD_REACH_TOLERANCE,
+  DEFAULT_FIELD_RESPONSE,
+  normalizeFieldResponse,
   deriveFieldBounds,
   deriveStepField,
   normalizeFieldReach,
@@ -16,6 +19,8 @@ import {
 
 export {
   STEP_FIELD_PHASE,
+  DEFAULT_FIELD_RESPONSE,
+  normalizeFieldResponse,
   deriveFieldBounds,
   deriveStepField,
   normalizeFieldReach,
@@ -35,13 +40,12 @@ function defaultPreferences() {
     stepFieldEnabled: true,
     tailVisible: true,
     leadVisible: true,
-    tailRate: 0.5,
-    leadRate: 2
+    ...DEFAULT_FIELD_RESPONSE
   };
 }
 
 function snapshotReach(snapshot) {
-  return snapshot.stepReach ?? snapshot.stepSeconds ?? 10;
+  return normalizeFieldReach(snapshot?.stepReach);
 }
 
 function semanticKey(snapshot) {
@@ -175,7 +179,7 @@ export function createStepFieldController({
 
   function createSide(role) {
     const side = sides[role];
-    if (side.adapter || !globalThis.YT?.Player || !document?.getElementById?.(side.elementId)) return;
+    if (side.adapter || !isYouTubeApiReady() || !document?.getElementById?.(side.elementId)) return;
     side.adapter = createPlayer(side.elementId, {
       playerVars: {
         controls: 0,

@@ -11,7 +11,7 @@ import {
 import { createSession, saveExtentAsSection } from "./session.js";
 import { createLoopTransport } from "./transport.js";
 
-const targets = deriveStepField(50, 10, { start: 0, end: 100 });
+const targets = deriveStepField(50, { backward: 10, forward: 10, linked: true }, { start: 0, end: 100 });
 const unfolding = deriveObservedField({
   targets,
   phase: STEP_FIELD_PHASE.UNFOLDING,
@@ -32,7 +32,7 @@ assert.equal(sideActivationMode(unfolding.tail, unfolding.phase), "go");
 assert.equal(sideActivationMode(unfolding.lead, unfolding.phase), "go");
 
 const held = deriveObservedField({
-  targets: deriveStepField(60, 10, { start: 0, end: 100 }),
+  targets: deriveStepField(60, { backward: 10, forward: 10, linked: true }, { start: 0, end: 100 }),
   phase: STEP_FIELD_PHASE.HELD,
   centerAddress: 60,
   tailAddress: 50,

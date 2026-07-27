@@ -1,11 +1,12 @@
 {
   "name": "binary-youtube-reader",
-  "version": "5.5.2",
+  "version": "5.6.0",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node tests.mjs && node transport-tests.mjs && node source-field-tests.mjs && node fuzz-tests.mjs && node v5.2-regression-tests.mjs && node step-field-tests.mjs && node field-grammar-tests.mjs && node field-bounds-tests.mjs && node field-coherence-tests.mjs",
-    "check": "node --check app.js && node --check step-field.js && node --check step-field-geometry.js && node --check session.js && node --check guide.js && node --check range-geometry.js && node --check transport.js && node --check source-field.js && node --check youtube.js && node --check view.js && npm test && node integration-check.mjs && node startup-smoke.mjs && node interaction-smoke.mjs && node context-smoke.mjs && node metadata-smoke.mjs"
+    "check": "node --check app.js && node --check step-field.js && node --check step-field-geometry.js && node --check session.js && node --check guide.js && node --check range-geometry.js && node --check transport.js && node --check source-field.js && node --check youtube.js && node --check view.js && npm test && npm run audit && node startup-smoke.mjs && node interaction-smoke.mjs && node context-smoke.mjs && node metadata-smoke.mjs",
+    "audit": "node integration-check.mjs && node project-audit.mjs"
   },
   "engines": {
     "node": ">=20"

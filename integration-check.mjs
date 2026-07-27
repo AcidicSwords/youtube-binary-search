@@ -8,6 +8,7 @@ const styles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
 const visibleSource = `${html}\n${view}`;
 const sessionSource = readFileSync(new URL("./session.js", import.meta.url), "utf8");
 const youtubeSource = readFileSync(new URL("./youtube.js", import.meta.url), "utf8");
+const fieldGeometrySource = readFileSync(new URL("./step-field-geometry.js", import.meta.url), "utf8");
 const files = [
   html,
   app,
@@ -130,6 +131,8 @@ assert.match(view, /setAttribute\?\.\("aria-expanded", "true"\)/, "Pin clusters 
 assert.equal(/\bseek\s*:/.test(sessionSource), false, "Semantic transaction effects must use placement vocabulary.");
 assert.match(sessionSource, /medium = "direct"/, "Direct movement must use canonical Interval vocabulary.");
 assert.match(youtubeSource, /place\(address, allowSeekAhead = true\)/, "The YouTube adapter must expose placement rather than seek vocabulary.");
+assert.match(youtubeSource, /isYouTubeApiReady/, "YouTube readiness must be owned by the adapter.");
+assert.doesNotMatch(fieldGeometrySource, /stepSeconds/, "Step Field geometry must receive directional Reach only.");
 assert.match(app, /compactGuideLayout\(\) && state\.guideOpen/, "Compact Guide must suspend background reader shortcuts.");
 assert.match(
   sessionSource,

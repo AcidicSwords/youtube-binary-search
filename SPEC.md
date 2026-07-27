@@ -1,432 +1,162 @@
-# Binary YouTube Reader — Canonical Specification v5.1
+# Binary YouTube Reader — Canonical Specification
 
-## 1. Primitive
+## 1. Authority
 
-The sole semantic primitive is a temporal **Address**:
+This document defines the current semantic and interaction contract. `IMPLEMENTATION.md` explains how the contract is realized. Historical behavior is not normative.
 
-\[
-t \in [0,D]
-\]
+## 2. Primitive and ordered space
 
-where \(D\) is video duration. Every semantic object is an Address, a bounded relation between Addresses, or a transformation of those values.
+The primitive is a temporal Address `t` inside video duration `[0, D]`.
 
-## 2. Ordered space
+- **Current** is the committed Address from which semantic operators act.
+- **Cursor** is a transient physical player position.
+- **Range** is the sole hard admissible extent.
+- **Resolution** is the current scale of discrimination.
+- **Neighborhood** is the left/current/right structure at that Resolution.
+- **Interval** is the last committed movement extent.
+- **Pin** is a retained Address.
+- **Section** is a retained explicit Extent whose endpoints are Pins.
+- **Guide** is the video-specific collection of Pins and Sections.
+- **Field Span** is the live Tail-to-Lead physical extent.
 
-### Current
+At rest, Cursor and Current coincide. Observation may separate them temporarily; Cursor is never stored in Session.
 
-\[
-C \in Range
-\]
-
-Current is the settled Address from which operators act.
-
-### Range
-
-\[
-Range=[A,B], \qquad 0\le A<B\le D
-\]
-
-Range is the complete bounded extent currently available. The full video is the default Range. Focusing a Section makes that Section the active Range.
-
-### Neighborhood and Resolution
-
-\[
-N=(L,C,R,\ell)
-\]
-
-subject to:
-
-\[
-A\le L\le C\le R\le B
-\]
-
-Neighborhood is the recursively restricted part of Range presently under examination. \(\ell\) is Resolution Level. Greater \(\ell\) represents finer recursive distinction.
-
-### Interval
-
-A committed movement from departure \(x\) to arrival \(y\), where \(x\ne y\), derives:
-
-\[
-I=[\min(x,y),\max(x,y)]
-\]
-
-Interval also records:
+## 3. Global invariants
 
 ```text
-departure
-arrival
-operator
-medium: direct | continuous
-direction: backward | forward
+Range.start ≤ Current ≤ Range.end
+Range is the only hard Field boundary
+linked Reach ⇒ backward Reach = forward Reach
+0.25s ≤ each Reach ≤ 300s
+Center is the only audible player
+Tail and Lead never commit Current directly
+Return restores semantic checkpoints, not transient transport
 ```
 
-Interval is transient. It can be Loop-ed or retained as a Section.
+A null operation creates no history entry. A transient player event cannot privately redefine semantic state.
 
-### Pin
-
-A Pin is one persistent Address.
-
-### Section
-
-A Section is one persistent named bounded extent whose endpoints are shared Pins. Start, End, midpoint, and duration are derived from those endpoint Pins.
-
-### Guide
-
-Guide is the persistent per-video structure:
-
-```text
-Guide = Pins + Sections
-```
-
-### Source
-
-A Source is external read-only temporal structure such as a chapter or transcript cue. Source records remain potential structure until an explicit Guide transaction retains them.
-
-## 3. Direction
-
-Forward and Backward are defined by reading order, not by screen geometry.
-
-```text
-video timeline: Forward → right
-vertical document: Forward → down
-```
-
-The vocabulary therefore remains valid across layouts.
-
-## 4. Semantic transformations
+## 4. Semantic operators
 
 ### Go
 
-Direct placement establishes Current at a selected Address \(x\):
-
-\[
-Go(x): C\rightarrow x
-\]
-
-Timeline click, Pin selection, source cue selection, Section midpoint, and Range midpoint are projections of Go.
-
-Go is scale-independent. Even when \(x=C\), Go reopens a refined Neighborhood to Range-level Resolution. Because the Address did not change, this scale-only transformation preserves the existing Interval and does not create a false movement.
+Commits Current to a bounded Address. Direct timeline placement, Pin selection, source selection, and midpoint actions are projections of Go.
 
 ### Refine Backward / Forward
 
-Let:
-
-\[
-T_B=\frac{L+C}{2}, \qquad T_F=\frac{C+R}{2}
-\]
-
-Refine chooses the corresponding directional target, restricts Neighborhood toward that side, and increments Resolution Level.
-
-```text
-Refine Backward:
-  Current becomes T_B
-  Neighborhood becomes [L, previous C]
-  Resolution Level increases
-
-Refine Forward:
-  Current becomes T_F
-  Neighborhood becomes [previous C, R]
-  Resolution Level increases
-```
-
-Binary subdivision is implementation. The semantic operation is directional refinement: restricting Neighborhood to gain Resolution.
+Selects one directional child of the current Neighborhood, commits its midpoint as Current, and increases Resolution.
 
 ### Reopen
 
-\[
-Reopen(L,C,R,\ell)=(A,C,B,0)
-\]
-
-Reopen preserves Current, escapes recursive restriction, and restores the entire active Range as available Neighborhood.
-
-Reopen is not Return. It constructs broader availability around the present Current rather than restoring an earlier state.
+Preserves Current and restores Range-level Resolution. Reopen broadens availability; it is not Return.
 
 ### Step Backward / Forward
 
-For configured distance \(\delta>0\):
-
-\[
-Step_B(C)=\max(A,C-\delta)
-\]
-
-\[
-Step_F(C)=\min(B,C+\delta)
-\]
-
-Step translates Current locally without intentionally increasing Resolution. If the destination remains inside Neighborhood, its existing bounds are preserved. If Step exits Neighborhood, Resolution reopens to Range around the destination.
-
-Rapid repeated Steps coalesce into one departure, one Interval, and one Return entry.
+Moves from Current by the corresponding directional Reach and clamps to Range. A committed movement derives an Interval. Rapid repeated Steps coalesce into one transaction.
 
 ### Return
 
-Return restores the complete model stored by the latest committed semantic transaction:
+Restores the complete previous semantic checkpoint: Range, Resolution, Current, Interval, Focus, Reach, and Guide when changed by that transaction.
+
+### Focus / Leave Focus
+
+Focus installs a Section as Range. Leave Focus restores the containing Range. Only explicit Range operations change Range.
+
+### Pin Current / Save Section
+
+Pin Current retains an Address. Save Section retains an explicit Interval or Held Field Span, reusing coincident endpoint Pins.
+
+## 5. Observation and traversal
+
+Transport has one kind at a time:
 
 ```text
-Range
-Neighborhood / Resolution
-Current
-Interval
-Focus
-Guide, when the transaction changed Guide
+idle | context | continue | skim | loop
 ```
 
-Context and other transient transport states never enter Return history.
+- **Context** observes a bounded window around Current and restores Cursor to Current.
+- **Continue** traverses forward through Range and commits actual movement on settlement.
+- **Skim** traverses toward the forward refinement target at a supported boosted rate, then hands off to Continue.
+- **Loop** repeats an immutable captured Interval or Field Span and restores Current when stopped.
 
-### Focus / Leave
+Semantic operators may interrupt transport. Observational transport restores Current unless replaced by an immediate Go; committing transport records only movement already manifested.
 
-Focus applies one Section as Range while retaining the Range to restore later. If prior Current lies outside the Section, Current relocates to the Section midpoint and produces an ordinary Go Interval.
-
-Leave restores the retained Range. It physically relocates Cursor only if the restored Range displaces Current.
-
-### Pin Current
-
-Pin Current retains Current as an explicit Pin. A coincident Pin is reused rather than duplicated.
-
-### Save Section
-
-Save Section retains the current Interval. Its endpoints are resolved through shared Pins; coincident endpoint Pins are reused.
-
-## 5. Physical execution
-
-The YouTube iframe has an internal physical playhead or Cursor \(P\):
-
-\[
-P\in[0,D]
-\]
-
-At rest:
-
-\[
-P=C
-\]
-
-During transient observation:
-
-\[
-P\ne C
-\]
-
-Cursor is never stored in Session.
-
-The temporal map projects both values when they differ: Current remains fixed as the semantic reference, while Cursor indicates the material physically unfolding.
-
-One transport value describes current execution:
+## 6. Step Field
 
 ```text
-idle
-context
-continue
-skim
-loop
+Tail   ← Current →   Lead
+slower     1×        faster
+muted   audible      muted
 ```
 
-### Context
-
-A direct movement may derive a local observation window around Current:
-
-\[
-Context_\delta(C)=[C-p,C+(\delta-p)]\cap Range
-\]
-
-The window shifts at Range boundaries to preserve as much requested duration as possible.
-
-Settlement:
+Field targets are:
 
 ```text
-unfold local window
-→ pause
-→ restore Cursor to Current
-→ idle
+Tail target = max(Range Start, Current − Backward Reach)
+Lead target = min(Range End, Current + Forward Reach)
 ```
 
-Context does not mutate Session.
+Resolution never clips the Field.
 
-### Continue
-
-Continue unfolds normally forward through Range. It wraps Range End to Range Start. When paused, actual movement is committed as one continuous Interval. Crossing the current Neighborhood reopens Resolution to Range.
-
-### Skim
-
-Skim targets the forward Refine destination. Unfolding rate decreases logarithmically from the configured maximum toward `1×`. On reaching the target, it continues normally until stopped. Actual movement is committed.
-
-### Loop
-
-Loop repeatedly unfolds the current Interval. It is observational; stopping restores Cursor to Current and does not mutate Session.
-
-### Pause
-
-Pause settles the active transport according to its class:
+Field phases are:
 
 ```text
-Context / Loop → restore Current
-Continue / Skim → commit physical movement
+Off → Coincident → Unfolding → Partially Held → Held
+                         ↘ Suspended ↗
 ```
 
-## 6. Interruption
+A forming side resolves through Go to its observed Cursor. A Held side resolves through directional Step to its semantic target.
 
-Transport is not a modal lock. Any semantic operator may interrupt it.
+Tail accepts supported rates below `1×`; Lead accepts supported rates above `1×`. Requested and actual rates remain distinct. Missing directional rates produce an unavailable side. Autoplay rejection produces a blocked side.
 
-- A new Go replaces active Context directly without first returning visibly to the old anchor.
-- Context and Loop restore Current unless replaced by an immediate new Go.
-- Continue and Skim commit the movement already manifested.
-- The requested operator then runs normally.
+Changing rate is kinetic and preserves Field geometry. Enabling/disabling the Field or hiding/showing a pane is structural and re-establishes it.
 
-## 7. Potential source field
+## 7. Transport authority
 
-A normalized source record has the form:
-
-```js
-{
-  id,
-  kind: "chapter" | "transcript",
-  start,
-  end,
-  text,
-  source,
-  sourceId,
-  language
-}
-```
-
-It supplies:
+Application Continue is the authoritative three-pane start gesture:
 
 ```text
-start / end → potential Pins
-[start, end] → potential Section
-text → timed semantic content
+settle prior transport
+→ establish Continue
+→ prepare available Tail and Lead
+→ request side playback
+→ start Center
+→ verify actual states
 ```
 
-Source records:
+Native Center Play remains supported but side activation is best effort because browser policy may treat later side-player requests differently.
 
-- do not enter Guide automatically;
-- do not add Return history;
-- do not alter Range or Resolution merely by existing;
-- may be searched, filtered by extent, previewed, or projected into existing Go, Focus, Pin, and Save Section operations.
+With Step Field disabled, the application is observationally equivalent to the stable single-player reader.
 
-## 8. Interface grammar
+## 8. Persistence
 
-The desktop Navigation deck has three invariant columns:
+Guide data is stored per video. Preferences store Context duration, directional Reach, last edited Reach side, Field response, and pane visibility.
+
+Legacy scalar `stepSeconds` is accepted only at the persistence migration boundary and becomes equal linked directional Reach before entering Session. Runtime Field APIs accept directional Reach only.
+
+Actual rates, buffering, blocked state, Cursors, and Field phases are runtime-only.
+
+## 9. Interface grammar
+
+Desktop navigation preserves three columns:
 
 ```text
-BACKWARD              SHARED               FORWARD
+Backward | shared spine | Forward
 ```
 
-Its vertical grammar is:
+The shared spine contains Reopen, Return, Step Reach settings, Pin Current, and Pins access. Directional actions remain on their corresponding sides.
 
-```text
-                         Reopen
-Refine Backward          Return           Refine Forward
-                       Step size
-Step Backward                              Step Forward
-                       Pin Current
-Pin Backward              Pins             Pin Forward
-```
+On compact screens, Guide becomes an off-canvas sheet. On phones, Center, Tail, and Lead stack vertically; side-player viewports retain the minimum dimensions needed for IFrame capability reporting.
 
-Reopen is adjacent to the Refine pair but not between it. Step size is adjacent to the Step pair but not between its directional actions. Pin Current occupies the same shared spine. Return remains central and prominent.
+All visible controls, statuses, code, and documentation use the same vocabulary.
 
-On wide desktop:
+## 10. Non-contracts
 
-```text
-Video + temporal map | Navigation | Guide
-```
+The following are not current contracts:
 
-On compact screens, Guide becomes an off-canvas sheet while the operator grammar remains unchanged.
-
-## 9. Keyboard grammar
-
-```text
-    W Reopen
-A Refine Backward   S Return   D Refine Forward
-
-← Step Backward                 Step Forward →
-Shift+← Pin Backward            Pin Forward Shift+→
-```
-
-Additional direct operations:
-
-```text
-P Pin Current
-C Context
-Space Continue / Pause
-F Skim
-L Loop
-G Guide
-[ ] Step size
-Ctrl/Cmd+Z or Backspace Return
-Escape stop or close
-? help
-```
-
-Only unmodified Step arrows repeat while held.
-
-## 10. Interaction integrity
-
-### Native YouTube controls
-
-A stable native YouTube scrub is reconciled through ordinary Go after a short settlement window. The destination is clamped to Range. App-generated placements carry temporary ownership so keyframe delay is not misread as user intent; ownership ends as soon as the adapter reports the requested Address.
-
-### Coalesced gestures
-
-Rapid Step presses share one departure and one Return checkpoint. If the net sequence returns to the original Range, Neighborhood, Resolution, Current, and Focus, the pending transaction is discarded entirely.
-
-Range-handle preview is derived from the drag origin on every pointer movement. Returning the handle to its origin restores the exact starting model and adds no Return checkpoint.
-
-### Modal ownership
-
-A compact Guide or Guide edit dialog owns pointer, focus, and keyboard interaction. Background spatial commands are suspended. Escape closes one active layer at a time.
-
-### Persistence recovery
-
-Guide loading salvages valid Pins and Sections independently. Coincident Pins are merged, reversed Section endpoints are reordered by Address, duplicate Sections are removed, and invalid records are discarded without invalidating unrelated retained structure.
-
-### Asynchronous player boundaries
-
-Context, Loop, Continue, and Skim tolerate delayed player placement. Initial placements are retried only after a grace period. Internal PAUSED events are counted and bounded so delayed adapter events cannot cancel a later transport. Video duration is retried before a zero-duration load is rejected.
-
-## 11. Persistence
-
-Canonical Guide schema version is 5:
-
-```js
-{
-  version: 5,
-  videoId,
-  pins: [],
-  sections: [],
-  updatedAt
-}
-```
-
-Storage key:
-
-```text
-binary-youtube-reader:v5:<videoId>
-```
-
-Legacy v4, v3, v2, and v1 records are read and migrated. Their original keys remain untouched.
-
-## v5.2 canonical interaction invariants
-
-### Movement and scale
-
-A direct movement from departure `A` to arrival `B` establishes Current at `B`, Interval `min(A,B)…max(A,B)`, and a movement-seeded Neighborhood. The crossed Interval occupies one side of Current; an equal-scale extent is generated on the opposite side and clipped to Range.
-
-A same-address Go is null. It does not alter Resolution, Interval, Range, Focus, Guide, or Return history.
-
-### Step
-
-Step is evaluated from the origin of a coalesced Step sequence and its final destination. Inside the origin Neighborhood it preserves that Neighborhood. Outside it, the net Step movement establishes a new movement-seeded Neighborhood. A net-zero sequence restores the exact origin state and records nothing.
-
-### Continue and Skim
-
-Continue leaves semantic Current fixed while Cursor unfolds. Settlement inside the parent Neighborhood preserves its basis and partitions the remaining extent. Settlement after crossing the Neighborhood reopens Resolution to Range. A wrapped Continue clears Interval.
-
-Skim holds one supported boosted rate to the Forward refinement target. Reaching that target applies the same semantic Resolution as Refine Forward and hands off to Continue at `1×` without creating another Return checkpoint.
-
-### Range, Focus, and Interval
-
-Only explicit Range operations change Range. Range changes preserve Interval only when the complete Interval is contained by the new Range; otherwise Interval becomes null. Focus relocation is administrative and creates no Interval. A direct Go outside a focused Section is recorded as the composite `Leave Section + Go`, expanding to Full Video when the containing Range cannot contain both departure and destination.
-
-### Guide integrity
-
-Focus is valid only while its referenced Section resolves in Guide. Every Guide mutation reconciles this invariant. Deleting the focused Section restores its containing Range, clears Focus, removes orphan endpoint Pins, and remains completely Returnable.
+- scalar runtime Step size;
+- Resolution as a Field boundary;
+- fixed immutable Tail/Lead rates;
+- native Center Play as the sole transport authority;
+- side Cursors as semantic history;
+- implicit retention of Field Span;
+- chronological documentation that competes with the current specification.

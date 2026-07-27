@@ -1,3 +1,4 @@
+// Immutable semantic kernel and Return history. This module does not touch the DOM or media players.
 import {
   EPSILON,
   RESOLUTION_BASIS,

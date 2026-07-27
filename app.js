@@ -1,3 +1,4 @@
+// Application composition root. Semantic mutations pass through Session; player effects pass through adapters.
 import {
   EPSILON,
   clamp,
@@ -64,7 +65,11 @@ import {
   createYouTubePlayer,
   parseYouTubeUrl
 } from "./youtube.js";
-import { createStepFieldController } from "./step-field.js";
+import {
+  DEFAULT_FIELD_RESPONSE,
+  createStepFieldController,
+  normalizeFieldResponse
+} from "./step-field.js";
 import { createView } from "./view.js";
 
 const STORAGE_V5_PREFIX = "binary-youtube-reader:v5:";
@@ -83,20 +88,6 @@ const METADATA_GRACE_MS = 4000;
 const METADATA_RETRY_MS = 150;
 const PROGRAMMATIC_PLACEMENT_GRACE_MS = 2000;
 const NATIVE_POSITION_TOLERANCE_SECONDS = 0.25;
-const DEFAULT_FIELD_RESPONSE = Object.freeze({ tailRate: 0.5, leadRate: 2 });
-
-function normalizeFieldResponse(value = DEFAULT_FIELD_RESPONSE) {
-  const tailRate = Number(value?.tailRate);
-  const leadRate = Number(value?.leadRate);
-  return {
-    tailRate: Number.isFinite(tailRate) && tailRate > 0 && tailRate < 1
-      ? tailRate
-      : DEFAULT_FIELD_RESPONSE.tailRate,
-    leadRate: Number.isFinite(leadRate) && leadRate > 1
-      ? leadRate
-      : DEFAULT_FIELD_RESPONSE.leadRate
-  };
-}
 
 function normalizeLastStepReachEdited(value) {
   return value === "backward" ? "backward" : "forward";

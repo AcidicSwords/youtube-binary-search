@@ -1,3 +1,4 @@
+// Sole raw YouTube IFrame API adapter. Other modules consume this normalized boundary.
 export const YOUTUBE_STATE = Object.freeze({
   UNSTARTED: "unstarted",
   ENDED: "ended",
@@ -92,7 +93,12 @@ function currentOrigin() {
   return typeof origin === "string" && /^https?:\/\//.test(origin) ? origin : null;
 }
 
+export function isYouTubeApiReady() {
+  return typeof globalThis.YT?.Player === "function";
+}
+
 export function createYouTubePlayer(elementId, options = {}) {
+  if (!isYouTubeApiReady()) throw new Error("YouTube IFrame API is not ready.");
   let rawPlayer = null;
   let internalPauseUntil = 0;
   let internalPauseCount = 0;
@@ -158,7 +164,7 @@ export function createYouTubePlayer(elementId, options = {}) {
     }
   };
 
-  rawPlayer = new YT.Player(elementId, {
+  rawPlayer = new globalThis.YT.Player(elementId, {
     width: options.width || "100%",
     height: options.height || "100%",
     playerVars,

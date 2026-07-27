@@ -42,7 +42,7 @@
   z-index: 6;
   inset: 0 0 auto;
   display: flex;
-  min-height: 31px;
+  min-height: var(--control-height);
   align-items: center;
   gap: 7px;
   padding: 4px 6px 8px 8px;
@@ -77,8 +77,8 @@
 .pane-rate-setting select {
   width: 74px;
   min-width: 74px;
-  min-height: 25px;
-  height: 25px;
+  min-height: var(--compact-control-height);
+  height: var(--compact-control-height);
   padding: 0 1.3rem 0 0.42rem;
   border-color: rgba(116, 134, 157, 0.62);
   background: rgba(17, 23, 32, 0.9);
@@ -87,7 +87,7 @@
 
 .pane-collapse,
 .field-toggle {
-  min-height: 25px;
+  min-height: var(--compact-control-height);
   border-color: rgba(116, 134, 157, 0.62);
   background: rgba(17, 23, 32, 0.84);
   pointer-events: auto;
@@ -174,26 +174,6 @@
   filter: grayscale(0.35) brightness(0.58);
 }
 
-/* Three panes need the reader width; Navigation stays compact below the Field. */
-@media (min-width: 1221px) {
-  .reader-column {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: none;
-  }
-
-  .player-panel,
-  .timeline-panel,
-  .navigation-panel,
-  .secondary-tools { grid-area: auto; }
-
-  .interaction-grid {
-    display: grid;
-    grid-template-columns: minmax(430px, 1.18fr) minmax(390px, 0.82fr);
-  }
-
-  .navigation-panel { position: static; top: auto; }
-}
-
 @media (max-width: 1040px) {
   .step-field {
     grid-template-columns: minmax(120px, 0.62fr) minmax(300px, 1.45fr) minmax(120px, 0.62fr);
@@ -243,12 +223,17 @@
 }
 
 @media (pointer: coarse) {
-  .step-pane-bar { min-height: 52px; }
+  .step-pane-bar { min-height: 56px; }
+  .pane-rate-setting select,
+  .pane-collapse,
+  .field-toggle {
+    min-height: var(--touch);
+    height: var(--touch);
+  }
   .pane-rate-setting select {
-    width: 84px;
-    min-width: 84px;
-    min-height: 44px;
-    height: 44px;
+    width: 88px;
+    min-width: 88px;
     font-size: 16px;
   }
+  .pane-collapse { width: var(--touch); }
 }
