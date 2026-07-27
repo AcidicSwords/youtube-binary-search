@@ -40,6 +40,7 @@ jobs:
           python3 .github/stabilize-repository-v5.6.0-fix4.py 2>&1 | tee -a stabilization-apply.log
           python3 .github/stabilize-repository-v5.6.0-fix5.py 2>&1 | tee -a stabilization-apply.log
           python3 .github/stabilize-repository-v5.6.0-fix6.py 2>&1 | tee -a stabilization-apply.log
+          python3 .github/stabilize-repository-v5.6.0-fix7.py 2>&1 | tee -a stabilization-apply.log
 
       - name: Run complete repository gate
         shell: bash
@@ -51,7 +52,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]]"
+          git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git diff --cached --check
