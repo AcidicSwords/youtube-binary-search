@@ -1,8 +1,9 @@
-import { clamp } from "./range-geometry.js";
+import { EPSILON, clamp } from "./range-geometry.js";
 import { YOUTUBE_STATE, createYouTubePlayer } from "./youtube.js";
 import {
   STEP_FIELD_PHASE,
   FIELD_REACH_TOLERANCE,
+  deriveFieldBounds,
   deriveStepField,
   chooseNearestRate,
   chooseDirectionalRate,
@@ -14,6 +15,7 @@ import {
 
 export {
   STEP_FIELD_PHASE,
+  deriveFieldBounds,
   deriveStepField,
   chooseNearestRate,
   chooseDirectionalRate,
@@ -45,6 +47,16 @@ function semanticKey(snapshot) {
     Number(range.end || 0).toFixed(3),
     Number(snapshot.stepSeconds || 0).toFixed(3)
   ].join("|");
+}
+
+export function fieldShouldSuspend(snapshot) {
+  const transportKind = snapshot?.transport?.kind ?? snapshot?.transportKind;
+  return Boolean(
+    snapshot?.rangeDragging
+    || snapshot?.dragging
+    || snapshot?.pendingStep
+    || ["context", "skim", "loop"].includes(transportKind)
+  );
 }
 
 export function createStepFieldController({
@@ -183,6 +195,25 @@ export function createStepFieldController({
     pauseSide(sides.lead);
   }
 
+  function resetSideState() {
+    for (const side of Object.values(sides)) {
+      side.held = false;
+      side.heldDistance = 0;
+    }
+  }
+
+  function invalidate() {
+    pauseSides();
+    resetSideState();
+    runtime.semanticKey = null;
+    runtime.lastCenterTime = null;
+    runtime.forceEstablish = true;
+    runtime.suspended = false;
+    runtime.field = null;
+    runtime.fieldKey = "";
+    onChange?.(null);
+  }
+
   function readSide(side) {
     return side.adapter?.read?.() || {
       time: 0,
@@ -235,9 +266,8 @@ export function createStepFieldController({
 
   function establish(snapshot, address = snapshot.current) {
     const bounded = clamp(address, snapshot.range.start, snapshot.range.end);
+    resetSideState();
     for (const side of Object.values(sides)) {
-      side.held = false;
-      side.heldDistance = 0;
       pauseSide(side);
       placeSide(side, bounded);
     }
@@ -309,7 +339,6 @@ export function createStepFieldController({
     return `${rounded}s`;
   }
 
-
   function publishField(targets, sideStates, centerTime, prefs, phase = runtime.phase) {
     const tailRead = readSide(sides.tail);
     const leadRead = readSide(sides.lead);
@@ -326,6 +355,7 @@ export function createStepFieldController({
     });
     const key = JSON.stringify({
       phase: observed.phase,
+      constraint: observed.constraint,
       tail: Number(observed.tail.address.toFixed(2)),
       lead: Number(observed.lead.address.toFixed(2)),
       tailHeld: observed.tail.held,
@@ -360,6 +390,20 @@ export function createStepFieldController({
     else onStep(payload.direction);
   }
 
+  function sideMetadata(role, target, sideState) {
+    if (runtime.phase === STEP_FIELD_PHASE.SUSPENDED) return "Suspended";
+    const prefix = role === "tail" ? "−" : "+";
+    const boundary = target.constrained
+      ? role === "tail" ? "Range start" : "Range end"
+      : null;
+    if (!target.available) return boundary || (role === "tail" ? "Range start" : "Range end");
+    if (sideState.held) return `${prefix}${formatOffset(target.distance)} · ${boundary || "Held"}`;
+    if (sideState.offset > REACH_TOLERANCE) {
+      return `${prefix}${formatOffset(sideState.offset)} / ${formatOffset(target.distance)}${boundary ? ` · ${boundary}` : ""}`;
+    }
+    return `${prefix}${formatOffset(target.distance)} · ${boundary || "Ready"}`;
+  }
+
   function render(snapshot = getSnapshot?.(), live = null, sideStates = null) {
     if (!snapshot || !elements["step-field"]) return;
     const prefs = preferences();
@@ -381,6 +425,7 @@ export function createStepFieldController({
     root.classList.toggle("lead-collapsed", !prefs.leadVisible);
     root.classList.toggle("is-suspended", runtime.phase === STEP_FIELD_PHASE.SUSPENDED);
     root.dataset.phase = runtime.phase;
+    root.dataset.constraint = field.constraint || "none";
 
     elements["tail-pane"]?.classList?.toggle("is-collapsed", !prefs.tailVisible);
     elements["lead-pane"]?.classList?.toggle("is-collapsed", !prefs.leadVisible);
@@ -406,38 +451,28 @@ export function createStepFieldController({
     setText(elements["center-meta"], loaded ? formatTime(centerTime) : "—");
 
     for (const role of ["tail", "lead"]) {
-      const prefix = role === "tail" ? "−" : "+";
       const target = field[role];
       const sideState = states[role];
-      const meta = runtime.phase === STEP_FIELD_PHASE.SUSPENDED
-        ? "Suspended"
-        : !target.available
-          ? role === "tail" ? "Range start" : "Range end"
-          : sideState.held
-            ? `${prefix}${formatOffset(target.distance)} · Held`
-            : sideState.offset > REACH_TOLERANCE
-              ? `${prefix}${formatOffset(sideState.offset)} / ${formatOffset(target.distance)}`
-              : `${prefix}${formatOffset(target.distance)} · Ready`;
+      const meta = sideMetadata(role, target, sideState);
       setText(elements[`${role}-meta`], meta);
       const button = elements[`${role}-step`];
-      if (button) {
-        const observedSide = runtime.field?.[role] || {
-          ...sideState,
-          address: centerTime,
-          visible: prefs[`${role}Visible`],
-          available: target.available
-        };
-        const mode = sideActivationMode(observedSide, runtime.phase);
-        const action = mode === "step"
-          ? role === "tail" ? "Step Backward" : "Step Forward"
-          : mode === "go"
-            ? role === "tail" ? "Go to visible Tail" : "Go to visible Lead"
-            : role === "tail" ? "Tail is coincident" : "Lead is coincident";
-        const destination = mode === "step" ? target.target : observedSide.address;
-        button.disabled = !loaded || !prefs.stepFieldEnabled || !mode;
-        button.dataset.action = mode || "none";
-        button.setAttribute("aria-label", `${action}${Number.isFinite(destination) ? ` at ${formatTime(destination)}` : ""}. ${meta}.`);
-      }
+      if (!button) continue;
+      const observedSide = runtime.field?.[role] || {
+        ...sideState,
+        address: centerTime,
+        visible: prefs[`${role}Visible`],
+        available: target.available
+      };
+      const mode = sideActivationMode(observedSide, runtime.phase);
+      const action = mode === "step"
+        ? role === "tail" ? "Step Backward" : "Step Forward"
+        : mode === "go"
+          ? role === "tail" ? "Go to visible Tail" : "Go to visible Lead"
+          : role === "tail" ? "Tail is coincident" : "Lead is coincident";
+      const destination = mode === "step" ? target.target : observedSide.address;
+      button.disabled = !loaded || !prefs.stepFieldEnabled || !mode;
+      button.dataset.action = mode || "none";
+      button.setAttribute("aria-label", `${action}${Number.isFinite(destination) ? ` at ${formatTime(destination)}` : ""}. ${meta}.`);
     }
   }
 
@@ -447,6 +482,7 @@ export function createStepFieldController({
     if (!snapshot || !snapshot.range) return;
     if (snapshot.videoLoaded) ensurePlayers(prefs);
     syncVideo(snapshot);
+
     if (!snapshot.videoLoaded || !snapshot.videoId) {
       pauseSides();
       runtime.semanticKey = null;
@@ -458,12 +494,7 @@ export function createStepFieldController({
       return;
     }
 
-    const suspended = Boolean(
-      snapshot.pendingStep
-      || snapshot.dragging
-      || ["context", "loop", "skim"].includes(snapshot.transportKind)
-      || document?.hidden
-    );
+    const suspended = fieldShouldSuspend(snapshot) || Boolean(document?.hidden);
 
     if (!prefs.stepFieldEnabled || (!prefs.tailVisible && !prefs.leadVisible)) {
       pauseSides();
@@ -546,6 +577,7 @@ export function createStepFieldController({
     tick,
     render,
     pause: pauseSides,
+    invalidate,
     establish() {
       const snapshot = getSnapshot?.();
       if (snapshot?.videoLoaded) establish(snapshot, snapshot.current);
