@@ -26,6 +26,19 @@ jobs:
           fetch-depth: 0
           show-progress: false
 
+      - name: Repair applicator boundary
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('.github/consolidate-field-coherence-v5.5.1.py')
+          text = path.read_text()
+          old = 'start, end = function_block(app, "readPreferences")'
+          new = 'start = app.index("function readPreferences(")\nend = app.index("\\n\\nconst preferences = readPreferences();", start)'
+          if text.count(old) != 1:
+              raise RuntimeError('readPreferences boundary anchor')
+          path.write_text(text.replace(old, new, 1))
+          PY
+
       - name: Apply consolidation
         run: python3 .github/consolidate-field-coherence-v5.5.1.py
 
