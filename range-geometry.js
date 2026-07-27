@@ -1,4 +1,8 @@
 export const EPSILON = 0.04;
+export const RESOLUTION_BASIS = Object.freeze({
+  RANGE: "range",
+  MOVEMENT: "movement"
+});
 
 export function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -101,6 +105,53 @@ export function refineNeighborhood(neighborhood, destination, range) {
   );
 }
 
+/**
+ * Establish a local two-sided Neighborhood from an actual movement. The crossed
+ * Interval occupies one side of Current; the opposite side is generated at the
+ * same scale and clipped to Range. This preserves the scale communicated by Go
+ * without changing Range or conflating Neighborhood with Interval.
+ */
+export function seedNeighborhoodFromMovement(departure, arrival, range) {
+  if (!Number.isFinite(departure) || !Number.isFinite(arrival)) {
+    throw new TypeError("Movement-seeded Resolution requires finite Addresses.");
+  }
+  if (!range || !Number.isFinite(range.start) || !Number.isFinite(range.end) || range.start > range.end) {
+    throw new TypeError("Movement-seeded Resolution requires a valid Range.");
+  }
+
+  const A = clamp(departure, range.start, range.end);
+  const C = clamp(arrival, range.start, range.end);
+  const scale = Math.abs(C - A);
+  if (scale <= EPSILON) return createRoot(range.start, C, range.end);
+
+  if (C > A) {
+    return assertNeighborhood({
+      L: A,
+      C,
+      R: Math.min(range.end, C + scale),
+      level: 0
+    });
+  }
+
+  return assertNeighborhood({
+    L: Math.max(range.start, C - scale),
+    C,
+    R: A,
+    level: 0
+  });
+}
+
+export function isRangeNeighborhood(neighborhood, range) {
+  assertNeighborhood(neighborhood);
+  return Boolean(
+    range
+    && Number.isFinite(range.start)
+    && Number.isFinite(range.end)
+    && Math.abs(neighborhood.L - range.start) <= EPSILON
+    && Math.abs(neighborhood.R - range.end) <= EPSILON
+  );
+}
+
 export function reopenToRange(current, range) {
   if (!Number.isFinite(current)) throw new TypeError("A finite Current is required.");
   if (!range || !Number.isFinite(range.start) || !Number.isFinite(range.end) || range.start > range.end) {
@@ -126,19 +177,28 @@ export function stepTarget(current, seconds, direction, range) {
   throw new TypeError(`Unknown direction: ${direction}`);
 }
 
-export function stepNeighborhood(neighborhood, destination, range) {
+export function stepNeighborhood(
+  neighborhood,
+  destination,
+  range,
+  departure = neighborhood.C
+) {
   assertNeighborhood(neighborhood);
   if (!Number.isFinite(destination)) throw new TypeError("Step destination must be finite.");
   const C = clamp(destination, range.start, range.end);
   if (C >= neighborhood.L - EPSILON && C <= neighborhood.R + EPSILON) {
     return assertNeighborhood({
       L: neighborhood.L,
-      C,
+      C: clamp(C, neighborhood.L, neighborhood.R),
       R: neighborhood.R,
       level: neighborhood.level ?? 0
     });
   }
-  return reopenToRange(C, range);
+
+  // A Step that leaves the current Neighborhood remains a local displacement:
+  // its net movement establishes the next scale instead of silently performing
+  // Reopen. Range-level availability remains one explicit Reopen away.
+  return seedNeighborhoodFromMovement(departure, C, range);
 }
 
 export function settleContinuous(neighborhood, departure, current) {
@@ -198,6 +258,8 @@ export function getActionRanges(
   };
 }
 
+// Retained for compatibility with external imports; Skim no longer uses a
+// progress-dependent curve because YouTube exposes only a small boosted range.
 export function logSpeed(maxRate, progress) {
   return Math.pow(Math.max(1, maxRate), 1 - clamp(progress, 0, 1));
 }

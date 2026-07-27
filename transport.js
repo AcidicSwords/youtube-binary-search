@@ -1,8 +1,7 @@
 import {
   EPSILON,
   clamp,
-  chooseSupportedRate,
-  logSpeed
+  chooseSupportedRate
 } from "./range-geometry.js";
 
 export const TRANSPORT_KIND = Object.freeze({
@@ -79,6 +78,7 @@ export function createLoopTransport({ anchor, start, end }) {
 export function createContinueTransport({
   departure,
   parentNeighborhood,
+  parentResolutionBasis,
   returnModel,
   crossedResolution = false,
   wrapped = false,
@@ -90,6 +90,7 @@ export function createContinueTransport({
     phase: "starting",
     departure,
     parentNeighborhood,
+    parentResolutionBasis,
     returnModel,
     crossedResolution,
     wrapped,
@@ -100,15 +101,25 @@ export function createContinueTransport({
   };
 }
 
-export function createSkimTransport({ departure, target, parentNeighborhood, returnModel, maxRate }) {
+export function createSkimTransport({
+  departure,
+  target,
+  parentNeighborhood,
+  parentResolutionBasis,
+  returnModel,
+  maxRate,
+  rate = maxRate
+}) {
   return {
     kind: TRANSPORT_KIND.SKIM,
     phase: "starting",
     departure,
     target,
     parentNeighborhood,
+    parentResolutionBasis,
     returnModel,
     maxRate,
+    rate: Number.isFinite(rate) ? rate : 1,
     enteredPath: false,
     startedAt: Date.now()
   };
@@ -120,11 +131,12 @@ export function withTransportPhase(transport, phase) {
     : { ...transport, phase };
 }
 
-export function desiredSkimRate(transport, current, availableRates) {
+/**
+ * Skim holds one supported boosted rate for the whole path. It changes to 1×
+ * only when the Forward destination is reached and Skim becomes Continue.
+ */
+export function desiredSkimRate(transport, _current, availableRates) {
   if (transport?.kind !== TRANSPORT_KIND.SKIM) return 1;
-  const total = transport.target - transport.departure;
-  const progress = total > 0
-    ? clamp((current - transport.departure) / total, 0, 1)
-    : 1;
-  return chooseSupportedRate(availableRates, logSpeed(transport.maxRate, progress));
+  const requested = Number.isFinite(transport.rate) ? transport.rate : transport.maxRate;
+  return chooseSupportedRate(availableRates, requested);
 }
