@@ -5,7 +5,9 @@ import {
   setStepReach,
   step,
   returnState,
-  normalizeStepReach
+  normalizeStepReach,
+  MIN_STEP_REACH_SECONDS,
+  MAX_STEP_REACH_SECONDS
 } from "./session.js";
 import {
   getActionRanges,
@@ -13,7 +15,9 @@ import {
 } from "./range-geometry.js";
 import {
   deriveFieldBounds,
-  chooseDirectionalRate
+  chooseDirectionalRate,
+  fieldPreferenceRequiresEstablish,
+  createStepFieldController
 } from "./step-field.js";
 
 assert.deepEqual(normalizeStepReach(8), {
@@ -30,6 +34,20 @@ assert.deepEqual(normalizeDirectionalReach({
   forward: 15,
   linked: false
 });
+assert.deepEqual(normalizeStepReach({ backward: 5, forward: 15, linked: true }), {
+  backward: 15,
+  forward: 15,
+  linked: true
+}, "Linked Reach is one canonical value.");
+assert.deepEqual(normalizeStepReach({ backward: 0.01, forward: 900, linked: false }), {
+  backward: MIN_STEP_REACH_SECONDS,
+  forward: MAX_STEP_REACH_SECONDS,
+  linked: false
+}, "Reach normalization owns the same bounds as the UI.");
+assert.equal(fieldPreferenceRequiresEstablish({ tailRate: 0.75 }), false);
+assert.equal(fieldPreferenceRequiresEstablish({ leadRate: 1.5 }), false);
+assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: false }), true);
+assert.equal(fieldPreferenceRequiresEstablish({ stepFieldEnabled: false }), true);
 
 {
   let session = createSession({
@@ -100,10 +118,63 @@ assert.equal(chooseDirectionalRate([1], 0.5, "tail"), null);
 assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
 
 {
+  const originalYT = globalThis.YT;
+  globalThis.YT = { Player() {} };
+  let created = 0;
+  const element = () => ({
+    hidden: false,
+    disabled: false,
+    value: "",
+    textContent: "",
+    dataset: {},
+    classList: { toggle() {} },
+    addEventListener() {},
+    setAttribute() {},
+    replaceChildren() {},
+    appendChild() {}
+  });
+  const elements = new Map();
+  const document = {
+    hidden: false,
+    createElement: element,
+    getElementById(id) {
+      if (!elements.has(id)) elements.set(id, element());
+      return elements.get(id);
+    }
+  };
+  const controller = createStepFieldController({
+    document,
+    getSnapshot: () => ({
+      videoLoaded: true,
+      videoId: "single-player-contract",
+      current: 50,
+      range: { start: 0, end: 100 },
+      stepReach: { backward: 10, forward: 10, linked: true },
+      transportKind: "continue",
+      center: { time: 50, rate: 1, state: 1, availableRates: [0.5, 1, 2] }
+    }),
+    getPreferences: () => ({
+      stepFieldEnabled: false,
+      tailVisible: true,
+      leadVisible: true,
+      tailRate: 0.5,
+      leadRate: 2
+    }),
+    createPlayer: () => { created += 1; return null; }
+  });
+  controller.tick();
+  assert.equal(controller.play(), false);
+  assert.equal(created, 0, "Disabling Step Field preserves the single-player reader boundary.");
+  globalThis.YT = originalYT;
+}
+
+{
   const html = readFileSync("index.html", "utf8");
   const app = readFileSync("app.js", "utf8");
   const field = readFileSync("step-field.js", "utf8");
   const view = readFileSync("view.js", "utf8");
+  const implementation = readFileSync("IMPLEMENTATION.md", "utf8");
+  const readme = readFileSync("README.md", "utf8");
 
   for (const id of [
     "step-link",
@@ -124,6 +195,13 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   assert.match(field, /leadRate: 2/);
   assert.match(field, /onAutoplayBlocked:[\s\S]*playback = "blocked"/);
   assert.match(view, /session\.model\.stepReach/);
+  assert.match(app, /stepReachLastEdited: preferences\.stepReachLastEdited/);
+  assert.match(app, /preferences\.stepReach = normalizeStepReach/);
+  assert.match(implementation, /^# Binary YouTube Reader v5\.5\.1/m);
+  assert.doesNotMatch(implementation, /sole visible Continue\/Pause authority/);
+  assert.doesNotMatch(implementation, /^# Binary YouTube Reader v5\.1/m);
+  assert.doesNotMatch(readme, /Step Size/);
+  assert.match(readme, /Application Continue/);
 }
 
 console.log("Field coherence v5.5 tests passed.");

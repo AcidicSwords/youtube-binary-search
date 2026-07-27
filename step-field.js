@@ -68,6 +68,11 @@ export function fieldShouldSuspend(snapshot) {
   );
 }
 
+export function fieldPreferenceRequiresEstablish(patch) {
+  return ["stepFieldEnabled", "tailVisible", "leadVisible"]
+    .some(key => Object.hasOwn(patch || {}, key));
+}
+
 export function createStepFieldController({
   document,
   getSnapshot,
@@ -136,7 +141,7 @@ export function createStepFieldController({
 
   function changePreferences(patch) {
     setPreferences?.(patch);
-    runtime.forceEstablish = true;
+    if (fieldPreferenceRequiresEstablish(patch)) runtime.forceEstablish = true;
   }
 
   function bind() {

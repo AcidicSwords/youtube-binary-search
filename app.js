@@ -83,26 +83,38 @@ const METADATA_GRACE_MS = 4000;
 const METADATA_RETRY_MS = 150;
 const PROGRAMMATIC_PLACEMENT_GRACE_MS = 2000;
 const NATIVE_POSITION_TOLERANCE_SECONDS = 0.25;
+const DEFAULT_FIELD_RESPONSE = Object.freeze({ tailRate: 0.5, leadRate: 2 });
+
+function normalizeFieldResponse(value = DEFAULT_FIELD_RESPONSE) {
+  const tailRate = Number(value?.tailRate);
+  const leadRate = Number(value?.leadRate);
+  return {
+    tailRate: Number.isFinite(tailRate) && tailRate > 0 && tailRate < 1
+      ? tailRate
+      : DEFAULT_FIELD_RESPONSE.tailRate,
+    leadRate: Number.isFinite(leadRate) && leadRate > 1
+      ? leadRate
+      : DEFAULT_FIELD_RESPONSE.leadRate
+  };
+}
+
+function normalizeLastStepReachEdited(value) {
+  return value === "backward" ? "backward" : "forward";
+}
 
 function readPreferences() {
   try {
     const value = JSON.parse(localStorage.getItem(PREFERENCES_KEY) || "null");
     const legacyStep = Number.isFinite(Number(value?.stepSeconds))
-      ? clamp(Number(value.stepSeconds), 0.25, 300)
+      ? Number(value.stepSeconds)
       : 10;
     return {
       contextSeconds: [0, 3, 5, 10].includes(Number(value?.contextSeconds))
         ? Number(value.contextSeconds)
         : 5,
       stepReach: normalizeStepReach(value?.stepReach ?? legacyStep),
-      fieldResponse: {
-        tailRate: Number.isFinite(Number(value?.fieldResponse?.tailRate))
-          ? Number(value.fieldResponse.tailRate)
-          : 0.5,
-        leadRate: Number.isFinite(Number(value?.fieldResponse?.leadRate))
-          ? Number(value.fieldResponse.leadRate)
-          : 2
-      },
+      stepReachLastEdited: normalizeLastStepReachEdited(value?.stepReachLastEdited),
+      fieldResponse: normalizeFieldResponse(value?.fieldResponse),
       stepFieldEnabled: value?.stepFieldEnabled !== false,
       tailVisible: value?.tailVisible !== false,
       leadVisible: value?.leadVisible !== false
@@ -111,13 +123,15 @@ function readPreferences() {
     return {
       contextSeconds: 5,
       stepReach: normalizeStepReach(10),
-      fieldResponse: { tailRate: 0.5, leadRate: 2 },
+      stepReachLastEdited: "forward",
+      fieldResponse: { ...DEFAULT_FIELD_RESPONSE },
       stepFieldEnabled: true,
       tailVisible: true,
       leadVisible: true
     };
   }
 }
+
 
 const preferences = readPreferences();
 const state = {
@@ -129,8 +143,8 @@ const state = {
   availableRates: [1],
   transport: idleTransport(),
   pendingStep: null,
-  lastStepReachEdited: "forward",
-  fieldResponse: { ...preferences.fieldResponse },
+  lastStepReachEdited: preferences.stepReachLastEdited,
+  fieldResponse: normalizeFieldResponse(preferences.fieldResponse),
   contextSeconds: preferences.contextSeconds,
   stepFieldEnabled: preferences.stepFieldEnabled,
   tailVisible: preferences.tailVisible,
@@ -224,15 +238,25 @@ function persistGuide() {
 
 function persistPreferences() {
   try {
+    preferences.stepReach = normalizeStepReach(
+      model()?.stepReach ?? preferences.stepReach,
+      preferences.stepReach
+    );
+    preferences.stepReachLastEdited = normalizeLastStepReachEdited(state.lastStepReachEdited);
+    preferences.fieldResponse = normalizeFieldResponse(state.fieldResponse);
+    preferences.contextSeconds = state.contextSeconds;
+    preferences.stepFieldEnabled = state.stepFieldEnabled;
+    preferences.tailVisible = state.tailVisible;
+    preferences.leadVisible = state.leadVisible;
+
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify({
-      contextSeconds: state.contextSeconds,
-      stepReach: normalizeStepReach(model()?.stepReach ?? preferences.stepReach),
-      fieldResponse: { ...state.fieldResponse },
-      stepFieldEnabled: state.stepFieldEnabled,
-      tailVisible: state.tailVisible,
-      leadVisible: state.leadVisible,
-      tailRate: state.fieldResponse.tailRate,
-      leadRate: state.fieldResponse.leadRate
+      contextSeconds: preferences.contextSeconds,
+      stepReach: preferences.stepReach,
+      stepReachLastEdited: preferences.stepReachLastEdited,
+      fieldResponse: preferences.fieldResponse,
+      stepFieldEnabled: preferences.stepFieldEnabled,
+      tailVisible: preferences.tailVisible,
+      leadVisible: preferences.leadVisible
     }));
   } catch (error) {
     console.warn("Could not save preferences:", error);
@@ -598,6 +622,7 @@ function returnLastAction() {
     return;
   }
   state.session = result.session;
+  persistPreferences();
   const guidePersisted = result.guideChanged ? persistGuide() : true;
   persistPreferences();
   stepField?.invalidate();
@@ -1804,11 +1829,8 @@ function initializePlayerApi() {
       if (Object.hasOwn(patch, "stepFieldEnabled")) state.stepFieldEnabled = Boolean(patch.stepFieldEnabled);
       if (Object.hasOwn(patch, "tailVisible")) state.tailVisible = Boolean(patch.tailVisible);
       if (Object.hasOwn(patch, "leadVisible")) state.leadVisible = Boolean(patch.leadVisible);
-      if (Object.hasOwn(patch, "tailRate") && Number.isFinite(Number(patch.tailRate))) {
-        state.fieldResponse.tailRate = Number(patch.tailRate);
-      }
-      if (Object.hasOwn(patch, "leadRate") && Number.isFinite(Number(patch.leadRate))) {
-        state.fieldResponse.leadRate = Number(patch.leadRate);
+      if (Object.hasOwn(patch, "tailRate") || Object.hasOwn(patch, "leadRate")) {
+        state.fieldResponse = normalizeFieldResponse({ ...state.fieldResponse, ...patch });
       }
       persistPreferences();
     },

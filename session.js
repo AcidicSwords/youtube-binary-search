@@ -31,6 +31,8 @@ import {
 
 export const HISTORY_LIMIT = 100;
 export const MIN_RANGE_SECONDS = 0.25;
+export const MIN_STEP_REACH_SECONDS = 0.25;
+export const MAX_STEP_REACH_SECONDS = 300;
 
 export const DEFAULT_STEP_REACH = Object.freeze({
   backward: 10,
@@ -38,23 +40,47 @@ export const DEFAULT_STEP_REACH = Object.freeze({
   linked: true
 });
 
-export function normalizeStepReach(value, fallback = DEFAULT_STEP_REACH) {
-  const source = Number.isFinite(Number(value))
-    ? { backward: Number(value), forward: Number(value), linked: true }
-    : value && typeof value === "object"
-      ? value
-      : fallback;
-  const fallbackBackward = Number(fallback?.backward) > 0 ? Number(fallback.backward) : 10;
-  const fallbackForward = Number(fallback?.forward) > 0 ? Number(fallback.forward) : fallbackBackward;
-  const backward = Number(source?.backward);
-  const forward = Number(source?.forward);
-  return {
-    backward: Number.isFinite(backward) && backward > 0 ? backward : fallbackBackward,
-    forward: Number.isFinite(forward) && forward > 0 ? forward : fallbackForward,
-    linked: source?.linked !== false
-  };
+function normalizeReachSeconds(value, fallback) {
+  const fallbackValue = Number.isFinite(Number(fallback)) ? Number(fallback) : 10;
+  const candidate = Number(value);
+  return clamp(
+    Number.isFinite(candidate) && candidate > 0 ? candidate : fallbackValue,
+    MIN_STEP_REACH_SECONDS,
+    MAX_STEP_REACH_SECONDS
+  );
 }
 
+export function normalizeStepReach(value, fallback = DEFAULT_STEP_REACH) {
+  const fallbackSource = Number.isFinite(Number(fallback))
+    ? { backward: Number(fallback), forward: Number(fallback), linked: true }
+    : fallback && typeof fallback === "object"
+      ? fallback
+      : DEFAULT_STEP_REACH;
+  const fallbackBackward = normalizeReachSeconds(fallbackSource.backward, 10);
+  const fallbackForward = normalizeReachSeconds(fallbackSource.forward, fallbackBackward);
+
+  if (Number.isFinite(Number(value))) {
+    const reach = normalizeReachSeconds(value, fallbackForward);
+    return { backward: reach, forward: reach, linked: true };
+  }
+
+  const source = value && typeof value === "object" ? value : fallbackSource;
+  const linked = source.linked !== false;
+  let backward = normalizeReachSeconds(source.backward, fallbackBackward);
+  let forward = normalizeReachSeconds(source.forward, fallbackForward);
+
+  // Linked Reach has one value. Forward is used only to salvage malformed
+  // persisted objects; normal UI linking supplies equal directional values.
+  if (linked) {
+    const reach = Number.isFinite(Number(source.forward))
+      ? normalizeReachSeconds(source.forward, fallbackForward)
+      : normalizeReachSeconds(source.backward, fallbackBackward);
+    backward = reach;
+    forward = reach;
+  }
+
+  return { backward, forward, linked };
+}
 export function copy(value) {
   if (value === null || value === undefined) return value;
   return globalThis.structuredClone ? structuredClone(value) : JSON.parse(JSON.stringify(value));
