@@ -108,3 +108,4 @@ assert.match(packageJson.scripts.test, /field-grammar-tests\.mjs/);
 assert.match(packageJson.scripts.check, /step-field-geometry\.js/);
 
 console.log("Field grammar tests passed.");
+// Workflow trigger: v5.4 grammar integration.
