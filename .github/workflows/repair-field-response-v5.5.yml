@@ -1,0 +1,81 @@
+name: Repair Field response wiring v5.5
+
+on:
+  pull_request:
+    branches:
+      - feature/field-bounds-v5.4.1
+    paths:
+      - .github/workflows/repair-field-response-v5.5.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-field-response-v5.5
+  cancel-in-progress: false
+
+jobs:
+  repair-test-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/field-coherence-v5.5
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Wire Field response preferences and regression
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          app = Path('app.js')
+          source = app.read_text()
+          old = '''    getPreferences: () => ({
+              stepFieldEnabled: state.stepFieldEnabled,
+              tailVisible: state.tailVisible,
+              leadVisible: state.leadVisible
+            }),'''
+          new = '''    getPreferences: () => ({
+              stepFieldEnabled: state.stepFieldEnabled,
+              tailVisible: state.tailVisible,
+              leadVisible: state.leadVisible,
+              tailRate: state.fieldResponse.tailRate,
+              leadRate: state.fieldResponse.leadRate
+            }),'''
+          if source.count(old) != 1:
+              raise SystemExit(f'Expected one Field preference callback, found {source.count(old)}')
+          app.write_text(source.replace(old, new, 1))
+
+          tests = Path('field-coherence-tests.mjs')
+          text = tests.read_text()
+          anchor = '''  assert.match(app, /stepReach: currentStepReach\\(\\)/);
+            assert.match(app, /stepField\\?\\.play\\(\\)/);'''
+          replacement = '''  assert.match(app, /stepReach: currentStepReach\\(\\)/);
+            assert.match(app, /getPreferences:[\\s\\S]*tailRate: state\\.fieldResponse\\.tailRate[\\s\\S]*leadRate: state\\.fieldResponse\\.leadRate/);
+            assert.match(app, /stepField\\?\\.play\\(\\)/);'''
+          if text.count(anchor) != 1:
+              raise SystemExit(f'Expected one coherence assertion anchor, found {text.count(anchor)}')
+          tests.write_text(text.replace(anchor, replacement, 1))
+          PY
+
+      - name: Run complete repository checks
+        run: npm run check
+
+      - name: Commit verified repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/repair-field-response-v5.5.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Wire configurable Field response rates"
+          git push origin HEAD:feature/field-coherence-v5.5
