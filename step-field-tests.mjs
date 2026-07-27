@@ -75,7 +75,9 @@ assert.equal(resolveFieldPhase({
   }
 
   assert.match(app, /createStepFieldController/);
-  assert.match(app, /onStep:\s*performStep/);
+  assert.match(app, /onSelect:\s*selectFieldSide/);
+  assert.match(app, /function selectFieldSide\(selection\)/);
+  assert.match(app, /if \(selection\.mode === "step"\) \{\s*performStep\(selection\.direction\)/s);
   assert.doesNotMatch(app, /Recenter(?: Tail| Lead)?/i);
   assert.match(fieldSource, /setAttribute\?\.\("tabindex", "-1"\)/);
   assert.match(fieldSource, /setAttribute\?\.\("aria-hidden", "true"\)/);
