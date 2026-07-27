@@ -61,6 +61,7 @@ import {
   createYouTubePlayer,
   parseYouTubeUrl
 } from "./youtube.js";
+import { createStepFieldController } from "./step-field.js";
 import { createView } from "./view.js";
 
 const STORAGE_V5_PREFIX = "binary-youtube-reader:v5:";
@@ -89,10 +90,19 @@ function readPreferences() {
         : 5,
       stepSeconds: Number.isFinite(Number(value?.stepSeconds))
         ? clamp(Number(value.stepSeconds), 0.25, 300)
-        : 10
+        : 10,
+      stepFieldEnabled: value?.stepFieldEnabled !== false,
+      tailVisible: value?.tailVisible !== false,
+      leadVisible: value?.leadVisible !== false
     };
   } catch {
-    return { contextSeconds: 5, stepSeconds: 10 };
+    return {
+      contextSeconds: 5,
+      stepSeconds: 10,
+      stepFieldEnabled: true,
+      tailVisible: true,
+      leadVisible: true
+    };
   }
 }
 
@@ -108,6 +118,9 @@ const state = {
   pendingStep: null,
   stepSeconds: preferences.stepSeconds,
   contextSeconds: preferences.contextSeconds,
+  stepFieldEnabled: preferences.stepFieldEnabled,
+  tailVisible: preferences.tailVisible,
+  leadVisible: preferences.leadVisible,
   dragHandle: null,
   rangeDragOrigin: null,
   guideTab: "sections",
@@ -120,6 +133,7 @@ const state = {
 };
 
 let player = null;
+let stepField = null;
 let pendingLoad = null;
 let pollTimer = null;
 let metadataTimer = null;
@@ -187,7 +201,10 @@ function persistPreferences() {
   try {
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify({
       contextSeconds: state.contextSeconds,
-      stepSeconds: state.stepSeconds
+      stepSeconds: state.stepSeconds,
+      stepFieldEnabled: state.stepFieldEnabled,
+      tailVisible: state.tailVisible,
+      leadVisible: state.leadVisible
     }));
   } catch (error) {
     console.warn("Could not save preferences:", error);
@@ -1210,6 +1227,7 @@ function handlePlayerError(code) {
 }
 
 function pollPlayer() {
+  stepField?.tick();
   if (!state.videoLoaded || !player || !state.playerReady) return;
   const now = safeCurrentTime();
   const transport = state.transport;
@@ -1647,6 +1665,34 @@ function initializePlayerApi() {
       onAutoplayBlocked: handleAutoplayBlocked,
       onError: handlePlayerError
     }
+  });
+  stepField = createStepFieldController({
+    document,
+    getSnapshot: () => ({
+      videoLoaded: state.videoLoaded,
+      videoId: state.videoId,
+      current: currentResolution()?.C || 0,
+      range: activeRange(),
+      stepSeconds: state.stepSeconds,
+      transportKind: state.transport.kind,
+      pendingStep: Boolean(state.pendingStep),
+      dragging: Boolean(state.dragHandle),
+      center: playerSnapshot(),
+      playerState: state.playerState
+    }),
+    getPreferences: () => ({
+      stepFieldEnabled: state.stepFieldEnabled,
+      tailVisible: state.tailVisible,
+      leadVisible: state.leadVisible
+    }),
+    setPreferences: patch => {
+      if (Object.hasOwn(patch, "stepFieldEnabled")) state.stepFieldEnabled = Boolean(patch.stepFieldEnabled);
+      if (Object.hasOwn(patch, "tailVisible")) state.tailVisible = Boolean(patch.tailVisible);
+      if (Object.hasOwn(patch, "leadVisible")) state.leadVisible = Boolean(patch.leadVisible);
+      persistPreferences();
+    },
+    onStep: performStep,
+    formatTime
   });
   if (pollTimer === null) pollTimer = window.setInterval(pollPlayer, POLL_MS);
 }

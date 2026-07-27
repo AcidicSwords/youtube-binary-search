@@ -9,6 +9,7 @@
   <title>Binary YouTube Reader</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="step-field.css">
 </head>
 <body>
   <main class="app-shell">
@@ -36,7 +37,48 @@
     <div class="workspace">
       <section id="reader-column" class="reader-column" aria-label="Video reader">
         <section class="player-panel" aria-label="Video and observation">
-          <div class="player-wrap"><div id="player"></div></div>
+          <div id="step-field" class="step-field field-off" data-phase="off" aria-label="Step Field">
+            <section id="tail-pane" class="step-pane step-pane-side tail-pane" aria-label="Tail Step projection">
+              <div class="step-pane-bar">
+                <span class="step-pane-role">Tail</span>
+                <span id="tail-meta" class="step-pane-meta">—</span>
+                <button id="tail-collapse" class="pane-collapse" type="button" aria-label="Hide Tail" title="Hide Tail">×</button>
+              </div>
+              <div class="player-wrap"><div id="player-tail"></div></div>
+              <button id="tail-step" class="step-pane-action" type="button" aria-label="Step Backward" disabled>
+                <span class="sr-only">Step Backward</span>
+              </button>
+              <button id="tail-restore" class="step-pane-restore" type="button" aria-label="Show Tail" hidden>
+                <span aria-hidden="true">←</span><span>Tail</span>
+              </button>
+            </section>
+
+            <section class="step-pane step-pane-center" aria-label="Center video">
+              <div class="step-pane-bar center-bar">
+                <span class="step-pane-role">Center</span>
+                <span id="center-meta" class="step-pane-meta">—</span>
+                <button id="step-field-toggle" class="field-toggle" type="button" aria-pressed="true" aria-label="Hide Step Field">
+                  <span>Field</span><span id="step-field-meta">Ready</span>
+                </button>
+              </div>
+              <div class="player-wrap"><div id="player"></div></div>
+            </section>
+
+            <section id="lead-pane" class="step-pane step-pane-side lead-pane" aria-label="Lead Step projection">
+              <div class="step-pane-bar">
+                <span class="step-pane-role">Lead</span>
+                <span id="lead-meta" class="step-pane-meta">—</span>
+                <button id="lead-collapse" class="pane-collapse" type="button" aria-label="Hide Lead" title="Hide Lead">×</button>
+              </div>
+              <div class="player-wrap"><div id="player-lead"></div></div>
+              <button id="lead-step" class="step-pane-action" type="button" aria-label="Step Forward" disabled>
+                <span class="sr-only">Step Forward</span>
+              </button>
+              <button id="lead-restore" class="step-pane-restore" type="button" aria-label="Show Lead" hidden>
+                <span>Lead</span><span aria-hidden="true">→</span>
+              </button>
+            </section>
+          </div>
 
           <div class="observation-dock" aria-label="Observation controls">
             <div class="context-control">

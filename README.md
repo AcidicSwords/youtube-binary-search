@@ -1,6 +1,6 @@
 # Binary YouTube Reader
 
-Version 5.1 is the audited spatial-reader build.
+Version 5.3 adds the audited Step Field projection to the spatial reader.
 
 Binary YouTube Reader presents a YouTube video as an ordered spatial Range rather than only as mutually exclusive linear presentation.
 
@@ -157,6 +157,18 @@ Section → active Range through Focus
 ```
 
 `source-field.js` reserves a separate read-only boundary for chapters and transcripts. Source records can provide potential Pins, potential Sections, and timed text, but are never copied into the Guide automatically.
+
+## Step Field
+
+The optional Step Field projects the existing local Step relation through three synchronized panes:
+
+```text
+Tail | Center | Lead
+```
+
+Center remains the sole authoritative player and the only audible pane. Tail and Lead are smaller, muted, independently collapsible projections. They begin coincident with Current, unfold through differential playback while Continue is active, and hold at the existing Step distance. Selecting Tail or Lead executes the existing Step Backward or Step Forward operator; the Field creates no new Current, Interval, history, Pin, or Section semantics.
+
+Context, Loop, Skim, pending Step gestures, and Range dragging suspend the side projections. Visibility is a presentation preference and does not enter Return history.
 
 ## Architecture
 

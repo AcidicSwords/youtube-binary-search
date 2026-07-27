@@ -128,6 +128,16 @@ export function createYouTubePlayer(elementId, options = {}) {
     setRate(rate) {
       rawPlayer?.setPlaybackRate(rate);
     },
+    mute() {
+      rawPlayer?.mute?.();
+    },
+    unmute() {
+      rawPlayer?.unMute?.();
+    },
+    destroy() {
+      rawPlayer?.destroy?.();
+      rawPlayer = null;
+    },
     read() {
       const time = rawPlayer?.getCurrentTime?.();
       const duration = rawPlayer?.getDuration?.();

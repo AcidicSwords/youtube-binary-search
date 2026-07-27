@@ -287,3 +287,17 @@ The v5.2 kernel adds `resolutionBasis: "range" | "movement"` to Session state wi
 `app.js` passes the origin Resolution through coalesced Step sequences, carries Resolution basis through Continue and Skim, and discloses implicit scope transitions in status text. `view.js` distinguishes Range and movement scale, disables Skim without a boosted rate, clears stale focused-Section presentation, and shows fixed-rate Skim metadata.
 
 The new `v5.2-regression-tests.mjs` is part of `npm test`. Installation is transactional: the applicator verifies the exact v5.1 checksums, creates backups, runs the complete existing `npm run check`, and restores the original tree automatically on failure.
+
+## v5.3 Step Field projection
+
+`step-field.js` is a small physical projection layer around the existing Center player. It derives both side targets from `stepTarget(Current, Step Size, Range)`, owns only muted side-player synchronization and pane visibility, and never mutates Session.
+
+```text
+Session       semantic Current, Range, Resolution, Interval, Guide, Return
+Transport     Context, Continue, Skim, Loop settlement
+Step Field    Tail/Lead cursors, differential rates, hold and collapse state
+View          existing semantic and timeline projection
+```
+
+The Center player remains authoritative. Side-player events cannot create Go, settle Transport, or update Current. The Field uses fixed conservative rates, exposes no separate distance setting, and adds only one Center-level toggle plus one collapse control per side.
+
