@@ -34,23 +34,30 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           app = Path('app.js')
           source = app.read_text()
-          needle = '''      leadVisible: state.leadVisible
-            }),'''
-          replacement = '''      leadVisible: state.leadVisible,
-              tailRate: state.fieldResponse.tailRate,
-              leadRate: state.fieldResponse.leadRate
-            }),'''
-          if source.count(needle) != 1:
-              raise SystemExit(f'Expected one Field preference callback tail, found {source.count(needle)}')
-          app.write_text(source.replace(needle, replacement, 1))
+          pattern = re.compile(
+              r'(getPreferences:\s*\(\)\s*=>\s*\(\{\s*'
+              r'stepFieldEnabled:\s*state\.stepFieldEnabled,\s*'
+              r'tailVisible:\s*state\.tailVisible,\s*'
+              r'leadVisible:\s*state\.leadVisible)'
+              r'(\s*\}\),)'
+          )
+          source, count = pattern.subn(
+              r'\1,\n      tailRate: state.fieldResponse.tailRate,\n      leadRate: state.fieldResponse.leadRate\2',
+              source,
+              count=1
+          )
+          if count != 1:
+              raise SystemExit(f'Expected one structural Field preference callback, found {count}')
+          app.write_text(source)
 
           tests = Path('field-coherence-tests.mjs')
           text = tests.read_text()
-          anchor = '  assert.match(app, /stepField\\?\\.play\\(\\)/);'
-          addition = '  assert.match(app, /getPreferences:[\\s\\S]*tailRate: state\\.fieldResponse\\.tailRate[\\s\\S]*leadRate: state\\.fieldResponse\\.leadRate/);\n'
+          anchor = 'assert.match(app, /stepField\\?\\.play\\(\\)/);'
+          addition = 'assert.match(app, /getPreferences:[\\s\\S]*tailRate: state\\.fieldResponse\\.tailRate[\\s\\S]*leadRate: state\\.fieldResponse\\.leadRate/);\n  '
           if text.count(anchor) != 1:
               raise SystemExit(f'Expected one Field-play assertion, found {text.count(anchor)}')
           tests.write_text(text.replace(anchor, addition + anchor, 1))
