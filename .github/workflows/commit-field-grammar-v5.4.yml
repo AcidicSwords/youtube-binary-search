@@ -48,6 +48,43 @@ jobs:
             apply-field-grammar-v5.4.py \
             apply-field-grammar-v5.4-transport-fix.py
 
+      - name: Repair duplicated Tail and Lead applicator anchor
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('apply-field-grammar-v5.4.py')
+          text = path.read_text(encoding='utf-8')
+          helper_anchor = '\ndef regex_once(content, pattern, replacement, label):\n'
+          helper = '''
+def replace_first(content, before, after, label):
+    count = content.count(before)
+    if count < 1:
+        raise RuntimeError(f"Expected at least one {label} anchor, found {count}")
+    return content.replace(before, after, 1)
+
+'''
+          if helper_anchor not in text:
+              raise RuntimeError('Could not locate applicator helper insertion point.')
+          text = text.replace(helper_anchor, '\n' + helper + 'def regex_once(content, pattern, replacement, label):\n', 1)
+
+          marker = '"Tail rate availability",\n)'
+          marker_index = text.find(marker)
+          if marker_index < 0:
+              raise RuntimeError('Could not locate Tail rate availability transformation.')
+          call_index = text.rfind('field = replace_once(', 0, marker_index)
+          if call_index < 0:
+              raise RuntimeError('Could not locate Tail replacement call.')
+          text = text[:call_index] + text[call_index:].replace(
+              'field = replace_once(',
+              'field = replace_first(',
+              1,
+          )
+          path.write_text(text, encoding='utf-8')
+          PY
+
       - name: Apply coherent Field grammar
         id: apply
         shell: bash
