@@ -42,11 +42,12 @@ jobs:
           rm -f field-coherence-v5.5-check.txt
           rm -f field-coherence-v5.5-failure.log
 
-      - name: Extend the existing DOM test double
+      - name: Extend compatibility fixtures
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
+
           path = Path('field-bounds-tests.mjs')
           text = path.read_text()
           old = '''    classList: { toggle() {} },
@@ -71,6 +72,13 @@ jobs:
           if old_doc not in text:
               raise SystemExit('Could not extend Field-bounds fake document.')
           path.write_text(text.replace(old_doc, new_doc, 1))
+
+          app = Path('app.js')
+          source = app.read_text()
+          obsolete = '\nsyncStepControls();\n'
+          if obsolete not in source:
+              raise SystemExit('Could not remove obsolete scalar Step initializer.')
+          app.write_text(source.replace(obsolete, '\n', 1))
           PY
 
       - name: Recover and decode applicator
