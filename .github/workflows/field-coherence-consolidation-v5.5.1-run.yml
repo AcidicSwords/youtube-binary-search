@@ -24,18 +24,32 @@ jobs:
         with:
           ref: feature/field-coherence-v5.5
           fetch-depth: 0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
+          show-progress: false
 
       - name: Apply consolidation
         run: python3 .github/consolidate-field-coherence-v5.5.1.py
 
       - name: Run complete repository checks
-        run: npm run check
+        id: checks
+        shell: bash
+        run: |
+          set +e
+          npm run check > /tmp/field-coherence-check.log 2>&1
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Upload check log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: field-coherence-check-log
+          path: /tmp/field-coherence-check.log
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Commit verified consolidation
+        if: steps.checks.outputs.status == '0'
         shell: bash
         run: |
           set -euo pipefail
