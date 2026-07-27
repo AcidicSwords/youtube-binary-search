@@ -41,13 +41,16 @@ jobs:
         with:
           node-version: 22
 
-      - name: Restore audited v5.3 application base
+      - name: Restore audited v5.3 application base and applicators
         shell: bash
         run: |
           git fetch origin feature/step-field-v5.3-final
           git checkout origin/feature/step-field-v5.3-final -- \
             index.html transport.js session.js step-field.js app.js view.js \
             package.json README.md IMPLEMENTATION.md
+          git checkout 61e2a7efa8960f21e5a10e9d407e6703142df985 -- \
+            apply-field-grammar-v5.4.py \
+            apply-field-grammar-v5.4-transport-fix.py
 
       - name: Apply and test transaction
         id: transaction
