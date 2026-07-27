@@ -1,353 +1,406 @@
-# Binary YouTube Reader — Guide v3 Canonical Specification
+# Binary YouTube Reader — Canonical Specification v5.1
 
-## 1. Purpose
+## 1. Primitive
 
-The application converts a transient video stream into an addressable, repeatable, and lightly organized temporal workspace.
+The sole semantic primitive is a temporal **Address**:
 
-The design requirement is compositional closure: a small set of operators act on shared temporal attributes, and useful compound manoeuvres emerge from their sequence rather than from dedicated feature buttons.
+\[
+t \in [0,D]
+\]
 
-## 2. Primitive
+where \(D\) is video duration. Every semantic object is an Address, a bounded relation between Addresses, or a transformation of those values.
 
-An **Address** is a finite timestamp:
+## 2. Ordered space
+
+### Current
+
+\[
+C \in Range
+\]
+
+Current is the settled Address from which operators act.
+
+### Range
+
+\[
+Range=[A,B], \qquad 0\le A<B\le D
+\]
+
+Range is the complete bounded extent currently available. The full video is the default Range. Focusing a Section makes that Section the active Range.
+
+### Neighborhood and Resolution
+
+\[
+N=(L,C,R,\ell)
+\]
+
+subject to:
+
+\[
+A\le L\le C\le R\le B
+\]
+
+Neighborhood is the recursively restricted part of Range presently under examination. \(\ell\) is Resolution Level. Greater \(\ell\) represents finer recursive distinction.
+
+### Interval
+
+A committed movement from departure \(x\) to arrival \(y\), where \(x\ne y\), derives:
+
+\[
+I=[\min(x,y),\max(x,y)]
+\]
+
+Interval also records:
 
 ```text
-Address = t, 0 ≤ t ≤ Duration
+departure
+arrival
+operator
+medium: direct | continuous
+direction: backward | forward
 ```
 
-Address is internal vocabulary. The interface presents Address roles such as Current and Mark.
+Interval is transient. It can be Loop-ed or retained as a Section.
 
-## 3. User-facing state
+### Pin
 
-### 3.1 Current
+A Pin is one persistent Address.
 
-The active Address.
+### Section
 
-### 3.2 Range
+A Section is one persistent named bounded extent whose endpoints are shared Pins. Start, End, midpoint, and duration are derived from those endpoint Pins.
 
-The one active bounded workspace:
+### Guide
+
+Guide is the persistent per-video structure:
 
 ```text
-Range = [A, B], A < B
+Guide = Pins + Sections
 ```
 
-Range constrains direct timeline traversal, Step, Narrow, Skim, and playback. Normal Play loops Range.
+### Source
 
-### 3.3 Resolution
+A Source is external read-only temporal structure such as a chapter or transcript cue. Source records remain potential structure until an explicit Guide transaction retains them.
 
-The current binary refinement inside Range. Internally:
+## 3. Direction
+
+Forward and Backward are defined by reading order, not by screen geometry.
 
 ```text
-Frame = {L, C, R, level}
-A ≤ L ≤ C ≤ R ≤ B
+video timeline: Forward → right
+vertical document: Forward → down
 ```
 
-The interface calls `[L,R]` Resolution, not Passage.
+The vocabulary therefore remains valid across layouts.
 
-### 3.4 Traversal
+## 4. Semantic transformations
 
-An ordered movement event:
+### Go
+
+Direct placement establishes Current at a selected Address \(x\):
+
+\[
+Go(x): C\rightarrow x
+\]
+
+Timeline click, Pin selection, source cue selection, Section midpoint, and Range midpoint are projections of Go.
+
+Go is scale-independent. Even when \(x=C\), Go reopens a refined Neighborhood to Range-level Resolution. Because the Address did not change, this scale-only transformation preserves the existing Interval and does not create a false movement.
+
+### Refine Backward / Forward
+
+Let:
+
+\[
+T_B=\frac{L+C}{2}, \qquad T_F=\frac{C+R}{2}
+\]
+
+Refine chooses the corresponding directional target, restricts Neighborhood toward that side, and increments Resolution Level.
 
 ```text
-Traversal = {
-  departure,
-  arrival,
-  start = min(departure, arrival),
-  end = max(departure, arrival),
-  operator,
-  medium
+Refine Backward:
+  Current becomes T_B
+  Neighborhood becomes [L, previous C]
+  Resolution Level increases
+
+Refine Forward:
+  Current becomes T_F
+  Neighborhood becomes [previous C, R]
+  Resolution Level increases
+```
+
+Binary subdivision is implementation. The semantic operation is directional refinement: restricting Neighborhood to gain Resolution.
+
+### Reopen
+
+\[
+Reopen(L,C,R,\ell)=(A,C,B,0)
+\]
+
+Reopen preserves Current, escapes recursive restriction, and restores the entire active Range as available Neighborhood.
+
+Reopen is not Return. It constructs broader availability around the present Current rather than restoring an earlier state.
+
+### Step Backward / Forward
+
+For configured distance \(\delta>0\):
+
+\[
+Step_B(C)=\max(A,C-\delta)
+\]
+
+\[
+Step_F(C)=\min(B,C+\delta)
+\]
+
+Step translates Current locally without intentionally increasing Resolution. If the destination remains inside Neighborhood, its existing bounds are preserved. If Step exits Neighborhood, Resolution reopens to Range around the destination.
+
+Rapid repeated Steps coalesce into one departure, one Interval, and one Return entry.
+
+### Return
+
+Return restores the complete model stored by the latest committed semantic transaction:
+
+```text
+Range
+Neighborhood / Resolution
+Current
+Interval
+Focus
+Guide, when the transaction changed Guide
+```
+
+Context and other transient transport states never enter Return history.
+
+### Focus / Leave
+
+Focus applies one Section as Range while retaining the Range to restore later. If prior Current lies outside the Section, Current relocates to the Section midpoint and produces an ordinary Go Interval.
+
+Leave restores the retained Range. It physically relocates Cursor only if the restored Range displaces Current.
+
+### Pin Current
+
+Pin Current retains Current as an explicit Pin. A coincident Pin is reused rather than duplicated.
+
+### Save Section
+
+Save Section retains the current Interval. Its endpoints are resolved through shared Pins; coincident endpoint Pins are reused.
+
+## 5. Physical execution
+
+The YouTube iframe has an internal physical playhead or Cursor \(P\):
+
+\[
+P\in[0,D]
+\]
+
+At rest:
+
+\[
+P=C
+\]
+
+During transient observation:
+
+\[
+P\ne C
+\]
+
+Cursor is never stored in Session.
+
+The temporal map projects both values when they differ: Current remains fixed as the semantic reference, while Cursor indicates the material physically unfolding.
+
+One transport value describes current execution:
+
+```text
+idle
+context
+continue
+skim
+loop
+```
+
+### Context
+
+A direct movement may derive a local observation window around Current:
+
+\[
+Context_\delta(C)=[C-p,C+(\delta-p)]\cap Range
+\]
+
+The window shifts at Range boundaries to preserve as much requested duration as possible.
+
+Settlement:
+
+```text
+unfold local window
+→ pause
+→ restore Cursor to Current
+→ idle
+```
+
+Context does not mutate Session.
+
+### Continue
+
+Continue unfolds normally forward through Range. It wraps Range End to Range Start. When paused, actual movement is committed as one continuous Interval. Crossing the current Neighborhood reopens Resolution to Range.
+
+### Skim
+
+Skim targets the forward Refine destination. Unfolding rate decreases logarithmically from the configured maximum toward `1×`. On reaching the target, it continues normally until stopped. Actual movement is committed.
+
+### Loop
+
+Loop repeatedly unfolds the current Interval. It is observational; stopping restores Cursor to Current and does not mutate Session.
+
+### Pause
+
+Pause settles the active transport according to its class:
+
+```text
+Context / Loop → restore Current
+Continue / Skim → commit physical movement
+```
+
+## 6. Interruption
+
+Transport is not a modal lock. Any semantic operator may interrupt it.
+
+- A new Go replaces active Context directly without first returning visibly to the old anchor.
+- Context and Loop restore Current unless replaced by an immediate new Go.
+- Continue and Skim commit the movement already manifested.
+- The requested operator then runs normally.
+
+## 7. Potential source field
+
+A normalized source record has the form:
+
+```js
+{
+  id,
+  kind: "chapter" | "transcript",
+  start,
+  end,
+  text,
+  source,
+  sourceId,
+  language
 }
 ```
 
-### 3.5 Repeat Window
-
-The extent of the latest Traversal:
+It supplies:
 
 ```text
-Repeat Window = [Traversal.start, Traversal.end]
+start / end → potential Pins
+[start, end] → potential Section
+text → timed semantic content
 ```
 
-Repeat loops this interval.
+Source records:
 
-### 3.6 Mark
+- do not enter Guide automatically;
+- do not add Return history;
+- do not alter Range or Resolution merely by existing;
+- may be searched, filtered by extent, previewed, or projected into existing Go, Focus, Pin, and Save Section operations.
 
-A persistent saved Address:
+## 8. Interface grammar
+
+The desktop Navigation deck has three invariant columns:
 
 ```text
-Mark = {id, t, label, provenance, createdAt, updatedAt}
+BACKWARD              SHARED               FORWARD
 ```
 
-Clicking a Mark traverses to `Mark.t`.
-
-### 3.7 Section
-
-A persistent named relation between two Marks:
+Its vertical grammar is:
 
 ```text
-Section = {
-  id,
-  startMarkId,
-  endMarkId,
-  label,
-  createdAt,
+                         Reopen
+Refine Backward          Return           Refine Forward
+                       Step size
+Step Backward                              Step Forward
+                       Pin Current
+Pin Backward              Pins             Pin Forward
+```
+
+Reopen is adjacent to the Refine pair but not between it. Step size is adjacent to the Step pair but not between its directional actions. Pin Current occupies the same shared spine. Return remains central and prominent.
+
+On wide desktop:
+
+```text
+Video + temporal map | Navigation | Guide
+```
+
+On compact screens, Guide becomes an off-canvas sheet while the operator grammar remains unchanged.
+
+## 9. Keyboard grammar
+
+```text
+    W Reopen
+A Refine Backward   S Return   D Refine Forward
+
+← Step Backward                 Step Forward →
+Shift+← Pin Backward            Pin Forward Shift+→
+```
+
+Additional direct operations:
+
+```text
+P Pin Current
+C Context
+Space Continue / Pause
+F Skim
+L Loop
+G Guide
+[ ] Step size
+Ctrl/Cmd+Z or Backspace Return
+Escape stop or close
+? help
+```
+
+Only unmodified Step arrows repeat while held.
+
+## 10. Interaction integrity
+
+### Native YouTube controls
+
+A stable native YouTube scrub is reconciled through ordinary Go after a short settlement window. The destination is clamped to Range. App-generated placements carry temporary ownership so keyframe delay is not misread as user intent; ownership ends as soon as the adapter reports the requested Address.
+
+### Coalesced gestures
+
+Rapid Step presses share one departure and one Return checkpoint. If the net sequence returns to the original Range, Neighborhood, Resolution, Current, and Focus, the pending transaction is discarded entirely.
+
+Range-handle preview is derived from the drag origin on every pointer movement. Returning the handle to its origin restores the exact starting model and adds no Return checkpoint.
+
+### Modal ownership
+
+A compact Guide or Guide edit dialog owns pointer, focus, and keyboard interaction. Background spatial commands are suspended. Escape closes one active layer at a time.
+
+### Persistence recovery
+
+Guide loading salvages valid Pins and Sections independently. Coincident Pins are merged, reversed Section endpoints are reordered by Address, duplicate Sections are removed, and invalid records are discarded without invalidating unrelated retained structure.
+
+### Asynchronous player boundaries
+
+Context, Loop, Continue, and Skim tolerate delayed player placement. Initial placements are retried only after a grace period. Internal PAUSED events are counted and bounded so delayed adapter events cannot cancel a later transport. Video duration is retried before a zero-duration load is rejected.
+
+## 11. Persistence
+
+Canonical Guide schema version is 5:
+
+```js
+{
+  version: 5,
+  videoId,
+  pins: [],
+  sections: [],
   updatedAt
 }
 ```
 
-Section geometry is derived through linked Marks:
+Storage key:
 
 ```text
-start(Section) = startMark.t
-end(Section)   = endMark.t
-mid(Section)   = (start + end) / 2
+binary-youtube-reader:v5:<videoId>
 ```
 
-A Mark may be referenced by any number of Sections.
-
-Clicking a Section traverses to its midpoint. Clicking either endpoint control traverses to that Mark.
-
-### 3.8 Focused Section
-
-A Section is Focused when its bounds supply Range.
-
-Only one Section can be Focused. The Range preceding the first Focus is retained for Unfocus. Switching directly between Focused Sections retains that original return Range.
-
-## 4. Movement operators
-
-All movement operators commit the same state relation:
-
-```text
-resolve destination
-→ Current := destination
-→ update Resolution according to movement geometry
-→ Repeat Window := departure–arrival
-→ record one Undo snapshot
-```
-
-### 4.1 Timeline Click
-
-A click inside Range supplies an exact destination and performs direct refinement through the same binary descent used by Narrow.
-
-A click outside Range is rejected.
-
-### 4.2 Narrow Earlier / Narrow Later
-
-Automatic logarithmic destinations:
-
-```text
-Earlier = (L + C) / 2
-Later   = (C + R) / 2
-```
-
-Narrow increments Level and replaces one side of Resolution.
-
-### 4.3 Step Earlier / Step Later
-
-Fixed linear movement:
-
-```text
-Destination = clamp(C ± stepSeconds, Range)
-```
-
-If Destination remains inside Resolution, Resolution is translated only through Current. If it leaves Resolution, Resolution resets to Range at Destination.
-
-Rapid Steps coalesce into one Traversal and one Undo entry.
-
-### 4.4 Previous Mark / Next Mark
-
-Move to the closest visible Mark earlier or later inside Range.
-
-Visible Marks are explicit Marks or Marks with nonempty labels. Anonymous Section endpoints are not global navigation landmarks.
-
-### 4.5 Mark click
-
-Move directly to the Mark Address. If the Mark lies outside a Focused Section, Focus is removed and the preceding Range is restored within the same undoable action. If the Address remains outside a manually restricted Range, Range expands to Full Video for that action.
-
-### 4.6 Section click
-
-Move directly to the Section midpoint under the same availability rules as Mark click.
-
-## 5. Nonmovement operators
-
-### 5.1 Widen
-
-```text
-{L,C,R,level} → {Range.start,C,Range.end,0}
-```
-
-Widen does not move Current, alter Range, or replace Repeat Window. It records one Undo entry.
-
-### 5.2 Focus
-
-```text
-Section bounds → Range
-```
-
-Focus:
-
-1. stores the preceding Range if no Section is currently Focused;
-2. applies Section Start and End as Range;
-3. retains Current if it lies inside the Section;
-4. otherwise moves Current to the Section midpoint and records that movement as the latest Traversal;
-5. resets Resolution to the new Range;
-6. records one Undo entry.
-
-### 5.3 Unfocus
-
-Unfocus restores the Range retained before Focus, retains or clamps Current, resets Resolution to restored Range, preserves Repeat Window, and records one Undo entry.
-
-### 5.4 Manual Range deformation
-
-Dragging a Range handle or using Start Here, End Here, or Full Video:
-
-- clears Focus;
-- applies the new Range;
-- resets Resolution;
-- preserves Repeat Window;
-- records one Undo entry.
-
-Go to Midpoint is movement, not Range deformation, and therefore replaces Repeat Window.
-
-## 6. Playback
-
-### 6.1 Play Range
-
-Play begins at Current at `1×`.
-
-At Range End, playback seeks to Range Start and continues. Range is therefore the normal playback loop.
-
-If Play pauses before wrapping, its departure-to-arrival extent becomes Repeat Window. If Play wraps Range at least once, the previous Repeat Window is retained because the cyclic route cannot be represented by one ordinary interval.
-
-Crossing a Resolution boundary during Play Widens Resolution to Range without interrupting playback.
-
-### 6.2 Repeat
-
-Repeat loops Repeat Window at `1×`. Stopping Repeat returns playback to Current. Repeat does not alter Range, Resolution, Guide, or history.
-
-### 6.3 Skim
-
-Skim moves toward the Later destination through supported playback rates from selected maximum toward `1×`. Actual movement becomes Repeat Window. Reaching the destination continues as normal Play.
-
-## 7. Persistence operators
-
-### 7.1 Add Mark
-
-The only Mark constructor is:
-
-```text
-Current → Mark
-```
-
-The title is optional. Adding at an existing Section endpoint promotes that endpoint into an explicit global Mark instead of creating a duplicate.
-
-### 7.2 Save Section
-
-The only primary Section constructor is:
-
-```text
-Repeat Window → Section
-```
-
-The operation creates or reuses Marks at Repeat Window Start and End, links them, and requires a Section title.
-
-The operation does not modify Repeat Window, Range, Resolution, or Current.
-
-### 7.3 Rename and delete
-
-Marks and Sections can be renamed.
-
-A referenced Mark cannot be deleted. Its Sections must be removed first.
-
-Deleting a Section removes orphan unnamed automatic endpoint Marks but retains explicit or named Marks.
-
-## 8. Undo
-
-Undo uses one history across:
-
-- timeline clicks;
-- Narrow;
-- Step;
-- Mark and Section navigation;
-- Widen;
-- Focus and Unfocus;
-- Range deformation;
-- Mark and Section creation;
-- rename and deletion;
-- completed Play and Skim movement.
-
-Each history entry restores:
-
-```text
-Range
-Resolution Frame
-Focused Section and return Range
-Repeat Window
-Guide data
-```
-
-Repeat playback itself is transient and does not create history.
-
-## 9. Guide projection
-
-The sidebar contains only:
-
-1. Mark Current composer;
-2. Save Repeat Window as Section composer;
-3. Focused Section state with Unfocus;
-4. chronological Sections list;
-5. collapsed Marks list.
-
-No persistent object selection, role chips, endpoint draft, Anchor, Enter, Exit, or separate structural Undo appears.
-
-## 10. Visual density
-
-### 10.1 Timeline Marks
-
-Only explicit or named Marks are globally projected.
-
-Marks are clustered by rendered pixel distance. A cluster displays a count; activating it opens a compact list of its Marks.
-
-### 10.2 Sections
-
-All Section intervals are never drawn simultaneously.
-
-A temporary Section preview is shown only while its Guide row is hovered or focused. A Focused Section is already represented by Range.
-
-### 10.3 Repeat Window
-
-Repeat Window remains persistently visible because it is immediately actionable through Repeat and Save Section.
-
-## 11. Storage and migration
-
-Version 3 storage:
-
-```text
-binary-youtube-reader:v3:<videoId>
-```
-
-Load order:
-
-1. valid v3 Guide;
-2. migrate v2 `{marks, spans}` to `{marks, sections}`;
-3. migrate v1 saved regions.
-
-Earlier keys are not deleted.
-
-## 12. Acceptance conditions
-
-- A timeline click immediately moves and creates Repeat Window.
-- Two successive clicks make the second movement the Repeat Window.
-- Narrow and Step create Repeat Window through their respective geometries.
-- Widen preserves Current and Repeat Window.
-- Play loops Range.
-- Repeat loops Repeat Window.
-- Add Mark saves only Current.
-- Save Section uses only Repeat Window.
-- Clicking a Mark moves to it.
-- Clicking a Section moves to its midpoint.
-- Clicking a Section endpoint moves to its bound and makes the traversed half repeatable.
-- Focus applies Section bounds as Range.
-- Unfocus restores the preceding Range.
-- Undo reverses the last committed operator regardless of whether it was navigation, Range, Focus, or Guide mutation.
-- Automatic unnamed Section endpoints do not clutter the global Mark lane.
-- Dense visible Marks cluster without overlap.
-- Existing v2 data migrates without deleting the v2 key.
+Legacy v4, v3, v2, and v1 records are read and migrated. Their original keys remain untouched.

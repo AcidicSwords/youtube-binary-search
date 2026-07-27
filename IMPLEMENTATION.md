@@ -1,149 +1,279 @@
-# Guide v3 Implementation and Replacement Map
+# Binary YouTube Reader v5.1 — Implementation Notes
 
-## Baseline
+## Purpose of the refactor
 
-This replacement was built from the exact current `main` blobs:
+The v5.1 audited refactor aligns implementation, vocabulary, control placement, keyboard geometry, and persistence around one ordered spatial grammar.
 
-```text
-app.js       138b3426a5393122e8020722d4383fd60ff71ae3
-index.html   82ed47e4882512c9812487e013989884008e223c
-styles.css   b3cafa5e7f652330b16d2256694b1bf4f6704f8e
-structure.js f27711e320634524b891f4d67dba07d86640487b
-traversal.js e536495befefe60cf8cb97004557ed2378778a34
-```
+The application no longer presents one vocabulary in the kernel and another in the UI. Canonical names now propagate through modules, transaction labels, DOM IDs, status messages, Guide data, tests, and documentation.
 
-## Preserved mechanisms
-
-The following working relationships remain:
-
-- binary `Frame` geometry and Level;
-- direct timeline click through binary descent;
-- logarithmic Narrow Earlier/Later;
-- fixed Step with rapid-action coalescing;
-- Widen to Range while retaining Current;
-- Skim fast-to-normal;
-- Last Traversal provenance and Repeat looping;
-- linked endpoint Marks for persistent bounded regions;
-- per-video local persistence;
-- v1 and v2 migration;
-- static deployment with no dependencies or build step.
-
-## Refactored mechanisms
-
-### Resolution state
-
-`state.stack` and Passage-level navigation history are replaced by one current `state.frame`. A single full-state Undo history now restores prior Frames and all other committed state.
-
-### Direct traversal
-
-Timeline clicks, Narrow, Mark navigation, Section midpoint navigation, Range midpoint, and adjacent Marks all converge on `commitSeekTraversal()`.
-
-### Guide model
-
-`structure.js` remains the replacement filename, but its internal contract is now:
+## Semantic kernel
 
 ```text
-Guide = {version: 3, videoId, marks, sections}
+Address
+→ Current inside Range
+→ Neighborhood at Resolution
+→ movement derives Interval
+
+Address → Pin
+Interval → Section
+Section → Range through Focus
 ```
 
-Existing v2 Spans migrate to Sections. Sections continue to reference shared Marks.
+### `range-geometry.js`
 
-### Focus
+Provides the canonical spatial geometry kernel. It contains pure operations only:
 
-The former Context stack, Enter, Enter Here, Focus, and Exit system is replaced by:
+```js
+createRoot
+getTargets
+descend
+refineNeighborhood
+reopenToRange
+canReopen
+stepTarget
+stepNeighborhood
+settleContinuous
+getActionRanges
+logSpeed
+chooseSupportedRate
+```
+
+It knows nothing about DOM, YouTube, persistence, Guide, or history.
+
+### `guide.js`
+
+Guide schema v5 uses Pins directly:
 
 ```text
-focusedSectionId
-focusReturnRange
+pins[]
+sections[].startPinId
+sections[].endPinId
 ```
 
-Focus snaps Section bounds to Range. Unfocus restores the prior Range.
+It owns endpoint reuse, visibility, adjacency, clustering, validation, and migration from pre-v5 point records.
 
-### Unified Undo
+### `session.js`
 
-Every committed operator records the same snapshot:
+Session is the immutable semantic transaction layer. Its model contains:
 
 ```text
-Range
-Frame
-Focus state
-Repeat Window
-Guide
+duration
+range
+resolution
+focus
+interval
+guide
 ```
 
-Rapid Step and continuous playback coalesce into one entry.
+Every committed transformation adds one Return checkpoint unless it is a no-op. Coalesced Step amends one pending transaction rather than generating one entry per repeated key press.
 
-### Playback
+## Transport boundary
 
-Play loops Range instead of stopping at Range End. Repeat remains independent and loops Repeat Window.
+`transport.js` defines one transient execution value:
 
-## Removed interface and state
+```text
+idle | context | continue | skim | loop
+```
 
-- Point row and marker;
-- Passage terminology;
-- Context and Exit;
-- Span terminology;
-- Anchor;
-- Address-source selector;
-- Save Passage / Save Range / Save Last Traversal split;
-- selected Mark and selected Span state;
-- role chips;
-- Span endpoint draft;
-- separate structural Undo button;
-- Passage-bound mutation functions.
+The command path is:
 
-## New sidebar
+```text
+browser intention
+→ settle active transport
+→ Session transaction
+→ install semantic result
+→ derive player effect
+→ execute through YouTube adapter
+→ project through View
+```
 
-The old Structure editor is replaced by Guide:
+Observation classes:
 
-1. Add Mark at Current.
-2. Save Repeat Window as Section.
-3. Focused Section state and Unfocus.
-4. Sections list with midpoint navigation, endpoint navigation, Focus, Rename, Delete.
-5. Collapsed explicit/named Marks list with navigation, Rename, Delete.
+```text
+Context
+Loop
+```
 
-## Visual clutter strategy
+restore semantic Current on settlement.
 
-- automatic unnamed Section endpoints remain internal;
-- only explicit or named Marks are shown globally;
-- visible Marks cluster according to screen pixels;
-- Section intervals are previewed only on row hover/focus;
-- Repeat Window is always shown because it is immediately actionable;
-- Focused Section needs no extra persistent bar because it is Range.
+Committing classes:
 
-## File changes
+```text
+Continue
+Skim
+```
 
-### Replaced
+commit actual Cursor movement on settlement.
 
-- `app.js`
-- `index.html`
-- `styles.css`
-- `structure.js`
-- `traversal.js`
-- `tests.mjs`
-- `package.json`
-- `README.md`
-- `SPEC.md`
+## YouTube boundary
 
-### Added
+`youtube.js` remains the only module that touches raw IFrame methods and numeric player states. It exposes a small adapter:
 
-- `integration-check.mjs`
-- `startup-smoke.mjs`
-- `IMPLEMENTATION.md`
-- `BRANCH_INSTALL.md`
+```js
+cue(videoId, startSeconds)
+place(address)
+play()
+pause()
+setRate(rate)
+read()
+```
 
-### Unchanged
+`app.js` never calls raw `playVideo`, `pauseVideo`, `seekTo`, or `getCurrentTime` methods.
 
-- `youtube.js`
-- `favicon.svg`
-- GitHub Pages workflow
+The adapter counts internal pause requests and avoids redundant pauses on already-settled states. This prevents delayed PAUSED events from being misclassified as user intent.
+
+## View boundary
+
+`view.js` owns presentation only:
+
+- formatting;
+- semantic state chips;
+- timeline Range, Resolution, Interval, previews, and Pins;
+- Pin clustering;
+- Guide Sections and Pins;
+- control enablement and destination metadata;
+- semantic Current versus transient Cursor projection.
+
+It receives state through a getter and does not mutate Session.
+
+## Desktop interaction architecture
+
+At widths above 1220 px, CSS places the working surfaces into three adjacent zones:
+
+```text
+reader surface | navigation deck | sticky Guide
+```
+
+Within the reader surface:
+
+```text
+video
+observation dock
+temporal map
+secondary tools
+```
+
+Navigation remains sticky beside the video. This keeps Refine, Return, Reopen, Step, and Pin operations above the fold at a standard 1440×900 viewport.
+
+The Navigation grid uses explicit named areas, enforcing:
+
+```text
+backward column | shared spine | forward column
+```
+
+At intermediate widths, Navigation returns below the player. At 900 px and below, Guide becomes a fixed off-canvas sheet.
+
+## Touch behaviour
+
+The mobile refactor does not disable page zoom.
+
+```css
+button,
+summary,
+select,
+[role="button"] {
+  touch-action: manipulation;
+}
+```
+
+This prevents accidental double-tap zoom on rapid operator presses while preserving intentional pinch zoom.
+
+The timeline uses:
+
+```css
+.timeline { touch-action: pan-y; }
+.range-handle { touch-action: none; }
+```
+
+so a gesture beginning on the timeline may still scroll the page unless it begins on a draggable Range handle.
+
+## Keyboard handling
+
+The compact spatial key cluster mirrors the Navigation deck:
+
+```text
+W / A / S / D = Reopen / Refine Backward / Return / Refine Forward
+```
+
+Arrows perform Step; Shift+Arrows move among Pins. Only unmodified Step arrows repeat while held. Space does not intercept native activation when focus is already on a button or summary, preventing double execution.
+
+Input, select, textarea, and contenteditable elements suspend global shortcuts. Escape leaves editing or settles transient UI.
+
+## One-click retention
+
+`Pin Current` creates or reuses an explicit Pin immediately. It no longer sends the user to a distant composer.
+
+`Interval` is displayed beside Current and Resolution. Activating its state chip opens the inline Section capture bar in place. On save, the Guide selects Sections.
+
+## Guide access
+
+Desktop Guide is always present and sticky. The top Guide control and central Pins control select the relevant tab rather than hiding the rail.
+
+Mobile Guide is an off-canvas sheet opened directly to Sections, Pins, or Sources. It preserves the reader’s page position.
+
+## Source boundary
+
+`source-field.js` remains separate from Guide and Session. It currently provides:
+
+```js
+createSourceField
+normalizeTimedRecord
+normalizeSourceField
+parseTimestamp
+parseDescriptionChapters
+parseTimestampedText
+recordsWithin
+searchSourceRecords
+potentialExtent
+```
+
+No undocumented transcript scraper, API credential flow, or automatic Guide population is included. Future adapters project source records through existing operators.
 
 ## Verification
 
-```text
-All logic tests passed.
-Integration check passed: 74 DOM references, 0 missing.
-Startup smoke passed.
-```
+`npm run check` performs:
 
-A real YouTube IFrame browser test is still required after copying because this environment cannot reliably complete an external embedded-player session.
+1. syntax validation for every runtime module;
+2. Range geometry tests;
+3. Guide schema, migration, Pin, and Section tests;
+4. Session, no-op, coalescing, and Return tests;
+5. transport and Context-window tests;
+6. source-field parsing and filtering tests;
+7. DOM reference and canonical-vocabulary validation;
+8. CSS spatial-layout and touch-contract validation;
+9. startup smoke;
+10. complete interaction smoke;
+11. delayed-player Context and Loop startup, restoration, replacement, Return isolation, and startup-Pause smoke;
+12. delayed YouTube metadata availability;
+13. 25,000 deterministic semantic operations preserving model invariants.
+
+A real-network browser smoke is still required for video-specific embedding permission, buffering, keyframe precision, and autoplay policy.
+
+
+## v5.1 audit corrections
+
+### Direct placement and native reconciliation
+
+`seekPlayer()` is the only app-level physical-placement path. It records temporary programmatic ownership, acknowledges synchronous adapter placement, and prevents keyframe lag from becoming a false native Go.
+
+Stable native YouTube scrubbing is settled and passed through `session.goTo()`. It therefore receives normal Range clamping, Resolution reopening, Interval derivation, and Return history.
+
+### Gesture transactions
+
+A pending Step stores its origin model and origin history. Opposed rapid Steps that return to that origin are cancelled as one net-zero gesture.
+
+Range dragging is path-independent: every preview derives from the original model, not from the previous preview. Pointer cancellation and a handle returned to origin restore Range, Current, Focus, Resolution, Interval, and history exactly.
+
+### Presentation truthfulness
+
+`view.js` keeps semantic Current fixed and renders a separate Cursor only while the physical YouTube position differs. Resolution is shown as Range-level or as a count of refinements rather than an implementation-style level code. Pin Current disables only when Current is already an explicit Pin.
+
+### Accessibility and focus
+
+Timeline Pin clusters expose menu semantics, expanded state, arrow/Home/End navigation, Escape restoration, focus-leave dismissal, and outside-pointer dismissal.
+
+Guide mutations deliberately restore focus to the recreated rename action or the relevant Guide tab after deletion. Compact Guide uses `inert`, focus trapping, and complete shortcut suspension.
+
+### Persistence salvage
+
+`sanitizeGuide()` now canonicalizes reversed Section endpoints, merges coincident Pins, rejects invalid references, and deduplicates equivalent labelled Sections while retaining every independent valid record.

@@ -1,145 +1,221 @@
 # Binary YouTube Reader
 
-A lightweight static interface for traversing and organizing long YouTube videos as addressable temporal spaces.
+Version 5.1 is the audited spatial-reader build.
 
-The system is built around one primitive—an exact temporal **Address**—and a small set of tightly composed operations.
+Binary YouTube Reader presents a YouTube video as an ordered spatial Range rather than only as mutually exclusive linear presentation.
 
-## Core objects
+The application is generated from one primitive: an **Address** in video time. Every retained object, movement, observation, and control is derived from that ordered space.
 
-- **Current** — the active Address.
-- **Range** — the one active bounded workspace. Normal Play loops it.
-- **Resolution** — the current binary refinement inside Range.
-- **Traversal** — movement from one Address to another.
-- **Repeat Window** — the extent of the latest Traversal. Repeat loops it.
-- **Mark** — a saved Address.
-- **Section** — a named persistent relation between two Marks.
-- **Focused Section** — the Section currently supplying Range.
+## Canonical vocabulary
 
-`Interval`, `Frame`, `extent`, and endpoint identity remain implementation terms. The interface does not expose Passage, Span, Point, Context, Anchor, endpoint roles, or structural drafts.
+- **Current** — the Address presently established.
+- **Range** — the complete bounded extent currently available.
+- **Neighborhood** — the recursively restricted part of Range currently under examination.
+- **Resolution** — how finely the Neighborhood distinguishes the material.
+- **Interval** — the transient bounded extent between the preceding and current Addresses.
+- **Pin** — a retained Address.
+- **Section** — a retained bounded extent whose endpoints are Pins.
+- **Guide** — the retained structure composed of Pins and Sections.
 
 ## Operator grammar
 
-Every movement operator resolves or retrieves a destination Address and produces the same consequence:
-
 ```text
-choose or derive destination
-→ traverse
-→ Current changes
-→ Repeat Window becomes departure–arrival
-→ Undo becomes available
+Range
+  Focus Section
+  Leave Section
+
+Neighborhood / Resolution
+  Refine Backward
+  Refine Forward
+  Reopen
+
+Current
+  Step Backward
+  Step Forward
+  Go directly
+  Pin Current
+
+History
+  Return
+
+Observation
+  Context
+  Continue
+  Skim
+  Loop
+  Pause
 ```
 
-Destination sources:
+Forward and Backward follow reading order rather than physical orientation. Forward is rightward in the horizontal video map and would be downward in a vertically laid-out document.
 
-- timeline click — direct Address;
-- Narrow Earlier/Later — logarithmic destination;
-- Step Earlier/Later — fixed linear destination;
-- Previous/Next Mark — adjacent saved Address;
-- Mark click — exact saved Address;
-- Section click — derived midpoint;
-- Skim and Play — actual playback arrival.
+### Refine
 
-Nonmovement deformations:
+Refine restricts the current Neighborhood toward one direction and increases Resolution. The implementation uses binary subdivision, but the operation is named for the reader's purpose: zeroing in.
 
-- **Widen** — restore Range-level Resolution without moving or replacing Repeat Window.
-- **Focus** — apply a Section as Range.
-- **Unfocus** — restore the Range that preceded Focus.
-- **Undo** — restore the complete state preceding the last committed operator, including Guide edits.
+### Reopen
 
-## Primary rhythm
+Reopen preserves Current while escaping recursive restriction and restoring access to material excluded by refinement. It does not restore a former state; that is Return.
+
+### Return
+
+Return restores the preceding complete semantic state. The canonical branch pivot is:
 
 ```text
-click or Narrow
-→ Repeat when useful
-→ Widen for context
-→ click, Narrow, or Step again
-
-Current → Add Mark
-Repeat Window → Save Section
-Section → Focus → Range
+Refine Forward
+→ Return
+→ Refine Backward
 ```
 
-Clicking a Section moves to its midpoint. Clicking either endpoint Mark then makes that half of the Section the new Repeat Window without requiring a dedicated half-section command.
+## Context
 
-## Playback
+After a direct movement—timeline placement, Refine, Step, Pin navigation, Section midpoint navigation, or relocating Focus—the reader can automatically unfold a short audiovisual neighborhood around Current.
 
-- **Play Range** loops the active Range continuously.
-- **Repeat** loops the Repeat Window.
-- **Skim** approaches the Later destination fast-to-normal and continues at `1×`.
-- When Play wraps Range, it preserves the prior Repeat Window because a wrapped cyclic path is not one ordinary interval.
+```text
+Off / 3 s / 5 s / 10 s
+```
 
-## Guide and visual density
+The default five-second Context begins approximately one second before Current, stays inside Range, and returns the physical playhead to semantic Current when it ends.
 
-The sidebar is a Guide rather than a structural editor:
+Context:
 
-- add a Mark at Current;
-- save the Repeat Window as a Section;
-- click Marks and Sections to navigate;
-- Focus or Unfocus Sections;
-- rename or delete Guide objects.
+- does not create another Interval;
+- does not add Return history;
+- does not change Range, Neighborhood, or Resolution;
+- is replaced immediately by the next movement;
+- may be stopped manually with `C` or `Escape`.
 
-Sections retain linked endpoint Marks internally. Automatically generated unnamed endpoints are not projected into the global Mark lane or Marks list. Explicit or named Marks are clustered by screen position when they would overlap. Only the hovered Section receives a temporary timeline preview; all Section extents are not drawn simultaneously.
+## Observation
+
+- **Continue** unfolds normally forward through Range and wraps at Range End.
+- **Skim** approaches the forward refinement destination at a logarithmically decreasing unfolding rate, then continues at normal speed.
+- **Loop** repeatedly unfolds the current Interval.
+- **Pause** settles active Continue, Skim, Loop, or Context according to its semantic contract.
+
+Context and Loop are observational: when stopped, the playhead returns to Current. Continue and Skim commit the actual movement that occurred.
+
+The interface distinguishes **Current**, the settled semantic Address, from **Cursor**, the physical YouTube position temporarily unfolding during observation. They coincide whenever transport is idle.
+
+## Interface
+
+On wide desktop screens, the interface forms three adjacent working zones:
+
+```text
+Video + temporal map | Navigation grammar | Guide
+```
+
+This keeps the principal mouse paths short:
+
+- observation remains directly beneath the video;
+- Navigation remains beside the video and above the fold;
+- Pins and Sections remain immediately beside Navigation in the sticky Guide;
+- backward operations align on the left, shared operations on the centre spine, and forward operations on the right.
+
+The central Navigation spine is:
+
+```text
+Reopen
+Return
+Step size
+Pin Current
+Pins
+```
+
+On mobile, the same grammar is preserved while Guide becomes an off-canvas sheet. Controls suppress accidental double-tap zoom without disabling intentional page zoom, and the timeline preserves vertical page scrolling.
 
 ## Keyboard
 
-### Resolution
-
-- `Q` — Narrow Earlier
-- `W` — Widen
-- `E` — Narrow Later
-
-### Linear
-
-- `Left Arrow` — Step Earlier
-- `Right Arrow` — Step Later
-- `[` / `]` — decrease/increase Step size
-
-### Marks
-
-- `,` — Previous Mark
-- `.` — Next Mark
-- `M` — focus the Mark title field
-
-### Playback and history
-
-- `S` — Skim
-- `Space` — Play/Pause Range
-- `T` — Repeat/Stop Repeat
-- `R` or `Backspace` — Undo
-- `Escape` — close transient menus or previews
-
-## Persistence
-
-Guide data is stored locally per video at:
-
 ```text
-binary-youtube-reader:v3:<videoId>
+W                 Reopen
+A                 Refine Backward
+S                 Return
+D                 Refine Forward
+← / →             Step Backward / Forward
+Shift+← / Shift+→ Pin Backward / Forward
+[ / ]             Decrease / increase Step size
+P                 Pin Current
+C                 Context
+Space             Continue / Pause
+F                 Skim / stop Skim
+L                 Loop / stop Loop
+G                 Open Guide
+Ctrl/Cmd+Z        Return
+Backspace         Return
+Escape            Stop active observation or close transient UI
+?                 Keyboard reference
 ```
 
-Version 3 reads and migrates existing version 2 Marks and Spans into Marks and Sections. The version 2 key is left untouched as a rollback copy. Version 1 saved passages also migrate.
+Only Step repeats while a key is held. Pin navigation and structural operations require distinct presses. Modal Guide and edit surfaces own the keyboard completely; hidden reader commands cannot run behind them.
+
+## Guide and potential sources
+
+The Guide contains only structure explicitly retained by the user:
+
+```text
+Current → Pin
+Interval → Section
+Section → active Range through Focus
+```
+
+`source-field.js` reserves a separate read-only boundary for chapters and transcripts. Source records can provide potential Pins, potential Sections, and timed text, but are never copied into the Guide automatically.
+
+## Architecture
+
+```text
+range-geometry.js  pure Range, Neighborhood, Resolution, Refine, Reopen, and Step geometry
+guide.js           persistent Pins and Sections plus storage migration
+session.js         immutable semantic state, transactions, and Return history
+transport.js       transient Context, Continue, Skim, and Loop execution
+youtube.js         sole raw YouTube IFrame adapter
+source-field.js    optional chapter/transcript candidate records
+view.js            DOM projection, timeline Pins, previews, formatting, and control state
+app.js             composition root, commands, persistence, player effects, and browser events
+```
+
+The governing boundary is:
+
+> Session owns semantic structure. Transport temporarily manifests or observes that structure through YouTube. At rest, the physical playhead and semantic Current coincide.
 
 ## Run
 
-Serve the directory over HTTP or HTTPS so the YouTube embed receives a referrer:
+Serve the directory over HTTP or HTTPS:
 
 ```bash
-python -m http.server 8080
+python3 -m http.server 8000
 ```
 
-Open `http://localhost:8080`.
+Open `http://localhost:8000`.
 
-No build step, dependency installation, API key, backend, or secret is required.
-
-## Verification
+## Verify
 
 ```bash
 npm run check
 ```
 
-The check runs:
+The suite covers syntax, Range geometry, Guide and Session transactions, Return, transport, source-field parsing, 25,000 deterministic invariant operations, DOM bindings, spatial layout contracts, startup, the complete interaction flow, native YouTube-position reconciliation, path-independent Range editing, delayed transport startup, pause-event ownership, and delayed metadata availability.
 
-- JavaScript syntax validation;
-- traversal and Guide model tests;
-- DOM-binding validation;
-- obsolete-state validation;
-- startup smoke under a minimal DOM.
+## Persistence
+
+Guide data is stored per video under:
+
+```text
+binary-youtube-reader:v5:<videoId>
+```
+
+The application reads and migrates v4, v3, v2, and v1 records without deleting their original keys. Context and Step preferences remain under:
+
+```text
+binary-youtube-reader:preferences:v1
+```
+
+
+## Audited interaction invariants
+
+- Direct Go is scale-independent: selecting Current again still reopens a recursively refined Neighborhood without inventing movement.
+- Rapid opposed Steps and a Range-handle gesture returned to its origin are true no-ops: no phantom Interval or Return entry is retained.
+- App-generated player placements are distinguished from genuine native YouTube scrubbing.
+- Native scrubbing is committed through the same Go transaction and constrained to the active Range.
+- Context and Loop never displace semantic Current; a separate Cursor shows what is physically unfolding.
+- Repeated internal pause requests cannot cancel a later user transport.
+- Guide dialogs restore keyboard focus after mutation; compact Guide is modal and suspends background shortcuts.
+- Corrupt persisted data is salvaged record by record. Reversed Section endpoints are canonicalized and duplicate Sections are removed.
+- Storage failure is reported truthfully; the in-memory Guide remains usable for the current page.

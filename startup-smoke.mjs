@@ -31,6 +31,7 @@ class FakeElement {
   removeAttribute() {}
   focus() { document.activeElement = this; }
   blur() { document.activeElement = null; }
+  click() {}
   closest() { return null; }
   contains() { return false; }
   getBoundingClientRect() { return { left: 0, width: 900 }; }
@@ -46,7 +47,6 @@ for (const match of html.matchAll(/<([a-z0-9-]+)[^>]*\sid="([^"]+)"[^>]*>/gi)) {
   if (value) element.value = value[1];
   elements.push(element);
 }
-const byId = new Map(elements.map(element => [element.id, element]));
 
 const documentStub = {
   activeElement: null,
