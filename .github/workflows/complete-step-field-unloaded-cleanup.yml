@@ -1,0 +1,55 @@
+name: Complete unloaded Step Field cleanup
+
+on:
+  push:
+    branches:
+      - feature/step-field-v5.3-final
+    paths:
+      - apply-step-field-unloaded-cleanup.py
+      - .github/workflows/complete-step-field-unloaded-cleanup.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: complete-step-field-unloaded-cleanup-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  cleanup-and-test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply unloaded-state cleanup
+        run: python3 apply-step-field-unloaded-cleanup.py
+
+      - name: Run complete repository checks
+        run: npm run check
+
+      - name: Remove one-use files
+        run: |
+          rm -f apply-step-field-unloaded-cleanup.py
+          rm -f .github/workflows/complete-step-field-unloaded-cleanup.yml
+
+      - name: Commit verified cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "Keep unloaded Step Field compact"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
