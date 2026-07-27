@@ -346,7 +346,8 @@ export function createStepFieldController({
     };
 
     const root = elements["step-field"];
-    root.classList.toggle("field-off", !prefs.stepFieldEnabled);
+    const fieldShown = loaded && prefs.stepFieldEnabled;
+    root.classList.toggle("field-off", !fieldShown);
     root.classList.toggle("tail-collapsed", !prefs.tailVisible);
     root.classList.toggle("lead-collapsed", !prefs.leadVisible);
     root.classList.toggle("is-suspended", runtime.phase === STEP_FIELD_PHASE.SUSPENDED);
@@ -359,15 +360,18 @@ export function createStepFieldController({
     if (elements["tail-collapse"]) elements["tail-collapse"].hidden = !prefs.tailVisible;
     if (elements["lead-collapse"]) elements["lead-collapse"].hidden = !prefs.leadVisible;
 
-    elements["step-field-toggle"]?.setAttribute?.("aria-pressed", String(prefs.stepFieldEnabled));
-    elements["step-field-toggle"]?.setAttribute?.("aria-label", `${prefs.stepFieldEnabled ? "Hide" : "Show"} Step Field`);
-    setText(elements["step-field-meta"], prefs.stepFieldEnabled
-      ? runtime.phase === STEP_FIELD_PHASE.PARTIAL ? "Partial"
-        : runtime.phase === STEP_FIELD_PHASE.HELD ? "Held"
-          : runtime.phase === STEP_FIELD_PHASE.UNFOLDING ? "Unfolding"
-            : runtime.phase === STEP_FIELD_PHASE.SUSPENDED ? "Suspended"
-              : "Ready"
-      : "Off");
+    if (elements["step-field-toggle"]) elements["step-field-toggle"].disabled = !loaded;
+    elements["step-field-toggle"]?.setAttribute?.("aria-pressed", String(fieldShown));
+    elements["step-field-toggle"]?.setAttribute?.("aria-label", `${fieldShown ? "Hide" : "Show"} Step Field`);
+    setText(elements["step-field-meta"], !loaded
+      ? "Load video"
+      : prefs.stepFieldEnabled
+        ? runtime.phase === STEP_FIELD_PHASE.PARTIAL ? "Partial"
+          : runtime.phase === STEP_FIELD_PHASE.HELD ? "Held"
+            : runtime.phase === STEP_FIELD_PHASE.UNFOLDING ? "Unfolding"
+              : runtime.phase === STEP_FIELD_PHASE.SUSPENDED ? "Suspended"
+                : "Ready"
+        : "Off");
 
     const centerTime = Number(snapshot.center?.time ?? snapshot.current ?? 0);
     setText(elements["center-meta"], loaded ? formatTime(centerTime) : "—");
@@ -396,9 +400,9 @@ export function createStepFieldController({
 
   function tick() {
     const prefs = preferences();
-    ensurePlayers(prefs);
     const snapshot = getSnapshot?.();
     if (!snapshot || !snapshot.range) return;
+    if (snapshot.videoLoaded) ensurePlayers(prefs);
     syncVideo(snapshot);
     if (!snapshot.videoLoaded || !snapshot.videoId) {
       pauseSides();

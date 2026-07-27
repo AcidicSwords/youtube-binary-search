@@ -79,6 +79,8 @@ assert.equal(resolveFieldPhase({
   assert.doesNotMatch(app, /Recenter(?: Tail| Lead)?/i);
   assert.match(fieldSource, /setAttribute\?\.\("tabindex", "-1"\)/);
   assert.match(fieldSource, /setAttribute\?\.\("aria-hidden", "true"\)/);
+  assert.match(fieldSource, /const fieldShown = loaded && prefs\.stepFieldEnabled/);
+  assert.match(fieldSource, /if \(snapshot\.videoLoaded\) ensurePlayers\(prefs\)/);
   assert.match(css, /\.step-field\.field-off/);
   assert.match(css, /tail-collapsed/);
   assert.match(css, /lead-collapsed/);
