@@ -61,7 +61,7 @@ jobs:
           )
           text = text.replace(
               '    if count != 1:\n        raise RuntimeError(f"{label or name}: expected one literal match, found {count}")\n    write(name, text.replace(old, new, 1))',
-              '    if count != 1:\n        first_match_labels = {"import normalizeFieldReach", "off field reach"}\n        if not (label in first_match_labels and count >= 1):\n            raise RuntimeError(f"{label or name}: expected one literal match, found {count}")\n    write(name, text.replace(old, new, 1))'
+              '    if count != 1:\n        first_match_labels = {"import normalizeFieldReach", "off field reach", "Field response preferences"}\n        if not (label in first_match_labels and count >= 1):\n            raise RuntimeError(f"{label or name}: expected one literal match, found {count}")\n    write(name, text.replace(old, new, 1))'
           )
           target.write_text(text)
           PY
