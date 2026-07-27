@@ -1,3 +1,4 @@
+// DOM projection layer. It derives presentation from state and does not own semantic transactions.
 import {
   EPSILON,
   clamp,

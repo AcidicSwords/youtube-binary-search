@@ -19,7 +19,7 @@ function assertContained(bounds, range) {
 {
   const range = { start: 0, end: 100 };
   const resolution = { L: 48, C: 50, R: 52 };
-  const bounds = deriveFieldBounds({ current: 50, stepSeconds: 10, range });
+  const bounds = deriveFieldBounds({ current: 50, stepReach: { backward: 10, forward: 10, linked: true }, range });
   assert.deepEqual(bounds.envelope, { start: 40, end: 60 });
   assert.ok(bounds.envelope.start < resolution.L, "Field may extend behind Resolution.");
   assert.ok(bounds.envelope.end > resolution.R, "Field may extend ahead of Resolution.");
@@ -28,11 +28,11 @@ function assertContained(bounds, range) {
 
 for (const current of [0, 1, 4, 25, 50, 96, 99, 100]) {
   const range = { start: 0, end: 100 };
-  assertContained(deriveFieldBounds({ current, stepSeconds: 10, range }), range);
+  assertContained(deriveFieldBounds({ current, stepReach: { backward: 10, forward: 10, linked: true }, range }), range);
 }
 
 {
-  const bounds = deriveFieldBounds({ current: 4, stepSeconds: 10, range: { start: 0, end: 100 } });
+  const bounds = deriveFieldBounds({ current: 4, stepReach: { backward: 10, forward: 10, linked: true }, range: { start: 0, end: 100 } });
   assert.equal(bounds.tail.target, 0);
   assert.equal(bounds.tail.reach, 4);
   assert.equal(bounds.tail.constrained, true);
@@ -41,7 +41,7 @@ for (const current of [0, 1, 4, 25, 50, 96, 99, 100]) {
 }
 
 {
-  const bounds = deriveFieldBounds({ current: 96, stepSeconds: 10, range: { start: 0, end: 100 } });
+  const bounds = deriveFieldBounds({ current: 96, stepReach: { backward: 10, forward: 10, linked: true }, range: { start: 0, end: 100 } });
   assert.equal(bounds.lead.target, 100);
   assert.equal(bounds.lead.reach, 4);
   assert.equal(bounds.lead.constrained, true);
@@ -50,7 +50,7 @@ for (const current of [0, 1, 4, 25, 50, 96, 99, 100]) {
 }
 
 {
-  const bounds = deriveFieldBounds({ current: 4, stepSeconds: 10, range: { start: 0, end: 12 } });
+  const bounds = deriveFieldBounds({ current: 4, stepReach: { backward: 10, forward: 10, linked: true }, range: { start: 0, end: 12 } });
   assert.equal(bounds.tail.target, 0);
   assert.equal(bounds.lead.target, 12);
   assert.equal(bounds.constraint, "both");
@@ -95,7 +95,7 @@ function makeControllerHarness() {
     videoId: "bounds-test",
     current: 50,
     range: { start: 0, end: 100 },
-    stepSeconds: 10,
+    stepReach: { backward: 10, forward: 10, linked: true },
     transportKind: "idle",
     pendingStep: false,
     dragging: false,

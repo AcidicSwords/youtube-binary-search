@@ -17,7 +17,8 @@ import {
   deriveFieldBounds,
   chooseDirectionalRate,
   fieldPreferenceRequiresEstablish,
-  createStepFieldController
+  createStepFieldController,
+  normalizeFieldResponse
 } from "./step-field.js";
 
 assert.deepEqual(normalizeStepReach(8), {
@@ -48,6 +49,8 @@ assert.equal(fieldPreferenceRequiresEstablish({ tailRate: 0.75 }), false);
 assert.equal(fieldPreferenceRequiresEstablish({ leadRate: 1.5 }), false);
 assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: false }), true);
 assert.equal(fieldPreferenceRequiresEstablish({ stepFieldEnabled: false }), true);
+assert.deepEqual(normalizeFieldResponse({ tailRate: 0.75, leadRate: 1.5 }), { tailRate: 0.75, leadRate: 1.5 });
+assert.deepEqual(normalizeFieldResponse({ tailRate: 2, leadRate: 0.5 }), { tailRate: 0.5, leadRate: 2 });
 
 {
   let session = createSession({
@@ -172,6 +175,7 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   const html = readFileSync("index.html", "utf8");
   const app = readFileSync("app.js", "utf8");
   const field = readFileSync("step-field.js", "utf8");
+  const fieldCss = readFileSync("step-field.css", "utf8");
   const view = readFileSync("view.js", "utf8");
   const implementation = readFileSync("IMPLEMENTATION.md", "utf8");
   const readme = readFileSync("README.md", "utf8");
@@ -187,21 +191,29 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   ]) assert.match(html, new RegExp(`id=["']${id}["']`));
 
   assert.doesNotMatch(html, /id=["']continue["'][^>]*sr-only/);
+  assert.equal((html.match(/id=["']tail-rate-select["']/g) || []).length, 1);
+  assert.equal((html.match(/id=["']lead-rate-select["']/g) || []).length, 1);
+  assert.match(html, /id=["']tail-pane["'][\s\S]*id=["']tail-rate-select["'][\s\S]*id=["']tail-collapse["']/);
+  assert.match(html, /id=["']lead-pane["'][\s\S]*id=["']lead-rate-select["'][\s\S]*id=["']lead-collapse["']/);
+  assert.match(fieldCss, /\.pane-rate-setting[\s\S]*pointer-events: auto/);
+  assert.match(fieldCss, /@media \(max-width: 680px\)[\s\S]*\.tail-pane \{ grid-column: 1; grid-row: 2; \}[\s\S]*\.lead-pane \{ grid-column: 1; grid-row: 3; \}[\s\S]*\.step-pane-side \.player-wrap \{[\s\S]*min-height: 200px/);
+  assert.match(fieldCss, /@media \(pointer: coarse\)[\s\S]*\.pane-rate-setting select[\s\S]*min-height: var\(--touch\)/);
   assert.match(app, /setStepReach as setSessionStepReach/);
   assert.match(app, /stepReach: currentStepReach\(\)/);
   assert.match(app, /getPreferences:[\s\S]*tailRate: state\.fieldResponse\.tailRate[\s\S]*leadRate: state\.fieldResponse\.leadRate/);
   assert.match(app, /stepField\?\.play\(\)/);
-  assert.match(field, /tailRate: 0\.5/);
-  assert.match(field, /leadRate: 2/);
+  assert.match(field, /DEFAULT_FIELD_RESPONSE/);
+  assert.doesNotMatch(field, /tailRate: 0\.5/);
+  assert.doesNotMatch(field, /leadRate: 2/);
   assert.match(field, /onAutoplayBlocked:[\s\S]*playback = "blocked"/);
   assert.match(view, /session\.model\.stepReach/);
   assert.match(app, /stepReachLastEdited: preferences\.stepReachLastEdited/);
   assert.match(app, /preferences\.stepReach = normalizeStepReach/);
-  assert.match(implementation, /^# Binary YouTube Reader v5\.5\.1/m);
+  assert.match(implementation, /^# Binary YouTube Reader — Canonical Implementation/m);
   assert.doesNotMatch(implementation, /sole visible Continue\/Pause authority/);
   assert.doesNotMatch(implementation, /^# Binary YouTube Reader v5\.1/m);
   assert.doesNotMatch(readme, /Step Size/);
   assert.match(readme, /Application Continue/);
 }
 
-console.log("Field coherence v5.5 tests passed.");
+console.log("Field coherence tests passed.");
