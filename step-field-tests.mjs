@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   STEP_FIELD_PHASE,
+  deriveFieldBounds,
   deriveStepField,
   chooseNearestRate,
   hasCenterDiscontinuity,
@@ -9,20 +10,40 @@ import {
 } from "./step-field.js";
 
 {
-  const field = deriveStepField(50, 10, { start: 0, end: 100 });
-  assert.deepEqual(field, {
-    center: 50,
-    tail: { target: 40, distance: 10, available: true },
-    lead: { target: 60, distance: 10, available: true }
+  const bounds = deriveFieldBounds({
+    current: 50,
+    stepSeconds: 10,
+    range: { start: 0, end: 100 }
   });
+  assert.deepEqual(bounds, {
+    current: 50,
+    requestedReach: 10,
+    tail: { target: 40, reach: 10, constrained: false },
+    lead: { target: 60, reach: 10, constrained: false },
+    envelope: { start: 40, end: 60 },
+    constraint: "none"
+  });
+
+  const field = deriveStepField(50, 10, { start: 0, end: 100 });
+  assert.equal(field.center, 50);
+  assert.equal(field.tail.target, 40);
+  assert.equal(field.tail.distance, 10);
+  assert.equal(field.tail.available, true);
+  assert.equal(field.lead.target, 60);
+  assert.equal(field.lead.distance, 10);
+  assert.equal(field.lead.available, true);
+  assert.equal(field.constraint, "none");
 }
 
 {
   const field = deriveStepField(4, 10, { start: 0, end: 12 });
   assert.equal(field.tail.target, 0);
   assert.equal(field.tail.distance, 4);
+  assert.equal(field.tail.constrained, true);
   assert.equal(field.lead.target, 12);
   assert.equal(field.lead.distance, 8);
+  assert.equal(field.lead.constrained, true);
+  assert.equal(field.constraint, "both");
 }
 
 assert.equal(chooseNearestRate([0.25, 0.5, 1, 1.5, 2], 0.5), 0.5);
