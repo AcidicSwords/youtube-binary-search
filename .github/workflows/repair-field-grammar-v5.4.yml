@@ -6,6 +6,16 @@ on:
       - feature/field-grammar-v5.4
     paths:
       - .github/workflows/repair-field-grammar-v5.4.yml
+  pull_request:
+    branches:
+      - feature/step-field-v5.3-final
+    paths:
+      - .github/workflows/repair-field-grammar-v5.4.yml
+      - apply-field-grammar-v5.4.py
+      - apply-field-grammar-v5.4-transport-fix.py
+      - step-field-geometry.js
+      - field-grammar.css
+      - field-grammar-tests.mjs
   workflow_dispatch:
 
 permissions:
