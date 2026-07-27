@@ -1,0 +1,55 @@
+name: Complete Step Field audit
+
+on:
+  push:
+    branches:
+      - feature/step-field-v5.3
+    paths:
+      - apply-step-field-audit.py
+      - .github/workflows/complete-step-field-audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: complete-step-field-audit-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  audit-and-test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply final audit
+        run: python3 apply-step-field-audit.py
+
+      - name: Run complete repository checks
+        run: npm run check
+
+      - name: Remove one-use audit files
+        run: |
+          rm -f apply-step-field-audit.py
+          rm -f .github/workflows/complete-step-field-audit.yml
+
+      - name: Commit verified audit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "Audit compact Step Field integration"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
