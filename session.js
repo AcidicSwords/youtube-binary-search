@@ -509,13 +509,18 @@ export function pinCurrent(session, label = "") {
   }, { guideEdit: true });
 }
 
-export function saveIntervalAsSection(session, label) {
-  if (!session.model.interval) return unchanged(session, "no-interval");
+export function saveExtentAsSection(session, extent, label, provenance = "extent") {
+  if (
+    !extent
+    || !Number.isFinite(extent.start)
+    || !Number.isFinite(extent.end)
+    || extent.end - extent.start <= EPSILON
+  ) return unchanged(session, "no-extent");
   const text = String(label || "").trim();
   if (!text) return unchanged(session, "missing-title");
 
-  const startPin = findPinAt(session.model.guide, session.model.interval.start);
-  const endPin = findPinAt(session.model.guide, session.model.interval.end);
+  const startPin = findPinAt(session.model.guide, extent.start);
+  const endPin = findPinAt(session.model.guide, extent.end);
   const duplicate = startPin && endPin
     ? session.model.guide.sections.find(section =>
       section.startPinId === startPin.id
@@ -532,12 +537,22 @@ export function saveIntervalAsSection(session, label) {
   return commit(session, "Save Section", draft => {
     const value = createSectionFromTimes(
       draft.guide,
-      draft.interval.start,
-      draft.interval.end,
-      { label: text, provenance: `interval:${draft.interval.operator}` }
+      extent.start,
+      extent.end,
+      { label: text, provenance }
     );
     return { changed: true, guideChanged: true, value };
   }, { guideEdit: true });
+}
+
+export function saveIntervalAsSection(session, label) {
+  if (!session.model.interval) return unchanged(session, "no-interval");
+  return saveExtentAsSection(
+    session,
+    session.model.interval,
+    label,
+    `interval:${session.model.interval.operator}`
+  );
 }
 
 export function renameGuidePin(session, pinId, label) {

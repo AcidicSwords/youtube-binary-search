@@ -305,30 +305,30 @@ byId.get("sections-list").dispatch("click", { target: focusButton });
 assert.equal(byId.get("range-label").textContent, "0:25.000–0:50.000");
 assert.equal(byId.get("focused-label").textContent, "Middle quarter");
 
-// Continue loops the active Range; Loop loops the current Interval.
+// Continue traverses Range once; Loop is the sole repetition operator.
 byId.get("continue").click();
 assert.equal(byId.get("continue-label").textContent, "Pause");
 assert.equal(byId.get("continue")["aria-pressed"], "true");
 fakePlayer.currentTime = 50;
 intervalCallbacks[0]();
-assert.equal(fakePlayer.currentTime, 25, "Continue must wrap Range End to Range Start.");
-byId.get("continue").click();
+assert.equal(fakePlayer.currentTime, 50, "Continue must settle at Range End without wrapping.");
 assert.equal(byId.get("continue-label").textContent, "Continue");
-assert.equal(
+assert.equal(byId.get("continue")["aria-pressed"], "false");
+assert.match(
   byId.get("interval-label").textContent,
-  "—",
-  "Wrapped Continue must clear its non-contiguous Interval."
+  /0:25\.000–0:50\.000/,
+  "One-pass Continue must retain its contiguous movement Interval."
 );
 assert.equal(
   byId.get("loop").disabled,
-  true,
-  "Loop must be unavailable until a new contiguous Interval exists."
+  false,
+  "Loop must be available for the settled Continue Interval."
 );
 
-// Establish a new contiguous Interval before testing Loop independently.
+// Establish a reverse contiguous Interval before testing Loop independently.
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 375 });
 assert.equal(byId.get("current-label").textContent, "0:37.500");
-assert.match(byId.get("interval-label").textContent, /0:25\.000–0:37\.500/);
+assert.match(byId.get("interval-label").textContent, /0:37\.500–0:50\.000/);
 assert.equal(byId.get("loop").disabled, false);
 
 byId.get("loop").click();
@@ -336,7 +336,7 @@ assert.equal(byId.get("loop-label").textContent, "Stop Loop");
 assert.equal(byId.get("continue-label").textContent, "Pause", "Continue is the universal observation Pause control.");
 fakePlayer.currentTime = 37.5;
 intervalCallbacks[0]();
-assert.equal(fakePlayer.currentTime, 25, "Loop must restore the Interval start.");
+assert.equal(fakePlayer.currentTime, 37.5, "Loop must restore the active Interval start.");
 byId.get("loop").click();
 assert.equal(byId.get("loop-label").textContent, "Loop");
 

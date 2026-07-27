@@ -1,6 +1,6 @@
 # Binary YouTube Reader
 
-Version 5.1 is the audited spatial-reader build.
+Version 5.4 integrates the Step Field as a complete Address-and-Extent grammar rather than a parallel playback system.
 
 Binary YouTube Reader presents a YouTube video as an ordered spatial Range rather than only as mutually exclusive linear presentation.
 
@@ -97,30 +97,18 @@ The interface distinguishes **Current**, the settled semantic Address, from **Cu
 
 ## Interface
 
-On wide desktop screens, the interface forms three adjacent working zones:
+On wide desktop screens, the Guide remains the only side rail while the reader uses the available width for the Step Field:
 
 ```text
-Video + temporal map | Navigation grammar | Guide
+Step Field                         | Guide
+Observation                        | Guide
+Temporal map | Navigation grammar  | Guide
+Secondary tools                    | Guide
 ```
 
-This keeps the principal mouse paths short:
+Center is larger and authoritative. Tail and Lead are smaller, visually separated, muted, and independently collapsible. The Field adds only one compact Center-level toggle and one collapse control per side; existing Step buttons and Arrow keys remain the labelled and repeatable forms of the same operators.
 
-- observation remains directly beneath the video;
-- Navigation remains beside the video and above the fold;
-- Pins and Sections remain immediately beside Navigation in the sticky Guide;
-- backward operations align on the left, shared operations on the centre spine, and forward operations on the right.
-
-The central Navigation spine is:
-
-```text
-Reopen
-Return
-Step size
-Pin Current
-Pins
-```
-
-On mobile, the same grammar is preserved while Guide becomes an off-canvas sheet. Controls suppress accidental double-tap zoom without disabling intentional page zoom, and the timeline preserves vertical page scrolling.
+Backward operations remain left, shared operations remain on the centre spine, and Forward operations remain right. On mobile, Center occupies the first full row and the optional side projections become compact cards beneath it while Guide remains an off-canvas sheet. Controls suppress accidental double-tap zoom without disabling intentional page zoom, and the timeline preserves vertical page scrolling.
 
 ## Keyboard
 
@@ -158,13 +146,27 @@ Section → active Range through Focus
 
 `source-field.js` reserves a separate read-only boundary for chapters and transcripts. Source records can provide potential Pins, potential Sections, and timed text, but are never copied into the Guide automatically.
 
+## Step Field
+
+The optional Step Field projects the existing local Step relation through three synchronized panes:
+
+```text
+Tail | Center | Lead
+```
+
+Center remains the sole authoritative player and the only audible pane. Tail and Lead are smaller, muted, independently collapsible projections. They begin coincident with Current, unfold through differential playback while Continue is active, and hold at the existing Step distance. Once Held, all active panes continue at `1×`, so the completed relation slides through the source as one field.
+
+A forming side is an actual visible Cursor and selects through Go. A Held side coincides with its Step Target and selects through Step. The actual Tail-to-Lead relation is Field Span: a transient Extent that may be looped or retained as a Section without becoming another Current, Interval, or Return history. Native Center play/pause remains the sole visible transport authority. Context belongs to Current, Skim to the Forward Target, and Loop to an explicit Extent. Context, Loop, Skim, pending Step gestures, and Range dragging suspend the side projections. Visibility is a presentation preference and does not enter Return history.
+
 ## Architecture
 
 ```text
 range-geometry.js  pure Range, Neighborhood, Resolution, Refine, Reopen, and Step geometry
 guide.js           persistent Pins and Sections plus storage migration
 session.js         immutable semantic state, transactions, and Return history
-transport.js       transient Context, Continue, Skim, and Loop execution
+transport.js       transient Context, Continue, Skim, and Extent-driven Loop execution
+step-field-geometry.js pure Field targets, actual offsets, Span, phases, and side-selection mode
+step-field.js      transient Tail/Center/Lead player synchronization
 youtube.js         sole raw YouTube IFrame adapter
 source-field.js    optional chapter/transcript candidate records
 view.js            DOM projection, timeline Pins, previews, formatting, and control state
