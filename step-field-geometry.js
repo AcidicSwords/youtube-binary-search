@@ -1,4 +1,4 @@
-import { EPSILON, clamp, stepTarget } from "./range-geometry.js";
+import { EPSILON, clamp } from "./range-geometry.js";
 
 export const STEP_FIELD_PHASE = Object.freeze({
   OFF: "off",
@@ -11,28 +11,99 @@ export const STEP_FIELD_PHASE = Object.freeze({
 
 export const FIELD_REACH_TOLERANCE = 0.16;
 
-export function deriveStepField(current, stepSeconds, range) {
-  if (!Number.isFinite(current) || !Number.isFinite(stepSeconds) || stepSeconds <= 0) {
-    throw new TypeError("Step Field requires a finite Current and positive Step size.");
+export function normalizeFieldReach(value) {
+  if (Number.isFinite(Number(value)) && Number(value) > 0) {
+    const reach = Number(value);
+    return { backward: reach, forward: reach, linked: true };
   }
-  if (!range || !Number.isFinite(range.start) || !Number.isFinite(range.end)) {
+  const backward = Number(value?.backward);
+  const forward = Number(value?.forward);
+  if (!(Number.isFinite(backward) && backward > 0 && Number.isFinite(forward) && forward > 0)) {
+    throw new TypeError("Step Field requires positive backward and forward Reach.");
+  }
+  return { backward, forward, linked: value?.linked !== false };
+}
+
+function validateFieldInputs(current, stepReach, range) {
+  if (!Number.isFinite(current)) {
+    throw new TypeError("Step Field requires a finite Current.");
+  }
+  normalizeFieldReach(stepReach);
+  if (
+    !range
+    || !Number.isFinite(range.start)
+    || !Number.isFinite(range.end)
+    || range.end < range.start
+  ) {
     throw new TypeError("Step Field requires a valid Range.");
   }
+}
+
+export function deriveFieldBounds({ current, stepSeconds = null, stepReach = null, range }) {
+  const requested = normalizeFieldReach(stepReach ?? stepSeconds);
+  validateFieldInputs(current, requested, range);
 
   const center = clamp(current, range.start, range.end);
-  const tailTarget = stepTarget(center, stepSeconds, "backward", range);
-  const leadTarget = stepTarget(center, stepSeconds, "forward", range);
+  const backwardReach = Math.min(
+    requested.backward,
+    Math.max(0, center - range.start)
+  );
+  const forwardReach = Math.min(
+    requested.forward,
+    Math.max(0, range.end - center)
+  );
+  const tailConstrained = backwardReach < requested.backward - EPSILON;
+  const leadConstrained = forwardReach < requested.forward - EPSILON;
+
   return {
-    center,
+    current: center,
+    requestedReach: requested,
     tail: {
-      target: tailTarget,
-      distance: center - tailTarget,
-      available: tailTarget < center - EPSILON
+      target: center - backwardReach,
+      reach: backwardReach,
+      constrained: tailConstrained
     },
     lead: {
-      target: leadTarget,
-      distance: leadTarget - center,
-      available: leadTarget > center + EPSILON
+      target: center + forwardReach,
+      reach: forwardReach,
+      constrained: leadConstrained
+    },
+    envelope: {
+      start: center - backwardReach,
+      end: center + forwardReach
+    },
+    constraint: tailConstrained && leadConstrained
+      ? "both"
+      : tailConstrained
+        ? "start"
+        : leadConstrained
+          ? "end"
+          : "none"
+  };
+}
+
+export function deriveStepField(current, stepReach, range) {
+  const bounds = deriveFieldBounds({ current, stepReach, range });
+  return {
+    center: bounds.current,
+    requestedReach: bounds.requestedReach,
+    constraint: bounds.constraint,
+    envelope: bounds.envelope,
+    tail: {
+      target: bounds.tail.target,
+      distance: bounds.tail.reach,
+      reach: bounds.tail.reach,
+      requestedReach: bounds.requestedReach.backward,
+      constrained: bounds.tail.constrained,
+      available: bounds.tail.reach > EPSILON
+    },
+    lead: {
+      target: bounds.lead.target,
+      distance: bounds.lead.reach,
+      reach: bounds.lead.reach,
+      requestedReach: bounds.requestedReach.forward,
+      constrained: bounds.lead.constrained,
+      available: bounds.lead.reach > EPSILON
     }
   };
 }
@@ -104,12 +175,20 @@ export function deriveObservedField({
 
   return {
     phase,
+    constraint: targets.constraint || "none",
+    envelope: targets.envelope || {
+      start: targets.tail.target,
+      end: targets.lead.target
+    },
     center: { address: center },
     tail: {
       address: tail,
       target: targets.tail.target,
+      requestedReach: targets.tail.requestedReach ?? targets.requestedReach ?? targets.tail.distance,
+      effectiveReach: targets.tail.reach ?? targets.tail.distance,
       targetDistance: targets.tail.distance,
       offset: tailOffset,
+      constrained: Boolean(targets.tail.constrained),
       available: targets.tail.available,
       visible: tailVisible,
       held: Boolean(tailHeld)
@@ -117,8 +196,11 @@ export function deriveObservedField({
     lead: {
       address: lead,
       target: targets.lead.target,
+      requestedReach: targets.lead.requestedReach ?? targets.requestedReach ?? targets.lead.distance,
+      effectiveReach: targets.lead.reach ?? targets.lead.distance,
       targetDistance: targets.lead.distance,
       offset: leadOffset,
+      constrained: Boolean(targets.lead.constrained),
       available: targets.lead.available,
       visible: leadVisible,
       held: Boolean(leadHeld)

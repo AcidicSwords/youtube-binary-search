@@ -390,7 +390,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? getTargets(currentResolution)
       : { backward: null, forward: null };
     const actionModel = currentResolution
-      ? getActionRanges(currentResolution, activeRange, currentInterval, semanticCurrent, currentState.stepSeconds)
+      ? getActionRanges(currentResolution, activeRange, currentInterval, semanticCurrent, currentState.session.model.stepReach)
       : null;
     const previous = currentResolution
       ? previousPin(guide(), semanticCurrent, activeRange)
@@ -434,7 +434,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const captureKind = currentState.captureExtentKind || "interval";
     elements["section-source-label"].textContent = captureKind === "field-span" ? "Retain Field Span" : "Retain Interval";
     elements["section-window"].textContent = captureExtent ? formatRange(captureExtent) : "—";
-    elements["step-setting-value"].textContent = formatDuration(currentState.stepSeconds);
+    const stepReach = currentState.session.model.stepReach || { backward: 10, forward: 10, linked: true };
+    elements["step-setting-value"].textContent = `← ${formatDuration(stepReach.backward)} | ${formatDuration(stepReach.forward)} →`;
+    elements["step-backward-seconds"].value = String(stepReach.backward);
+    elements["step-forward-seconds"].value = String(stepReach.forward);
+    elements["step-link"].checked = stepReach.linked !== false;
 
     elements["focused-section"].hidden = !focused;
     if (focused) {
@@ -448,7 +452,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const interactionLocked = !loaded;
     for (const id of [
       "range-start-here", "range-midpoint", "range-end-here", "full-video-range",
-      "step-slider", "step-seconds", "section-label", "save-section", "speed-select"
+      "step-backward-seconds", "step-forward-seconds", "step-link",
+      "tail-rate-select", "lead-rate-select",
+      "section-label", "save-section", "speed-select"
     ]) elements[id].disabled = interactionLocked;
 
     elements["context-select"].disabled = interactionLocked;

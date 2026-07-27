@@ -31,7 +31,56 @@ import {
 
 export const HISTORY_LIMIT = 100;
 export const MIN_RANGE_SECONDS = 0.25;
+export const MIN_STEP_REACH_SECONDS = 0.25;
+export const MAX_STEP_REACH_SECONDS = 300;
 
+export const DEFAULT_STEP_REACH = Object.freeze({
+  backward: 10,
+  forward: 10,
+  linked: true
+});
+
+function normalizeReachSeconds(value, fallback) {
+  const fallbackValue = Number.isFinite(Number(fallback)) ? Number(fallback) : 10;
+  const candidate = Number(value);
+  return clamp(
+    Number.isFinite(candidate) && candidate > 0 ? candidate : fallbackValue,
+    MIN_STEP_REACH_SECONDS,
+    MAX_STEP_REACH_SECONDS
+  );
+}
+
+export function normalizeStepReach(value, fallback = DEFAULT_STEP_REACH) {
+  const fallbackSource = Number.isFinite(Number(fallback))
+    ? { backward: Number(fallback), forward: Number(fallback), linked: true }
+    : fallback && typeof fallback === "object"
+      ? fallback
+      : DEFAULT_STEP_REACH;
+  const fallbackBackward = normalizeReachSeconds(fallbackSource.backward, 10);
+  const fallbackForward = normalizeReachSeconds(fallbackSource.forward, fallbackBackward);
+
+  if (Number.isFinite(Number(value))) {
+    const reach = normalizeReachSeconds(value, fallbackForward);
+    return { backward: reach, forward: reach, linked: true };
+  }
+
+  const source = value && typeof value === "object" ? value : fallbackSource;
+  const linked = source.linked !== false;
+  let backward = normalizeReachSeconds(source.backward, fallbackBackward);
+  let forward = normalizeReachSeconds(source.forward, fallbackForward);
+
+  // Linked Reach has one value. Forward is used only to salvage malformed
+  // persisted objects; normal UI linking supplies equal directional values.
+  if (linked) {
+    const reach = Number.isFinite(Number(source.forward))
+      ? normalizeReachSeconds(source.forward, fallbackForward)
+      : normalizeReachSeconds(source.backward, fallbackBackward);
+    backward = reach;
+    forward = reach;
+  }
+
+  return { backward, forward, linked };
+}
 export function copy(value) {
   if (value === null || value === undefined) return value;
   return globalThis.structuredClone ? structuredClone(value) : JSON.parse(JSON.stringify(value));
@@ -58,7 +107,7 @@ export function createInterval(departure, arrival, operator, medium = "direct") 
   };
 }
 
-export function createSession({ duration = 0, current = 0, guide = createGuide() } = {}) {
+export function createSession({ duration = 0, current = 0, guide = createGuide(), stepReach = DEFAULT_STEP_REACH } = {}) {
   const end = Math.max(0, Number(duration) || 0);
   const C = clamp(Number(current) || 0, 0, end);
   return {
@@ -69,6 +118,7 @@ export function createSession({ duration = 0, current = 0, guide = createGuide()
       resolutionBasis: RESOLUTION_BASIS.RANGE,
       focus: null,
       interval: null,
+      stepReach: normalizeStepReach(stepReach),
       guide
     },
     history: []
@@ -83,6 +133,7 @@ export function snapshotModel(model, options = {}) {
     resolutionBasis: model.resolutionBasis || RESOLUTION_BASIS.RANGE,
     focus: clone(model.focus),
     interval: clone(model.interval),
+    stepReach: normalizeStepReach(model.stepReach),
     guide: options.cloneGuide ? clone(model.guide) : model.guide
   };
 }
@@ -317,8 +368,12 @@ export function refine(session, direction) {
   });
 }
 
-export function step(session, direction, seconds, options = {}) {
-  const target = stepTarget(session.model.resolution.C, seconds, direction, session.model.range);
+export function step(session, direction, seconds = null, options = {}) {
+  const configured = normalizeStepReach(session.model.stepReach);
+  const reach = Number.isFinite(Number(seconds)) && Number(seconds) > 0
+    ? Number(seconds)
+    : configured[direction];
+  const target = stepTarget(session.model.resolution.C, reach, direction, session.model.range);
   if (Math.abs(target - session.model.resolution.C) <= EPSILON) return unchanged(session, "range-edge");
   const backward = direction === "backward";
   return goTo(session, target, {
@@ -329,6 +384,20 @@ export function step(session, direction, seconds, options = {}) {
     originResolution: options.originResolution,
     originResolutionBasis: options.originResolutionBasis,
     amend: options.amend
+  });
+}
+
+export function setStepReach(session, nextReach, label = "Set Step Reach") {
+  const current = normalizeStepReach(session.model.stepReach);
+  const next = normalizeStepReach(nextReach, current);
+  const unchangedReach = Math.abs(current.backward - next.backward) <= EPSILON
+    && Math.abs(current.forward - next.forward) <= EPSILON
+    && current.linked === next.linked;
+  if (unchangedReach) return unchanged(session, "unchanged-step-reach", { stepReach: current });
+
+  return commit(session, label, draft => {
+    draft.stepReach = next;
+    return { changed: true, stepReach: next };
   });
 }
 

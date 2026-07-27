@@ -206,3 +206,81 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* v5.5 Step Field coherence */
+.field-transport-bar {
+  display: grid;
+  grid-template-columns: auto minmax(90px, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--line);
+  background: #0d1219;
+}
+.field-transport {
+  display: inline-flex;
+  min-width: 132px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  padding-inline: 10px;
+}
+.field-transport .control-meta { display: inline; }
+.field-transport-state,
+.field-rate-state {
+  color: var(--muted);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+.field-rate-state {
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+}
+.step-field-settings {
+  width: min(360px, calc(100vw - 32px));
+  display: grid;
+  gap: 10px;
+}
+.step-field-settings fieldset {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.step-field-settings legend {
+  padding: 0 5px;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+.link-setting,
+.rate-setting,
+.fixed-rate,
+.step-field-settings .number-setting {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.link-setting {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+.link-setting input { min-height: 0; }
+.step-field-settings input[type="number"] { width: 92px; }
+.step-field-settings select { min-width: 92px; }
+.fixed-rate strong { color: var(--text); }
+
+@media (max-width: 680px) {
+  .field-transport-bar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .field-rate-state {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}

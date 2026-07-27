@@ -26,6 +26,8 @@ import {
   goTo,
   refine as refineSession,
   step as stepSession,
+  setStepReach as setSessionStepReach,
+  normalizeStepReach,
   reopen as reopenSession,
   setRange as setSessionRange,
   previewRange,
@@ -81,17 +83,38 @@ const METADATA_GRACE_MS = 4000;
 const METADATA_RETRY_MS = 150;
 const PROGRAMMATIC_PLACEMENT_GRACE_MS = 2000;
 const NATIVE_POSITION_TOLERANCE_SECONDS = 0.25;
+const DEFAULT_FIELD_RESPONSE = Object.freeze({ tailRate: 0.5, leadRate: 2 });
+
+function normalizeFieldResponse(value = DEFAULT_FIELD_RESPONSE) {
+  const tailRate = Number(value?.tailRate);
+  const leadRate = Number(value?.leadRate);
+  return {
+    tailRate: Number.isFinite(tailRate) && tailRate > 0 && tailRate < 1
+      ? tailRate
+      : DEFAULT_FIELD_RESPONSE.tailRate,
+    leadRate: Number.isFinite(leadRate) && leadRate > 1
+      ? leadRate
+      : DEFAULT_FIELD_RESPONSE.leadRate
+  };
+}
+
+function normalizeLastStepReachEdited(value) {
+  return value === "backward" ? "backward" : "forward";
+}
 
 function readPreferences() {
   try {
     const value = JSON.parse(localStorage.getItem(PREFERENCES_KEY) || "null");
+    const legacyStep = Number.isFinite(Number(value?.stepSeconds))
+      ? Number(value.stepSeconds)
+      : 10;
     return {
       contextSeconds: [0, 3, 5, 10].includes(Number(value?.contextSeconds))
         ? Number(value.contextSeconds)
         : 5,
-      stepSeconds: Number.isFinite(Number(value?.stepSeconds))
-        ? clamp(Number(value.stepSeconds), 0.25, 300)
-        : 10,
+      stepReach: normalizeStepReach(value?.stepReach ?? legacyStep),
+      stepReachLastEdited: normalizeLastStepReachEdited(value?.stepReachLastEdited),
+      fieldResponse: normalizeFieldResponse(value?.fieldResponse),
       stepFieldEnabled: value?.stepFieldEnabled !== false,
       tailVisible: value?.tailVisible !== false,
       leadVisible: value?.leadVisible !== false
@@ -99,7 +122,9 @@ function readPreferences() {
   } catch {
     return {
       contextSeconds: 5,
-      stepSeconds: 10,
+      stepReach: normalizeStepReach(10),
+      stepReachLastEdited: "forward",
+      fieldResponse: { ...DEFAULT_FIELD_RESPONSE },
       stepFieldEnabled: true,
       tailVisible: true,
       leadVisible: true
@@ -107,9 +132,10 @@ function readPreferences() {
   }
 }
 
+
 const preferences = readPreferences();
 const state = {
-  session: createSession(),
+  session: createSession({ stepReach: preferences.stepReach }),
   playerReady: false,
   videoLoaded: false,
   videoId: null,
@@ -117,7 +143,8 @@ const state = {
   availableRates: [1],
   transport: idleTransport(),
   pendingStep: null,
-  stepSeconds: preferences.stepSeconds,
+  lastStepReachEdited: preferences.stepReachLastEdited,
+  fieldResponse: normalizeFieldResponse(preferences.fieldResponse),
   contextSeconds: preferences.contextSeconds,
   stepFieldEnabled: preferences.stepFieldEnabled,
   tailVisible: preferences.tailVisible,
@@ -152,6 +179,14 @@ function currentResolution() {
 
 function activeRange() {
   return model().range;
+}
+
+function currentStepReach() {
+  return normalizeStepReach(model()?.stepReach ?? preferences.stepReach);
+}
+
+function reachFor(direction) {
+  return currentStepReach()[direction];
 }
 
 function guide() {
@@ -203,12 +238,25 @@ function persistGuide() {
 
 function persistPreferences() {
   try {
+    preferences.stepReach = normalizeStepReach(
+      model()?.stepReach ?? preferences.stepReach,
+      preferences.stepReach
+    );
+    preferences.stepReachLastEdited = normalizeLastStepReachEdited(state.lastStepReachEdited);
+    preferences.fieldResponse = normalizeFieldResponse(state.fieldResponse);
+    preferences.contextSeconds = state.contextSeconds;
+    preferences.stepFieldEnabled = state.stepFieldEnabled;
+    preferences.tailVisible = state.tailVisible;
+    preferences.leadVisible = state.leadVisible;
+
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify({
-      contextSeconds: state.contextSeconds,
-      stepSeconds: state.stepSeconds,
-      stepFieldEnabled: state.stepFieldEnabled,
-      tailVisible: state.tailVisible,
-      leadVisible: state.leadVisible
+      contextSeconds: preferences.contextSeconds,
+      stepReach: preferences.stepReach,
+      stepReachLastEdited: preferences.stepReachLastEdited,
+      fieldResponse: preferences.fieldResponse,
+      stepFieldEnabled: preferences.stepFieldEnabled,
+      tailVisible: preferences.tailVisible,
+      leadVisible: preferences.leadVisible
     }));
   } catch (error) {
     console.warn("Could not save preferences:", error);
@@ -340,6 +388,7 @@ function locateAddress(address) {
   if (!player || !Number.isFinite(address)) return;
   clearNativeGo();
   state.transport = idleTransport();
+  stepField?.pause();
   player.pause();
   player.setRate(1);
   placePlayer(address);
@@ -407,6 +456,7 @@ function settleTransport(options = {}) {
   state.transport = idleTransport();
 
   if (issuePause) player.pause();
+  stepField?.pause();
   player.setRate(1);
 
   if (isObservationalTransport(active)) {
@@ -572,7 +622,10 @@ function returnLastAction() {
     return;
   }
   state.session = result.session;
+  persistPreferences();
   const guidePersisted = result.guideChanged ? persistGuide() : true;
+  persistPreferences();
+  stepField?.invalidate();
   locateAddress(currentResolution().C);
   view.renderGuide();
   if (guidePersisted) setStatus(`Returned from ${result.label}.`);
@@ -592,7 +645,7 @@ function performStep(direction) {
     };
   }
 
-  const result = stepSession(state.session, direction, state.stepSeconds, {
+  const result = stepSession(state.session, direction, reachFor(direction), {
     departure: state.pendingStep.departure,
     originResolution: state.pendingStep.originModel.resolution,
     originResolutionBasis: state.pendingStep.originModel.resolutionBasis,
@@ -741,10 +794,12 @@ function startContinueSession(playNow = true) {
     if (Math.abs(safeCurrentTime() - current) <= NATIVE_POSITION_TOLERANCE_SECONDS) {
       state.transport.enteredPath = true;
     }
+    stepField?.play();
     player.play();
   } else {
     state.transport.enteredPath = true;
     state.transport = withTransportPhase(state.transport, "playing");
+    stepField?.play();
   }
 
   setStatus(`Continuing through Range ${formatRange(activeRange())}.`);
@@ -828,7 +883,9 @@ function setRange(start, end, current, label, status) {
     else setStatus("Range must remain within the video and have positive duration.", true);
     return false;
   }
-  return accept(result, { renderGuide: true, status, observe: false });
+  const accepted = accept(result, { renderGuide: true, status, observe: false });
+  stepField?.invalidate();
+  return accepted;
 }
 
 function focusSection(sectionId) {
@@ -841,6 +898,7 @@ function focusSection(sectionId) {
     return;
   }
   accept(result, { renderGuide: true, status: `Focused “${section.label}” as Range.` });
+  stepField?.invalidate();
   closeCompactGuideAfterSelection();
 }
 
@@ -853,6 +911,7 @@ function leaveSection() {
     observe: false,
     status: `Restored Range ${formatRange(result.session.model.range)}.`
   });
+  stepField?.invalidate();
 }
 
 function pinCurrent() {
@@ -1139,7 +1198,8 @@ function initializeVideo() {
   state.session = createSession({
     duration,
     current: requestedStart,
-    guide: readStoredGuide(duration)
+    guide: readStoredGuide(duration),
+    stepReach: preferences.stepReach
   });
   state.videoLoaded = true;
   state.transport = idleTransport();
@@ -1173,7 +1233,7 @@ function cuePendingVideo() {
   state.transport = idleTransport();
   state.videoLoaded = false;
   state.videoId = null;
-  state.session = createSession();
+  state.session = createSession({ stepReach: preferences.stepReach });
   view.setPreviewAction(null);
   view.setPreviewSection(null);
   view.invalidateTimelinePins();
@@ -1448,6 +1508,7 @@ function finishRangeDrag() {
     state.session = checkpoint(state.session, "Adjust Range", origin).session;
     locateAddress(currentResolution().C);
     view.renderGuide();
+    stepField?.invalidate();
     setStatus(`Range set to ${formatRange(activeRange())}.`);
   } else if (origin) {
     state.session = { model: origin, history: state.session.history };
@@ -1482,7 +1543,7 @@ function adjustRangeHandle(kind, event) {
   if (!state.videoLoaded) return;
 
   const range = activeRange();
-  const amount = state.stepSeconds * (event.shiftKey ? 5 : 1);
+  const amount = reachFor(forward ? "forward" : "backward") * (event.shiftKey ? 5 : 1);
   let value = kind === "start" ? range.start : range.end;
   if (event.key === "Home") value = kind === "start" ? 0 : range.start + MIN_RANGE_SECONDS;
   else if (event.key === "End") value = kind === "start" ? range.end - MIN_RANGE_SECONDS : model().duration;
@@ -1497,22 +1558,65 @@ function adjustRangeHandle(kind, event) {
   }
 }
 
-function adjustStepPreset(direction) {
-  const current = state.stepSeconds;
-  const nextIndex = direction < 0
-    ? Math.max(0, STEP_PRESETS.findIndex(value => value >= current - EPSILON) - 1)
-    : Math.min(STEP_PRESETS.length - 1, STEP_PRESETS.findIndex(value => value > current + EPSILON));
-  state.stepSeconds = STEP_PRESETS[nextIndex < 0 ? STEP_PRESETS.length - 1 : nextIndex];
-  syncStepControls();
-  view.render();
+function presetStep(value, delta) {
+  const current = clamp(Number(value), 0.25, 300);
+  if (delta < 0) {
+    const candidates = STEP_PRESETS.filter(item => item < current - EPSILON);
+    return candidates.at(-1) ?? STEP_PRESETS[0];
+  }
+  return STEP_PRESETS.find(item => item > current + EPSILON) ?? STEP_PRESETS.at(-1);
 }
 
-function syncStepControls(source = null) {
-  const value = clamp(Number(source?.value ?? state.stepSeconds), 0.25, 300);
-  state.stepSeconds = value;
-  elements["step-seconds"].value = String(value);
-  elements["step-slider"].value = String(Math.min(value, 60));
+function commitStepReach(nextReach, label) {
+  if (!state.videoLoaded) {
+    preferences.stepReach = normalizeStepReach(nextReach);
+    state.session = createSession({ stepReach: preferences.stepReach });
+    persistPreferences();
+    view.render();
+    return false;
+  }
+  settleBeforeAction({ replacingContext: true });
+  const result = setSessionStepReach(state.session, nextReach, label);
+  if (!result.changed) {
+    view.render();
+    return false;
+  }
+  state.session = result.session;
   persistPreferences();
+  stepField?.invalidate();
+  setStatus(`${label}: Backward ${result.stepReach.backward}s; Forward ${result.stepReach.forward}s.`);
+  view.render();
+  return true;
+}
+
+function adjustStepPreset(direction) {
+  const current = currentStepReach();
+  commitStepReach({
+    backward: presetStep(current.backward, direction),
+    forward: presetStep(current.forward, direction),
+    linked: current.linked
+  }, direction < 0 ? "Decrease Step Reach" : "Increase Step Reach");
+}
+
+function changeDirectionalReach(direction, value) {
+  const amount = clamp(Number(value), 0.25, 300);
+  if (!Number.isFinite(amount)) return;
+  const current = currentStepReach();
+  state.lastStepReachEdited = direction;
+  const next = current.linked
+    ? { backward: amount, forward: amount, linked: true }
+    : { ...current, [direction]: amount };
+  commitStepReach(next, direction === "backward" ? "Set Backward Reach" : "Set Forward Reach");
+}
+
+function changeReachLink(linked) {
+  const current = currentStepReach();
+  if (!linked) {
+    commitStepReach({ ...current, linked: false }, "Unlink Step Reach");
+    return;
+  }
+  const source = state.lastStepReachEdited === "backward" ? current.backward : current.forward;
+  commitStepReach({ backward: source, forward: source, linked: true }, "Link Step Reach");
 }
 
 function syncContextControl() {
@@ -1707,7 +1811,7 @@ function initializePlayerApi() {
       videoId: state.videoId,
       current: currentResolution()?.C || 0,
       range: activeRange(),
-      stepSeconds: state.stepSeconds,
+      stepReach: currentStepReach(),
       transportKind: state.transport.kind,
       pendingStep: Boolean(state.pendingStep),
       dragging: Boolean(state.dragHandle),
@@ -1717,12 +1821,17 @@ function initializePlayerApi() {
     getPreferences: () => ({
       stepFieldEnabled: state.stepFieldEnabled,
       tailVisible: state.tailVisible,
-      leadVisible: state.leadVisible
+      leadVisible: state.leadVisible,
+      tailRate: state.fieldResponse.tailRate,
+      leadRate: state.fieldResponse.leadRate
     }),
     setPreferences: patch => {
       if (Object.hasOwn(patch, "stepFieldEnabled")) state.stepFieldEnabled = Boolean(patch.stepFieldEnabled);
       if (Object.hasOwn(patch, "tailVisible")) state.tailVisible = Boolean(patch.tailVisible);
       if (Object.hasOwn(patch, "leadVisible")) state.leadVisible = Boolean(patch.leadVisible);
+      if (Object.hasOwn(patch, "tailRate") || Object.hasOwn(patch, "leadRate")) {
+        state.fieldResponse = normalizeFieldResponse({ ...state.fieldResponse, ...patch });
+      }
       persistPreferences();
     },
     onSelect: selectFieldSide,
@@ -1904,9 +2013,16 @@ for (const control of document.querySelectorAll("[data-preview-action]")) {
   control.addEventListener("blur", () => { view.setPreviewAction(null); view.render(); });
 }
 
-// Step size
-elements["step-slider"].addEventListener("input", event => { syncStepControls(event.target); view.render(); });
-elements["step-seconds"].addEventListener("change", event => { syncStepControls(event.target); view.render(); });
+// Step Field geometry
+elements["step-backward-seconds"].addEventListener("change", event => {
+  changeDirectionalReach("backward", event.target.value);
+});
+elements["step-forward-seconds"].addEventListener("change", event => {
+  changeDirectionalReach("forward", event.target.value);
+});
+elements["step-link"].addEventListener("change", event => {
+  changeReachLink(event.target.checked);
+});
 
 // Interval and Range affordances
 elements["interval-state"].addEventListener("click", () => openSectionCapture("interval"));
@@ -2125,7 +2241,6 @@ window.addEventListener("resize", () => {
 });
 
 syncGuideLayout();
-syncStepControls();
 syncContextControl();
 view.renderGuide();
 view.render();

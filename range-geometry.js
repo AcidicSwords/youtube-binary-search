@@ -165,6 +165,21 @@ export function canReopen(neighborhood, range) {
   return neighborhood.L > range.start + EPSILON || neighborhood.R < range.end - EPSILON;
 }
 
+export function normalizeDirectionalReach(value, fallback = 10) {
+  if (Number.isFinite(Number(value)) && Number(value) > 0) {
+    const reach = Number(value);
+    return { backward: reach, forward: reach, linked: true };
+  }
+  const backward = Number(value?.backward);
+  const forward = Number(value?.forward);
+  const safeFallback = Number.isFinite(Number(fallback)) && Number(fallback) > 0 ? Number(fallback) : 10;
+  return {
+    backward: Number.isFinite(backward) && backward > 0 ? backward : safeFallback,
+    forward: Number.isFinite(forward) && forward > 0 ? forward : safeFallback,
+    linked: value?.linked !== false
+  };
+}
+
 export function stepTarget(current, seconds, direction, range) {
   if (!Number.isFinite(current) || !Number.isFinite(seconds) || seconds <= 0) {
     throw new TypeError("Step requires a finite Current and a positive duration.");
@@ -220,7 +235,7 @@ export function getActionRanges(
   range,
   interval = null,
   current = neighborhood.C,
-  stepSeconds = 10
+  stepReach = 10
 ) {
   assertNeighborhood(neighborhood);
   const targets = getTargets(neighborhood);
@@ -231,8 +246,9 @@ export function getActionRanges(
     ? null
     : descend(neighborhood, "forward", targets.forward, range);
   const reopened = canReopen(neighborhood, range) ? reopenToRange(current, range) : null;
-  const stepBackward = stepTarget(neighborhood.C, stepSeconds, "backward", range);
-  const stepForward = stepTarget(neighborhood.C, stepSeconds, "forward", range);
+  const reach = normalizeDirectionalReach(stepReach);
+  const stepBackward = stepTarget(neighborhood.C, reach.backward, "backward", range);
+  const stepForward = stepTarget(neighborhood.C, reach.forward, "forward", range);
 
   return {
     targets,
