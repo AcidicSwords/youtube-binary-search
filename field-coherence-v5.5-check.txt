@@ -1,16 +1,6 @@
 Traceback (most recent call last):
-  File "/tmp/apply-field-coherence-v5.5.py", line 42, in <module>
+  File "/tmp/apply-field-coherence-v5.5.py", line 376, in <module>
     replace_once(
-  File "/tmp/apply-field-coherence-v5.5.py", line 20, in replace_once
-    text = read(name)
-           ^^^^^^^^^^
-  File "/tmp/apply-field-coherence-v5.5.py", line 14, in read
-    return path(name).read_text()
-           ^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/pathlib.py", line 1029, in read_text
-    with self.open(mode='r', encoding=encoding, errors=errors) as f:
-         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/pathlib.py", line 1015, in open
-    return io.open(self, mode, buffering, encoding, errors, newline)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-FileNotFoundError: [Errno 2] No such file or directory: '/session.js'
+  File "/tmp/apply-field-coherence-v5.5.py", line 23, in replace_once
+    raise RuntimeError(f"{label or name}: expected one literal match, found {count}")
+RuntimeError: import normalizeFieldReach: expected one literal match, found 2

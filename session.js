@@ -32,6 +32,29 @@ import {
 export const HISTORY_LIMIT = 100;
 export const MIN_RANGE_SECONDS = 0.25;
 
+export const DEFAULT_STEP_REACH = Object.freeze({
+  backward: 10,
+  forward: 10,
+  linked: true
+});
+
+export function normalizeStepReach(value, fallback = DEFAULT_STEP_REACH) {
+  const source = Number.isFinite(Number(value))
+    ? { backward: Number(value), forward: Number(value), linked: true }
+    : value && typeof value === "object"
+      ? value
+      : fallback;
+  const fallbackBackward = Number(fallback?.backward) > 0 ? Number(fallback.backward) : 10;
+  const fallbackForward = Number(fallback?.forward) > 0 ? Number(fallback.forward) : fallbackBackward;
+  const backward = Number(source?.backward);
+  const forward = Number(source?.forward);
+  return {
+    backward: Number.isFinite(backward) && backward > 0 ? backward : fallbackBackward,
+    forward: Number.isFinite(forward) && forward > 0 ? forward : fallbackForward,
+    linked: source?.linked !== false
+  };
+}
+
 export function copy(value) {
   if (value === null || value === undefined) return value;
   return globalThis.structuredClone ? structuredClone(value) : JSON.parse(JSON.stringify(value));
@@ -58,7 +81,7 @@ export function createInterval(departure, arrival, operator, medium = "direct") 
   };
 }
 
-export function createSession({ duration = 0, current = 0, guide = createGuide() } = {}) {
+export function createSession({ duration = 0, current = 0, guide = createGuide(), stepReach = DEFAULT_STEP_REACH } = {}) {
   const end = Math.max(0, Number(duration) || 0);
   const C = clamp(Number(current) || 0, 0, end);
   return {
@@ -69,6 +92,7 @@ export function createSession({ duration = 0, current = 0, guide = createGuide()
       resolutionBasis: RESOLUTION_BASIS.RANGE,
       focus: null,
       interval: null,
+      stepReach: normalizeStepReach(stepReach),
       guide
     },
     history: []
@@ -83,6 +107,7 @@ export function snapshotModel(model, options = {}) {
     resolutionBasis: model.resolutionBasis || RESOLUTION_BASIS.RANGE,
     focus: clone(model.focus),
     interval: clone(model.interval),
+    stepReach: normalizeStepReach(model.stepReach),
     guide: options.cloneGuide ? clone(model.guide) : model.guide
   };
 }
@@ -317,8 +342,12 @@ export function refine(session, direction) {
   });
 }
 
-export function step(session, direction, seconds, options = {}) {
-  const target = stepTarget(session.model.resolution.C, seconds, direction, session.model.range);
+export function step(session, direction, seconds = null, options = {}) {
+  const configured = normalizeStepReach(session.model.stepReach);
+  const reach = Number.isFinite(Number(seconds)) && Number(seconds) > 0
+    ? Number(seconds)
+    : configured[direction];
+  const target = stepTarget(session.model.resolution.C, reach, direction, session.model.range);
   if (Math.abs(target - session.model.resolution.C) <= EPSILON) return unchanged(session, "range-edge");
   const backward = direction === "backward";
   return goTo(session, target, {
@@ -329,6 +358,20 @@ export function step(session, direction, seconds, options = {}) {
     originResolution: options.originResolution,
     originResolutionBasis: options.originResolutionBasis,
     amend: options.amend
+  });
+}
+
+export function setStepReach(session, nextReach, label = "Set Step Reach") {
+  const current = normalizeStepReach(session.model.stepReach);
+  const next = normalizeStepReach(nextReach, current);
+  const unchangedReach = Math.abs(current.backward - next.backward) <= EPSILON
+    && Math.abs(current.forward - next.forward) <= EPSILON
+    && current.linked === next.linked;
+  if (unchangedReach) return unchanged(session, "unchanged-step-reach", { stepReach: current });
+
+  return commit(session, label, draft => {
+    draft.stepReach = next;
+    return { changed: true, stepReach: next };
   });
 }
 

@@ -27,25 +27,32 @@ export {
 
 const REACH_TOLERANCE = FIELD_REACH_TOLERANCE;
 const DRIFT_TOLERANCE = 0.42;
-const TAIL_RATE = 0.5;
-const LEAD_RATE = 2;
 
 function defaultPreferences() {
   return {
     stepFieldEnabled: true,
     tailVisible: true,
-    leadVisible: true
+    leadVisible: true,
+    tailRate: 0.5,
+    leadRate: 2
   };
+}
+
+function snapshotReach(snapshot) {
+  return snapshot.stepReach ?? snapshot.stepSeconds ?? 10;
 }
 
 function semanticKey(snapshot) {
   const range = snapshot.range || { start: 0, end: 0 };
+  const reach = normalizeFieldReach(snapshotReach(snapshot));
   return [
     snapshot.videoId || "",
     Number(snapshot.current || 0).toFixed(3),
     Number(range.start || 0).toFixed(3),
     Number(range.end || 0).toFixed(3),
-    Number(snapshot.stepSeconds || 0).toFixed(3)
+    Number(reach.backward).toFixed(3),
+    Number(reach.forward).toFixed(3),
+    String(reach.linked)
   ].join("|");
 }
 

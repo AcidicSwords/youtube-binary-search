@@ -11,10 +11,24 @@ export const STEP_FIELD_PHASE = Object.freeze({
 
 export const FIELD_REACH_TOLERANCE = 0.16;
 
-function validateFieldInputs(current, stepSeconds, range) {
-  if (!Number.isFinite(current) || !Number.isFinite(stepSeconds) || stepSeconds <= 0) {
-    throw new TypeError("Step Field requires a finite Current and positive Step size.");
+export function normalizeFieldReach(value) {
+  if (Number.isFinite(Number(value)) && Number(value) > 0) {
+    const reach = Number(value);
+    return { backward: reach, forward: reach, linked: true };
   }
+  const backward = Number(value?.backward);
+  const forward = Number(value?.forward);
+  if (!(Number.isFinite(backward) && backward > 0 && Number.isFinite(forward) && forward > 0)) {
+    throw new TypeError("Step Field requires positive backward and forward Reach.");
+  }
+  return { backward, forward, linked: value?.linked !== false };
+}
+
+function validateFieldInputs(current, stepReach, range) {
+  if (!Number.isFinite(current)) {
+    throw new TypeError("Step Field requires a finite Current.");
+  }
+  normalizeFieldReach(stepReach);
   if (
     !range
     || !Number.isFinite(range.start)
@@ -25,24 +39,25 @@ function validateFieldInputs(current, stepSeconds, range) {
   }
 }
 
-export function deriveFieldBounds({ current, stepSeconds, range }) {
-  validateFieldInputs(current, stepSeconds, range);
+export function deriveFieldBounds({ current, stepSeconds = null, stepReach = null, range }) {
+  const requested = normalizeFieldReach(stepReach ?? stepSeconds);
+  validateFieldInputs(current, requested, range);
 
   const center = clamp(current, range.start, range.end);
   const backwardReach = Math.min(
-    stepSeconds,
+    requested.backward,
     Math.max(0, center - range.start)
   );
   const forwardReach = Math.min(
-    stepSeconds,
+    requested.forward,
     Math.max(0, range.end - center)
   );
-  const tailConstrained = backwardReach < stepSeconds - EPSILON;
-  const leadConstrained = forwardReach < stepSeconds - EPSILON;
+  const tailConstrained = backwardReach < requested.backward - EPSILON;
+  const leadConstrained = forwardReach < requested.forward - EPSILON;
 
   return {
     current: center,
-    requestedReach: stepSeconds,
+    requestedReach: requested,
     tail: {
       target: center - backwardReach,
       reach: backwardReach,
@@ -67,8 +82,8 @@ export function deriveFieldBounds({ current, stepSeconds, range }) {
   };
 }
 
-export function deriveStepField(current, stepSeconds, range) {
-  const bounds = deriveFieldBounds({ current, stepSeconds, range });
+export function deriveStepField(current, stepReach, range) {
+  const bounds = deriveFieldBounds({ current, stepReach, range });
   return {
     center: bounds.current,
     requestedReach: bounds.requestedReach,
@@ -78,7 +93,7 @@ export function deriveStepField(current, stepSeconds, range) {
       target: bounds.tail.target,
       distance: bounds.tail.reach,
       reach: bounds.tail.reach,
-      requestedReach: bounds.requestedReach,
+      requestedReach: bounds.requestedReach.backward,
       constrained: bounds.tail.constrained,
       available: bounds.tail.reach > EPSILON
     },
@@ -86,7 +101,7 @@ export function deriveStepField(current, stepSeconds, range) {
       target: bounds.lead.target,
       distance: bounds.lead.reach,
       reach: bounds.lead.reach,
-      requestedReach: bounds.requestedReach,
+      requestedReach: bounds.requestedReach.forward,
       constrained: bounds.lead.constrained,
       available: bounds.lead.reach > EPSILON
     }
