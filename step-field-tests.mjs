@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   STEP_FIELD_PHASE,
   deriveStepField,
@@ -58,5 +59,30 @@ assert.equal(resolveFieldPhase({
     { visible: true, available: true, held: true, offset: 10 }
   ]
 }), STEP_FIELD_PHASE.HELD);
+
+{
+  const html = readFileSync("index.html", "utf8");
+  const css = readFileSync("step-field.css", "utf8");
+  const app = readFileSync("app.js", "utf8");
+  const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
+
+  for (const id of [
+    "step-field", "player-tail", "player", "player-lead", "tail-step", "lead-step",
+    "tail-collapse", "lead-collapse", "tail-restore", "lead-restore", "step-field-toggle"
+  ]) {
+    assert.match(html, new RegExp(`id=["']${id}["']`), `Missing Step Field DOM id: ${id}`);
+  }
+
+  assert.match(app, /createStepFieldController/);
+  assert.match(app, /onStep:\s*performStep/);
+  assert.doesNotMatch(app, /Recenter(?: Tail| Lead)?/i);
+  assert.match(css, /\.step-field\.field-off/);
+  assert.match(css, /tail-collapsed/);
+  assert.match(css, /lead-collapsed/);
+  assert.match(css, /@media \(max-width: 680px\)/);
+  assert.match(css, /@media \(min-width: 1221px\)/);
+  assert.match(packageJson.scripts.check, /step-field\.js/);
+  assert.match(packageJson.scripts.test, /step-field-tests\.mjs/);
+}
 
 console.log("All Step Field tests passed.");

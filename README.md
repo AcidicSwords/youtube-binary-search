@@ -97,30 +97,18 @@ The interface distinguishes **Current**, the settled semantic Address, from **Cu
 
 ## Interface
 
-On wide desktop screens, the interface forms three adjacent working zones:
+On wide desktop screens, the Guide remains the only side rail while the reader uses the available width for the Step Field:
 
 ```text
-Video + temporal map | Navigation grammar | Guide
+Step Field                         | Guide
+Observation                        | Guide
+Temporal map | Navigation grammar  | Guide
+Secondary tools                    | Guide
 ```
 
-This keeps the principal mouse paths short:
+Center is larger and authoritative. Tail and Lead are smaller, visually separated, muted, and independently collapsible. The Field adds only one compact Center-level toggle and one collapse control per side; existing Step buttons and Arrow keys remain the labelled and repeatable forms of the same operators.
 
-- observation remains directly beneath the video;
-- Navigation remains beside the video and above the fold;
-- Pins and Sections remain immediately beside Navigation in the sticky Guide;
-- backward operations align on the left, shared operations on the centre spine, and forward operations on the right.
-
-The central Navigation spine is:
-
-```text
-Reopen
-Return
-Step size
-Pin Current
-Pins
-```
-
-On mobile, the same grammar is preserved while Guide becomes an off-canvas sheet. Controls suppress accidental double-tap zoom without disabling intentional page zoom, and the timeline preserves vertical page scrolling.
+Backward operations remain left, shared operations remain on the centre spine, and Forward operations remain right. On mobile, Center occupies the first full row and the optional side projections become compact cards beneath it while Guide remains an off-canvas sheet. Controls suppress accidental double-tap zoom without disabling intentional page zoom, and the timeline preserves vertical page scrolling.
 
 ## Keyboard
 
@@ -177,6 +165,7 @@ range-geometry.js  pure Range, Neighborhood, Resolution, Refine, Reopen, and Ste
 guide.js           persistent Pins and Sections plus storage migration
 session.js         immutable semantic state, transactions, and Return history
 transport.js       transient Context, Continue, Skim, and Loop execution
+step-field.js      transient Tail/Center/Lead projection and side-player synchronization
 youtube.js         sole raw YouTube IFrame adapter
 source-field.js    optional chapter/transcript candidate records
 view.js            DOM projection, timeline Pins, previews, formatting, and control state

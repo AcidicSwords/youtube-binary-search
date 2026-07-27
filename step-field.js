@@ -198,9 +198,10 @@ export function createStepFieldController({
     });
   }
 
-  function ensurePlayers() {
-    createSide("tail");
-    createSide("lead");
+  function ensurePlayers(prefs) {
+    if (!prefs.stepFieldEnabled) return;
+    if (prefs.tailVisible) createSide("tail");
+    if (prefs.leadVisible) createSide("lead");
   }
 
   function pauseSide(side) {
@@ -391,12 +392,11 @@ export function createStepFieldController({
   }
 
   function tick() {
-    ensurePlayers();
+    const prefs = preferences();
+    ensurePlayers(prefs);
     const snapshot = getSnapshot?.();
     if (!snapshot || !snapshot.range) return;
     syncVideo(snapshot);
-
-    const prefs = preferences();
     if (!snapshot.videoLoaded || !snapshot.videoId) {
       pauseSides();
       runtime.semanticKey = null;
