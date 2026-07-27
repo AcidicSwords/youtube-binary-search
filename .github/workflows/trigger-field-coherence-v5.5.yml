@@ -63,13 +63,12 @@ jobs:
           rm -f .github/workflows/trigger-field-coherence-v5.5.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
           if [ "${{ steps.apply.outputs.status }}" = "0" ]; then
             rm -f field-coherence-v5.5-check.log
             git add -A
-            git diff --cached --check
             git commit -m "Complete Field coherence v5.5"
           else
+            git add -A
             git commit -m "Apply Field coherence v5.5 with failing check log"
           fi
           git push origin HEAD:feature/field-coherence-v5.5
