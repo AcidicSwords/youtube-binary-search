@@ -1,0 +1,113 @@
+name: Commit verified Field grammar v5.4
+
+on:
+  push:
+    branches:
+      - feature/field-grammar-v5.4
+    paths:
+      - .github/workflows/commit-field-grammar-v5.4.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: commit-field-grammar-v5.4
+  cancel-in-progress: false
+
+jobs:
+  apply-test-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/field-grammar-v5.4
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Restore audited base and applicators
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin feature/step-field-v5.3-final
+          git checkout origin/feature/step-field-v5.3-final -- \
+            index.html transport.js session.js step-field.js app.js view.js \
+            package.json README.md IMPLEMENTATION.md
+          git checkout 61e2a7efa8960f21e5a10e9d407e6703142df985 -- \
+            apply-field-grammar-v5.4.py \
+            apply-field-grammar-v5.4-transport-fix.py
+
+      - name: Apply coherent Field grammar
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 apply-field-grammar-v5.4.py
+          python3 apply-field-grammar-v5.4-transport-fix.py
+
+      - name: Assert complete integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const pkg = require('./package.json');
+          const app = fs.readFileSync('app.js', 'utf8');
+          const field = fs.readFileSync('step-field.js', 'utf8');
+          const view = fs.readFileSync('view.js', 'utf8');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const readme = fs.readFileSync('README.md', 'utf8');
+          const fail = message => { throw new Error(message); };
+          if (pkg.version !== '5.4.0') fail('package version is not 5.4.0');
+          if (!pkg.scripts.test.includes('field-grammar-tests.mjs')) fail('field grammar tests are not wired into npm test');
+          if (!pkg.scripts.check.includes('step-field-geometry.js')) fail('geometry syntax check is not wired');
+          if (!app.includes('saveExtentAsSection')) fail('app lacks generic Extent retention');
+          if (!/onSelect:\s*selectFieldSide/.test(app)) fail('app lacks phase-sensitive Field side routing');
+          if (!app.includes('source: "field-span"')) fail('app lacks Field Span Loop source');
+          if (!field.includes('from "./step-field-geometry.js"')) fail('Field controller lacks pure geometry import');
+          if (!field.includes('chooseDirectionalRate')) fail('Field controller lacks direction-preserving rates');
+          if (!view.includes('field-span-label')) fail('View lacks Field Span projection');
+          if (!html.includes('id="field-span-state"')) fail('UI lacks Field Span object');
+          if (/class="observation-dock"/.test(html)) fail('flat playback dock remains');
+          if (!readme.includes('Version 5.4')) fail('README was not updated to v5.4');
+          NODE
+
+          required=(
+            README.md app.js field-grammar-tests.mjs field-grammar.css index.html
+            package.json session.js step-field-geometry.js step-field.js transport.js view.js
+          )
+          changed="$(git diff --name-only origin/feature/step-field-v5.3-final --)"
+          printf '%s\n' "$changed"
+          for path in "${required[@]}"; do
+            grep -Fxq "$path" <<< "$changed" || {
+              echo "Required v5.4 change missing: $path" >&2
+              exit 1
+            }
+          done
+
+      - name: Run Field grammar tests directly
+        run: node field-grammar-tests.mjs
+
+      - name: Run complete repository checks
+        run: npm run check
+
+      - name: Commit verified implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f apply-field-grammar-v5.4.py
+          rm -f apply-field-grammar-v5.4-transport-fix.py
+          rm -f install-field-grammar-v5.4.py
+          rm -f manifest.json
+          rm -f .github/workflows/commit-field-grammar-v5.4.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Complete coherent Field grammar v5.4"
+          git push origin HEAD:feature/field-grammar-v5.4
