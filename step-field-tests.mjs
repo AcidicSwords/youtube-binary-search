@@ -64,6 +64,7 @@ assert.equal(resolveFieldPhase({
   const html = readFileSync("index.html", "utf8");
   const css = readFileSync("step-field.css", "utf8");
   const app = readFileSync("app.js", "utf8");
+  const fieldSource = readFileSync("step-field.js", "utf8");
   const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 
   for (const id of [
@@ -76,6 +77,8 @@ assert.equal(resolveFieldPhase({
   assert.match(app, /createStepFieldController/);
   assert.match(app, /onStep:\s*performStep/);
   assert.doesNotMatch(app, /Recenter(?: Tail| Lead)?/i);
+  assert.match(fieldSource, /setAttribute\?\.\("tabindex", "-1"\)/);
+  assert.match(fieldSource, /setAttribute\?\.\("aria-hidden", "true"\)/);
   assert.match(css, /\.step-field\.field-off/);
   assert.match(css, /tail-collapsed/);
   assert.match(css, /lead-collapsed/);

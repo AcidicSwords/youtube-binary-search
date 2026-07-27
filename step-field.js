@@ -185,6 +185,9 @@ export function createStepFieldController({
           side.ready = true;
           side.error = false;
           adapter.mute?.();
+          const iframe = adapter.raw?.()?.getIframe?.();
+          iframe?.setAttribute?.("tabindex", "-1");
+          iframe?.setAttribute?.("aria-hidden", "true");
           runtime.forceEstablish = true;
         },
         onStateChange: () => {},
