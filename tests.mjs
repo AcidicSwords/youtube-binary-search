@@ -57,7 +57,7 @@ import {
   checkpoint,
   focusSection,
   leaveSection,
-  completeContinue,
+  completePlayback,
   pinCurrent,
   saveIntervalAsSection,
   renameGuidePin,
@@ -407,38 +407,41 @@ assert.equal(deletion.model.focus, null);
 assert.deepEqual(deletion.model.range, { start: 0, end: 100 });
 assert.equal(deletion.model.guide.sections.length, 0);
 
-// Wrapped Range play reopens Resolution without replacing the prior Loop Window.
+// Native playback settles one continuous Interval and reopens Resolution after crossing it.
 let playback = createSession({ duration: 100, current: 20 });
 playback = goTo(playback, 30, { operator: "timeline", label: "Timeline Click" }).session;
-const loopBeforePlay = copy(playback.model.interval);
 const playbackUndo = snapshotModel(playback.model);
-playback = completeContinue(playback, {
-  current: 10,
+playback = completePlayback(playback, {
+  current: 70,
   departure: 30,
   parentNeighborhood: copy(playback.model.resolution),
+  parentResolutionBasis: playback.model.resolutionBasis,
   crossedResolution: true,
-  wrapped: true,
   returnModel: playbackUndo,
-  label: "Continue"
+  label: "Playback"
 }).session;
-assert.equal(playback.model.interval, null, "Wrapped Continue is not one contiguous Interval.");
+assert.deepEqual(
+  { start: playback.model.interval.start, end: playback.model.interval.end },
+  { start: 30, end: 70 }
+);
+assert.equal(playback.model.interval.operator, "playback");
 assert.equal(playback.model.resolution.level, 0);
 
-// A complete Range cycle can end at its departure while still changing Resolution.
+// A crossed playback can restore Range-level Resolution even when physical movement is small.
 let fullCycle = createSession({ duration: 100, current: 0 });
 fullCycle = refine(fullCycle, "forward").session;
 const fullCycleReturn = snapshotModel(fullCycle.model);
 fullCycle = previewRange(fullCycle, 0, 100, 0).session;
-const fullCycleResult = completeContinue(fullCycle, {
-  current: 0,
+const fullCycleResult = completePlayback(fullCycle, {
+  current: 1,
   departure: 0,
   parentNeighborhood: copy(fullCycleReturn.resolution),
+  parentResolutionBasis: fullCycleReturn.resolutionBasis,
   crossedResolution: true,
-  wrapped: true,
   returnModel: fullCycleReturn,
-  label: "Continue"
+  label: "Playback"
 });
-assert.equal(fullCycleResult.changed, true, "A wrapped Resolution change must remain Returnable even at the departure Address.");
+assert.equal(fullCycleResult.changed, true);
 assert.equal(fullCycleResult.session.history.length, 2);
 assert.equal(returnState(fullCycleResult.session).session.model.resolution.level, fullCycleReturn.resolution.level);
 

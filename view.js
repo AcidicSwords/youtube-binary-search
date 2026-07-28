@@ -6,7 +6,6 @@ import {
   midpoint,
   getTargets,
   getActionRanges,
-  chooseSupportedRate,
   RESOLUTION_BASIS
 } from "./range-geometry.js";
 import {
@@ -21,8 +20,7 @@ import {
 } from "./guide.js";
 import {
   TRANSPORT_KIND,
-  isTransportActive,
-  deriveContextWindow
+  isTransportActive
 } from "./transport.js";
 import { YOUTUBE_STATE } from "./youtube.js";
 
@@ -256,6 +254,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           focus.dataset.focusSection = section.id;
           focus.textContent = "Focus";
         }
+        const loop = document.createElement("button");
+        loop.type = "button";
+        loop.dataset.loopSection = section.id;
+        loop.textContent = "Loop";
         const rename = document.createElement("button");
         rename.type = "button";
         rename.dataset.renameSection = section.id;
@@ -265,7 +267,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         remove.dataset.deleteSection = section.id;
         remove.textContent = "Delete";
         remove.className = "danger-text";
-        actions.append(focus, rename, remove);
+        actions.append(focus, loop, rename, remove);
 
         const endpoints = document.createElement("div");
         endpoints.className = "section-endpoints";
@@ -382,9 +384,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const fieldSpan = field?.span?.held && field.span.available
       ? { start: field.span.start, end: field.span.end }
       : null;
-    const skimActive = transportIs(TRANSPORT_KIND.SKIM);
     const loopActive = transportIs(TRANSPORT_KIND.LOOP);
-    const contextActive = transportIs(TRANSPORT_KIND.CONTEXT);
     const semanticCurrent = currentResolution?.C ?? 0;
     const targets = currentResolution
       ? getTargets(currentResolution)
@@ -401,13 +401,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const structuralPresentation = currentResolution ? {
       previousPin: previous ? { start: previous.t, end: semanticCurrent } : null,
       nextPin: next ? { start: semanticCurrent, end: next.t } : null,
-      context: deriveContextWindow(semanticCurrent, activeRange, currentState.contextSeconds),
-      continue: activeRange
+      loop: currentInterval
     } : null;
     const focused = resolveSection(guide(), focusedSectionId());
-    const requestedSkimRate = Number(elements["speed-select"].value || 1);
-    const skimRate = chooseSupportedRate(currentState.availableRates, requestedSkimRate);
-    const skimAvailable = skimRate > 1;
 
     elements["duration-time"].textContent = formatTime(model().duration);
     elements["range-label"].textContent = loaded ? formatRange(activeRange) : "—";
@@ -424,20 +420,25 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
               }`
         }`
       : "—";
-    elements["current-label"].textContent = currentResolution ? formatTime(semanticCurrent) : "—";
-    elements["interval-label"].textContent = currentInterval ? formatRange(currentInterval) : "—";
-    elements["field-span-label"].textContent = fieldSpan ? formatRange(fieldSpan) : "—";
-    elements["field-span-state"].hidden = !fieldSpan;
     elements["range-tools-value"].textContent = loaded ? formatRange(activeRange) : "—";
-    const captureExtent = currentState.captureExtent || currentInterval;
-    const captureKind = currentState.captureExtentKind || "interval";
-    elements["section-source-label"].textContent = captureKind === "field-span" ? "Retain Field Span" : "Retain Interval";
-    elements["section-window"].textContent = captureExtent ? formatRange(captureExtent) : "—";
-    const stepReach = currentState.session.model.stepReach || { backward: 10, forward: 10, linked: true };
-    elements["step-setting-value"].textContent = `← ${formatDuration(stepReach.backward)} | ${formatDuration(stepReach.forward)} →`;
+    elements["pin-current-position"].textContent = currentResolution ? `Current ${formatTime(semanticCurrent)}` : "Current —";
+    elements["context-setting-value"].textContent = currentState.contextSeconds > 0
+      ? `${currentState.contextSeconds} s after traversal`
+      : "Off";
+
+    const stepReach = currentState.session.model.stepReach || { backward: 10, forward: 10, linked: false };
     elements["step-backward-seconds"].value = String(stepReach.backward);
     elements["step-forward-seconds"].value = String(stepReach.forward);
-    elements["step-link"].checked = stepReach.linked !== false;
+
+    const sectionKind = elements["section-source"].value || "interval";
+    const sectionExtent = sectionKind === "field-span" ? fieldSpan : currentInterval;
+    elements["section-window"].textContent = sectionExtent
+      ? `${sectionKind === "field-span" ? "Field" : "Interval"} ${formatRange(sectionExtent)}`
+      : `No ${sectionKind === "field-span" ? "Held Field span" : "movement Interval"}`;
+    const sourceOptions = [...elements["section-source"].options];
+    const fieldOption = sourceOptions.find(option => option.value === "field-span");
+    if (fieldOption) fieldOption.disabled = !fieldSpan;
+    if (sectionKind === "field-span" && !fieldSpan) elements["section-source"].value = currentInterval ? "interval" : "field-span";
 
     elements["focused-section"].hidden = !focused;
     if (focused) {
@@ -451,16 +452,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const interactionLocked = !loaded;
     for (const id of [
       "range-start-here", "range-midpoint", "range-end-here", "full-video-range",
-      "step-backward-seconds", "step-forward-seconds", "step-link",
-      "tail-rate-select", "lead-rate-select",
-      "section-label", "save-section", "speed-select"
-    ]) elements[id].disabled = interactionLocked;
+      "step-backward-seconds", "step-forward-seconds",
+      "tail-rate-select", "lead-rate-select", "context-select",
+      "section-source", "section-label", "pin-label"
+    ]) {
+      if (elements[id]) elements[id].disabled = interactionLocked;
+    }
 
-    elements["context-select"].disabled = interactionLocked;
-    elements["context-action"].disabled = interactionLocked || currentState.contextSeconds <= 0;
-    elements["interval-state"].disabled = interactionLocked || !currentInterval;
     elements["save-section"].disabled = interactionLocked
-      || !currentInterval
+      || !sectionExtent
       || !elements["section-label"].value.trim();
     elements["leave-section"].disabled = interactionLocked || !focused;
     elements["refine-backward"].disabled = interactionLocked || targets.backward === null;
@@ -471,20 +471,14 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["step-forward"].disabled = interactionLocked || !actionModel?.stepForward;
     elements["pin-backward"].disabled = interactionLocked || !previous;
     elements["pin-forward"].disabled = interactionLocked || !next;
-    const currentPin = currentResolution
-      ? findPinAt(guide(), semanticCurrent)
-      : null;
+
+    const currentPin = currentResolution ? findPinAt(guide(), semanticCurrent) : null;
     const alreadyPinned = currentPin?.kind === PIN_KIND.EXPLICIT;
-    elements["pin-current"].disabled = interactionLocked || alreadyPinned;
-    elements.continue.disabled = interactionLocked;
-    const loopSource = currentState.transport.source || "interval";
-    const intervalLoopActive = loopActive && loopSource === "interval";
-    const fieldLoopActive = loopActive && loopSource === "field-span";
-    elements.loop.disabled = interactionLocked || (!currentInterval && !intervalLoopActive) || fieldLoopActive;
-    elements["field-span-loop"].disabled = interactionLocked || (!fieldSpan && !fieldLoopActive) || intervalLoopActive;
-    elements["field-span-retain"].disabled = interactionLocked || !fieldSpan;
-    elements.skim.disabled = interactionLocked
-      || (skimActive ? false : targets.forward === null || !skimAvailable);
+    elements["pin-current"].disabled = interactionLocked || (alreadyPinned && !elements["pin-label"].value.trim());
+    elements.loop.disabled = interactionLocked || (!currentInterval && !loopActive);
+    elements.loop.classList.toggle("is-active", loopActive);
+    elements.loop.setAttribute("aria-pressed", String(loopActive));
+    elements["loop-label"].textContent = loopActive ? "Stop Loop" : "Loop";
 
     const atFullVideo = loaded
       && Math.abs(activeRange.start) <= EPSILON
@@ -503,40 +497,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       || !currentResolution
       || Math.abs(semanticCurrent - midpoint(activeRange.start, activeRange.end)) <= EPSILON;
 
-    const transportActive = isTransportActive(currentState.transport);
-    const activeKindLabel = {
-      [TRANSPORT_KIND.CONTEXT]: "Context",
-      [TRANSPORT_KIND.CONTINUE]: "Continue",
-      [TRANSPORT_KIND.SKIM]: "Skim",
-      [TRANSPORT_KIND.LOOP]: "Loop"
-    }[currentState.transport.kind] || "Observation";
-    elements["context-label"].textContent = contextActive ? "Stop Context" : "Context";
-    elements["skim-label"].textContent = skimActive ? "Stop Skim" : "Skim";
-    elements["continue-label"].textContent = transportActive ? "Pause" : "Continue";
-    elements["loop-label"].textContent = intervalLoopActive ? "Stop Loop" : "Loop";
-    elements["field-span-loop-label"].textContent = fieldLoopActive ? "Stop Loop" : "Loop";
-    elements["continue-meta"].textContent = transportActive
-      ? `${activeKindLabel} active`
-      : loaded ? formatRange(activeRange) : "—";
-    for (const [id, active] of [
-      ["context-action", contextActive],
-      ["continue", transportActive],
-      ["skim", skimActive],
-      ["loop", intervalLoopActive],
-      ["field-span-loop", fieldLoopActive]
-    ]) {
-      elements[id].classList.toggle("is-active", active);
-      elements[id].setAttribute("aria-pressed", String(active));
-    }
-    elements["context-state"].textContent = contextActive
-      ? formatRange(currentState.transport)
-      : currentState.contextSeconds > 0
-        ? `${currentState.contextSeconds} s`
-        : "Off";
     elements["return-meta"].textContent = currentState.session.history.length
       ? currentState.session.history.at(-1).label
       : "Nothing to return to";
-
     setActionMeta(
       "refine-backward",
       "backward-meta",
@@ -552,11 +515,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["reopen-meta"].textContent = actionModel?.reopen
       ? `${formatDuration(activeRange.end - activeRange.start)} available`
       : "Range-level resolution";
-    elements["skim-meta"].textContent = targets.forward === null
-      ? "No forward destination"
-      : !skimAvailable
-        ? "No boosted rate available"
-        : `to ${formatTime(targets.forward)} · ${skimRate}×`;
     elements["loop-meta"].textContent = currentInterval ? formatRange(currentInterval) : "No Interval";
     elements["step-backward-meta"].textContent = actionModel?.stepBackward
       ? `to ${formatTime(actionModel.stepBackward.destination)}`
@@ -570,11 +528,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["pin-forward-meta"].textContent = next
       ? `${formatTime(next.t)}${next.label ? ` · ${next.label}` : ""}`
       : "No Pin forward";
-    elements["pin-current-meta"].textContent = currentResolution
-      ? alreadyPinned
-        ? `Pinned at ${formatTime(semanticCurrent)}`
-        : `at ${formatTime(semanticCurrent)}`
-      : "—";
 
     if (!loaded || !currentResolution) {
       for (const id of [

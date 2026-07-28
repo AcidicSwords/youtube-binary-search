@@ -1,4 +1,4 @@
-// Step Field execution controller. Tail and Lead remain muted physical projections of Session state.
+// Step Field execution controller. Tail and Lead are muted physical projections of Session state.
 import { EPSILON, clamp } from "./range-geometry.js";
 import { YOUTUBE_STATE, createYouTubePlayer, isYouTubeApiReady } from "./youtube.js";
 import {
@@ -11,9 +11,7 @@ import {
   normalizeFieldReach,
   chooseNearestRate,
   chooseDirectionalRate,
-  hasCenterDiscontinuity,
   resolveFieldPhase,
-  sideActivationMode,
   deriveObservedField
 } from "./step-field-geometry.js";
 
@@ -26,11 +24,14 @@ export {
   normalizeFieldReach,
   chooseNearestRate,
   chooseDirectionalRate,
-  hasCenterDiscontinuity,
   resolveFieldPhase,
-  sideActivationMode,
   deriveObservedField
 } from "./step-field-geometry.js";
+
+export const FIELD_SIDE_MODE = Object.freeze({
+  HELD: "held",
+  STRETCHING: "stretching"
+});
 
 const REACH_TOLERANCE = FIELD_REACH_TOLERANCE;
 const DRIFT_TOLERANCE = 0.42;
@@ -48,17 +49,12 @@ function snapshotReach(snapshot) {
   return normalizeFieldReach(snapshot?.stepReach);
 }
 
-function semanticKey(snapshot) {
+function structuralKey(snapshot) {
   const range = snapshot.range || { start: 0, end: 0 };
-  const reach = normalizeFieldReach(snapshotReach(snapshot));
   return [
     snapshot.videoId || "",
-    Number(snapshot.current || 0).toFixed(3),
     Number(range.start || 0).toFixed(3),
-    Number(range.end || 0).toFixed(3),
-    Number(reach.backward).toFixed(3),
-    Number(reach.forward).toFixed(3),
-    String(reach.linked)
+    Number(range.end || 0).toFixed(3)
   ].join("|");
 }
 
@@ -68,7 +64,7 @@ export function fieldShouldSuspend(snapshot) {
     snapshot?.rangeDragging
     || snapshot?.dragging
     || snapshot?.pendingStep
-    || ["context", "skim", "loop"].includes(transportKind)
+    || transportKind === "context"
   );
 }
 
@@ -82,62 +78,56 @@ export function createStepFieldController({
   getSnapshot,
   getPreferences = defaultPreferences,
   setPreferences = () => {},
-  onStep = () => {},
-  onSelect = null,
+  onSelect = () => {},
+  onHoldOffsets = () => {},
   onChange = () => {},
   formatTime = value => String(value),
   createPlayer = createYouTubePlayer
 }) {
-  const elements = Object.fromEntries(
-    [
-      "step-field", "step-field-toggle", "step-field-meta",
-      "tail-pane", "tail-meta", "tail-step", "tail-collapse", "tail-restore",
-      "lead-pane", "lead-meta", "lead-step", "lead-collapse", "lead-restore",
-      "center-meta", "tail-rate-select", "lead-rate-select",
-      "field-transport-state", "field-rate-state"
-    ].map(id => [id, document?.getElementById?.(id) || null])
-  );
+  const ids = [
+    "step-field", "step-field-toggle", "step-field-meta",
+    "tail-pane", "tail-meta", "tail-step", "tail-step-button", "tail-collapse", "tail-restore",
+    "lead-pane", "lead-meta", "lead-step", "lead-step-button", "lead-collapse", "lead-restore",
+    "center-meta", "tail-rate-select", "lead-rate-select",
+    "tail-field-toggle", "tail-field-toggle-label", "tail-offset-state",
+    "lead-field-toggle", "lead-field-toggle-label", "lead-offset-state",
+    "field-both-toggle", "field-both-toggle-label", "field-transport-state", "field-rate-state",
+    "field-span-label"
+  ];
+  const elements = Object.fromEntries(ids.map(id => [id, document?.getElementById?.(id) || null]));
 
   const sides = {
-    tail: {
-      role: "tail",
-      elementId: "player-tail",
-      requestedRate: 0.5,
-      actualRate: 1,
-      playback: "idle",
-      adapter: null,
-      ready: false,
-      videoId: null,
-      held: false,
-      heldDistance: 0,
-      rateAvailable: true,
-      error: false
-    },
-    lead: {
-      role: "lead",
-      elementId: "player-lead",
-      requestedRate: 2,
-      actualRate: 1,
-      playback: "idle",
-      adapter: null,
-      ready: false,
-      videoId: null,
-      held: false,
-      heldDistance: 0,
-      rateAvailable: true,
-      error: false
-    }
+    tail: createSideState("tail", "player-tail", DEFAULT_FIELD_RESPONSE.tailRate),
+    lead: createSideState("lead", "player-lead", DEFAULT_FIELD_RESPONSE.leadRate)
   };
 
   const runtime = {
     phase: STEP_FIELD_PHASE.OFF,
-    semanticKey: null,
+    structuralKey: null,
+    semanticCurrent: null,
     lastCenterTime: null,
-    suspended: false,
     forceEstablish: true,
+    suspended: false,
     field: null,
     fieldKey: ""
   };
+
+  function createSideState(role, elementId, requestedRate) {
+    return {
+      role,
+      elementId,
+      requestedRate,
+      actualRate: 1,
+      playback: "idle",
+      adapter: null,
+      ready: false,
+      videoId: null,
+      mode: FIELD_SIDE_MODE.HELD,
+      offset: 0,
+      rateAvailable: true,
+      error: false
+    };
+  }
 
   function preferences() {
     return { ...defaultPreferences(), ...(getPreferences?.() || {}) };
@@ -146,6 +136,14 @@ export function createStepFieldController({
   function changePreferences(patch) {
     setPreferences?.(patch);
     if (fieldPreferenceRequiresEstablish(patch)) runtime.forceEstablish = true;
+  }
+
+  function directionFor(role) {
+    return role === "tail" ? "backward" : "forward";
+  }
+
+  function maxOffset(role, snapshot = getSnapshot?.()) {
+    return snapshotReach(snapshot)[directionFor(role)];
   }
 
   function bind() {
@@ -167,26 +165,28 @@ export function createStepFieldController({
     elements["lead-restore"]?.addEventListener?.("click", () => {
       changePreferences({ leadVisible: true, stepFieldEnabled: true });
     });
-    elements["tail-step"]?.addEventListener?.("click", () => selectSide("tail"));
-    elements["lead-step"]?.addEventListener?.("click", () => selectSide("lead"));
+    for (const id of ["tail-step", "tail-step-button"]) {
+      elements[id]?.addEventListener?.("click", () => selectSide("tail"));
+    }
+    for (const id of ["lead-step", "lead-step-button"]) {
+      elements[id]?.addEventListener?.("click", () => selectSide("lead"));
+    }
     elements["tail-rate-select"]?.addEventListener?.("change", event => {
       changePreferences({ tailRate: Number(event.target.value) });
     });
     elements["lead-rate-select"]?.addEventListener?.("change", event => {
       changePreferences({ leadRate: Number(event.target.value) });
     });
+    elements["tail-field-toggle"]?.addEventListener?.("click", () => toggleSide("tail"));
+    elements["lead-field-toggle"]?.addEventListener?.("click", () => toggleSide("lead"));
+    elements["field-both-toggle"]?.addEventListener?.("click", toggleBoth);
   }
 
   function createSide(role) {
     const side = sides[role];
     if (side.adapter || !isYouTubeApiReady() || !document?.getElementById?.(side.elementId)) return;
     side.adapter = createPlayer(side.elementId, {
-      playerVars: {
-        controls: 0,
-        disablekb: 1,
-        fs: 0,
-        playsinline: 1
-      },
+      playerVars: { controls: 0, disablekb: 1, fs: 0, playsinline: 1 },
       events: {
         onReady: adapter => {
           side.ready = true;
@@ -199,6 +199,9 @@ export function createStepFieldController({
         },
         onStateChange: name => {
           side.playback = name;
+          if (name === YOUTUBE_STATE.PLAYING || name === YOUTUBE_STATE.BUFFERING) {
+            populateRateControl(role, preferences());
+          }
         },
         onPlaybackRateChange: rate => {
           if (Number.isFinite(Number(rate))) side.actualRate = Number(rate);
@@ -210,6 +213,7 @@ export function createStepFieldController({
         onError: () => {
           side.error = true;
           side.ready = false;
+          side.playback = "error";
         }
       }
     });
@@ -221,11 +225,20 @@ export function createStepFieldController({
     if (prefs.leadVisible) createSide("lead");
   }
 
+  function readSide(side) {
+    return side.adapter?.read?.() || {
+      time: runtime.semanticCurrent || 0,
+      rate: 1,
+      state: YOUTUBE_STATE.UNSTARTED,
+      availableRates: [1]
+    };
+  }
+
   function pauseSide(side) {
     side.adapter?.pause?.();
     side.adapter?.setRate?.(1);
     side.actualRate = 1;
-    if (side.playback !== "blocked" && side.playback !== "error") side.playback = "idle";
+    if (!["blocked", "error"].includes(side.playback)) side.playback = "idle";
   }
 
   function pauseSides() {
@@ -233,50 +246,26 @@ export function createStepFieldController({
     pauseSide(sides.lead);
   }
 
-  function resetSideState() {
-    for (const side of Object.values(sides)) {
-      side.held = false;
-      side.heldDistance = 0;
-    }
+  function placeSide(side, address) {
+    if (!side.ready || !side.adapter) return;
+    side.adapter.mute?.();
+    side.adapter.setRate?.(1);
+    side.actualRate = 1;
+    side.adapter.place?.(address);
   }
 
-  function invalidate() {
-    pauseSides();
-    resetSideState();
-    runtime.semanticKey = null;
-    runtime.lastCenterTime = null;
-    runtime.forceEstablish = true;
-    runtime.suspended = false;
-    runtime.field = null;
-    runtime.fieldKey = "";
-    onChange?.(null);
+  function exactAddress(role, center, offset, range) {
+    return role === "tail"
+      ? clamp(center - offset, range.start, range.end)
+      : clamp(center + offset, range.start, range.end);
   }
 
-  function readSide(side) {
-    return side.adapter?.read?.() || {
-      time: 0,
-      rate: 1,
-      state: YOUTUBE_STATE.UNSTARTED,
-      availableRates: [1]
-    };
-  }
-
-  function setSideRate(side, requestedRate) {
-    side.adapter?.mute?.();
-    side.requestedRate = requestedRate;
-    const snapshot = readSide(side);
-    side.actualRate = snapshot.rate;
-    const rate = requestedRate === 1
-      ? 1
-      : chooseDirectionalRate(snapshot.availableRates, requestedRate, side.role);
-    side.rateAvailable = rate !== null;
-    if (rate === null) {
-      pauseSide(side);
-      return false;
-    }
-    if (Math.abs(snapshot.rate - rate) > 0.001) side.adapter?.setRate?.(rate);
-    side.actualRate = readSide(side).rate;
-    return true;
+  function measuredOffset(role, center = runtime.lastCenterTime ?? runtime.semanticCurrent, snapshot = getSnapshot?.()) {
+    const side = sides[role];
+    const time = readSide(side).time;
+    const value = role === "tail" ? center - time : time - center;
+    const maximum = maxOffset(role, snapshot);
+    return clamp(Math.max(0, value), 0, maximum);
   }
 
   function ensureSidePlaying(side) {
@@ -324,23 +313,401 @@ export function createStepFieldController({
     select.dataset.requested = String(requested);
   }
 
-  function playSides() {
+  function requestStretchRate(side) {
+    side.adapter?.mute?.();
+    side.requestedRate = Number(preferences()[`${side.role}Rate`]);
+    const snapshot = readSide(side);
+    const rate = chooseDirectionalRate(snapshot.availableRates, side.requestedRate, side.role);
+    side.rateAvailable = rate !== null;
+    if (rate === null) {
+      side.adapter?.setRate?.(1);
+      side.actualRate = 1;
+      return false;
+    }
+    if (Math.abs(snapshot.rate - rate) > 0.001) side.adapter?.setRate?.(rate);
+    side.actualRate = readSide(side).rate;
+    return true;
+  }
+
+  function establish(snapshot, address = snapshot.current) {
+    const center = clamp(address, snapshot.range.start, snapshot.range.end);
+    for (const side of Object.values(sides)) {
+      side.mode = FIELD_SIDE_MODE.HELD;
+      side.offset = 0;
+      pauseSide(side);
+      placeSide(side, center);
+    }
+    runtime.structuralKey = structuralKey(snapshot);
+    runtime.semanticCurrent = center;
+    runtime.lastCenterTime = center;
+    runtime.forceEstablish = false;
+    runtime.phase = STEP_FIELD_PHASE.COINCIDENT;
+  }
+
+  function translateToCurrent(current, { preserve = true } = {}) {
+    const snapshot = getSnapshot?.();
+    if (!snapshot?.videoLoaded || !snapshot.range || !Number.isFinite(current)) return;
+    const previous = Number.isFinite(runtime.lastCenterTime)
+      ? runtime.lastCenterTime
+      : Number.isFinite(runtime.semanticCurrent)
+        ? runtime.semanticCurrent
+        : snapshot.current;
+    const offsets = {
+      tail: preserve ? measuredOffset("tail", previous, snapshot) : 0,
+      lead: preserve ? measuredOffset("lead", previous, snapshot) : 0
+    };
+    runtime.semanticCurrent = clamp(current, snapshot.range.start, snapshot.range.end);
+    runtime.lastCenterTime = runtime.semanticCurrent;
+    for (const role of ["tail", "lead"]) {
+      const side = sides[role];
+      const offset = clamp(offsets[role], 0, maxOffset(role, snapshot));
+      side.offset = offset;
+      pauseSide(side);
+      placeSide(side, exactAddress(role, runtime.semanticCurrent, offset, snapshot.range));
+    }
+    runtime.structuralKey = structuralKey(snapshot);
+    runtime.forceEstablish = false;
+    publish(snapshot);
+  }
+
+  function translatePhysicalCenter(address, { preserve = true } = {}) {
+    const snapshot = getSnapshot?.();
+    if (!snapshot?.videoLoaded || !snapshot.range || !Number.isFinite(address)) return;
+    const previous = Number.isFinite(runtime.lastCenterTime)
+      ? runtime.lastCenterTime
+      : Number(snapshot.center?.time ?? snapshot.current);
+    const nextCenter = clamp(address, snapshot.range.start, snapshot.range.end);
+    for (const role of ["tail", "lead"]) {
+      const side = sides[role];
+      const offset = preserve ? measuredOffset(role, previous, snapshot) : 0;
+      side.offset = clamp(offset, 0, maxOffset(role, snapshot));
+      pauseSide(side);
+      placeSide(side, exactAddress(role, nextCenter, side.offset, snapshot.range));
+    }
+    runtime.lastCenterTime = nextCenter;
+  }
+
+  function stretch(role) {
+    const snapshot = getSnapshot?.();
+    const side = sides[role];
+    if (!snapshot?.videoLoaded || !side) return;
+    const center = clamp(
+      Number(snapshot.center?.time ?? snapshot.current),
+      snapshot.range.start,
+      snapshot.range.end
+    );
+    side.mode = FIELD_SIDE_MODE.STRETCHING;
+    side.offset = 0;
+    pauseSide(side);
+    // Stretch is one complete operation: refold to the physical Center, then
+    // diverge from that same point on the next genuine Center playback.
+    placeSide(side, center);
+    runtime.semanticCurrent = snapshot.current;
+    runtime.lastCenterTime = center;
+    publish(snapshot);
+  }
+
+  function hold(role) {
+    const snapshot = getSnapshot?.();
+    const side = sides[role];
+    if (!snapshot?.videoLoaded || !side) return;
+    const offset = measuredOffset(role, Number(snapshot.center?.time ?? snapshot.current), snapshot);
+    side.mode = FIELD_SIDE_MODE.HELD;
+    side.offset = offset;
+    side.adapter?.setRate?.(1);
+    side.actualRate = 1;
+    onHoldOffsets?.({ [directionFor(role)]: Math.max(0.25, offset || maxOffset(role, snapshot)) });
+    publish(snapshot);
+  }
+
+  function toggleSide(role) {
+    const side = sides[role];
+    if (side.mode === FIELD_SIDE_MODE.HELD) stretch(role);
+    else hold(role);
+  }
+
+  function toggleBoth() {
+    const allHeld = ["tail", "lead"].every(role => sides[role].mode === FIELD_SIDE_MODE.HELD);
+    if (allHeld) {
+      stretch("tail");
+      stretch("lead");
+      return;
+    }
+    const snapshot = getSnapshot?.();
+    if (!snapshot?.videoLoaded) return;
+    const center = Number(snapshot.center?.time ?? snapshot.current);
+    const offsets = {
+      backward: Math.max(0.25, measuredOffset("tail", center, snapshot) || maxOffset("tail", snapshot)),
+      forward: Math.max(0.25, measuredOffset("lead", center, snapshot) || maxOffset("lead", snapshot))
+    };
+    for (const role of ["tail", "lead"]) {
+      const side = sides[role];
+      side.mode = FIELD_SIDE_MODE.HELD;
+      side.offset = offsets[directionFor(role)];
+      side.adapter?.setRate?.(1);
+      side.actualRate = 1;
+    }
+    onHoldOffsets?.(offsets);
+    publish(snapshot);
+  }
+
+  function driveSide(role, center, snapshot, centerPlaying) {
+    const side = sides[role];
+    const prefs = preferences();
+    const visible = prefs[`${role}Visible`];
+    const maximum = maxOffset(role, snapshot);
+    if (!visible || !side.ready || side.error || maximum <= EPSILON) {
+      pauseSide(side);
+      return { available: false, held: false, offset: 0 };
+    }
+
+    const offset = measuredOffset(role, center, snapshot);
+    side.offset = offset;
+    if (!centerPlaying) {
+      pauseSide(side);
+      return { available: true, held: side.mode === FIELD_SIDE_MODE.HELD, offset };
+    }
+
+    if (side.mode === FIELD_SIDE_MODE.HELD) {
+      side.adapter?.setRate?.(1);
+      side.actualRate = 1;
+      ensureSidePlaying(side);
+      const exact = exactAddress(role, center, offset, snapshot.range);
+      const actual = readSide(side).time;
+      if (Math.abs(actual - exact) > DRIFT_TOLERANCE) {
+        placeSide(side, exact);
+        ensureSidePlaying(side);
+      }
+      return { available: true, held: true, offset };
+    }
+
+    // Prime at 1× first. Directional capability is only trusted after the side
+    // player has actually entered playback and exposed its own rate list.
+    ensureSidePlaying(side);
+    const sideState = readSide(side).state;
+    if ([YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(sideState)) {
+      populateRateControl(role, prefs);
+      requestStretchRate(side);
+    }
+    const nextOffset = measuredOffset(role, center, snapshot);
+    side.offset = nextOffset;
+    if (nextOffset >= maximum - REACH_TOLERANCE) {
+      side.mode = FIELD_SIDE_MODE.HELD;
+      side.offset = maximum;
+      placeSide(side, exactAddress(role, center, maximum, snapshot.range));
+      side.adapter?.setRate?.(1);
+      side.actualRate = 1;
+      ensureSidePlaying(side);
+      return { available: true, held: true, offset: maximum };
+    }
+    return { available: true, held: false, offset: nextOffset };
+  }
+
+  function selectSide(role) {
+    const snapshot = getSnapshot?.();
+    if (!snapshot?.videoLoaded) return;
+    const side = sides[role];
+    const measured = measuredOffset(role, Number(snapshot.center?.time ?? snapshot.current), snapshot);
+    const distance = measured > REACH_TOLERANCE ? measured : maxOffset(role, snapshot);
+    if (!(distance > EPSILON)) return;
+    onSelect?.({
+      role,
+      direction: directionFor(role),
+      mode: "step",
+      distance,
+      offset: measured,
+      target: maxOffset(role, snapshot),
+      address: exactAddress(role, snapshot.current, distance, snapshot.range)
+    });
+  }
+
+  function formatOffset(value) {
+    if (!Number.isFinite(value)) return "—";
+    const rounded = value >= 10 ? value.toFixed(0) : value.toFixed(1).replace(/\.0$/, "");
+    return `${rounded}s`;
+  }
+
+  function sideMeta(role, sideState, target) {
+    const side = sides[role];
+    if (runtime.suspended) return "Context suspended";
+    if (side.playback === "blocked") return "Playback blocked";
+    if (side.error) return "Player unavailable";
+    if (!side.rateAvailable && side.mode === FIELD_SIDE_MODE.STRETCHING) return "Directional rate unavailable";
+    const prefix = role === "tail" ? "−" : "+";
+    const state = side.mode === FIELD_SIDE_MODE.HELD ? "Held" : "Stretching";
+    return `${prefix}${formatOffset(sideState.offset)} / ${formatOffset(target.distance)} · ${state} · ${side.actualRate}×`;
+  }
+
+  function publish(snapshot = getSnapshot?.(), live = null, sideStates = null) {
+    if (!snapshot?.range) return null;
+    const prefs = preferences();
+    const center = clamp(Number(snapshot.center?.time ?? snapshot.current ?? 0), snapshot.range.start, snapshot.range.end);
+    const targets = live || deriveStepField(center, snapshotReach(snapshot), snapshot.range);
+    const states = sideStates || {
+      tail: { available: targets.tail.available, held: sides.tail.mode === FIELD_SIDE_MODE.HELD, offset: measuredOffset("tail", center, snapshot) },
+      lead: { available: targets.lead.available, held: sides.lead.mode === FIELD_SIDE_MODE.HELD, offset: measuredOffset("lead", center, snapshot) }
+    };
+    const observed = deriveObservedField({
+      targets,
+      phase: runtime.phase,
+      centerAddress: center,
+      tailAddress: exactAddress("tail", center, states.tail.offset, snapshot.range),
+      leadAddress: exactAddress("lead", center, states.lead.offset, snapshot.range),
+      tailVisible: prefs.tailVisible,
+      leadVisible: prefs.leadVisible,
+      tailHeld: states.tail.held,
+      leadHeld: states.lead.held
+    });
+    for (const role of ["tail", "lead"]) {
+      observed[role].mode = sides[role].mode;
+      observed[role].requestedRate = Number(prefs[`${role}Rate`]);
+      observed[role].actualRate = sides[role].actualRate;
+      observed[role].playback = sides[role].playback;
+      observed[role].rateAvailable = sides[role].rateAvailable;
+      observed[role].offset = states[role].offset;
+      observed[role].targetDistance = targets[role].distance;
+    }
+    observed.span = {
+      start: observed.tail.address,
+      end: observed.lead.address,
+      duration: Math.max(0, observed.lead.address - observed.tail.address),
+      available: observed.tail.visible && observed.lead.visible && observed.lead.address - observed.tail.address > EPSILON,
+      held: observed.tail.held && observed.lead.held
+    };
+    const key = JSON.stringify({
+      phase: observed.phase,
+      center: Number(center.toFixed(2)),
+      tail: Number(observed.tail.offset.toFixed(2)),
+      lead: Number(observed.lead.offset.toFixed(2)),
+      modes: [observed.tail.mode, observed.lead.mode],
+      rates: [observed.tail.actualRate, observed.lead.actualRate],
+      playback: [observed.tail.playback, observed.lead.playback],
+      suspended: runtime.suspended
+    });
+    runtime.field = observed;
+    if (key !== runtime.fieldKey) {
+      runtime.fieldKey = key;
+      onChange?.(observed);
+    }
+    render(snapshot, observed, states);
+    return observed;
+  }
+
+  function setText(element, value) {
+    if (element) element.textContent = value;
+  }
+
+  function render(snapshot = getSnapshot?.(), field = runtime.field, sideStates = null) {
+    if (!snapshot || !elements["step-field"]) return;
+    const prefs = preferences();
+    const loaded = Boolean(snapshot.videoLoaded);
+    const root = elements["step-field"];
+    const shown = loaded && prefs.stepFieldEnabled;
+    root.classList.toggle("field-off", !shown);
+    root.classList.toggle("tail-collapsed", !prefs.tailVisible);
+    root.classList.toggle("lead-collapsed", !prefs.leadVisible);
+    root.classList.toggle("is-suspended", runtime.suspended);
+    root.dataset.phase = runtime.phase;
+
+    elements["tail-pane"]?.classList?.toggle("is-collapsed", !prefs.tailVisible);
+    elements["lead-pane"]?.classList?.toggle("is-collapsed", !prefs.leadVisible);
+    if (elements["tail-restore"]) elements["tail-restore"].hidden = prefs.tailVisible;
+    if (elements["lead-restore"]) elements["lead-restore"].hidden = prefs.leadVisible;
+    if (elements["tail-collapse"]) elements["tail-collapse"].hidden = !prefs.tailVisible;
+    if (elements["lead-collapse"]) elements["lead-collapse"].hidden = !prefs.leadVisible;
+
+    if (elements["step-field-toggle"]) elements["step-field-toggle"].disabled = !loaded;
+    elements["step-field-toggle"]?.setAttribute?.("aria-pressed", String(shown));
+    elements["step-field-toggle"]?.setAttribute?.("aria-label", `${shown ? "Hide" : "Show"} Step Field`);
+    setText(elements["step-field-meta"], !loaded ? "Load video" : shown ? "On" : "Off");
+    setText(elements["center-meta"], loaded ? formatTime(Number(snapshot.center?.time ?? snapshot.current)) : "—");
+
+    const reach = snapshotReach(snapshot);
+    for (const role of ["tail", "lead"]) {
+      const side = sides[role];
+      const direction = directionFor(role);
+      const actual = field?.[role]?.offset ?? side.offset;
+      const target = reach[direction];
+      const nextAction = side.mode === FIELD_SIDE_MODE.HELD ? "Stretch" : "Hold";
+      setText(elements[`${role}-field-toggle-label`], nextAction);
+      setText(elements[`${role}-offset-state`], `${formatOffset(actual)} / ${formatOffset(target)}`);
+      elements[`${role}-field-toggle`]?.setAttribute?.("aria-pressed", String(side.mode === FIELD_SIDE_MODE.HELD));
+      if (elements[`${role}-field-toggle`]) elements[`${role}-field-toggle`].disabled = !shown || !prefs[`${role}Visible`];
+      for (const id of [`${role}-step`, `${role}-step-button`]) {
+        if (elements[id]) elements[id].disabled = !shown || !prefs[`${role}Visible`] || !(target > EPSILON);
+      }
+      setText(elements[`${role}-meta`], !loaded ? "—" : sideMeta(role, { offset: actual }, { distance: target }));
+    }
+
+    const bothHeld = sides.tail.mode === FIELD_SIDE_MODE.HELD && sides.lead.mode === FIELD_SIDE_MODE.HELD;
+    setText(elements["field-both-toggle-label"], bothHeld ? "Stretch both" : "Hold both");
+    elements["field-both-toggle"]?.setAttribute?.("aria-pressed", String(bothHeld));
+    if (elements["field-both-toggle"]) elements["field-both-toggle"].disabled = !shown;
+    setText(elements["field-transport-state"], runtime.suspended
+      ? "Context suspended"
+      : runtime.phase === STEP_FIELD_PHASE.PARTIAL
+        ? "Partially Held"
+        : runtime.phase.charAt(0).toUpperCase() + runtime.phase.slice(1));
+    setText(elements["field-rate-state"], `Tail ${sides.tail.actualRate}× · Center 1× · Lead ${sides.lead.actualRate}×`);
+    setText(elements["field-span-label"], field?.span?.held && field.span.available
+      ? `${formatTime(field.span.start)}–${formatTime(field.span.end)}`
+      : `Current ${loaded ? formatTime(snapshot.current) : "—"}`);
+  }
+
+  function tick() {
     const prefs = preferences();
     const snapshot = getSnapshot?.();
-    if (!snapshot?.videoLoaded || !prefs.stepFieldEnabled) return false;
-    ensurePlayers(prefs);
+    if (!snapshot?.range) return;
+    if (snapshot.videoLoaded) ensurePlayers(prefs);
     syncVideo(snapshot);
-    let started = false;
-    for (const role of ["tail", "lead"]) {
-      const visible = prefs[`${role}Visible`];
-      const side = sides[role];
-      if (!visible || !side.ready || side.error) continue;
-      const requested = Number(prefs[`${role}Rate`]);
-      if (!setSideRate(side, requested)) continue;
-      ensureSidePlaying(side);
-      started = true;
+    populateRateControl("tail", prefs);
+    populateRateControl("lead", prefs);
+
+    if (!snapshot.videoLoaded || !snapshot.videoId) {
+      pauseSides();
+      runtime.phase = prefs.stepFieldEnabled ? STEP_FIELD_PHASE.COINCIDENT : STEP_FIELD_PHASE.OFF;
+      runtime.semanticCurrent = snapshot.current || 0;
+      publish(snapshot);
+      return;
     }
-    return started;
+
+    if (runtime.forceEstablish || runtime.structuralKey !== structuralKey(snapshot)) {
+      establish(snapshot, snapshot.current);
+    } else if (Math.abs((runtime.semanticCurrent ?? snapshot.current) - snapshot.current) > EPSILON) {
+      translateToCurrent(snapshot.current, { preserve: true });
+    }
+
+    if (!prefs.stepFieldEnabled || (!prefs.tailVisible && !prefs.leadVisible)) {
+      pauseSides();
+      runtime.phase = STEP_FIELD_PHASE.OFF;
+      runtime.suspended = false;
+      publish(snapshot);
+      return;
+    }
+
+    runtime.suspended = fieldShouldSuspend(snapshot) || Boolean(document?.hidden);
+    const center = clamp(Number(snapshot.center?.time ?? snapshot.current), snapshot.range.start, snapshot.range.end);
+    const centerPlaying = !runtime.suspended
+      && snapshot.center?.state === YOUTUBE_STATE.PLAYING;
+    const live = deriveStepField(center, snapshotReach(snapshot), snapshot.range);
+
+    if (runtime.suspended) pauseSides();
+    const sideStates = {
+      tail: driveSide("tail", center, snapshot, centerPlaying),
+      lead: driveSide("lead", center, snapshot, centerPlaying)
+    };
+    runtime.phase = runtime.suspended
+      ? STEP_FIELD_PHASE.SUSPENDED
+      : resolveFieldPhase({
+        enabled: prefs.stepFieldEnabled,
+        suspended: false,
+        sides: [
+          { ...sideStates.tail, visible: prefs.tailVisible },
+          { ...sideStates.lead, visible: prefs.leadVisible }
+        ]
+      });
+    if (!runtime.suspended) runtime.lastCenterTime = center;
+    publish(snapshot, live, sideStates);
   }
 
   function syncVideo(snapshot) {
@@ -351,361 +718,24 @@ export function createStepFieldController({
       side.error = false;
       side.playback = "idle";
       side.actualRate = 1;
-      side.held = false;
-      side.heldDistance = 0;
+      side.mode = FIELD_SIDE_MODE.HELD;
+      side.offset = 0;
       side.adapter.mute?.();
       side.adapter.cue?.(snapshot.videoId, snapshot.current || 0);
       runtime.forceEstablish = true;
     }
   }
 
-  function placeSide(side, address) {
-    if (!side.ready || !side.adapter) return;
-    side.adapter.mute?.();
-    side.adapter.setRate?.(1);
-    side.adapter.place?.(address);
-  }
-
-  function establish(snapshot, address = snapshot.current) {
-    const bounded = clamp(address, snapshot.range.start, snapshot.range.end);
-    resetSideState();
-    for (const side of Object.values(sides)) {
-      pauseSide(side);
-      placeSide(side, bounded);
-    }
-    runtime.semanticKey = semanticKey(snapshot);
-    runtime.lastCenterTime = bounded;
-    runtime.forceEstablish = false;
-    runtime.phase = STEP_FIELD_PHASE.COINCIDENT;
-  }
-
-  function exactSideAddress(role, centerTime, distance, range) {
-    return role === "tail"
-      ? clamp(centerTime - distance, range.start, range.end)
-      : clamp(centerTime + distance, range.start, range.end);
-  }
-
-  function updateSide(side, centerTime, targetDistance, range) {
-    if (!side.ready || side.error) return { available: false, held: false, offset: 0 };
-    side.adapter?.mute?.();
-    const snapshot = readSide(side);
-    const rawOffset = side.role === "tail" ? centerTime - snapshot.time : snapshot.time - centerTime;
-    const offset = Math.max(0, rawOffset);
-    const available = targetDistance > EPSILON;
-
-    if (!available) {
-      side.held = false;
-      side.heldDistance = 0;
-      pauseSide(side);
-      placeSide(side, centerTime);
-      return { available: false, held: false, offset: 0 };
-    }
-
-    if (side.held && targetDistance > side.heldDistance + DRIFT_TOLERANCE) side.held = false;
-
-    const exact = exactSideAddress(side.role, centerTime, targetDistance, range);
-    if (side.held) {
-      setSideRate(side, 1);
-      ensureSidePlaying(side);
-      if (Math.abs(offset - targetDistance) > DRIFT_TOLERANCE) {
-        placeSide(side, exact);
-        ensureSidePlaying(side);
-      }
-      side.heldDistance = targetDistance;
-      return { available: true, held: true, offset: targetDistance };
-    }
-
-    if (offset >= targetDistance - REACH_TOLERANCE) {
-      placeSide(side, exact);
-      setSideRate(side, 1);
-      ensureSidePlaying(side);
-      side.held = true;
-      side.heldDistance = targetDistance;
-      return { available: true, held: true, offset: targetDistance };
-    }
-
-    if (!setSideRate(side, side.requestedRate)) {
-      return { available: false, held: false, offset, rateUnavailable: true };
-    }
-    ensureSidePlaying(side);
-    return { available: true, held: false, offset };
-  }
-
-  function setText(element, value) {
-    if (element) element.textContent = value;
-  }
-
-  function formatOffset(value) {
-    if (!Number.isFinite(value)) return "—";
-    const rounded = value >= 10 ? value.toFixed(0) : value.toFixed(1).replace(/\.0$/, "");
-    return `${rounded}s`;
-  }
-
-  function publishField(targets, sideStates, centerTime, prefs, phase = runtime.phase) {
-    const tailRead = readSide(sides.tail);
-    const leadRead = readSide(sides.lead);
-    const observed = deriveObservedField({
-      targets,
-      phase,
-      centerAddress: centerTime,
-      tailAddress: prefs.tailVisible && sides.tail.ready ? tailRead.time : centerTime,
-      leadAddress: prefs.leadVisible && sides.lead.ready ? leadRead.time : centerTime,
-      tailVisible: prefs.tailVisible,
-      leadVisible: prefs.leadVisible,
-      tailHeld: sideStates?.tail?.held,
-      leadHeld: sideStates?.lead?.held
-    });
-    observed.tail.requestedRate = Number(prefs.tailRate);
-    observed.tail.actualRate = sides.tail.actualRate;
-    observed.tail.playback = sides.tail.playback;
-    observed.lead.requestedRate = Number(prefs.leadRate);
-    observed.lead.actualRate = sides.lead.actualRate;
-    observed.lead.playback = sides.lead.playback;
-    const key = JSON.stringify({
-      phase: observed.phase,
-      constraint: observed.constraint,
-      tail: Number(observed.tail.address.toFixed(2)),
-      lead: Number(observed.lead.address.toFixed(2)),
-      tailHeld: observed.tail.held,
-      leadHeld: observed.lead.held,
-      rates: [observed.tail.actualRate, observed.lead.actualRate],
-      playback: [observed.tail.playback, observed.lead.playback],
-      visible: [observed.tail.visible, observed.lead.visible]
-    });
-    runtime.field = observed;
-    if (key !== runtime.fieldKey) {
-      runtime.fieldKey = key;
-      onChange?.(observed);
-    }
-    return observed;
-  }
-
-  function selectSide(role) {
-    const observed = runtime.field;
-    const side = observed?.[role];
-    const mode = sideActivationMode(side, observed?.phase);
-    if (!mode) return;
-    const payload = {
-      role,
-      direction: role === "tail" ? "backward" : "forward",
-      mode,
-      phase: observed.phase,
-      held: side.held,
-      address: side.address,
-      target: side.target,
-      offset: side.offset,
-      span: observed.span
-    };
-    if (typeof onSelect === "function") onSelect(payload);
-    else onStep(payload.direction);
-  }
-
-  function sideMetadata(role, target, sideState) {
-    if (runtime.phase === STEP_FIELD_PHASE.SUSPENDED) return "Suspended";
-    const runtimeSide = sides[role];
-    if (runtimeSide.playback === "blocked") return "Playback blocked";
-    if (runtimeSide.error) return "Player unavailable";
-    const prefix = role === "tail" ? "−" : "+";
-    const boundary = target.constrained
-      ? role === "tail" ? "Range start" : "Range end"
-      : null;
-    const rate = Number.isFinite(runtimeSide.actualRate) ? ` · ${runtimeSide.actualRate}×` : "";
-    if (!target.available) return boundary || (role === "tail" ? "Range start" : "Range end");
-    if (!runtimeSide.rateAvailable) return `${prefix}${formatOffset(target.distance)} · Rate unavailable`;
-    if (sideState.held) return `${prefix}${formatOffset(target.distance)} · ${boundary || "Held"}${rate}`;
-    if (sideState.offset > REACH_TOLERANCE) {
-      return `${prefix}${formatOffset(sideState.offset)} / ${formatOffset(target.distance)}${boundary ? ` · ${boundary}` : ""}${rate}`;
-    }
-    return `${prefix}${formatOffset(target.distance)} · ${boundary || "Ready"}${rate}`;
-  }
-
-  function render(snapshot = getSnapshot?.(), live = null, sideStates = null) {
-    if (!snapshot || !elements["step-field"]) return;
-    const prefs = preferences();
-    const loaded = Boolean(snapshot.videoLoaded);
-    const field = live || deriveStepField(
-      Number(snapshot.center?.time ?? snapshot.current ?? 0),
-      snapshotReach(snapshot),
-      snapshot.range || { start: 0, end: 0 }
-    );
-    const states = sideStates || {
-      tail: { available: field.tail.available, held: false, offset: 0 },
-      lead: { available: field.lead.available, held: false, offset: 0 }
-    };
-
-    const root = elements["step-field"];
-    const fieldShown = loaded && prefs.stepFieldEnabled;
-    root.classList.toggle("field-off", !fieldShown);
-    root.classList.toggle("tail-collapsed", !prefs.tailVisible);
-    root.classList.toggle("lead-collapsed", !prefs.leadVisible);
-    root.classList.toggle("is-suspended", runtime.phase === STEP_FIELD_PHASE.SUSPENDED);
-    root.dataset.phase = runtime.phase;
-    root.dataset.constraint = field.constraint || "none";
-
-    elements["tail-pane"]?.classList?.toggle("is-collapsed", !prefs.tailVisible);
-    elements["lead-pane"]?.classList?.toggle("is-collapsed", !prefs.leadVisible);
-    if (elements["tail-restore"]) elements["tail-restore"].hidden = prefs.tailVisible;
-    if (elements["lead-restore"]) elements["lead-restore"].hidden = prefs.leadVisible;
-    if (elements["tail-collapse"]) elements["tail-collapse"].hidden = !prefs.tailVisible;
-    if (elements["lead-collapse"]) elements["lead-collapse"].hidden = !prefs.leadVisible;
-
-    if (elements["step-field-toggle"]) elements["step-field-toggle"].disabled = !loaded;
-    elements["step-field-toggle"]?.setAttribute?.("aria-pressed", String(fieldShown));
-    elements["step-field-toggle"]?.setAttribute?.("aria-label", `${fieldShown ? "Hide" : "Show"} Step Field`);
-    setText(elements["step-field-meta"], !loaded
-      ? "Load video"
-      : prefs.stepFieldEnabled
-        ? runtime.phase === STEP_FIELD_PHASE.PARTIAL ? "Partial"
-          : runtime.phase === STEP_FIELD_PHASE.HELD ? "Held"
-            : runtime.phase === STEP_FIELD_PHASE.UNFOLDING ? "Unfolding"
-              : runtime.phase === STEP_FIELD_PHASE.SUSPENDED ? "Suspended"
-                : "Ready"
-        : "Off");
-
-    const centerTime = Number(snapshot.center?.time ?? snapshot.current ?? 0);
-    setText(elements["center-meta"], loaded ? formatTime(centerTime) : "—");
-
-    for (const role of ["tail", "lead"]) {
-      const target = field[role];
-      const sideState = states[role];
-      const meta = sideMetadata(role, target, sideState);
-      setText(elements[`${role}-meta`], meta);
-      const button = elements[`${role}-step`];
-      if (!button) continue;
-      const observedSide = runtime.field?.[role] || {
-        ...sideState,
-        address: centerTime,
-        visible: prefs[`${role}Visible`],
-        available: target.available
-      };
-      const mode = sideActivationMode(observedSide, runtime.phase);
-      const action = mode === "step"
-        ? role === "tail" ? "Step Backward" : "Step Forward"
-        : mode === "go"
-          ? role === "tail" ? "Go to visible Tail" : "Go to visible Lead"
-          : role === "tail" ? "Tail is coincident" : "Lead is coincident";
-      const destination = mode === "step" ? target.target : observedSide.address;
-      button.disabled = !loaded || !prefs.stepFieldEnabled || !mode;
-      button.dataset.action = mode || "none";
-      button.setAttribute("aria-label", `${action}${Number.isFinite(destination) ? ` at ${formatTime(destination)}` : ""}. ${meta}.`);
-    }
-  }
-
-  function tick() {
-    const prefs = preferences();
-    const snapshot = getSnapshot?.();
-    if (!snapshot || !snapshot.range) return;
-    if (snapshot.videoLoaded) ensurePlayers(prefs);
-    syncVideo(snapshot);
-    populateRateControl("tail", prefs);
-    populateRateControl("lead", prefs);
-    sides.tail.requestedRate = Number(prefs.tailRate);
-    sides.lead.requestedRate = Number(prefs.leadRate);
-
-    if (!snapshot.videoLoaded || !snapshot.videoId) {
-      pauseSides();
-      runtime.semanticKey = null;
-      runtime.lastCenterTime = null;
-      runtime.phase = prefs.stepFieldEnabled ? STEP_FIELD_PHASE.COINCIDENT : STEP_FIELD_PHASE.OFF;
-      const targets = deriveStepField(snapshot.current || 0, snapshotReach(snapshot), snapshot.range);
-      publishField(targets, null, snapshot.current || 0, prefs, runtime.phase);
-      render(snapshot);
-      return;
-    }
-
-    const suspended = fieldShouldSuspend(snapshot) || Boolean(document?.hidden);
-
-    if (!prefs.stepFieldEnabled || (!prefs.tailVisible && !prefs.leadVisible)) {
-      pauseSides();
-      runtime.phase = STEP_FIELD_PHASE.OFF;
-      runtime.suspended = false;
-      const centerTime = clamp(Number(snapshot.center?.time ?? snapshot.current), snapshot.range.start, snapshot.range.end);
-      const targets = deriveStepField(centerTime, snapshotReach(snapshot), snapshot.range);
-      publishField(targets, null, centerTime, prefs, runtime.phase);
-      render(snapshot);
-      return;
-    }
-
-    if (suspended) {
-      pauseSides();
-      runtime.phase = STEP_FIELD_PHASE.SUSPENDED;
-      runtime.suspended = true;
-      const centerTime = clamp(Number(snapshot.center?.time ?? snapshot.current), snapshot.range.start, snapshot.range.end);
-      const targets = deriveStepField(centerTime, snapshotReach(snapshot), snapshot.range);
-      publishField(targets, null, centerTime, prefs, runtime.phase);
-      render(snapshot);
-      return;
-    }
-
-    const key = semanticKey(snapshot);
-    const centerTime = clamp(Number(snapshot.center?.time ?? snapshot.current), snapshot.range.start, snapshot.range.end);
-
-    if (runtime.suspended) {
-      runtime.suspended = false;
-      establish(snapshot, snapshot.current);
-    } else if (snapshot.transportKind !== "continue" && (runtime.forceEstablish || key !== runtime.semanticKey)) {
-      establish(snapshot, snapshot.current);
-    } else if (snapshot.transportKind === "continue" && runtime.semanticKey === null) {
-      establish(snapshot, centerTime);
-    }
-
-    if (hasCenterDiscontinuity(runtime.lastCenterTime, centerTime)) establish(snapshot, centerTime);
-    runtime.lastCenterTime = centerTime;
-
-    const live = deriveStepField(centerTime, snapshotReach(snapshot), snapshot.range);
-    const centerPlaying = snapshot.center?.state === YOUTUBE_STATE.PLAYING && snapshot.transportKind === "continue";
-
-    const sideStates = {
-      tail: {
-        available: live.tail.available,
-        held: sides.tail.held,
-        offset: Math.max(0, centerTime - readSide(sides.tail).time)
-      },
-      lead: {
-        available: live.lead.available,
-        held: sides.lead.held,
-        offset: Math.max(0, readSide(sides.lead).time - centerTime)
-      }
-    };
-
-    if (!centerPlaying) {
-      pauseSides();
-    } else {
-      if (prefs.tailVisible) {
-        sides.tail.requestedRate = Number(prefs.tailRate);
-        sideStates.tail = updateSide(sides.tail, centerTime, live.tail.distance, snapshot.range);
-      }
-      else pauseSide(sides.tail);
-      if (prefs.leadVisible) {
-        sides.lead.requestedRate = Number(prefs.leadRate);
-        sideStates.lead = updateSide(sides.lead, centerTime, live.lead.distance, snapshot.range);
-      }
-      else pauseSide(sides.lead);
-    }
-
-    runtime.phase = resolveFieldPhase({
-      enabled: prefs.stepFieldEnabled,
-      suspended: false,
-      sides: [
-        { ...sideStates.tail, visible: prefs.tailVisible },
-        { ...sideStates.lead, visible: prefs.leadVisible }
-      ]
-    });
-    publishField(live, sideStates, centerTime, prefs, runtime.phase);
-    if (elements["field-transport-state"]) {
-      elements["field-transport-state"].textContent = runtime.phase === STEP_FIELD_PHASE.PARTIAL
-        ? "Partially Held"
-        : runtime.phase.charAt(0).toUpperCase() + runtime.phase.slice(1);
-    }
-    if (elements["field-rate-state"]) {
-      const rateText = side => {
-        if (!side.ready) return "loading";
-        if (!side.rateAvailable) return side.role === "tail" ? "no slow rate" : "no fast rate";
-        return `${side.actualRate}×`;
-      };
-      elements["field-rate-state"].textContent = `Tail ${rateText(sides.tail)} · Center 1× · Lead ${rateText(sides.lead)}`;
-    }
-    render(snapshot, live, sideStates);
+  function invalidate() {
+    pauseSides();
+    runtime.structuralKey = null;
+    runtime.semanticCurrent = null;
+    runtime.lastCenterTime = null;
+    runtime.forceEstablish = true;
+    runtime.suspended = false;
+    runtime.field = null;
+    runtime.fieldKey = "";
+    onChange?.(null);
   }
 
   bind();
@@ -714,31 +744,30 @@ export function createStepFieldController({
   return {
     tick,
     render,
-    play: playSides,
     pause: pauseSides,
     invalidate,
-    establish() {
-      const snapshot = getSnapshot?.();
-      if (snapshot?.videoLoaded) establish(snapshot, snapshot.current);
+    translateToCurrent,
+    translatePhysicalCenter,
+    hold(role = "both") {
+      if (role === "both") {
+        hold("tail");
+        hold("lead");
+      } else hold(role);
+    },
+    stretch(role = "both") {
+      if (role === "both") {
+        stretch("tail");
+        stretch("lead");
+      } else stretch(role);
     },
     snapshot() {
       return {
         ...(runtime.field || {}),
         phase: runtime.phase,
-        tailHeld: sides.tail.held,
-        leadHeld: sides.lead.held,
-        tailRuntime: {
-          requestedRate: sides.tail.requestedRate,
-          actualRate: sides.tail.actualRate,
-          playback: sides.tail.playback,
-          rateAvailable: sides.tail.rateAvailable
-        },
-        leadRuntime: {
-          requestedRate: sides.lead.requestedRate,
-          actualRate: sides.lead.actualRate,
-          playback: sides.lead.playback,
-          rateAvailable: sides.lead.rateAvailable
-        },
+        tailMode: sides.tail.mode,
+        leadMode: sides.lead.mode,
+        tailRuntime: { ...sides.tail, adapter: undefined },
+        leadRuntime: { ...sides.lead, adapter: undefined },
         preferences: preferences()
       };
     }

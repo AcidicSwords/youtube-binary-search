@@ -4,12 +4,10 @@ import {
   idleTransport,
   deriveContextWindow,
   createContextTransport,
+  createPlaybackTransport,
   createLoopTransport,
-  createContinueTransport,
-  createSkimTransport,
   isTransportActive,
-  isObservationalTransport,
-  desiredSkimRate
+  isObservationalTransport
 } from "./transport.js";
 
 assert.deepEqual(deriveContextWindow(50, { start: 0, end: 100 }, 5, 1), { start: 49, end: 54 });
@@ -20,31 +18,23 @@ assert.equal(deriveContextWindow(12, { start: 12, end: 12 }, 5, 1), null);
 
 const idle = idleTransport();
 const context = createContextTransport({ anchor: 50, range: { start: 0, end: 100 }, seconds: 5 });
-const loop = createLoopTransport({ anchor: 50, start: 40, end: 50 });
-const continuation = createContinueTransport({
+const playback = createPlaybackTransport({
   departure: 50,
   parentNeighborhood: { L: 0, C: 50, R: 100 },
+  parentResolutionBasis: "range",
   returnModel: {}
 });
-const skim = createSkimTransport({
-  departure: 50,
-  target: 75,
-  parentNeighborhood: { L: 0, C: 50, R: 100 },
-  returnModel: {},
-  maxRate: 2
-});
+const loop = createLoopTransport({ anchor: 50, start: 40, end: 50 });
 
 assert.equal(context.kind, TRANSPORT_KIND.CONTEXT);
+assert.equal(playback.kind, TRANSPORT_KIND.PLAYBACK);
 assert.equal(loop.kind, TRANSPORT_KIND.LOOP);
-assert.equal(continuation.kind, TRANSPORT_KIND.CONTINUE);
+assert.deepEqual({ start: loop.start, end: loop.end }, { start: 40, end: 50 });
+assert.equal(loop.cycles, 0);
 assert.equal(isTransportActive(idle), false);
 assert.equal(isTransportActive(context), true);
 assert.equal(isObservationalTransport(context), true);
-assert.equal(isObservationalTransport(loop), true);
-assert.equal(isObservationalTransport(continuation), false);
-assert.equal(desiredSkimRate(skim, 50, [1, 1.5, 2]), 2);
-assert.equal(desiredSkimRate(skim, 62.5, [1, 1.5, 2]), 2);
-assert.equal(desiredSkimRate(skim, 75, [1, 1.5, 2]), 2);
-assert.equal(desiredSkimRate(skim, 75, [1]), 1);
+assert.equal(isObservationalTransport(playback), false);
+assert.equal(isObservationalTransport(loop), false);
 
-console.log("Transport tests passed: Context windows, observation/commit classes, and Skim rate.");
+console.log("Transport tests passed: Context windows, native playback settlement, and frozen Loop operands.");

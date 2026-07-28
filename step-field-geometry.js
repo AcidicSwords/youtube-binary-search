@@ -157,18 +157,11 @@ export function resolveFieldPhase({ enabled, suspended, sides }) {
   if (suspended) return STEP_FIELD_PHASE.SUSPENDED;
   const active = (sides || []).filter(side => side.visible && side.available);
   if (!active.length) return STEP_FIELD_PHASE.COINCIDENT;
+  if (active.every(side => !(side.offset > FIELD_REACH_TOLERANCE))) return STEP_FIELD_PHASE.COINCIDENT;
   const held = active.filter(side => side.held).length;
   if (held === active.length) return STEP_FIELD_PHASE.HELD;
   if (held > 0) return STEP_FIELD_PHASE.PARTIAL;
-  if (active.some(side => side.offset > FIELD_REACH_TOLERANCE)) return STEP_FIELD_PHASE.UNFOLDING;
-  return STEP_FIELD_PHASE.COINCIDENT;
-}
-
-export function sideActivationMode(side, phase) {
-  if (!side?.visible || !side.available) return null;
-  if (side.held && [STEP_FIELD_PHASE.HELD, STEP_FIELD_PHASE.PARTIAL].includes(phase)) return "step";
-  if (side.offset > FIELD_REACH_TOLERANCE && Number.isFinite(side.address)) return "go";
-  return null;
+  return STEP_FIELD_PHASE.UNFOLDING;
 }
 
 export function deriveObservedField({
