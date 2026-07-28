@@ -102,6 +102,12 @@ jobs:
 
           interaction_text = interaction_text.replace(old_focus, new_focus, 1)
           interaction_text = interaction_text.replace(old_pins, new_pins, 1)
+
+          remaining_focus = 'byId.get("focused-label")'
+          if interaction_text.count(remaining_focus) != 2:
+              raise SystemExit(f'Expected two remaining focused-label references, found {interaction_text.count(remaining_focus)}')
+          interaction_text = interaction_text.replace(remaining_focus, 'byId.get("focused-section-title")')
+
           interaction_path.write_text(interaction_text)
           PY
 
