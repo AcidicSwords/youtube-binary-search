@@ -67,6 +67,7 @@ Inputs and selects suspend global shortcuts.
 
 - `SPEC.md` — canonical semantic and interaction contract.
 - `IMPLEMENTATION.md` — runtime architecture, ownership, and module boundaries.
+- `INTERFACE.md` — visible-element ownership, layout grammar, and the presence test.
 - `DEVELOPMENT.md` — setup, change discipline, and extension workflow.
 - `VALIDATION.md` — automated coverage and the real-browser/device matrix.
 

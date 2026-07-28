@@ -82,11 +82,11 @@ Application Continue prepares side players before starting Center. Native Center
 
 ## 6. Interface system
 
-Styles are loaded in increasing specificity:
+Styles are loaded by ownership:
 
-1. `styles.css` — tokens, global controls, shell, panels, Navigation, Guide, and authoritative responsive layout.
-2. `step-field.css` — pane geometry, local pane controls, collapse behavior, and mobile stacking.
-3. `field-grammar.css` — Field phase cues, object-local actions, transport bar, and final interaction-state overrides.
+1. `styles.css` — tokens, global controls, full application composition, timeline, Parameters, operator matrix, Guide, and responsive layout.
+2. `step-field.css` — panoramic pane geometry, pane-local controls, collapse behavior, and mobile stacking.
+3. `field-grammar.css` — Field phase cues, playback dock, live operands, and final transport interaction states.
 
 Wide-desktop layout is defined only in `styles.css`. Later files must not redefine the application grid.
 
@@ -98,9 +98,18 @@ Shared sizing tokens are:
 --touch: 48px;
 ```
 
-Desktop prioritizes density and alignment. Coarse pointers receive explicit `48px` targets, including controls whose component selectors load after the global rule.
+Desktop composition is:
 
-The Navigation deck preserves Backward / shared spine / Forward. The state strip uses responsive auto-fit columns. Settings popovers are bounded and scroll internally rather than overflowing the viewport.
+```text
+Panoramic media
+→ playback dock
+→ full-width temporal map
+→ Parameters | Operator matrix | Guide
+```
+
+The matrix contains operators only. Parameters alter operands without creating semantic transactions. Guide owns retained structure. Playback owns Continue, Context, Skim, Loop, and live movement operands. The timeline owns spatial projection.
+
+`INTERFACE.md` states the purpose and negated consequence of every visible surface. `project-audit.mjs` prevents duplicate controls, stale layout owners, and retired matrix elements from returning.
 
 ## 7. Persistence
 

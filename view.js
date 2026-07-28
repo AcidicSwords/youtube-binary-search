@@ -213,7 +213,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     for (const id of ["section-count", "sections-list-count", "header-section-count"]) {
       elements[id].textContent = counts.sections;
     }
-    elements["pins-access-meta"].textContent = `${pins.length} retained`;
     elements["guide-toggle"].setAttribute(
       "aria-label",
       `Guide: ${sections.length} Section${sections.length === 1 ? "" : "s"}, ${pins.length} Pin${pins.length === 1 ? "" : "s"}`
@@ -429,7 +428,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["interval-label"].textContent = currentInterval ? formatRange(currentInterval) : "—";
     elements["field-span-label"].textContent = fieldSpan ? formatRange(fieldSpan) : "—";
     elements["field-span-state"].hidden = !fieldSpan;
-    elements["focused-label"].textContent = focused ? focused.label : "None";
     elements["range-tools-value"].textContent = loaded ? formatRange(activeRange) : "—";
     const captureExtent = currentState.captureExtent || currentInterval;
     const captureKind = currentState.captureExtentKind || "interval";
@@ -461,7 +459,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["context-select"].disabled = interactionLocked;
     elements["context-action"].disabled = interactionLocked || currentState.contextSeconds <= 0;
     elements["interval-state"].disabled = interactionLocked || !currentInterval;
-    elements["focused-state"].disabled = interactionLocked || !focused;
     elements["save-section"].disabled = interactionLocked
       || !currentInterval
       || !elements["section-label"].value.trim();

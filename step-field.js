@@ -305,7 +305,7 @@ export function createStepFieldController({
       if (!rates.length) {
         const option = document.createElement("option");
         option.value = "1";
-        option.textContent = "Unavailable";
+        option.textContent = side.role === "tail" ? "No slow rate" : "No fast rate";
         select.appendChild(option);
       } else {
         for (const rate of rates) {
@@ -698,7 +698,12 @@ export function createStepFieldController({
         : runtime.phase.charAt(0).toUpperCase() + runtime.phase.slice(1);
     }
     if (elements["field-rate-state"]) {
-      elements["field-rate-state"].textContent = `Tail ${sides.tail.actualRate}× · Center 1× · Lead ${sides.lead.actualRate}×`;
+      const rateText = side => {
+        if (!side.ready) return "loading";
+        if (!side.rateAvailable) return side.role === "tail" ? "no slow rate" : "no fast rate";
+        return `${side.actualRate}×`;
+      };
+      elements["field-rate-state"].textContent = `Tail ${rateText(sides.tail)} · Center 1× · Lead ${rateText(sides.lead)}`;
     }
     render(snapshot, live, sideStates);
   }

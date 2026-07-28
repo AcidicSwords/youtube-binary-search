@@ -51,6 +51,10 @@ const references = new Set([...bracketRefs, ...dotRefs]);
 const missing = [...references].filter(id => !htmlIds.has(id));
 assert.deepEqual(missing, [], `Missing DOM ids: ${missing.join(", ")}`);
 
+for (const removed of ["pins-access", "pins-access-meta", "focused-state", "focused-label", "deck-spacer"]) {
+  assert.equal(htmlIds.has(removed), false, `Removed duplicate control remains: ${removed}`);
+}
+
 for (const required of [
   "range-fill",
   "resolution-fill",
@@ -121,8 +125,8 @@ assert.ok(app.includes('from "./range-geometry.js"'), "app.js must use the Range
 assert.equal(app.includes('from "./traversal.js"'), false, "Legacy traversal.js import remains.");
 assert.equal(app.includes('from "./structure.js"'), false, "Legacy structure.js import remains.");
 
-assert.match(styles, /grid-template-areas:[\s\S]*reopen[\s\S]*refine-backward[\s\S]*return[\s\S]*refine-forward[\s\S]*step-settings[\s\S]*step-backward[\s\S]*step-forward[\s\S]*pin-current[\s\S]*pin-backward[\s\S]*pins-access[\s\S]*pin-forward/,
-  "Navigation CSS must preserve the backward / shared spine / forward grammar.");
+assert.match(styles, /grid-template-areas:[\s\S]*"\. reopen \."[\s\S]*"refine-backward \. refine-forward"[\s\S]*"step-backward return step-forward"[\s\S]*"pin-backward pin-current pin-forward"/,
+  "Navigation CSS must preserve the operator-only spatial matrix.");
 assert.match(styles, /touch-action:\s*manipulation/, "Controls must suppress accidental double-tap zoom without disabling page zoom.");
 assert.match(styles, /\.timeline[^{]*\{[^}]*touch-action:\s*pan-y/s, "Timeline must preserve vertical page scrolling on touch devices.");
 assert.match(view, /setAttribute\("role", "menuitem"\)/, "Pin clusters must expose keyboard-addressable menu items.");

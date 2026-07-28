@@ -137,13 +137,27 @@ Actual rates, buffering, blocked state, Cursors, and Field phases are runtime-on
 
 ## 9. Interface grammar
 
-Desktop navigation preserves three columns:
+The interface has one ordered composition:
 
 ```text
-Backward | shared spine | Forward
+Panoramic media
+→ playback and live operands
+→ full-width temporal map
+→ Parameters | Operator matrix | Guide
 ```
 
-The shared spine contains Reopen, Return, Step Reach settings, Pin Current, and Pins access. Directional actions remain on their corresponding sides.
+The centered operator matrix is:
+
+```text
+        W
+     A     D
+     ←  S  →
+    ⇧←  P  ⇧→
+```
+
+Step Reach, Range tools, Context duration, and Skim rate are parameters and therefore remain outside the matrix. Guide is the sole retained-structure surface; no duplicate retained-Pins access button belongs in the matrix. Focused Section state is shown in Guide rather than in playback controls.
+
+`INTERFACE.md` defines the presence test for every visible element: removing an element must remove a concrete operation, conceal state required to predict one, or erase feedback needed to distinguish semantic commitment from physical observation.
 
 On compact screens, Guide becomes an off-canvas sheet. On phones, Center, Tail, and Lead stack vertically; side-player viewports retain the minimum dimensions needed for IFrame capability reporting.
 
