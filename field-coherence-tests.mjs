@@ -196,24 +196,24 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   assert.match(html, /id=["']tail-pane["'][\s\S]*id=["']tail-rate-select["'][\s\S]*id=["']tail-collapse["']/);
   assert.match(html, /id=["']lead-pane["'][\s\S]*id=["']lead-rate-select["'][\s\S]*id=["']lead-collapse["']/);
   const tailPaneStart = html.indexOf('id="tail-pane"');
-const tailRateControl = html.indexOf('id="tail-rate-select"', tailPaneStart);
-const tailPlayerWrap = html.indexOf('class="player-wrap"', tailPaneStart);
-const leadPaneStart = html.indexOf('id="lead-pane"');
-const leadRateControl = html.indexOf('id="lead-rate-select"', leadPaneStart);
-const leadPlayerWrap = html.indexOf('class="player-wrap"', leadPaneStart);
-assert.ok(
-  tailPaneStart >= 0 && tailRateControl > tailPaneStart && tailRateControl < tailPlayerWrap,
-  "Tail rate control remains in the pane header before the player selection overlay."
-);
-assert.ok(
-  leadPaneStart >= 0 && leadRateControl > leadPaneStart && leadRateControl < leadPlayerWrap,
-  "Lead rate control remains in the pane header before the player selection overlay."
-);
-assert.match(fieldCss, /\.step-pane-bar\s*\{[\s\S]*z-index:\s*7/);
-assert.match(fieldCss, /\.step-pane-action\s*\{[\s\S]*z-index:\s*5/);
+  const tailRateControl = html.indexOf('id="tail-rate-select"', tailPaneStart);
+  const tailPlayerWrap = html.indexOf('class="player-wrap"', tailPaneStart);
+  const leadPaneStart = html.indexOf('id="lead-pane"');
+  const leadRateControl = html.indexOf('id="lead-rate-select"', leadPaneStart);
+  const leadPlayerWrap = html.indexOf('class="player-wrap"', leadPaneStart);
+  assert.ok(
+    tailPaneStart >= 0 && tailRateControl > tailPaneStart && tailRateControl < tailPlayerWrap,
+    "Tail rate control remains in the pane header before the player selection overlay."
+  );
+  assert.ok(
+    leadPaneStart >= 0 && leadRateControl > leadPaneStart && leadRateControl < leadPlayerWrap,
+    "Lead rate control remains in the pane header before the player selection overlay."
+  );
+  assert.match(fieldCss, /\.step-pane-bar\s*\{[\s\S]*z-index:\s*7/);
+  assert.match(fieldCss, /\.step-pane-action\s*\{[\s\S]*z-index:\s*5/);
   assert.match(fieldCss, /@media \(max-width: 680px\)[\s\S]*\.tail-pane\s*\{[\s\S]*grid-column:\s*1;[\s\S]*grid-row:\s*2;/);
-assert.match(fieldCss, /@media \(max-width: 680px\)[\s\S]*\.lead-pane\s*\{[\s\S]*grid-column:\s*1;[\s\S]*grid-row:\s*3;/);
-assert.match(fieldCss, /@media \(max-width: 680px\)[\s\S]*\.step-pane-side \.player-wrap\s*\{[\s\S]*min-height:\s*200px;/);
+  assert.match(fieldCss, /@media \(max-width: 680px\)[\s\S]*\.lead-pane\s*\{[\s\S]*grid-column:\s*1;[\s\S]*grid-row:\s*3;/);
+  assert.match(fieldCss, /@media \(max-width: 680px\)[\s\S]*\.step-pane-side \.player-wrap\s*\{[\s\S]*min-height:\s*200px;/);
   assert.match(fieldCss, /@media \(pointer: coarse\)[\s\S]*\.pane-rate-setting select[\s\S]*min-height: var\(--touch\)/);
   assert.match(app, /setStepReach as setSessionStepReach/);
   assert.match(app, /stepReach: currentStepReach\(\)/);
