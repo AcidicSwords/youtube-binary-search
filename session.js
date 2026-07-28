@@ -108,6 +108,17 @@ export function createInterval(departure, arrival, operator, medium = "direct") 
   };
 }
 
+function stepIntervalAnchor(model, sourceInterval = model.interval) {
+  const current = model.resolution.C;
+  if (
+    !sourceInterval
+    || !Number.isFinite(sourceInterval.departure)
+    || !Number.isFinite(sourceInterval.arrival)
+    || Math.abs(sourceInterval.arrival - current) > EPSILON
+  ) return current;
+  return sourceInterval.departure;
+}
+
 export function createSession({ duration = 0, current = 0, guide = createGuide(), stepReach = DEFAULT_STEP_REACH } = {}) {
   const end = Math.max(0, Number(duration) || 0);
   const C = clamp(Number(current) || 0, 0, end);
@@ -322,8 +333,11 @@ function moveDraft(model, destination, options = {}) {
       : RESOLUTION_BASIS.MOVEMENT;
   }
 
+  const intervalDeparture = Number.isFinite(options.intervalDeparture)
+    ? options.intervalDeparture
+    : departure;
   model.interval = createInterval(
-    departure,
+    intervalDeparture,
     finalDestination,
     options.operator || "go",
     options.medium || "direct"
@@ -377,11 +391,15 @@ export function step(session, direction, seconds = null, options = {}) {
   const target = stepTarget(session.model.resolution.C, reach, direction, session.model.range);
   if (Math.abs(target - session.model.resolution.C) <= EPSILON) return unchanged(session, "range-edge");
   const backward = direction === "backward";
+  const intervalDeparture = Number.isFinite(options.intervalDeparture)
+    ? options.intervalDeparture
+    : stepIntervalAnchor(session.model, options.originInterval ?? session.model.interval);
   return goTo(session, target, {
     mode: "step",
     operator: backward ? "stepBackward" : "stepForward",
     label: backward ? "Step Backward" : "Step Forward",
     departure: options.departure,
+    intervalDeparture,
     originResolution: options.originResolution,
     originResolutionBasis: options.originResolutionBasis,
     amend: options.amend

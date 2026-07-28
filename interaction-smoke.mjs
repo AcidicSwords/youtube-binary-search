@@ -44,6 +44,20 @@ await flush();
 assert.equal(currentText(), "Current 0:50.000", "Next Pin must traverse through the same movement model.");
 assert.match(byId.get("section-window").textContent, /0:25\.000–0:50\.000/);
 
+// Step edits the active Interval instead of replacing it. Outward Step extends
+// the Pin-defined region; inward Step shrinks the same region back to its anchor.
+byId.get("step-forward").click();
+await env.delay(150);
+await flush();
+assert.equal(currentText(), "Current 1:00.000");
+assert.match(byId.get("section-window").textContent, /0:25\.000–1:00\.000/);
+assert.match(byId.get("loop-meta").textContent, /0:25\.000–1:00\.000/);
+byId.get("step-backward").click();
+await env.delay(150);
+await flush();
+assert.equal(currentText(), "Current 0:50.000");
+assert.match(byId.get("section-window").textContent, /0:25\.000–0:50\.000/);
+
 // Guide owns Section creation and names the exact current Interval.
 byId.get("section-source").value = "interval";
 byId.get("section-label").value = "Quarter to middle";
@@ -134,4 +148,4 @@ assert.equal(byId.has("context-action"), false);
 assert.equal(byId.has("skim"), false);
 assert.equal(byId.get("loop").classList.contains("loop-action"), true);
 
-console.log("Interaction smoke passed: Guide retention, frozen Loop, native playback settlement, Field rate priming, Hold/Stretch, side Step, and Space playback.");
+console.log("Interaction smoke passed: Guide retention, composable Step intervals, frozen Loop, native playback settlement, Field rate priming, Hold/Stretch, side Step, and Space playback.");

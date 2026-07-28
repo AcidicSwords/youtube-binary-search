@@ -505,7 +505,7 @@ function sameSpatialModel(first, second) {
 
 function flushPendingStep(options = {}) {
   const pending = state.pendingStep;
-  if (!pending) return { flushed: false, cancelled: false };
+  if (!pending) return { flushed: false, cancelled: false, direction: null };
   clearTimeout(pending.timer);
   state.pendingStep = null;
 
@@ -515,7 +515,7 @@ function flushPendingStep(options = {}) {
       history: pending.originHistory
     };
     view.render();
-    return { flushed: true, cancelled: true };
+    return { flushed: true, cancelled: true, direction: pending.lastDirection };
   }
 
   if (options.effect !== false) {
@@ -524,7 +524,23 @@ function flushPendingStep(options = {}) {
       interval: currentInterval()
     }, { observe: options.observe });
   }
-  return { flushed: true, cancelled: false };
+  return { flushed: true, cancelled: false, direction: pending.lastDirection };
+}
+
+function completePendingStep(options = {}) {
+  const outcome = flushPendingStep({ observe: options.observe !== false });
+  if (!outcome.flushed) return outcome;
+  const interval = currentInterval();
+  const intervalStatus = interval
+    ? formatRange(interval)
+    : `collapsed at ${formatTime(currentResolution().C)}`;
+  setStatus(
+    outcome.cancelled
+      ? `Step sequence returned to ${formatTime(currentResolution().C)}; no state was recorded.`
+      : `Stepped ${outcome.direction === "backward" ? "Backward" : "Forward"} to ${formatTime(currentResolution().C)}; Interval ${intervalStatus}.`
+  );
+  view.render();
+  return outcome;
 }
 
 function settleBeforeAction(options = {}) {
@@ -617,23 +633,37 @@ function returnLastAction() {
   view.render();
 }
 
-function performStep(direction, distance = reachFor(direction)) {
+function performStep(direction, distance = reachFor(direction), options = {}) {
   if (!state.videoLoaded) return;
   const resolvedDistance = Number(distance);
   if (!(Number.isFinite(resolvedDistance) && resolvedDistance > 0)) return;
   if (!state.pendingStep) {
     settleBeforeAction({ replacingContext: true });
+    const departure = currentResolution().C;
+    const originModel = snapshotModel(model());
+    const intervalDeparture = originModel.interval
+      && Math.abs(originModel.interval.arrival - departure) <= EPSILON
+      ? originModel.interval.departure
+      : departure;
     state.pendingStep = {
-      departure: currentResolution().C,
-      originModel: snapshotModel(model()),
+      departure,
+      intervalDeparture,
+      originModel,
       originHistory: state.session.history,
       timer: null,
-      started: false
+      started: false,
+      lastDirection: direction,
+      waitForKeyup: options.waitForKeyup === true
     };
+  } else {
+    state.pendingStep.lastDirection = direction;
+    state.pendingStep.waitForKeyup ||= options.waitForKeyup === true;
   }
 
   const result = stepSession(state.session, direction, resolvedDistance, {
     departure: state.pendingStep.departure,
+    intervalDeparture: state.pendingStep.intervalDeparture,
+    originInterval: state.pendingStep.originModel.interval,
     originResolution: state.pendingStep.originModel.resolution,
     originResolutionBasis: state.pendingStep.originModel.resolutionBasis,
     amend: state.pendingStep.started
@@ -648,15 +678,12 @@ function performStep(direction, distance = reachFor(direction)) {
   stepField?.translateToCurrent(currentResolution().C, { preserve: true });
 
   clearTimeout(state.pendingStep.timer);
-  state.pendingStep.timer = window.setTimeout(() => {
-    const outcome = flushPendingStep({ observe: true });
-    setStatus(
-      outcome.cancelled
-        ? `Step sequence returned to ${formatTime(currentResolution().C)}; no state was recorded.`
-        : `Stepped ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(currentResolution().C)}.`
-    );
-    view.render();
-  }, STEP_DEBOUNCE_MS);
+  state.pendingStep.timer = null;
+  if (!state.pendingStep.waitForKeyup) {
+    state.pendingStep.timer = window.setTimeout(() => {
+      completePendingStep({ observe: true });
+    }, STEP_DEBOUNCE_MS);
+  }
   view.render();
 }
 
@@ -2009,19 +2036,32 @@ document.addEventListener("keydown", event => {
   else if (plain && key === "l") { event.preventDefault(); startLoop(); }
   else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && event.key === "ArrowLeft") { event.preventDefault(); goToAdjacentPin("backward"); }
   else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && event.key === "ArrowRight") { event.preventDefault(); goToAdjacentPin("forward"); }
-  else if (plain && event.key === "ArrowLeft") { event.preventDefault(); performStep("backward"); }
-  else if (plain && event.key === "ArrowRight") { event.preventDefault(); performStep("forward"); }
+  else if (plain && event.key === "ArrowLeft") { event.preventDefault(); performStep("backward", reachFor("backward"), { waitForKeyup: true }); }
+  else if (plain && event.key === "ArrowRight") { event.preventDefault(); performStep("forward", reachFor("forward"), { waitForKeyup: true }); }
   else if (plain && event.key === "[") { event.preventDefault(); adjustStepPreset(-1); }
   else if (plain && event.key === "]") { event.preventDefault(); adjustStepPreset(1); }
   else if (commandReturn || (plain && event.key === "Backspace")) { event.preventDefault(); returnLastAction(); }
   else if (plain && event.key === " ") { event.preventDefault(); toggleNativePlayback(); }
 });
 
+document.addEventListener("keyup", event => {
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+  if (!state.pendingStep?.waitForKeyup) return;
+  event.preventDefault();
+  completePendingStep({ observe: true });
+});
+
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden && isTransportActive(state.transport)) {
+  if (!document.hidden) return;
+  if (state.pendingStep?.waitForKeyup) completePendingStep({ observe: false });
+  if (isTransportActive(state.transport)) {
     settleTransport();
     setStatus("Playback paused because the document became hidden.");
   }
+});
+
+window.addEventListener("blur", () => {
+  if (state.pendingStep?.waitForKeyup) completePendingStep({ observe: false });
 });
 
 window.addEventListener("resize", () => {

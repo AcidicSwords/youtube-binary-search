@@ -13,7 +13,7 @@ The primitive is an Address `t` inside duration `[0, D]`.
 - **Range** — sole hard admissible extent.
 - **Resolution** — current grain of semantic discrimination.
 - **Neighborhood** — `{L, C, R}` around Current at that Resolution.
-- **Interval** — last committed movement extent, including departure and arrival.
+- **Interval** — active committed movement extent. Departure is its anchor; arrival is the active endpoint at Current.
 - **Pin** — retained Address.
 - **Section** — retained bounded Extent whose endpoints are Pins.
 - **Guide** — video-specific Pins and Sections.
@@ -29,6 +29,8 @@ Range is the only hard Field boundary
 0.25s ≤ backward Offset, forward Offset ≤ 300s
 Center is the only audible player
 Tail and Lead cannot commit Current except through Step
+Interval is null or Interval.arrival = Current
+Step preserves a usable Interval.departure
 Context never activates Tail or Lead
 Loop wraps do not mutate Session
 Return restores semantic checkpoints, never transient player state
@@ -52,7 +54,26 @@ Preserves Current and returns Resolution to Range scale. It preserves the curren
 
 ### Step Backward / Forward
 
-Moves Current by the directional Field Offset, clamped to Range. The matrix Step and the corresponding side-pane Step are the same operation. Rapid repeated Steps coalesce into one transaction.
+Moves Current by the directional Field Offset, clamped to Range. The matrix Step and the corresponding side-pane Step are the same operation.
+
+Step edits the active Interval rather than replacing it:
+
+```text
+anchor = existing Interval.departure when Interval.arrival = Current
+otherwise anchor = Current before the first Step
+arrival = Current after Step
+Interval = bounded extent between anchor and arrival
+```
+
+Consequences:
+
+- Step away from the anchor extends the Interval.
+- Step toward the anchor shrinks it.
+- Step across the anchor redraws it in the opposite direction.
+- Landing exactly on the anchor collapses the Interval; the next Step redraws from that same Current.
+- Refine, Go, Pin traversal, timeline traversal, native playback, or any other movement may establish the Interval that Step subsequently edits.
+
+Each distinct Step gesture is a traversal and may invoke automatic Context. Auto-repeated arrow-key events coalesce into one transaction, update Current and the timeline immediately, and invoke Context once on keyup at the final Current.
 
 ### Return
 
@@ -68,7 +89,7 @@ play/unpause from start toward end
 → play/unpause again
 ```
 
-The internal end-to-start wrap does not commit Current, redefine Interval, append Return history, or invoke Context. Reopen does not alter the operand; operators that commit movement may establish a later Interval after Loop stops.
+The internal end-to-start wrap does not commit Current, redefine Interval, append Return history, or invoke Context. Reopen does not alter the operand. Movement operators may establish a later Interval after Loop stops, while Step may resize the current operand before Loop starts.
 
 ### Pin / Section / Focus
 
@@ -105,7 +126,7 @@ commit Current
 → remain paused until genuine native playback
 ```
 
-A new traversal during Context supersedes the old window and starts Context around the new destination. Context creates no history and does not redefine Interval.
+A new traversal during Context supersedes the old window and starts Context around the new destination. Context creates no history and does not redefine Interval. Held arrow-key Step suppresses intermediate Context windows and starts one observation only when the key gesture ends.
 
 ## 7. Step Field
 
@@ -143,7 +164,7 @@ Center exposes Hold both / Stretch both. Each side remains independently control
 
 ### Side Step and translation
 
-Side-pane click and local Step button invoke the same Step. Distance is the meaningful visible Offset, otherwise the maximum Offset. After Step, the complete Field translates by the same signed movement so repeated side clicks form continuous slideshow-like traversal. Automatic Context then runs in Center only.
+Side-pane click and local Step button invoke the same Step. Distance is the meaningful visible Offset, otherwise the maximum Offset. The Step moves the active Interval endpoint, so repeated side clicks extend, shrink, or reverse the same Loop/Section region. After Step, the complete Field translates by the same signed movement. Automatic Context then runs in Center only.
 
 ## 8. Physical versus semantic effects
 

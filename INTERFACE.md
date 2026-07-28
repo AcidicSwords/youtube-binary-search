@@ -22,7 +22,7 @@ Tail and Lead are constitutive projections, not thumbnails. On wide desktop the 
 | Rate | requested side Stretch kinetics | directional formation speed cannot be chosen |
 | Offset | maximum differential and Step distance | side target and Step magnitude become implicit |
 | Hold / Stretch | freezes measured relation or snaps/refolds and re-forms it | Field relation cannot be controlled |
-| Local Step | explicit equivalent of clicking the pane | side Step is not discoverable |
+| Local Step | explicit equivalent of clicking the pane; moves the active Interval endpoint | side Step and Interval editing are not discoverable |
 | Hold both / Stretch both | coordinated two-side transition | common Field transition requires two commands |
 | Field state/rates/span | reports measured relation, actual rates, and Held extent | physical claims cannot be verified |
 | Field on/off and pane hide/restore | removes optional projection cost without changing semantics | single-player fallback and space recovery are lost |
@@ -37,7 +37,7 @@ The map spans the same width as the viewer and shows:
 - Resolution;
 - semantic Current;
 - physical Cursor during playback/Context/Loop;
-- current movement Interval;
+- current movement Interval, resized live by Step;
 - Held Field span;
 - Pins;
 - action and Section previews.
@@ -66,9 +66,9 @@ Previous Pin    | Return | Next Pin
 The layout expresses relations, not keyboard geometry.
 
 - Row 1 acts on Resolution.
-- Row 2 acts on movement and its active Interval.
+- Row 2 acts on movement and its active Interval: Step resizes the operand and Loop consumes its frozen extent.
 - Row 3 crosses retained Addresses or restores history.
-- Loop is central because surrounding movement operators establish the Interval it consumes. It is genuine bounded playback with internal non-committing wraps.
+- Loop is central because surrounding movement operators establish the Interval it consumes and Step directly extends or shrinks that operand. It is genuine bounded playback with internal non-committing wraps.
 
 Pin Current and Save Section do not belong in the matrix; they create retained records and therefore belong in Guide.
 

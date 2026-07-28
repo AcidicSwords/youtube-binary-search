@@ -18,7 +18,7 @@ Semantic truth is immutable Session state. Physical player commands are requests
 | Module | Ownership |
 |---|---|
 | `range-geometry.js` | pure Range, Resolution, Neighborhood, Step, preview geometry |
-| `session.js` | semantic transactions, Interval creation, directional Offset normalization, Return |
+| `session.js` | semantic transactions, Interval creation/editing, directional Offset normalization, Return |
 | `transport.js` | transient Context, native playback, and frozen Loop values |
 | `youtube.js` | sole raw YouTube IFrame API boundary |
 | `step-field-geometry.js` | pure Field bounds, phases, and rate policy |
@@ -44,6 +44,15 @@ Semantic truth is immutable Session state. Physical player commands are requests
 ```
 
 `stepReach` is the persisted maximum Field Offset and default Step distance. Runtime no longer broadens this API to accept obsolete scalar values; legacy preference migration normalizes at the persistence boundary.
+
+The Interval is directed even though it renders as an ordered extent:
+
+```text
+Interval.departure = fixed anchor
+Interval.arrival = active endpoint = Current
+```
+
+Non-Step movement establishes both endpoints. Step preserves a usable existing departure and replaces only arrival. `moveDraft()` therefore keeps movement departure separate from `intervalDeparture`: movement departure controls Step Neighborhood geometry and Return provenance, while `intervalDeparture` controls the extent consumed by Loop and Section creation.
 
 ## 4. Transport model
 
@@ -73,7 +82,7 @@ Programmatic placement has a grace record so delayed iframe reporting cannot be 
 
 `applyPlayerEffect()` receives a changed Session result. When the result includes an Interval and Context duration is non-zero, it translates the Field to the new Current, pauses sides, and starts Context. Otherwise it places Center at Current.
 
-Pending rapid Steps suppress intermediate Context and invoke it once after coalescing.
+Pending rapid Steps suppress intermediate Context and invoke it once after coalescing. Pointer/button Step uses the short debounce boundary. Arrow-key Step freezes the gesture origin and Interval anchor across key repeat, updates Session immediately, and invokes Context explicitly on keyup. Blur or hidden-document settlement commits the final Step without autoplay.
 
 ## 7. Step Field runtime
 
@@ -98,7 +107,7 @@ Stretch first places the side at Current. On genuine Center playback the side is
 
 Held sides run at `1×`; measured drift beyond tolerance is corrected by placement. Holding emits measured offsets to `app.js`, which commits them through Session `setStepReach()`.
 
-Side selection emits a Step payload only. `app.js` commits through the same `performStep()` used by matrix arrows and translates the Field around the new Current.
+Side selection emits a Step payload only. `app.js` commits through the same `performStep()` used by matrix arrows, preserves the pending Interval anchor, and translates the Field around the new Current.
 
 ## 8. Guide integration
 

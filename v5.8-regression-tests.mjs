@@ -106,7 +106,66 @@ stepped = step(stepped, "forward", 100, {
 }).session;
 assert.deepEqual(stepped.model.resolution, { L: 180, C: 300, R: 420, level: 0 });
 assert.equal(stepped.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
-assert.deepEqual({ start: stepped.model.interval.start, end: stepped.model.interval.end }, { start: 180, end: 300 });
+assert.deepEqual(
+  { start: stepped.model.interval.start, end: stepped.model.interval.end },
+  { start: 120, end: 300 },
+  "Step must extend the Interval established by timeline traversal rather than replace it from the first Step departure."
+);
+
+// Step edits the active Interval around its original departure anchor.
+let drawnInterval = createSession({ duration: 100, current: 20 });
+drawnInterval = goTo(drawnInterval, 40, { operator: "timeline" }).session;
+drawnInterval = step(drawnInterval, "forward", 10).session;
+assert.deepEqual(
+  { start: drawnInterval.model.interval.start, end: drawnInterval.model.interval.end },
+  { start: 20, end: 50 },
+  "Step outward extends the active Interval."
+);
+drawnInterval = step(drawnInterval, "backward", 10).session;
+assert.deepEqual(
+  { start: drawnInterval.model.interval.start, end: drawnInterval.model.interval.end },
+  { start: 20, end: 40 },
+  "Step inward shrinks the active Interval."
+);
+drawnInterval = step(drawnInterval, "backward", 30).session;
+assert.deepEqual(
+  {
+    start: drawnInterval.model.interval.start,
+    end: drawnInterval.model.interval.end,
+    departure: drawnInterval.model.interval.departure,
+    arrival: drawnInterval.model.interval.arrival,
+    direction: drawnInterval.model.interval.direction
+  },
+  { start: 10, end: 20, departure: 20, arrival: 10, direction: "backward" },
+  "Crossing the anchor redraws the Interval in the opposite direction."
+);
+
+let collapsedInterval = createSession({ duration: 100, current: 20 });
+collapsedInterval = goTo(collapsedInterval, 40, { operator: "timeline" }).session;
+collapsedInterval = step(collapsedInterval, "backward", 20).session;
+assert.equal(collapsedInterval.model.interval, null, "Landing on the anchor collapses the Interval.");
+collapsedInterval = step(collapsedInterval, "forward", 10).session;
+assert.deepEqual(
+  { start: collapsedInterval.model.interval.start, end: collapsedInterval.model.interval.end },
+  { start: 20, end: 30 },
+  "The next Step redraws from the collapsed anchor."
+);
+
+let refinedDraw = createSession({ duration: 100, current: 50 });
+refinedDraw = refine(refinedDraw, "forward").session;
+assert.deepEqual(
+  { start: refinedDraw.model.interval.start, end: refinedDraw.model.interval.end },
+  { start: 50, end: 75 }
+);
+const refinedBeforeStep = snapshotModel(refinedDraw.model);
+refinedDraw = step(refinedDraw, "backward", 5).session;
+assert.deepEqual(
+  { start: refinedDraw.model.interval.start, end: refinedDraw.model.interval.end },
+  { start: 50, end: 70 },
+  "Step must trim a Refine-established Interval without replacing its anchor."
+);
+refinedDraw = returnState(refinedDraw).session;
+assert.deepEqual(refinedDraw.model.interval, refinedBeforeStep.interval, "Return restores the preceding resized-Interval checkpoint exactly.");
 
 // A coalesced Step result depends on origin plus final destination, not the path.
 let pathA = createSession({ duration: 100, current: 20 });
@@ -258,9 +317,13 @@ assert.ok(EPSILON > 0);
 
 // Repository-level contracts for the narrow UI/application patches.
 const appSource = readFileSync(new URL("./app.js", import.meta.url), "utf8");
+const sessionSource = readFileSync(new URL("./session.js", import.meta.url), "utf8");
 const viewSource = readFileSync(new URL("./view.js", import.meta.url), "utf8");
 const cssSource = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
 assert.match(appSource, /originResolution: state\.pendingStep\.originModel\.resolution/, "Rapid Step must derive spatial state from its origin.");
+assert.match(appSource, /intervalDeparture: state\.pendingStep\.intervalDeparture/, "Pending Step must freeze the Interval anchor across repeat.");
+assert.match(appSource, /document\.addEventListener\("keyup"[\s\S]*completePendingStep/, "Held-key Step must run Context from keyup rather than repeat.");
+assert.match(sessionSource, /stepIntervalAnchor[\s\S]*intervalDeparture/, "Session must separate Step movement departure from the Interval anchor.");
 assert.match(appSource, /Left the focused Section and opened Full Video/, "Composite direct Go must disclose its Range escape.");
 assert.match(appSource, /createPlaybackTransport/, "Native playback must own continuous settlement.");
 assert.doesNotMatch(appSource, /startSkim|createSkimTransport|desiredSkimRate/, "Skim must be removed from the runtime.");
@@ -269,4 +332,4 @@ assert.doesNotMatch(viewSource, /skim/i, "The projection layer must not expose r
 assert.match(viewSource, /focused-section-title"\]\.textContent = "—"/, "View must clear stale focused Section text.");
 assert.match(cssSource, /\[hidden\]\s*\{\s*display:\s*none\s*!important;/, "Hidden state must override component display rules.");
 
-console.log("v5.8 comprehensive regression tests passed: direct scale, Refine, Step, native playback, Range, Focus, Guide, Loop boundaries, and Return.");
+console.log("v5.8.1 comprehensive regression tests passed: direct scale, Refine, composable Step intervals, native playback, Range, Focus, Guide, Loop boundaries, and Return.");

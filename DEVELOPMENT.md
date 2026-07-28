@@ -53,6 +53,8 @@ Autoplay blocking, buffering, delayed placement, and missing directional rates a
 - Stretch always snaps to Current before forming.
 - Hold during formation commits measured Offset through Session.
 - Pane Step and matrix Step must share `performStep()`.
+- Step must preserve the active Interval departure and move only its arrival endpoint; do not recreate the Interval from each Step departure.
+- Held arrow-key Step owns one pending transaction and one Context on keyup.
 - Internal Loop wraps must never invoke Session movement or Context.
 
 ## 6. UI discipline

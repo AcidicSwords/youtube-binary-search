@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createSmokeEnvironment } from "./smoke-harness.mjs";
 
 const env = createSmokeEnvironment();
-const { byId, flush, poll, currentText } = env;
+const { byId, flush, poll, currentText, dispatchDocument } = env;
 
 await import("./app.js");
 window.onYouTubeIframeAPIReady();
@@ -53,6 +53,38 @@ assert.equal(center.state, 2);
 assert.equal(currentText(), "Current 0:50.000");
 assert.equal(byId.get("cursor-marker").hidden, true);
 
+// Held Step keys resize the active Interval immediately but defer automatic
+// Context until keyup, so key repeat draws one extent rather than repeatedly
+// starting and cancelling observation.
+const playsBeforeHeldStep = center.commands.filter(command => command[0] === "play").length;
+dispatchDocument("keydown", { key: "ArrowRight", code: "ArrowRight" });
+dispatchDocument("keydown", { key: "ArrowRight", code: "ArrowRight", repeat: true });
+assert.equal(currentText(), "Current 1:10.000");
+assert.equal(byId.get("loop-meta").textContent, "0:00.000–1:10.000");
+await env.delay(150);
+await flush();
+assert.equal(
+  center.commands.filter(command => command[0] === "play").length,
+  playsBeforeHeldStep,
+  "Held-key repeats must not start intermediate Context playback."
+);
+assert.equal(center.currentTime, 50);
+assert.equal(center.state, 2);
+dispatchDocument("keyup", { key: "ArrowRight", code: "ArrowRight" });
+await flush();
+assert.equal(center.currentTime, 69);
+assert.equal(center.state, 1);
+assert.equal(
+  center.commands.filter(command => command[0] === "play").length,
+  playsBeforeHeldStep + 1,
+  "Keyup must start exactly one Context observation at the final Step destination."
+);
+center.currentTime = 74;
+await poll();
+await flush();
+assert.equal(center.currentTime, 70);
+assert.equal(center.state, 2);
+
 // A new traversal supersedes active Context without restoring the old anchor.
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 250 });
 await flush();
@@ -102,4 +134,4 @@ await flush();
 assert.equal(currentText(), "Current 1:25.000");
 assert.equal(center.currentTime, 85);
 
-console.log("Context smoke passed: automatic post-traversal observation, delayed placement, Field suspension, replacement traversal, Step during Context, Off, and Return isolation.");
+console.log("Context smoke passed: automatic post-traversal observation, held-key Step deferral, delayed placement, Field suspension, replacement traversal, Step during Context, Off, and Return isolation.");

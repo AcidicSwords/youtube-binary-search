@@ -32,6 +32,7 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 ### Automatic Context
 
 - Enable each duration and invoke timeline, Refine, Step, side Step, Pin, Section, and Return traversal.
+- Hold each arrow key through repeated Step events; confirm Current/Interval update during repeat, no intermediate Context starts, and one Context runs on keyup at the final Current.
 - Confirm Center plays the bounded window and restores Current.
 - Confirm Tail/Lead remain paused and preserve their modes/Offsets.
 - Trigger a new traversal while Context is active; only the new destination remains authoritative.
@@ -48,6 +49,16 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 - Exercise different Tail/Lead Offsets and rates.
 - Confirm blocked/unavailable rate states are honest.
 - Confirm sides remain muted.
+
+### Composable Step Interval
+
+- Establish an Interval through Refine, timeline, Pin traversal, and native playback.
+- Step away from its departure and confirm the displayed Interval extends without moving the anchor.
+- Step back into the extent and confirm it shrinks.
+- Cross the anchor and confirm direction reverses while the ordered timeline extent remains valid.
+- Confirm matrix Step, pane click, and local side Step edit the same Interval.
+- Confirm Loop and Save Section consume the resized extent exactly.
+- Return after each resize and confirm the preceding Current, Resolution, and Interval are restored.
 
 ### Loop
 
