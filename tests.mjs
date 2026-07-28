@@ -73,6 +73,11 @@ import { formatTime, formatDuration } from "./view.js";
 const root = createRoot(0, 60, 180);
 assert.deepEqual(root, { L: 0, C: 60, R: 180, level: 0 });
 assert.deepEqual(getTargets(root), { backward: 30, forward: 120 });
+assert.deepEqual(
+  getTargets({ L: 0, C: 0.077, R: 1, level: 3 }),
+  { backward: 0, forward: 0.5385 },
+  "When a midpoint is below the movement floor, Refine must consume the remaining distinct endpoint."
+);
 assert.deepEqual(descend(root, "backward", 30), { L: 0, C: 30, R: 60, level: 1 });
 assert.deepEqual(descend(root, "forward", 120), { L: 60, C: 120, R: 180, level: 1 });
 assert.deepEqual(refineNeighborhood(root, 20, { start: 0, end: 180 }), { L: 0, C: 20, R: 60, level: 1 });
@@ -103,7 +108,22 @@ assert.deepEqual(
 );
 assert.deepEqual(
   stepNeighborhood({ L: 30, C: 60, R: 90, level: 2 }, 100, { start: 0, end: 180 }),
-  { L: 60, C: 100, R: 140, level: 0 }
+  { L: 30, C: 100, R: 140, level: 0 }
+);
+assert.deepEqual(
+  stepNeighborhood({ L: 0, C: 25, R: 50, level: 1 }, 50, { start: 0, end: 100 }, 25),
+  { L: 0, C: 50, R: 75, level: 0 },
+  "Step landing on a refinement endpoint must push that endpoint one Step beyond Current."
+);
+assert.equal(
+  getTargets(stepNeighborhood(
+    { L: 0, C: 25, R: 50, level: 1 },
+    50,
+    { start: 0, end: 100 },
+    25
+  )).forward,
+  62.5,
+  "The next directional Refine must remain half a Step away."
 );
 assert.deepEqual(
   settleContinuous({ L: 0, C: 300, R: 600, level: 2 }, 300, 350),
@@ -154,7 +174,11 @@ const generated = createSectionFromTimes(guide, 30, 40, { label: "Generated", pr
 const generatedSection = resolveSection(guide, generated.section.id);
 assert.equal(generatedSection.start, 30);
 assert.equal(generatedSection.end, 40);
-assert.equal(visiblePins(guide).some(pin => pin.id === generatedSection.startPinId), false);
+assert.equal(
+  visiblePins(guide).some(pin => pin.id === generatedSection.startPinId),
+  true,
+  "Section endpoint Pins must remain visible and traversable."
+);
 assert.equal(deleteSection(guide, generatedSection.id), true);
 assert.equal(getPin(guide, generatedSection.startPinId), null);
 assert.equal(getPin(guide, generatedSection.endPinId), null);
@@ -314,6 +338,20 @@ assert.deepEqual(
 );
 stepped = returnState(stepped).session;
 assert.equal(stepped.model.resolution.C, 50);
+
+// Step pushes a reached binary endpoint instead of collapsing the next Refine.
+let pushedNeighborhood = createSession({ duration: 100, current: 50 });
+pushedNeighborhood = refine(pushedNeighborhood, "backward").session;
+assert.deepEqual(pushedNeighborhood.model.resolution, { L: 0, C: 25, R: 50, level: 1 });
+pushedNeighborhood = step(pushedNeighborhood, "forward", 25).session;
+assert.deepEqual(pushedNeighborhood.model.resolution, { L: 0, C: 50, R: 75, level: 0 });
+assert.deepEqual(getTargets(pushedNeighborhood.model.resolution), { backward: 25, forward: 62.5 });
+
+let pushedBackward = createSession({ duration: 100, current: 50 });
+pushedBackward = refine(pushedBackward, "forward").session;
+pushedBackward = step(pushedBackward, "backward", 25).session;
+assert.deepEqual(pushedBackward.model.resolution, { L: 25, C: 50, R: 100, level: 0 });
+assert.deepEqual(getTargets(pushedBackward.model.resolution), { backward: 37.5, forward: 75 });
 
 // Range deformation preserves the Loop Window while rebasing endpoint frames
 // to the new hard bound.

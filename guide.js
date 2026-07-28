@@ -84,9 +84,7 @@ export function sectionsForPin(guide, pinId) {
 }
 
 export function visiblePins(guide) {
-  return sortPins(guide.pins).filter(pin =>
-    pin.kind === PIN_KIND.EXPLICIT || Boolean(pin.label?.trim())
-  );
+  return sortPins(guide.pins);
 }
 
 export function deletePin(guide, pinId) {
@@ -119,6 +117,18 @@ export function resolveSection(guide, sectionOrId) {
   };
 }
 
+export function sectionIdentityKey(startPinId, endPinId, label) {
+  return `${startPinId}|${endPinId}|${String(label || "").trim().toLocaleLowerCase()}`;
+}
+
+export function findDuplicateSection(guide, startPinId, endPinId, label, excludeId = null) {
+  const key = sectionIdentityKey(startPinId, endPinId, label);
+  return guide.sections.find(section =>
+    section.id !== excludeId
+    && sectionIdentityKey(section.startPinId, section.endPinId, section.label) === key
+  ) || null;
+}
+
 export function createSection(guide, startPinId, endPinId, options = {}) {
   const first = getPin(guide, startPinId);
   const second = getPin(guide, endPinId);
@@ -130,11 +140,7 @@ export function createSection(guide, startPinId, endPinId, options = {}) {
   const label = String(options.label || options.title || "").trim();
   if (!label) throw new RangeError("A Section requires a title.");
 
-  const duplicate = guide.sections.find(section =>
-    section.startPinId === start.id
-    && section.endPinId === end.id
-    && section.label === label
-  );
+  const duplicate = findDuplicateSection(guide, start.id, end.id, label);
   if (duplicate) return { section: duplicate, created: false };
 
   const createdAt = Number(options.createdAt) || now();
@@ -177,6 +183,15 @@ export function renameSection(guide, sectionId, label) {
   if (!section) throw new RangeError("Section not found.");
   const text = String(label || "").trim();
   if (!text) throw new RangeError("A Section requires a title.");
+  if (findDuplicateSection(
+    guide,
+    section.startPinId,
+    section.endPinId,
+    text,
+    section.id
+  )) {
+    throw new RangeError("A Section with this title and Extent already exists.");
+  }
   section.label = text;
   section.updatedAt = now();
   guide.updatedAt = section.updatedAt;
@@ -431,7 +446,7 @@ export function sanitizeGuide(input, videoId, duration) {
     const [startPinId, endPinId] = firstPin.t < secondPin.t
       ? [firstPinId, secondPinId]
       : [secondPinId, firstPinId];
-    const duplicateKey = `${startPinId}|${endPinId}|${label.toLocaleLowerCase()}`;
+    const duplicateKey = sectionIdentityKey(startPinId, endPinId, label);
     if (sectionKeys.has(duplicateKey)) continue;
 
     const section = {

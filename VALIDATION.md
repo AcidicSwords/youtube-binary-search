@@ -6,7 +6,15 @@
 npm run check
 ```
 
-The gate covers syntax, Session/Undo, endpoint frames and transposition, Guide, Context/playback/Loop values, source normalization, 25,000-operation fuzzing, native-playback regressions, Field geometry and controller behaviour, DOM/accessibility contracts, repository audits, startup, interaction, Context, and metadata paths.
+The gate covers syntax, Session/Undo, endpoint frames and transposition, matrix Interval composition, all seven semantic-audit regressions, Guide, Context/playback/Loop values, source normalization, 25,000-operation fuzzing, native-playback regressions, Field geometry and controller behaviour, DOM/accessibility contracts, repository audits, startup, interaction, Context, and metadata paths.
+
+The deeper semantic proof is separate:
+
+```bash
+npm run test:semantic
+```
+
+It covers 200,000 mixed random operations, 10,000 arbitrary point targets, 10,000 variable-Step Interval trials, and 10,000 arbitrary matrix Interval targets located through Refine at the 40 ms floor.
 
 A passing gate is necessary, not sufficient, because actual YouTube iframe behaviour remains browser- and video-dependent.
 
@@ -50,9 +58,10 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 - Reach maximum and verify automatic `1×` Held state.
 - Pause Center and confirm both sides are paused on the exact frames their displayed offsets imply.
 - Click each side video surface and local Step button; confirm all equal matrix Step, translate the whole relation, and park again like a slideshow.
-- Confirm Tail controls mirror Lead around Center.
+- Confirm Tail controls mirror Lead around Center and no control clips in the narrow three-pane width band.
 - Collapse Tail and confirm Lead keeps its current frame/mode/Offset; repeat in the other direction.
 - With one side collapsed, confirm Hold/Stretch visible side affects only the visible projection and the expanded pane reclaims width.
+- Force a side-player media error, hide/show that pane, and confirm the current source is retried; reload the same video and confirm both panes can recover.
 - Exercise different Tail/Lead Offsets and rates, Range boundaries, rapid pause/play, native scrub, Loop wraps, and Context replacement.
 - Confirm Context never changes stored side offsets and the first Play immediately after Context still starts both sides.
 - Confirm a source with only `1×` parks each side at its target and becomes Held instead of remaining stuck.
@@ -67,6 +76,18 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 - Confirm matrix Step, pane click, and local side Step edit the same Interval.
 - Confirm Loop and Save Section consume the resized extent exactly.
 - Undo after each resize and confirm the preceding Current, Resolution, and Interval are restored.
+- Step exactly onto each non-Range binary Neighborhood endpoint and confirm that endpoint advances by one Step and the next directional Refine is half a Step away.
+- Repeat past the original endpoint and confirm only Range stops further endpoint pushing.
+
+### Matrix Interval composition
+
+- Reach endpoint A, Switch Endpoint, then locate endpoint B through repeated Refine; confirm A remains fixed while B converges to the Resolution floor.
+- Repeat B traversal across several Section endpoint Pins; confirm the final Interval remains A→B rather than only the last Pin hop.
+- Cross A exactly, then continue; confirm the collapsed Interval redraws from A on the next matrix direction.
+- Invoke a direct timeline or Guide Go and confirm it intentionally replaces the Active Interval.
+- Exhaust Refine away from a Range edge and confirm the UI says `Resolution limit`; Reopen or Step must restore useful scale.
+- Exercise a final side narrower than 80 ms; confirm Refine consumes its still-distinct endpoint rather than exposing an enabled no-op midpoint.
+- Switch and confirm its meta and hover/focus preview expose the destination endpoint frame before committing.
 
 ### Endpoint Transposition
 
@@ -92,6 +113,8 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 
 - Create titled/untitled Pins from Pins tab.
 - Create Sections from Interval and Held Field span.
+- Confirm every Section endpoint appears as a Pin target and participates in previous/next traversal.
+- Attempt case-only duplicate Section titles on the same Extent and confirm runtime and reload preserve the same single identity.
 - Exercise Go, Focus, Loop, Rename, Delete, and Leave.
 - Reload and replace video; Guide remains video-specific.
 
@@ -99,6 +122,7 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 
 - Medium layout places Center above side panes.
 - Phone layout stacks Center, Tail, Lead without horizontal overflow.
+- Field-off remains a full-width Center-only projection even when either collapsed-side preference is persisted.
 - Every iframe remains at least `200 × 200` CSS pixels.
 - Native Center controls remain usable during ordinary playback; the paused shared-start surface is keyboard accessible and clearly labelled.
 - Side controls remain reachable with 48px coarse-pointer targets.

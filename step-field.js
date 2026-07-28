@@ -149,7 +149,8 @@ export function createStepFieldController({
       lastPlaceAt: 0,
       rateAvailable: true,
       blocked: false,
-      error: false
+      error: false,
+      retrySource: false
     };
   }
 
@@ -164,7 +165,10 @@ export function createStepFieldController({
     for (const role of ["tail", "lead"]) {
       const visibilityKey = `${role}Visible`;
       if (before[visibilityKey] && !after[visibilityKey]) pauseSide(sides[role]);
-      if (!before[visibilityKey] && after[visibilityKey]) runtime.restoreRoles.add(role);
+      if (!before[visibilityKey] && after[visibilityKey]) {
+        runtime.restoreRoles.add(role);
+        if (sides[role].error) sides[role].retrySource = true;
+      }
     }
     if (before.stepFieldEnabled && !after.stepFieldEnabled) {
       pauseSides({ freeze: false });
@@ -172,7 +176,10 @@ export function createStepFieldController({
       runtime.centerWasRunning = false;
     } else if (!before.stepFieldEnabled && after.stepFieldEnabled) {
       for (const role of ["tail", "lead"]) {
-        if (after[`${role}Visible`]) runtime.restoreRoles.add(role);
+        if (after[`${role}Visible`]) {
+          runtime.restoreRoles.add(role);
+          if (sides[role].error) sides[role].retrySource = true;
+        }
       }
     }
     if (fieldPreferenceRequiresEstablish(patch) && patch?.stepFieldEnabled === true) {
@@ -311,7 +318,10 @@ export function createStepFieldController({
           side.sourceReady = false;
           side.ratesKnown = false;
           side.error = true;
-          side.ready = false;
+          // The IFrame adapter remains usable after a media error. Keeping the
+          // player ready allows an explicit pane restore or video reload to cue
+          // the source again instead of leaving this projection permanently dead.
+          side.ready = Boolean(side.adapter);
           side.playback = "error";
         }
       }
@@ -865,11 +875,13 @@ export function createStepFieldController({
     const snapshot = getSnapshot?.();
     if (!snapshot?.videoLoaded) return;
     const side = sides[role];
-    const center = Number(snapshot.center?.time ?? snapshot.current);
+    const center = Number(snapshot.current);
+    const availableDistance = effectiveOffset(role, center, snapshot);
+    if (!(availableDistance > EPSILON)) return;
     const visibleOffset = clamp(side.offset, 0, effectiveOffset(role, center, snapshot));
     const distance = visibleOffset > REACH_TOLERANCE
       ? visibleOffset
-      : effectiveOffset(role, center, snapshot);
+      : availableDistance;
     if (!(distance > EPSILON)) return;
     onSelect?.({
       role,
@@ -888,22 +900,26 @@ export function createStepFieldController({
     return `${rounded}s`;
   }
 
-  function sideMeta(role, sideState, target) {
+  function sideMeta(role) {
     const side = sides[role];
     if (runtime.suspended) return "Context suspended";
     if (!side.sourceReady && !side.error) return "Preparing video";
     if (side.blocked) return "Playback blocked — retry Play";
     if (side.error) return "Player unavailable";
     if (!side.rateAvailable && side.mode === FIELD_SIDE_MODE.STRETCHING) return "Rate unavailable — held at target";
-    const prefix = role === "tail" ? "−" : "+";
-    const state = side.mode === FIELD_SIDE_MODE.HELD ? "Held" : "Stretching";
-    return `${prefix}${formatOffset(sideState.offset)} / ${formatOffset(target.distance)} · ${state} · ${side.actualRate}×`;
+    return Number.isFinite(side.desiredAddress)
+      ? formatTime(side.desiredAddress)
+      : "Preparing frame";
   }
 
   function publish(snapshot = getSnapshot?.(), live = null, sideStates = null) {
     if (!snapshot?.range) return null;
     const prefs = preferences();
-    const center = clamp(Number(snapshot.center?.time ?? snapshot.current ?? 0), snapshot.range.start, snapshot.range.end);
+    const center = clamp(
+      Number(runtime.suspended ? snapshot.current : snapshot.center?.time ?? snapshot.current ?? 0),
+      snapshot.range.start,
+      snapshot.range.end
+    );
     const targets = live || deriveStepField(center, snapshotReach(snapshot), snapshot.range);
     const states = sideStates || {
       tail: { available: targets.tail.available, held: sides.tail.mode === FIELD_SIDE_MODE.HELD, offset: sides.tail.offset },
@@ -999,15 +1015,31 @@ export function createStepFieldController({
       const direction = directionFor(role);
       const actual = field?.[role]?.offset ?? side.offset;
       const target = reach[direction];
+      const availableDistance = effectiveOffset(role, snapshot.current, snapshot);
+      const canStep = shown
+        && prefs[`${role}Visible`]
+        && availableDistance > EPSILON;
       const nextAction = side.mode === FIELD_SIDE_MODE.HELD ? "Stretch" : "Hold";
       setText(elements[`${role}-field-toggle-label`], nextAction);
       setText(elements[`${role}-offset-state`], `${formatOffset(actual)} / ${formatOffset(target)}`);
       elements[`${role}-field-toggle`]?.setAttribute?.("aria-pressed", String(side.mode === FIELD_SIDE_MODE.HELD));
-      if (elements[`${role}-field-toggle`]) elements[`${role}-field-toggle`].disabled = !shown || !prefs[`${role}Visible`] || side.error;
-      if (elements[`${role}-step-button`]) {
-        elements[`${role}-step-button`].disabled = !shown || !prefs[`${role}Visible`] || !(Math.max(actual, target) > EPSILON);
+      if (elements[`${role}-field-toggle`]) {
+        elements[`${role}-field-toggle`].disabled = !canStep || side.error;
       }
-      setText(elements[`${role}-meta`], !loaded ? "—" : sideMeta(role, { offset: actual }, { distance: target }));
+      if (elements[`${role}-step-button`]) {
+        elements[`${role}-step-button`].disabled = !canStep;
+      }
+      const surface = elements[`${role}-player-surface`];
+      surface?.setAttribute?.("aria-disabled", String(!canStep));
+      if (surface) surface.tabIndex = canStep ? 0 : -1;
+      setText(
+        elements[`${role}-meta`],
+        !loaded
+          ? "—"
+          : availableDistance <= EPSILON
+            ? role === "tail" ? "Range start" : "Range end"
+            : sideMeta(role)
+      );
     }
 
     const visibleRoles = ["tail", "lead"].filter(role => prefs[`${role}Visible`]);
@@ -1096,10 +1128,11 @@ export function createStepFieldController({
       pauseSides({ center, freeze: true });
     }
 
-    const live = deriveStepField(center, snapshotReach(snapshot), snapshot.range);
+    const relationalCenter = runtime.suspended ? snapshot.current : center;
+    const live = deriveStepField(relationalCenter, snapshotReach(snapshot), snapshot.range);
     const sideStates = {
-      tail: driveSide("tail", center, centerDelta, snapshot, centerRunning && !runtime.suspended),
-      lead: driveSide("lead", center, centerDelta, snapshot, centerRunning && !runtime.suspended)
+      tail: driveSide("tail", relationalCenter, centerDelta, snapshot, centerRunning && !runtime.suspended),
+      lead: driveSide("lead", relationalCenter, centerDelta, snapshot, centerRunning && !runtime.suspended)
     };
     runtime.phase = runtime.suspended
       ? STEP_FIELD_PHASE.SUSPENDED
@@ -1119,7 +1152,8 @@ export function createStepFieldController({
   function syncVideo(snapshot) {
     if (!snapshot.videoLoaded || !snapshot.videoId) return;
     for (const side of Object.values(sides)) {
-      if (!side.ready || side.videoId === snapshot.videoId) continue;
+      if (!side.ready || (side.videoId === snapshot.videoId && !side.retrySource)) continue;
+      side.retrySource = false;
       side.videoId = snapshot.videoId;
       side.error = false;
       side.blocked = false;
@@ -1141,6 +1175,22 @@ export function createStepFieldController({
       side.adapter.cue?.(snapshot.videoId, snapshot.current);
       runtime.forceEstablish = true;
     }
+  }
+
+  function resetSources() {
+    for (const side of Object.values(sides)) {
+      pauseSide(side);
+      side.videoId = null;
+      side.sourceReady = false;
+      side.ratesKnown = false;
+      side.pendingPlay = false;
+      side.blocked = false;
+      side.error = false;
+      side.retrySource = true;
+      side.ready = Boolean(side.adapter);
+      side.playback = side.adapter ? "idle" : YOUTUBE_STATE.UNSTARTED;
+    }
+    runtime.forceEstablish = true;
   }
 
   function invalidate() {
@@ -1171,6 +1221,7 @@ export function createStepFieldController({
     playFromGesture,
     activationState,
     invalidate,
+    resetSources,
     translateToCurrent,
     translatePhysicalCenter,
     hold(role = "both") {

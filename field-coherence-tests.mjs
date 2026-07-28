@@ -153,8 +153,11 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   assert.match(field, /bindSideStepSurface\("tail"\)/);
   assert.match(field, /bindSideStepSurface\("lead"\)/);
   assert.match(fieldCss, /\.pane-field-controls\s*\{[\s\S]*z-index:\s*7/);
-  assert.match(fieldCss, /@media \(max-width: 680px\)[\s\S]*\.tail-pane\s*\{[\s\S]*grid-row:\s*2;/);
-  assert.match(fieldCss, /@media \(max-width: 680px\)[\s\S]*\.lead-pane\s*\{[\s\S]*grid-row:\s*3;/);
+  assert.match(
+    fieldCss,
+    /@media \(max-width: 680px\)[\s\S]*grid-template-areas:\s*"center"\s*"tail"\s*"lead"/,
+    "Phone layout must explicitly stack Center, Tail, Lead without relying on auto-placement."
+  );
   assert.match(fieldCss, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);
   assert.match(app, /setStepReach as setSessionStepReach/);
   assert.match(app, /stepReach: currentStepReach\(\)/);

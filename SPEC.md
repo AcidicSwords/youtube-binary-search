@@ -13,7 +13,7 @@ The primitive is an Address `t` inside duration `[0, D]`.
 - **Range** — sole hard admissible extent.
 - **Resolution** — current grain of semantic discrimination.
 - **Neighborhood** — `{L, C, R}` around Current at that Resolution.
-- **Interval** — active committed movement extent. Departure is its anchor; arrival is the active endpoint at Current. Each endpoint retains the Resolution frame last occupied there.
+- **Interval** — active editable movement extent. Departure is its retained anchor; arrival is the active endpoint at Current. Each endpoint retains the Resolution frame last occupied there.
 - **Pin** — retained Address.
 - **Section** — retained bounded Extent whose endpoints are Pins.
 - **Guide** — video-specific Pins and Sections.
@@ -33,6 +33,8 @@ Interval is null or Interval.arrival = Current
 Interval.arrivalFrame = current Resolution and basis
 Interval endpoint frames remain inside Range
 Step preserves a usable Interval.departure
+Matrix Refine and Pin traversal preserve a usable Interval.departure
+Step preserves its binary Neighborhood and pushes only a reached directional endpoint
 Context never activates Tail or Lead
 Loop wraps do not mutate Session
 Undo restores semantic checkpoints, never transient player state
@@ -44,11 +46,13 @@ A null operation creates no history entry.
 
 ### Go
 
-Commits Current to a bounded Address and derives a movement Interval. Timeline selection, Pin selection, Section midpoint selection, and settled native scrubbing project Go.
+Commits Current to a bounded Address and establishes a replacement Interval from the preceding Current. Timeline selection, direct Guide selection, Section midpoint selection, and settled native scrubbing project Go.
 
 ### Refine Backward / Forward
 
-Selects one child of the active Neighborhood, commits its midpoint as Current, and increases discrimination.
+Selects one child of the active Neighborhood, commits its midpoint as Current, and increases discrimination. If that midpoint is within the 40 ms identity floor but the directional endpoint remains distinct, the terminal Refine consumes that endpoint instead of exposing a no-op target. Refine becomes unavailable only when no distinct Address remains on that side.
+
+Refine is a matrix-direction operation: when an Interval is active at Current, it preserves that Interval’s departure and edits only its arrival. With no active Interval, the first Refine establishes one from Current.
 
 ### Reopen
 
@@ -73,7 +77,10 @@ Consequences:
 - Step toward the anchor shrinks it.
 - Step across the anchor redraws it in the opposite direction.
 - Landing exactly on the anchor collapses the Interval; the next Step redraws from that same Current.
-- Refine, Go, Pin traversal, timeline traversal, native playback, or any other movement may establish the Interval that Step subsequently edits.
+- Direct Go and settled native playback establish replacement Intervals.
+- Refine, Step, and matrix Pin traversal share one endpoint-edit rule and preserve the active departure.
+
+Step also preserves the active binary Neighborhood. It moves `C` inside that frame until the destination reaches or crosses `L` or `R`. It then pushes only the crossed directional endpoint to one Step beyond the new `C`, clamped to Range. Consequently, the next Refine in the Step direction is half a Step away whenever the remaining Range can contain that full Step of headroom. Range remains the sole hard boundary; at Range itself, Refine may necessarily become unavailable.
 
 Each distinct Step gesture is a traversal and may invoke automatic Context. Auto-repeated arrow-key events coalesce into one transaction, update Current and the timeline immediately, and invoke Context once on keyup at the final Current.
 
@@ -86,13 +93,13 @@ Interval (departure A, arrival B = Current)
 → Interval (departure B, arrival A = Current)
 ```
 
-`Interval.start` and `Interval.end` do not change. The frame being left is stored at its endpoint and the frame retained at the destination is restored as active Resolution. Switching twice therefore restores the same Current, directed Interval, and endpoint frames. Step after switching edits from the newly transposed departure anchor. A null/collapsed Interval has no endpoints and Switch Endpoint is unavailable.
+`Interval.start` and `Interval.end` do not change. The frame being left is stored at its endpoint and the frame retained at the destination is restored as active Resolution. Switching twice therefore restores the same Current, directed Interval, and endpoint frames. Refine, Step, and matrix Pin traversal after switching edit from the newly transposed departure anchor. A null/collapsed Interval has no endpoints and Switch Endpoint is unavailable; the next directional movement establishes again from that Current.
 
 Switch Endpoint is a traversal and may invoke automatic Context.
 
 ### Undo
 
-Restores the previous complete semantic checkpoint: Range, Resolution, Current, Interval, Focus, directional Offsets, and Guide changes belonging to that transaction.
+Restores the previous complete semantic checkpoint: Range, Resolution, Current, Interval, Focus, directional Offsets, and Guide changes belonging to that transaction. If Hold changes an Offset during native playback, playback settlement follows it in history; one Undo restores the pre-settlement spatial state with the Held Offset intact, and the next Undo restores the earlier Offset.
 
 ### Loop
 
@@ -109,7 +116,9 @@ The internal end-to-start wrap does not commit Current, redefine Interval, appen
 ### Pin / Section / Focus
 
 - Pin Current retains Current as an Address.
-- Save Section retains an explicit movement Interval or Held Field span and reuses coincident endpoint Pins.
+- Every Section endpoint is a Pin operand for timeline and matrix Pin traversal, whether or not it has an independent title.
+- Save Section retains an Active Interval or Held Field span and reuses coincident endpoint Pins.
+- Section identity is case-insensitive for equal endpoints and title, both at runtime and after persistence recovery.
 - Focus installs a Section as Range.
 - Leave restores the containing Range.
 
@@ -156,6 +165,8 @@ requested and confirmed Rate
 player readiness / playback state
 ```
 
+A side-player media error does not invalidate its IFrame adapter. Restoring the pane or reloading a video may re-cue that source. Pane collapse is projection-local, and the Field-off projection remains Center-only regardless of persisted collapse state.
+
 ### Stretch
 
 Stretch is one operation containing refold and unfold:
@@ -180,7 +191,7 @@ Center exposes Hold both / Stretch both. Each side remains independently control
 
 ### Side Step and translation
 
-The read-only side video surface and local Step button invoke the same Step. Distance is the meaningful visible Offset, otherwise the maximum Offset. The Step moves the active Interval endpoint, so repeated side clicks extend, shrink, or reverse the same Loop/Section region. After Step, the complete Field translates by the same signed movement and all three panes park at their translated addresses. Automatic Context then runs in Center only and leaves the parked Field relation untouched.
+The read-only side video surface and local Step button invoke the same Step. Distance is the meaningful visible Offset, otherwise the maximum Offset. At a hard Range boundary the corresponding surface and button are unavailable rather than exposing a null action. The Step moves the active Interval endpoint, so repeated side clicks extend, shrink, or reverse the same Loop/Section region. After Step, the complete Field translates by the same signed movement and all three panes park at their translated addresses. Automatic Context then runs in Center only and leaves the parked Field relation untouched.
 
 ## 8. Physical versus semantic effects
 

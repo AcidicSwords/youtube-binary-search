@@ -28,7 +28,7 @@ assert.equal(byId.get("current-marker").style.left, "50%");
 byId.get("pin-label").value = "Middle";
 byId.get("pin-capture").dispatch("submit");
 await flush();
-assert.equal(byId.get("pin-count").textContent, "1");
+assert.equal(byId.get("pins-list-count").textContent, "1");
 assert.equal(byId.get("pin-label").value, "");
 assert.ok(descendants(byId.get("pins-list")).some(node => node.textContent === "Middle"));
 
@@ -36,13 +36,24 @@ byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 
 byId.get("pin-label").value = "Quarter";
 byId.get("pin-capture").dispatch("submit");
 await flush();
-assert.equal(byId.get("pin-count").textContent, "2");
+assert.equal(byId.get("pins-list-count").textContent, "2");
 assert.equal(currentText(), "Current 0:25.000");
 
 byId.get("pin-forward").click();
 await flush();
 assert.equal(currentText(), "Current 0:50.000", "Next Pin must traverse through the same movement model.");
+assert.equal(
+  byId.get("section-window").textContent,
+  "No active Interval",
+  "Returning to the retained anchor must collapse the Active Interval."
+);
+byId.get("pin-backward").click();
+await flush();
+assert.equal(currentText(), "Current 0:25.000");
 assert.match(byId.get("section-window").textContent, /0:25\.000–0:50\.000/);
+byId.get("switch-endpoint").click();
+await flush();
+assert.equal(currentText(), "Current 0:50.000");
 
 // Step edits the active Interval instead of replacing it. Outward Step extends
 // the Pin-defined region; inward Step shrinks the same region back to its anchor.
@@ -82,7 +93,7 @@ byId.get("section-label").value = "Quarter to middle";
 byId.get("section-label").dispatch("input");
 byId.get("section-capture").dispatch("submit");
 await flush();
-assert.equal(byId.get("section-count").textContent, "1");
+assert.equal(byId.get("sections-list-count").textContent, "1");
 const sectionNodes = descendants(byId.get("sections-list"));
 assert.ok(sectionNodes.some(node => node.textContent === "Quarter to middle"));
 assert.ok(sectionNodes.some(node => node.dataset.loopSection), "Saved Sections must expose their own Loop action.");

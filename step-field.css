@@ -2,7 +2,8 @@
 .step-field {
   --field-gap: clamp(7px, 0.72vw, 12px);
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) minmax(264px, 1.1fr) minmax(240px, 1fr);
+  grid-template-areas: "tail center lead";
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr);
   gap: var(--field-gap);
   align-items: stretch;
   padding: var(--field-gap);
@@ -21,6 +22,7 @@
 }
 
 .step-pane-center {
+  grid-area: center;
   border-color: var(--line-strong);
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
 }
@@ -28,6 +30,9 @@
 .step-pane-side {
   opacity: 0.96;
 }
+
+.tail-pane { grid-area: tail; }
+.lead-pane { grid-area: lead; }
 
 .step-pane-side .player-wrap {
   filter: saturate(0.88) brightness(0.88);
@@ -50,6 +55,12 @@
 .side-player-surface:focus-visible {
   outline: 2px solid rgba(121, 168, 255, 0.84);
   outline-offset: -3px;
+}
+
+.side-player-surface[aria-disabled="true"] {
+  cursor: default;
+  filter: saturate(0.7);
+  opacity: 0.72;
 }
 
 .step-pane-bar {
@@ -231,72 +242,82 @@
 .step-pane.is-collapsed .step-pane-bar,
 .step-pane.is-collapsed .pane-field-controls { display: none; }
 
-.step-field.field-off { grid-template-columns: minmax(0, 1fr); }
+.step-field.field-off {
+  grid-template-areas: "center";
+  grid-template-columns: minmax(0, 1fr);
+}
 .step-field.field-off .step-pane-side { display: none; }
 .step-field.field-off .step-pane-center {
   width: min(1100px, 100%);
   justify-self: center;
 }
 
-.step-field.tail-collapsed { grid-template-columns: 48px minmax(264px, 1.1fr) minmax(240px, 1fr); }
-.step-field.lead-collapsed { grid-template-columns: minmax(240px, 1fr) minmax(264px, 1.1fr) 48px; }
-.step-field.tail-collapsed.lead-collapsed { grid-template-columns: 48px minmax(264px, 1fr) 48px; }
+.step-field.tail-collapsed:not(.field-off) {
+  grid-template-columns: 48px minmax(0, 1.1fr) minmax(0, 1fr);
+}
+.step-field.lead-collapsed:not(.field-off) {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) 48px;
+}
+.step-field.tail-collapsed.lead-collapsed:not(.field-off) {
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+}
 
 .step-field.is-suspended .step-pane-side .player-wrap {
   filter: grayscale(0.4) brightness(0.58);
 }
 
-@media (max-width: 1380px) {
+@media (max-width: 1440px) {
   .pane-field-controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 1180px) {
-  .step-field {
+  .step-field:not(.field-off) {
+    grid-template-areas:
+      "center center"
+      "tail lead";
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .step-field.tail-collapsed:not(.lead-collapsed) {
+  .step-field.tail-collapsed:not(.lead-collapsed):not(.field-off) {
     grid-template-columns: 48px minmax(0, 1fr);
   }
 
-  .step-field.lead-collapsed:not(.tail-collapsed) {
+  .step-field.lead-collapsed:not(.tail-collapsed):not(.field-off) {
     grid-template-columns: minmax(0, 1fr) 48px;
   }
 
-  .step-field.tail-collapsed.lead-collapsed {
+  .step-field.tail-collapsed.lead-collapsed:not(.field-off) {
+    grid-template-areas:
+      "center center center"
+      "tail . lead";
     grid-template-columns: 48px minmax(0, 1fr) 48px;
   }
 
   .step-pane-center {
-    grid-column: 1 / -1;
-    grid-row: 1;
     width: min(920px, 100%);
     justify-self: center;
   }
 
-  .tail-pane { grid-column: 1; grid-row: 2; }
-  .lead-pane { grid-column: 2; grid-row: 2; }
-  .step-field.tail-collapsed.lead-collapsed .lead-pane { grid-column: 3; }
   .step-pane.is-collapsed { min-height: 64px; }
   .step-pane-restore { writing-mode: horizontal-tb; }
 }
 
 @media (max-width: 680px) {
-  .step-field,
-  .step-field.tail-collapsed,
-  .step-field.lead-collapsed,
-  .step-field.tail-collapsed.lead-collapsed {
+  .step-field:not(.tail-collapsed):not(.lead-collapsed):not(.field-off),
+  .step-field.tail-collapsed:not(.lead-collapsed):not(.field-off),
+  .step-field.lead-collapsed:not(.tail-collapsed):not(.field-off),
+  .step-field.tail-collapsed.lead-collapsed:not(.field-off) {
+    grid-template-areas:
+      "center"
+      "tail"
+      "lead";
     grid-template-columns: minmax(0, 1fr);
     gap: 7px;
     padding: 7px;
   }
 
-  .step-pane-center { grid-column: 1; grid-row: 1; }
-  .tail-pane { grid-column: 1; grid-row: 2; }
-  .lead-pane { grid-column: 1; grid-row: 3; }
-  .step-field.tail-collapsed.lead-collapsed .lead-pane { grid-column: 1; }
   .step-pane-side .player-wrap { min-height: 200px; aspect-ratio: auto; }
   .step-pane-bar { min-height: 50px; }
   .step-pane-meta { font-size: 0.59rem; }

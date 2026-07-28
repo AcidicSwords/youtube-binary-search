@@ -171,7 +171,7 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
   byId.get("context-select").value = "5";
   for (const value of ["0", "3", "5", "10"]) addOption(byId.get("context-select"), value, value === "0" ? "Off" : `${value} s`);
   byId.get("section-source").value = "interval";
-  addOption(byId.get("section-source"), "interval", "Last movement Interval");
+  addOption(byId.get("section-source"), "interval", "Active Interval");
   addOption(byId.get("section-source"), "field-span", "Held Field span");
   addOption(byId.get("tail-rate-select"), "1", "Loading");
   addOption(byId.get("lead-rate-select"), "1", "Loading");

@@ -159,15 +159,29 @@ assert.equal(resolveFieldPhase({
   assert.match(html, /id="center-transport-surface"/,
     "Paused Center must expose a parent-owned playback surface for shared iframe activation.");
   assert.match(layoutCss, /\.center-transport-surface[\s\S]*position:\s*absolute/);
-  assert.match(css, /grid-template-columns:\s*minmax\(240px, 1fr\) minmax\(264px, 1\.1fr\) minmax\(240px, 1fr\)/);
-  assert.match(css, /\.step-field\.tail-collapsed:not\(\.lead-collapsed\)[\s\S]*grid-template-columns:\s*48px minmax\(0, 1fr\)/,
+  assert.match(css, /grid-template-areas:\s*"tail center lead"[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1\.1fr\) minmax\(0, 1fr\)/,
+    "Wide panes must occupy explicit Tail | Center | Lead areas without fixed minima that clip the containing panel.");
+  assert.match(css, /\.step-field\.field-off[\s\S]*grid-template-areas:\s*"center"[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/,
+    "Field-off projection must remain Center-only even when collapsed preferences persist.");
+  assert.match(css, /\.step-field\.tail-collapsed:not\(\.lead-collapsed\):not\(\.field-off\)[\s\S]*grid-template-columns:\s*48px minmax\(0, 1fr\)/,
     "A collapsed Tail must release medium-layout width to Lead.");
-  assert.match(css, /\.step-field\.lead-collapsed:not\(\.tail-collapsed\)[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 48px/,
+  assert.match(css, /\.step-field\.lead-collapsed:not\(\.tail-collapsed\):not\(\.field-off\)[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 48px/,
     "A collapsed Lead must release medium-layout width to Tail.");
+  assert.match(css, /@media \(max-width: 1440px\)[\s\S]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/,
+    "Three-pane controls must fold before their four-column minimum can clip a side pane.");
+  assert.match(
+    css,
+    /@media \(max-width: 680px\)[\s\S]*\.step-field\.tail-collapsed\.lead-collapsed:not\(\.field-off\)[\s\S]*grid-template-areas:\s*"center"\s*"tail"\s*"lead"/,
+    "Phone stacking must override the more-specific collapsed medium layout."
+  );
   assert.match(fieldSource, /const visibleRoles = \["tail", "lead"\]\.filter[\s\S]*visibleRoles\.every/,
     "Combined Field state must derive from visible projections only.");
   assert.match(fieldSource, /runtime\.restoreRoles/,
     "Restoring one collapsed projection must not force a sibling re-establishment.");
+  assert.match(fieldSource, /side\.ready = Boolean\(side\.adapter\)/);
+  assert.match(fieldSource, /resetSources/);
+  assert.match(app, /stepField\?\.resetSources\?\.\(\)/,
+    "Reloading a video must release stale side-source errors, including same-video reloads.");
   assert.match(css, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);
   assert.match(css, /@media \(max-width: 680px\)/);
   assert.doesNotMatch(css, /@media \(min-width: 1221px\)/);

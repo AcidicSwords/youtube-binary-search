@@ -6,12 +6,14 @@ import {
   midpoint,
   getTargets,
   getActionRanges,
+  refineBlockReason,
   RESOLUTION_BASIS
 } from "./range-geometry.js";
 import {
   PIN_KIND,
   findPinAt,
   visiblePins,
+  sectionsForPin,
   resolveSection,
   previousPin,
   nextPin,
@@ -81,6 +83,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
   const focusedSectionId = () => model().focus?.sectionId || null;
   const transportIs = kind => state().transport.kind === kind;
 
+  function pinLabel(pin) {
+    if (pin.label?.trim()) return pin.label.trim();
+    return pin.kind === PIN_KIND.ENDPOINT ? "Section endpoint" : "Unnamed Pin";
+  }
 
   function setStatus(message, isError = false) {
     elements.status.textContent = message;
@@ -137,7 +143,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       button.setAttribute("role", "menuitem");
       button.dataset.pinGo = pin.id;
       const label = document.createElement("span");
-      label.textContent = pin.label || "Unnamed Pin";
+      label.textContent = pinLabel(pin);
       const time = document.createElement("time");
       time.textContent = formatTime(pin.t);
       button.append(label, time);
@@ -174,7 +180,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       if (cluster.pins.length === 1) {
         const pin = cluster.pins[0];
         button.dataset.pinGo = pin.id;
-        const description = `${pin.label || "Unnamed Pin"} at ${formatTime(pin.t)}`;
+        const description = `${pinLabel(pin)} at ${formatTime(pin.t)}`;
         button.setAttribute("aria-label", description);
         button.title = description;
       } else {
@@ -189,7 +195,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         const description = `${cluster.pins.length} nearby Pins`;
         button.setAttribute("aria-label", description);
         button.title = cluster.pins
-          .map(pin => `${pin.label || "Unnamed Pin"} — ${formatTime(pin.t)}`)
+          .map(pin => `${pinLabel(pin)} — ${formatTime(pin.t)}`)
           .join("\n");
       }
       elements["pin-lane"].appendChild(button);
@@ -205,10 +211,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       sections: String(sections.length)
     };
 
-    for (const id of ["pin-count", "pins-list-count", "header-pin-count"]) {
+    for (const id of ["pins-list-count", "header-pin-count"]) {
       elements[id].textContent = counts.pins;
     }
-    for (const id of ["section-count", "sections-list-count", "header-section-count"]) {
+    for (const id of ["sections-list-count", "header-section-count"]) {
       elements[id].textContent = counts.sections;
     }
     elements["guide-toggle"].setAttribute(
@@ -300,7 +306,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         main.dataset.pinGo = pin.id;
         const title = document.createElement("span");
         title.className = "guide-item-title";
-        title.textContent = pin.label || "Unnamed Pin";
+        title.textContent = pinLabel(pin);
         const time = document.createElement("span");
         time.className = "guide-item-time";
         time.textContent = formatTime(pin.t);
@@ -317,6 +323,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         remove.dataset.deletePin = pin.id;
         remove.textContent = "Delete";
         remove.className = "danger-text";
+        const references = sectionsForPin(guide(), pin.id).length;
+        remove.disabled = references > 0;
+        if (references) {
+          remove.title = `Used by ${references} Section${references === 1 ? "" : "s"}`;
+        }
         actions.append(rename, remove);
         item.append(main, actions);
         elements["pins-list"].appendChild(item);
@@ -428,10 +439,13 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const next = currentResolution
       ? nextPin(guide(), semanticCurrent, activeRange)
       : null;
+    const switchFrame = currentInterval?.departureFrame?.resolution;
     const structuralPresentation = currentResolution ? {
       previousPin: previous ? { start: previous.t, end: semanticCurrent } : null,
       nextPin: next ? { start: semanticCurrent, end: next.t } : null,
-      switchEndpoint: currentInterval,
+      switchEndpoint: switchFrame
+        ? { start: switchFrame.L, end: switchFrame.R }
+        : currentInterval,
       loop: currentInterval
     } : null;
     const focused = resolveSection(guide(), focusedSectionId());
@@ -440,18 +454,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["range-label"].textContent = loaded ? formatRange(activeRange) : "—";
     elements["resolution-label"].textContent = currentResolution
       ? `${formatDuration(currentResolution.R - currentResolution.L)} · ${
-          (currentResolution.level ?? 0) === 0
-            ? currentState.session.model.resolutionBasis === RESOLUTION_BASIS.MOVEMENT
-              ? "Movement scale"
-              : "Range"
-            : `${currentResolution.level} refinement${currentResolution.level === 1 ? "" : "s"} · ${
-                currentState.session.model.resolutionBasis === RESOLUTION_BASIS.MOVEMENT
-                  ? "movement scale"
-                  : "Range"
-              }`
+          currentState.session.model.resolutionBasis === RESOLUTION_BASIS.MOVEMENT
+            ? "Movement scale"
+            : "Range scale"
         }`
       : "—";
-    elements["range-tools-value"].textContent = loaded ? formatRange(activeRange) : "—";
     elements["pin-current-position"].textContent = currentResolution ? `Current ${formatTime(semanticCurrent)}` : "Current —";
     elements["context-setting-value"].textContent = currentState.contextSeconds > 0
       ? `${currentState.contextSeconds} s after traversal`
@@ -465,7 +472,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const sectionExtent = sectionKind === "field-span" ? fieldSpan : currentInterval;
     elements["section-window"].textContent = sectionExtent
       ? `${sectionKind === "field-span" ? "Field" : "Interval"} ${formatRange(sectionExtent)}`
-      : `No ${sectionKind === "field-span" ? "Held Field span" : "movement Interval"}`;
+      : `No ${sectionKind === "field-span" ? "Held Field span" : "active Interval"}`;
     const sourceOptions = [...elements["section-source"].options];
     const fieldOption = sourceOptions.find(option => option.value === "field-span");
     if (fieldOption) fieldOption.disabled = !fieldSpan;
@@ -532,20 +539,39 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["return-meta"].textContent = currentState.session.history.length
       ? currentState.session.history.at(-1).label
       : "Nothing to undo";
-    elements["switch-endpoint-meta"].textContent = currentInterval
-      ? `to ${formatTime(currentInterval.departure)}`
-      : "No Interval";
+    const destinationFrame = currentInterval?.departureFrame;
+    const destinationScale = destinationFrame?.resolution
+      ? formatDuration(destinationFrame.resolution.R - destinationFrame.resolution.L)
+      : null;
+    setActionMeta(
+      "switch-endpoint",
+      "switch-endpoint-meta",
+      "Switch Endpoint",
+      currentInterval
+        ? `to ${formatTime(currentInterval.departure)}${destinationScale ? ` · ${destinationScale} ${destinationFrame.resolutionBasis === RESOLUTION_BASIS.RANGE ? "Range" : "movement"} scale` : ""}`
+        : "No Interval"
+    );
+    const backwardBlock = currentResolution
+      ? refineBlockReason(currentResolution, activeRange, "backward")
+      : null;
+    const forwardBlock = currentResolution
+      ? refineBlockReason(currentResolution, activeRange, "forward")
+      : null;
     setActionMeta(
       "refine-backward",
       "backward-meta",
       "Refine Backward",
-      targets.backward === null ? "Range start" : `to ${formatTime(targets.backward)}`
+      targets.backward === null
+        ? backwardBlock === "resolution-limit" ? "Resolution limit" : "Range start"
+        : `to ${formatTime(targets.backward)}`
     );
     setActionMeta(
       "refine-forward",
       "forward-meta",
       "Refine Forward",
-      targets.forward === null ? "Range end" : `to ${formatTime(targets.forward)}`
+      targets.forward === null
+        ? forwardBlock === "resolution-limit" ? "Resolution limit" : "Range end"
+        : `to ${formatTime(targets.forward)}`
     );
     elements["reopen-meta"].textContent = actionModel?.reopen
       ? `${formatDuration(activeRange.end - activeRange.start)} available`
@@ -558,10 +584,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? `to ${formatTime(actionModel.stepForward.destination)}`
       : "Range end";
     elements["pin-backward-meta"].textContent = previous
-      ? `${formatTime(previous.t)}${previous.label ? ` · ${previous.label}` : ""}`
+      ? `${formatTime(previous.t)} · ${pinLabel(previous)}`
       : "No Pin backward";
     elements["pin-forward-meta"].textContent = next
-      ? `${formatTime(next.t)}${next.label ? ` · ${next.label}` : ""}`
+      ? `${formatTime(next.t)} · ${pinLabel(next)}`
       : "No Pin forward";
 
     if (!loaded || !currentResolution) {

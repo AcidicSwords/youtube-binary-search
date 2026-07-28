@@ -57,6 +57,12 @@ assert.match(html, /id="lead-pane"[\s\S]*id="player-lead"[\s\S]*id="lead-rate-se
   "Lead controls must remain object-local beneath its player.");
 assert.match(html, /id="guide-sections-panel"[\s\S]*id="section-capture"[\s\S]*id="sections-list"/);
 assert.match(html, /id="guide-pins-panel"[\s\S]*id="pin-capture"[\s\S]*id="pins-list"/);
+assert.doesNotMatch(html, /guide-tab-sources|guide-sources-panel|Potential structure/,
+  "Unimplemented Sources must not occupy interface space.");
+assert.doesNotMatch(`${styles}\n${fieldCss}`, /source-placeholder|guide-counts/,
+  "Removed placeholder and duplicate-count projections must not retain CSS.");
+assert.match(html, /<option value="interval">Active Interval<\/option>/,
+  "Section creation must name its editable operand accurately.");
 
 assert.match(styles, /--control-height:\s*40px/);
 assert.match(styles, /--compact-control-height:\s*32px/);
@@ -64,7 +70,10 @@ assert.match(styles, /--touch:\s*48px/);
 assert.equal((styles.match(/@media \(min-width: 1221px\)/g) || []).length, 1, "Desktop layout must have one owner.");
 assert.doesNotMatch(fieldCss, /@media \(min-width: 1221px\)/, "Step Field CSS must not override application layout.");
 assert.match(styles, /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward loop step-forward"[\s\S]*"pin-backward switch-endpoint pin-forward"/);
-assert.match(fieldCss, /grid-template-columns:\s*minmax\(240px, 1fr\) minmax\(264px, 1\.1fr\) minmax\(240px, 1fr\)/);
+assert.match(
+  fieldCss,
+  /grid-template-areas:\s*"tail center lead"[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1\.1fr\) minmax\(0, 1fr\)/
+);
 assert.match(fieldCss, /\.pane-field-controls[\s\S]*z-index:\s*7/);
 assert.match(grammarCss, /field-span-fill/);
 assert.doesNotMatch(grammarCss, /field-transport-bar|transport-actions|transport-readouts|transport-status/,
@@ -97,10 +106,13 @@ assert.doesNotMatch(transport, /CONTINUE|SKIM/);
 
 assert.match(pkg.scripts.test, /v5\.8-regression-tests\.mjs/);
 assert.match(pkg.scripts.test, /endpoint-transposition-tests\.mjs/);
+assert.match(pkg.scripts.test, /semantic-composition-tests\.mjs/);
+assert.match(pkg.scripts.test, /semantic-audit-probes\.mjs/);
+assert.match(pkg.scripts["test:semantic"], /semantic-state-space-tests\.mjs/);
 assert.match(pkg.scripts.test, /field-runtime-tests\.mjs/);
 assert.doesNotMatch(pkg.scripts.test, /v5\.2-regression-tests\.mjs/);
 assert.match(pkg.scripts.audit, /integration-check\.mjs/);
 assert.match(pkg.scripts.audit, /project-audit\.mjs/);
 assert.match(pkg.scripts.check, /npm run audit/);
 
-console.log("Project audit passed: v5.8.6 Endpoint Transposition, endpoint frames, mirrored Field controls, collapse isolation, composable Step intervals, native playback settlement, Guide ownership, operator geometry, CSS boundaries, and adapter contracts are coherent.");
+console.log("Project audit passed: v5.8.6 Endpoint Transposition, matrix Interval composition, semantic repairs, mirrored Field controls, collapse isolation, native playback settlement, Guide ownership, operator geometry, CSS boundaries, and adapter contracts are coherent.");
