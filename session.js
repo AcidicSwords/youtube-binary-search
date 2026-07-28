@@ -1,4 +1,4 @@
-// Immutable semantic kernel and Return history. This module does not touch the DOM or media players.
+// Immutable semantic kernel and Undo history. This module does not touch the DOM or media players.
 import {
   EPSILON,
   RESOLUTION_BASIS,
@@ -89,7 +89,64 @@ export function copy(value) {
 
 const clone = copy;
 
-export function createInterval(departure, arrival, operator, medium = "direct") {
+export function createEndpointFrame(resolution, resolutionBasis = RESOLUTION_BASIS.RANGE) {
+  if (
+    !resolution
+    || !Number.isFinite(resolution.L)
+    || !Number.isFinite(resolution.C)
+    || !Number.isFinite(resolution.R)
+  ) return null;
+  return {
+    resolution: clone(resolution),
+    resolutionBasis: resolutionBasis || RESOLUTION_BASIS.RANGE
+  };
+}
+
+function currentEndpointFrame(model) {
+  return createEndpointFrame(model.resolution, model.resolutionBasis);
+}
+
+function usableEndpointFrame(frame, address, range) {
+  const resolution = frame?.resolution;
+  return Boolean(
+    resolution
+    && Number.isFinite(address)
+    && Number.isFinite(resolution.L)
+    && Number.isFinite(resolution.C)
+    && Number.isFinite(resolution.R)
+    && resolution.L >= range.start - EPSILON
+    && resolution.R <= range.end + EPSILON
+    && resolution.L <= resolution.C
+    && resolution.C <= resolution.R
+    && Math.abs(resolution.C - address) <= EPSILON
+  );
+}
+
+function resolveEndpointFrame(frame, address, opposite, range) {
+  if (usableEndpointFrame(frame, address, range)) {
+    return createEndpointFrame(frame.resolution, frame.resolutionBasis);
+  }
+  const resolution = seedNeighborhoodFromMovement(opposite, address, range);
+  return createEndpointFrame(
+    resolution,
+    isRangeNeighborhood(resolution, range)
+      ? RESOLUTION_BASIS.RANGE
+      : RESOLUTION_BASIS.MOVEMENT
+  );
+}
+
+function syncIntervalEndpointFrames(model) {
+  if (!model.interval) return;
+  model.interval.departureFrame = resolveEndpointFrame(
+    model.interval.departureFrame,
+    model.interval.departure,
+    model.interval.arrival,
+    model.range
+  );
+  model.interval.arrivalFrame = currentEndpointFrame(model);
+}
+
+export function createInterval(departure, arrival, operator, medium = "direct", endpointFrames = {}) {
   if (
     !Number.isFinite(departure)
     || !Number.isFinite(arrival)
@@ -104,6 +161,8 @@ export function createInterval(departure, arrival, operator, medium = "direct") 
     operator,
     medium,
     direction: arrival < departure ? "backward" : "forward",
+    departureFrame: clone(endpointFrames.departureFrame) || null,
+    arrivalFrame: clone(endpointFrames.arrivalFrame) || null,
     createdAt: Date.now()
   };
 }
@@ -193,6 +252,7 @@ function commit(session, label, transform, options = {}) {
     if (reconciliation.moved) detail.place = draft.resolution.C;
   }
   if (detail.changed === false) return unchanged(session, detail.reason, detail);
+  syncIntervalEndpointFrames(draft);
 
   const returnModel = options.returnModel ? snapshotModel(options.returnModel) : session.model;
   const committedLabel = detail.historyLabel || label;
@@ -214,6 +274,7 @@ function amend(session, transform) {
   const draft = snapshotModel(session.model);
   const detail = transform(draft) || {};
   if (detail.changed === false) return unchanged(session, detail.reason, detail);
+  syncIntervalEndpointFrames(draft);
   return {
     ...detail,
     changed: true,
@@ -273,6 +334,10 @@ function openAddress(model, address) {
 function moveDraft(model, destination, options = {}) {
   if (!Number.isFinite(destination)) return { changed: false, reason: "invalid-destination" };
 
+  const sourceInterval = clone(
+    options.originInterval === undefined ? model.interval : options.originInterval
+  );
+  const movementDepartureFrame = currentEndpointFrame(model);
   const departure = Number.isFinite(options.departure)
     ? options.departure
     : model.resolution.C;
@@ -336,11 +401,36 @@ function moveDraft(model, destination, options = {}) {
   const intervalDeparture = Number.isFinite(options.intervalDeparture)
     ? options.intervalDeparture
     : departure;
+  const inheritedDepartureFrame = sourceInterval
+    && Math.abs(sourceInterval.departure - intervalDeparture) <= EPSILON
+    ? sourceInterval.departureFrame
+    : null;
+  const originDepartureFrame = createEndpointFrame(
+    options.originResolution,
+    options.originResolutionBasis
+  );
+  const intervalDepartureFrame = clone(options.intervalDepartureFrame)
+    || clone(inheritedDepartureFrame)
+    || (
+      Math.abs((originDepartureFrame?.resolution.C ?? NaN) - intervalDeparture) <= EPSILON
+        ? originDepartureFrame
+        : null
+    )
+    || (
+      Math.abs(intervalDeparture - departure) <= EPSILON
+        ? movementDepartureFrame
+        : resolveEndpointFrame(null, intervalDeparture, finalDestination, model.range)
+    );
+  const intervalArrivalFrame = currentEndpointFrame(model);
   model.interval = createInterval(
     intervalDeparture,
     finalDestination,
     options.operator || "go",
-    options.medium || "direct"
+    options.medium || "direct",
+    {
+      departureFrame: intervalDepartureFrame,
+      arrivalFrame: intervalArrivalFrame
+    }
   );
 
   const baseLabel = options.label || "Go";
@@ -400,6 +490,7 @@ export function step(session, direction, seconds = null, options = {}) {
     label: backward ? "Step Backward" : "Step Forward",
     departure: options.departure,
     intervalDeparture,
+    originInterval: options.originInterval,
     originResolution: options.originResolution,
     originResolutionBasis: options.originResolutionBasis,
     amend: options.amend
@@ -429,6 +520,42 @@ export function reopen(session) {
     draft.resolution = reopenToRange(draft.resolution.C, draft.range);
     draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
     return { changed: true };
+  });
+}
+
+export function switchEndpoint(session) {
+  const interval = session.model.interval;
+  if (!interval) return unchanged(session, "no-interval");
+
+  return commit(session, "Switch Endpoint", draft => {
+    const active = clone(draft.interval);
+    if (!active) return { changed: false, reason: "no-interval" };
+    const departure = active.departure;
+    const arrival = active.arrival;
+    const frameBeingLeft = currentEndpointFrame(draft);
+    const frameBeingEntered = resolveEndpointFrame(
+      active.departureFrame,
+      departure,
+      arrival,
+      draft.range
+    );
+
+    draft.resolution = clone(frameBeingEntered.resolution);
+    draft.resolutionBasis = frameBeingEntered.resolutionBasis;
+    draft.interval = {
+      ...active,
+      departure: arrival,
+      arrival: departure,
+      direction: departure < arrival ? "backward" : "forward",
+      departureFrame: frameBeingLeft,
+      arrivalFrame: frameBeingEntered
+    };
+
+    return {
+      changed: true,
+      place: draft.resolution.C,
+      interval: draft.interval
+    };
   });
 }
 
@@ -521,11 +648,21 @@ export function completePlayback(session, options) {
         || options.returnModel?.resolutionBasis
         || draft.resolutionBasis
         || RESOLUTION_BASIS.RANGE;
+    const departureFrame = createEndpointFrame(
+      options.returnModel?.resolution || options.parentNeighborhood,
+      options.returnModel?.resolutionBasis
+        || options.parentResolutionBasis
+        || draft.resolutionBasis
+    );
     draft.interval = createInterval(
       options.departure,
       current,
       options.operator || "playback",
-      "continuous"
+      "continuous",
+      {
+        departureFrame,
+        arrivalFrame: currentEndpointFrame(draft)
+      }
     );
     return {
       changed: true,
@@ -665,7 +802,7 @@ export function deleteGuideSection(session, sectionId) {
   }, { guideEdit: true });
 }
 
-export function returnState(session) {
+export function undo(session) {
   const entry = session.history.at(-1);
   if (!entry) return unchanged(session, "empty-history");
   return {
@@ -679,6 +816,9 @@ export function returnState(session) {
     }
   };
 }
+
+// Compatibility name for existing imports. Canonical interface vocabulary is Undo.
+export const returnState = undo;
 
 export function previewRange(session, start, end, current) {
   const next = normalizedRange(session.model, start, end, current);

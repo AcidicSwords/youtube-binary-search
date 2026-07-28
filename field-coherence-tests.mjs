@@ -32,8 +32,10 @@ assert.deepEqual(normalizeStepReach({ backward: 0.01, forward: 900, linked: fals
 });
 assert.equal(fieldPreferenceRequiresEstablish({ tailRate: 0.75 }), false);
 assert.equal(fieldPreferenceRequiresEstablish({ leadRate: 1.5 }), false);
-assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: false }), true);
-assert.equal(fieldPreferenceRequiresEstablish({ stepFieldEnabled: false }), true);
+assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: false }), false);
+assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: true }), true);
+assert.equal(fieldPreferenceRequiresEstablish({ stepFieldEnabled: false }), false);
+assert.equal(fieldPreferenceRequiresEstablish({ stepFieldEnabled: true }), true);
 assert.deepEqual(normalizeFieldResponse({ tailRate: 0.75, leadRate: 1.5 }), { tailRate: 0.75, leadRate: 1.5 });
 assert.deepEqual(normalizeFieldResponse({ tailRate: 2, leadRate: 0.5 }), { tailRate: 0.5, leadRate: 2 });
 

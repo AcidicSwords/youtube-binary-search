@@ -626,6 +626,7 @@ kbd {
   display: flex;
   min-width: 0;
   flex-direction: column;
+  gap: 8px;
 }
 
 .navigation-heading {
@@ -638,7 +639,7 @@ kbd {
   grid-template-areas:
     "refine-backward reopen refine-forward"
     "step-backward loop step-forward"
-    "pin-backward return pin-forward";
+    "pin-backward switch-endpoint pin-forward";
   gap: 8px;
   align-items: stretch;
   margin: auto 0;
@@ -649,7 +650,7 @@ kbd {
 #refine-forward { grid-area: refine-forward; }
 #step-backward { grid-area: step-backward; }
 #loop { grid-area: loop; }
-#return-action { grid-area: return; }
+#switch-endpoint { grid-area: switch-endpoint; }
 #step-forward { grid-area: step-forward; }
 #pin-backward { grid-area: pin-backward; }
 #pin-forward { grid-area: pin-forward; }
@@ -672,6 +673,27 @@ kbd {
 .history-action {
   border-color: rgba(159, 217, 184, 0.5);
   background: rgba(159, 217, 184, 0.09);
+}
+
+.endpoint-action {
+  border-color: rgba(226, 181, 103, 0.52);
+  background: rgba(226, 181, 103, 0.08);
+}
+
+.undo-action {
+  display: flex;
+  width: min(100%, 420px);
+  min-height: var(--control-height);
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  align-self: center;
+  padding: 7px 12px;
+}
+
+.undo-action .action-meta {
+  padding-left: 8px;
+  border-left: 1px solid rgba(159, 217, 184, 0.34);
 }
 
 .reopen-action {

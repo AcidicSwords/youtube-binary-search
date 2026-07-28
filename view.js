@@ -431,6 +431,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const structuralPresentation = currentResolution ? {
       previousPin: previous ? { start: previous.t, end: semanticCurrent } : null,
       nextPin: next ? { start: semanticCurrent, end: next.t } : null,
+      switchEndpoint: currentInterval,
       loop: currentInterval
     } : null;
     const focused = resolveSection(guide(), focusedSectionId());
@@ -497,6 +498,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["refine-forward"].disabled = interactionLocked || targets.forward === null;
     elements.reopen.disabled = interactionLocked || !actionModel?.reopen;
     elements["return-action"].disabled = !loaded || !currentState.session.history.length;
+    elements["switch-endpoint"].disabled = interactionLocked || !currentInterval;
     elements["step-backward"].disabled = interactionLocked || !actionModel?.stepBackward;
     elements["step-forward"].disabled = interactionLocked || !actionModel?.stepForward;
     elements["pin-backward"].disabled = interactionLocked || !previous;
@@ -529,7 +531,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
     elements["return-meta"].textContent = currentState.session.history.length
       ? currentState.session.history.at(-1).label
-      : "Nothing to return to";
+      : "Nothing to undo";
+    elements["switch-endpoint-meta"].textContent = currentInterval
+      ? `to ${formatTime(currentInterval.departure)}`
+      : "No Interval";
     setActionMeta(
       "refine-backward",
       "backward-meta",

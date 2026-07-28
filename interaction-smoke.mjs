@@ -58,6 +58,24 @@ await flush();
 assert.equal(currentText(), "Current 0:50.000");
 assert.match(byId.get("section-window").textContent, /0:25\.000–0:50\.000/);
 
+// Switch Endpoint preserves the ordered Interval while transposing its active
+// endpoint and retained search frame. S owns the same operator; Undo remains a
+// separate Ctrl/Cmd+Z history action outside the matrix.
+byId.get("switch-endpoint").click();
+await flush();
+assert.equal(currentText(), "Current 0:25.000");
+assert.match(byId.get("section-window").textContent, /0:25\.000–0:50\.000/);
+assert.match(byId.get("switch-endpoint-meta").textContent, /0:50\.000/);
+dispatchDocument("keydown", { key: "s", code: "KeyS" });
+await flush();
+assert.equal(currentText(), "Current 0:50.000");
+dispatchDocument("keydown", { key: "z", code: "KeyZ", ctrlKey: true });
+await flush();
+assert.equal(currentText(), "Current 0:25.000");
+dispatchDocument("keydown", { key: "z", code: "KeyZ", ctrlKey: true });
+await flush();
+assert.equal(currentText(), "Current 0:50.000");
+
 // Guide owns Section creation and names the exact current Interval.
 byId.get("section-source").value = "interval";
 byId.get("section-label").value = "Quarter to middle";
@@ -104,6 +122,24 @@ assert.match(String(tail.iframe.allow || ""), /autoplay/, "Tail iframe must expl
 assert.match(String(lead.iframe.allow || ""), /autoplay/, "Lead iframe must explicitly receive autoplay permission.");
 assert.ok(tail.commands.some(command => command[0] === "cue"), "Tail must use cue only for pre-activation placement.");
 assert.ok(lead.commands.some(command => command[0] === "cue"), "Lead must use cue only for pre-activation placement.");
+
+// Collapse is projection-local: hiding Tail pauses only Tail, exposes its
+// restore rail, and leaves Lead's established frame untouched.
+const leadBeforeCollapse = lead.currentTime;
+const leadPlacesBeforeCollapse = lead.commands.filter(command => command[0] === "place").length;
+byId.get("tail-collapse").click();
+await flush();
+await poll();
+assert.equal(byId.get("tail-pane").classList.contains("is-collapsed"), true);
+assert.equal(byId.get("tail-restore").hidden, false);
+assert.equal(byId.get("field-both-toggle-label").textContent, "Stretch visible side");
+assert.equal(lead.currentTime, leadBeforeCollapse);
+assert.equal(lead.commands.filter(command => command[0] === "place").length, leadPlacesBeforeCollapse);
+byId.get("tail-restore").click();
+await flush();
+await poll();
+assert.equal(byId.get("tail-pane").classList.contains("is-collapsed"), false);
+assert.equal(byId.get("tail-restore").hidden, true);
 
 // One parent-page click refolds both sides to Center and requests Tail, Center,
 // and Lead synchronously. It is a fresh Stretch regardless of the prior held
@@ -219,4 +255,4 @@ assert.equal(byId.has("context-action"), false);
 assert.equal(byId.has("skim"), false);
 assert.equal(byId.get("loop").classList.contains("loop-action"), true);
 
-console.log("Interaction smoke passed: Guide retention, composable Step intervals, frozen Loop, shared activation, deterministic refold/stretch, confirmed rates, exact paused frames, Hold isolation, whole-Field side Step, and Space playback.");
+console.log("Interaction smoke passed: Endpoint Transposition, separate Undo, Guide retention, composable Step intervals, collapse isolation, frozen Loop, shared activation, deterministic refold/stretch, confirmed rates, exact paused frames, Hold isolation, whole-Field side Step, and Space playback.");

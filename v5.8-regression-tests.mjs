@@ -52,7 +52,7 @@ assert.deepEqual(session.model.resolution, { L: 120, C: 180, R: 240, level: 0 })
 assert.equal(session.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
 assert.deepEqual(getTargets(session.model.resolution), { backward: 150, forward: 210 });
 
-// Refine subdivides the movement-seeded Neighborhood and Return restores it.
+// Refine subdivides the movement-seeded Neighborhood and Undo restores it.
 const beforeRefine = snapshotModel(session.model);
 session = refine(session, "backward").session;
 assert.equal(session.model.resolution.C, 150);
@@ -61,12 +61,27 @@ session = returnState(session).session;
 assert.deepEqual(session.model.resolution, beforeRefine.resolution);
 assert.equal(session.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
 
-// Reopen alone restores Range scale and preserves Interval.
+// Reopen restores Range scale and preserves Interval geometry while updating
+// the search frame stored at its active endpoint.
 const intervalBeforeReopen = copy(session.model.interval);
 session = reopen(session).session;
 assert.deepEqual(session.model.resolution, { L: 0, C: 180, R: 480, level: 0 });
 assert.equal(session.model.resolutionBasis, RESOLUTION_BASIS.RANGE);
-assert.deepEqual(session.model.interval, intervalBeforeReopen);
+assert.deepEqual(
+  {
+    start: session.model.interval.start,
+    end: session.model.interval.end,
+    departure: session.model.interval.departure,
+    arrival: session.model.interval.arrival
+  },
+  {
+    start: intervalBeforeReopen.start,
+    end: intervalBeforeReopen.end,
+    departure: intervalBeforeReopen.departure,
+    arrival: intervalBeforeReopen.arrival
+  }
+);
+assert.deepEqual(session.model.interval.arrivalFrame.resolution, session.model.resolution);
 session = returnState(session).session;
 assert.deepEqual(session.model.resolution, { L: 120, C: 180, R: 240, level: 0 });
 
@@ -165,7 +180,7 @@ assert.deepEqual(
   "Step must trim a Refine-established Interval without replacing its anchor."
 );
 refinedDraw = returnState(refinedDraw).session;
-assert.deepEqual(refinedDraw.model.interval, refinedBeforeStep.interval, "Return restores the preceding resized-Interval checkpoint exactly.");
+assert.deepEqual(refinedDraw.model.interval, refinedBeforeStep.interval, "Undo restores the preceding resized-Interval checkpoint exactly.");
 
 // A coalesced Step result depends on origin plus final destination, not the path.
 let pathA = createSession({ duration: 100, current: 20 });
@@ -235,7 +250,21 @@ let ranged = createSession({ duration: 100, current: 20 });
 ranged = goTo(ranged, 40, { operator: "timeline" }).session;
 const containedInterval = copy(ranged.model.interval);
 ranged = setRange(ranged, 10, 50, 40).session;
-assert.deepEqual(ranged.model.interval, containedInterval);
+assert.deepEqual(
+  {
+    start: ranged.model.interval.start,
+    end: ranged.model.interval.end,
+    departure: ranged.model.interval.departure,
+    arrival: ranged.model.interval.arrival
+  },
+  {
+    start: containedInterval.start,
+    end: containedInterval.end,
+    departure: containedInterval.departure,
+    arrival: containedInterval.arrival
+  }
+);
+assert.deepEqual(ranged.model.interval.arrivalFrame.resolution, ranged.model.resolution);
 ranged = setRange(ranged, 30, 50, 40).session;
 assert.equal(ranged.model.interval, null);
 let previewed = createSession({ duration: 100, current: 20 });
@@ -268,7 +297,7 @@ assert.deepEqual(outside.session.model.range, { start: 0, end: 480 });
 assert.deepEqual(outside.session.model.resolution, { L: 150, C: 300, R: 450, level: 0 });
 assert.deepEqual({ start: outside.session.model.interval.start, end: outside.session.model.interval.end }, { start: 150, end: 300 });
 
-// Focused Section deletion clears Focus and presentation state; Return restores all.
+// Focused Section deletion clears Focus and presentation state; Undo restores all.
 let deleteFocused = createSession({ duration: 480, current: 150, guide: focusGuide });
 deleteFocused = focusSection(deleteFocused, retained.id).session;
 const deleted = deleteGuideSection(deleteFocused, retained.id);
@@ -332,4 +361,4 @@ assert.doesNotMatch(viewSource, /skim/i, "The projection layer must not expose r
 assert.match(viewSource, /focused-section-title"\]\.textContent = "—"/, "View must clear stale focused Section text.");
 assert.match(cssSource, /\[hidden\]\s*\{\s*display:\s*none\s*!important;/, "Hidden state must override component display rules.");
 
-console.log("v5.8.1 comprehensive regression tests passed: direct scale, Refine, composable Step intervals, native playback, Range, Focus, Guide, Loop boundaries, and Return.");
+console.log("v5.8.6 comprehensive regression tests passed: direct scale, Refine, endpoint frames, composable Step intervals, native playback, Range, Focus, Guide, Loop boundaries, and Undo.");

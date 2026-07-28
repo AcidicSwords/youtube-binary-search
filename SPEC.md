@@ -13,7 +13,7 @@ The primitive is an Address `t` inside duration `[0, D]`.
 - **Range** — sole hard admissible extent.
 - **Resolution** — current grain of semantic discrimination.
 - **Neighborhood** — `{L, C, R}` around Current at that Resolution.
-- **Interval** — active committed movement extent. Departure is its anchor; arrival is the active endpoint at Current.
+- **Interval** — active committed movement extent. Departure is its anchor; arrival is the active endpoint at Current. Each endpoint retains the Resolution frame last occupied there.
 - **Pin** — retained Address.
 - **Section** — retained bounded Extent whose endpoints are Pins.
 - **Guide** — video-specific Pins and Sections.
@@ -30,10 +30,12 @@ Range is the only hard Field boundary
 Center is the only audible player
 Tail and Lead cannot commit Current except through Step
 Interval is null or Interval.arrival = Current
+Interval.arrivalFrame = current Resolution and basis
+Interval endpoint frames remain inside Range
 Step preserves a usable Interval.departure
 Context never activates Tail or Lead
 Loop wraps do not mutate Session
-Return restores semantic checkpoints, never transient player state
+Undo restores semantic checkpoints, never transient player state
 ```
 
 A null operation creates no history entry.
@@ -75,7 +77,20 @@ Consequences:
 
 Each distinct Step gesture is a traversal and may invoke automatic Context. Auto-repeated arrow-key events coalesce into one transaction, update Current and the timeline immediately, and invoke Context once on keyup at the final Current.
 
-### Return
+### Switch Endpoint
+
+Transposes the directed Interval:
+
+```text
+Interval (departure A, arrival B = Current)
+→ Interval (departure B, arrival A = Current)
+```
+
+`Interval.start` and `Interval.end` do not change. The frame being left is stored at its endpoint and the frame retained at the destination is restored as active Resolution. Switching twice therefore restores the same Current, directed Interval, and endpoint frames. Step after switching edits from the newly transposed departure anchor. A null/collapsed Interval has no endpoints and Switch Endpoint is unavailable.
+
+Switch Endpoint is a traversal and may invoke automatic Context.
+
+### Undo
 
 Restores the previous complete semantic checkpoint: Range, Resolution, Current, Interval, Focus, directional Offsets, and Guide changes belonging to that transaction.
 
@@ -89,7 +104,7 @@ play/unpause from start toward end
 → play/unpause again
 ```
 
-The internal end-to-start wrap does not commit Current, redefine Interval, append Return history, or invoke Context. Reopen does not alter the operand. Movement operators may establish a later Interval after Loop stops, while Step may resize the current operand before Loop starts.
+The internal end-to-start wrap does not commit Current, redefine Interval, append Undo history, or invoke Context. Reopen does not alter the ordered operand, though it updates the active endpoint frame. Movement operators may establish a later Interval after Loop stops, while Step may resize the current operand before Loop starts.
 
 ### Pin / Section / Focus
 
@@ -172,7 +187,7 @@ The read-only side video surface and local Step button invoke the same Step. Dis
 All meaningful state is expressed through Session, but runtime effects remain separate:
 
 ```text
-Session: Range, Resolution, Current, Interval, Guide, Focus, Offsets
+Session: Range, Resolution, Current, Interval endpoint frames, Guide, Focus, Offsets
 Runtime: Cursor, Context, Loop cycle, side mode/address/offset/rate/playback
 ```
 

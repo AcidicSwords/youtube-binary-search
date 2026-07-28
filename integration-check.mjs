@@ -56,7 +56,7 @@ for (const required of [
   "range-fill", "resolution-fill", "interval-fill", "field-span-fill", "section-preview-fill",
   "pin-lane", "pin-cluster-menu", "current-marker", "cursor-marker", "guide-dialog",
   "refine-backward", "reopen", "refine-forward", "step-backward", "loop", "step-forward",
-  "pin-backward", "return-action", "pin-forward",
+  "pin-backward", "switch-endpoint", "pin-forward", "return-action",
   "tail-field-toggle", "field-both-toggle", "lead-field-toggle",
   "tail-step-button", "lead-step-button", "step-backward-seconds", "step-forward-seconds",
   "section-capture", "section-source", "save-section", "pin-capture", "pin-current",
@@ -78,10 +78,12 @@ assert.ok(app.includes('from "./range-geometry.js"'), "app.js must use the Range
 assert.equal(app.includes('from "./traversal.js"'), false, "Legacy traversal.js import remains.");
 assert.equal(app.includes('from "./structure.js"'), false, "Legacy structure.js import remains.");
 
-assert.match(styles, /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward loop step-forward"[\s\S]*"pin-backward return pin-forward"/,
+assert.match(styles, /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward loop step-forward"[\s\S]*"pin-backward switch-endpoint pin-forward"/,
   "Navigation CSS must preserve the exact relational 3×3 matrix.");
-assert.match(html, /id="refine-backward"[\s\S]*id="reopen"[\s\S]*id="refine-forward"[\s\S]*id="step-backward"[\s\S]*id="loop"[\s\S]*id="step-forward"[\s\S]*id="pin-backward"[\s\S]*id="return-action"[\s\S]*id="pin-forward"/,
+assert.match(html, /id="refine-backward"[\s\S]*id="reopen"[\s\S]*id="refine-forward"[\s\S]*id="step-backward"[\s\S]*id="loop"[\s\S]*id="step-forward"[\s\S]*id="pin-backward"[\s\S]*id="switch-endpoint"[\s\S]*id="pin-forward"[\s\S]*id="return-action"/,
   "DOM order must match the matrix.");
+assert.match(html, /id="return-action"[^>]*aria-keyshortcuts="Control\+Z Meta\+Z"/,
+  "Undo must remain outside the matrix on the platform-standard shortcut.");
 assert.match(styles, /touch-action:\s*manipulation/, "Controls must suppress accidental double-tap zoom without disabling page zoom.");
 assert.match(styles, /\.timeline[^{]*\{[^}]*touch-action:\s*pan-y/s, "Timeline must preserve vertical page scrolling on touch devices.");
 assert.match(fieldCss, /grid-template-columns:\s*minmax\(240px, 1fr\) minmax\(264px, 1\.1fr\) minmax\(240px, 1fr\)/,
@@ -93,6 +95,10 @@ assert.match(view, /dataset\.loopSection/, "Saved Sections must expose Loop in G
 assert.equal(/\bseek\s*:/.test(sessionSource), false, "Semantic transaction effects must use placement vocabulary.");
 assert.match(sessionSource, /medium = "direct"/, "Direct movement must use canonical Interval vocabulary.");
 assert.match(sessionSource, /export function completePlayback/, "Native playback must settle through Session.");
+assert.match(sessionSource, /departureFrame:[\s\S]*arrivalFrame:/,
+  "Intervals must retain both endpoint search frames.");
+assert.match(sessionSource, /export function switchEndpoint[\s\S]*departure: arrival[\s\S]*arrival: departure/,
+  "Endpoint Transposition must swap directed roles in the Session kernel.");
 assert.match(transportSource, /PLAYBACK:\s*"playback"/);
 assert.match(transportSource, /LOOP:\s*"loop"/);
 assert.doesNotMatch(transportSource, /CONTINUE|SKIM/);
@@ -105,5 +111,9 @@ assert.match(youtubeSource, /place\(address, allowSeekAhead = true\)/, "The YouT
 assert.match(youtubeSource, /isYouTubeApiReady/, "YouTube readiness must be owned by the adapter.");
 assert.doesNotMatch(fieldGeometrySource, /stepSeconds/, "Field geometry must receive directional Offset objects only.");
 assert.match(app, /compactGuideLayout\(\) && state\.guideOpen/, "Compact Guide must suspend background reader shortcuts.");
+assert.match(app, /spatialKey\("s"\)[\s\S]*switchCurrentEndpoint\(\)/,
+  "S must own Switch Endpoint.");
+assert.doesNotMatch(app, /plain && event\.key === "Backspace"/,
+  "Undo must use Ctrl/Cmd+Z rather than a destructive navigation key.");
 
 console.log(`Integration check passed: ${references.size} DOM references, native playback, automatic Context, Field controls, Guide creation, and 3×3 operator geometry.`);

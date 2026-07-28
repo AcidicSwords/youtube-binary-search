@@ -61,7 +61,8 @@ assert.equal(fieldShouldSuspend({ transportKind: "playback" }), false);
 assert.equal(fieldShouldSuspend({ transportKind: "loop" }), false);
 assert.equal(fieldShouldSuspend({ pendingStep: true, transportKind: "idle" }), true);
 assert.equal(fieldShouldSuspend({ dragging: true, transportKind: "idle" }), true);
-assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: false }), true);
+assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: false }), false);
+assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: true }), true);
 assert.equal(fieldPreferenceRequiresEstablish({ tailRate: 0.75 }), false);
 
 assert.equal(resolveFieldPhase({ enabled: false, suspended: false, sides: [] }), STEP_FIELD_PHASE.OFF);
@@ -149,12 +150,24 @@ assert.equal(resolveFieldPhase({
     "YouTube side iframes must not be covered by a transparent action element.");
   assert.match(html, /id="tail-player-surface"[\s\S]*role="button"[\s\S]*id="player-tail"/);
   assert.match(html, /id="lead-player-surface"[\s\S]*role="button"[\s\S]*id="player-lead"/);
+  assert.match(html, /id="player-tail"[\s\S]*id="tail-step-button"[\s\S]*id="tail-field-toggle"[\s\S]*id="step-backward-seconds"[\s\S]*id="tail-rate-select"/,
+    "Tail controls must mirror Lead from the outside edge toward Center.");
+  assert.match(html, /id="player-lead"[\s\S]*id="lead-rate-select"[\s\S]*id="step-forward-seconds"[\s\S]*id="lead-field-toggle"[\s\S]*id="lead-step-button"/,
+    "Lead controls must mirror Tail from Center toward the outside edge.");
   assert.match(css, /\.side-player-surface iframe[\s\S]*pointer-events:\s*none/,
     "Side video surfaces must route clicks to semantic Step instead of independently toggling muted iframes.");
   assert.match(html, /id="center-transport-surface"/,
     "Paused Center must expose a parent-owned playback surface for shared iframe activation.");
   assert.match(layoutCss, /\.center-transport-surface[\s\S]*position:\s*absolute/);
   assert.match(css, /grid-template-columns:\s*minmax\(240px, 1fr\) minmax\(264px, 1\.1fr\) minmax\(240px, 1fr\)/);
+  assert.match(css, /\.step-field\.tail-collapsed:not\(\.lead-collapsed\)[\s\S]*grid-template-columns:\s*48px minmax\(0, 1fr\)/,
+    "A collapsed Tail must release medium-layout width to Lead.");
+  assert.match(css, /\.step-field\.lead-collapsed:not\(\.tail-collapsed\)[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 48px/,
+    "A collapsed Lead must release medium-layout width to Tail.");
+  assert.match(fieldSource, /const visibleRoles = \["tail", "lead"\]\.filter[\s\S]*visibleRoles\.every/,
+    "Combined Field state must derive from visible projections only.");
+  assert.match(fieldSource, /runtime\.restoreRoles/,
+    "Restoring one collapsed projection must not force a sibling re-establishment.");
   assert.match(css, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);
   assert.match(css, /@media \(max-width: 680px\)/);
   assert.doesNotMatch(css, /@media \(min-width: 1221px\)/);

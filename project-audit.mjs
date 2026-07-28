@@ -31,7 +31,7 @@ const docs = Object.fromEntries([
   "README.md", "SPEC.md", "IMPLEMENTATION.md", "INTERFACE.md", "DEVELOPMENT.md", "VALIDATION.md"
 ].map(path => [path, read(path)]));
 
-assert.equal(pkg.version, "5.8.5");
+assert.equal(pkg.version, "5.8.6");
 assert.equal(docs["SPEC.md"].startsWith("# Binary YouTube Reader — Canonical Specification\n"), true);
 assert.equal(docs["IMPLEMENTATION.md"].startsWith("# Binary YouTube Reader — Canonical Implementation\n"), true);
 assert.equal(docs["INTERFACE.md"].startsWith("# Binary YouTube Reader — Interface Grammar\n"), true);
@@ -51,8 +51,8 @@ assert.doesNotMatch(html, /id="pins-access"|id="focused-state"/, "Removed duplic
 for (const retired of ["continue", "context-action", "skim", "speed-select", "pin-current-meta", "step-link"]) {
   assert.doesNotMatch(html, new RegExp(`id="${retired}"`), `Retired UI id remains: ${retired}`);
 }
-assert.match(html, /id="tail-pane"[\s\S]*id="player-tail"[\s\S]*id="tail-rate-select"[\s\S]*id="tail-field-toggle"[\s\S]*id="tail-step-button"/,
-  "Tail controls must remain object-local beneath its player.");
+assert.match(html, /id="tail-pane"[\s\S]*id="player-tail"[\s\S]*id="tail-step-button"[\s\S]*id="tail-field-toggle"[\s\S]*id="step-backward-seconds"[\s\S]*id="tail-rate-select"/,
+  "Tail controls must mirror Lead from the outside edge toward Center.");
 assert.match(html, /id="lead-pane"[\s\S]*id="player-lead"[\s\S]*id="lead-rate-select"[\s\S]*id="lead-field-toggle"[\s\S]*id="lead-step-button"/,
   "Lead controls must remain object-local beneath its player.");
 assert.match(html, /id="guide-sections-panel"[\s\S]*id="section-capture"[\s\S]*id="sections-list"/);
@@ -63,7 +63,7 @@ assert.match(styles, /--compact-control-height:\s*32px/);
 assert.match(styles, /--touch:\s*48px/);
 assert.equal((styles.match(/@media \(min-width: 1221px\)/g) || []).length, 1, "Desktop layout must have one owner.");
 assert.doesNotMatch(fieldCss, /@media \(min-width: 1221px\)/, "Step Field CSS must not override application layout.");
-assert.match(styles, /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward loop step-forward"[\s\S]*"pin-backward return pin-forward"/);
+assert.match(styles, /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward loop step-forward"[\s\S]*"pin-backward switch-endpoint pin-forward"/);
 assert.match(fieldCss, /grid-template-columns:\s*minmax\(240px, 1fr\) minmax\(264px, 1\.1fr\) minmax\(240px, 1fr\)/);
 assert.match(fieldCss, /\.pane-field-controls[\s\S]*z-index:\s*7/);
 assert.match(grammarCss, /field-span-fill/);
@@ -96,10 +96,11 @@ assert.match(transport, /PLAYBACK:\s*"playback"/);
 assert.doesNotMatch(transport, /CONTINUE|SKIM/);
 
 assert.match(pkg.scripts.test, /v5\.8-regression-tests\.mjs/);
+assert.match(pkg.scripts.test, /endpoint-transposition-tests\.mjs/);
 assert.match(pkg.scripts.test, /field-runtime-tests\.mjs/);
 assert.doesNotMatch(pkg.scripts.test, /v5\.2-regression-tests\.mjs/);
 assert.match(pkg.scripts.audit, /integration-check\.mjs/);
 assert.match(pkg.scripts.audit, /project-audit\.mjs/);
 assert.match(pkg.scripts.check, /npm run audit/);
 
-console.log("Project audit passed: v5.8.4 deterministic Field state, decoded paused frames, fresh refold/stretch, composable Step intervals, native playback settlement, Guide ownership, operator geometry, CSS boundaries, and adapter contracts are coherent.");
+console.log("Project audit passed: v5.8.6 Endpoint Transposition, endpoint frames, mirrored Field controls, collapse isolation, composable Step intervals, native playback settlement, Guide ownership, operator geometry, CSS boundaries, and adapter contracts are coherent.");

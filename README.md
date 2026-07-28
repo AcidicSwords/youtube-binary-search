@@ -6,7 +6,7 @@ Binary YouTube Reader is a spatial-temporal interface for navigating long YouTub
 Current inside Range at a Resolution
 ```
 
-Refine, Reopen, Step, Return, Loop, Pin, Section, Focus, native playback, and automatic Context all compose through that model. The optional three-pane Step Field projects a muted Tail and Lead around the audible Center without creating a second semantic timeline.
+Refine, Reopen, Step, Switch Endpoint, Undo, Loop, Pin, Section, Focus, native playback, and automatic Context all compose through that model. The optional three-pane Step Field projects a muted Tail and Lead around the audible Center without creating a second semantic timeline.
 
 ## Run
 
@@ -32,6 +32,7 @@ Address → Current inside Range
 Current + Resolution → Neighborhood
 committed movement → Interval
 Step → move the Interval's active endpoint
+Switch Endpoint → transpose Interval endpoints and restore the other endpoint frame
 Address → Pin
 explicit Extent → Section
 Section → Range through Focus
@@ -46,6 +47,8 @@ Center is the only audible player and retains native YouTube controls during pla
 Context is not a button. A configured Context window runs automatically after discrete traversal, plays only in Center, restores Center to committed Current, and never activates Tail or Lead.
 
 Step is also the Interval editor. The movement that establishes an Interval supplies its fixed departure anchor; subsequent Step actions move the active endpoint at Current. Stepping outward extends the Loop/Section region, stepping inward shrinks it, and crossing the anchor redraws it in the opposite direction. Held arrow-key repeats form one gesture and start Context once on keyup.
+
+Every Interval endpoint retains the Resolution frame last occupied there. Switch Endpoint leaves the ordered extent unchanged, makes the other endpoint Current, and restores that endpoint’s frame. Step then composes from the transposed anchor. A collapsed Interval has nothing to switch.
 
 ## Step Field
 
@@ -71,10 +74,12 @@ Disabling the Field preserves the stable single-player reader and does not creat
 ```text
 Refine Backward | Reopen | Refine Forward
 Step Backward   | Loop   | Step Forward
-Previous Pin    | Return | Next Pin
+Previous Pin    | Switch Endpoint | Next Pin
 ```
 
 Loop freezes the current Interval when started. It plays to the Interval end, internally returns to the frozen start without changing Session or invoking Context, and unpauses again.
+
+Undo is intentionally outside the relational matrix and uses the platform-standard Ctrl/Cmd+Z shortcut.
 
 Pin and Section creation live in Guide beside naming, traversal, Loop, Focus, rename, and deletion.
 
@@ -85,7 +90,8 @@ A / W / D      Refine Backward / Reopen / Refine Forward
 ← / →          Step Backward / Step Forward
 L              Loop current Interval
 Shift+← / →    Previous / next Pin
-S              Return
+S              Switch Endpoint
+Ctrl/Cmd+Z     Undo
 Space          Shared Field play/pause
 P              Open Pins creation in Guide
 Shift+P        Open Sections creation in Guide

@@ -19,7 +19,7 @@ Node 20 or newer is required. There is no build step or runtime dependency.
 ## 2. Ownership
 
 - temporal mathematics: `range-geometry.js`
-- semantic transactions and Return: `session.js`
+- semantic transactions, endpoint frames, and Undo: `session.js`
 - Context/playback/Loop runtime values: `transport.js`
 - raw IFrame API: `youtube.js`
 - Field mathematics: `step-field-geometry.js`
@@ -55,9 +55,11 @@ Autoplay blocking, buffering, delayed placement, and missing directional rates a
 - Hold during formation may commit measured Offset through Session Step Reach, but must never write semantic Interval.
 - Context must preserve stored Field geometry and must not remeasure against its transient Cursor.
 - Side video surface, local Step button, and matrix Step must share `performStep()`.
-- Step must preserve the active Interval departure and move only its arrival endpoint; do not recreate the Interval from each Step departure.
+- Step must preserve the active Interval departure and departure frame while moving only its arrival endpoint; do not recreate the Interval from each Step departure.
+- Switch Endpoint must preserve ordered Interval extent, swap its directed roles, and restore the retained frame at the destination.
 - Held arrow-key Step owns one pending transaction and one Context on keyup.
 - Internal Loop wraps must never invoke Session movement or Context.
+- Collapsing one Field side must not re-establish the other; combined Field controls operate only on visible sides.
 
 ## 6. UI discipline
 
@@ -72,6 +74,7 @@ Every form control needs an accessible name; every button declares a type; focus
 - `source-field-tests.mjs` — external structure normalization
 - `fuzz-tests.mjs` — deterministic semantic invariants
 - `v5.8-regression-tests.mjs` — stable reader and native playback contracts
+- `endpoint-transposition-tests.mjs` — endpoint frames, Switch involution, Step composition, collapsed state, and Undo separation
 - `step-field-tests.mjs` — Field geometry and source-level wiring
 - `field-runtime-tests.mjs` — explicit address/offset/rate state transitions and edge recovery
 - `field-grammar-tests.mjs` — composed operator grammar
