@@ -1,0 +1,59 @@
+name: Apply v5.8 interaction corrections
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - tools/apply-v5.8.py
+      - .github/workflows/apply-v5.8-interaction-corrections.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-v5.8-interaction-corrections
+  cancel-in-progress: false
+
+jobs:
+  apply-check-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/automatic-context-field-playback-v5.8
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply v5.8 corrections
+        run: python3 tools/apply-v5.8.py
+
+      - name: Run complete repository gate
+        run: |
+          set +e
+          npm run check 2>&1 | tee v5.8-check.log
+          status=${PIPESTATUS[0]}
+          exit "$status"
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v5.8-interaction-corrections-diagnostic
+          path: |
+            v5.8-check.log
+            tools/apply-v5.8.py
+
+      - name: Remove temporary machinery and commit verified tree
+        run: |
+          rm tools/apply-v5.8.py
+          rm .github/workflows/apply-v5.8-interaction-corrections.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Establish automatic Context and coherent playback UI v5.8.0"
+          git push origin HEAD:fix/automatic-context-field-playback-v5.8
