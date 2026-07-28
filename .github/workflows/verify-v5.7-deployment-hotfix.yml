@@ -59,7 +59,18 @@ jobs:
           PY
 
       - name: Run complete repository gate
-        run: npm run check
+        run: |
+          set +e
+          npm run check 2>&1 | tee deployment-hotfix-check.log
+          status=${PIPESTATUS[0]}
+          exit "$status"
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v5.7-deployment-hotfix-check
+          path: deployment-hotfix-check.log
 
       - name: Remove temporary workflow and commit verified hotfix
         run: |
