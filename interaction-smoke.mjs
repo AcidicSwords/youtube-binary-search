@@ -303,7 +303,10 @@ assert.match(byId.get("interval-label").textContent, /0:25\.000–0:37\.500/);
 
 byId.get("sections-list").dispatch("click", { target: focusButton });
 assert.equal(byId.get("range-label").textContent, "0:25.000–0:50.000");
-assert.equal(byId.get("focused-label").textContent, "Middle quarter");
+assert.equal(byId.get("focused-section").hidden, false);
+assert.equal(byId.get("focused-section-title").textContent, "Middle quarter");
+assert.equal(byId.get("focused-section-range").textContent, "0:25.000–0:50.000");
+assert.equal(byId.get("leave-section").disabled, false);
 
 // Continue traverses Range once; Loop is the sole repetition operator.
 byId.get("continue").click();
@@ -400,13 +403,14 @@ assert.equal(byId.get("guide-scrim").hidden, true);
 
 // Selecting retained structure from the compact Guide closes the sheet and
 // returns keyboard focus to the control that opened it.
-byId.get("pins-access").focus();
-byId.get("pins-access").click();
+byId.get("guide-toggle").focus();
+byId.get("guide-toggle").click();
+byId.get("guide-tab-pins").click();
 const mobilePinMain = descendants(byId.get("pins-list")).find(node => node.dataset.pinGo);
 assert.ok(mobilePinMain);
 byId.get("pins-list").dispatch("click", { target: mobilePinMain });
 assert.equal(byId.get("guide-panel").classList.contains("is-open"), false);
-assert.equal(document.activeElement, byId.get("pins-access"));
+assert.equal(document.activeElement, byId.get("guide-toggle"));
 
 // Breakpoint state must re-synchronize, and Guide edits use the accessible dialog rather than prompts.
 window.matchMedia = () => ({ matches: false });
@@ -438,7 +442,7 @@ byId.get("timeline").dispatch("pointercancel", { target: byId.get("timeline") })
 assert.equal(byId.get("range-label").textContent, rangeBeforeCancel);
 
 const currentBeforeRoundTripDrag = byId.get("current-label").textContent;
-const focusedBeforeRoundTripDrag = byId.get("focused-label").textContent;
+const focusedBeforeRoundTripDrag = byId.get("focused-section-title").textContent;
 const returnBeforeRoundTripDrag = byId.get("return-meta").textContent;
 byId.get("range-start-handle").dispatch("pointerdown", { target: byId.get("range-start-handle"), clientX: 250 });
 byId.get("timeline").dispatch("pointermove", { target: byId.get("timeline"), clientX: 450 });
@@ -446,7 +450,7 @@ byId.get("timeline").dispatch("pointermove", { target: byId.get("timeline"), cli
 byId.get("timeline").dispatch("pointerup", { target: byId.get("timeline") });
 assert.equal(byId.get("range-label").textContent, rangeBeforeCancel, "Returning a Range handle to its origin must restore the exact Range.");
 assert.equal(byId.get("current-label").textContent, currentBeforeRoundTripDrag, "Range preview must be path-independent for Current.");
-assert.equal(byId.get("focused-label").textContent, focusedBeforeRoundTripDrag, "A net-zero Range gesture must preserve Focus.");
+assert.equal(byId.get("focused-section-title").textContent, focusedBeforeRoundTripDrag, "A net-zero Range gesture must preserve Focus.");
 assert.equal(byId.get("return-meta").textContent, returnBeforeRoundTripDrag, "A net-zero Range gesture must not add history.");
 
 // A paused native-player scrub becomes a semantic move after it settles.
