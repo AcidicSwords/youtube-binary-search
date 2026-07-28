@@ -108,6 +108,16 @@ const tail = env.tail();
 const lead = env.lead();
 assert.equal(tail.playerVars.controls, 0);
 assert.equal(lead.playerVars.controls, 0);
+assert.equal(tail.createdWhileFieldOff, false, "Tail must be created only after its pane is measurable.");
+assert.equal(lead.createdWhileFieldOff, false, "Lead must be created only after its pane is measurable.");
+assert.match(String(tail.iframe.allow || ""), /autoplay/, "Tail iframe must explicitly receive autoplay permission.");
+assert.match(String(lead.iframe.allow || ""), /autoplay/, "Lead iframe must explicitly receive autoplay permission.");
+assert.ok(tail.commands.some(command => command[0] === "cue"), "Tail must be parked with cueVideoById.");
+assert.ok(lead.commands.some(command => command[0] === "cue"), "Lead must be parked with cueVideoById.");
+assert.equal(tail.commands.some(command => command[0] === "place"), false, "Tail must not seek from CUED state before playback.");
+assert.equal(lead.commands.some(command => command[0] === "place"), false, "Lead must not seek from CUED state before playback.");
+assert.equal(tail.commands.some(command => command[0] === "play"), false, "Tail must remain paused before native Center playback.");
+assert.equal(lead.commands.some(command => command[0] === "play"), false, "Lead must remain paused before native Center playback.");
 
 byId.get("tail-field-toggle").click(); // Held -> Stretch
 center.currentTime = 60;
@@ -148,4 +158,4 @@ assert.equal(byId.has("context-action"), false);
 assert.equal(byId.has("skim"), false);
 assert.equal(byId.get("loop").classList.contains("loop-action"), true);
 
-console.log("Interaction smoke passed: Guide retention, composable Step intervals, frozen Loop, native playback settlement, Field rate priming, Hold/Stretch, side Step, and Space playback.");
+console.log("Interaction smoke passed: Guide retention, composable Step intervals, frozen Loop, native playback settlement, visible side-player bootstrap, cue-based parking, Field rate priming, Hold/Stretch, side Step, and Space playback.");

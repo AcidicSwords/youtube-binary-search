@@ -101,7 +101,7 @@ assert.match(app, /data-loop-section/);
 assert.match(app, /saveExtentAsSection/);
 assert.doesNotMatch(app, /createSkimTransport|completeSkim|reachSkimDestination/);
 assert.match(fieldSource, /FIELD_SIDE_MODE/);
-assert.match(fieldSource, /function stretch\(role\)[\s\S]*const center = clamp\([\s\S]*snapshot\.center\?\.time[\s\S]*placeSide\(side, center\)/,
+assert.match(fieldSource, /function stretch\(role\)[\s\S]*const center = clamp\([\s\S]*snapshot\.center\?\.time[\s\S]*parkSide\(side, center\)/,
   "Stretch must snap/refold to the physical Center before future divergence.");
 assert.match(fieldSource, /function hold\(role\)[\s\S]*onHoldOffsets/,
   "Holding mid-stretch must commit the measured offset as the new Step distance.");
@@ -115,4 +115,4 @@ assert.match(css, /field-span-fill/);
 assert.match(packageJson.scripts.test, /field-grammar-tests\.mjs/);
 assert.match(packageJson.scripts.check, /step-field-geometry\.js/);
 
-console.log("Field grammar tests passed: automatic Context, Hold/Stretch, side Step, frozen Loop, and Guide retention.");
+console.log("Field grammar tests passed: automatic Context, safe side-player parking, Hold/Stretch, side Step, frozen Loop, and Guide retention.");

@@ -19,6 +19,15 @@ const RAW_STATE = Object.freeze({
 });
 
 const INTERNAL_PAUSE_TTL_MS = 1200;
+const DEFAULT_IFRAME_ALLOW = [
+  "accelerometer",
+  "autoplay",
+  "clipboard-write",
+  "encrypted-media",
+  "gyroscope",
+  "picture-in-picture",
+  "web-share"
+].join("; ");
 
 export function playerStateName(value) {
   return RAW_STATE[value] || YOUTUBE_STATE.UNKNOWN;
@@ -112,6 +121,13 @@ export function createYouTubePlayer(elementId, options = {}) {
     ...(options.playerVars || {})
   };
 
+  function configureIframe() {
+    const iframe = rawPlayer?.getIframe?.();
+    if (!iframe) return null;
+    iframe.setAttribute?.("allow", options.iframeAllow || DEFAULT_IFRAME_ALLOW);
+    return iframe;
+  }
+
   const adapter = {
     cue(videoId, startSeconds = 0) {
       rawPlayer?.cueVideoById({ videoId, startSeconds });
@@ -169,7 +185,10 @@ export function createYouTubePlayer(elementId, options = {}) {
     height: options.height || "100%",
     playerVars,
     events: {
-      onReady: event => callbacks.onReady?.(adapter, event),
+      onReady: event => {
+        configureIframe();
+        callbacks.onReady?.(adapter, event);
+      },
       onStateChange: event => {
         if (Date.now() > internalPauseUntil) internalPauseCount = 0;
         const internal = event.data === 2 && internalPauseCount > 0;
@@ -182,6 +201,7 @@ export function createYouTubePlayer(elementId, options = {}) {
       onError: event => callbacks.onError?.(event.data, event)
     }
   });
+  configureIframe();
 
   return adapter;
 }

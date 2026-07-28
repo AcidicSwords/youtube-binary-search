@@ -97,11 +97,12 @@ assert.equal(resolveFieldPhase({
   const layoutCss = readFileSync("styles.css", "utf8");
   const app = readFileSync("app.js", "utf8");
   const fieldSource = readFileSync("step-field.js", "utf8");
+  const youtubeSource = readFileSync("youtube.js", "utf8");
   const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 
   for (const id of [
     "step-field", "player-tail", "player", "player-lead",
-    "tail-step", "tail-step-button", "lead-step", "lead-step-button",
+    "tail-step-button", "lead-step-button",
     "tail-field-toggle", "lead-field-toggle", "field-both-toggle",
     "tail-rate-select", "lead-rate-select",
     "step-backward-seconds", "step-forward-seconds",
@@ -125,6 +126,15 @@ assert.equal(resolveFieldPhase({
   assert.doesNotMatch(fieldSource, /mode:\s*"go"/);
   assert.match(fieldSource, /setAttribute\?\.\("tabindex", "-1"\)/);
   assert.match(fieldSource, /setAttribute\?\.\("aria-hidden", "true"\)/);
+  assert.match(fieldSource, /function parkSide\(side, address\)/);
+  assert.match(fieldSource, /side\.adapter\.cue\?\.\(side\.videoId, address\)/,
+    "Paused side placement must use cueVideoById rather than seekTo.");
+  assert.match(fieldSource, /render\(snapshot\);[\s\S]*ensurePlayers\(prefs\);/,
+    "Side panes must be rendered and measurable before player creation.");
+  assert.match(youtubeSource, /DEFAULT_IFRAME_ALLOW[\s\S]*"autoplay"/);
+  assert.match(youtubeSource, /setAttribute\?\.\("allow", options\.iframeAllow \|\| DEFAULT_IFRAME_ALLOW\)/);
+  assert.doesNotMatch(html, /class="step-pane-action"/,
+    "YouTube side iframes must remain unobscured; Step uses the dedicated button below each player.");
   assert.match(css, /grid-template-columns:\s*minmax\(240px, 1fr\) minmax\(264px, 1\.1fr\) minmax\(240px, 1fr\)/);
   assert.match(css, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);
   assert.match(css, /@media \(max-width: 680px\)/);
@@ -134,4 +144,4 @@ assert.equal(resolveFieldPhase({
   assert.match(packageJson.scripts.test, /step-field-tests\.mjs/);
 }
 
-console.log("All Step Field tests passed: geometry, suspension, Hold/Stretch, side Step, rate priming, and panoramic layout.");
+console.log("All Step Field tests passed: geometry, suspension, Hold/Stretch, side Step, visible bootstrap, autoplay delegation, cue-based parking, rate priming, and panoramic layout.");

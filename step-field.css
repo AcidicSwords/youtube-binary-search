@@ -106,26 +106,6 @@
   aspect-ratio: 16 / 9;
 }
 
-.step-pane-action {
-  position: absolute;
-  z-index: 5;
-  inset: 0;
-  width: 100%;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-.step-pane-action:hover:not(:disabled),
-.step-pane-action:focus-visible {
-  background: rgba(121, 168, 255, 0.08);
-  box-shadow: inset 0 0 0 2px rgba(121, 168, 255, 0.46);
-}
-
-.step-pane-action:disabled { opacity: 1; }
-
 .pane-field-controls {
   position: relative;
   z-index: 7;

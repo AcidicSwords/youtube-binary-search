@@ -86,8 +86,8 @@ export function createStepFieldController({
 }) {
   const ids = [
     "step-field", "step-field-toggle", "step-field-meta",
-    "tail-pane", "tail-meta", "tail-step", "tail-step-button", "tail-collapse", "tail-restore",
-    "lead-pane", "lead-meta", "lead-step", "lead-step-button", "lead-collapse", "lead-restore",
+    "tail-pane", "tail-meta", "tail-step-button", "tail-collapse", "tail-restore",
+    "lead-pane", "lead-meta", "lead-step-button", "lead-collapse", "lead-restore",
     "center-meta", "tail-rate-select", "lead-rate-select",
     "tail-field-toggle", "tail-field-toggle-label", "tail-offset-state",
     "lead-field-toggle", "lead-field-toggle-label", "lead-offset-state",
@@ -165,12 +165,8 @@ export function createStepFieldController({
     elements["lead-restore"]?.addEventListener?.("click", () => {
       changePreferences({ leadVisible: true, stepFieldEnabled: true });
     });
-    for (const id of ["tail-step", "tail-step-button"]) {
-      elements[id]?.addEventListener?.("click", () => selectSide("tail"));
-    }
-    for (const id of ["lead-step", "lead-step-button"]) {
-      elements[id]?.addEventListener?.("click", () => selectSide("lead"));
-    }
+    elements["tail-step-button"]?.addEventListener?.("click", () => selectSide("tail"));
+    elements["lead-step-button"]?.addEventListener?.("click", () => selectSide("lead"));
     elements["tail-rate-select"]?.addEventListener?.("change", event => {
       changePreferences({ tailRate: Number(event.target.value) });
     });
@@ -246,11 +242,21 @@ export function createStepFieldController({
     pauseSide(sides.lead);
   }
 
-  function placeSide(side, address) {
-    if (!side.ready || !side.adapter) return;
+  function parkSide(side, address) {
+    if (!side.ready || !side.adapter || !side.videoId) return;
     side.adapter.mute?.();
     side.adapter.setRate?.(1);
     side.actualRate = 1;
+    // cueVideoById is the paused placement primitive. YouTube documents that
+    // seekTo() from a cued player may start playback, which can immediately
+    // trigger autoplay blocking in the independent Tail and Lead iframes.
+    side.adapter.cue?.(side.videoId, address);
+    side.playback = YOUTUBE_STATE.CUED;
+  }
+
+  function seekPlayingSide(side, address) {
+    if (!side.ready || !side.adapter) return;
+    side.adapter.mute?.();
     side.adapter.place?.(address);
   }
 
@@ -269,6 +275,7 @@ export function createStepFieldController({
   }
 
   function ensureSidePlaying(side) {
+    side.adapter?.mute?.();
     const state = readSide(side).state;
     side.playback = state;
     if (![YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(state)) {
@@ -335,7 +342,7 @@ export function createStepFieldController({
       side.mode = FIELD_SIDE_MODE.HELD;
       side.offset = 0;
       pauseSide(side);
-      placeSide(side, center);
+      parkSide(side, center);
     }
     runtime.structuralKey = structuralKey(snapshot);
     runtime.semanticCurrent = center;
@@ -363,7 +370,7 @@ export function createStepFieldController({
       const offset = clamp(offsets[role], 0, maxOffset(role, snapshot));
       side.offset = offset;
       pauseSide(side);
-      placeSide(side, exactAddress(role, runtime.semanticCurrent, offset, snapshot.range));
+      parkSide(side, exactAddress(role, runtime.semanticCurrent, offset, snapshot.range));
     }
     runtime.structuralKey = structuralKey(snapshot);
     runtime.forceEstablish = false;
@@ -382,7 +389,7 @@ export function createStepFieldController({
       const offset = preserve ? measuredOffset(role, previous, snapshot) : 0;
       side.offset = clamp(offset, 0, maxOffset(role, snapshot));
       pauseSide(side);
-      placeSide(side, exactAddress(role, nextCenter, side.offset, snapshot.range));
+      parkSide(side, exactAddress(role, nextCenter, side.offset, snapshot.range));
     }
     runtime.lastCenterTime = nextCenter;
   }
@@ -401,7 +408,7 @@ export function createStepFieldController({
     pauseSide(side);
     // Stretch is one complete operation: refold to the physical Center, then
     // diverge from that same point on the next genuine Center playback.
-    placeSide(side, center);
+    parkSide(side, center);
     runtime.semanticCurrent = snapshot.current;
     runtime.lastCenterTime = center;
     publish(snapshot);
@@ -475,7 +482,7 @@ export function createStepFieldController({
       const exact = exactAddress(role, center, offset, snapshot.range);
       const actual = readSide(side).time;
       if (Math.abs(actual - exact) > DRIFT_TOLERANCE) {
-        placeSide(side, exact);
+        seekPlayingSide(side, exact);
         ensureSidePlaying(side);
       }
       return { available: true, held: true, offset };
@@ -494,7 +501,7 @@ export function createStepFieldController({
     if (nextOffset >= maximum - REACH_TOLERANCE) {
       side.mode = FIELD_SIDE_MODE.HELD;
       side.offset = maximum;
-      placeSide(side, exactAddress(role, center, maximum, snapshot.range));
+      seekPlayingSide(side, exactAddress(role, center, maximum, snapshot.range));
       side.adapter?.setRate?.(1);
       side.actualRate = 1;
       ensureSidePlaying(side);
@@ -633,8 +640,8 @@ export function createStepFieldController({
       setText(elements[`${role}-offset-state`], `${formatOffset(actual)} / ${formatOffset(target)}`);
       elements[`${role}-field-toggle`]?.setAttribute?.("aria-pressed", String(side.mode === FIELD_SIDE_MODE.HELD));
       if (elements[`${role}-field-toggle`]) elements[`${role}-field-toggle`].disabled = !shown || !prefs[`${role}Visible`];
-      for (const id of [`${role}-step`, `${role}-step-button`]) {
-        if (elements[id]) elements[id].disabled = !shown || !prefs[`${role}Visible`] || !(target > EPSILON);
+      if (elements[`${role}-step-button`]) {
+        elements[`${role}-step-button`].disabled = !shown || !prefs[`${role}Visible`] || !(target > EPSILON);
       }
       setText(elements[`${role}-meta`], !loaded ? "—" : sideMeta(role, { offset: actual }, { distance: target }));
     }
@@ -658,6 +665,10 @@ export function createStepFieldController({
     const prefs = preferences();
     const snapshot = getSnapshot?.();
     if (!snapshot?.range) return;
+    // Make the side panes measurable before YT.Player replaces their host divs.
+    // Creating them under `.field-off { display:none }` gives YouTube a zero-size
+    // embed and violates the API's minimum player viewport contract.
+    render(snapshot);
     if (snapshot.videoLoaded) ensurePlayers(prefs);
     syncVideo(snapshot);
     populateRateControl("tail", prefs);
@@ -721,7 +732,6 @@ export function createStepFieldController({
       side.mode = FIELD_SIDE_MODE.HELD;
       side.offset = 0;
       side.adapter.mute?.();
-      side.adapter.cue?.(snapshot.videoId, snapshot.current || 0);
       runtime.forceEstablish = true;
     }
   }

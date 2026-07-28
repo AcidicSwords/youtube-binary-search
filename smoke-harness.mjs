@@ -238,6 +238,7 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
       this.pendingPlacement = null;
       this.deferNextPlacement = deferredPlacement;
       this.iframe = new FakeElement(`${id}-iframe`, "IFRAME");
+      this.createdWhileFieldOff = byId.get("step-field")?.classList?.contains("field-off") === true;
       players.set(id, this);
       queueMicrotask(() => this.events.onReady?.({ target: this }));
     }
