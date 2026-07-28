@@ -29,15 +29,16 @@ jobs:
         with:
           node-version: 22
 
-      - name: Replace stale overlay assertion
+      - name: Replace stale interface assertions
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
           path = Path('field-coherence-tests.mjs')
           text = path.read_text()
-          old = '  assert.match(fieldCss, /\\.pane-rate-setting[\\s\\S]*pointer-events: auto/);'
-          new = '''  const tailPaneStart = html.indexOf('id="tail-pane"');
+
+          old_overlay = '  assert.match(fieldCss, /\\.pane-rate-setting[\\s\\S]*pointer-events: auto/);'
+          new_overlay = '''  const tailPaneStart = html.indexOf('id="tail-pane"');
           const tailRateControl = html.indexOf('id="tail-rate-select"', tailPaneStart);
           const tailPlayerWrap = html.indexOf('class="player-wrap"', tailPaneStart);
           const leadPaneStart = html.indexOf('id="lead-pane"');
@@ -53,9 +54,20 @@ jobs:
           );
           assert.match(fieldCss, /\\.step-pane-bar\\s*\\{[\\s\\S]*z-index:\\s*7/);
           assert.match(fieldCss, /\\.step-pane-action\\s*\\{[\\s\\S]*z-index:\\s*5/);'''
-          if text.count(old) != 1:
-              raise SystemExit(f'Expected one stale assertion, found {text.count(old)}')
-          path.write_text(text.replace(old, new, 1))
+
+          old_mobile = '  assert.match(fieldCss, /@media \\(max-width: 680px\\)[\\s\\S]*\\.tail-pane \\{ grid-column: 1; grid-row: 2; \\}[\\s\\S]*\\.lead-pane \\{ grid-column: 1; grid-row: 3; \\}[\\s\\S]*\\.step-pane-side \\.player-wrap \\{[\\s\\S]*min-height: 200px/);'
+          new_mobile = '''  assert.match(fieldCss, /@media \\(max-width: 680px\\)[\\s\\S]*\\.tail-pane\\s*\\{[\\s\\S]*grid-column:\\s*1;[\\s\\S]*grid-row:\\s*2;/);
+          assert.match(fieldCss, /@media \\(max-width: 680px\\)[\\s\\S]*\\.lead-pane\\s*\\{[\\s\\S]*grid-column:\\s*1;[\\s\\S]*grid-row:\\s*3;/);
+          assert.match(fieldCss, /@media \\(max-width: 680px\\)[\\s\\S]*\\.step-pane-side \\.player-wrap\\s*\\{[\\s\\S]*min-height:\\s*200px;/);'''
+
+          if text.count(old_overlay) != 1:
+              raise SystemExit(f'Expected one stale overlay assertion, found {text.count(old_overlay)}')
+          if text.count(old_mobile) != 1:
+              raise SystemExit(f'Expected one stale mobile assertion, found {text.count(old_mobile)}')
+
+          text = text.replace(old_overlay, new_overlay, 1)
+          text = text.replace(old_mobile, new_mobile, 1)
+          path.write_text(text)
           PY
 
       - name: Run complete repository gate
@@ -78,5 +90,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add field-coherence-tests.mjs .github/workflows/verify-v5.7-deployment-hotfix.yml
-          git commit -m "Fix stale pane rate interaction regression"
+          git commit -m "Fix stale interface regression assertions"
           git push origin HEAD:fix/v5.7-deployment-test
