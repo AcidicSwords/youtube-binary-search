@@ -145,7 +145,7 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   assert.equal((html.match(/id=["']lead-rate-select["']/g) || []).length, 1);
   assert.match(html, /id=["']tail-pane["'][\s\S]*id=["']player-tail["'][\s\S]*id=["']tail-rate-select["']/);
   assert.match(html, /id=["']lead-pane["'][\s\S]*id=["']player-lead["'][\s\S]*id=["']lead-rate-select["']/);
-  assert.match(fieldCss, /\.step-pane-action\s*\{[\s\S]*z-index:\s*5/);
+  assert.doesNotMatch(fieldCss, /\.step-pane-action/, "YouTube players must not be covered by an application overlay.");
   assert.match(fieldCss, /\.pane-field-controls\s*\{[\s\S]*z-index:\s*7/);
   assert.match(fieldCss, /@media \(max-width: 680px\)[\s\S]*\.tail-pane\s*\{[\s\S]*grid-row:\s*2;/);
   assert.match(fieldCss, /@media \(max-width: 680px\)[\s\S]*\.lead-pane\s*\{[\s\S]*grid-row:\s*3;/);
