@@ -72,14 +72,37 @@ jobs:
 
           interaction_path = Path('interaction-smoke.mjs')
           interaction_text = interaction_path.read_text()
+
           old_focus = 'assert.equal(byId.get("focused-label").textContent, "Middle quarter");'
           new_focus = '''assert.equal(byId.get("focused-section").hidden, false);
           assert.equal(byId.get("focused-section-title").textContent, "Middle quarter");
           assert.equal(byId.get("focused-section-range").textContent, "0:25.000–0:50.000");
           assert.equal(byId.get("leave-section").disabled, false);'''
+
+          old_pins = '''byId.get("pins-access").focus();
+          byId.get("pins-access").click();
+          const mobilePinMain = descendants(byId.get("pins-list")).find(node => node.dataset.pinGo);
+          assert.ok(mobilePinMain);
+          byId.get("pins-list").dispatch("click", { target: mobilePinMain });
+          assert.equal(byId.get("guide-panel").classList.contains("is-open"), false);
+          assert.equal(document.activeElement, byId.get("pins-access"));'''
+          new_pins = '''byId.get("guide-toggle").focus();
+          byId.get("guide-toggle").click();
+          byId.get("guide-tab-pins").click();
+          const mobilePinMain = descendants(byId.get("pins-list")).find(node => node.dataset.pinGo);
+          assert.ok(mobilePinMain);
+          byId.get("pins-list").dispatch("click", { target: mobilePinMain });
+          assert.equal(byId.get("guide-panel").classList.contains("is-open"), false);
+          assert.equal(document.activeElement, byId.get("guide-toggle"));'''
+
           if interaction_text.count(old_focus) != 1:
               raise SystemExit(f'Expected one stale focused Section assertion, found {interaction_text.count(old_focus)}')
-          interaction_path.write_text(interaction_text.replace(old_focus, new_focus, 1))
+          if interaction_text.count(old_pins) != 1:
+              raise SystemExit(f'Expected one stale Pins access sequence, found {interaction_text.count(old_pins)}')
+
+          interaction_text = interaction_text.replace(old_focus, new_focus, 1)
+          interaction_text = interaction_text.replace(old_pins, new_pins, 1)
+          interaction_path.write_text(interaction_text)
           PY
 
       - name: Run complete repository gate
