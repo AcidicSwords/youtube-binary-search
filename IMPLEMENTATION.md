@@ -70,7 +70,7 @@ Loop wraps use adapter placement directly and never call a Session movement tran
 
 ## 5. Center lifecycle
 
-A trusted parent-page Center click or Space command calls Tail, Lead, and Center playback synchronously. Center `PLAYING` then begins a playback transport unless Context or Loop already owns playback. Native `PAUSED` settles the active kind:
+A trusted parent-page Center click or Space command first refolds each available side to the physical Center, primes it at `1×`, and calls Tail, Lead, and Center playback synchronously. Center `PLAYING` then begins a playback transport unless Context or Loop already owns playback. Native `PAUSED` captures the latest side offsets before settling the active kind:
 
 - Context restores committed Current.
 - Loop ends without committing internal wraps.
@@ -80,7 +80,7 @@ Programmatic placement has a grace record so delayed iframe reporting cannot be 
 
 ## 6. Automatic Context
 
-`applyPlayerEffect()` receives a changed Session result. When the result includes an Interval and Context duration is non-zero, it translates the Field to the new Current, pauses sides, and starts Context. Otherwise it places Center at Current.
+`applyPlayerEffect()` receives a changed Session result. When the result includes an Interval and Context duration is non-zero, it translates the complete Field to the new Current, parks the sides without remeasurement, and starts Center-only Context. Otherwise it places Center and the translated Field at Current.
 
 Pending rapid Steps suppress intermediate Context and invoke it once after coalescing. Pointer/button Step uses the short debounce boundary. Arrow-key Step freezes the gesture origin and Interval anchor across key repeat, updates Session immediately, and invokes Context explicitly on keyup. Blur or hidden-document settlement commits the final Step without autoplay.
 
@@ -94,20 +94,30 @@ Each side runtime owns:
 {
   mode: "held" | "stretching",
   offset,
+  progressOffset,
+  targetOffset,
+  desiredAddress,
+  lastPlacedAddress,
   requestedRate,
+  desiredRate,
   actualRate,
+  availableRates,
   playback,
   ready,
+  activated,
   rateAvailable,
+  blocked,
   error
 }
 ```
 
-Stretch first places the side at Current. On genuine Center playback the side is started at `1×`; only after its own state reports playback does the controller inspect its own available rates and request the nearest valid directional rate. `onPlaybackRateChange` owns actual rate.
+Every ordinary play calls `beginStretch()` for each available side. It records the prior relation, resets physical offset to zero, places or cues the side at Center, requests `1×`, and starts it in the same trusted gesture as Center. Only after the side reports playback does the controller inspect that iframe’s own rate menu and request the nearest valid directional rate. `onPlaybackRateChange` and adapter snapshots own actual rate; requests are retried with throttling until confirmed.
 
-Held sides run at `1×`; measured drift beyond tolerance is corrected by placement. Holding emits measured offsets to `app.js`, which commits them through Session `setStepReach()`.
+Paused sides retain a desired address. After first activation, parking uses seek plus pause so each pane displays the represented video frame rather than reverting to a source thumbnail. Pre-activation parking cues the source and requests frame placement; any transient muted playback is immediately paused. Held sides run at `1×` with drift correction while Center runs and park exactly when Center pauses.
 
-Side selection emits a Step payload only. `app.js` commits through the same `performStep()` used by matrix arrows, preserves the pending Interval anchor, and translates the Field around the new Current.
+Holding emits measured offsets to `app.js`, which may commit them through Session `setStepReach()`. It never mutates Session Interval. Context parks the existing relation around semantic Current without measuring against its transient Cursor.
+
+Side selection emits a Step payload only. `app.js` commits through the same `performStep()` used by matrix arrows, preserves the pending Interval anchor, and translates the complete Field around the new Current before Center-only Context.
 
 ## 8. Guide integration
 

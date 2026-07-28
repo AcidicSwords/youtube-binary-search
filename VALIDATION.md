@@ -40,15 +40,19 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 
 ### Step Field
 
-- Confirm initial coincidence.
+- Confirm the initial paused panorama shows Tail and Lead at their represented Step frames rather than source thumbnails.
+- Start through Center and Space; every start must refold both sides to Center before a fresh Stretch.
 - Stretch each side independently and together.
-- Confirm sides prime at 1× before directional rate takes effect.
-- Hold midway and verify displayed maximum Offset and subsequent Step distance change to measured Offset.
-- Reach maximum and verify automatic 1× Held state.
-- Click pane and local Step button; confirm both equal matrix Step and translate the whole relation.
-- Exercise different Tail/Lead Offsets and rates.
-- Confirm blocked/unavailable rate states are honest.
-- Confirm sides remain muted.
+- Confirm sides prime at `1×`, then use only a rate confirmed by that iframe.
+- Change each Rate during Stretch and confirm the new supported rate takes effect without restarting or sticking.
+- Hold midway and verify displayed maximum Offset and subsequent Step distance change to measured Offset while semantic Interval remains unchanged.
+- Reach maximum and verify automatic `1×` Held state.
+- Pause Center and confirm both sides are paused on the exact frames their displayed offsets imply.
+- Click each side video surface and local Step button; confirm all equal matrix Step, translate the whole relation, and park again like a slideshow.
+- Exercise different Tail/Lead Offsets and rates, Range boundaries, rapid pause/play, native scrub, Loop wraps, and Context replacement.
+- Confirm Context never changes stored side offsets and the first Play immediately after Context still starts both sides.
+- Confirm a source with only `1×` parks each side at its target and becomes Held instead of remaining stuck.
+- Confirm blocked playback can be retried, unavailable-rate states are honest, and sides remain muted.
 
 ### Composable Step Interval
 

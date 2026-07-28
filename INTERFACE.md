@@ -16,18 +16,18 @@ Tail and Lead are constitutive projections, not thumbnails. On wide desktop the 
 
 | Element | Contribution | Lost if removed |
 |---|---|---|
-| Tail pane | simultaneous backward material and direct Step Backward target | backward comparison and pane-local Step |
+| Tail pane | paused backward frame, simultaneous backward material, and direct Step Backward surface | backward comparison and pane-local Step |
 | Center pane | audible authority, paused shared-start surface, native YouTube controls while running, physical Cursor | reliable ordinary playback and authoritative player state |
-| Lead pane | simultaneous forward material and direct Step Forward target | forward comparison and pane-local Step |
+| Lead pane | paused forward frame, simultaneous forward material, and direct Step Forward surface | forward comparison and pane-local Step |
 | Rate | requested side Stretch kinetics | directional formation speed cannot be chosen |
 | Offset | maximum differential and Step distance | side target and Step magnitude become implicit |
 | Hold / Stretch | freezes measured relation or snaps/refolds and re-forms it | Field relation cannot be controlled |
-| Local Step | explicit equivalent of clicking the pane; moves the active Interval endpoint | side Step and Interval editing are not discoverable |
+| Side video surface / Local Step | one read-only visual target and one explicit button for the same Step; moves the active Interval endpoint | slideshow traversal and Interval editing are not discoverable |
 | Hold both / Stretch both | coordinated two-side transition | common Field transition requires two commands |
 | Field state/rates/span | reports measured relation, actual rates, and Held extent | physical claims cannot be verified |
 | Field on/off and pane hide/restore | removes optional projection cost without changing semantics | single-player fallback and space recovery are lost |
 
-No separate playback dock, Context button, or Skim button appears here. Clicking paused Center or pressing Space starts all three players through one parent-owned gesture; once ordinary playback begins, the surface withdraws and Center’s native YouTube controls are exposed. Context is configured elsewhere and runs automatically.
+No separate playback dock, Context button, or Skim button appears here. Clicking paused Center or pressing Space refolds available sides and starts all three players through one parent-owned gesture; once ordinary playback begins, the surface withdraws and Center’s native YouTube controls are exposed. When paused, each side shows its represented frame. Side iframe pointer input is disabled so clicking the visible side surface performs semantic Step rather than independently toggling a muted player. Context is configured elsewhere and runs automatically.
 
 ## 3. Temporal map
 

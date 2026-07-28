@@ -102,7 +102,7 @@ Creation and management belong to Guide.
 
 ## 5. Native playback
 
-A paused Center surface and Space invoke ordinary playback through the parent document. The same trusted gesture requests muted Tail, audible Center, and muted Lead playback synchronously. Once Center enters ordinary playback, the surface withdraws so native YouTube controls remain available. Starting playback creates a transient playback transaction from the current physical position. Pausing or reaching Range End settles actual movement once through Session:
+A paused Center surface and Space invoke ordinary playback through the parent document. The same trusted gesture first refolds each available side to Center, then requests muted Tail, audible Center, and muted Lead playback synchronously. Every ordinary play/unpause therefore starts a fresh Stretch rather than resuming stale side clocks. Once Center enters ordinary playback, the surface withdraws so native YouTube controls remain available. Starting playback creates a transient playback transaction from the current physical position. Pausing freezes side frames at their represented addresses and settles Center movement once through Session:
 
 ```text
 physical Cursor movement
@@ -134,10 +134,11 @@ Each side has:
 
 ```text
 mode ∈ {held, stretching}
-actual Offset
+parked / desired Address
+actual and progress Offset
 maximum Offset / Step distance
-requested directional Rate
-actual player Rate
+requested and confirmed Rate
+player readiness / playback state
 ```
 
 ### Stretch
@@ -154,17 +155,17 @@ snap side to Current
 → switch to 1× and become Held
 ```
 
-Tail requests a rate below `1×`; Lead requests a rate above `1×`. Unsupported directional rates remain visible as unavailable rather than being invented.
+Tail requests a rate below `1×`; Lead requests a rate above `1×`. Rate requests are retried against the player’s confirmed rate. If a source exposes no valid directional rate, the side is placed at its requested target and becomes Held instead of remaining stuck in Stretch.
 
 ### Hold
 
-Hold switches the side to `1×` and fixes its measured Offset. If invoked during Stretch, the measured Offset becomes the new maximum Offset and Step distance.
+Hold switches the side to `1×` and fixes its measured Offset. If invoked during Stretch, the measured Offset may become the new maximum Offset and Step distance. Hold and Stretch are physical Field transitions: neither operation commits Current nor rewrites Interval.
 
 Center exposes Hold both / Stretch both. Each side remains independently controllable.
 
 ### Side Step and translation
 
-Side-pane click and local Step button invoke the same Step. Distance is the meaningful visible Offset, otherwise the maximum Offset. The Step moves the active Interval endpoint, so repeated side clicks extend, shrink, or reverse the same Loop/Section region. After Step, the complete Field translates by the same signed movement. Automatic Context then runs in Center only.
+The read-only side video surface and local Step button invoke the same Step. Distance is the meaningful visible Offset, otherwise the maximum Offset. The Step moves the active Interval endpoint, so repeated side clicks extend, shrink, or reverse the same Loop/Section region. After Step, the complete Field translates by the same signed movement and all three panes park at their translated addresses. Automatic Context then runs in Center only and leaves the parked Field relation untouched.
 
 ## 8. Physical versus semantic effects
 
@@ -172,7 +173,7 @@ All meaningful state is expressed through Session, but runtime effects remain se
 
 ```text
 Session: Range, Resolution, Current, Interval, Guide, Focus, Offsets
-Runtime: Cursor, Context, Loop cycle, side mode/rate/playback
+Runtime: Cursor, Context, Loop cycle, side mode/address/offset/rate/playback
 ```
 
 A physical command is never assumed successful merely because it was requested. Adapter events and snapshots are authoritative for actual playback, placement, and rate. Sibling iframe playback must be requested in the same trusted parent-page gesture; a later Center state callback is not treated as transferable activation.

@@ -101,14 +101,18 @@ assert.match(app, /data-loop-section/);
 assert.match(app, /saveExtentAsSection/);
 assert.doesNotMatch(app, /createSkimTransport|completeSkim|reachSkimDestination/);
 assert.match(fieldSource, /FIELD_SIDE_MODE/);
-assert.match(fieldSource, /function stretch\(role\)[\s\S]*const center = clamp\([\s\S]*snapshot\.center\?\.time[\s\S]*parkSide\(side, center\)/,
-  "Stretch must snap/refold to the physical Center before future divergence.");
-assert.match(fieldSource, /function hold\(role\)[\s\S]*onHoldOffsets/,
-  "Holding mid-stretch must commit the measured offset as the new Step distance.");
+assert.match(fieldSource, /function stretch\(role\)[\s\S]*beginStretch\(side, center, snapshot, \{ play: centerRunning && !runtime\.suspended \}\)/,
+  "Stretch must delegate to the deterministic refold-then-diverge transition.");
+assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*side\.offset = 0[\s\S]*requestRate\(side, 1, true\)[\s\S]*(?:adapter\?\.place|adapter\?\.cue)[\s\S]*side\.adapter\?\.play/,
+  "Every running Stretch must refold to Center at 1× before future divergence.");
+assert.match(fieldSource, /function hold\(role, \{ record = true \} = \{\}\)[\s\S]*onHoldOffsets/,
+  "Holding mid-stretch may commit the measured physical offset as the new Step distance without touching Interval.");
 assert.match(app, /commitStepReach\(next, "Hold Field Offset", \{ settle: false, translate: false \}\)/,
   "Holding a Field offset must not interrupt the Center playback that produced it.");
-assert.match(fieldSource, /ensureSidePlaying\(side\)[\s\S]*requestStretchRate\(side\)/,
-  "Side playback must prime before requesting a directional rate.");
+assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*side\.adapter\?\.play/,
+  "Side playback must prime at 1× inside the same Stretch transition.");
+assert.match(fieldSource, /function driveSide\(role, center, centerDelta, snapshot, centerRunning\)[\s\S]*requestStretchRate\(side\)/,
+  "Directional rate must be requested only after a side is running and its capabilities are observable.");
 assert.match(css, /data-phase="unfolding"/);
 assert.match(css, /data-phase="held"/);
 assert.match(css, /field-span-fill/);

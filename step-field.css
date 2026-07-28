@@ -39,6 +39,19 @@
   filter: saturate(0.98) brightness(0.98);
 }
 
+.side-player-surface {
+  cursor: pointer;
+}
+
+.side-player-surface iframe {
+  pointer-events: none;
+}
+
+.side-player-surface:focus-visible {
+  outline: 2px solid rgba(121, 168, 255, 0.84);
+  outline-offset: -3px;
+}
+
 .step-pane-bar {
   position: relative;
   z-index: 7;

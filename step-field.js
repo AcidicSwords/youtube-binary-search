@@ -1,4 +1,6 @@
 // Step Field execution controller. Tail and Lead are muted physical projections of Session state.
+// Session owns semantic Current/Interval. This controller owns only physical pane addresses,
+// offsets, rates, and Hold/Stretch state.
 import { EPSILON, clamp } from "./range-geometry.js";
 import { YOUTUBE_STATE, createYouTubePlayer, isYouTubeApiReady } from "./youtube.js";
 import {
@@ -34,7 +36,12 @@ export const FIELD_SIDE_MODE = Object.freeze({
 });
 
 const REACH_TOLERANCE = FIELD_REACH_TOLERANCE;
-const DRIFT_TOLERANCE = 0.42;
+const PARK_TOLERANCE = 0.28;
+const DRIFT_TOLERANCE = 0.48;
+const DIRECT_PLACE_TOLERANCE = 1.35;
+const RATE_RETRY_MS = 550;
+const PLACE_RETRY_MS = 260;
+const MAX_CENTER_DELTA = 2.5;
 
 function defaultPreferences() {
   return {
@@ -86,8 +93,8 @@ export function createStepFieldController({
 }) {
   const ids = [
     "step-field", "step-field-toggle", "step-field-meta",
-    "tail-pane", "tail-meta", "tail-step-button", "tail-collapse", "tail-restore",
-    "lead-pane", "lead-meta", "lead-step-button", "lead-collapse", "lead-restore",
+    "tail-pane", "tail-meta", "tail-player-surface", "tail-step-button", "tail-collapse", "tail-restore",
+    "lead-pane", "lead-meta", "lead-player-surface", "lead-step-button", "lead-collapse", "lead-restore",
     "center-meta", "tail-rate-select", "lead-rate-select",
     "tail-field-toggle", "tail-field-toggle-label", "tail-offset-state",
     "lead-field-toggle", "lead-field-toggle-label", "lead-offset-state",
@@ -106,6 +113,7 @@ export function createStepFieldController({
     structuralKey: null,
     semanticCurrent: null,
     lastCenterTime: null,
+    centerWasRunning: false,
     forceEstablish: true,
     suspended: false,
     field: null,
@@ -117,14 +125,25 @@ export function createStepFieldController({
       role,
       elementId,
       requestedRate,
+      desiredRate: 1,
       actualRate: 1,
+      availableRates: [1],
+      rateAskedAt: 0,
       playback: "idle",
       adapter: null,
       ready: false,
+      activated: false,
       videoId: null,
       mode: FIELD_SIDE_MODE.HELD,
       offset: 0,
+      progressOffset: 0,
+      targetOffset: 0,
+      beforeStretchOffset: 0,
+      desiredAddress: null,
+      lastPlacedAddress: null,
+      lastPlaceAt: 0,
       rateAvailable: true,
+      blocked: false,
       error: false
     };
   }
@@ -142,8 +161,27 @@ export function createStepFieldController({
     return role === "tail" ? "backward" : "forward";
   }
 
-  function maxOffset(role, snapshot = getSnapshot?.()) {
+  function configuredOffset(role, snapshot = getSnapshot?.()) {
     return snapshotReach(snapshot)[directionFor(role)];
+  }
+
+  function effectiveOffset(role, center, snapshot = getSnapshot?.()) {
+    const configured = configuredOffset(role, snapshot);
+    if (!snapshot?.range) return configured;
+    return role === "tail"
+      ? Math.min(configured, Math.max(0, center - snapshot.range.start))
+      : Math.min(configured, Math.max(0, snapshot.range.end - center));
+  }
+
+  function exactAddress(role, center, offset, range) {
+    return role === "tail"
+      ? clamp(center - offset, range.start, range.end)
+      : clamp(center + offset, range.start, range.end);
+  }
+
+  function offsetFromAddress(role, center, address, maximum) {
+    const raw = role === "tail" ? center - address : address - center;
+    return clamp(Math.max(0, raw), 0, Math.max(0, maximum));
   }
 
   function bind() {
@@ -165,13 +203,25 @@ export function createStepFieldController({
     elements["lead-restore"]?.addEventListener?.("click", () => {
       changePreferences({ leadVisible: true, stepFieldEnabled: true });
     });
-    elements["tail-step-button"]?.addEventListener?.("click", () => selectSide("tail"));
-    elements["lead-step-button"]?.addEventListener?.("click", () => selectSide("lead"));
+    const bindSideStepSurface = role => {
+      elements[`${role}-player-surface`]?.addEventListener?.("click", () => selectSide(role));
+      elements[`${role}-player-surface`]?.addEventListener?.("keydown", event => {
+        if (!["Enter", " "].includes(event.key)) return;
+        event.preventDefault?.();
+        event.stopPropagation?.();
+        selectSide(role);
+      });
+      elements[`${role}-step-button`]?.addEventListener?.("click", () => selectSide(role));
+    };
+    bindSideStepSurface("tail");
+    bindSideStepSurface("lead");
     elements["tail-rate-select"]?.addEventListener?.("change", event => {
       changePreferences({ tailRate: Number(event.target.value) });
+      if (sides.tail.mode === FIELD_SIDE_MODE.STRETCHING) requestStretchRate(sides.tail, true);
     });
     elements["lead-rate-select"]?.addEventListener?.("change", event => {
       changePreferences({ leadRate: Number(event.target.value) });
+      if (sides.lead.mode === FIELD_SIDE_MODE.STRETCHING) requestStretchRate(sides.lead, true);
     });
     elements["tail-field-toggle"]?.addEventListener?.("click", () => toggleSide("tail"));
     elements["lead-field-toggle"]?.addEventListener?.("click", () => toggleSide("lead"));
@@ -187,22 +237,34 @@ export function createStepFieldController({
         onReady: adapter => {
           side.ready = true;
           side.error = false;
+          side.blocked = false;
           adapter.mute?.();
           const iframe = adapter.raw?.()?.getIframe?.();
           iframe?.setAttribute?.("tabindex", "-1");
           iframe?.setAttribute?.("aria-hidden", "true");
+          refreshSideSnapshot(side);
           runtime.forceEstablish = true;
         },
         onStateChange: name => {
           side.playback = name;
-          if (name === YOUTUBE_STATE.PLAYING || name === YOUTUBE_STATE.BUFFERING) {
+          if ([YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(name)) {
+            side.activated = true;
+            side.blocked = false;
+            refreshSideSnapshot(side);
             populateRateControl(role, preferences());
+            // A pre-play parking seek may briefly start a muted iframe. Stop it as
+            // soon as YouTube confirms playback so the represented frame remains
+            // visible without turning parking into Field playback.
+            if (!runtime.centerWasRunning && side.mode === FIELD_SIDE_MODE.HELD) {
+              side.adapter?.pause?.();
+            }
           }
         },
         onPlaybackRateChange: rate => {
           if (Number.isFinite(Number(rate))) side.actualRate = Number(rate);
         },
         onAutoplayBlocked: () => {
+          side.blocked = true;
           side.playback = "blocked";
           side.adapter?.pause?.();
         },
@@ -223,103 +285,135 @@ export function createStepFieldController({
 
   function readSide(side) {
     return side.adapter?.read?.() || {
-      time: runtime.semanticCurrent || 0,
+      time: Number.isFinite(side.desiredAddress) ? side.desiredAddress : runtime.semanticCurrent || 0,
       rate: 1,
       state: YOUTUBE_STATE.UNSTARTED,
       availableRates: [1]
     };
   }
 
+  function refreshSideSnapshot(side) {
+    const snapshot = readSide(side);
+    side.playback = snapshot.state;
+    if (Number.isFinite(snapshot.rate)) side.actualRate = snapshot.rate;
+    if (Array.isArray(snapshot.availableRates) && snapshot.availableRates.length) {
+      side.availableRates = [...new Set(snapshot.availableRates)]
+        .filter(rate => Number.isFinite(rate) && rate > 0)
+        .sort((a, b) => a - b);
+    }
+    return snapshot;
+  }
+
+  function sideCanRun(side) {
+    return side.ready && !side.error && Boolean(side.adapter);
+  }
+
+  function requestRate(side, rate, force = false) {
+    if (!sideCanRun(side)) return false;
+    const now = Date.now();
+    const changed = Math.abs(side.desiredRate - rate) > 0.001;
+    side.desiredRate = rate;
+    if (!force && Math.abs(side.actualRate - rate) <= 0.001) return true;
+    if (!force && !changed && now - side.rateAskedAt < RATE_RETRY_MS) return false;
+    side.rateAskedAt = now;
+    side.adapter?.setRate?.(rate);
+    return true;
+  }
+
   function pauseSide(side) {
+    if (!sideCanRun(side)) return;
     side.adapter?.pause?.();
-    side.adapter?.setRate?.(1);
-    side.actualRate = 1;
-    if (!["blocked", "error"].includes(side.playback)) side.playback = "idle";
+    requestRate(side, 1, true);
+    side.desiredRate = 1;
+    if (!["blocked", "error"].includes(side.playback)) side.playback = YOUTUBE_STATE.PAUSED;
   }
 
-  function pauseSides() {
-    pauseSide(sides.tail);
-    pauseSide(sides.lead);
-  }
-
-  function parkSide(side, address) {
-    if (!side.ready || !side.adapter || !side.videoId) return;
-    side.adapter.mute?.();
-    side.adapter.setRate?.(1);
-    side.actualRate = 1;
-    // cueVideoById is the paused placement primitive. YouTube documents that
-    // seekTo() from a cued player may start playback, which can immediately
-    // trigger autoplay blocking in the independent Tail and Lead iframes.
-    side.adapter.cue?.(side.videoId, address);
-    side.playback = YOUTUBE_STATE.CUED;
-  }
-
-  function seekPlayingSide(side, address) {
-    if (!side.ready || !side.adapter) return;
-    side.adapter.mute?.();
-    side.adapter.place?.(address);
-  }
-
-  function exactAddress(role, center, offset, range) {
-    return role === "tail"
-      ? clamp(center - offset, range.start, range.end)
-      : clamp(center + offset, range.start, range.end);
-  }
-
-  function measuredOffset(role, center = runtime.lastCenterTime ?? runtime.semanticCurrent, snapshot = getSnapshot?.()) {
-    const side = sides[role];
-    const time = readSide(side).time;
-    const value = role === "tail" ? center - time : time - center;
-    const maximum = maxOffset(role, snapshot);
-    return clamp(Math.max(0, value), 0, maximum);
-  }
-
-  function ensureSidePlaying(side) {
+  function parkSide(side, address, { force = false } = {}) {
+    if (!sideCanRun(side) || !side.videoId || !Number.isFinite(address)) return false;
+    const target = Math.max(0, address);
+    const now = Date.now();
+    side.desiredAddress = target;
     side.adapter?.mute?.();
-    const state = readSide(side).state;
-    side.playback = state;
-    if (![YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(state)) {
-      side.playback = "starting";
-      side.adapter?.play?.();
+    requestRate(side, 1, true);
+
+    const snapshot = readSide(side);
+    const alreadyThere = Math.abs(snapshot.time - target) <= PARK_TOLERANCE;
+    const recentlyPlaced = side.lastPlacedAddress !== null
+      && Math.abs(side.lastPlacedAddress - target) <= PARK_TOLERANCE
+      && now - side.lastPlaceAt < PLACE_RETRY_MS;
+    if (!force && (alreadyThere || recentlyPlaced)) {
+      pauseSide(side);
+      return false;
     }
+
+    // cue is used only before this iframe has accepted its first trusted play request.
+    // After activation, seek + pause preserves the actual frame instead of returning
+    // the pane to YouTube's source thumbnail.
+    if (side.activated) {
+      side.adapter?.place?.(target);
+      side.adapter?.pause?.();
+      side.playback = YOUTUBE_STATE.PAUSED;
+    } else {
+      // Cue loads the source; the following placement asks YouTube to decode the
+      // represented frame. If that seek briefly starts playback, onStateChange
+      // immediately pauses it while the Field is not running.
+      side.adapter?.cue?.(side.videoId, target);
+      side.adapter?.place?.(target);
+      side.adapter?.pause?.();
+      side.playback = YOUTUBE_STATE.CUED;
+    }
+    side.lastPlacedAddress = target;
+    side.lastPlaceAt = now;
+    return true;
   }
 
-  function playFromGesture() {
+  function parkAtRelation(side, center, snapshot, { force = false } = {}) {
+    const maximum = effectiveOffset(side.role, center, snapshot);
+    side.offset = clamp(side.offset, 0, maximum);
+    side.progressOffset = clamp(side.progressOffset, 0, maximum);
+    return parkSide(side, exactAddress(side.role, center, side.offset, snapshot.range), { force });
+  }
+
+  function stabilizeParkedSide(side, center, snapshot) {
+    if (!sideCanRun(side) || !side.activated || !Number.isFinite(side.desiredAddress)) return;
+    const observed = refreshSideSnapshot(side);
+    if ([YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(observed.state)) {
+      side.adapter?.pause?.();
+      return;
+    }
+    if (Math.abs(observed.time - side.desiredAddress) > PARK_TOLERANCE) {
+      parkSide(side, side.desiredAddress, { force: true });
+    }
+    side.offset = offsetFromAddress(
+      side.role,
+      center,
+      Number.isFinite(side.desiredAddress) ? side.desiredAddress : observed.time,
+      effectiveOffset(side.role, center, snapshot)
+    );
+  }
+
+  function pauseSides({ center = null, freeze = true } = {}) {
     const snapshot = getSnapshot?.();
-    const prefs = preferences();
-    if (!snapshot?.videoLoaded || !prefs.stepFieldEnabled || runtime.suspended) {
-      return { tail: false, lead: false };
+    if (!snapshot?.range) {
+      for (const side of Object.values(sides)) pauseSide(side);
+      return;
     }
-    const started = { tail: false, lead: false };
-    for (const role of ["tail", "lead"]) {
-      const side = sides[role];
-      if (!prefs[`${role}Visible`] || !side.ready || side.error || maxOffset(role, snapshot) <= EPSILON) continue;
-      side.adapter?.mute?.();
-      side.adapter?.setRate?.(1);
-      side.actualRate = 1;
-      side.playback = "starting";
-      side.adapter?.play?.();
-      started[role] = true;
+    const resolvedCenter = clamp(
+      Number.isFinite(center) ? center : Number(snapshot.center?.time ?? snapshot.current),
+      snapshot.range.start,
+      snapshot.range.end
+    );
+    for (const side of Object.values(sides)) {
+      if (freeze) freezeSideForPause(side, resolvedCenter, snapshot);
+      else {
+        pauseSide(side);
+        parkAtRelation(side, resolvedCenter, snapshot);
+      }
     }
-    return started;
-  }
-
-  function activationState() {
-    const prefs = preferences();
-    if (!prefs.stepFieldEnabled) {
-      return { ready: true, pending: [], available: {} };
-    }
-    const visible = ["tail", "lead"].filter(role => prefs[`${role}Visible`]);
-    const pending = visible.filter(role => !sides[role].ready && !sides[role].error);
-    return {
-      ready: pending.length === 0,
-      pending,
-      available: Object.fromEntries(visible.map(role => [role, sides[role].ready && !sides[role].error]))
-    };
   }
 
   function directionalRates(side) {
-    return [...new Set(readSide(side).availableRates || [])]
+    return [...new Set(side.availableRates || readSide(side).availableRates || [])]
       .filter(rate => Number.isFinite(rate) && (side.role === "tail" ? rate < 1 : rate > 1))
       .sort((a, b) => a - b);
   }
@@ -328,6 +422,7 @@ export function createStepFieldController({
     const side = sides[role];
     const select = elements[`${role}-rate-select`];
     if (!select || !side.ready) return;
+    refreshSideSnapshot(side);
     const rates = directionalRates(side);
     const key = rates.join("|");
     if (select.dataset.rates !== key) {
@@ -354,57 +449,56 @@ export function createStepFieldController({
     select.dataset.requested = String(requested);
   }
 
-  function requestStretchRate(side) {
-    side.adapter?.mute?.();
+  function requestStretchRate(side, force = false) {
     side.requestedRate = Number(preferences()[`${side.role}Rate`]);
-    const snapshot = readSide(side);
-    const rate = chooseDirectionalRate(snapshot.availableRates, side.requestedRate, side.role);
+    refreshSideSnapshot(side);
+    const rate = chooseDirectionalRate(side.availableRates, side.requestedRate, side.role);
     side.rateAvailable = rate !== null;
     if (rate === null) {
-      side.adapter?.setRate?.(1);
-      side.actualRate = 1;
-      return false;
+      requestRate(side, 1, force);
+      return null;
     }
-    if (Math.abs(snapshot.rate - rate) > 0.001) side.adapter?.setRate?.(rate);
-    side.actualRate = readSide(side).rate;
-    return true;
+    requestRate(side, rate, force);
+    return rate;
   }
 
   function establish(snapshot, address = snapshot.current) {
     const center = clamp(address, snapshot.range.start, snapshot.range.end);
     for (const side of Object.values(sides)) {
+      const offset = effectiveOffset(side.role, center, snapshot);
       side.mode = FIELD_SIDE_MODE.HELD;
-      side.offset = 0;
+      side.offset = offset;
+      side.progressOffset = offset;
+      side.targetOffset = configuredOffset(side.role, snapshot);
+      side.beforeStretchOffset = offset;
       pauseSide(side);
-      parkSide(side, center);
+      parkAtRelation(side, center, snapshot, { force: true });
     }
     runtime.structuralKey = structuralKey(snapshot);
     runtime.semanticCurrent = center;
     runtime.lastCenterTime = center;
+    runtime.centerWasRunning = false;
     runtime.forceEstablish = false;
-    runtime.phase = STEP_FIELD_PHASE.COINCIDENT;
+    runtime.phase = STEP_FIELD_PHASE.HELD;
   }
 
   function translateToCurrent(current, { preserve = true } = {}) {
     const snapshot = getSnapshot?.();
     if (!snapshot?.videoLoaded || !snapshot.range || !Number.isFinite(current)) return;
-    const previous = Number.isFinite(runtime.lastCenterTime)
-      ? runtime.lastCenterTime
-      : Number.isFinite(runtime.semanticCurrent)
-        ? runtime.semanticCurrent
-        : snapshot.current;
-    const offsets = {
-      tail: preserve ? measuredOffset("tail", previous, snapshot) : 0,
-      lead: preserve ? measuredOffset("lead", previous, snapshot) : 0
-    };
-    runtime.semanticCurrent = clamp(current, snapshot.range.start, snapshot.range.end);
-    runtime.lastCenterTime = runtime.semanticCurrent;
-    for (const role of ["tail", "lead"]) {
-      const side = sides[role];
-      const offset = clamp(offsets[role], 0, maxOffset(role, snapshot));
+    const nextCenter = clamp(current, snapshot.range.start, snapshot.range.end);
+    runtime.semanticCurrent = nextCenter;
+    runtime.lastCenterTime = nextCenter;
+    runtime.centerWasRunning = false;
+    for (const side of Object.values(sides)) {
+      const maximum = effectiveOffset(side.role, nextCenter, snapshot);
+      const retained = side.offset > REACH_TOLERANCE ? side.offset : side.targetOffset;
+      const offset = preserve ? clamp(retained, 0, maximum) : maximum;
+      side.mode = FIELD_SIDE_MODE.HELD;
       side.offset = offset;
+      side.progressOffset = offset;
+      side.targetOffset = configuredOffset(side.role, snapshot);
       pauseSide(side);
-      parkSide(side, exactAddress(role, runtime.semanticCurrent, offset, snapshot.range));
+      parkAtRelation(side, nextCenter, snapshot, { force: true });
     }
     runtime.structuralKey = structuralKey(snapshot);
     runtime.forceEstablish = false;
@@ -414,57 +508,166 @@ export function createStepFieldController({
   function translatePhysicalCenter(address, { preserve = true } = {}) {
     const snapshot = getSnapshot?.();
     if (!snapshot?.videoLoaded || !snapshot.range || !Number.isFinite(address)) return;
-    const previous = Number.isFinite(runtime.lastCenterTime)
-      ? runtime.lastCenterTime
-      : Number(snapshot.center?.time ?? snapshot.current);
     const nextCenter = clamp(address, snapshot.range.start, snapshot.range.end);
-    for (const role of ["tail", "lead"]) {
-      const side = sides[role];
-      const offset = preserve ? measuredOffset(role, previous, snapshot) : 0;
-      side.offset = clamp(offset, 0, maxOffset(role, snapshot));
+    for (const side of Object.values(sides)) {
+      const maximum = effectiveOffset(side.role, nextCenter, snapshot);
+      const retained = side.offset > REACH_TOLERANCE ? side.offset : side.targetOffset;
+      side.offset = preserve ? clamp(retained, 0, maximum) : maximum;
+      side.progressOffset = side.offset;
+      side.targetOffset = configuredOffset(side.role, snapshot);
+      side.mode = FIELD_SIDE_MODE.HELD;
       pauseSide(side);
-      parkSide(side, exactAddress(role, nextCenter, side.offset, snapshot.range));
+      parkAtRelation(side, nextCenter, snapshot, { force: true });
     }
     runtime.lastCenterTime = nextCenter;
+    runtime.centerWasRunning = false;
+    publish(snapshot);
+  }
+
+  function beginStretch(side, center, snapshot, { play = false } = {}) {
+    if (!sideCanRun(side)) return false;
+    side.beforeStretchOffset = side.offset;
+    side.mode = FIELD_SIDE_MODE.STRETCHING;
+    side.offset = 0;
+    side.progressOffset = 0;
+    side.targetOffset = configuredOffset(side.role, snapshot);
+    side.blocked = false;
+    side.adapter?.mute?.();
+    requestRate(side, 1, true);
+
+    // Stretch is one operation: refold to physical Center, then diverge toward
+    // the configured maximum. The refold does not touch Session Current/Interval.
+    if (side.activated) side.adapter?.place?.(center);
+    else side.adapter?.cue?.(side.videoId, center);
+    side.desiredAddress = center;
+    side.lastPlacedAddress = center;
+    side.lastPlaceAt = Date.now();
+    if (play) {
+      side.adapter?.play?.();
+      side.activated = true;
+      side.playback = "starting";
+    } else {
+      side.adapter?.pause?.();
+      side.playback = side.activated ? YOUTUBE_STATE.PAUSED : YOUTUBE_STATE.CUED;
+    }
+    return true;
+  }
+
+  function playFromGesture(options = {}) {
+    const snapshot = getSnapshot?.();
+    const prefs = preferences();
+    const suspendedNow = fieldShouldSuspend(snapshot) || Boolean(document?.hidden);
+    if (!snapshot?.videoLoaded || !prefs.stepFieldEnabled || suspendedNow) {
+      return { tail: false, lead: false };
+    }
+    // Context may have just been settled in the same click/Space stack. Do not
+    // let a stale controller flag suppress the new trusted playback gesture.
+    runtime.suspended = false;
+    const center = clamp(
+      Number.isFinite(options.center) ? options.center : Number(snapshot.center?.time ?? snapshot.current),
+      snapshot.range.start,
+      snapshot.range.end
+    );
+    const started = { tail: false, lead: false };
+    for (const role of ["tail", "lead"]) {
+      const side = sides[role];
+      if (!prefs[`${role}Visible`] || !sideCanRun(side) || configuredOffset(role, snapshot) <= EPSILON) continue;
+      started[role] = beginStretch(side, center, snapshot, { play: true });
+    }
+    runtime.lastCenterTime = center;
+    runtime.centerWasRunning = true;
+    publish(snapshot);
+    return started;
+  }
+
+  function activationState() {
+    const prefs = preferences();
+    if (!prefs.stepFieldEnabled) return { ready: true, pending: [], available: {} };
+    const visible = ["tail", "lead"].filter(role => prefs[`${role}Visible`]);
+    const pending = visible.filter(role => !sides[role].ready && !sides[role].error);
+    return {
+      ready: pending.length === 0,
+      pending,
+      available: Object.fromEntries(visible.map(role => [role, sides[role].ready && !sides[role].error]))
+    };
   }
 
   function stretch(role) {
     const snapshot = getSnapshot?.();
     const side = sides[role];
-    if (!snapshot?.videoLoaded || !side) return;
-    const center = clamp(
-      Number(snapshot.center?.time ?? snapshot.current),
-      snapshot.range.start,
-      snapshot.range.end
-    );
-    side.mode = FIELD_SIDE_MODE.STRETCHING;
-    side.offset = 0;
-    pauseSide(side);
-    // Stretch is one complete operation: refold to the physical Center, then
-    // diverge from that same point on the next genuine Center playback.
-    parkSide(side, center);
-    runtime.semanticCurrent = snapshot.current;
-    runtime.lastCenterTime = center;
+    if (!snapshot?.videoLoaded || !snapshot.range || !sideCanRun(side)) return;
+    const center = clamp(Number(snapshot.center?.time ?? snapshot.current), snapshot.range.start, snapshot.range.end);
+    const centerRunning = [YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(snapshot.center?.state);
+    beginStretch(side, center, snapshot, { play: centerRunning && !runtime.suspended });
     publish(snapshot);
   }
 
-  function hold(role) {
+  function measuredOffset(side, center, snapshot) {
+    const maximum = effectiveOffset(side.role, center, snapshot);
+    const observed = refreshSideSnapshot(side);
+    if (!Number.isFinite(observed.time)) return clamp(side.progressOffset, 0, maximum);
+    const measured = offsetFromAddress(side.role, center, observed.time, maximum);
+    const plausible = Math.abs(measured - side.progressOffset) <= DIRECT_PLACE_TOLERANCE
+      || [YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(observed.state);
+    return plausible ? measured : clamp(side.progressOffset, 0, maximum);
+  }
+
+  function hold(role, { record = true } = {}) {
     const snapshot = getSnapshot?.();
     const side = sides[role];
-    if (!snapshot?.videoLoaded || !side) return;
-    const offset = measuredOffset(role, Number(snapshot.center?.time ?? snapshot.current), snapshot);
+    if (!snapshot?.videoLoaded || !snapshot.range || !sideCanRun(side)) return null;
+    const center = clamp(Number(snapshot.center?.time ?? snapshot.current), snapshot.range.start, snapshot.range.end);
+    let offset;
+    if (side.mode === FIELD_SIDE_MODE.STRETCHING) {
+      offset = measuredOffset(side, center, snapshot);
+      // Holding an armed-but-paused zero-width Stretch restores the visible field
+      // instead of accidentally redefining Step Reach to its minimum.
+      if (offset <= REACH_TOLERANCE && !runtime.centerWasRunning && side.beforeStretchOffset > REACH_TOLERANCE) {
+        offset = clamp(side.beforeStretchOffset, 0, effectiveOffset(role, center, snapshot));
+      }
+    } else {
+      offset = clamp(side.offset, 0, effectiveOffset(role, center, snapshot));
+    }
     side.mode = FIELD_SIDE_MODE.HELD;
     side.offset = offset;
-    side.adapter?.setRate?.(1);
-    side.actualRate = 1;
-    onHoldOffsets?.({ [directionFor(role)]: Math.max(0.25, offset || maxOffset(role, snapshot)) });
+    side.progressOffset = offset;
+    side.targetOffset = record && offset > REACH_TOLERANCE ? offset : configuredOffset(role, snapshot);
+    requestRate(side, 1, true);
+    side.desiredAddress = exactAddress(role, center, offset, snapshot.range);
+    if (runtime.centerWasRunning) {
+      if (Math.abs(readSide(side).time - side.desiredAddress) > DRIFT_TOLERANCE) side.adapter?.place?.(side.desiredAddress);
+      side.adapter?.play?.();
+    } else {
+      parkSide(side, side.desiredAddress, { force: true });
+    }
+    if (record && offset > REACH_TOLERANCE) {
+      onHoldOffsets?.({ [directionFor(role)]: Math.max(0.25, offset) });
+    }
     publish(snapshot);
+    return offset;
+  }
+
+  function freezeSideForPause(side, center, snapshot) {
+    if (!sideCanRun(side)) return;
+    const maximum = effectiveOffset(side.role, center, snapshot);
+    const observed = refreshSideSnapshot(side);
+    let offset = side.offset;
+    if ([YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING, YOUTUBE_STATE.PAUSED].includes(observed.state)) {
+      const measured = offsetFromAddress(side.role, center, observed.time, maximum);
+      if (measured > REACH_TOLERANCE || side.offset <= REACH_TOLERANCE) offset = measured;
+    }
+    offset = clamp(offset, 0, maximum);
+    side.mode = FIELD_SIDE_MODE.HELD;
+    side.offset = offset;
+    side.progressOffset = offset;
+    requestRate(side, 1, true);
+    parkAtRelation(side, center, snapshot, { force: true });
   }
 
   function toggleSide(role) {
     const side = sides[role];
     if (side.mode === FIELD_SIDE_MODE.HELD) stretch(role);
-    else hold(role);
+    else hold(role, { record: true });
   }
 
   function toggleBoth() {
@@ -474,90 +677,126 @@ export function createStepFieldController({
       stretch("lead");
       return;
     }
-    const snapshot = getSnapshot?.();
-    if (!snapshot?.videoLoaded) return;
-    const center = Number(snapshot.center?.time ?? snapshot.current);
-    const offsets = {
-      backward: Math.max(0.25, measuredOffset("tail", center, snapshot) || maxOffset("tail", snapshot)),
-      forward: Math.max(0.25, measuredOffset("lead", center, snapshot) || maxOffset("lead", snapshot))
-    };
+    const patch = {};
     for (const role of ["tail", "lead"]) {
-      const side = sides[role];
-      side.mode = FIELD_SIDE_MODE.HELD;
-      side.offset = offsets[directionFor(role)];
-      side.adapter?.setRate?.(1);
-      side.actualRate = 1;
+      if (sides[role].mode !== FIELD_SIDE_MODE.STRETCHING) continue;
+      const offset = hold(role, { record: false });
+      if (Number.isFinite(offset) && offset > REACH_TOLERANCE) patch[directionFor(role)] = Math.max(0.25, offset);
     }
-    onHoldOffsets?.(offsets);
-    publish(snapshot);
+    if (Object.keys(patch).length) onHoldOffsets?.(patch);
+    publish(getSnapshot?.());
   }
 
-  function driveSide(role, center, snapshot, centerPlaying) {
+  function ensureSidePlaying(side) {
+    if (!sideCanRun(side)) return false;
+    side.adapter?.mute?.();
+    const state = refreshSideSnapshot(side).state;
+    if (![YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(state)) {
+      side.playback = "starting";
+      side.adapter?.play?.();
+      side.activated = true;
+      return false;
+    }
+    return true;
+  }
+
+  function correctRunningSide(side, desiredAddress) {
+    const observed = refreshSideSnapshot(side);
+    const error = observed.time - desiredAddress;
+    if (Math.abs(error) > DIRECT_PLACE_TOLERANCE) {
+      side.adapter?.place?.(desiredAddress);
+      ensureSidePlaying(side);
+      return true;
+    }
+    return false;
+  }
+
+  function driveSide(role, center, centerDelta, snapshot, centerRunning) {
     const side = sides[role];
     const prefs = preferences();
     const visible = prefs[`${role}Visible`];
-    const maximum = maxOffset(role, snapshot);
-    if (!visible || !side.ready || side.error || maximum <= EPSILON) {
+    const maximum = effectiveOffset(role, center, snapshot);
+    if (!visible || !sideCanRun(side)) {
       pauseSide(side);
       return { available: false, held: false, offset: 0 };
     }
-
-    const offset = measuredOffset(role, center, snapshot);
-    side.offset = offset;
-    if (!centerPlaying) {
+    if (maximum <= EPSILON) {
+      side.mode = FIELD_SIDE_MODE.HELD;
+      side.offset = 0;
+      side.progressOffset = 0;
+      side.targetOffset = configuredOffset(role, snapshot);
       pauseSide(side);
-      return { available: true, held: side.mode === FIELD_SIDE_MODE.HELD, offset };
+      parkSide(side, center);
+      return { available: false, held: true, offset: 0 };
+    }
+
+    side.targetOffset = configuredOffset(role, snapshot);
+    if (!centerRunning) {
+      stabilizeParkedSide(side, center, snapshot);
+      return { available: true, held: side.mode === FIELD_SIDE_MODE.HELD, offset: side.offset };
     }
 
     if (side.mode === FIELD_SIDE_MODE.HELD) {
-      side.adapter?.setRate?.(1);
-      side.actualRate = 1;
+      side.offset = clamp(side.offset, 0, maximum);
+      side.progressOffset = side.offset;
+      requestRate(side, 1);
       ensureSidePlaying(side);
-      const exact = exactAddress(role, center, offset, snapshot.range);
-      const actual = readSide(side).time;
-      if (Math.abs(actual - exact) > DRIFT_TOLERANCE) {
-        seekPlayingSide(side, exact);
-        ensureSidePlaying(side);
-      }
-      return { available: true, held: true, offset };
+      const desired = exactAddress(role, center, side.offset, snapshot.range);
+      side.desiredAddress = desired;
+      correctRunningSide(side, desired);
+      return { available: true, held: true, offset: side.offset };
     }
 
-    // Prime at 1× first. Directional capability is only trusted after the side
-    // player has actually entered playback and exposed its own rate list.
     ensureSidePlaying(side);
-    const sideState = readSide(side).state;
-    if ([YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(sideState)) {
-      populateRateControl(role, prefs);
-      requestStretchRate(side);
+    const rate = requestStretchRate(side);
+    const confirmed = Number.isFinite(side.actualRate) ? side.actualRate : 1;
+    const differential = role === "tail" ? Math.max(0, 1 - confirmed) : Math.max(0, confirmed - 1);
+    if (centerDelta > 0 && rate !== null) {
+      side.progressOffset = Math.min(maximum, side.progressOffset + differential * centerDelta);
     }
-    const nextOffset = measuredOffset(role, center, snapshot);
-    side.offset = nextOffset;
-    if (nextOffset >= maximum - REACH_TOLERANCE) {
+
+    const actual = measuredOffset(side, center, snapshot);
+    side.offset = clamp(actual, 0, maximum);
+    const desiredOffset = Math.min(maximum, Math.max(side.progressOffset, side.offset));
+    side.progressOffset = desiredOffset;
+    const desired = exactAddress(role, center, desiredOffset, snapshot.range);
+    side.desiredAddress = desired;
+    correctRunningSide(side, desired);
+
+    const reached = desiredOffset >= maximum - REACH_TOLERANCE
+      || side.offset >= maximum - REACH_TOLERANCE;
+    if (reached || rate === null) {
+      // A source without a directional rate still remains usable: place the side
+      // at the requested frame and hold it instead of leaving the control stuck.
       side.mode = FIELD_SIDE_MODE.HELD;
       side.offset = maximum;
-      seekPlayingSide(side, exactAddress(role, center, maximum, snapshot.range));
-      side.adapter?.setRate?.(1);
-      side.actualRate = 1;
+      side.progressOffset = maximum;
+      side.desiredAddress = exactAddress(role, center, maximum, snapshot.range);
+      if (Math.abs(readSide(side).time - side.desiredAddress) > DRIFT_TOLERANCE) side.adapter?.place?.(side.desiredAddress);
+      requestRate(side, 1, true);
       ensureSidePlaying(side);
       return { available: true, held: true, offset: maximum };
     }
-    return { available: true, held: false, offset: nextOffset };
+    return { available: true, held: false, offset: side.offset };
   }
 
   function selectSide(role) {
     const snapshot = getSnapshot?.();
     if (!snapshot?.videoLoaded) return;
     const side = sides[role];
-    const measured = measuredOffset(role, Number(snapshot.center?.time ?? snapshot.current), snapshot);
-    const distance = measured > REACH_TOLERANCE ? measured : maxOffset(role, snapshot);
+    const center = Number(snapshot.center?.time ?? snapshot.current);
+    const visibleOffset = clamp(side.offset, 0, effectiveOffset(role, center, snapshot));
+    const distance = visibleOffset > REACH_TOLERANCE
+      ? visibleOffset
+      : effectiveOffset(role, center, snapshot);
     if (!(distance > EPSILON)) return;
     onSelect?.({
       role,
       direction: directionFor(role),
       mode: "step",
       distance,
-      offset: measured,
-      target: maxOffset(role, snapshot),
+      offset: visibleOffset,
+      target: configuredOffset(role, snapshot),
       address: exactAddress(role, snapshot.current, distance, snapshot.range)
     });
   }
@@ -571,9 +810,9 @@ export function createStepFieldController({
   function sideMeta(role, sideState, target) {
     const side = sides[role];
     if (runtime.suspended) return "Context suspended";
-    if (side.playback === "blocked") return "Playback blocked";
+    if (side.blocked) return "Playback blocked — retry Play";
     if (side.error) return "Player unavailable";
-    if (!side.rateAvailable && side.mode === FIELD_SIDE_MODE.STRETCHING) return "Directional rate unavailable";
+    if (!side.rateAvailable && side.mode === FIELD_SIDE_MODE.STRETCHING) return "Rate unavailable — held at target";
     const prefix = role === "tail" ? "−" : "+";
     const state = side.mode === FIELD_SIDE_MODE.HELD ? "Held" : "Stretching";
     return `${prefix}${formatOffset(sideState.offset)} / ${formatOffset(target.distance)} · ${state} · ${side.actualRate}×`;
@@ -585,8 +824,8 @@ export function createStepFieldController({
     const center = clamp(Number(snapshot.center?.time ?? snapshot.current ?? 0), snapshot.range.start, snapshot.range.end);
     const targets = live || deriveStepField(center, snapshotReach(snapshot), snapshot.range);
     const states = sideStates || {
-      tail: { available: targets.tail.available, held: sides.tail.mode === FIELD_SIDE_MODE.HELD, offset: measuredOffset("tail", center, snapshot) },
-      lead: { available: targets.lead.available, held: sides.lead.mode === FIELD_SIDE_MODE.HELD, offset: measuredOffset("lead", center, snapshot) }
+      tail: { available: targets.tail.available, held: sides.tail.mode === FIELD_SIDE_MODE.HELD, offset: sides.tail.offset },
+      lead: { available: targets.lead.available, held: sides.lead.mode === FIELD_SIDE_MODE.HELD, offset: sides.lead.offset }
     };
     const observed = deriveObservedField({
       targets,
@@ -600,15 +839,18 @@ export function createStepFieldController({
       leadHeld: states.lead.held
     });
     for (const role of ["tail", "lead"]) {
-      observed[role].mode = sides[role].mode;
+      const side = sides[role];
+      observed[role].mode = side.mode;
       observed[role].requestedRate = Number(prefs[`${role}Rate`]);
-      observed[role].actualRate = sides[role].actualRate;
-      observed[role].playback = sides[role].playback;
-      observed[role].ready = sides[role].ready;
-      observed[role].error = sides[role].error;
-      observed[role].rateAvailable = sides[role].rateAvailable;
+      observed[role].actualRate = side.actualRate;
+      observed[role].playback = side.playback;
+      observed[role].ready = side.ready;
+      observed[role].activated = side.activated;
+      observed[role].error = side.error;
+      observed[role].rateAvailable = side.rateAvailable;
       observed[role].offset = states[role].offset;
       observed[role].targetDistance = targets[role].distance;
+      observed[role].desiredAddress = side.desiredAddress;
     }
     observed.activation = activationState();
     observed.span = {
@@ -627,6 +869,7 @@ export function createStepFieldController({
       rates: [observed.tail.actualRate, observed.lead.actualRate],
       playback: [observed.tail.playback, observed.lead.playback],
       ready: [observed.tail.ready, observed.lead.ready],
+      activated: [observed.tail.activated, observed.lead.activated],
       errors: [observed.tail.error, observed.lead.error],
       suspended: runtime.suspended
     });
@@ -643,7 +886,7 @@ export function createStepFieldController({
     if (element) element.textContent = value;
   }
 
-  function render(snapshot = getSnapshot?.(), field = runtime.field, sideStates = null) {
+  function render(snapshot = getSnapshot?.(), field = runtime.field) {
     if (!snapshot || !elements["step-field"]) return;
     const prefs = preferences();
     const loaded = Boolean(snapshot.videoLoaded);
@@ -678,9 +921,9 @@ export function createStepFieldController({
       setText(elements[`${role}-field-toggle-label`], nextAction);
       setText(elements[`${role}-offset-state`], `${formatOffset(actual)} / ${formatOffset(target)}`);
       elements[`${role}-field-toggle`]?.setAttribute?.("aria-pressed", String(side.mode === FIELD_SIDE_MODE.HELD));
-      if (elements[`${role}-field-toggle`]) elements[`${role}-field-toggle`].disabled = !shown || !prefs[`${role}Visible`];
+      if (elements[`${role}-field-toggle`]) elements[`${role}-field-toggle`].disabled = !shown || !prefs[`${role}Visible`] || side.error;
       if (elements[`${role}-step-button`]) {
-        elements[`${role}-step-button`].disabled = !shown || !prefs[`${role}Visible`] || !(target > EPSILON);
+        elements[`${role}-step-button`].disabled = !shown || !prefs[`${role}Visible`] || !(Math.max(actual, target) > EPSILON);
       }
       setText(elements[`${role}-meta`], !loaded ? "—" : sideMeta(role, { offset: actual }, { distance: target }));
     }
@@ -704,9 +947,7 @@ export function createStepFieldController({
     const prefs = preferences();
     const snapshot = getSnapshot?.();
     if (!snapshot?.range) return;
-    // Make the side panes measurable before YT.Player replaces their host divs.
-    // Creating them under `.field-off { display:none }` gives YouTube a zero-size
-    // embed and violates the API's minimum player viewport contract.
+    // Side hosts must be measurable before YT.Player replaces them.
     render(snapshot);
     if (snapshot.videoLoaded) ensurePlayers(prefs);
     syncVideo(snapshot);
@@ -714,7 +955,7 @@ export function createStepFieldController({
     populateRateControl("lead", prefs);
 
     if (!snapshot.videoLoaded || !snapshot.videoId) {
-      pauseSides();
+      pauseSides({ freeze: false });
       runtime.phase = prefs.stepFieldEnabled ? STEP_FIELD_PHASE.COINCIDENT : STEP_FIELD_PHASE.OFF;
       runtime.semanticCurrent = snapshot.current || 0;
       publish(snapshot);
@@ -728,23 +969,46 @@ export function createStepFieldController({
     }
 
     if (!prefs.stepFieldEnabled || (!prefs.tailVisible && !prefs.leadVisible)) {
-      pauseSides();
+      pauseSides({ freeze: false });
       runtime.phase = STEP_FIELD_PHASE.OFF;
       runtime.suspended = false;
+      runtime.centerWasRunning = false;
       publish(snapshot);
       return;
     }
 
     runtime.suspended = fieldShouldSuspend(snapshot) || Boolean(document?.hidden);
     const center = clamp(Number(snapshot.center?.time ?? snapshot.current), snapshot.range.start, snapshot.range.end);
-    const centerPlaying = !runtime.suspended
-      && snapshot.center?.state === YOUTUBE_STATE.PLAYING;
-    const live = deriveStepField(center, snapshotReach(snapshot), snapshot.range);
+    const centerRunning = !runtime.suspended
+      && [YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(snapshot.center?.state);
+    const centerPlaying = !runtime.suspended && snapshot.center?.state === YOUTUBE_STATE.PLAYING;
+    const rawDelta = Number.isFinite(runtime.lastCenterTime) ? center - runtime.lastCenterTime : 0;
+    const centerDelta = centerPlaying && rawDelta > 0 && rawDelta <= MAX_CENTER_DELTA ? rawDelta : 0;
+    const discontinuity = centerPlaying && Number.isFinite(runtime.lastCenterTime)
+      && (rawDelta < -0.75 || Math.abs(rawDelta) > MAX_CENTER_DELTA);
 
-    if (runtime.suspended) pauseSides();
+    if (runtime.suspended) {
+      // Context and semantic gestures are Center-only. Preserve the stored Field
+      // relation around semantic Current; never remeasure offsets against the
+      // transient Context cursor or an in-flight placement.
+      pauseSides({ center: snapshot.current, freeze: false });
+    } else if (discontinuity) {
+      // A native scrub or clock jump starts a fresh physical formation at the new
+      // Center without creating a semantic Interval here.
+      for (const role of ["tail", "lead"]) {
+        const side = sides[role];
+        if (prefs[`${role}Visible`] && sideCanRun(side)) beginStretch(side, center, snapshot, { play: true });
+      }
+    } else if (!centerRunning && runtime.centerWasRunning) {
+      // Native pause freezes the visible Field once. It does not write Session
+      // Interval or Step Reach; the next Play refolds and stretches anew.
+      pauseSides({ center, freeze: true });
+    }
+
+    const live = deriveStepField(center, snapshotReach(snapshot), snapshot.range);
     const sideStates = {
-      tail: driveSide("tail", center, snapshot, centerPlaying),
-      lead: driveSide("lead", center, snapshot, centerPlaying)
+      tail: driveSide("tail", center, centerDelta, snapshot, centerRunning && !runtime.suspended),
+      lead: driveSide("lead", center, centerDelta, snapshot, centerRunning && !runtime.suspended)
     };
     runtime.phase = runtime.suspended
       ? STEP_FIELD_PHASE.SUSPENDED
@@ -757,6 +1021,7 @@ export function createStepFieldController({
         ]
       });
     if (!runtime.suspended) runtime.lastCenterTime = center;
+    runtime.centerWasRunning = centerRunning && !runtime.suspended;
     publish(snapshot, live, sideStates);
   }
 
@@ -766,20 +1031,29 @@ export function createStepFieldController({
       if (!side.ready || side.videoId === snapshot.videoId) continue;
       side.videoId = snapshot.videoId;
       side.error = false;
+      side.blocked = false;
+      side.activated = false;
       side.playback = "idle";
       side.actualRate = 1;
+      side.desiredRate = 1;
+      side.availableRates = [1];
       side.mode = FIELD_SIDE_MODE.HELD;
       side.offset = 0;
+      side.progressOffset = 0;
+      side.targetOffset = configuredOffset(side.role, snapshot);
+      side.desiredAddress = null;
+      side.lastPlacedAddress = null;
       side.adapter.mute?.();
       runtime.forceEstablish = true;
     }
   }
 
   function invalidate() {
-    pauseSides();
+    pauseSides({ freeze: false });
     runtime.structuralKey = null;
     runtime.semanticCurrent = null;
     runtime.lastCenterTime = null;
+    runtime.centerWasRunning = false;
     runtime.forceEstablish = true;
     runtime.suspended = false;
     runtime.field = null;
@@ -793,7 +1067,11 @@ export function createStepFieldController({
   return {
     tick,
     render,
-    pause: pauseSides,
+    pause(options = {}) {
+      pauseSides({ center: options.center, freeze: options.freeze !== false });
+      runtime.centerWasRunning = false;
+      publish(getSnapshot?.());
+    },
     playFromGesture,
     activationState,
     invalidate,
@@ -801,9 +1079,15 @@ export function createStepFieldController({
     translatePhysicalCenter,
     hold(role = "both") {
       if (role === "both") {
-        hold("tail");
-        hold("lead");
-      } else hold(role);
+        const patch = {};
+        for (const name of ["tail", "lead"]) {
+          const offset = hold(name, { record: false });
+          if (Number.isFinite(offset) && offset > REACH_TOLERANCE) {
+            patch[directionFor(name)] = Math.max(0.25, offset);
+          }
+        }
+        if (Object.keys(patch).length) onHoldOffsets?.(patch);
+      } else hold(role, { record: true });
     },
     stretch(role = "both") {
       if (role === "both") {

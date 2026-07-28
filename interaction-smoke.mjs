@@ -87,21 +87,29 @@ await flush();
 assert.equal(byId.get("loop-label").textContent, "Loop");
 assert.equal(center.currentTime, 50, "Stopping Loop restores its semantic anchor.");
 
-// Tail and Lead are ready before the paused Center surface accepts the first
-// ordinary playback gesture.
+// Tail and Lead are ready before the paused Center surface accepts ordinary
+// playback. Once activated, every paused side is parked on the exact frame it
+// represents rather than being re-cued to YouTube's source thumbnail.
 await poll();
 await flush(4);
 assert.ok(players.has("player-tail") && players.has("player-lead"));
 const tail = env.tail();
 const lead = env.lead();
 assert.equal(byId.get("center-transport-surface").disabled, false);
-assert.notEqual(tail.state, 1, "Tail must be paused after Loop settles and before ordinary shared activation.");
-assert.notEqual(lead.state, 1, "Lead must be paused after Loop settles and before ordinary shared activation.");
+assert.equal(tail.playerVars.controls, 0);
+assert.equal(lead.playerVars.controls, 0);
+assert.equal(tail.createdWhileFieldOff, false, "Tail must be created only after its pane is measurable.");
+assert.equal(lead.createdWhileFieldOff, false, "Lead must be created only after its pane is measurable.");
+assert.match(String(tail.iframe.allow || ""), /autoplay/, "Tail iframe must explicitly receive autoplay permission.");
+assert.match(String(lead.iframe.allow || ""), /autoplay/, "Lead iframe must explicitly receive autoplay permission.");
+assert.ok(tail.commands.some(command => command[0] === "cue"), "Tail must use cue only for pre-activation placement.");
+assert.ok(lead.commands.some(command => command[0] === "cue"), "Lead must use cue only for pre-activation placement.");
 
-// One parent-page click requests Tail, Center, and Lead synchronously. Native
-// controls remain exposed after Center enters ordinary playback, so pausing or
-// scrubbing still follows YouTube's normal control path.
+// One parent-page click refolds both sides to Center and requests Tail, Center,
+// and Lead synchronously. It is a fresh Stretch regardless of the prior held
+// geometry; the semantic Interval remains untouched while the Field forms.
 center.currentTime = 50;
+const intervalBeforeStretch = byId.get("section-window").textContent;
 const playCounts = {
   center: center.commands.filter(command => command[0] === "play").length,
   tail: tail.commands.filter(command => command[0] === "play").length,
@@ -111,70 +119,104 @@ byId.get("center-transport-surface").click();
 assert.equal(center.commands.filter(command => command[0] === "play").length, playCounts.center + 1);
 assert.equal(tail.commands.filter(command => command[0] === "play").length, playCounts.tail + 1);
 assert.equal(lead.commands.filter(command => command[0] === "play").length, playCounts.lead + 1);
+assert.deepEqual(tail.commands.slice(-2).map(command => command[0]), ["place", "play"], "Activated Tail must refold to Center before it plays.");
+assert.deepEqual(lead.commands.slice(-2).map(command => command[0]), ["place", "play"], "Activated Lead must refold to Center before it plays.");
 await flush();
 assert.equal(byId.get("center-transport-surface").hidden, true, "Native Center controls must be exposed while ordinary playback is running.");
-center.currentTime = 60;
-center.pauseVideo();
-await flush();
-assert.equal(byId.get("center-transport-surface").hidden, false, "Paused Center must restore the shared activation surface.");
-assert.equal(currentText(), "Current 1:00.000");
-assert.match(byId.get("section-window").textContent, /0:50\.000–1:00\.000/);
 
-// Side players are created independently and prime at 1× before applying their
-// directional rate. Stretch begins from the physical Center, Hold records the
-// measured differential without pausing Center, and local Step uses that offset.
-assert.equal(tail.playerVars.controls, 0);
-assert.equal(lead.playerVars.controls, 0);
-assert.equal(tail.createdWhileFieldOff, false, "Tail must be created only after its pane is measurable.");
-assert.equal(lead.createdWhileFieldOff, false, "Lead must be created only after its pane is measurable.");
-assert.match(String(tail.iframe.allow || ""), /autoplay/, "Tail iframe must explicitly receive autoplay permission.");
-assert.match(String(lead.iframe.allow || ""), /autoplay/, "Lead iframe must explicitly receive autoplay permission.");
-assert.ok(tail.commands.some(command => command[0] === "cue"), "Tail must be parked with cueVideoById.");
-assert.ok(lead.commands.some(command => command[0] === "cue"), "Lead must be parked with cueVideoById.");
-assert.equal(tail.commands.some(command => command[0] === "place"), false, "Tail must not seek from CUED state before playback.");
-assert.equal(lead.commands.some(command => command[0] === "place"), false, "Lead must not seek from CUED state before playback.");
+// The Field forms from authoritative Center progression. Tail and Lead use
+// confirmed directional rates, while Hold freezes the measured visible frame.
+for (let elapsed = 1; elapsed <= 8; elapsed += 1) {
+  center.currentTime = 50 + elapsed;
+  tail.currentTime = 50 + elapsed * 0.5;
+  lead.currentTime = 50 + elapsed * 2;
+  await poll();
+}
+assert.equal(tail.rate, 0.5, "Tail must use its confirmed sub-1x rate while stretching.");
+assert.equal(lead.rate, 2, "Lead must use its confirmed supra-1x rate while stretching.");
+assert.equal(byId.get("tail-offset-state").textContent, "4s / 10s");
+assert.equal(byId.get("lead-offset-state").textContent, "8s / 10s");
+assert.equal(byId.get("section-window").textContent, intervalBeforeStretch,
+  "Stretch progression must never rewrite the semantic Interval.");
 
-byId.get("tail-field-toggle").click(); // Held -> Stretch
-center.currentTime = 60;
-byId.get("center-transport-surface").click();
-await flush();
-await poll();
-assert.ok(tail.commands.some(command => command[0] === "play"), "Tail must activate from native Center playback.");
-assert.ok(tail.commands.some(command => command[0] === "rate" && command[1] === 0.5), "Tail must request its supported stretch rate after priming.");
-
-tail.currentTime = 56;
-center.currentTime = 60;
-await poll();
 byId.get("tail-field-toggle").click(); // Stretch -> Hold at 4 s
 await flush();
-assert.equal(center.state, 1, "Holding a side must not interrupt native Center playback.");
-assert.equal(byId.get("step-backward-seconds").value, "4");
-assert.equal(byId.get("tail-field-toggle-label").textContent, "Stretch");
+assert.equal(center.state, 1, "Holding a side must not interrupt Center playback.");
+assert.equal(tail.rate, 1, "Held Tail must match Center at 1x.");
+assert.equal(byId.get("step-backward-seconds").value, "4", "Explicit Hold adopts its visible offset as backward Step size.");
+assert.equal(byId.get("section-window").textContent, intervalBeforeStretch,
+  "Hold may update Step Reach but must not rewrite Interval.");
 
+byId.get("field-both-toggle").click(); // Hold remaining Lead at 8 s
+await flush();
+assert.equal(lead.rate, 1);
+assert.equal(byId.get("step-forward-seconds").value, "8");
+assert.equal(byId.get("field-both-toggle-label").textContent, "Stretch both");
+assert.equal(byId.get("section-window").textContent, intervalBeforeStretch);
+
+// Native pause freezes and parks exact side frames. Playback settlement alone
+// writes the playback Interval; the Field remains a separate physical object.
+center.currentTime = 58;
+tail.currentTime = 54;
+lead.currentTime = 66;
 center.pauseVideo();
 await flush();
-const beforeSideStep = currentText();
-byId.get("tail-step-button").click();
+await poll();
+assert.equal(byId.get("center-transport-surface").hidden, false, "Paused Center must restore the shared activation surface.");
+assert.equal(currentText(), "Current 0:58.000");
+assert.match(byId.get("section-window").textContent, /0:50\.000–0:58\.000/);
+assert.equal(tail.currentTime, 54, "Paused Tail must display its represented backward frame.");
+assert.equal(lead.currentTime, 66, "Paused Lead must display its represented forward frame.");
+assert.equal(tail.state, 2);
+assert.equal(lead.state, 2);
+
+// Side Step uses the visible pane offset and translates the complete Field.
+// Repeated clicks therefore behave like a temporal slideshow while Step edits
+// the same semantic Interval.
+byId.get("tail-player-surface").click();
 await env.delay(150);
 await flush();
-assert.notEqual(currentText(), beforeSideStep);
-assert.equal(currentText(), "Current 0:56.000", "Tail Step must use the held 4 s differential.");
+await poll();
+assert.equal(currentText(), "Current 0:54.000");
+assert.equal(center.currentTime, 54);
+assert.equal(tail.currentTime, 50);
+assert.equal(lead.currentTime, 62);
+assert.match(byId.get("section-window").textContent, /0:50\.000–0:54\.000/);
 
-// Space uses the same shared parent-page activation as the paused Center surface.
+byId.get("lead-step-button").click();
+await env.delay(150);
+await flush();
+await poll();
+assert.equal(currentText(), "Current 1:02.000");
+assert.equal(center.currentTime, 62);
+assert.equal(tail.currentTime, 58);
+assert.equal(lead.currentTime, 70);
+assert.match(byId.get("section-window").textContent, /0:50\.000–1:02\.000/);
+
+// Space uses the same shared activation and always begins a fresh refold/stretch.
 const tailPlayBeforeSpace = tail.commands.filter(command => command[0] === "play").length;
 const leadPlayBeforeSpace = lead.commands.filter(command => command[0] === "play").length;
 dispatchDocument("keydown", { key: " ", code: "Space" });
-await flush();
-assert.equal(center.state, 1);
 assert.equal(tail.commands.filter(command => command[0] === "play").length, tailPlayBeforeSpace + 1);
 assert.equal(lead.commands.filter(command => command[0] === "play").length, leadPlayBeforeSpace + 1);
+assert.deepEqual(tail.commands.slice(-2), [["place", 62], ["play"]]);
+assert.deepEqual(lead.commands.slice(-2), [["place", 62], ["play"]]);
+await flush();
+assert.equal(center.state, 1);
+center.currentTime = 64;
+tail.currentTime = 63;
+lead.currentTime = 66;
+await poll();
 dispatchDocument("keydown", { key: " ", code: "Space" });
 await flush();
+await poll();
 assert.equal(center.state, 2);
+assert.equal(tail.state, 2);
+assert.equal(lead.state, 2);
 
 assert.equal(byId.has("continue"), false);
 assert.equal(byId.has("context-action"), false);
 assert.equal(byId.has("skim"), false);
 assert.equal(byId.get("loop").classList.contains("loop-action"), true);
 
-console.log("Interaction smoke passed: Guide retention, composable Step intervals, frozen Loop, shared Center/Tail/Lead activation, native playback settlement, visible side-player bootstrap, cue-based parking, Field rate priming, Hold/Stretch, side Step, and Space playback.");
+console.log("Interaction smoke passed: Guide retention, composable Step intervals, frozen Loop, shared activation, deterministic refold/stretch, confirmed rates, exact paused frames, Hold isolation, whole-Field side Step, and Space playback.");

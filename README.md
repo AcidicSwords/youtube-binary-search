@@ -41,7 +41,7 @@ Range is the sole hard temporal boundary. Resolution controls semantic discrimin
 
 ## Native playback and Context
 
-Center is the only audible player and retains native YouTube controls during playback. While paused, a parent-owned Center surface and Space start Center, Tail, and Lead synchronously from one trusted gesture; once Center is playing, the surface withdraws and YouTube’s native controls remain available. Pausing settles physical movement once into semantic Current and Interval.
+Center is the only audible player and retains native YouTube controls during playback. While paused, a parent-owned Center surface and Space start Center, Tail, and Lead synchronously from one trusted gesture. Every ordinary play/unpause refolds each available side to Center and begins a fresh Stretch toward its configured Offset; once Center is playing, the surface withdraws and YouTube’s native controls remain available. Pausing freezes each side on its represented frame, then settles Center movement once into semantic Current and Interval.
 
 Context is not a button. A configured Context window runs automatically after discrete traversal, plays only in Center, restores Center to committed Current, and never activates Tail or Lead.
 
@@ -58,10 +58,11 @@ Hold/Stretch     Hold/Stretch both  Hold/Stretch
 
 Each side owns a maximum Offset and a supported directional Rate.
 
-- **Stretch** snaps the side to Current, then diverges on the next genuine Center playback until its maximum Offset is reached.
-- **Hold** switches the side to `1×` and preserves the measured Offset. Holding midway through Stretch makes that measured Offset the new maximum and Step distance.
-- Clicking a side pane or its Step button performs the same semantic Step by the visible differential, falling back to the configured maximum Offset, and edits the same active Interval used by Loop and Section creation.
-- Context suspends the sides. Native Center playback resumes Field behaviour.
+- While paused, Tail and Lead display the exact frames represented by their current offsets; they are not thumbnail placeholders.
+- **Stretch** snaps the side to Current, primes it at `1×`, then diverges during genuine Center playback until its configured maximum Offset is reached.
+- **Hold** switches the side to `1×` and preserves the measured Offset. Holding midway through Stretch may make that measured Offset the new maximum and Step distance, but never changes the semantic Interval.
+- Clicking a side video surface or its Step button performs the same semantic Step by the visible differential, falling back to the configured maximum Offset. The complete Field translates by that amount and parks again, producing slideshow-like repeated traversal while editing the active Loop/Section Interval.
+- Context suspends the sides without remeasuring or changing their stored relation. The next genuine play refolds and starts a fresh Stretch.
 
 Disabling the Field preserves the stable single-player reader and does not create side players.
 

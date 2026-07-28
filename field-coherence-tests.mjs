@@ -134,6 +134,7 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   for (const id of [
     "step-backward-seconds", "step-forward-seconds",
     "tail-rate-select", "lead-rate-select",
+    "tail-player-surface", "lead-player-surface",
     "tail-field-toggle", "lead-field-toggle", "field-both-toggle",
     "field-transport-state", "field-rate-state"
   ]) assert.match(html, new RegExp(`id=["']${id}["']`));
@@ -145,7 +146,10 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   assert.equal((html.match(/id=["']lead-rate-select["']/g) || []).length, 1);
   assert.match(html, /id=["']tail-pane["'][\s\S]*id=["']player-tail["'][\s\S]*id=["']tail-rate-select["']/);
   assert.match(html, /id=["']lead-pane["'][\s\S]*id=["']player-lead["'][\s\S]*id=["']lead-rate-select["']/);
-  assert.doesNotMatch(fieldCss, /\.step-pane-action/, "YouTube players must not be covered by an application overlay.");
+  assert.doesNotMatch(fieldCss, /\.step-pane-action/, "Side players must not use a transparent overlay element.");
+  assert.match(fieldCss, /\.side-player-surface iframe[\s\S]*pointer-events:\s*none/);
+  assert.match(field, /bindSideStepSurface\("tail"\)/);
+  assert.match(field, /bindSideStepSurface\("lead"\)/);
   assert.match(fieldCss, /\.pane-field-controls\s*\{[\s\S]*z-index:\s*7/);
   assert.match(fieldCss, /@media \(max-width: 680px\)[\s\S]*\.tail-pane\s*\{[\s\S]*grid-row:\s*2;/);
   assert.match(fieldCss, /@media \(max-width: 680px\)[\s\S]*\.lead-pane\s*\{[\s\S]*grid-row:\s*3;/);
@@ -157,7 +161,10 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   assert.match(app, /stepField\?\.translateToCurrent/);
   assert.match(field, /DEFAULT_FIELD_RESPONSE/);
   assert.match(field, /onAutoplayBlocked:[\s\S]*playback = "blocked"/);
-  assert.match(field, /side\.adapter\?\.setRate\?\.\(1\)[\s\S]*ensureSidePlaying/);
+  assert.match(field, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*side\.adapter\?\.play/,
+    "Playback must refold and prime each side at 1× before directional divergence.");
+  assert.match(field, /function driveSide\(role, center, centerDelta, snapshot, centerRunning\)[\s\S]*requestStretchRate\(side\)/,
+    "Running Stretch must reconcile to a supported confirmed directional rate.");
   assert.match(view, /session\.model\.stepReach/);
   assert.match(app, /preferences\.stepReach = normalizeStepReach/);
   assert.match(implementation, /^# Binary YouTube Reader — Canonical Implementation/m);
