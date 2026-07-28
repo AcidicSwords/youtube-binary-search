@@ -14,6 +14,7 @@
   position: relative;
   display: grid;
   min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto minmax(64px, auto);
   overflow: hidden;
   border: 1px solid var(--line);
@@ -266,13 +267,13 @@
   filter: grayscale(0.4) brightness(0.58);
 }
 
-@media (max-width: 1440px) {
+@container (max-width: 1440px) {
   .pane-field-controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 1180px) {
+@container (max-width: 1180px) {
   .step-field:not(.field-off) {
     grid-template-areas:
       "center center"
@@ -304,7 +305,7 @@
   .step-pane-restore { writing-mode: horizontal-tb; }
 }
 
-@media (max-width: 680px) {
+@container (max-width: 680px) {
   .step-field:not(.tail-collapsed):not(.lead-collapsed):not(.field-off),
   .step-field.tail-collapsed:not(.lead-collapsed):not(.field-off),
   .step-field.lead-collapsed:not(.tail-collapsed):not(.field-off),

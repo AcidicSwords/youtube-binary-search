@@ -106,10 +106,16 @@ assert.match(sessionSource, /departureFrame:[\s\S]*arrivalFrame:/,
   "Intervals must retain both endpoint search frames.");
 assert.match(sessionSource, /export function switchEndpoint[\s\S]*departure: arrival[\s\S]*arrival: departure/,
   "Endpoint Transposition must swap directed roles in the Session kernel.");
-assert.match(sessionSource, /export function refine[\s\S]*intervalMode:\s*"edit"/,
-  "Matrix Refine must edit the Active Interval endpoint.");
-assert.match(app, /function goToAdjacentPin[\s\S]*intervalMode:\s*"edit"/,
-  "Matrix Pin traversal must edit the Active Interval endpoint.");
+assert.match(sessionSource, /export function refine[\s\S]*mode:\s*"refine"[\s\S]*operator:/,
+  "Refine must record its own local traversal instead of entering Interval-edit mode.");
+assert.match(app, /function goToAdjacentPin[\s\S]*mode:\s*"linear"/,
+  "Matrix Pin traversal must push the approached refinement endpoint.");
+assert.match(sessionSource, /syncIntervalEndpointFrames[\s\S]*containExtent\(model\.resolution, model\.interval, model\.range\)/,
+  "Every committed Loop must be contained by its active refinement frame.");
+assert.match(sessionSource, /resolveIntervalEndpointFrame[\s\S]*containExtent\(resolved\.resolution, interval, range\)/,
+  "Both Switch endpoint frames must contain the complete Loop.");
+assert.match(sessionSource, /completePlayback[\s\S]*stepIntervalAnchor[\s\S]*translateNeighborhood/,
+  "Playback must edit the active Loop endpoint while pushing one refinement bound.");
 assert.match(view, /departureFrame[\s\S]*destinationScale[\s\S]*Switch Endpoint/,
   "Switch must expose the destination endpoint frame before traversal.");
 assert.match(view, /refineBlockReason/,
@@ -118,6 +124,8 @@ assert.match(transportSource, /PLAYBACK:\s*"playback"/);
 assert.match(transportSource, /LOOP:\s*"loop"/);
 assert.doesNotMatch(transportSource, /CONTINUE|SKIM/);
 assert.match(app, /result\?\.interval[\s\S]*startContext\(destination\)/, "Context must be automatic after traversal.");
+assert.match(app, /HELD_STEP_INITIAL_DELAY_MS[\s\S]*repeatHeldStep[\s\S]*HELD_STEP_REPEAT_MS/,
+  "Held Arrow Step must own a deterministic repeat cadence.");
 assert.match(app, /transport\.cycles \+= 1[\s\S]*placePlayer\(transport\.start\)[\s\S]*player\.play\(\)/,
   "Loop wraps must remain physical and immediately unpause.");
 assert.match(fieldSource, /mode:\s*"step"/);

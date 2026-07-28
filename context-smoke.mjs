@@ -53,16 +53,20 @@ assert.equal(center.state, 2);
 assert.equal(currentText(), "Current 0:50.000");
 assert.equal(byId.get("cursor-marker").hidden, true);
 
-// Held Step keys resize the active Interval immediately but defer automatic
-// Context until keyup, so key repeat draws one extent rather than repeatedly
-// starting and cancelling observation.
+// Held Step owns its repeat cadence instead of trusting browser key-repeat.
+// Native repeat events are ignored, the app advances after its initial delay,
+// and automatic Context remains deferred until keyup.
 const playsBeforeHeldStep = center.commands.filter(command => command[0] === "play").length;
 dispatchDocument("keydown", { key: "ArrowRight", code: "ArrowRight" });
-dispatchDocument("keydown", { key: "ArrowRight", code: "ArrowRight", repeat: true });
-assert.equal(currentText(), "Current 1:10.000");
-assert.equal(byId.get("loop-meta").textContent, "0:00.000–1:10.000");
-await env.delay(150);
+for (let index = 0; index < 5; index += 1) {
+  dispatchDocument("keydown", { key: "ArrowRight", code: "ArrowRight", repeat: true });
+}
+assert.equal(currentText(), "Current 1:00.000");
+assert.equal(byId.get("loop-meta").textContent, "0:00.000–1:00.000");
+await env.delay(375);
 await flush();
+assert.equal(currentText(), "Current 1:20.000");
+assert.equal(byId.get("loop-meta").textContent, "0:00.000–1:20.000");
 assert.equal(
   center.commands.filter(command => command[0] === "play").length,
   playsBeforeHeldStep,
@@ -72,17 +76,17 @@ assert.equal(center.currentTime, 50);
 assert.equal(center.state, 2);
 dispatchDocument("keyup", { key: "ArrowRight", code: "ArrowRight" });
 await flush();
-assert.equal(center.currentTime, 69);
+assert.equal(center.currentTime, 79);
 assert.equal(center.state, 1);
 assert.equal(
   center.commands.filter(command => command[0] === "play").length,
   playsBeforeHeldStep + 1,
   "Keyup must start exactly one Context observation at the final Step destination."
 );
-center.currentTime = 74;
+center.currentTime = 84;
 await poll();
 await flush();
-assert.equal(center.currentTime, 70);
+assert.equal(center.currentTime, 80);
 assert.equal(center.state, 2);
 
 // A new traversal supersedes active Context without restoring the old anchor.

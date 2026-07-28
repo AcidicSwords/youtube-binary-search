@@ -54,13 +54,23 @@ Interval.departureFrame = Resolution/basis retained at the anchor
 Interval.arrivalFrame = active Resolution/basis at Current
 ```
 
-Direct Go and settled playback establish both endpoints and capture both frames. Matrix directions use `intervalMode: "edit"`: Refine and Pin traversal preserve a usable existing departure, while Step supplies the same anchor explicitly across coalesced repeats. `moveDraft()` therefore keeps movement departure separate from `intervalDeparture`: movement departure controls Undo provenance and direct replacement, while `intervalDeparture` controls the Active Interval consumed by Loop and Section creation. No persistent hidden mode exists; matrix versus direct projection determines the lifecycle.
+Operator ownership is explicit. Direct Go, Refine, and Pin traversal replace Interval with their actual movement. Step and settled playback preserve a usable existing departure and edit only arrival. `moveDraft()` keeps movement departure separate from `intervalDeparture`: ordinary movement departure records local traversal, while the explicit Interval departure is used only by endpoint-editing operators. No persistent hidden mode selects behavior.
 
-`stepNeighborhood()` retains the gesture-origin binary frame; when the Step destination reaches or crosses its directional endpoint, it advances that endpoint to `Current ± stepReach`, clamped to Range, and resets refinement lineage because the scale was deformed. This keeps the next directional Refine at half-Step distance without manufacturing a movement-seeded frame. Full-Range geometry is canonicalized to Range basis, so Session and view share one Reopen predicate.
+`stepNeighborhood()` retains the gesture-origin binary frame, leaves the receding endpoint fixed, and advances the approached endpoint by the signed Step. When the destination reaches or crosses the old directional endpoint, it retains `Current ± stepReach`, clamped to Range. `translateNeighborhood()` applies the same one-sided rule to playback and Pin hops. Scale deformation resets refinement lineage. Full-Range geometry is canonicalized to Range basis, so Session and view share one Reopen predicate.
 
-`getTargets()` never advertises a movement that `moveDraft()` will reject at the 40 ms identity floor. When the ordinary half-side midpoint is no longer distinct but the side endpoint is, it returns that endpoint as the terminal Refine target. This preserves arbitrary-target convergence without weakening semantic equality.
+Every commit runs one containment postcondition:
 
-`switchEndpoint()` captures the active frame being left, restores the retained departure frame, swaps directed departure/arrival and their frames, and preserves ordered `start/end`, provenance, medium, and creation time. It is an involution over semantic state. Range changes defensively rebase any endpoint frame that no longer fits the sole hard bound.
+```text
+Interval ⊆ active Resolution ⊆ Range
+Interval ⊆ departure endpoint frame
+Interval ⊆ arrival endpoint frame
+```
+
+`containExtent()` expands only a bound that fails that relation and never moves Current or changes Interval. This repairs legacy/narrow endpoint frames without letting Switch Endpoint sacrifice the Loop it transposes.
+
+`getTargets()` never advertises a movement that `moveDraft()` will reject at the 40 ms identity floor. When a half-side midpoint is no longer distinct, that direction becomes unavailable; it does not substitute the endpoint, because every successful Refine must leave Current centered in its child Neighborhood. A later linear endpoint push can restore useful scale.
+
+`switchEndpoint()` captures the active frame being left, restores the retained departure frame, swaps directed departure/arrival and their frames, and preserves ordered `start/end`, provenance, medium, and creation time. Restored frames are normalized to contain the unchanged Interval. It is an involution over semantic state. Range changes defensively rebase any endpoint frame that no longer fits the sole hard bound.
 
 ## 4. Transport model
 
@@ -71,7 +81,7 @@ idle | context | playback | loop
 ```
 
 - Context stores anchor and bounded observation window.
-- Playback stores departure, parent Neighborhood/basis, and Undo model until physical settlement. Settlement merges any intervening Held Offset and Guide state into that checkpoint so history order remains compositional.
+- Playback stores departure, parent Neighborhood/basis, the active Interval anchor, and Undo model until physical settlement. Settlement moves that active endpoint, pushes only the approached refinement bound, and merges any intervening Held Offset and Guide state into the checkpoint so history order remains compositional.
 - Loop stores an immutable start/end/source snapshot and a cycle count.
 
 Loop wraps use adapter placement directly and never call a Session movement transaction. Playback settlement uses `completePlayback()` exactly once.
@@ -90,7 +100,7 @@ Programmatic placement has a grace record so delayed iframe reporting cannot be 
 
 `applyPlayerEffect()` receives a changed Session result. When the result includes an Interval and Context duration is non-zero, it translates the complete Field to the new Current, parks the sides without remeasurement, and starts Center-only Context. Otherwise it places Center and the translated Field at Current.
 
-Pending rapid Steps suppress intermediate Context and invoke it once after coalescing. Pointer/button Step uses the short debounce boundary. Arrow-key Step freezes the gesture origin, Interval anchor, and departure frame across key repeat, updates Session immediately, and invokes Context explicitly on keyup. Blur or hidden-document settlement commits the final Step without autoplay.
+Pending rapid Steps suppress intermediate Context and invoke it once after coalescing. Pointer/button Step uses the short debounce boundary. Held Arrow Step freezes the gesture origin, Interval anchor, and departure frame, then uses an application-owned initial delay and repeat timer rather than browser repeat frequency. It updates Session immediately and invokes Context explicitly on keyup. Blur or hidden-document settlement commits the final Step without autoplay.
 
 ## 7. Step Field runtime
 
@@ -145,7 +155,7 @@ All Section endpoints remain Pin operands. `visiblePins()` therefore projects th
 
 `view.js` derives all labels and enabled states from Session and runtime snapshots. Refine exhaustion distinguishes a hard Range edge from the Resolution floor. Switch previews the destination endpoint’s retained Neighborhood and reports its Address, duration, and basis. The UI reports actual Resolution duration rather than a lineage count invalidated by Step.
 
-The wide Step Field ratio is `1 : 1.1 : 1`. Tail, Center, and Lead occupy explicit grid areas with zero-minimum tracks; Field-off always projects Center alone, independent of collapsed-side preferences. Side controls fold to two columns before their intrinsic widths can clip a pane. A paused Center surface owns the shared user activation; it withdraws during ordinary playback so native YouTube controls remain usable. Below each player are mirrored object-local Field controls; no generic playback dock exists. `styles.css` owns the wide application layout, the exact 3×3 matrix, and the separate Undo action; `step-field.css` owns only the Field component and narrower stacking.
+The wide Step Field ratio is `1 : 1.1 : 1`. Tail, Center, and Lead occupy explicit grid areas with zero-minimum tracks; every pane also owns an explicit `minmax(0, 1fr)` content column so child controls cannot widen and clip the player. Field-off always projects Center alone, independent of collapsed-side preferences. The player panel is an inline-size container, so controls fold and panes stack from actual component width rather than the outer viewport. A paused Center surface owns the shared user activation; it withdraws during ordinary playback so native YouTube controls remain usable. Below each player are mirrored object-local Field controls; no generic playback dock exists. `styles.css` owns the wide application layout, the exact 3×3 matrix, and the separate Undo action; `step-field.css` owns only the Field component and narrower stacking.
 
 ## 10. Persistence
 

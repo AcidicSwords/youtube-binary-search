@@ -15,6 +15,7 @@ import {
   canReopen,
   stepTarget,
   stepNeighborhood,
+  translateNeighborhood,
   settleContinuous,
   getActionRanges,
   logSpeed,
@@ -75,8 +76,8 @@ assert.deepEqual(root, { L: 0, C: 60, R: 180, level: 0 });
 assert.deepEqual(getTargets(root), { backward: 30, forward: 120 });
 assert.deepEqual(
   getTargets({ L: 0, C: 0.077, R: 1, level: 3 }),
-  { backward: 0, forward: 0.5385 },
-  "When a midpoint is below the movement floor, Refine must consume the remaining distinct endpoint."
+  { backward: null, forward: 0.5385 },
+  "When a midpoint is below the movement floor, Refine must stop rather than leave Current on an endpoint."
 );
 assert.deepEqual(descend(root, "backward", 30), { L: 0, C: 30, R: 60, level: 1 });
 assert.deepEqual(descend(root, "forward", 120), { L: 60, C: 120, R: 180, level: 1 });
@@ -104,11 +105,17 @@ assert.equal(stepTarget(60, 10, "backward", { start: 0, end: 180 }), 50);
 assert.equal(stepTarget(175, 10, "forward", { start: 0, end: 180 }), 180);
 assert.deepEqual(
   stepNeighborhood({ L: 30, C: 60, R: 90, level: 2 }, 70, { start: 0, end: 180 }),
-  { L: 30, C: 70, R: 90, level: 2 }
+  { L: 30, C: 70, R: 100, level: 0 },
+  "Every forward Step must push only the approached refinement endpoint."
 );
 assert.deepEqual(
   stepNeighborhood({ L: 30, C: 60, R: 90, level: 2 }, 100, { start: 0, end: 180 }),
   { L: 30, C: 100, R: 140, level: 0 }
+);
+assert.deepEqual(
+  stepNeighborhood({ L: 30, C: 60, R: 90, level: 2 }, 50, { start: 0, end: 180 }),
+  { L: 20, C: 50, R: 90, level: 0 },
+  "Every backward Step must push only the approached refinement endpoint."
 );
 assert.deepEqual(
   stepNeighborhood({ L: 0, C: 25, R: 50, level: 1 }, 50, { start: 0, end: 100 }, 25),
@@ -126,8 +133,23 @@ assert.equal(
   "The next directional Refine must remain half a Step away."
 );
 assert.deepEqual(
-  settleContinuous({ L: 0, C: 300, R: 600, level: 2 }, 300, 350),
-  { L: 300, C: 350, R: 600, level: 2 }
+  translateNeighborhood(
+    { L: 0, C: 300, R: 600, level: 2 },
+    350,
+    { start: 0, end: 900 }
+  ),
+  { L: 0, C: 350, R: 650, level: 0 },
+  "Forward playback must preserve the receding endpoint and translate only the approached endpoint."
+);
+assert.deepEqual(
+  settleContinuous(
+    { L: 0, C: 300, R: 600, level: 2 },
+    300,
+    250,
+    { start: 0, end: 900 }
+  ),
+  { L: 0, C: 250, R: 600, level: 2 },
+  "A hard Range boundary clips only the approached side of continuous movement."
 );
 
 const actionRanges = getActionRanges(
@@ -475,7 +497,8 @@ assert.equal(deletion.model.focus, null);
 assert.deepEqual(deletion.model.range, { start: 0, end: 100 });
 assert.equal(deletion.model.guide.sections.length, 0);
 
-// Native playback settles one continuous Interval and reopens Resolution after crossing it.
+// Native playback moves the active Interval endpoint and translates only the
+// approached Resolution side.
 let playback = createSession({ duration: 100, current: 20 });
 playback = goTo(playback, 30, { operator: "timeline", label: "Timeline Click" }).session;
 const playbackUndo = snapshotModel(playback.model);
@@ -484,13 +507,12 @@ playback = completePlayback(playback, {
   departure: 30,
   parentNeighborhood: copy(playback.model.resolution),
   parentResolutionBasis: playback.model.resolutionBasis,
-  crossedResolution: true,
   returnModel: playbackUndo,
   label: "Playback"
 }).session;
 assert.deepEqual(
   { start: playback.model.interval.start, end: playback.model.interval.end },
-  { start: 30, end: 70 }
+  { start: 20, end: 70 }
 );
 assert.equal(playback.model.interval.operator, "playback");
 assert.equal(playback.model.resolution.level, 0);
@@ -505,7 +527,6 @@ const fullCycleResult = completePlayback(fullCycle, {
   departure: 0,
   parentNeighborhood: copy(fullCycleReturn.resolution),
   parentResolutionBasis: fullCycleReturn.resolutionBasis,
-  crossedResolution: true,
   returnModel: fullCycleReturn,
   label: "Playback"
 });

@@ -31,27 +31,28 @@ npm run check
 ```text
 Address → Current inside Range
 Current + Resolution → Neighborhood
-direct committed movement → establish/replace Interval
-matrix direction → move the Interval's active endpoint
+direct Go, Refine, or Pin hop → replace Interval with that traversal
+Step or settled playback → move the Interval's active endpoint
+linear movement → push the approached Resolution endpoint
 Switch Endpoint → transpose Interval endpoints and restore the other endpoint frame
 Address → Pin
 explicit Extent → Section
 Section → Range through Focus
 ```
 
-Range is the sole hard temporal boundary. Resolution controls semantic discrimination; it does not clip physical observation.
+Range is the sole hard temporal boundary. Resolution controls semantic discrimination; it does not clip physical observation. Every non-null Interval is contained by active Resolution, and both endpoint frames contain that same Interval.
 
 ## Native playback and Context
 
-Center is the only audible player and retains native YouTube controls during playback. While paused, a parent-owned Center surface and Space start Center, Tail, and Lead synchronously from one trusted gesture. Every ordinary play/unpause refolds each available side to Center and begins a fresh Stretch toward its configured Offset; once Center is playing, the surface withdraws and YouTube’s native controls remain available. Pausing freezes each side on its represented frame, then settles Center movement once into semantic Current and Interval.
+Center is the only audible player and retains native YouTube controls during playback. While paused, a parent-owned Center surface and Space start Center, Tail, and Lead synchronously from one trusted gesture. Every ordinary play/unpause refolds each available side to Center and begins a fresh Stretch toward its configured Offset; once Center is playing, the surface withdraws and YouTube’s native controls remain available. Pausing freezes each side on its represented frame, then settles Center movement once by moving the active Interval endpoint and pushing only the approached Resolution endpoint.
 
 Context is not a button. A configured Context window runs automatically after discrete traversal, plays only in Center, restores Center to committed Current, and never activates Tail or Lead.
 
-The matrix is also the Interval editor. A direct movement establishes its fixed departure anchor; subsequent Refine, Step, and Pin-direction actions move the active endpoint at Current. They can therefore locate an arbitrary endpoint, cross retained Pins, or deform the Loop/Section region without losing the opposite endpoint. A later direct timeline/Guide Go or settled native playback intentionally establishes a new Interval.
+The matrix has distinct ownership rather than one hidden edit mode. Refine subdivides Resolution and replaces Interval with that local refinement traversal. Pin Forward/Backward pushes the approached Resolution endpoint but replaces Interval with the single Pin hop. Step resizes the existing Interval around its opposite endpoint. Direct timeline/Guide Go replaces Interval. Settled native playback follows Step’s endpoint-edit rule.
 
-Stepping outward extends the operand, stepping inward shrinks it, and crossing the anchor redraws it in the opposite direction. Inside Resolution, Step retains the active binary Neighborhood. When it reaches or crosses the directional Neighborhood endpoint, it pushes that endpoint to one Step beyond Current, clamped to Range, so the next directional Refine remains half a Step away wherever Range permits. Held arrow-key repeats form one gesture and start Context once on keyup.
+Stepping outward extends the operand, stepping inward shrinks it, and crossing the anchor redraws it in the opposite direction. Every Step pushes only the approached Neighborhood endpoint while leaving the receding endpoint fixed. When it reaches or crosses the old directional endpoint, it keeps a full Step beyond Current, clamped to Range, so the next directional Refine remains half a Step away wherever Range permits. Held arrows use an application-owned repeat cadence, form one gesture, and start Context once on keyup.
 
-Every Interval endpoint retains the Resolution frame last occupied there. Switch Endpoint leaves the ordered extent unchanged, makes the other endpoint Current, and restores that endpoint’s frame. Refine, Step, and Pin traversal then compose from the transposed anchor. A collapsed Interval has nothing to switch; the next matrix direction redraws from that same Current.
+Every Interval endpoint retains a Resolution frame that contains the complete Interval. Switch Endpoint leaves the ordered extent unchanged, makes the other endpoint Current, and restores that endpoint’s frame. Switching twice is an exact involution. A following Step or playback edits from the transposed anchor; Refine and Pin traversal intentionally replace the Loop with their own local movement. A collapsed Interval has nothing to switch.
 
 ## Step Field
 
@@ -67,7 +68,7 @@ Each side owns a maximum Offset and a supported directional Rate.
 - While paused, Tail and Lead display the exact frames represented by their current offsets; they are not thumbnail placeholders.
 - **Stretch** snaps the side to Current, primes it at `1×`, then diverges during genuine Center playback until its configured maximum Offset is reached.
 - **Hold** switches the side to `1×` and preserves the measured Offset. Holding midway through Stretch may make that measured Offset the new maximum and Step distance, but never changes the semantic Interval.
-- Clicking a side video surface or its Step button performs the same semantic Step by the visible differential, falling back to the configured maximum Offset. The complete Field translates by that amount and parks again, producing slideshow-like repeated traversal while editing the active Loop/Section Interval.
+- Clicking a side video surface or its Step button performs the same semantic Step by the visible differential, falling back to the configured maximum Offset. The complete Field translates by that amount and parks again, producing slideshow-like repeated traversal while editing the active Loop Interval.
 - Context suspends the sides without remeasuring or changing their stored relation. The next genuine play refolds and starts a fresh Stretch.
 - A side-player media error remains recoverable: restoring that pane or reloading the video retries its source instead of leaving the projection permanently unavailable.
 

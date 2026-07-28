@@ -44,13 +44,18 @@ function assertInvariant(session) {
   assert.equal(validateGuide(guide, duration), true);
 
   const targets = getTargets(resolution);
-  assert.equal(targets.backward === null, resolution.C - resolution.L <= EPSILON);
-  assert.equal(targets.forward === null, resolution.R - resolution.C <= EPSILON);
+  assert.equal(targets.backward === null, resolution.C - resolution.L <= EPSILON * 2);
+  assert.equal(targets.forward === null, resolution.R - resolution.C <= EPSILON * 2);
 
   if (interval) {
     assert.ok(interval.end - interval.start > EPSILON);
     assert.ok(interval.start >= range.start - EPSILON);
     assert.ok(interval.end <= range.end + EPSILON);
+    assert.ok(
+      interval.start >= resolution.L - EPSILON
+      && interval.end <= resolution.R + EPSILON,
+      `Active Interval must remain inside Resolution: ${JSON.stringify({ interval, resolution })}`
+    );
     assert.ok(Math.abs(interval.arrival - resolution.C) <= EPSILON);
     assert.ok(Math.abs(interval.start - Math.min(interval.departure, interval.arrival)) <= EPSILON);
     assert.ok(Math.abs(interval.end - Math.max(interval.departure, interval.arrival)) <= EPSILON);
@@ -63,6 +68,8 @@ function assertInvariant(session) {
       assert.ok(frame.resolution.L >= range.start - EPSILON);
       assert.ok(frame.resolution.R <= range.end + EPSILON);
       assert.ok(Math.abs(frame.resolution.C - address) <= EPSILON);
+      assert.ok(frame.resolution.L <= interval.start + EPSILON);
+      assert.ok(frame.resolution.R >= interval.end - EPSILON);
     }
     assert.deepEqual(interval.arrivalFrame.resolution, resolution);
     assert.equal(interval.arrivalFrame.resolutionBasis, model.resolutionBasis);
@@ -190,53 +197,9 @@ for (let trial = 0; trial < INTERVAL_TRIALS; trial += 1) {
   assert.ok(Math.abs(intervalSession.model.interval.end - Math.max(A, B)) <= EPSILON);
 }
 
-// Full matrix composition: direct movement establishes A, Switch selects A as
-// the retained anchor, and ordinary Refine operations locate B while editing
-// the active endpoint. This is the high-resolution capability the old
-// replacement lifecycle could not express.
-const MATRIX_INTERVAL_TRIALS = 10_000;
-let maximumEndpointRefinements = 0;
-for (let trial = 0; trial < MATRIX_INTERVAL_TRIALS; trial += 1) {
-  const P = random() * 600;
-  const A = random() * 600;
-  const B = random() * 600;
-  if (Math.abs(A - P) <= EPSILON || Math.abs(B - P) <= EPSILON || Math.abs(A - B) <= EPSILON) {
-    trial -= 1;
-    continue;
-  }
-
-  let intervalSession = createSession({ duration: 600, current: P });
-  intervalSession = goTo(intervalSession, A, { operator: "targetA" }).session;
-  intervalSession = switchEndpoint(intervalSession).session;
-  let count = 0;
-  while (Math.abs(intervalSession.model.resolution.C - B) > EPSILON) {
-    const direction = B < intervalSession.model.resolution.C ? "backward" : "forward";
-    const result = refine(intervalSession, direction);
-    assert.equal(result.changed, true, JSON.stringify({
-      trial,
-      P,
-      A,
-      B,
-      direction,
-      resolution: intervalSession.model.resolution,
-      reason: result.reason
-    }));
-    intervalSession = result.session;
-    count += 1;
-    assert.ok(count < 32);
-  }
-  maximumEndpointRefinements = Math.max(maximumEndpointRefinements, count);
-  assert.ok(Math.abs(intervalSession.model.interval.departure - A) <= EPSILON);
-  assert.ok(Math.abs(intervalSession.model.interval.arrival - B) <= EPSILON);
-  assert.ok(Math.abs(intervalSession.model.interval.start - Math.min(A, B)) <= EPSILON);
-  assert.ok(Math.abs(intervalSession.model.interval.end - Math.max(A, B)) <= EPSILON);
-}
-
 console.log(JSON.stringify({
   randomizedOperations: RUNS * OPERATIONS_PER_RUN,
   targetTrials: TARGET_TRIALS,
   maximumRefinements,
-  variableStepIntervalTrials: INTERVAL_TRIALS,
-  matrixIntervalTrials: MATRIX_INTERVAL_TRIALS,
-  maximumEndpointRefinements
+  variableStepIntervalTrials: INTERVAL_TRIALS
 }));

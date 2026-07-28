@@ -47,6 +47,48 @@ export function assertNeighborhood(neighborhood) {
   return neighborhood;
 }
 
+/**
+ * Make a Neighborhood a valid frame for a retained Extent without moving
+ * Current or replacing either object. A linear operator normally needs to
+ * advance only the endpoint it approaches; this postcondition also repairs
+ * restored or persisted endpoint frames that predate that rule.
+ */
+export function containExtent(neighborhood, extent, range) {
+  assertNeighborhood(neighborhood);
+  if (
+    !extent
+    || !Number.isFinite(extent.start)
+    || !Number.isFinite(extent.end)
+    || extent.start > extent.end
+  ) {
+    throw new TypeError("Neighborhood containment requires a valid Extent.");
+  }
+  if (
+    !range
+    || !Number.isFinite(range.start)
+    || !Number.isFinite(range.end)
+    || range.start > range.end
+  ) {
+    throw new TypeError("Neighborhood containment requires a valid Range.");
+  }
+  if (
+    extent.start < range.start - EPSILON
+    || extent.end > range.end + EPSILON
+  ) {
+    throw new RangeError("A Neighborhood cannot contain an Extent outside Range.");
+  }
+
+  const L = Math.max(range.start, Math.min(neighborhood.L, extent.start));
+  const R = Math.min(range.end, Math.max(neighborhood.R, extent.end));
+  const expanded = L < neighborhood.L - EPSILON || R > neighborhood.R + EPSILON;
+  return assertNeighborhood({
+    L,
+    C: neighborhood.C,
+    R,
+    level: expanded ? 0 : neighborhood.level ?? 0
+  });
+}
+
 export function getTargets(neighborhood) {
   assertNeighborhood(neighborhood);
   const backward = midpoint(neighborhood.L, neighborhood.C);
@@ -54,14 +96,10 @@ export function getTargets(neighborhood) {
   return {
     backward: backward < neighborhood.C - EPSILON
       ? backward
-      : neighborhood.L < neighborhood.C - EPSILON
-        ? neighborhood.L
-        : null,
+      : null,
     forward: forward > neighborhood.C + EPSILON
       ? forward
-      : neighborhood.R > neighborhood.C + EPSILON
-        ? neighborhood.R
-        : null
+      : null
   };
 }
 
@@ -236,36 +274,83 @@ export function stepNeighborhood(
     R: neighborhood.R,
     level: neighborhood.level ?? 0
   };
-  let scaleDeformed = false;
 
-  // Step translates Current without discarding the active binary neighborhood.
-  // Once it reaches or crosses the directional endpoint, that endpoint advances
-  // to one Step beyond Current. The next Refine in that direction is therefore
-  // half a Step away unless the sole hard Range boundary has been reached.
-  if (C > neighborhood.C + EPSILON && C >= neighborhood.R - EPSILON) {
-    next.R = Math.min(range.end, C + reach);
-    scaleDeformed = true;
-  } else if (C < neighborhood.C - EPSILON && C <= neighborhood.L + EPSILON) {
-    next.L = Math.max(range.start, C - reach);
-    scaleDeformed = true;
+  // Step is linear: it preserves the endpoint being left and pushes only the
+  // approached refinement endpoint. If the Step reaches or crosses that bound,
+  // retain a full Step beyond Current so the next directional Refine remains
+  // available at half-Step scale (unless Range is the hard stop).
+  const delta = C - neighborhood.C;
+  if (delta > EPSILON) {
+    const translated = neighborhood.R + delta;
+    const crossed = C >= neighborhood.R - EPSILON ? C + reach : translated;
+    next.R = Math.min(range.end, Math.max(translated, crossed));
+    next.level = 0;
+  } else if (delta < -EPSILON) {
+    const translated = neighborhood.L + delta;
+    const crossed = C <= neighborhood.L + EPSILON ? C - reach : translated;
+    next.L = Math.max(range.start, Math.min(translated, crossed));
+    next.level = 0;
   }
-  if (scaleDeformed) next.level = 0;
 
   return assertNeighborhood(next);
 }
 
-export function settleContinuous(neighborhood, departure, current) {
+/**
+ * Translate Current through a Neighborhood without replacing its two-sided
+ * relation. The endpoint in the direction of travel advances by the same
+ * signed distance while the endpoint being left remains fixed. Range is the
+ * sole hard boundary, so clipping may compress only the approached side.
+ *
+ * This is the continuous counterpart to a spatial traversal: playback moves
+ * one active endpoint through the existing Resolution rather than opening a
+ * new Resolution around its departure and arrival.
+ */
+export function translateNeighborhood(neighborhood, destination, range) {
   assertNeighborhood(neighborhood);
+  if (!Number.isFinite(destination)) {
+    throw new TypeError("Linear destination must be a finite number.");
+  }
+  if (
+    !range
+    || !Number.isFinite(range.start)
+    || !Number.isFinite(range.end)
+    || range.start > range.end
+  ) {
+    throw new TypeError("Linear translation requires a valid Range.");
+  }
+
+  const C = clamp(destination, range.start, range.end);
+  const delta = C - neighborhood.C;
+  const next = {
+    L: neighborhood.L,
+    C,
+    R: neighborhood.R,
+    level: neighborhood.level ?? 0
+  };
+
+  if (delta > EPSILON) {
+    next.R = Math.min(range.end, neighborhood.R + delta);
+    if (next.R > neighborhood.R + EPSILON) next.level = 0;
+  } else if (delta < -EPSILON) {
+    next.L = Math.max(range.start, neighborhood.L + delta);
+    if (next.L < neighborhood.L - EPSILON) next.level = 0;
+  }
+
+  return assertNeighborhood(next);
+}
+
+export function settleContinuous(neighborhood, departure, current, range = null) {
   if (!Number.isFinite(departure) || !Number.isFinite(current)) {
     throw new TypeError("Continuous positions must be finite numbers.");
   }
-
-  const start = clamp(departure, neighborhood.L, neighborhood.R);
-  const C = clamp(current, neighborhood.L, neighborhood.R);
-  const next = { L: neighborhood.L, C, R: neighborhood.R, level: neighborhood.level ?? 0 };
-  if (C > start + EPSILON) next.L = Math.max(neighborhood.L, start);
-  if (C < start - EPSILON) next.R = Math.min(neighborhood.R, start);
-  return assertNeighborhood(next);
+  if (Math.abs(departure - neighborhood.C) > EPSILON) {
+    throw new RangeError("Continuous departure must equal the parent Neighborhood Current.");
+  }
+  return translateNeighborhood(
+    neighborhood,
+    current,
+    range || { start: neighborhood.L, end: neighborhood.R }
+  );
 }
 
 export function getActionRanges(

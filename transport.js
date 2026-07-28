@@ -56,7 +56,6 @@ export function createPlaybackTransport({
   parentNeighborhood,
   parentResolutionBasis,
   returnModel,
-  crossedResolution = false,
   label = "Playback",
   operator = "playback"
 }) {
@@ -67,7 +66,6 @@ export function createPlaybackTransport({
     parentNeighborhood,
     parentResolutionBasis,
     returnModel,
-    crossedResolution,
     label,
     operator,
     enteredPath: false,

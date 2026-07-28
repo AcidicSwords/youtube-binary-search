@@ -74,6 +74,11 @@ assert.match(
   fieldCss,
   /grid-template-areas:\s*"tail center lead"[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1\.1fr\) minmax\(0, 1fr\)/
 );
+assert.match(fieldCss, /\.step-pane\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/,
+  "Pane content tracks must shrink instead of clipping Lead.");
+assert.match(styles, /\.player-panel\s*\{[\s\S]*container-type:\s*inline-size/,
+  "Step Field breakpoints must follow actual panel width.");
+assert.match(fieldCss, /@container \(max-width: 1180px\)/);
 assert.match(fieldCss, /\.pane-field-controls[\s\S]*z-index:\s*7/);
 assert.match(grammarCss, /field-span-fill/);
 assert.doesNotMatch(grammarCss, /field-transport-bar|transport-actions|transport-readouts|transport-status/,
@@ -115,4 +120,4 @@ assert.match(pkg.scripts.audit, /integration-check\.mjs/);
 assert.match(pkg.scripts.audit, /project-audit\.mjs/);
 assert.match(pkg.scripts.check, /npm run audit/);
 
-console.log("Project audit passed: v5.8.6 Endpoint Transposition, matrix Interval composition, semantic repairs, mirrored Field controls, collapse isolation, native playback settlement, Guide ownership, operator geometry, CSS boundaries, and adapter contracts are coherent.");
+console.log("Project audit passed: v5.8.6 Endpoint Transposition, distinct operator ownership, Loop containment, semantic repairs, mirrored Field controls, collapse isolation, native playback settlement, Guide ownership, operator geometry, CSS boundaries, and adapter contracts are coherent.");
