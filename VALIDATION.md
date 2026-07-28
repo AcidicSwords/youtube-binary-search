@@ -2,90 +2,80 @@
 
 ## 1. Automated gate
 
-Run:
-
 ```bash
 npm run check
 ```
 
-The gate covers syntax, pure geometry, Session/Return, Guide integrity, transport, source normalization, deterministic fuzz, stable-reader regressions, Step Field phases and bounds, directional Reach, response policy, DOM/accessibility contracts, documentation consistency, startup, interaction, Context, and metadata paths.
+The gate covers syntax, Session/Return, Guide, Context/playback/Loop values, source normalization, 25,000-operation fuzzing, native-playback regressions, Field geometry and controller behaviour, DOM/accessibility contracts, repository audits, startup, interaction, Context, and metadata paths.
 
-A passing gate is necessary but not sufficient for release.
+A passing gate is necessary, not sufficient, because actual YouTube iframe behaviour remains browser- and video-dependent.
 
-## 2. Desktop browser matrix
+## 2. Wide desktop
 
-Use at least two ordinary videos with different durations and reported playback-rate sets.
+### Composition
 
-### Interface composition
+- Tail, Center, Lead form one panoramic row at approximately `1 : 1.1 : 1`.
+- Object-local Rate, Offset, Hold/Stretch, and Step controls sit beneath each side.
+- Center exposes Field state and Hold both/Stretch both, not duplicate playback.
+- Timeline spans viewer width.
+- Parameters, exact 3×3 matrix, and Guide occupy left/centre/right.
+- Matrix is `Refine/Reopen/Refine`, `Step/Loop/Step`, `Pin/Return/Pin`.
+- Pin and Section creation appear only in Guide.
 
-- Confirm Tail, Center, and Lead form one panoramic row at wide desktop widths.
-- Confirm playback controls sit directly under the panes and share one visual grammar.
-- Confirm the temporal map spans the media width and has no stretched empty panel area.
-- Confirm Parameters, the centered operator matrix, and Guide occupy left, center, and right respectively.
-- Confirm the matrix order is `W`; `A/D`; `←/S/→`; `Shift+←/P/Shift+→`.
-- Confirm Step Reach and all other entered values are absent from the matrix.
-- Confirm there is no duplicate retained-Pins button and no inert Section state button.
-- Confirm Range and Resolution are presented as parameter/state information rather than playback commands.
-- Confirm Loop matches Continue, Context, and Skim as a playback/observation action.
-- Confirm each visible element has a specific capability or irreducible state described in `INTERFACE.md`.
+### Native playback
 
-### Load and stable reader
+- Start/pause through Center iframe and Space.
+- Confirm native pause settles Current and Interval once.
+- Confirm native scrub settles as Go after the grace period.
+- Confirm crossing Resolution during playback reopens Range scale.
 
-- Load by full URL, short URL, and raw video ID.
-- Confirm Current, Range, Resolution, and Cursor labels.
-- Disable Step Field and exercise Refine, Reopen, Step, Return, Context, Continue, Skim, Loop, Pin, Section, Focus, and Leave Focus.
-- Reload and replace the video; confirm preferences persist and Guide remains video-specific.
+### Automatic Context
+
+- Enable each duration and invoke timeline, Refine, Step, side Step, Pin, Section, and Return traversal.
+- Confirm Center plays the bounded window and restores Current.
+- Confirm Tail/Lead remain paused and preserve their modes/Offsets.
+- Trigger a new traversal while Context is active; only the new destination remains authoritative.
+- Set Off and confirm traversal remains paused at destination.
 
 ### Step Field
 
-- Confirm Tail, Center, and Lead initialize coincident.
-- Use Application Continue and verify all available panes start from one gesture.
-- Change Tail and Lead rates while unfolding; geometry must not reset.
-- Exercise linked and independent Reach.
-- Hide and restore each side.
-- Reach Range Start, Range End, and both-constrained cases.
-- Select a forming side and a Held side; verify Go versus Step semantics.
-- Confirm Tail and Lead remain muted.
+- Confirm initial coincidence.
+- Stretch each side independently and together.
+- Confirm sides prime at 1× before directional rate takes effect.
+- Hold midway and verify displayed maximum Offset and subsequent Step distance change to measured Offset.
+- Reach maximum and verify automatic 1× Held state.
+- Click pane and local Step button; confirm both equal matrix Step and translate the whole relation.
+- Exercise different Tail/Lead Offsets and rates.
+- Confirm blocked/unavailable rate states are honest.
+- Confirm sides remain muted.
 
-### Native Center controls
+### Loop
 
-- Play, pause, and scrub through native controls.
-- Confirm semantic Current follows settled native placement.
-- Confirm side activation is reported honestly when autoplay blocks it.
-- Enter and leave fullscreen.
+- Establish Interval through each movement class.
+- Start matrix Loop and confirm frozen start/end.
+- Confirm end-to-start wraps do not change Current, Interval, Return history, or invoke Context.
+- Pause/stop and restart.
+- Loop a saved Section from Guide and confirm its own frozen extent.
 
-### Failure states
+### Guide
 
-- Use a video that reports only `1×` if available; directional controls should show unavailable rather than inventing rates.
-- Observe buffering and delayed placement.
-- Hide the document and return.
-- Disconnect/reconnect network if practical and confirm state remains recoverable.
+- Create titled/untitled Pins from Pins tab.
+- Create Sections from Interval and Held Field span.
+- Exercise Go, Focus, Loop, Rename, Delete, and Leave.
+- Reload and replace video; Guide remains video-specific.
 
-## 3. Mobile device matrix
+## 3. Responsive and mobile
 
-Use a real coarse-pointer phone browser, not only responsive emulation.
+- Medium layout places Center above side panes.
+- Phone layout stacks Center, Tail, Lead without horizontal overflow.
+- Every iframe remains at least `200 × 200` CSS pixels.
+- Native Center controls remain usable.
+- Side controls remain reachable with 48px coarse-pointer targets.
+- Guide opens as a modal sheet, traps focus, restores focus, and respects safe-area padding.
+- Range dragging preserves vertical page scrolling.
 
-- Confirm Center, Tail, and Lead stack vertically without horizontal overflow.
-- Confirm each side player remains at least `200 × 200` CSS pixels.
-- Confirm Tail and Lead selectors are visible in their pane headers and open the native picker.
-- Confirm every visible button, summary, selector, Guide action, and close control has a practical touch target.
-- Confirm the sticky load bar does not obscure focused controls.
-- Open/close Guide, edit retained items, and verify safe-area padding.
-- Drag Range handles while the page remains vertically scrollable.
-- Rotate portrait/landscape and repeat Continue, rate selection, hide/restore, and fullscreen.
+## 4. Failure matrix
 
-## 4. Record results
+Test buffering, delayed placement, autoplay blocking, videos with only `1×`, hidden-tab suspension, network interruption, embed-disabled videos, fullscreen, and video replacement.
 
-For each manual pass record:
-
-```text
-browser + version
-device / viewport
-video IDs tested
-rates reported per player
-scenarios passed
-blocked or unavailable states observed
-failures with reproduction steps
-```
-
-Only observed failures should create new implementation work. Pure visual preference changes remain UI/UX work and must not silently alter semantic contracts.
+Record browser/version, device/viewport, video IDs, actual rates per iframe, passed scenarios, blocked states, and exact reproductions. Do not claim real iframe validation from automated tests alone.

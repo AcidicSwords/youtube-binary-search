@@ -36,9 +36,7 @@ import {
   checkpoint,
   focusSection as focusSessionSection,
   leaveSection as leaveSessionSection,
-  completeContinue,
-  completeSkim,
-  reachSkimDestination,
+  completePlayback,
   pinCurrent as pinSessionCurrent,
   saveIntervalAsSection,
   saveExtentAsSection,
@@ -55,10 +53,8 @@ import {
   isObservationalTransport,
   createContextTransport,
   createLoopTransport,
-  createContinueTransport,
-  createSkimTransport,
-  withTransportPhase,
-  desiredSkimRate
+  createPlaybackTransport,
+  withTransportPhase
 } from "./transport.js";
 import {
   YOUTUBE_STATE,
@@ -149,9 +145,7 @@ const state = {
   nativeGo: null,
   programmaticPlacement: null,
   guideDialog: null,
-  field: null,
-  captureExtent: null,
-  captureExtentKind: null
+  field: null
 };
 
 let player = null;
@@ -375,14 +369,14 @@ function scheduleNativeGo(address) {
   state.nativeGo = candidate;
 }
 
-function locateAddress(address) {
+function locateAddress(address, { preserveField = false } = {}) {
   if (!player || !Number.isFinite(address)) return;
   clearNativeGo();
   state.transport = idleTransport();
-  stepField?.pause();
   player.pause();
   player.setRate(1);
   placePlayer(address);
+  stepField?.translateToCurrent(address, { preserve: preserveField });
 }
 
 function startContext(anchor) {
@@ -394,11 +388,12 @@ function startContext(anchor) {
   });
 
   if (transport.kind === TRANSPORT_KIND.IDLE) {
-    locateAddress(anchor);
+    locateAddress(anchor, { preserveField: true });
     return;
   }
 
   state.transport = transport;
+  stepField?.pause();
   player.setRate(1);
   placePlayer(transport.start);
   if (Math.abs(safeCurrentTime() - transport.start) <= 0.25) transport.enteredWindow = true;
@@ -411,19 +406,14 @@ function applyPlayerEffect(result, options = {}) {
   const destination = Number.isFinite(result?.place)
     ? result.place
     : result?.interval?.arrival;
+  if (!Number.isFinite(destination)) return;
 
-  if (
-    observe
-    && state.contextSeconds > 0
-    && !(state.stepFieldEnabled && (state.tailVisible || state.leadVisible))
-    && result?.interval?.medium === "direct"
-    && Number.isFinite(destination)
-  ) {
+  stepField?.translateToCurrent(destination, { preserve: true });
+  if (observe && state.contextSeconds > 0 && result?.interval) {
     startContext(destination);
     return;
   }
-
-  if (Number.isFinite(destination)) locateAddress(destination);
+  locateAddress(destination, { preserveField: true });
 }
 
 function accept(result, options = {}) {
@@ -447,42 +437,44 @@ function settleTransport(options = {}) {
   state.transport = idleTransport();
 
   if (issuePause) player.pause();
-  stepField?.pause();
   player.setRate(1);
 
-  if (isObservationalTransport(active)) {
-    if (restoreObservation && currentResolution()) placePlayer(currentResolution().C);
+  if (active.kind === TRANSPORT_KIND.CONTEXT) {
+    if (restoreObservation && currentResolution()) {
+      placePlayer(currentResolution().C);
+      stepField?.translateToCurrent(currentResolution().C, { preserve: true });
+    }
     view.render();
     return true;
   }
 
-  if (active.kind === TRANSPORT_KIND.CONTINUE) {
-    const result = completeContinue(state.session, {
+  if (active.kind === TRANSPORT_KIND.LOOP) {
+    if (restoreObservation && Number.isFinite(active.anchor)) {
+      placePlayer(active.anchor);
+      stepField?.translateToCurrent(active.anchor, { preserve: true });
+    }
+    view.render();
+    return true;
+  }
+
+  if (active.kind === TRANSPORT_KIND.PLAYBACK) {
+    const result = completePlayback(state.session, {
       current,
       departure: active.departure,
       parentNeighborhood: active.parentNeighborhood,
       parentResolutionBasis: active.parentResolutionBasis,
       crossedResolution: active.crossedResolution,
-      wrapped: active.wrapped,
       returnModel: active.returnModel,
       label: active.label,
-      operator: active.operator || "continue"
+      operator: active.operator || "playback"
     });
-    if (result.changed) accept(result, { effect: false, renderGuide: false });
-    else view.render();
-    return true;
-  }
-
-  if (active.kind === TRANSPORT_KIND.SKIM) {
-    const result = completeSkim(state.session, {
-      current,
-      departure: active.departure,
-      parentNeighborhood: active.parentNeighborhood,
-      parentResolutionBasis: active.parentResolutionBasis,
-      returnModel: active.returnModel
-    });
-    if (result.changed) accept(result, { effect: false, renderGuide: false });
-    else view.render();
+    if (result.changed) {
+      state.session = result.session;
+      stepField?.translateToCurrent(current, { preserve: true });
+      persistPreferences();
+      view.renderGuide();
+    }
+    view.render();
     return true;
   }
 
@@ -606,7 +598,8 @@ function reopenFully() {
 }
 
 function returnLastAction() {
-  settleBeforeAction();
+  settleBeforeAction({ replacingContext: true });
+  const departure = currentResolution().C;
   const result = returnSession(state.session);
   if (!result.changed) {
     setStatus("There is no preceding state to Return to.");
@@ -615,16 +608,19 @@ function returnLastAction() {
   state.session = result.session;
   persistPreferences();
   const guidePersisted = result.guideChanged ? persistGuide() : true;
-  persistPreferences();
-  stepField?.invalidate();
-  locateAddress(currentResolution().C);
+  const destination = currentResolution().C;
+  stepField?.translateToCurrent(destination, { preserve: true });
+  if (Math.abs(destination - departure) > EPSILON && state.contextSeconds > 0) startContext(destination);
+  else locateAddress(destination, { preserveField: true });
   view.renderGuide();
   if (guidePersisted) setStatus(`Returned from ${result.label}.`);
   view.render();
 }
 
-function performStep(direction) {
+function performStep(direction, distance = reachFor(direction)) {
   if (!state.videoLoaded) return;
+  const resolvedDistance = Number(distance);
+  if (!(Number.isFinite(resolvedDistance) && resolvedDistance > 0)) return;
   if (!state.pendingStep) {
     settleBeforeAction({ replacingContext: true });
     state.pendingStep = {
@@ -636,7 +632,7 @@ function performStep(direction) {
     };
   }
 
-  const result = stepSession(state.session, direction, reachFor(direction), {
+  const result = stepSession(state.session, direction, resolvedDistance, {
     departure: state.pendingStep.departure,
     originResolution: state.pendingStep.originModel.resolution,
     originResolutionBasis: state.pendingStep.originModel.resolutionBasis,
@@ -649,6 +645,7 @@ function performStep(direction) {
   }
   state.pendingStep.started = true;
   state.session = result.session;
+  stepField?.translateToCurrent(currentResolution().C, { preserve: true });
 
   clearTimeout(state.pendingStep.timer);
   state.pendingStep.timer = window.setTimeout(() => {
@@ -663,165 +660,53 @@ function performStep(direction) {
   view.render();
 }
 
-
 function selectFieldSide(selection) {
-  if (!state.videoLoaded || !selection || !Number.isFinite(selection.address)) return;
-  if (selection.mode === "step") {
-    performStep(selection.direction);
-    return;
-  }
-  moveToAddress(selection.address, {
-    operator: selection.role === "tail" ? "fieldTail" : "fieldLead",
-    label: selection.role === "tail" ? "Go to Tail" : "Go to Lead",
-    status: destination => `Current moved to visible ${selection.role === "tail" ? "Tail" : "Lead"} at ${formatTime(destination)}.`
-  });
+  if (!state.videoLoaded || !selection) return;
+  performStep(selection.direction, selection.distance);
 }
 
-function startSkim() {
-  if (!state.videoLoaded) return;
-  if (transportIs(TRANSPORT_KIND.SKIM)) {
-    settleTransport();
-    setStatus("Skim stopped.");
-    return;
-  }
+function startNativePlaybackSession() {
+  if (!state.videoLoaded || transportIs(TRANSPORT_KIND.PLAYBACK)) return;
+  clearNativeGo();
+  clearProgrammaticPlacement();
+  const current = clamp(safeCurrentTime(), activeRange().start, activeRange().end);
 
-  settleBeforeAction();
-  const target = getTargets(currentResolution()).forward;
-  if (target === null) {
-    setStatus("There is no forward Neighborhood to Skim.");
-    return;
-  }
-
-  const requestedRate = Number(elements["speed-select"].value || 1);
-  const rate = desiredSkimRate(
-    { kind: TRANSPORT_KIND.SKIM, maxRate: requestedRate, rate: requestedRate },
-    currentResolution().C,
-    state.availableRates
-  );
-  if (!(rate > 1)) {
-    setStatus("Skim requires a supported playback rate above 1×.", true);
-    view.render();
-    return;
-  }
-
-  state.transport = createSkimTransport({
-    parentNeighborhood: copy(currentResolution()),
-    parentResolutionBasis: model().resolutionBasis,
-    departure: currentResolution().C,
-    target,
-    maxRate: rate,
-    rate,
-    returnModel: snapshotModel(model())
-  });
-  player.setRate(rate);
-  placePlayer(currentResolution().C);
-  if (Math.abs(safeCurrentTime() - state.transport.departure) <= 0.25) state.transport.enteredPath = true;
-  player.play();
-  setStatus(`Skimming at ${rate}× to ${formatTime(target)}.`);
-  view.render();
-}
-
-function finishSkimDestination() {
-  const skim = state.transport;
-  if (skim.kind !== TRANSPORT_KIND.SKIM) return;
-
-  const result = reachSkimDestination(state.session, {
-    parentNeighborhood: skim.parentNeighborhood,
-    parentResolutionBasis: skim.parentResolutionBasis,
-    departure: skim.departure,
-    destination: skim.target
-  });
-  if (result.changed) state.session = result.session;
-
-  state.transport = createContinueTransport({
-    departure: skim.departure,
-    parentNeighborhood: copy(currentResolution()),
-    parentResolutionBasis: model().resolutionBasis,
-    returnModel: skim.returnModel,
-    crossedResolution: false,
-    wrapped: false,
-    label: "Skim and Continue",
-    operator: "skim"
-  });
-  state.transport.enteredPath = true;
-  state.transport = withTransportPhase(state.transport, "playing");
-  player.setRate(1);
-  setStatus(`Skim reached ${formatTime(skim.target)} and continued at 1×.`);
-  view.render();
-}
-
-function startContinueSession(playNow = true) {
-  if (!state.videoLoaded) return;
-  if (playNow) settleBeforeAction();
-  else {
-    clearNativeGo();
-    clearProgrammaticPlacement();
-  }
-
-  const current = playNow
-    ? currentResolution().C
-    : clamp(safeCurrentTime(), activeRange().start, activeRange().end);
-
-  if (!playNow && Math.abs(current - currentResolution().C) > NATIVE_POSITION_TOLERANCE_SECONDS) {
-    const direct = goTo(state.session, current, {
-      operator: "nativeGo",
-      label: "Native Go"
-    });
+  if (Math.abs(current - currentResolution().C) > NATIVE_POSITION_TOLERANCE_SECONDS) {
+    const direct = goTo(state.session, current, { operator: "nativeGo", label: "Native Go" });
     if (direct.changed) state.session = direct.session;
   }
 
-  state.transport = createContinueTransport({
+  state.transport = createPlaybackTransport({
     departure: current,
     parentNeighborhood: copy(currentResolution()),
     parentResolutionBasis: model().resolutionBasis,
     returnModel: snapshotModel(model()),
-    label: "Continue",
-    operator: "continue"
+    label: "Playback",
+    operator: "playback"
   });
-
-  player.setRate(1);
-  if (playNow) {
-    placePlayer(current);
-    if (Math.abs(safeCurrentTime() - current) <= NATIVE_POSITION_TOLERANCE_SECONDS) {
-      state.transport.enteredPath = true;
-    }
-    stepField?.play();
-    player.play();
-  } else {
-    state.transport.enteredPath = true;
-    state.transport = withTransportPhase(state.transport, "playing");
-    stepField?.play();
-  }
-
-  setStatus(`Continuing through Range ${formatRange(activeRange())}.`);
+  state.transport.enteredPath = true;
+  state.transport = withTransportPhase(state.transport, "playing");
+  setStatus(`Playing through Range ${formatRange(activeRange())}.`);
   view.render();
 }
 
-function continuePause() {
+function toggleNativePlayback() {
   if (!state.videoLoaded) return;
-
   if (transportIs(TRANSPORT_KIND.CONTEXT)) {
     settleTransport();
-    setStatus("Context stopped.");
+    player.play();
     return;
   }
-  if (transportIs(TRANSPORT_KIND.SKIM)) {
-    settleTransport();
-    setStatus("Skim paused.");
+  if (transportIs(TRANSPORT_KIND.LOOP) || transportIs(TRANSPORT_KIND.PLAYBACK)) {
+    player.pause();
     return;
   }
-  if (transportIs(TRANSPORT_KIND.LOOP)) {
-    settleTransport();
-    setStatus("Loop paused.");
-    return;
+  const snapshot = playerSnapshot();
+  if ([YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(snapshot.state)) player.pause();
+  else {
+    placePlayer(currentResolution().C);
+    player.play();
   }
-  if (transportIs(TRANSPORT_KIND.CONTINUE)) {
-    settleTransport();
-    setStatus("Continue paused.");
-    return;
-  }
-
-  startContinueSession(true);
 }
 
 function startLoopExtent(extent, source = "interval", label = "Interval") {
@@ -830,12 +715,9 @@ function startLoopExtent(extent, source = "interval", label = "Interval") {
     return;
   }
   if (transportIs(TRANSPORT_KIND.LOOP)) {
-    const sameSource = state.transport.source === source;
     settleTransport();
-    if (sameSource) {
-      setStatus("Loop stopped.");
-      return;
-    }
+    setStatus("Loop stopped.");
+    return;
   }
 
   settleBeforeAction();
@@ -847,6 +729,7 @@ function startLoopExtent(extent, source = "interval", label = "Interval") {
   });
   player.setRate(1);
   placePlayer(extent.start);
+  stepField?.translatePhysicalCenter(extent.start, { preserve: true });
   if (Math.abs(safeCurrentTime() - extent.start) <= 0.25) state.transport.enteredWindow = true;
   player.play();
   setStatus(`Looping ${label} ${formatRange(extent)}.`);
@@ -860,10 +743,6 @@ function startLoop() {
 function heldFieldSpan() {
   const span = state.field?.span;
   return span?.held && span.available ? { start: span.start, end: span.end } : null;
-}
-
-function startFieldSpanLoop() {
-  startLoopExtent(heldFieldSpan(), "field-span", "Field Span");
 }
 
 function setRange(start, end, current, label, status) {
@@ -905,9 +784,11 @@ function leaveSection() {
   stepField?.invalidate();
 }
 
-function pinCurrent() {
+function pinCurrent(event = null) {
+  event?.preventDefault?.();
+  const label = elements["pin-label"]?.value?.trim?.() || "";
   settleBeforeAction();
-  const result = pinSessionCurrent(state.session);
+  const result = pinSessionCurrent(state.session, label);
   if (!result.changed) {
     const pin = result.value?.pin;
     setStatus(pin ? `Current is already pinned at ${formatTime(pin.t)}.` : "Current is already pinned.");
@@ -918,14 +799,23 @@ function pinCurrent() {
     renderGuide: true,
     status: `Pinned Current at ${formatTime(pin.t)}.`
   });
+  if (elements["pin-label"]) elements["pin-label"].value = "";
+  selectGuideTab("pins");
+}
+
+function selectedSectionExtent() {
+  const kind = elements["section-source"]?.value || "interval";
+  return {
+    kind,
+    extent: kind === "field-span" ? heldFieldSpan() : currentInterval()
+  };
 }
 
 function saveCurrentIntervalAsSection(event = null) {
   event?.preventDefault?.();
   const label = elements["section-label"].value.trim();
-  const extent = state.captureExtent || currentInterval();
-  const kind = state.captureExtentKind || "interval";
-  if (!extent) return setStatus("Establish an Extent before saving a Section.", true);
+  const { kind, extent } = selectedSectionExtent();
+  if (!extent) return setStatus("Establish the selected Extent before saving a Section.", true);
   if (!label) return setStatus("A Section requires a title.", true);
   settleBeforeAction();
   const result = kind === "interval"
@@ -942,9 +832,7 @@ function saveCurrentIntervalAsSection(event = null) {
   }
   accept(result, { renderGuide: true, status: `Saved Section “${label}”.` });
   elements["section-label"].value = "";
-  closeSectionCapture();
   selectGuideTab("sections");
-  if (!compactGuideLayout()) openGuide("sections");
 }
 
 function guideDialogOpen() {
@@ -1146,20 +1034,6 @@ function clearMetadataRetry() {
   metadataTimer = null;
 }
 
-function populateSpeedOptions() {
-  const rates = [...new Set(state.availableRates)]
-    .filter(rate => Number.isFinite(rate) && rate >= 1)
-    .sort((a, b) => a - b);
-  elements["speed-select"].replaceChildren();
-  for (const rate of rates.length ? rates : [1]) {
-    const option = document.createElement("option");
-    option.value = String(rate);
-    option.textContent = `${rate}×`;
-    elements["speed-select"].appendChild(option);
-  }
-  elements["speed-select"].value = String(rates.at(-1) || 1);
-}
-
 function initializeVideo() {
   if (!pendingLoad) return;
   const snapshot = playerSnapshot();
@@ -1196,15 +1070,12 @@ function initializeVideo() {
   state.transport = idleTransport();
   state.pendingStep = null;
   state.field = null;
-  state.captureExtent = null;
-  state.captureExtentKind = null;
   state.availableRates = snapshot.availableRates;
   state.playerState = snapshot.state;
   view.invalidateTimelinePins();
   pendingLoad = null;
 
   locateAddress(requestedStart);
-  populateSpeedOptions();
   const guidePersisted = persistGuide();
   view.renderGuide();
   if (guidePersisted) setStatus(`Loaded ${formatTime(duration)} video.`);
@@ -1219,7 +1090,6 @@ function cuePendingVideo() {
   clearProgrammaticPlacement();
   flushPendingStep({ effect: false });
   if (guideDialogOpen()) closeGuideDialog({ restoreFocus: false });
-  closeSectionCapture();
   view.closePinClusterMenu();
   state.transport = idleTransport();
   state.videoLoaded = false;
@@ -1246,14 +1116,13 @@ function handlePlayerStateChange(name, _rawState, metadata = {}) {
     return;
   }
 
-  if (name === YOUTUBE_STATE.PLAYING && isTransportActive(state.transport)) {
-    state.transport = withTransportPhase(state.transport, "playing");
-    view.render();
-    return;
-  }
-
-  if (name === YOUTUBE_STATE.PLAYING && !isTransportActive(state.transport)) {
-    startContinueSession(false);
+  if (name === YOUTUBE_STATE.PLAYING) {
+    if (isTransportActive(state.transport)) {
+      state.transport = withTransportPhase(state.transport, "playing");
+      view.render();
+      return;
+    }
+    startNativePlaybackSession();
     return;
   }
 
@@ -1265,22 +1134,23 @@ function handlePlayerStateChange(name, _rawState, metadata = {}) {
   if (name === YOUTUBE_STATE.PAUSED && isTransportActive(state.transport)) {
     const kind = state.transport.kind;
     settleTransport({ issuePause: false });
-    if (kind === TRANSPORT_KIND.CONTINUE) setStatus("Continue paused.");
-    else if (kind === TRANSPORT_KIND.LOOP) setStatus("Loop stopped.");
-    else if (kind === TRANSPORT_KIND.SKIM) setStatus("Skim stopped.");
+    if (kind === TRANSPORT_KIND.LOOP) setStatus("Loop stopped.");
+    else if (kind === TRANSPORT_KIND.PLAYBACK) setStatus("Playback paused.");
     else setStatus("Context stopped.");
     return;
   }
 
   if (name === YOUTUBE_STATE.ENDED && transportIs(TRANSPORT_KIND.LOOP)) {
     placePlayer(state.transport.start);
+    stepField?.translatePhysicalCenter(state.transport.start, { preserve: true });
     player.play();
     return;
   }
 
-  if (name === YOUTUBE_STATE.ENDED && transportIs(TRANSPORT_KIND.CONTINUE)) {
+  if (name === YOUTUBE_STATE.ENDED && transportIs(TRANSPORT_KIND.PLAYBACK)) {
     settleTransport({ issuePause: false });
-    setStatus("Continue reached Range End.");
+    setStatus("Playback reached Range End.");
+    return;
   }
 
   view.render();
@@ -1328,7 +1198,7 @@ function pollPlayer() {
   ) {
     const kind = transport.kind;
     settleTransport({ issuePause: false });
-    setStatus(`${kind === TRANSPORT_KIND.CONTINUE ? "Continue" : kind === TRANSPORT_KIND.SKIM ? "Skim" : kind === TRANSPORT_KIND.LOOP ? "Loop" : "Context"} paused.`);
+    setStatus(`${kind === TRANSPORT_KIND.PLAYBACK ? "Playback" : kind === TRANSPORT_KIND.LOOP ? "Loop" : "Context"} paused.`);
     return;
   }
 
@@ -1351,33 +1221,15 @@ function pollPlayer() {
     if (inside) {
       transport.enteredWindow = true;
     } else if (transport.enteredWindow || Date.now() - transport.startedAt > TRANSPORT_START_GRACE_MS) {
-      // A completed Loop restarts immediately. A delayed initial placement is retried
-      // only after a grace period so the player is not flooded with placement commands.
       transport.enteredWindow = false;
+      transport.cycles += 1;
       transport.startedAt = Date.now();
       placePlayer(transport.start);
+      stepField?.translatePhysicalCenter(transport.start, { preserve: true });
       player.setRate(1);
       player.play();
     }
-  } else if (transport.kind === TRANSPORT_KIND.SKIM) {
-    const insidePath = now >= transport.departure - EPSILON && now <= transport.target + EPSILON;
-    if (!transport.enteredPath) {
-      if (insidePath) transport.enteredPath = true;
-      else if (Date.now() - transport.startedAt > TRANSPORT_START_GRACE_MS) {
-        transport.startedAt = Date.now();
-        placePlayer(transport.departure);
-        player.setRate(desiredSkimRate(transport, transport.departure, state.availableRates));
-        player.play();
-      }
-    } else {
-      const rate = desiredSkimRate(transport, now, state.availableRates);
-      if (Math.abs(playerSnapshot().rate - rate) > 0.001) player.setRate(rate);
-      if (now >= transport.target - EPSILON) {
-        finishSkimDestination();
-        return;
-      }
-    }
-  } else if (transport.kind === TRANSPORT_KIND.CONTINUE && state.playerState === YOUTUBE_STATE.PLAYING) {
+  } else if (transport.kind === TRANSPORT_KIND.PLAYBACK && state.playerState === YOUTUBE_STATE.PLAYING) {
     if (!transport.enteredPath) {
       const entered = now >= transport.departure - NATIVE_POSITION_TOLERANCE_SECONDS
         && now <= transport.departure + 1.5;
@@ -1402,13 +1254,13 @@ function pollPlayer() {
         state.session = preview.session;
         semanticChanged = true;
       }
-      setStatus(`Continue crossed the current Resolution and reopened Range ${formatRange(activeRange())}.`);
+      setStatus(`Playback crossed the current Resolution and reopened Range ${formatRange(activeRange())}.`);
     }
     if (now < activeRange().start - EPSILON) {
       placePlayer(activeRange().start);
     } else if (now >= activeRange().end - EPSILON) {
       settleTransport();
-      setStatus("Continue reached Range End.");
+      setStatus("Playback reached Range End.");
       return;
     }
     if (semanticChanged) view.render();
@@ -1558,7 +1410,7 @@ function presetStep(value, delta) {
   return STEP_PRESETS.find(item => item > current + EPSILON) ?? STEP_PRESETS.at(-1);
 }
 
-function commitStepReach(nextReach, label) {
+function commitStepReach(nextReach, label, options = {}) {
   if (!state.videoLoaded) {
     preferences.stepReach = normalizeStepReach(nextReach);
     state.session = createSession({ stepReach: preferences.stepReach });
@@ -1566,7 +1418,7 @@ function commitStepReach(nextReach, label) {
     view.render();
     return false;
   }
-  settleBeforeAction({ replacingContext: true });
+  if (options.settle !== false) settleBeforeAction({ replacingContext: true });
   const result = setSessionStepReach(state.session, nextReach, label);
   if (!result.changed) {
     view.render();
@@ -1574,7 +1426,9 @@ function commitStepReach(nextReach, label) {
   }
   state.session = result.session;
   persistPreferences();
-  stepField?.invalidate();
+  if (options.translate !== false) {
+    stepField?.translateToCurrent(currentResolution().C, { preserve: true });
+  }
   setStatus(`${label}: Backward ${result.stepReach.backward}s; Forward ${result.stepReach.forward}s.`);
   view.render();
   return true;
@@ -1594,66 +1448,12 @@ function changeDirectionalReach(direction, value) {
   if (!Number.isFinite(amount)) return;
   const current = currentStepReach();
   state.lastStepReachEdited = direction;
-  const next = current.linked
-    ? { backward: amount, forward: amount, linked: true }
-    : { ...current, [direction]: amount };
-  commitStepReach(next, direction === "backward" ? "Set Backward Reach" : "Set Forward Reach");
-}
-
-function changeReachLink(linked) {
-  const current = currentStepReach();
-  if (!linked) {
-    commitStepReach({ ...current, linked: false }, "Unlink Step Reach");
-    return;
-  }
-  const source = state.lastStepReachEdited === "backward" ? current.backward : current.forward;
-  commitStepReach({ backward: source, forward: source, linked: true }, "Link Step Reach");
+  const next = { ...current, [direction]: amount, linked: false };
+  commitStepReach(next, direction === "backward" ? "Set Backward Offset" : "Set Forward Offset");
 }
 
 function syncContextControl() {
   elements["context-select"].value = String(state.contextSeconds);
-}
-
-function replayContext() {
-  if (!state.videoLoaded) return;
-  if (state.contextSeconds <= 0) {
-    setStatus("Context is off. Choose a duration to enable it.");
-    return;
-  }
-  if (transportIs(TRANSPORT_KIND.CONTEXT)) {
-    settleTransport();
-    setStatus("Context stopped.");
-    return;
-  }
-  settleBeforeAction();
-  startContext(currentResolution().C);
-  setStatus(`Showing ${state.contextSeconds} seconds of Context around Current.`);
-  view.render();
-}
-
-function openSectionCapture(kind = "interval") {
-  const extent = kind === "field-span" ? heldFieldSpan() : currentInterval();
-  if (!extent) {
-    setStatus(`Establish a ${kind === "field-span" ? "Held Field Span" : "movement Interval"} before saving a Section.`);
-    return false;
-  }
-  state.captureExtent = { start: extent.start, end: extent.end };
-  state.captureExtentKind = kind;
-  elements["section-capture"].hidden = false;
-  elements["interval-state"].setAttribute("aria-expanded", String(kind === "interval"));
-  elements["section-label"].disabled = false;
-  elements["section-label"].focus();
-  view.render();
-  return true;
-}
-
-function closeSectionCapture() {
-  elements["section-capture"].hidden = true;
-  elements["interval-state"].setAttribute("aria-expanded", "false");
-  elements["section-label"].value = "";
-  state.captureExtent = null;
-  state.captureExtentKind = null;
-  view.render();
 }
 
 function selectGuideTab(tab, { focus = false } = {}) {
@@ -1755,15 +1555,6 @@ function stopOrClose() {
     view.render();
     return true;
   }
-  if (!elements["section-capture"].hidden) {
-    closeSectionCapture();
-    return true;
-  }
-  if (elements["step-settings"].open) {
-    elements["step-settings"].open = false;
-    view.render();
-    return true;
-  }
   if (compactGuideLayout() && state.guideOpen) {
     closeGuide();
     return true;
@@ -1826,6 +1617,17 @@ function initializePlayerApi() {
       persistPreferences();
     },
     onSelect: selectFieldSide,
+    onHoldOffsets: patch => {
+      const current = currentStepReach();
+      const next = normalizeStepReach({
+        backward: Number.isFinite(Number(patch.backward)) ? Number(patch.backward) : current.backward,
+        forward: Number.isFinite(Number(patch.forward)) ? Number(patch.forward) : current.forward,
+        linked: false
+      }, current);
+      // Holding is a physical Field transition. Recording its measured offset
+      // must not interrupt the Center playback that produced that measurement.
+      commitStepReach(next, "Hold Field Offset", { settle: false, translate: false });
+    },
     onChange: fieldState => {
       state.field = fieldState;
       view.render();
@@ -1977,14 +1779,7 @@ elements["step-backward"].addEventListener("click", () => performStep("backward"
 elements["step-forward"].addEventListener("click", () => performStep("forward"));
 elements["pin-backward"].addEventListener("click", () => goToAdjacentPin("backward"));
 elements["pin-forward"].addEventListener("click", () => goToAdjacentPin("forward"));
-elements["pin-current"].addEventListener("click", pinCurrent);
-elements["context-action"].addEventListener("click", replayContext);
-elements.continue.addEventListener("click", continuePause);
-elements.skim.addEventListener("click", startSkim);
 elements.loop.addEventListener("click", startLoop);
-elements["field-span-loop"].addEventListener("click", startFieldSpanLoop);
-elements["field-span-retain"].addEventListener("click", () => openSectionCapture("field-span"));
-elements["speed-select"].addEventListener("change", view.render);
 elements["context-select"].addEventListener("change", event => {
   state.contextSeconds = Number(event.target.value || 0);
   persistPreferences();
@@ -2010,15 +1805,13 @@ elements["step-backward-seconds"].addEventListener("change", event => {
 elements["step-forward-seconds"].addEventListener("change", event => {
   changeDirectionalReach("forward", event.target.value);
 });
-elements["step-link"].addEventListener("change", event => {
-  changeReachLink(event.target.checked);
-});
 
-// Interval and Range affordances
-elements["interval-state"].addEventListener("click", () => openSectionCapture("interval"));
+// Guide creation and Range affordances
 elements["section-capture"].addEventListener("submit", saveCurrentIntervalAsSection);
 elements["section-label"].addEventListener("input", view.render);
-elements["cancel-section"].addEventListener("click", closeSectionCapture);
+elements["section-source"].addEventListener("change", view.render);
+elements["pin-capture"].addEventListener("submit", pinCurrent);
+elements["pin-label"].addEventListener("input", view.render);
 elements["range-state"].addEventListener("click", toggleRangeTools);
 elements["range-tools"].addEventListener("toggle", () => {
   elements["range-state"].setAttribute("aria-expanded", String(elements["range-tools"].open));
@@ -2084,6 +1877,12 @@ function handleGuideClick(event) {
   if (pinGo) return goToPin(getPin(guide(), pinGo.dataset.pinGo));
   const sectionGo = event.target.closest("[data-section-go]");
   if (sectionGo) return goToSectionMidpoint(sectionGo.dataset.sectionGo);
+  const loopSection = event.target.closest("[data-loop-section]");
+  if (loopSection) {
+    const section = resolveSection(guide(), loopSection.dataset.loopSection);
+    if (section) startLoopExtent(section, `section:${section.id}`, `Section “${section.label}”`);
+    return;
+  }
   const focus = event.target.closest("[data-focus-section]");
   if (focus) return focusSection(focus.dataset.focusSection);
   const leave = event.target.closest("[data-leave-section]");
@@ -2136,7 +1935,6 @@ document.addEventListener("keydown", event => {
       if (guideDialogOpen()) closeGuideDialog();
       else {
         document.activeElement.blur();
-        closeSectionCapture();
       }
     }
     return;
@@ -2191,7 +1989,7 @@ document.addEventListener("keydown", event => {
     && (event.key === "ArrowLeft" || event.key === "ArrowRight");
   if (event.repeat && !repeatableStep) return;
 
-  // Space already activates a focused button or summary natively. Avoid toggling Continue twice.
+  // Space already activates a focused button or summary natively. Avoid toggling playback twice.
   if (event.key === " " && ["BUTTON", "SUMMARY"].includes(tag)) return;
 
   if (spatialKey("w")) { event.preventDefault(); reopenFully(); }
@@ -2200,11 +1998,14 @@ document.addEventListener("keydown", event => {
   else if (spatialKey("d")) { event.preventDefault(); refine("forward"); }
   else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && key === "p") {
     event.preventDefault();
-    openSectionCapture();
+    openGuide("sections");
+    elements["section-label"]?.focus?.({ preventScroll: true });
   }
-  else if (plain && key === "p") { event.preventDefault(); pinCurrent(); }
-  else if (plain && key === "c") { event.preventDefault(); replayContext(); }
-  else if (plain && key === "f") { event.preventDefault(); startSkim(); }
+  else if (plain && key === "p") {
+    event.preventDefault();
+    openGuide("pins");
+    elements["pin-label"]?.focus?.({ preventScroll: true });
+  }
   else if (plain && key === "l") { event.preventDefault(); startLoop(); }
   else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && event.key === "ArrowLeft") { event.preventDefault(); goToAdjacentPin("backward"); }
   else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && event.key === "ArrowRight") { event.preventDefault(); goToAdjacentPin("forward"); }
@@ -2213,13 +2014,13 @@ document.addEventListener("keydown", event => {
   else if (plain && event.key === "[") { event.preventDefault(); adjustStepPreset(-1); }
   else if (plain && event.key === "]") { event.preventDefault(); adjustStepPreset(1); }
   else if (commandReturn || (plain && event.key === "Backspace")) { event.preventDefault(); returnLastAction(); }
-  else if (plain && event.key === " ") { event.preventDefault(); continuePause(); }
+  else if (plain && event.key === " ") { event.preventDefault(); toggleNativePlayback(); }
 });
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden && isTransportActive(state.transport)) {
     settleTransport();
-    setStatus("Observation paused because the document became hidden.");
+    setStatus("Playback paused because the document became hidden.");
   }
 });
 

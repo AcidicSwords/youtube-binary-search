@@ -2,175 +2,156 @@
 
 ## 1. Authority
 
-This document defines the current semantic and interaction contract. `IMPLEMENTATION.md` explains how the contract is realized. Historical behavior is not normative.
+This document defines the current semantic and interaction contract. `IMPLEMENTATION.md` defines its runtime ownership. Historical behaviour is non-normative.
 
-## 2. Primitive and ordered space
+## 2. Ordered temporal space
 
-The primitive is a temporal Address `t` inside video duration `[0, D]`.
+The primitive is an Address `t` inside duration `[0, D]`.
 
-- **Current** is the committed Address from which semantic operators act.
-- **Cursor** is a transient physical player position.
-- **Range** is the sole hard admissible extent.
-- **Resolution** is the current scale of discrimination.
-- **Neighborhood** is the left/current/right structure at that Resolution.
-- **Interval** is the last committed movement extent.
-- **Pin** is a retained Address.
-- **Section** is a retained explicit Extent whose endpoints are Pins.
-- **Guide** is the video-specific collection of Pins and Sections.
-- **Field Span** is the live Tail-to-Lead physical extent.
+- **Current** — committed Address from which semantic operators act.
+- **Cursor** — transient physical Center-player position.
+- **Range** — sole hard admissible extent.
+- **Resolution** — current grain of semantic discrimination.
+- **Neighborhood** — `{L, C, R}` around Current at that Resolution.
+- **Interval** — last committed movement extent, including departure and arrival.
+- **Pin** — retained Address.
+- **Section** — retained bounded Extent whose endpoints are Pins.
+- **Guide** — video-specific Pins and Sections.
+- **Field** — physical Tail/Center/Lead relation.
 
-At rest, Cursor and Current coincide. Observation may separate them temporarily; Cursor is never stored in Session.
+At semantic rest, Cursor and Current coincide. Cursor is never persisted in Session.
 
-## 3. Global invariants
+## 3. Invariants
 
 ```text
-Range.start ≤ Current ≤ Range.end
+0 ≤ Range.start ≤ Current ≤ Range.end ≤ D
 Range is the only hard Field boundary
-linked Reach ⇒ backward Reach = forward Reach
-0.25s ≤ each Reach ≤ 300s
+0.25s ≤ backward Offset, forward Offset ≤ 300s
 Center is the only audible player
-Tail and Lead never commit Current directly
-Return restores semantic checkpoints, not transient transport
+Tail and Lead cannot commit Current except through Step
+Context never activates Tail or Lead
+Loop wraps do not mutate Session
+Return restores semantic checkpoints, never transient player state
 ```
 
-A null operation creates no history entry. A transient player event cannot privately redefine semantic state.
+A null operation creates no history entry.
 
 ## 4. Semantic operators
 
 ### Go
 
-Commits Current to a bounded Address. Direct timeline placement, Pin selection, source selection, and midpoint actions are projections of Go.
+Commits Current to a bounded Address and derives a movement Interval. Timeline selection, Pin selection, Section midpoint selection, and settled native scrubbing project Go.
 
 ### Refine Backward / Forward
 
-Selects one directional child of the current Neighborhood, commits its midpoint as Current, and increases Resolution.
+Selects one child of the active Neighborhood, commits its midpoint as Current, and increases discrimination.
 
 ### Reopen
 
-Preserves Current and restores Range-level Resolution. Reopen broadens availability; it is not Return.
+Preserves Current and returns Resolution to Range scale. It preserves the current Interval.
 
 ### Step Backward / Forward
 
-Moves from Current by the corresponding directional Reach and clamps to Range. A committed movement derives an Interval. Rapid repeated Steps coalesce into one transaction.
+Moves Current by the directional Field Offset, clamped to Range. The matrix Step and the corresponding side-pane Step are the same operation. Rapid repeated Steps coalesce into one transaction.
 
 ### Return
 
-Restores the complete previous semantic checkpoint: Range, Resolution, Current, Interval, Focus, Reach, and Guide when changed by that transaction.
+Restores the previous complete semantic checkpoint: Range, Resolution, Current, Interval, Focus, directional Offsets, and Guide changes belonging to that transaction.
 
-### Focus / Leave Focus
+### Loop
 
-Focus installs a Section as Range. Leave Focus restores the containing Range. Only explicit Range operations change Range.
-
-### Pin Current / Save Section
-
-Pin Current retains an Address. Save Section retains an explicit Interval or Held Field Span, reusing coincident endpoint Pins.
-
-## 5. Observation and traversal
-
-Transport has one kind at a time:
+Consumes a frozen snapshot of the current Interval. One cycle is:
 
 ```text
-idle | context | continue | skim | loop
+play/unpause from start toward end
+→ internal physical placement to start
+→ play/unpause again
 ```
 
-- **Context** observes a bounded window around Current and restores Cursor to Current.
-- **Continue** traverses forward through Range and commits actual movement on settlement.
-- **Skim** traverses toward the forward refinement target at a supported boosted rate, then hands off to Continue.
-- **Loop** repeats an immutable captured Interval or Field Span and restores Current when stopped.
+The internal end-to-start wrap does not commit Current, redefine Interval, append Return history, or invoke Context. Reopen does not alter the operand; operators that commit movement may establish a later Interval after Loop stops.
 
-Semantic operators may interrupt transport. Observational transport restores Current unless replaced by an immediate Go; committing transport records only movement already manifested.
+### Pin / Section / Focus
 
-## 6. Step Field
+- Pin Current retains Current as an Address.
+- Save Section retains an explicit movement Interval or Held Field span and reuses coincident endpoint Pins.
+- Focus installs a Section as Range.
+- Leave restores the containing Range.
+
+Creation and management belong to Guide.
+
+## 5. Native playback
+
+Center native controls and Space invoke ordinary playback. Starting playback creates a transient playback transaction from the current physical position. Pausing or reaching Range End settles actual movement once through Session:
 
 ```text
-Tail   ← Current →   Lead
-slower     1×        faster
-muted   audible      muted
+physical Cursor movement
+→ complete playback
+→ committed Current and Interval
 ```
 
-Field targets are:
+Playback crossing the current Neighborhood reopens Resolution to Range scale. Native playback is not exposed as a separate Continue operator.
+
+## 6. Automatic Context
+
+Context is a post-traversal policy parameterized by duration.
+
+After a discrete operation commits a different Current and produces an Interval:
 
 ```text
-Tail target = max(Range Start, Current − Backward Reach)
-Lead target = min(Range End, Current + Forward Reach)
+commit Current
+→ suspend Tail and Lead
+→ play bounded Center window around Current
+→ restore Center Cursor to Current
+→ remain paused until genuine native playback
 ```
 
-Resolution never clips the Field.
+A new traversal during Context supersedes the old window and starts Context around the new destination. Context creates no history and does not redefine Interval.
 
-Field phases are:
+## 7. Step Field
+
+Each side has:
 
 ```text
-Off → Coincident → Unfolding → Partially Held → Held
-                         ↘ Suspended ↗
+mode ∈ {held, stretching}
+actual Offset
+maximum Offset / Step distance
+requested directional Rate
+actual player Rate
 ```
 
-A forming side resolves through Go to its observed Cursor. A Held side resolves through directional Step to its semantic target.
+### Stretch
 
-Tail accepts supported rates below `1×`; Lead accepts supported rates above `1×`. Requested and actual rates remain distinct. Missing directional rates produce an unavailable side. Autoplay rejection produces a blocked side.
-
-Changing rate is kinetic and preserves Field geometry. Enabling/disabling the Field or hiding/showing a pane is structural and re-establishes it.
-
-## 7. Transport authority
-
-Application Continue is the authoritative three-pane start gesture:
+Stretch is one operation containing refold and unfold:
 
 ```text
-settle prior transport
-→ establish Continue
-→ prepare available Tail and Lead
-→ request side playback
-→ start Center
-→ verify actual states
+snap side to Current
+→ preserve maximum Offset
+→ wait for genuine Center playback
+→ prime side at 1×
+→ request supported directional Rate
+→ diverge toward maximum Offset
+→ switch to 1× and become Held
 ```
 
-Native Center Play remains supported but side activation is best effort because browser policy may treat later side-player requests differently.
+Tail requests a rate below `1×`; Lead requests a rate above `1×`. Unsupported directional rates remain visible as unavailable rather than being invented.
 
-With Step Field disabled, the application is observationally equivalent to the stable single-player reader.
+### Hold
 
-## 8. Persistence
+Hold switches the side to `1×` and fixes its measured Offset. If invoked during Stretch, the measured Offset becomes the new maximum Offset and Step distance.
 
-Guide data is stored per video. Preferences store Context duration, directional Reach, last edited Reach side, Field response, and pane visibility.
+Center exposes Hold both / Stretch both. Each side remains independently controllable.
 
-Legacy scalar `stepSeconds` is accepted only at the persistence migration boundary and becomes equal linked directional Reach before entering Session. Runtime Field APIs accept directional Reach only.
+### Side Step and translation
 
-Actual rates, buffering, blocked state, Cursors, and Field phases are runtime-only.
+Side-pane click and local Step button invoke the same Step. Distance is the meaningful visible Offset, otherwise the maximum Offset. After Step, the complete Field translates by the same signed movement so repeated side clicks form continuous slideshow-like traversal. Automatic Context then runs in Center only.
 
-## 9. Interface grammar
+## 8. Physical versus semantic effects
 
-The interface has one ordered composition:
+All meaningful state is expressed through Session, but runtime effects remain separate:
 
 ```text
-Panoramic media
-→ playback and live operands
-→ full-width temporal map
-→ Parameters | Operator matrix | Guide
+Session: Range, Resolution, Current, Interval, Guide, Focus, Offsets
+Runtime: Cursor, Context, Loop cycle, side mode/rate/playback
 ```
 
-The centered operator matrix is:
-
-```text
-        W
-     A     D
-     ←  S  →
-    ⇧←  P  ⇧→
-```
-
-Step Reach, Range tools, Context duration, and Skim rate are parameters and therefore remain outside the matrix. Guide is the sole retained-structure surface; no duplicate retained-Pins access button belongs in the matrix. Focused Section state is shown in Guide rather than in playback controls.
-
-`INTERFACE.md` defines the presence test for every visible element: removing an element must remove a concrete operation, conceal state required to predict one, or erase feedback needed to distinguish semantic commitment from physical observation.
-
-On compact screens, Guide becomes an off-canvas sheet. On phones, Center, Tail, and Lead stack vertically; side-player viewports retain the minimum dimensions needed for IFrame capability reporting.
-
-All visible controls, statuses, code, and documentation use the same vocabulary.
-
-## 10. Non-contracts
-
-The following are not current contracts:
-
-- scalar runtime Step size;
-- Resolution as a Field boundary;
-- fixed immutable Tail/Lead rates;
-- native Center Play as the sole transport authority;
-- side Cursors as semantic history;
-- implicit retention of Field Span;
-- chronological documentation that competes with the current specification.
+A physical command is never assumed successful merely because it was requested. Adapter events and snapshots are authoritative for actual playback, placement, and rate.

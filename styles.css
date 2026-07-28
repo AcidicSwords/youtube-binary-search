@@ -533,7 +533,6 @@ kbd {
   white-space: nowrap;
 }
 
-.settings-body,
 .compact-settings,
 .compact-actions,
 .shortcut-grid {
@@ -553,44 +552,6 @@ kbd {
   font-size: 0.7rem;
 }
 
-.step-field-settings {
-  display: grid;
-  gap: 8px;
-  padding: 9px;
-}
-
-.step-field-settings fieldset {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 9px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-
-.step-field-settings legend {
-  padding: 0 5px;
-  color: var(--muted);
-  font-size: 0.7rem;
-}
-
-.link-setting,
-.number-setting {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 9px;
-  color: var(--muted);
-  font-size: 0.72rem;
-}
-
-.link-setting {
-  grid-template-columns: auto minmax(0, 1fr);
-}
-
-.link-setting input { min-height: 0; }
-.number-setting input { width: 92px; }
-
 .observation-settings .compact-settings {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -603,27 +564,6 @@ kbd {
   gap: 5px;
   color: var(--muted);
   font-size: 0.72rem;
-}
-
-.capture-bar {
-  display: grid;
-  gap: 8px;
-  padding: 9px;
-  border: 1px solid rgba(246, 200, 110, 0.35);
-  border-radius: var(--radius-small);
-  background: rgba(246, 200, 110, 0.07);
-}
-
-.capture-bar strong {
-  display: block;
-  margin-top: 2px;
-  font-size: 0.75rem;
-}
-
-.capture-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px;
 }
 
 .shortcut-grid {
@@ -649,10 +589,9 @@ kbd {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-areas:
-    ". reopen ."
-    "refine-backward . refine-forward"
-    "step-backward return step-forward"
-    "pin-backward pin-current pin-forward";
+    "refine-backward reopen refine-forward"
+    "step-backward loop step-forward"
+    "pin-backward return pin-forward";
   gap: 8px;
   align-items: stretch;
   margin: auto 0;
@@ -662,10 +601,10 @@ kbd {
 #refine-backward { grid-area: refine-backward; }
 #refine-forward { grid-area: refine-forward; }
 #step-backward { grid-area: step-backward; }
+#loop { grid-area: loop; }
 #return-action { grid-area: return; }
 #step-forward { grid-area: step-forward; }
 #pin-backward { grid-area: pin-backward; }
-#pin-current { grid-area: pin-current; }
 #pin-forward { grid-area: pin-forward; }
 
 .nav-action {
@@ -693,9 +632,14 @@ kbd {
   background: rgba(188, 154, 255, 0.06);
 }
 
-.pin-current-action {
-  border-color: rgba(246, 200, 110, 0.5);
+.loop-action {
+  border-color: rgba(246, 200, 110, 0.56);
   background: rgba(246, 200, 110, 0.08);
+}
+
+.loop-action.is-active {
+  border-color: rgba(246, 200, 110, 0.9);
+  background: rgba(246, 200, 110, 0.18);
 }
 
 .action-name {
@@ -1077,7 +1021,6 @@ kbd {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .capture-actions,
   .compact-actions {
     grid-template-columns: 1fr;
   }
@@ -1094,5 +1037,74 @@ kbd {
   .timeline-pin {
     width: 22px;
     height: 22px;
+  }
+}
+
+
+.guide-create-form {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(121, 168, 255, 0.035);
+}
+
+.guide-create-heading {
+  display: grid;
+  gap: 2px;
+}
+
+.guide-create-heading strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guide-create-form label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 0.69rem;
+}
+
+.guide-create-form input,
+.guide-create-form select {
+  width: 100%;
+  min-width: 0;
+}
+
+.guide-create-form .primary {
+  justify-self: stretch;
+}
+
+.pin-create-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.pin-create-form .guide-create-heading {
+  grid-column: 1 / -1;
+}
+
+.section-create-form {
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+}
+
+.section-create-form .guide-create-heading,
+.section-create-form .primary {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 680px) {
+  .pin-create-form,
+  .section-create-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pin-create-form .guide-create-heading,
+  .section-create-form .guide-create-heading,
+  .section-create-form .primary {
+    grid-column: 1;
   }
 }

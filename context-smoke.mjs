@@ -1,307 +1,105 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { createSmokeEnvironment } from "./smoke-harness.mjs";
 
-function dataKey(attribute) {
-  return attribute.slice(5).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-}
-
-class FakeClassList {
-  constructor(element) { this.element = element; }
-  values() { return new Set(String(this.element.className || "").split(/\s+/).filter(Boolean)); }
-  write(values) { this.element.className = [...values].join(" "); }
-  add(...names) { const values = this.values(); names.forEach(name => values.add(name)); this.write(values); }
-  remove(...names) { const values = this.values(); names.forEach(name => values.delete(name)); this.write(values); }
-  toggle(name, force) {
-    const values = this.values();
-    const add = force === undefined ? !values.has(name) : Boolean(force);
-    if (add) values.add(name); else values.delete(name);
-    this.write(values);
-    return add;
-  }
-  contains(name) { return this.values().has(name); }
-}
-
-class FakeElement {
-  constructor(id = "", tagName = "DIV") {
-    this.id = id;
-    this.tagName = tagName;
-    this.dataset = {};
-    this.style = {};
-    this.className = "";
-    this.classList = new FakeClassList(this);
-    this.children = [];
-    this.parentElement = null;
-    this.listeners = new Map();
-    this.options = [];
-    this.selectedOptions = [];
-    this.hidden = false;
-    this.disabled = false;
-    this.open = false;
-    this.value = "";
-    this.textContent = "";
-    this.innerHTML = "";
-    this.clientWidth = 1000;
-    this.title = "";
-  }
-  addEventListener(type, listener) {
-    if (!this.listeners.has(type)) this.listeners.set(type, []);
-    this.listeners.get(type).push(listener);
-  }
-  dispatch(type, init = {}) {
-    const event = {
-      type,
-      target: init.target || this,
-      currentTarget: this,
-      clientX: init.clientX ?? 0,
-      pointerId: init.pointerId ?? 1,
-      key: init.key || "",
-      ctrlKey: Boolean(init.ctrlKey),
-      metaKey: Boolean(init.metaKey),
-      altKey: Boolean(init.altKey),
-      shiftKey: Boolean(init.shiftKey),
-      repeat: Boolean(init.repeat),
-      relatedTarget: init.relatedTarget || null,
-      preventDefault() {},
-      stopPropagation() {},
-      ...init
-    };
-    for (const listener of this.listeners.get(type) || []) listener(event);
-    return event;
-  }
-  click() { return this.dispatch("click"); }
-  appendChild(child) { this.attach(child); return child; }
-  append(...children) { children.forEach(child => this.attach(child)); }
-  attach(child) {
-    if (!child || typeof child !== "object") return;
-    child.parentElement = this;
-    this.children.push(child);
-    if (this.tagName === "SELECT") this.options.push(child);
-  }
-  replaceChildren(...children) {
-    this.children = [];
-    this.options = [];
-    children.forEach(child => this.attach(child));
-  }
-  setAttribute(name, value) {
-    if (name.startsWith("data-")) this.dataset[dataKey(name)] = String(value);
-    else this[name] = String(value);
-  }
-  removeAttribute(name) { delete this[name]; }
-  focus() { document.activeElement = this; }
-  blur() { document.activeElement = null; }
-  setPointerCapture() {}
-  contains(node) {
-    for (let current = node; current; current = current.parentElement) if (current === this) return true;
-    return false;
-  }
-  closest(selector) {
-    for (let current = this; current; current = current.parentElement) {
-      if (selector.startsWith(".")) {
-        if (current.classList.contains(selector.slice(1))) return current;
-      } else {
-        const match = selector.match(/^\[data-([a-z0-9-]+)\]$/i);
-        if (match && current.dataset[dataKey(`data-${match[1]}`)] !== undefined) return current;
-      }
-    }
-    return null;
-  }
-  getBoundingClientRect() { return { left: 0, width: 1000 }; }
-}
-
-const html = readFileSync(new URL("./index.html", import.meta.url), "utf8");
-const elements = [];
-for (const match of html.matchAll(/<([a-z0-9-]+)([^>]*)\sid="([^"]+)"([^>]*)>/gi)) {
-  const source = `${match[2]} ${match[4]}`;
-  const element = new FakeElement(match[3], match[1].toUpperCase());
-  const className = source.match(/class="([^"]*)"/);
-  if (className) element.className = className[1];
-  const value = source.match(/value="([^"]*)"/);
-  if (value) element.value = value[1];
-  for (const attribute of source.matchAll(/data-([a-z0-9-]+)="([^"]*)"/gi)) {
-    element.dataset[dataKey(`data-${attribute[1]}`)] = attribute[2];
-  }
-  elements.push(element);
-}
-const byId = new Map(elements.map(element => [element.id, element]));
-
-const documentStub = {
-  activeElement: null,
-  head: new FakeElement("head", "HEAD"),
-  querySelectorAll(selector) {
-    if (selector === "[id]") return elements;
-    if (selector === "[data-preview-action]") return elements.filter(element => element.dataset.previewAction);
-    return [];
-  },
-  createElement(tag) { return new FakeElement("", tag.toUpperCase()); },
-  addEventListener() {}
-};
-
-globalThis.document = documentStub;
-globalThis.window = globalThis;
-globalThis.window.addEventListener = () => {};
-globalThis.window.matchMedia = () => ({ matches: false });
-globalThis.window.setTimeout = setTimeout;
-const intervalCallbacks = [];
-globalThis.window.setInterval = callback => { intervalCallbacks.push(callback); return intervalCallbacks.length; };
-globalThis.localStorage = {
-  values: new Map(),
-  getItem(key) { return this.values.get(key) ?? null; },
-  setItem(key, value) { this.values.set(key, value); }
-};
-globalThis.confirm = () => true;
-globalThis.prompt = (_message, value) => value;
-
-const delay = () => new Promise(resolve => setTimeout(resolve, 5));
-let fakePlayer = null;
-class DelayedPlayer {
-  constructor(_id, config) {
-    this.events = config.events;
-    this.duration = 100;
-    this.currentTime = 0;
-    this.rate = 1;
-    this.state = -1;
-    this.commands = [];
-    this.deferNextPlacement = false;
-    this.pendingPlacement = null;
-    fakePlayer = this;
-    setTimeout(() => this.events.onReady?.(), 0);
-  }
-  emit(data) { setTimeout(() => this.events.onStateChange?.({ data }), 0); }
-  cueVideoById({ startSeconds = 0 }) {
-    this.commands.push(["cue", startSeconds]);
-    this.currentTime = startSeconds;
-    this.state = 5;
-    this.emit(5);
-  }
-  getDuration() { return this.duration; }
-  getCurrentTime() { return this.currentTime; }
-  getAvailablePlaybackRates() { return [1, 1.5, 2]; }
-  getPlayerState() { return this.state; }
-  getPlaybackRate() { return this.rate; }
-  setPlaybackRate(rate) { this.commands.push(["rate", rate]); this.rate = rate; }
-  seekTo(time) {
-    this.commands.push(["place", time]);
-    if (this.deferNextPlacement) {
-      this.deferNextPlacement = false;
-      this.pendingPlacement = time;
-    } else {
-      this.currentTime = time;
-    }
-  }
-  applyPendingPlacement() {
-    if (this.pendingPlacement === null) return;
-    this.currentTime = this.pendingPlacement;
-    this.pendingPlacement = null;
-  }
-  playVideo() { this.commands.push(["play"]); this.state = 1; this.emit(1); }
-  pauseVideo() { this.commands.push(["pause"]); this.state = 2; this.emit(2); }
-}
-globalThis.YT = { Player: DelayedPlayer };
+const env = createSmokeEnvironment();
+const { byId, flush, poll, currentText } = env;
 
 await import("./app.js");
 window.onYouTubeIframeAPIReady();
-await delay();
+await flush();
 
 byId.get("youtube-url").value = "https://youtu.be/dQw4w9WgXcQ";
 byId.get("load-video").click();
-await delay();
-await delay();
+await flush(5);
+await poll();
+await flush(4);
 
-fakePlayer.deferNextPlacement = true;
+const center = env.center();
+const tail = env.tail();
+assert.ok(center && tail, "Center and side players must exist for Context suspension coverage.");
+assert.equal(byId.get("context-setting-value").textContent, "5 s after traversal");
+
+// Arm Tail Stretch while Center is paused. A traversal must run Context only in
+// Center; the side remains suspended even though it is armed to stretch.
+byId.get("tail-field-toggle").click();
+const tailPlaysBeforeContext = tail.commands.filter(command => command[0] === "play").length;
+center.deferNextPlacement = true;
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 500 });
-assert.equal(byId.get("current-label").textContent, "0:50.000", "Direct placement must commit semantic Current immediately.");
-assert.equal(fakePlayer.currentTime, 0, "A delayed player placement may temporarily leave the physical Cursor behind.");
-assert.equal(fakePlayer.pendingPlacement, 50, "A visible Field must suppress automatic Context and place the destination itself.");
-assert.equal(byId.get("context-state").textContent, "5 s");
-assert.equal(byId.get("context-label").textContent, "Context");
-fakePlayer.applyPendingPlacement();
-intervalCallbacks[0]();
-await delay();
-assert.equal(fakePlayer.currentTime, 50);
+await flush();
 
-fakePlayer.deferNextPlacement = true;
-byId.get("context-action").click();
-assert.equal(fakePlayer.pendingPlacement, 49, "Explicit five-second Context should request one second of pre-roll.");
-await delay();
-assert.equal(byId.get("context-state").textContent, "0:49.000–0:54.000");
-assert.equal(byId.get("context-label").textContent, "Stop Context");
-assert.equal(byId.get("current-marker").style.left, "50%", "Semantic Current must remain fixed during Context.");
-assert.equal(byId.get("cursor-marker").hidden, false);
+assert.equal(currentText(), "Current 0:50.000", "Traversal must commit semantic Current before observation begins.");
+assert.equal(center.pendingPlacement, 49, "Five-second Context must request one second of pre-roll.");
+assert.equal(center.currentTime, 0, "A delayed iframe may temporarily leave physical Cursor behind semantic Current.");
+assert.equal(center.state, 1, "Automatic Context must play Center.");
+assert.equal(byId.get("current-marker").style.left, "50%", "Context must not displace semantic Current.");
 
-intervalCallbacks[0]();
-await delay();
-assert.notEqual(byId.get("context-state").textContent, "5 s", "Context must not terminate against a stale pre-placement Cursor.");
-fakePlayer.applyPendingPlacement();
-intervalCallbacks[0]();
-fakePlayer.currentTime = 54;
-intervalCallbacks[0]();
-await delay();
-assert.equal(fakePlayer.currentTime, 50, "Context must return the physical playhead to semantic Current.");
-assert.equal(byId.get("current-label").textContent, "0:50.000");
-assert.equal(byId.get("cursor-marker").hidden, true, "Observation Cursor collapses back into Current when Context ends.");
-assert.match(byId.get("interval-label").textContent, /0:00\.000–0:50\.000/, "Context must preserve the movement Interval.");
+await poll();
+assert.equal(byId.get("field-transport-state").textContent, "Context suspended");
+assert.equal(
+  tail.commands.filter(command => command[0] === "play").length,
+  tailPlaysBeforeContext,
+  "Context must not activate an armed side Field."
+);
 
-byId.get("return-action").click();
-await delay();
-assert.equal(byId.get("current-label").textContent, "0:00.000", "Context must not add its own Return entry.");
+// A stale pre-placement Cursor cannot terminate Context. Once the player enters
+// and leaves the window, Center returns to semantic Current and pauses.
+center.applyPendingPlacement();
+await poll();
+center.currentTime = 54;
+await poll();
+await flush();
+assert.equal(center.currentTime, 50);
+assert.equal(center.state, 2);
+assert.equal(currentText(), "Current 0:50.000");
+assert.equal(byId.get("cursor-marker").hidden, true);
 
-byId.get("context-select").value = "5";
-byId.get("context-select").dispatch("change");
+// A new traversal supersedes active Context without restoring the old anchor.
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 250 });
-byId.get("context-action").click();
-await delay();
+await flush();
+assert.equal(currentText(), "Current 0:25.000");
+assert.equal(center.currentTime, 24);
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 750 });
-assert.equal(byId.get("current-label").textContent, "1:15.000");
-assert.equal(fakePlayer.currentTime, 75, "A new move must stop explicit Context without returning to the old anchor.");
-assert.equal(byId.get("context-label").textContent, "Context");
-byId.get("context-action").click();
-assert.equal(fakePlayer.currentTime, 74, "Explicit replacement Context must begin at its pre-roll Address.");
-await delay();
-await delay();
-assert.equal(byId.get("context-state").textContent, "1:14.000–1:19.000", "Delayed internal PAUSED events must not stop explicit replacement Context.");
+await flush();
+assert.equal(currentText(), "Current 1:15.000");
+assert.equal(center.currentTime, 74, "Replacement Context must begin around the new destination, not restore the old one.");
+assert.equal(center.state, 1);
 
-const playsBeforeOff = fakePlayer.commands.filter(command => command[0] === "play").length;
+// Step remains available during Context. It cancels the previous observation,
+// commits the Step immediately, then starts a replacement Context after Step
+// coalescing completes.
+byId.get("step-forward").click();
+assert.equal(currentText(), "Current 1:25.000");
+await env.delay(150);
+await flush();
+assert.equal(center.currentTime, 84);
+assert.equal(center.state, 1);
+assert.equal(currentText(), "Current 1:25.000");
+
+// Turning Context off during observation restores Center once. Subsequent
+// traversal remains paused and does not issue an automatic play command.
 byId.get("context-select").value = "0";
 byId.get("context-select").dispatch("change");
-await delay();
+await flush();
+assert.equal(center.currentTime, 85);
+assert.equal(center.state, 2);
+assert.equal(byId.get("context-setting-value").textContent, "Off");
+const playsBeforeOffTraversal = center.commands.filter(command => command[0] === "play").length;
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 500 });
-await delay();
-const playsAfterOff = fakePlayer.commands.filter(command => command[0] === "play").length;
-assert.equal(playsAfterOff, playsBeforeOff, "Context Off must leave direct moves paused at their destination.");
-assert.equal(fakePlayer.currentTime, 50);
-
-// Loop startup must tolerate a player that reports the old Cursor until its
-// initial placement is actually applied. It may retry after the grace period,
-// but it must not flood the adapter or mistake stale position for a completed loop.
-byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 250 });
-byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 750 });
-assert.match(byId.get("interval-label").textContent, /0:25\.000–1:15\.000/);
-fakePlayer.deferNextPlacement = true;
-const placementsBeforeDelayedLoop = fakePlayer.commands.filter(command => command[0] === "place").length;
-byId.get("loop").click();
-await delay();
-assert.equal(fakePlayer.pendingPlacement, 25);
-intervalCallbacks[0]();
+await flush();
+assert.equal(currentText(), "Current 0:50.000");
+assert.equal(center.currentTime, 50);
+assert.equal(center.state, 2);
 assert.equal(
-  fakePlayer.commands.filter(command => command[0] === "place").length,
-  placementsBeforeDelayedLoop + 1,
-  "A stale pre-placement Cursor must not cause immediate repeated Loop placements."
+  center.commands.filter(command => command[0] === "play").length,
+  playsBeforeOffTraversal,
+  "Context Off must leave traversal paused at its destination."
 );
-fakePlayer.applyPendingPlacement();
-intervalCallbacks[0]();
-fakePlayer.currentTime = 75;
-intervalCallbacks[0]();
-assert.equal(fakePlayer.currentTime, 25, "A Loop that entered its Interval must restart at its beginning.");
-byId.get("loop").click();
-await delay();
 
-// A user pause during transport startup owns the resulting state even if the
-// adapter's PLAYING and PAUSED events arrive asynchronously.
-byId.get("continue").click();
-fakePlayer.pauseVideo();
-await delay();
-await delay();
-assert.equal(byId.get("continue-label").textContent, "Continue");
-assert.match(byId.get("status").textContent, /Continue paused/i);
+// Context contributes no Return entry of its own. Return restores the preceding
+// semantic state rather than any transient pre-roll or end address.
+byId.get("return-action").click();
+await flush();
+assert.equal(currentText(), "Current 1:25.000");
+assert.equal(center.currentTime, 85);
 
-console.log("Context smoke passed: Field-visible suppression, explicit observation, restoration, interruption, Return isolation, Off preference, delayed Loop startup, and startup Pause.");
+console.log("Context smoke passed: automatic post-traversal observation, delayed placement, Field suspension, replacement traversal, Step during Context, Off, and Return isolation.");

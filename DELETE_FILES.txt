@@ -1,4 +1,0 @@
-Delete these obsolete repository files after copying the replacement, if present:
-
-structure.js
-traversal.js

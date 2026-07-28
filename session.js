@@ -487,73 +487,34 @@ export function leaveSection(session) {
   });
 }
 
-export function completeContinue(session, options) {
+export function completePlayback(session, options) {
   const current = clamp(options.current, session.model.range.start, session.model.range.end);
   if (
     Math.abs(current - options.departure) <= EPSILON
     && !options.crossedResolution
-    && !options.wrapped
   ) return unchanged(session, "no-movement");
-  return commit(session, options.label || "Continue", draft => {
-    draft.resolution = options.crossedResolution || options.wrapped
+  return commit(session, options.label || "Playback", draft => {
+    draft.resolution = options.crossedResolution
       ? reopenToRange(current, draft.range)
       : settleContinuous(options.parentNeighborhood, options.departure, current);
-    draft.resolutionBasis = options.crossedResolution || options.wrapped
+    draft.resolutionBasis = options.crossedResolution
       ? RESOLUTION_BASIS.RANGE
       : options.parentResolutionBasis
         || options.returnModel?.resolutionBasis
         || draft.resolutionBasis
         || RESOLUTION_BASIS.RANGE;
-    if (options.wrapped) {
-      // A wrapped traversal is not one contiguous bounded extent, so retaining
-      // the preceding Interval would misdescribe the latest movement.
-      draft.interval = null;
-    } else {
-      draft.interval = createInterval(
-        options.departure,
-        current,
-        options.operator || "continue",
-        "continuous"
-      );
-    }
+    draft.interval = createInterval(
+      options.departure,
+      current,
+      options.operator || "playback",
+      "continuous"
+    );
     return {
       changed: true,
       place: current,
-      interval: draft.interval,
-      intervalCleared: options.wrapped
+      interval: draft.interval
     };
   }, { returnModel: options.returnModel });
-}
-
-export function completeSkim(session, options) {
-  const current = clamp(options.current, session.model.range.start, session.model.range.end);
-  if (Math.abs(current - options.departure) <= EPSILON) return unchanged(session, "no-movement");
-  return commit(session, options.label || "Skim", draft => {
-    const insideParent = current >= options.parentNeighborhood.L - EPSILON
-      && current <= options.parentNeighborhood.R + EPSILON;
-    draft.resolution = insideParent
-      ? settleContinuous(options.parentNeighborhood, options.departure, current)
-      : reopenToRange(current, draft.range);
-    draft.resolutionBasis = insideParent
-      ? options.parentResolutionBasis
-        || options.returnModel?.resolutionBasis
-        || draft.resolutionBasis
-        || RESOLUTION_BASIS.RANGE
-      : RESOLUTION_BASIS.RANGE;
-    draft.interval = createInterval(options.departure, current, "skim", "continuous");
-    return { changed: true, place: current, interval: draft.interval };
-  }, { returnModel: options.returnModel });
-}
-
-export function reachSkimDestination(session, options) {
-  return amend(session, draft => {
-    draft.resolution = refineNeighborhood(options.parentNeighborhood, options.destination, draft.range);
-    draft.resolutionBasis = options.parentResolutionBasis
-      || draft.resolutionBasis
-      || RESOLUTION_BASIS.RANGE;
-    draft.interval = createInterval(options.departure, options.destination, "skim", "continuous");
-    return { changed: true, place: options.destination, interval: draft.interval };
-  });
 }
 
 export function pinCurrent(session, label = "") {

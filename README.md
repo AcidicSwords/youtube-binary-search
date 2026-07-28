@@ -1,19 +1,23 @@
 # Binary YouTube Reader
 
-Binary YouTube Reader is a spatial-temporal interface for navigating long YouTube videos through a compact, composable operator grammar.
+Binary YouTube Reader is a spatial-temporal interface for navigating long YouTube videos through one semantic model:
 
-The application keeps one semantic model—Current inside Range at a Resolution—and lets Refine, Reopen, Step, Return, Continue, Context, Skim, Loop, Pin, Section, and Focus act on it predictably. The three-pane Step Field projects Tail and Lead around the audible Center without creating a second timeline.
+```text
+Current inside Range at a Resolution
+```
+
+Refine, Reopen, Step, Return, Loop, Pin, Section, Focus, native playback, and automatic Context all compose through that model. The optional three-pane Step Field projects a muted Tail and Lead around the audible Center without creating a second semantic timeline.
 
 ## Run
 
-Serve the repository through a local HTTP server, then open `index.html`. The YouTube IFrame API requires a normal browser origin and network access.
+Serve the static repository over HTTP, then open `index.html`:
 
 ```bash
 python3 -m http.server 8000
 # open http://localhost:8000
 ```
 
-Repository checks require Node 20 or newer:
+The YouTube IFrame API requires a browser origin and network access. Repository checks require Node 20 or newer:
 
 ```bash
 npm test
@@ -21,12 +25,12 @@ npm run audit
 npm run check
 ```
 
-## Core model
+## Core objects
 
 ```text
 Address → Current inside Range
 Current + Resolution → Neighborhood
-movement → Interval
+committed movement → Interval
 Address → Pin
 explicit Extent → Section
 Section → Range through Focus
@@ -34,31 +38,56 @@ Section → Range through Focus
 
 Range is the sole hard temporal boundary. Resolution controls semantic discrimination; it does not clip physical observation.
 
+## Native playback and Context
+
+Center is the only audible player and retains native YouTube controls. Clicking Center or pressing Space owns ordinary play/pause. When native playback pauses, its physical movement settles once into semantic Current and Interval.
+
+Context is not a button. A configured Context window runs automatically after discrete traversal, plays only in Center, restores Center to committed Current, and never activates Tail or Lead.
+
 ## Step Field
 
 ```text
-Tail   ← Current →   Lead
-slower     1×        faster
-muted   audible      muted
+Tail             Center             Lead
+slower, muted    1×, audible        faster, muted
+Step Backward    native playback    Step Forward
+Hold/Stretch     Hold/Stretch both  Hold/Stretch
 ```
 
-Backward and Forward Reach can be linked or independent. Tail and Lead rate controls live in their respective pane headers and expose only rates reported by the current YouTube player. Application Continue is the authoritative three-pane start gesture; native Center controls remain available.
+Each side owns a maximum Offset and a supported directional Rate.
 
-Disabling Step Field preserves the stable single-player reader and does not create side players.
+- **Stretch** snaps the side to Current, then diverges on the next genuine Center playback until its maximum Offset is reached.
+- **Hold** switches the side to `1×` and preserves the measured Offset. Holding midway through Stretch makes that measured Offset the new maximum and Step distance.
+- Clicking a side pane or its Step button performs the same semantic Step by the visible differential, falling back to the configured maximum Offset.
+- Context suspends the sides. Native Center playback resumes Field behaviour.
+
+Disabling the Field preserves the stable single-player reader and does not create side players.
+
+## Operator matrix
+
+```text
+Refine Backward | Reopen | Refine Forward
+Step Backward   | Loop   | Step Forward
+Previous Pin    | Return | Next Pin
+```
+
+Loop freezes the current Interval when started. It plays to the Interval end, internally returns to the frozen start without changing Session or invoking Context, and unpauses again.
+
+Pin and Section creation live in Guide beside naming, traversal, Loop, Focus, rename, and deletion.
 
 ## Keyboard
 
 ```text
-W / A / S / D = Reopen / Refine Backward / Return / Refine Forward
-← / →         = Step Backward / Step Forward
-[ / ]         = Reach preset down / up
-Space         = Continue / Pause
-C             = Context
-F             = Skim
-L             = Loop
-P             = Pin Current
-Shift+P       = Save Section
-Shift+← / →   = previous / next Pin
+A / W / D      Refine Backward / Reopen / Refine Forward
+← / →          Step Backward / Step Forward
+L              Loop current Interval
+Shift+← / →    Previous / next Pin
+S              Return
+Space          Native Center play/pause
+P              Open Pins creation in Guide
+Shift+P        Open Sections creation in Guide
+G              Guide
+[ / ]          Offset preset down / up
+Esc            Stop or close
 ```
 
 Inputs and selects suspend global shortcuts.
@@ -66,9 +95,7 @@ Inputs and selects suspend global shortcuts.
 ## Documentation map
 
 - `SPEC.md` — canonical semantic and interaction contract.
-- `IMPLEMENTATION.md` — runtime architecture, ownership, and module boundaries.
-- `INTERFACE.md` — visible-element ownership, layout grammar, and the presence test.
-- `DEVELOPMENT.md` — setup, change discipline, and extension workflow.
-- `VALIDATION.md` — automated coverage and the real-browser/device matrix.
-
-These documents describe the current tree. Git history and merged pull requests retain chronology; canonical documentation does not accumulate obsolete version layers.
+- `IMPLEMENTATION.md` — runtime architecture and module ownership.
+- `INTERFACE.md` — visible-element ownership and layout grammar.
+- `DEVELOPMENT.md` — setup and change discipline.
+- `VALIDATION.md` — automated and real-browser validation matrix.

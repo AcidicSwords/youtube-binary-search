@@ -1,16 +1,11 @@
-// Transient observation and traversal values. Transport state never enters Return history directly.
-import {
-  EPSILON,
-  clamp,
-  chooseSupportedRate
-} from "./range-geometry.js";
+// Transient physical playback state. Transport never enters Return history directly.
+import { EPSILON, clamp } from "./range-geometry.js";
 
 export const TRANSPORT_KIND = Object.freeze({
   IDLE: "idle",
   CONTEXT: "context",
-  LOOP: "loop",
-  CONTINUE: "continue",
-  SKIM: "skim"
+  PLAYBACK: "playback",
+  LOOP: "loop"
 });
 
 export function idleTransport() {
@@ -22,8 +17,7 @@ export function isTransportActive(transport) {
 }
 
 export function isObservationalTransport(transport) {
-  return transport?.kind === TRANSPORT_KIND.CONTEXT
-    || transport?.kind === TRANSPORT_KIND.LOOP;
+  return transport?.kind === TRANSPORT_KIND.CONTEXT;
 }
 
 export function deriveContextWindow(anchor, range, seconds, preRollSeconds = 1) {
@@ -57,6 +51,30 @@ export function createContextTransport({ anchor, range, seconds, preRollSeconds 
   };
 }
 
+export function createPlaybackTransport({
+  departure,
+  parentNeighborhood,
+  parentResolutionBasis,
+  returnModel,
+  crossedResolution = false,
+  label = "Playback",
+  operator = "playback"
+}) {
+  return {
+    kind: TRANSPORT_KIND.PLAYBACK,
+    phase: "starting",
+    departure,
+    parentNeighborhood,
+    parentResolutionBasis,
+    returnModel,
+    crossedResolution,
+    label,
+    operator,
+    enteredPath: false,
+    startedAt: Date.now()
+  };
+}
+
 export function createLoopTransport({ anchor, start, end, source = "interval" }) {
   if (
     !Number.isFinite(anchor)
@@ -73,56 +91,7 @@ export function createLoopTransport({ anchor, start, end, source = "interval" })
     start,
     end,
     enteredWindow: false,
-    startedAt: Date.now()
-  };
-}
-
-export function createContinueTransport({
-  departure,
-  parentNeighborhood,
-  parentResolutionBasis,
-  returnModel,
-  crossedResolution = false,
-  wrapped = false,
-  label = "Continue",
-  operator = "continue"
-}) {
-  return {
-    kind: TRANSPORT_KIND.CONTINUE,
-    phase: "starting",
-    departure,
-    parentNeighborhood,
-    parentResolutionBasis,
-    returnModel,
-    crossedResolution,
-    wrapped,
-    label,
-    operator,
-    enteredPath: false,
-    startedAt: Date.now()
-  };
-}
-
-export function createSkimTransport({
-  departure,
-  target,
-  parentNeighborhood,
-  parentResolutionBasis,
-  returnModel,
-  maxRate,
-  rate = maxRate
-}) {
-  return {
-    kind: TRANSPORT_KIND.SKIM,
-    phase: "starting",
-    departure,
-    target,
-    parentNeighborhood,
-    parentResolutionBasis,
-    returnModel,
-    maxRate,
-    rate: Number.isFinite(rate) ? rate : 1,
-    enteredPath: false,
+    cycles: 0,
     startedAt: Date.now()
   };
 }
@@ -131,14 +100,4 @@ export function withTransportPhase(transport, phase) {
   return transport?.kind === TRANSPORT_KIND.IDLE
     ? transport
     : { ...transport, phase };
-}
-
-/**
- * Skim holds one supported boosted rate for the whole path. It changes to 1×
- * only when the Forward destination is reached and Skim becomes Continue.
- */
-export function desiredSkimRate(transport, _current, availableRates) {
-  if (transport?.kind !== TRANSPORT_KIND.SKIM) return 1;
-  const requested = Number.isFinite(transport.rate) ? transport.rate : transport.maxRate;
-  return chooseSupportedRate(availableRates, requested);
 }

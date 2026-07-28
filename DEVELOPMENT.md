@@ -1,100 +1,78 @@
 # Development Guide
 
-## 1. Start here
+## 1. Setup
 
-Read in this order:
-
-1. `README.md` for the product surface.
-2. `SPEC.md` for semantic invariants.
-3. `IMPLEMENTATION.md` for ownership and module boundaries.
-4. `INTERFACE.md` for visible-element ownership and the presence test.
-5. `VALIDATION.md` before changing browser/player behavior.
-
-Serve the static application through HTTP:
+Read `SPEC.md`, `IMPLEMENTATION.md`, and `INTERFACE.md` before changing behaviour. Serve locally:
 
 ```bash
 python3 -m http.server 8000
 ```
 
-Run the repository gate:
+Run the complete gate:
 
 ```bash
 npm run check
 ```
 
-Node 20 or newer is required. The application has no build step and no runtime package dependency.
+Node 20 or newer is required. There is no build step or runtime dependency.
 
-## 2. Where changes belong
+## 2. Ownership
 
-- Change temporal mathematics in `range-geometry.js`.
-- Change semantic transactions or Return behavior in `session.js`.
-- Change transient observation values in `transport.js`.
-- Change raw IFrame interaction only in `youtube.js`.
-- Change Field mathematics or response validation in `step-field-geometry.js`.
-- Change Tail/Lead execution in `step-field.js`.
-- Change retained structure in `guide.js`.
-- Change DOM projection in `view.js`.
-- Compose user actions, persistence, and lifecycle in `app.js`.
+- temporal mathematics: `range-geometry.js`
+- semantic transactions and Return: `session.js`
+- Context/playback/Loop runtime values: `transport.js`
+- raw IFrame API: `youtube.js`
+- Field mathematics: `step-field-geometry.js`
+- Tail/Lead execution: `step-field.js`
+- retained structure: `guide.js`
+- DOM projection: `view.js`
+- composition and persistence: `app.js`
 
-When a rule appears in two modules, identify its owner and remove the duplicate.
+When the same rule appears twice, choose its owner and remove the duplicate.
 
-## 3. Semantic change protocol
+## 3. Change protocol
 
-Before editing, state:
+State the operator, operand, owner, and effect class before editing:
 
-- the operator being changed;
-- its operand;
-- its owner;
-- whether it is semantic, transient, physical, retained, or presentational;
-- which existing invariant constrains it.
+```text
+semantic | physical | transient | retained | presentational
+```
 
-Then add or update the smallest pure test first. Integration and smoke tests should confirm wiring, not replace kernel tests.
+Add the smallest pure test first. Integration and smoke tests confirm wiring; they do not replace kernel tests.
 
-## 4. UI change protocol
+## 4. Player discipline
 
-The UI mirrors operator geometry; it is not an independent taxonomy.
+Never access `YT.Player` outside `youtube.js`. Treat play, pause, placement, and rate commands as requests. Actual adapter state and events are authoritative.
 
-- Panoramic media, playback, temporal map, Parameters, operators, and Guide remain distinct ownership regions.
-- The centered matrix contains operators only.
-- Entered values and selectors belong in Parameters or on the object they directly modify.
-- Retained structure belongs only in Guide and timeline Pin markers.
-- One visible control must not imply authority it does not possess.
-- Every visible element must pass the `INTERFACE.md` presence test.
-- Disabled controls must remain legible enough to explain unavailable state.
-- Every interactive element needs an explicit accessible name and a visible focus state.
-- Coarse-pointer targets must be at least `48px` unless a larger invisible hit area is provided.
+Autoplay blocking, buffering, delayed placement, and missing directional rates are ordinary runtime states. They must remain visible and recoverable without mutating Session incorrectly.
 
-Desktop is the primary panoramic layout. Mobile may stack and disclose, but must preserve every operation and remain usable without a keyboard.
+## 5. Field discipline
 
-## 5. Player and asynchronous work
+- Context is the only transport that suspends Field playback by definition.
+- Native playback and Loop may drive Held/Stretching sides.
+- Stretch always snaps to Current before forming.
+- Hold during formation commits measured Offset through Session.
+- Pane Step and matrix Step must share `performStep()`.
+- Internal Loop wraps must never invoke Session movement or Context.
 
-Never read or construct `YT.Player` outside `youtube.js`. Use normalized adapter state.
+## 6. UI discipline
 
-Treat player commands as requests, not facts. Verify reported state after play, pause, placement, and rate changes. Keep requested and actual rates separate.
+The interface has four ownership regions: Field, map, operators/parameters, Guide. Do not reintroduce a generic playback dock.
 
-Autoplay rejection, buffering, delayed placement, and unavailable rates are ordinary runtime states, not exceptional semantic states.
+Every form control needs an accessible name; every button declares a type; focus and coarse-pointer targets remain visible and practical. Desktop is primary, but all operations must survive stacking and Guide modal presentation.
 
-## 6. Persistence and migrations
+## 7. Tests
 
-Do not broaden runtime APIs to accept historical schemas. Read legacy records at the persistence boundary, normalize once, and pass canonical data inward.
+- `tests.mjs` — geometry, Session, Guide fundamentals
+- `transport-tests.mjs` — Context, playback, Loop values
+- `source-field-tests.mjs` — external structure normalization
+- `fuzz-tests.mjs` — deterministic semantic invariants
+- `v5.8-regression-tests.mjs` — stable reader and native playback contracts
+- `step-field-tests.mjs` — Field geometry and source-level wiring
+- `field-grammar-tests.mjs` — composed operator grammar
+- `field-bounds-tests.mjs` — Range containment and controller behaviour
+- `field-coherence-tests.mjs` — offset/rate/UI coherence
+- audits — DOM, architecture, documentation, CSS, repository hygiene
+- smoke files — startup and integrated interaction paths
 
-Guide migrations must salvage valid independent records. Preference migration must preserve current behavior without creating Session history.
-
-## 7. Test map
-
-- `tests.mjs` — Range and Session fundamentals.
-- `transport-tests.mjs` — transient transport values.
-- `source-field-tests.mjs` — external source normalization.
-- `fuzz-tests.mjs` — deterministic long-run invariants.
-- `v5.2-regression-tests.mjs` — stable reader interaction contracts.
-- `step-field-tests.mjs` — Field phases and execution wiring.
-- `field-grammar-tests.mjs` — operator/Field interaction grammar.
-- `field-bounds-tests.mjs` — Range-only Field boundaries and suspension.
-- `field-coherence-tests.mjs` — directional Reach, response, persistence, and UI coherence.
-- `integration-check.mjs` — DOM, accessibility, vocabulary, and module wiring.
-- `project-audit.mjs` — documentation, CSS ownership, adapter boundary, and repository hygiene.
-- smoke files — startup and high-level interaction paths.
-
-## 8. Completion standard
-
-A branch is ready for review when `npm run check` passes and the PR states which `VALIDATION.md` scenarios were exercised. Keep browser-dependent items explicit; do not claim automated proof of IFrame behavior.
+A branch is ready only after `npm run check` passes and browser-dependent validation remains explicitly separated from automated proof.
