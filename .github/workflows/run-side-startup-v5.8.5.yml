@@ -28,7 +28,9 @@ jobs:
           node-version: 22
 
       - name: Apply exact repair
-        run: python .github/scripts/apply-side-startup-v5.8.5.py
+        run: |
+          python .github/scripts/apply-side-startup-v5.8.5.py
+          python .github/scripts/patch-side-startup-test-v5.8.5.py
 
       - name: Run complete repository gate
         id: gate
@@ -51,6 +53,7 @@ jobs:
         run: |
           rm -f .github/side-startup-trigger
           rm -f .github/scripts/apply-side-startup-v5.8.5.py
+          rm -f .github/scripts/patch-side-startup-test-v5.8.5.py
           rm -f .github/workflows/apply-side-startup-v5.8.5.yml
           rm -f .github/workflows/run-side-startup-v5.8.5.yml
           git config user.name "github-actions[bot]"
