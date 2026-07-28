@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - field-coherence-tests.mjs
+      - interaction-smoke.mjs
       - .github/workflows/verify-v5.7-deployment-hotfix.yml
 
 permissions:
@@ -34,8 +35,8 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          path = Path('field-coherence-tests.mjs')
-          text = path.read_text()
+          field_path = Path('field-coherence-tests.mjs')
+          field_text = field_path.read_text()
 
           old_overlay = '  assert.match(fieldCss, /\\.pane-rate-setting[\\s\\S]*pointer-events: auto/);'
           new_overlay = '''  const tailPaneStart = html.indexOf('id="tail-pane"');
@@ -60,14 +61,25 @@ jobs:
           assert.match(fieldCss, /@media \\(max-width: 680px\\)[\\s\\S]*\\.lead-pane\\s*\\{[\\s\\S]*grid-column:\\s*1;[\\s\\S]*grid-row:\\s*3;/);
           assert.match(fieldCss, /@media \\(max-width: 680px\\)[\\s\\S]*\\.step-pane-side \\.player-wrap\\s*\\{[\\s\\S]*min-height:\\s*200px;/);'''
 
-          if text.count(old_overlay) != 1:
-              raise SystemExit(f'Expected one stale overlay assertion, found {text.count(old_overlay)}')
-          if text.count(old_mobile) != 1:
-              raise SystemExit(f'Expected one stale mobile assertion, found {text.count(old_mobile)}')
+          if field_text.count(old_overlay) != 1:
+              raise SystemExit(f'Expected one stale overlay assertion, found {field_text.count(old_overlay)}')
+          if field_text.count(old_mobile) != 1:
+              raise SystemExit(f'Expected one stale mobile assertion, found {field_text.count(old_mobile)}')
 
-          text = text.replace(old_overlay, new_overlay, 1)
-          text = text.replace(old_mobile, new_mobile, 1)
-          path.write_text(text)
+          field_text = field_text.replace(old_overlay, new_overlay, 1)
+          field_text = field_text.replace(old_mobile, new_mobile, 1)
+          field_path.write_text(field_text)
+
+          interaction_path = Path('interaction-smoke.mjs')
+          interaction_text = interaction_path.read_text()
+          old_focus = 'assert.equal(byId.get("focused-label").textContent, "Middle quarter");'
+          new_focus = '''assert.equal(byId.get("focused-section").hidden, false);
+          assert.equal(byId.get("focused-section-title").textContent, "Middle quarter");
+          assert.equal(byId.get("focused-section-range").textContent, "0:25.000–0:50.000");
+          assert.equal(byId.get("leave-section").disabled, false);'''
+          if interaction_text.count(old_focus) != 1:
+              raise SystemExit(f'Expected one stale focused Section assertion, found {interaction_text.count(old_focus)}')
+          interaction_path.write_text(interaction_text.replace(old_focus, new_focus, 1))
           PY
 
       - name: Run complete repository gate
@@ -89,6 +101,6 @@ jobs:
           rm .github/workflows/verify-v5.7-deployment-hotfix.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add field-coherence-tests.mjs .github/workflows/verify-v5.7-deployment-hotfix.yml
-          git commit -m "Fix stale interface regression assertions"
+          git add field-coherence-tests.mjs interaction-smoke.mjs .github/workflows/verify-v5.7-deployment-hotfix.yml
+          git commit -m "Fix stale v5.7 interface regression assertions"
           git push origin HEAD:fix/v5.7-deployment-test
