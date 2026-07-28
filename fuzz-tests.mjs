@@ -42,6 +42,9 @@ function assertSessionInvariant(session) {
     assert.ok(interval.start < interval.end);
     assert.ok(interval.start >= range.start - EPSILON);
     assert.ok(interval.end <= range.end + EPSILON);
+    assert.ok(Math.abs(interval.arrival - resolution.C) <= EPSILON, "Interval arrival must remain the active endpoint at Current.");
+    assert.ok(Math.abs(interval.start - Math.min(interval.departure, interval.arrival)) <= EPSILON);
+    assert.ok(Math.abs(interval.end - Math.max(interval.departure, interval.arrival)) <= EPSILON);
   }
 
   if (focus) {

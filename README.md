@@ -31,6 +31,7 @@ npm run check
 Address → Current inside Range
 Current + Resolution → Neighborhood
 committed movement → Interval
+Step → move the Interval's active endpoint
 Address → Pin
 explicit Extent → Section
 Section → Range through Focus
@@ -43,6 +44,8 @@ Range is the sole hard temporal boundary. Resolution controls semantic discrimin
 Center is the only audible player and retains native YouTube controls. Clicking Center or pressing Space owns ordinary play/pause. When native playback pauses, its physical movement settles once into semantic Current and Interval.
 
 Context is not a button. A configured Context window runs automatically after discrete traversal, plays only in Center, restores Center to committed Current, and never activates Tail or Lead.
+
+Step is also the Interval editor. The movement that establishes an Interval supplies its fixed departure anchor; subsequent Step actions move the active endpoint at Current. Stepping outward extends the Loop/Section region, stepping inward shrinks it, and crossing the anchor redraws it in the opposite direction. Held arrow-key repeats form one gesture and start Context once on keyup.
 
 ## Step Field
 
@@ -57,7 +60,7 @@ Each side owns a maximum Offset and a supported directional Rate.
 
 - **Stretch** snaps the side to Current, then diverges on the next genuine Center playback until its maximum Offset is reached.
 - **Hold** switches the side to `1×` and preserves the measured Offset. Holding midway through Stretch makes that measured Offset the new maximum and Step distance.
-- Clicking a side pane or its Step button performs the same semantic Step by the visible differential, falling back to the configured maximum Offset.
+- Clicking a side pane or its Step button performs the same semantic Step by the visible differential, falling back to the configured maximum Offset, and edits the same active Interval used by Loop and Section creation.
 - Context suspends the sides. Native Center playback resumes Field behaviour.
 
 Disabling the Field preserves the stable single-player reader and does not create side players.
