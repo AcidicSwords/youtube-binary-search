@@ -1,0 +1,71 @@
+name: Verify v5.7 deployment hotfix
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - field-coherence-tests.mjs
+      - .github/workflows/verify-v5.7-deployment-hotfix.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: verify-v5.7-deployment-hotfix
+  cancel-in-progress: false
+
+jobs:
+  fix-check-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/v5.7-deployment-test
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Replace stale overlay assertion
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('field-coherence-tests.mjs')
+          text = path.read_text()
+          old = '  assert.match(fieldCss, /\\.pane-rate-setting[\\s\\S]*pointer-events: auto/);'
+          new = '''  const tailPaneStart = html.indexOf('id="tail-pane"');
+          const tailRateControl = html.indexOf('id="tail-rate-select"', tailPaneStart);
+          const tailPlayerWrap = html.indexOf('class="player-wrap"', tailPaneStart);
+          const leadPaneStart = html.indexOf('id="lead-pane"');
+          const leadRateControl = html.indexOf('id="lead-rate-select"', leadPaneStart);
+          const leadPlayerWrap = html.indexOf('class="player-wrap"', leadPaneStart);
+          assert.ok(
+            tailPaneStart >= 0 && tailRateControl > tailPaneStart && tailRateControl < tailPlayerWrap,
+            "Tail rate control remains in the pane header before the player selection overlay."
+          );
+          assert.ok(
+            leadPaneStart >= 0 && leadRateControl > leadPaneStart && leadRateControl < leadPlayerWrap,
+            "Lead rate control remains in the pane header before the player selection overlay."
+          );
+          assert.match(fieldCss, /\\.step-pane-bar\\s*\\{[\\s\\S]*z-index:\\s*7/);
+          assert.match(fieldCss, /\\.step-pane-action\\s*\\{[\\s\\S]*z-index:\\s*5/);'''
+          if text.count(old) != 1:
+              raise SystemExit(f'Expected one stale assertion, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Run complete repository gate
+        run: npm run check
+
+      - name: Remove temporary workflow and commit verified hotfix
+        run: |
+          rm .github/workflows/verify-v5.7-deployment-hotfix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add field-coherence-tests.mjs .github/workflows/verify-v5.7-deployment-hotfix.yml
+          git commit -m "Fix stale pane rate interaction regression"
+          git push origin HEAD:fix/v5.7-deployment-test
