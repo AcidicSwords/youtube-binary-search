@@ -717,22 +717,44 @@ function startNativePlaybackSession() {
   view.render();
 }
 
+function startFieldPlaybackFromGesture() {
+  if (!state.videoLoaded) return false;
+  clearNativeGo();
+  clearProgrammaticPlacement();
+  const destination = currentResolution().C;
+  if (Math.abs(safeCurrentTime() - destination) > NATIVE_POSITION_TOLERANCE_SECONDS) {
+    placePlayer(destination);
+  }
+  // This function is called directly from a trusted parent-page click or Space
+  // key event. Ask every muted side and Center to play in the same synchronous
+  // activation stack; delayed Center state events are too late to transfer that
+  // activation to sibling YouTube iframes reliably.
+  stepField?.playFromGesture?.();
+  player.play();
+  return true;
+}
+
+function pauseFieldPlayback() {
+  stepField?.pause();
+  player.pause();
+}
+
 function toggleNativePlayback() {
   if (!state.videoLoaded) return;
   if (transportIs(TRANSPORT_KIND.CONTEXT)) {
     settleTransport();
-    player.play();
+    startFieldPlaybackFromGesture();
     return;
   }
   if (transportIs(TRANSPORT_KIND.LOOP) || transportIs(TRANSPORT_KIND.PLAYBACK)) {
-    player.pause();
+    pauseFieldPlayback();
     return;
   }
   const snapshot = playerSnapshot();
-  if ([YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(snapshot.state)) player.pause();
-  else {
-    placePlayer(currentResolution().C);
-    player.play();
+  if ([YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(snapshot.state)) {
+    pauseFieldPlayback();
+  } else {
+    startFieldPlaybackFromGesture();
   }
 }
 
@@ -1103,6 +1125,10 @@ function initializeVideo() {
   pendingLoad = null;
 
   locateAddress(requestedStart);
+  // Build and cue Tail/Lead before the Center transport surface becomes active.
+  // This keeps the first parent-owned playback gesture synchronous across all
+  // ready players instead of racing the polling interval.
+  stepField?.tick();
   const guidePersisted = persistGuide();
   view.renderGuide();
   if (guidePersisted) setStatus(`Loaded ${formatTime(duration)} video.`);
@@ -1602,8 +1628,10 @@ function initializePlayerApi() {
   if (player || !globalThis.YT?.Player) return;
   player = createYouTubePlayer("player", {
     events: {
-      onReady: () => {
+      onReady: adapter => {
         state.playerReady = true;
+        const iframe = adapter.raw?.()?.getIframe?.();
+        iframe?.setAttribute?.("tabindex", "-1");
         setStatus("YouTube ready. Paste a link.");
         cuePendingVideo();
       },
@@ -1807,6 +1835,7 @@ elements["step-forward"].addEventListener("click", () => performStep("forward"))
 elements["pin-backward"].addEventListener("click", () => goToAdjacentPin("backward"));
 elements["pin-forward"].addEventListener("click", () => goToAdjacentPin("forward"));
 elements.loop.addEventListener("click", startLoop);
+elements["center-transport-surface"].addEventListener("click", toggleNativePlayback);
 elements["context-select"].addEventListener("change", event => {
   state.contextSeconds = Number(event.target.value || 0);
   persistPreferences();

@@ -31,7 +31,7 @@ const docs = Object.fromEntries([
   "README.md", "SPEC.md", "IMPLEMENTATION.md", "INTERFACE.md", "DEVELOPMENT.md", "VALIDATION.md"
 ].map(path => [path, read(path)]));
 
-assert.equal(pkg.version, "5.8.2");
+assert.equal(pkg.version, "5.8.3");
 assert.equal(docs["SPEC.md"].startsWith("# Binary YouTube Reader — Canonical Specification\n"), true);
 assert.equal(docs["IMPLEMENTATION.md"].startsWith("# Binary YouTube Reader — Canonical Implementation\n"), true);
 assert.equal(docs["INTERFACE.md"].startsWith("# Binary YouTube Reader — Interface Grammar\n"), true);
@@ -101,4 +101,4 @@ assert.match(pkg.scripts.audit, /integration-check\.mjs/);
 assert.match(pkg.scripts.audit, /project-audit\.mjs/);
 assert.match(pkg.scripts.check, /npm run audit/);
 
-console.log("Project audit passed: v5.8.2 documentation, composable Step intervals, native playback, Field ownership, Guide creation, operator geometry, CSS boundaries, and adapter contracts are coherent.");
+console.log("Project audit passed: v5.8.3 documentation, shared Field activation, composable Step intervals, native playback settlement, Field ownership, Guide creation, operator geometry, CSS boundaries, and adapter contracts are coherent.");

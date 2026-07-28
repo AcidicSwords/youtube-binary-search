@@ -101,7 +101,7 @@ assert.equal(resolveFieldPhase({
   const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 
   for (const id of [
-    "step-field", "player-tail", "player", "player-lead",
+    "step-field", "player-tail", "player", "player-lead", "center-transport-surface",
     "tail-step-button", "lead-step-button",
     "tail-field-toggle", "lead-field-toggle", "field-both-toggle",
     "tail-rate-select", "lead-rate-select",
@@ -115,6 +115,11 @@ assert.equal(resolveFieldPhase({
   assert.match(app, /onSelect:\s*selectFieldSide/);
   assert.match(app, /function selectFieldSide\(selection\)/);
   assert.match(app, /performStep\(selection\.direction, selection\.distance\)/);
+  assert.match(app, /function startFieldPlaybackFromGesture\(\)/);
+  assert.match(app, /stepField\?\.playFromGesture\?\.\(\);[\s\S]*player\.play\(\);/,
+    "Parent-owned playback must request both side players and Center in one synchronous gesture stack.");
+  assert.match(app, /center-transport-surface/);
+  assert.match(fieldSource, /function playFromGesture\(\)/);
   assert.match(app, /onHoldOffsets:/);
   assert.match(fieldSource, /const FIELD_SIDE_MODE/);
   assert.match(fieldSource, /function stretch\(role\)/);
@@ -135,6 +140,9 @@ assert.equal(resolveFieldPhase({
   assert.match(youtubeSource, /setAttribute\?\.\("allow", options\.iframeAllow \|\| DEFAULT_IFRAME_ALLOW\)/);
   assert.doesNotMatch(html, /class="step-pane-action"/,
     "YouTube side iframes must remain unobscured; Step uses the dedicated button below each player.");
+  assert.match(html, /id="center-transport-surface"/,
+    "Paused Center must expose a parent-owned playback surface for shared iframe activation.");
+  assert.match(layoutCss, /\.center-transport-surface[\s\S]*position:\s*absolute/);
   assert.match(css, /grid-template-columns:\s*minmax\(240px, 1fr\) minmax\(264px, 1\.1fr\) minmax\(240px, 1fr\)/);
   assert.match(css, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);
   assert.match(css, /@media \(max-width: 680px\)/);
@@ -144,4 +152,4 @@ assert.equal(resolveFieldPhase({
   assert.match(packageJson.scripts.test, /step-field-tests\.mjs/);
 }
 
-console.log("All Step Field tests passed: geometry, suspension, Hold/Stretch, side Step, visible bootstrap, autoplay delegation, cue-based parking, rate priming, and panoramic layout.");
+console.log("All Step Field tests passed: geometry, suspension, Hold/Stretch, side Step, visible bootstrap, shared user activation, autoplay delegation, cue-based parking, rate priming, and panoramic layout.");

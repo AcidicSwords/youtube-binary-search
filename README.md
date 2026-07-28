@@ -41,7 +41,7 @@ Range is the sole hard temporal boundary. Resolution controls semantic discrimin
 
 ## Native playback and Context
 
-Center is the only audible player and retains native YouTube controls. Clicking Center or pressing Space owns ordinary play/pause. When native playback pauses, its physical movement settles once into semantic Current and Interval.
+Center is the only audible player and retains native YouTube controls during playback. While paused, a parent-owned Center surface and Space start Center, Tail, and Lead synchronously from one trusted gesture; once Center is playing, the surface withdraws and YouTube’s native controls remain available. Pausing settles physical movement once into semantic Current and Interval.
 
 Context is not a button. A configured Context window runs automatically after discrete traversal, plays only in Center, restores Center to committed Current, and never activates Tail or Lead.
 
@@ -85,7 +85,7 @@ A / W / D      Refine Backward / Reopen / Refine Forward
 L              Loop current Interval
 Shift+← / →    Previous / next Pin
 S              Return
-Space          Native Center play/pause
+Space          Shared Field play/pause
 P              Open Pins creation in Guide
 Shift+P        Open Sections creation in Guide
 G              Guide

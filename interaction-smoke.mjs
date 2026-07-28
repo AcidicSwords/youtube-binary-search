@@ -87,25 +87,42 @@ await flush();
 assert.equal(byId.get("loop-label").textContent, "Loop");
 assert.equal(center.currentTime, 50, "Stopping Loop restores its semantic anchor.");
 
-// Native Center playback is the sole ordinary play/pause surface. Pausing
-// settles continuous physical movement into the same Session Current/Interval.
+// Tail and Lead are ready before the paused Center surface accepts the first
+// ordinary playback gesture.
+await poll();
+await flush(4);
+assert.ok(players.has("player-tail") && players.has("player-lead"));
+const tail = env.tail();
+const lead = env.lead();
+assert.equal(byId.get("center-transport-surface").disabled, false);
+assert.notEqual(tail.state, 1, "Tail must be paused after Loop settles and before ordinary shared activation.");
+assert.notEqual(lead.state, 1, "Lead must be paused after Loop settles and before ordinary shared activation.");
+
+// One parent-page click requests Tail, Center, and Lead synchronously. Native
+// controls remain exposed after Center enters ordinary playback, so pausing or
+// scrubbing still follows YouTube's normal control path.
 center.currentTime = 50;
-center.playVideo();
+const playCounts = {
+  center: center.commands.filter(command => command[0] === "play").length,
+  tail: tail.commands.filter(command => command[0] === "play").length,
+  lead: lead.commands.filter(command => command[0] === "play").length
+};
+byId.get("center-transport-surface").click();
+assert.equal(center.commands.filter(command => command[0] === "play").length, playCounts.center + 1);
+assert.equal(tail.commands.filter(command => command[0] === "play").length, playCounts.tail + 1);
+assert.equal(lead.commands.filter(command => command[0] === "play").length, playCounts.lead + 1);
 await flush();
+assert.equal(byId.get("center-transport-surface").hidden, true, "Native Center controls must be exposed while ordinary playback is running.");
 center.currentTime = 60;
 center.pauseVideo();
 await flush();
+assert.equal(byId.get("center-transport-surface").hidden, false, "Paused Center must restore the shared activation surface.");
 assert.equal(currentText(), "Current 1:00.000");
 assert.match(byId.get("section-window").textContent, /0:50\.000–1:00\.000/);
 
 // Side players are created independently and prime at 1× before applying their
 // directional rate. Stretch begins from the physical Center, Hold records the
 // measured differential without pausing Center, and local Step uses that offset.
-await poll();
-await flush(4);
-assert.ok(players.has("player-tail") && players.has("player-lead"));
-const tail = env.tail();
-const lead = env.lead();
 assert.equal(tail.playerVars.controls, 0);
 assert.equal(lead.playerVars.controls, 0);
 assert.equal(tail.createdWhileFieldOff, false, "Tail must be created only after its pane is measurable.");
@@ -116,12 +133,10 @@ assert.ok(tail.commands.some(command => command[0] === "cue"), "Tail must be par
 assert.ok(lead.commands.some(command => command[0] === "cue"), "Lead must be parked with cueVideoById.");
 assert.equal(tail.commands.some(command => command[0] === "place"), false, "Tail must not seek from CUED state before playback.");
 assert.equal(lead.commands.some(command => command[0] === "place"), false, "Lead must not seek from CUED state before playback.");
-assert.equal(tail.commands.some(command => command[0] === "play"), false, "Tail must remain paused before native Center playback.");
-assert.equal(lead.commands.some(command => command[0] === "play"), false, "Lead must remain paused before native Center playback.");
 
 byId.get("tail-field-toggle").click(); // Held -> Stretch
 center.currentTime = 60;
-center.playVideo();
+byId.get("center-transport-surface").click();
 await flush();
 await poll();
 assert.ok(tail.commands.some(command => command[0] === "play"), "Tail must activate from native Center playback.");
@@ -145,10 +160,14 @@ await flush();
 assert.notEqual(currentText(), beforeSideStep);
 assert.equal(currentText(), "Current 0:56.000", "Tail Step must use the held 4 s differential.");
 
-// Space controls the native Center player rather than a duplicate Continue UI.
+// Space uses the same shared parent-page activation as the paused Center surface.
+const tailPlayBeforeSpace = tail.commands.filter(command => command[0] === "play").length;
+const leadPlayBeforeSpace = lead.commands.filter(command => command[0] === "play").length;
 dispatchDocument("keydown", { key: " ", code: "Space" });
 await flush();
 assert.equal(center.state, 1);
+assert.equal(tail.commands.filter(command => command[0] === "play").length, tailPlayBeforeSpace + 1);
+assert.equal(lead.commands.filter(command => command[0] === "play").length, leadPlayBeforeSpace + 1);
 dispatchDocument("keydown", { key: " ", code: "Space" });
 await flush();
 assert.equal(center.state, 2);
@@ -158,4 +177,4 @@ assert.equal(byId.has("context-action"), false);
 assert.equal(byId.has("skim"), false);
 assert.equal(byId.get("loop").classList.contains("loop-action"), true);
 
-console.log("Interaction smoke passed: Guide retention, composable Step intervals, frozen Loop, native playback settlement, visible side-player bootstrap, cue-based parking, Field rate priming, Hold/Stretch, side Step, and Space playback.");
+console.log("Interaction smoke passed: Guide retention, composable Step intervals, frozen Loop, shared Center/Tail/Lead activation, native playback settlement, visible side-player bootstrap, cue-based parking, Field rate priming, Hold/Stretch, side Step, and Space playback.");

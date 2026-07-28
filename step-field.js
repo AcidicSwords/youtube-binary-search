@@ -284,6 +284,40 @@ export function createStepFieldController({
     }
   }
 
+  function playFromGesture() {
+    const snapshot = getSnapshot?.();
+    const prefs = preferences();
+    if (!snapshot?.videoLoaded || !prefs.stepFieldEnabled || runtime.suspended) {
+      return { tail: false, lead: false };
+    }
+    const started = { tail: false, lead: false };
+    for (const role of ["tail", "lead"]) {
+      const side = sides[role];
+      if (!prefs[`${role}Visible`] || !side.ready || side.error || maxOffset(role, snapshot) <= EPSILON) continue;
+      side.adapter?.mute?.();
+      side.adapter?.setRate?.(1);
+      side.actualRate = 1;
+      side.playback = "starting";
+      side.adapter?.play?.();
+      started[role] = true;
+    }
+    return started;
+  }
+
+  function activationState() {
+    const prefs = preferences();
+    if (!prefs.stepFieldEnabled) {
+      return { ready: true, pending: [], available: {} };
+    }
+    const visible = ["tail", "lead"].filter(role => prefs[`${role}Visible`]);
+    const pending = visible.filter(role => !sides[role].ready && !sides[role].error);
+    return {
+      ready: pending.length === 0,
+      pending,
+      available: Object.fromEntries(visible.map(role => [role, sides[role].ready && !sides[role].error]))
+    };
+  }
+
   function directionalRates(side) {
     return [...new Set(readSide(side).availableRates || [])]
       .filter(rate => Number.isFinite(rate) && (side.role === "tail" ? rate < 1 : rate > 1))
@@ -570,10 +604,13 @@ export function createStepFieldController({
       observed[role].requestedRate = Number(prefs[`${role}Rate`]);
       observed[role].actualRate = sides[role].actualRate;
       observed[role].playback = sides[role].playback;
+      observed[role].ready = sides[role].ready;
+      observed[role].error = sides[role].error;
       observed[role].rateAvailable = sides[role].rateAvailable;
       observed[role].offset = states[role].offset;
       observed[role].targetDistance = targets[role].distance;
     }
+    observed.activation = activationState();
     observed.span = {
       start: observed.tail.address,
       end: observed.lead.address,
@@ -589,6 +626,8 @@ export function createStepFieldController({
       modes: [observed.tail.mode, observed.lead.mode],
       rates: [observed.tail.actualRate, observed.lead.actualRate],
       playback: [observed.tail.playback, observed.lead.playback],
+      ready: [observed.tail.ready, observed.lead.ready],
+      errors: [observed.tail.error, observed.lead.error],
       suspended: runtime.suspended
     });
     runtime.field = observed;
@@ -755,6 +794,8 @@ export function createStepFieldController({
     tick,
     render,
     pause: pauseSides,
+    playFromGesture,
+    activationState,
     invalidate,
     translateToCurrent,
     translatePhysicalCenter,
