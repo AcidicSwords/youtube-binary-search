@@ -1,0 +1,56 @@
+name: Apply Endpoint Transposition v5.8.6
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/apply-v586.yml
+      - .github/v586/**
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-endpoint-transposition-v586
+  cancel-in-progress: false
+
+jobs:
+  apply-check-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/apply-v5.8.6
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Reconstruct verified overlay
+        run: |
+          cat .github/v586/part-* | base64 --decode > /tmp/v586-overlay.tar.gz
+          echo "0a2d4789864e8165a2e8e413b5a906d7442186c1514aac99aa043f6d12dd818d  /tmp/v586-overlay.tar.gz" | sha256sum --check --strict
+          test "$(tar -tzf /tmp/v586-overlay.tar.gz | wc -l)" -eq 25
+
+      - name: Apply exact v5.8.6 tree
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+          tar -xzf /tmp/v586-overlay.tar.gz -C .
+          test "$(node -p "require('./package.json').version")" = "5.8.6"
+          test ! -e .github/v586
+          test ! -e .github/workflows/apply-v586.yml
+
+      - name: Run complete repository gate
+        run: npm run check
+
+      - name: Commit verified product tree
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "No product changes produced"; exit 1; }
+          git commit -m "Add Endpoint Transposition and cohesive Field UI v5.8.6"
+          git push --force origin HEAD:feature/endpoint-transposition-v5.8.6
