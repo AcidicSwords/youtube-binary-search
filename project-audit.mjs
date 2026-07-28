@@ -31,7 +31,7 @@ const docs = Object.fromEntries([
   "README.md", "SPEC.md", "IMPLEMENTATION.md", "INTERFACE.md", "DEVELOPMENT.md", "VALIDATION.md"
 ].map(path => [path, read(path)]));
 
-assert.equal(pkg.version, "5.8.4");
+assert.equal(pkg.version, "5.8.5");
 assert.equal(docs["SPEC.md"].startsWith("# Binary YouTube Reader — Canonical Specification\n"), true);
 assert.equal(docs["IMPLEMENTATION.md"].startsWith("# Binary YouTube Reader — Canonical Implementation\n"), true);
 assert.equal(docs["INTERFACE.md"].startsWith("# Binary YouTube Reader — Interface Grammar\n"), true);
