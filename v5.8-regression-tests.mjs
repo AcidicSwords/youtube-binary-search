@@ -102,7 +102,8 @@ oldEquivalent = reopen(oldEquivalent).session;
 oldEquivalent = refine(oldEquivalent, "forward").session;
 assert.equal(oldEquivalent.model.resolution.C, 330);
 
-// Step preserves the origin Neighborhood inside it and seeds movement scale outside it.
+// Step preserves the origin Neighborhood and pushes a crossed directional
+// endpoint to retain a half-Step Refine target.
 let stepped = createSession({ duration: 480, current: 120 });
 stepped = goTo(stepped, 180, { operator: "timeline" }).session; // 120—180—240
 const stepOrigin = snapshotModel(stepped.model);
@@ -119,13 +120,20 @@ stepped = step(stepped, "forward", 100, {
   originResolutionBasis: stepOrigin.resolutionBasis,
   amend: true
 }).session;
-assert.deepEqual(stepped.model.resolution, { L: 180, C: 300, R: 420, level: 0 });
+assert.deepEqual(stepped.model.resolution, { L: 120, C: 300, R: 400, level: 0 });
 assert.equal(stepped.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
+assert.deepEqual(getTargets(stepped.model.resolution), { backward: 210, forward: 350 });
 assert.deepEqual(
   { start: stepped.model.interval.start, end: stepped.model.interval.end },
   { start: 120, end: 300 },
   "Step must extend the Interval established by timeline traversal rather than replace it from the first Step departure."
 );
+
+let boundaryPush = createSession({ duration: 100, current: 50 });
+boundaryPush = refine(boundaryPush, "backward").session;
+boundaryPush = step(boundaryPush, "forward", 25).session;
+assert.deepEqual(boundaryPush.model.resolution, { L: 0, C: 50, R: 75, level: 0 });
+assert.equal(getTargets(boundaryPush.model.resolution).forward, 62.5);
 
 // Step edits the active Interval around its original departure anchor.
 let drawnInterval = createSession({ duration: 100, current: 20 });

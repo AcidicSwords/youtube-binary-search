@@ -164,12 +164,14 @@ kbd {
 
 .load-actions {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 8px;
 }
 
 .url-row {
   display: grid;
+  min-width: 0;
   grid-template-columns: minmax(260px, 36vw) auto;
   gap: 7px;
 }
@@ -755,12 +757,6 @@ kbd {
   gap: 7px;
 }
 
-.guide-counts {
-  color: var(--muted);
-  font-size: 0.7rem;
-  white-space: nowrap;
-}
-
 .guide-close {
   display: none;
   width: 36px;
@@ -911,12 +907,6 @@ kbd {
   font-size: 0.67rem;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.source-placeholder { padding: 18px; }
-.source-placeholder p {
-  margin-top: 8px;
-  font-size: 0.79rem;
 }
 
 .guide-scrim { display: none; }

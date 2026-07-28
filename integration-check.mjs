@@ -60,8 +60,12 @@ for (const required of [
   "tail-field-toggle", "field-both-toggle", "lead-field-toggle",
   "tail-step-button", "lead-step-button", "step-backward-seconds", "step-forward-seconds",
   "section-capture", "section-source", "save-section", "pin-capture", "pin-current",
-  "sections-list", "pins-list", "guide-tab-sources", "leave-section"
+  "sections-list", "pins-list", "leave-section"
 ]) assert.ok(htmlIds.has(required), `Missing required projection: ${required}`);
+
+for (const removedPlaceholder of ["guide-tab-sources", "guide-sources-panel"]) {
+  assert.equal(htmlIds.has(removedPlaceholder), false, `Placeholder projection remains: ${removedPlaceholder}`);
+}
 
 const source = [html, app, view, styles, fieldCss, sessionSource, transportSource, fieldSource].join("\n");
 for (const obsolete of [
@@ -86,8 +90,11 @@ assert.match(html, /id="return-action"[^>]*aria-keyshortcuts="Control\+Z Meta\+Z
   "Undo must remain outside the matrix on the platform-standard shortcut.");
 assert.match(styles, /touch-action:\s*manipulation/, "Controls must suppress accidental double-tap zoom without disabling page zoom.");
 assert.match(styles, /\.timeline[^{]*\{[^}]*touch-action:\s*pan-y/s, "Timeline must preserve vertical page scrolling on touch devices.");
-assert.match(fieldCss, /grid-template-columns:\s*minmax\(240px, 1fr\) minmax\(264px, 1\.1fr\) minmax\(240px, 1fr\)/,
-  "Wide Field must make Center only marginally larger.");
+assert.match(
+  fieldCss,
+  /grid-template-areas:\s*"tail center lead"[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1\.1fr\) minmax\(0, 1fr\)/,
+  "Wide Field must make Center only marginally larger without fixed tracks that clip a pane."
+);
 
 assert.match(view, /setAttribute\("role", "menuitem"\)/, "Pin clusters must expose keyboard-addressable menu items.");
 assert.match(view, /setAttribute\("aria-haspopup", "menu"\)/, "Pin clusters must announce their popup relationship.");
@@ -99,6 +106,14 @@ assert.match(sessionSource, /departureFrame:[\s\S]*arrivalFrame:/,
   "Intervals must retain both endpoint search frames.");
 assert.match(sessionSource, /export function switchEndpoint[\s\S]*departure: arrival[\s\S]*arrival: departure/,
   "Endpoint Transposition must swap directed roles in the Session kernel.");
+assert.match(sessionSource, /export function refine[\s\S]*intervalMode:\s*"edit"/,
+  "Matrix Refine must edit the Active Interval endpoint.");
+assert.match(app, /function goToAdjacentPin[\s\S]*intervalMode:\s*"edit"/,
+  "Matrix Pin traversal must edit the Active Interval endpoint.");
+assert.match(view, /departureFrame[\s\S]*destinationScale[\s\S]*Switch Endpoint/,
+  "Switch must expose the destination endpoint frame before traversal.");
+assert.match(view, /refineBlockReason/,
+  "Refine projection must distinguish Resolution exhaustion from a hard Range edge.");
 assert.match(transportSource, /PLAYBACK:\s*"playback"/);
 assert.match(transportSource, /LOOP:\s*"loop"/);
 assert.doesNotMatch(transportSource, /CONTINUE|SKIM/);

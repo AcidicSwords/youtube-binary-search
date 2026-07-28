@@ -25,6 +25,7 @@ import {
   deletePin,
   sectionsForPin,
   createSectionFromTimes,
+  findDuplicateSection,
   renameSection,
   deleteSection,
   resolveSection
@@ -124,7 +125,12 @@ function usableEndpointFrame(frame, address, range) {
 
 function resolveEndpointFrame(frame, address, opposite, range) {
   if (usableEndpointFrame(frame, address, range)) {
-    return createEndpointFrame(frame.resolution, frame.resolutionBasis);
+    return createEndpointFrame(
+      frame.resolution,
+      isRangeNeighborhood(frame.resolution, range)
+        ? RESOLUTION_BASIS.RANGE
+        : frame.resolutionBasis
+    );
   }
   const resolution = seedNeighborhoodFromMovement(opposite, address, range);
   return createEndpointFrame(
@@ -341,6 +347,10 @@ function moveDraft(model, destination, options = {}) {
   const departure = Number.isFinite(options.departure)
     ? options.departure
     : model.resolution.C;
+  const editDeparture = sourceInterval
+    && Math.abs(sourceInterval.arrival - departure) <= EPSILON
+    ? sourceInterval.departure
+    : departure;
   const boundedDestination = clamp(destination, 0, model.duration);
   const opening = openAddress(model, boundedDestination);
   const rangeChanged = opening.changed;
@@ -369,21 +379,17 @@ function moveDraft(model, destination, options = {}) {
     const baseBasis = options.originResolutionBasis
       || model.resolutionBasis
       || RESOLUTION_BASIS.RANGE;
-    const remainedInside = resolvedDestination >= baseNeighborhood.L - EPSILON
-      && resolvedDestination <= baseNeighborhood.R + EPSILON;
 
     model.resolution = stepNeighborhood(
       baseNeighborhood,
       resolvedDestination,
       model.range,
-      departure
+      options.stepSeconds
     );
     finalDestination = model.resolution.C;
-    model.resolutionBasis = remainedInside
-      ? baseBasis
-      : isRangeNeighborhood(model.resolution, model.range)
-        ? RESOLUTION_BASIS.RANGE
-        : RESOLUTION_BASIS.MOVEMENT;
+    model.resolutionBasis = isRangeNeighborhood(model.resolution, model.range)
+      ? RESOLUTION_BASIS.RANGE
+      : baseBasis;
   } else {
     // Direct Go abandons the preceding recursive path while retaining the scale
     // communicated by the actual movement. The crossed Interval forms one side
@@ -400,7 +406,9 @@ function moveDraft(model, destination, options = {}) {
 
   const intervalDeparture = Number.isFinite(options.intervalDeparture)
     ? options.intervalDeparture
-    : departure;
+    : options.intervalMode === "edit"
+      ? editDeparture
+      : departure;
   const inheritedDepartureFrame = sourceInterval
     && Math.abs(sourceInterval.departure - intervalDeparture) <= EPSILON
     ? sourceInterval.departureFrame
@@ -468,6 +476,7 @@ export function refine(session, direction) {
   const backward = direction === "backward";
   return goTo(session, target, {
     mode: "refine",
+    intervalMode: "edit",
     operator: backward ? "refineBackward" : "refineForward",
     label: backward ? "Refine Backward" : "Refine Forward"
   });
@@ -493,6 +502,7 @@ export function step(session, direction, seconds = null, options = {}) {
     originInterval: options.originInterval,
     originResolution: options.originResolution,
     originResolutionBasis: options.originResolutionBasis,
+    stepSeconds: reach,
     amend: options.amend
   });
 }
@@ -512,10 +522,9 @@ export function setStepReach(session, nextReach, label = "Set Step Reach") {
 }
 
 export function reopen(session) {
-  if (
-    !canReopen(session.model.resolution, session.model.range)
-    && session.model.resolutionBasis === RESOLUTION_BASIS.RANGE
-  ) return unchanged(session, "already-open");
+  if (!canReopen(session.model.resolution, session.model.range)) {
+    return unchanged(session, "already-open");
+  }
   return commit(session, "Reopen", draft => {
     draft.resolution = reopenToRange(draft.resolution.C, draft.range);
     draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
@@ -638,6 +647,13 @@ export function completePlayback(session, options) {
     Math.abs(current - options.departure) <= EPSILON
     && !options.crossedResolution
   ) return unchanged(session, "no-movement");
+  const playbackCheckpoint = snapshotModel(options.returnModel || session.model);
+  // Playback owns the spatial path captured when it started. Semantic values
+  // that may legitimately change while it runs (currently Held Field Reach and
+  // retained Guide edits) must remain in the checkpoint immediately before
+  // settlement so Undo does not skip those intervening transactions.
+  playbackCheckpoint.stepReach = normalizeStepReach(session.model.stepReach);
+  playbackCheckpoint.guide = session.model.guide;
   return commit(session, options.label || "Playback", draft => {
     draft.resolution = options.crossedResolution
       ? reopenToRange(current, draft.range)
@@ -669,7 +685,7 @@ export function completePlayback(session, options) {
       place: current,
       interval: draft.interval
     };
-  }, { returnModel: options.returnModel });
+  }, { returnModel: playbackCheckpoint });
 }
 
 export function pinCurrent(session, label = "") {
@@ -708,10 +724,11 @@ export function saveExtentAsSection(session, extent, label, provenance = "extent
   const startPin = findPinAt(session.model.guide, extent.start);
   const endPin = findPinAt(session.model.guide, extent.end);
   const duplicate = startPin && endPin
-    ? session.model.guide.sections.find(section =>
-      section.startPinId === startPin.id
-      && section.endPinId === endPin.id
-      && section.label === text
+    ? findDuplicateSection(
+      session.model.guide,
+      startPin.id,
+      endPin.id,
+      text
     )
     : null;
   if (duplicate) {
@@ -770,6 +787,13 @@ export function renameGuideSection(session, sectionId, label) {
   const text = String(label || "").trim();
   if (!text) return unchanged(session, "missing-title");
   if (text === section.label) return unchanged(session, "unchanged-label", { value: section });
+  if (findDuplicateSection(
+    session.model.guide,
+    section.startPinId,
+    section.endPinId,
+    text,
+    section.id
+  )) return unchanged(session, "duplicate-section", { value: section });
   return commit(session, "Rename Section", draft => ({
     changed: true,
     guideChanged: true,

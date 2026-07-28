@@ -185,7 +185,7 @@
             </div>
 
             <details id="range-tools" class="tool-disclosure">
-              <summary><span>Range tools</span><span id="range-tools-value">—</span></summary>
+              <summary><span>Range tools</span></summary>
               <div class="compact-actions">
                 <button id="range-start-here" type="button" disabled>Start at Current</button>
                 <button id="range-midpoint" type="button" disabled>Go to Midpoint</button>
@@ -236,7 +236,7 @@
                 <span class="eyebrow">Operator matrix</span>
                 <h2 id="navigation-heading">Navigate</h2>
               </div>
-              <p>One spatial grammar: reopen, refine, step, transpose the active Interval, and cross retained Pins.</p>
+              <p>Directional operators edit the active Interval endpoint. Switch changes which endpoint they edit.</p>
             </div>
 
             <div class="navigation-deck">
@@ -293,7 +293,6 @@
                 <h2>Guide</h2>
               </div>
               <div class="guide-header-actions">
-                <span class="guide-counts"><span id="section-count">0</span> Sections · <span id="pin-count">0</span> Pins</span>
                 <button id="guide-close" class="guide-close" type="button" aria-label="Close Guide">×</button>
               </div>
             </div>
@@ -301,7 +300,6 @@
             <div class="guide-tabs" role="tablist" aria-label="Guide views">
               <button id="guide-tab-sections" class="guide-tab active" type="button" role="tab" aria-selected="true" aria-controls="guide-sections-panel" tabindex="0">Sections <span id="sections-list-count">0</span></button>
               <button id="guide-tab-pins" class="guide-tab" type="button" role="tab" aria-selected="false" aria-controls="guide-pins-panel" tabindex="-1">Pins <span id="pins-list-count">0</span></button>
-              <button id="guide-tab-sources" class="guide-tab" type="button" role="tab" aria-selected="false" aria-controls="guide-sources-panel" tabindex="-1">Sources</button>
             </div>
 
             <section id="focused-section" class="focused-section" hidden>
@@ -321,7 +319,7 @@
                 </div>
                 <label for="section-source">Source
                   <select id="section-source" disabled>
-                    <option value="interval">Last movement Interval</option>
+                    <option value="interval">Active Interval</option>
                     <option value="field-span">Held Field span</option>
                   </select>
                 </label>
@@ -347,11 +345,6 @@
               <div id="pins-list" class="guide-list"><p class="empty-state">No Pins for this video.</p></div>
             </section>
 
-            <section id="guide-sources-panel" class="guide-tab-panel source-placeholder" role="tabpanel" aria-labelledby="guide-tab-sources" hidden>
-              <span class="eyebrow">Potential structure</span>
-              <h3>Chapters and transcripts</h3>
-              <p>This boundary is reserved for source-provided potential Pins and Sections. Source records remain external until explicitly retained in the Guide.</p>
-            </section>
           </aside>
         </div>
       </section>

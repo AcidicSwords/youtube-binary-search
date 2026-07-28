@@ -106,6 +106,7 @@ function makeHarness({
         config.events.onStateChange?.(state);
       },
       block() { config.events.onAutoplayBlocked?.(); },
+      fail() { state = YOUTUBE_STATE.UNKNOWN; config.events.onError?.(2); },
       get time() { return time; },
       get rate() { return rate; },
       get state() { return state; }
@@ -151,6 +152,19 @@ function makeHarness({
     assert.equal(h.lead().time, 60, "Initial Lead must show the frame represented by forward Step.");
     assert.ok(h.tail().commands.some(command => command[0] === "cue"));
     assert.ok(h.tail().commands.some(command => command[0] === "place"), "Pre-activation parking must decode the represented frame after cueing.");
+
+    const leadCuesBeforeRecovery = h.lead().commands.filter(command => command[0] === "cue").length;
+    h.lead().fail();
+    assert.equal(h.controller.snapshot().leadRuntime.error, true);
+    assert.equal(h.controller.snapshot().leadRuntime.ready, true, "A media error must not discard the reusable IFrame adapter.");
+    h.elements.get("lead-collapse").click();
+    h.elements.get("lead-restore").click();
+    h.controller.tick();
+    assert.equal(h.controller.snapshot().leadRuntime.error, false, "Restoring a failed pane must retry its source.");
+    assert.ok(
+      h.lead().commands.filter(command => command[0] === "cue").length > leadCuesBeforeRecovery,
+      "Lead recovery must re-cue the current video instead of remaining permanently unavailable."
+    );
 
     const semanticInterval = Object.freeze({ departure: 30, arrival: 50 });
     h.snapshot = { ...h.snapshot, interval: semanticInterval, transportKind: "context" };

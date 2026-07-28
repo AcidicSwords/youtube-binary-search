@@ -49,14 +49,40 @@ export function assertNeighborhood(neighborhood) {
 
 export function getTargets(neighborhood) {
   assertNeighborhood(neighborhood);
+  const backward = midpoint(neighborhood.L, neighborhood.C);
+  const forward = midpoint(neighborhood.C, neighborhood.R);
   return {
-    backward: neighborhood.L < neighborhood.C - EPSILON
-      ? midpoint(neighborhood.L, neighborhood.C)
-      : null,
-    forward: neighborhood.C < neighborhood.R - EPSILON
-      ? midpoint(neighborhood.C, neighborhood.R)
-      : null
+    backward: backward < neighborhood.C - EPSILON
+      ? backward
+      : neighborhood.L < neighborhood.C - EPSILON
+        ? neighborhood.L
+        : null,
+    forward: forward > neighborhood.C + EPSILON
+      ? forward
+      : neighborhood.R > neighborhood.C + EPSILON
+        ? neighborhood.R
+        : null
   };
+}
+
+export function refineBlockReason(neighborhood, range, direction) {
+  assertNeighborhood(neighborhood);
+  if (!range || !Number.isFinite(range.start) || !Number.isFinite(range.end)) {
+    throw new TypeError("Refine availability requires a valid Range.");
+  }
+  const targets = getTargets(neighborhood);
+  if (targets[direction] !== null) return null;
+  if (direction === "backward") {
+    return neighborhood.C <= range.start + EPSILON
+      ? "range-start"
+      : "resolution-limit";
+  }
+  if (direction === "forward") {
+    return neighborhood.C >= range.end - EPSILON
+      ? "range-end"
+      : "resolution-limit";
+  }
+  throw new TypeError(`Unknown direction: ${direction}`);
 }
 
 export function descend(neighborhood, direction, target, range = null) {
@@ -196,24 +222,36 @@ export function stepNeighborhood(
   neighborhood,
   destination,
   range,
-  departure = neighborhood.C
+  stepSeconds = Math.abs(destination - neighborhood.C)
 ) {
   assertNeighborhood(neighborhood);
   if (!Number.isFinite(destination)) throw new TypeError("Step destination must be finite.");
   const C = clamp(destination, range.start, range.end);
-  if (C >= neighborhood.L - EPSILON && C <= neighborhood.R + EPSILON) {
-    return assertNeighborhood({
-      L: neighborhood.L,
-      C: clamp(C, neighborhood.L, neighborhood.R),
-      R: neighborhood.R,
-      level: neighborhood.level ?? 0
-    });
-  }
+  const reach = Number.isFinite(stepSeconds) && stepSeconds > EPSILON
+    ? stepSeconds
+    : Math.abs(C - neighborhood.C);
+  const next = {
+    L: neighborhood.L,
+    C,
+    R: neighborhood.R,
+    level: neighborhood.level ?? 0
+  };
+  let scaleDeformed = false;
 
-  // A Step that leaves the current Neighborhood remains a local displacement:
-  // its net movement establishes the next scale instead of silently performing
-  // Reopen. Range-level availability remains one explicit Reopen away.
-  return seedNeighborhoodFromMovement(departure, C, range);
+  // Step translates Current without discarding the active binary neighborhood.
+  // Once it reaches or crosses the directional endpoint, that endpoint advances
+  // to one Step beyond Current. The next Refine in that direction is therefore
+  // half a Step away unless the sole hard Range boundary has been reached.
+  if (C > neighborhood.C + EPSILON && C >= neighborhood.R - EPSILON) {
+    next.R = Math.min(range.end, C + reach);
+    scaleDeformed = true;
+  } else if (C < neighborhood.C - EPSILON && C <= neighborhood.L + EPSILON) {
+    next.L = Math.max(range.start, C - reach);
+    scaleDeformed = true;
+  }
+  if (scaleDeformed) next.level = 0;
+
+  return assertNeighborhood(next);
 }
 
 export function settleContinuous(neighborhood, departure, current) {

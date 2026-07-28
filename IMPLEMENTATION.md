@@ -54,7 +54,11 @@ Interval.departureFrame = Resolution/basis retained at the anchor
 Interval.arrivalFrame = active Resolution/basis at Current
 ```
 
-Non-Step movement establishes both endpoints and captures both frames. Step preserves a usable existing departure and departure frame while replacing arrival and its frame. `moveDraft()` therefore keeps movement departure separate from `intervalDeparture`: movement departure controls Step Neighborhood geometry and Undo provenance, while `intervalDeparture` controls the extent consumed by Loop and Section creation.
+Direct Go and settled playback establish both endpoints and capture both frames. Matrix directions use `intervalMode: "edit"`: Refine and Pin traversal preserve a usable existing departure, while Step supplies the same anchor explicitly across coalesced repeats. `moveDraft()` therefore keeps movement departure separate from `intervalDeparture`: movement departure controls Undo provenance and direct replacement, while `intervalDeparture` controls the Active Interval consumed by Loop and Section creation. No persistent hidden mode exists; matrix versus direct projection determines the lifecycle.
+
+`stepNeighborhood()` retains the gesture-origin binary frame; when the Step destination reaches or crosses its directional endpoint, it advances that endpoint to `Current ± stepReach`, clamped to Range, and resets refinement lineage because the scale was deformed. This keeps the next directional Refine at half-Step distance without manufacturing a movement-seeded frame. Full-Range geometry is canonicalized to Range basis, so Session and view share one Reopen predicate.
+
+`getTargets()` never advertises a movement that `moveDraft()` will reject at the 40 ms identity floor. When the ordinary half-side midpoint is no longer distinct but the side endpoint is, it returns that endpoint as the terminal Refine target. This preserves arbitrary-target convergence without weakening semantic equality.
 
 `switchEndpoint()` captures the active frame being left, restores the retained departure frame, swaps directed departure/arrival and their frames, and preserves ordered `start/end`, provenance, medium, and creation time. It is an involution over semantic state. Range changes defensively rebase any endpoint frame that no longer fits the sole hard bound.
 
@@ -67,7 +71,7 @@ idle | context | playback | loop
 ```
 
 - Context stores anchor and bounded observation window.
-- Playback stores departure, parent Neighborhood/basis, and Undo model until physical settlement.
+- Playback stores departure, parent Neighborhood/basis, and Undo model until physical settlement. Settlement merges any intervening Held Offset and Guide state into that checkpoint so history order remains compositional.
 - Loop stores an immutable start/end/source snapshot and a cycle count.
 
 Loop wraps use adapter placement directly and never call a Session movement transaction. Playback settlement uses `completePlayback()` exactly once.
@@ -111,7 +115,8 @@ Each side runtime owns:
   activated,
   rateAvailable,
   blocked,
-  error
+  error,
+  retrySource
 }
 ```
 
@@ -123,7 +128,7 @@ Holding emits measured offsets to `app.js`, which may commit them through Sessio
 
 Side selection emits a Step payload only. `app.js` commits through the same `performStep()` used by matrix arrows, preserves the pending Interval anchor, and translates the complete Field around the new Current before Center-only Context.
 
-Pane collapse is projection-local. Hiding a side pauses it immediately without re-establishing its sibling; restoring a side establishes only that projection. Combined Hold/Stretch derives its state and targets from visible roles. Tail control order mirrors Lead around Center.
+Pane collapse is projection-local. Hiding a side pauses it immediately without re-establishing its sibling; restoring a side establishes only that projection. A media error retains the reusable adapter; restoring that pane sets `retrySource`, while a video load resets both side sources so reloading the same video can recover. Combined Hold/Stretch derives its state and targets from visible roles. Tail control order mirrors Lead around Center.
 
 ## 8. Guide integration
 
@@ -132,11 +137,15 @@ Guide tabs own creation and management:
 - Pins tab: title + Pin Current, then Go/Rename/Delete.
 - Sections tab: source extent + title + Save, then Go/Focus/Loop/Rename/Delete.
 
-Section Loop passes the resolved Section extent into the same `startLoopExtent()` used by matrix Loop. Matrix Loop consumes only the current movement Interval.
+Section Loop passes the resolved Section extent into the same `startLoopExtent()` used by matrix Loop. Matrix Loop consumes only the Active Interval.
+
+All Section endpoints remain Pin operands. `visiblePins()` therefore projects the complete retained Address set to timeline, Guide, and previous/next traversal; Pins used by Sections cannot be deleted until those references are removed. Section duplicate identity uses the same case-insensitive endpoint/title key at creation, rename, and persistence sanitization.
 
 ## 9. Rendering and layout
 
-`view.js` derives all labels and enabled states from Session and runtime snapshots. The wide Step Field ratio is `1 : 1.1 : 1`. A paused Center surface owns the shared user activation; it withdraws during ordinary playback so native YouTube controls remain usable. Below each player are mirrored object-local Field controls; no generic playback dock exists. `styles.css` owns the wide application layout, the exact 3×3 matrix, and the separate Undo action; `step-field.css` owns only the Field component and narrower stacking.
+`view.js` derives all labels and enabled states from Session and runtime snapshots. Refine exhaustion distinguishes a hard Range edge from the Resolution floor. Switch previews the destination endpoint’s retained Neighborhood and reports its Address, duration, and basis. The UI reports actual Resolution duration rather than a lineage count invalidated by Step.
+
+The wide Step Field ratio is `1 : 1.1 : 1`. Tail, Center, and Lead occupy explicit grid areas with zero-minimum tracks; Field-off always projects Center alone, independent of collapsed-side preferences. Side controls fold to two columns before their intrinsic widths can clip a pane. A paused Center surface owns the shared user activation; it withdraws during ordinary playback so native YouTube controls remain usable. Below each player are mirrored object-local Field controls; no generic playback dock exists. `styles.css` owns the wide application layout, the exact 3×3 matrix, and the separate Undo action; `step-field.css` owns only the Field component and narrower stacking.
 
 ## 10. Persistence
 

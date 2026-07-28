@@ -4,7 +4,8 @@ import {
   clamp,
   contains,
   midpoint,
-  getTargets
+  getTargets,
+  refineBlockReason
 } from "./range-geometry.js";
 import {
   createGuide,
@@ -598,11 +599,17 @@ function refine(direction) {
   settleBeforeAction({ replacingContext: true });
   const result = refineSession(state.session, direction);
   if (!result.changed) {
-    setStatus(`Cannot Refine ${direction === "backward" ? "Backward" : "Forward"} beyond the current Neighborhood.`);
+    const reason = refineBlockReason(currentResolution(), activeRange(), direction);
+    const label = direction === "backward" ? "Backward" : "Forward";
+    setStatus(
+      reason === "resolution-limit"
+        ? `Cannot Refine ${label}: this side has reached the Resolution limit. Reopen or Step to restore scale.`
+        : `Cannot Refine ${label}: Current is at the Range ${direction === "backward" ? "start" : "end"}.`
+    );
     return;
   }
   accept(result, {
-    status: `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}.`
+    status: `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; active Interval endpoint updated.`
   });
 }
 
@@ -629,7 +636,7 @@ function switchCurrentEndpoint() {
     return;
   }
   accept(result, {
-    status: `Switched to the other Interval endpoint at ${formatTime(result.session.model.resolution.C)}; extent remains ${formatRange(interval)}.`
+    status: `Switched to ${formatTime(result.session.model.resolution.C)}; matrix directions now edit the opposite endpoint while extent remains ${formatRange(interval)}.`
   });
 }
 
@@ -1051,7 +1058,11 @@ function submitGuideDialog(event) {
       return;
     }
     result = renameGuideSection(state.session, action.id, value);
-    status = result.changed ? "Renamed Section." : "Section title is unchanged.";
+    status = result.changed
+      ? "Renamed Section."
+      : result.reason === "duplicate-section"
+        ? "A Section with this title and Extent already exists."
+        : "Section title is unchanged.";
   } else if (action.action === "delete-section") {
     result = deleteGuideSection(state.session, action.id);
     status = result.changed ? "Deleted Section." : "Section could not be deleted.";
@@ -1084,6 +1095,7 @@ function goToAdjacentPin(direction) {
   moveToAddress(pin.t, {
     operator: direction === "backward" ? "previousPin" : "nextPin",
     label: direction === "backward" ? "Pin Backward" : "Pin Forward",
+    intervalMode: "edit",
     status: destination => `Moved ${direction} to Pin at ${formatTime(destination)}.`
   });
 }
@@ -1168,6 +1180,7 @@ function cuePendingVideo() {
   state.transport = idleTransport();
   state.videoLoaded = false;
   state.videoId = null;
+  stepField?.resetSources?.();
   state.session = createSession({ stepReach: preferences.stepReach });
   view.setPreviewAction(null);
   view.setPreviewSection(null);
@@ -1533,7 +1546,7 @@ function syncContextControl() {
 }
 
 function selectGuideTab(tab, { focus = false } = {}) {
-  const names = ["sections", "pins", "sources"];
+  const names = ["sections", "pins"];
   const resolved = names.includes(tab) ? tab : "sections";
   state.guideTab = resolved;
   for (const name of names) {
@@ -1904,8 +1917,7 @@ elements["guide-close"].addEventListener("click", closeGuide);
 elements["guide-scrim"].addEventListener("click", closeGuide);
 elements["guide-tab-sections"].addEventListener("click", () => selectGuideTab("sections"));
 elements["guide-tab-pins"].addEventListener("click", () => selectGuideTab("pins"));
-elements["guide-tab-sources"].addEventListener("click", () => selectGuideTab("sources"));
-for (const id of ["guide-tab-sections", "guide-tab-pins", "guide-tab-sources"]) {
+for (const id of ["guide-tab-sections", "guide-tab-pins"]) {
   elements[id].addEventListener("keydown", handleGuideTabKeydown);
 }
 elements["guide-dialog-form"].addEventListener("submit", submitGuideDialog);
@@ -1916,7 +1928,7 @@ elements["guide-dialog"].addEventListener("cancel", event => {
 });
 
 function handleGuideTabKeydown(event) {
-  const names = ["sections", "pins", "sources"];
+  const names = ["sections", "pins"];
   const currentIndex = names.indexOf(state.guideTab);
   let nextIndex = null;
   if (event.key === "ArrowLeft") nextIndex = (currentIndex + names.length - 1) % names.length;

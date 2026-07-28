@@ -2,7 +2,7 @@
 
 ## 1. Presence rule
 
-A visible element is admitted only when removing it would remove an implemented operation, conceal state needed to predict an operation, or erase feedback required to distinguish semantic commitment from physical observation.
+A visible element is admitted only when removing it would remove an implemented operation, conceal state needed to predict an operation, erase feedback required to distinguish semantic commitment from physical observation, or remove the minimum orientation copy needed to explain the operator grammar.
 
 ```text
 Panoramic Field
@@ -29,7 +29,7 @@ Tail and Lead are constitutive projections, not thumbnails. On wide desktop the 
 
 No separate playback dock, Context button, or Skim button appears here. Clicking paused Center or pressing Space refolds available sides and starts all three players through one parent-owned gesture; once ordinary playback begins, the surface withdraws and Center’s native YouTube controls are exposed. When paused, each side shows its represented frame. Side iframe pointer input is disabled so clicking the visible side surface performs semantic Step rather than independently toggling a muted player. Context is configured elsewhere and runs automatically.
 
-Side controls mirror across Center. Tail reads from its outside edge toward Center as `Step | Hold/Stretch | Offset | Rate`; Lead reads from Center toward its outside edge as `Rate | Offset | Hold/Stretch | Step`. Collapsing one side pauses and removes only that projection; it must not refold or reset the still-visible side. Center’s combined Hold/Stretch action applies only to visible sides.
+Side controls mirror across Center. Tail reads from its outside edge toward Center as `Step | Hold/Stretch | Offset | Rate`; Lead reads from Center toward its outside edge as `Rate | Offset | Hold/Stretch | Step`. Collapsing one side pauses and removes only that projection; it must not refold or reset the still-visible side. Restoring a pane may also retry a failed side source. Center’s combined Hold/Stretch action applies only to visible sides.
 
 ## 3. Temporal map
 
@@ -39,7 +39,7 @@ The map spans the same width as the viewer and shows:
 - Resolution;
 - semantic Current;
 - physical Cursor during playback/Context/Loop;
-- current movement Interval, resized live by Step;
+- Active Interval, resized live by every matrix direction;
 - Held Field span;
 - Pins;
 - action and Section previews.
@@ -67,11 +67,11 @@ Previous Pin    | Switch Endpoint | Next Pin
 
 The layout expresses relations, not keyboard geometry.
 
-- Row 1 acts on Resolution.
+- Row 1 acts on Resolution while editing the Active Interval endpoint.
 - Row 2 acts on movement and its active Interval: Step resizes the operand and Loop consumes its frozen extent.
-- Row 3 crosses retained Addresses or transposes the active movement’s endpoints.
+- Row 3 crosses retained Addresses while preserving the active anchor, or transposes the Interval’s endpoints.
 - Loop is central because surrounding movement operators establish the Interval it consumes and Step directly extends or shrinks that operand. It is genuine bounded playback with internal non-committing wraps.
-- Switch Endpoint is central between directional Pin traversal because it crosses the active Interval without changing its ordered extent. It restores the other endpoint’s retained Resolution frame and gives subsequent Step a transposed anchor.
+- Switch Endpoint is central between directional Pin traversal because it crosses the active Interval without changing its ordered extent. It restores the other endpoint’s retained Resolution frame and gives subsequent Refine, Step, and Pin traversal a transposed anchor. Its meta reports the destination Address, retained scale, and basis; its timeline preview shows that destination frame.
 
 Pin Current and Save Section do not belong in the matrix; they create retained records and therefore belong in Guide.
 
@@ -83,17 +83,15 @@ Guide is the complete retained-structure surface.
 
 ### Pins
 
-Creation row: Current, optional title, Pin Current. Each retained Pin exposes Go, Rename, Delete.
+Creation row: Current, optional title, Pin Current. Every Section endpoint is also a Pin and is available to timeline and matrix traversal. Each retained Pin exposes Go and Rename; Delete is unavailable while a Section references it.
 
 ### Sections
 
-Creation row: source (`Last movement Interval` or `Held Field span`), title, Save Section. Each retained Section exposes Go, Focus, Loop, Rename, Delete.
-
-### Sources
-
-External chapter/transcript records remain potential structure until explicitly retained.
+Creation row: source (`Active Interval` or `Held Field span`), title, Save Section. Each retained Section exposes Go, Focus, Loop, Rename, Delete. Equal endpoints and titles are duplicate identity case-insensitively, so runtime and reloaded Guide state cannot disagree.
 
 Focused Section state and Leave remain in Guide because Focus makes a retained Section own Range.
+
+Unimplemented Sources do not appear. Range extent is shown once in Parameters rather than repeated in the Range-tools disclosure; Guide totals remain on the closed toggle and individual tabs rather than a third combined header readout.
 
 ## 7. Responsive behaviour
 
@@ -101,6 +99,7 @@ Focused Section state and Leave remain in Guide because Focus makes a retained S
 - Medium: Center above Tail and Lead.
 - Phone: Center, Tail, Lead stack; each player remains at least `200 × 200` CSS pixels.
 - A collapsed pane contracts to a restore rail/bar at every breakpoint and the remaining pane reclaims the freed width.
+- Pane placement is explicit rather than DOM-auto-flowed; Field-off remains Center-only and no grid track may force horizontal clipping.
 - Guide becomes a modal sheet below 900px.
 - Coarse-pointer controls preserve the shared 48px target.
 

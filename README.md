@@ -21,6 +21,7 @@ The YouTube IFrame API requires a browser origin and network access. Repository 
 
 ```bash
 npm test
+npm run test:semantic
 npm run audit
 npm run check
 ```
@@ -30,8 +31,8 @@ npm run check
 ```text
 Address → Current inside Range
 Current + Resolution → Neighborhood
-committed movement → Interval
-Step → move the Interval's active endpoint
+direct committed movement → establish/replace Interval
+matrix direction → move the Interval's active endpoint
 Switch Endpoint → transpose Interval endpoints and restore the other endpoint frame
 Address → Pin
 explicit Extent → Section
@@ -46,9 +47,11 @@ Center is the only audible player and retains native YouTube controls during pla
 
 Context is not a button. A configured Context window runs automatically after discrete traversal, plays only in Center, restores Center to committed Current, and never activates Tail or Lead.
 
-Step is also the Interval editor. The movement that establishes an Interval supplies its fixed departure anchor; subsequent Step actions move the active endpoint at Current. Stepping outward extends the Loop/Section region, stepping inward shrinks it, and crossing the anchor redraws it in the opposite direction. Held arrow-key repeats form one gesture and start Context once on keyup.
+The matrix is also the Interval editor. A direct movement establishes its fixed departure anchor; subsequent Refine, Step, and Pin-direction actions move the active endpoint at Current. They can therefore locate an arbitrary endpoint, cross retained Pins, or deform the Loop/Section region without losing the opposite endpoint. A later direct timeline/Guide Go or settled native playback intentionally establishes a new Interval.
 
-Every Interval endpoint retains the Resolution frame last occupied there. Switch Endpoint leaves the ordered extent unchanged, makes the other endpoint Current, and restores that endpoint’s frame. Step then composes from the transposed anchor. A collapsed Interval has nothing to switch.
+Stepping outward extends the operand, stepping inward shrinks it, and crossing the anchor redraws it in the opposite direction. Inside Resolution, Step retains the active binary Neighborhood. When it reaches or crosses the directional Neighborhood endpoint, it pushes that endpoint to one Step beyond Current, clamped to Range, so the next directional Refine remains half a Step away wherever Range permits. Held arrow-key repeats form one gesture and start Context once on keyup.
+
+Every Interval endpoint retains the Resolution frame last occupied there. Switch Endpoint leaves the ordered extent unchanged, makes the other endpoint Current, and restores that endpoint’s frame. Refine, Step, and Pin traversal then compose from the transposed anchor. A collapsed Interval has nothing to switch; the next matrix direction redraws from that same Current.
 
 ## Step Field
 
@@ -66,6 +69,7 @@ Each side owns a maximum Offset and a supported directional Rate.
 - **Hold** switches the side to `1×` and preserves the measured Offset. Holding midway through Stretch may make that measured Offset the new maximum and Step distance, but never changes the semantic Interval.
 - Clicking a side video surface or its Step button performs the same semantic Step by the visible differential, falling back to the configured maximum Offset. The complete Field translates by that amount and parks again, producing slideshow-like repeated traversal while editing the active Loop/Section Interval.
 - Context suspends the sides without remeasuring or changing their stored relation. The next genuine play refolds and starts a fresh Stretch.
+- A side-player media error remains recoverable: restoring that pane or reloading the video retries its source instead of leaving the projection permanently unavailable.
 
 Disabling the Field preserves the stable single-player reader and does not create side players.
 
@@ -81,7 +85,7 @@ Loop freezes the current Interval when started. It plays to the Interval end, in
 
 Undo is intentionally outside the relational matrix and uses the platform-standard Ctrl/Cmd+Z shortcut.
 
-Pin and Section creation live in Guide beside naming, traversal, Loop, Focus, rename, and deletion.
+Pin and Section creation live in Guide beside naming, traversal, Loop, Focus, rename, and deletion. Section endpoints are Pins and participate in matrix Pin traversal even before they receive independent titles.
 
 ## Keyboard
 
