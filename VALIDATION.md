@@ -16,6 +16,19 @@ A passing gate is necessary but not sufficient for release.
 
 Use at least two ordinary videos with different durations and reported playback-rate sets.
 
+### Interface composition
+
+- Confirm Tail, Center, and Lead form one panoramic row at wide desktop widths.
+- Confirm playback controls sit directly under the panes and share one visual grammar.
+- Confirm the temporal map spans the media width and has no stretched empty panel area.
+- Confirm Parameters, the centered operator matrix, and Guide occupy left, center, and right respectively.
+- Confirm the matrix order is `W`; `A/D`; `←/S/→`; `Shift+←/P/Shift+→`.
+- Confirm Step Reach and all other entered values are absent from the matrix.
+- Confirm there is no duplicate retained-Pins button and no inert Section state button.
+- Confirm Range and Resolution are presented as parameter/state information rather than playback commands.
+- Confirm Loop matches Continue, Context, and Skim as a playback/observation action.
+- Confirm each visible element has a specific capability or irreducible state described in `INTERFACE.md`.
+
 ### Load and stable reader
 
 - Load by full URL, short URL, and raw video ID.

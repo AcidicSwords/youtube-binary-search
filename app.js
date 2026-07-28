@@ -1978,7 +1978,6 @@ elements["step-forward"].addEventListener("click", () => performStep("forward"))
 elements["pin-backward"].addEventListener("click", () => goToAdjacentPin("backward"));
 elements["pin-forward"].addEventListener("click", () => goToAdjacentPin("forward"));
 elements["pin-current"].addEventListener("click", pinCurrent);
-elements["pins-access"].addEventListener("click", () => openGuide("pins"));
 elements["context-action"].addEventListener("click", replayContext);
 elements.continue.addEventListener("click", continuePause);
 elements.skim.addEventListener("click", startSkim);
@@ -2024,7 +2023,6 @@ elements["range-state"].addEventListener("click", toggleRangeTools);
 elements["range-tools"].addEventListener("toggle", () => {
   elements["range-state"].setAttribute("aria-expanded", String(elements["range-tools"].open));
 });
-elements["focused-state"].addEventListener("click", () => openGuide("sections"));
 elements["leave-section"].addEventListener("click", leaveSection);
 
 // Guide

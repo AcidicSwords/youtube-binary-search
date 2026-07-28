@@ -37,22 +37,28 @@
 
     <div class="workspace">
       <section id="reader-column" class="reader-column" aria-label="Video reader">
-        <section class="player-panel" aria-label="Video and observation">
+        <section class="player-panel" aria-label="Panoramic video field">
           <div id="step-field" class="step-field field-off" data-phase="off" aria-label="Step Field">
             <section id="tail-pane" class="step-pane step-pane-side tail-pane" aria-label="Tail Step projection">
               <div class="step-pane-bar">
-                <span class="step-pane-role">Tail</span>
-                <span id="tail-meta" class="step-pane-meta">—</span>
-                <label class="pane-rate-setting" for="tail-rate-select">
-                  <span class="sr-only">Tail playback rate</span>
-                  <select id="tail-rate-select" aria-label="Tail playback rate" disabled><option value="0.5">0.5×</option></select>
-                </label>
-                <button id="tail-collapse" class="pane-collapse" type="button" aria-label="Hide Tail" title="Hide Tail">×</button>
+                <div class="pane-identity">
+                  <span class="step-pane-role">Tail</span>
+                  <span id="tail-meta" class="step-pane-meta">—</span>
+                </div>
+                <div class="pane-controls">
+                  <label class="pane-rate-setting" for="tail-rate-select">
+                    <span>Rate</span>
+                    <select id="tail-rate-select" aria-label="Tail playback rate" disabled><option value="0.5">0.5×</option></select>
+                  </label>
+                  <button id="tail-collapse" class="pane-collapse" type="button" aria-label="Hide Tail" title="Hide Tail">×</button>
+                </div>
               </div>
-              <div class="player-wrap"><div id="player-tail"></div></div>
-              <button id="tail-step" class="step-pane-action" type="button" aria-label="Step Backward" disabled>
-                <span class="sr-only">Step Backward</span>
-              </button>
+              <div class="player-wrap">
+                <div id="player-tail"></div>
+                <button id="tail-step" class="step-pane-action" type="button" aria-label="Select Tail projection" disabled>
+                  <span class="sr-only">Select Tail projection</span>
+                </button>
+              </div>
               <button id="tail-restore" class="step-pane-restore" type="button" aria-label="Show Tail" hidden>
                 <span aria-hidden="true">←</span><span>Tail</span>
               </button>
@@ -60,8 +66,10 @@
 
             <section class="step-pane step-pane-center" aria-label="Center video">
               <div class="step-pane-bar center-bar">
-                <span class="step-pane-role">Center</span>
-                <span id="center-meta" class="step-pane-meta">—</span>
+                <div class="pane-identity">
+                  <span class="step-pane-role">Center</span>
+                  <span id="center-meta" class="step-pane-meta">—</span>
+                </div>
                 <button id="step-field-toggle" class="field-toggle" type="button" aria-pressed="true" aria-label="Hide Step Field">
                   <span>Field</span><span id="step-field-meta">Ready</span>
                 </button>
@@ -71,104 +79,57 @@
 
             <section id="lead-pane" class="step-pane step-pane-side lead-pane" aria-label="Lead Step projection">
               <div class="step-pane-bar">
-                <span class="step-pane-role">Lead</span>
-                <span id="lead-meta" class="step-pane-meta">—</span>
-                <label class="pane-rate-setting" for="lead-rate-select">
-                  <span class="sr-only">Lead playback rate</span>
-                  <select id="lead-rate-select" aria-label="Lead playback rate" disabled><option value="2">2×</option></select>
-                </label>
-                <button id="lead-collapse" class="pane-collapse" type="button" aria-label="Hide Lead" title="Hide Lead">×</button>
+                <div class="pane-identity">
+                  <span class="step-pane-role">Lead</span>
+                  <span id="lead-meta" class="step-pane-meta">—</span>
+                </div>
+                <div class="pane-controls">
+                  <label class="pane-rate-setting" for="lead-rate-select">
+                    <span>Rate</span>
+                    <select id="lead-rate-select" aria-label="Lead playback rate" disabled><option value="2">2×</option></select>
+                  </label>
+                  <button id="lead-collapse" class="pane-collapse" type="button" aria-label="Hide Lead" title="Hide Lead">×</button>
+                </div>
               </div>
-              <div class="player-wrap"><div id="player-lead"></div></div>
-              <button id="lead-step" class="step-pane-action" type="button" aria-label="Step Forward" disabled>
-                <span class="sr-only">Step Forward</span>
-              </button>
+              <div class="player-wrap">
+                <div id="player-lead"></div>
+                <button id="lead-step" class="step-pane-action" type="button" aria-label="Select Lead projection" disabled>
+                  <span class="sr-only">Select Lead projection</span>
+                </button>
+              </div>
               <button id="lead-restore" class="step-pane-restore" type="button" aria-label="Show Lead" hidden>
                 <span>Lead</span><span aria-hidden="true">→</span>
               </button>
             </section>
           </div>
 
-          <div class="field-transport-bar" aria-label="Field transport">
-            <span id="field-transport-help" class="sr-only">Continue controls Center and any available Tail and Lead panes. Native Center controls remain available.</span>
-            <button id="continue" class="field-transport" type="button" aria-keyshortcuts="Space" aria-describedby="field-transport-help" title="Continue or pause Center and available Field panes" disabled>
-              <span id="continue-label">Continue</span>
-              <span id="continue-meta" class="control-meta">—</span>
-            </button>
-            <span id="field-transport-state" class="field-transport-state">Off</span>
-            <span id="field-rate-state" class="field-rate-state">Tail — · Center 1× · Lead —</span>
-          </div>
-
-          <div id="status" class="status" role="status" aria-live="polite">Load a YouTube video to begin.</div>
-        </section>
-
-        <div class="interaction-grid">
-          <section class="panel timeline-panel" aria-label="Range and temporal map">
-            <div class="panel-heading compact-heading">
-              <div>
-                <span class="eyebrow">Range</span>
-                <h2>Temporal map</h2>
-              </div>
-              <div class="timeline-header">
-                <span id="cursor-time" aria-label="Observed position">0:00.000</span>
-                <span id="duration-time">0:00.000</span>
-              </div>
-            </div>
-
-            <div id="timeline" class="timeline" aria-label="Temporal map. Click inside Range to go directly to an Address.">
-              <div class="track">
-                <div id="range-fill" class="range-fill"></div>
-                <div id="resolution-fill" class="resolution-fill"></div>
-                <div id="interval-fill" class="interval-fill" hidden></div>
-                <div id="section-preview-fill" class="section-preview-fill" hidden></div>
-                <div id="action-preview-fill" class="action-preview-fill" hidden></div>
-                <div id="field-span-fill" class="field-span-fill" hidden></div>
-              </div>
-              <div id="pin-lane" class="pin-lane" aria-label="Pins"></div>
-              <div id="pin-cluster-menu" class="pin-cluster-menu" role="menu" aria-label="Nearby Pins" hidden></div>
-
-              <button id="range-start-handle" class="marker range-handle" type="button" role="slider" aria-label="Range Start" aria-orientation="horizontal" aria-valuemin="0" aria-valuenow="0"></button>
-              <button id="range-end-handle" class="marker range-handle" type="button" role="slider" aria-label="Range End" aria-orientation="horizontal" aria-valuemin="0" aria-valuenow="0"></button>
-              <span id="resolution-start-marker" class="marker resolution-marker" aria-hidden="true"></span>
-              <span id="resolution-end-marker" class="marker resolution-marker" aria-hidden="true"></span>
-              <span id="backward-target-marker" class="marker target-marker" aria-hidden="true"></span>
-              <span id="forward-target-marker" class="marker target-marker" aria-hidden="true"></span>
-              <span id="current-marker" class="marker current-marker" aria-hidden="true"></span>
-              <span id="cursor-marker" class="marker cursor-marker" aria-hidden="true" hidden></span>
-            </div>
-
-            <div class="state-strip" aria-label="Current spatial state">
-              <button id="range-state" class="state-chip state-button" type="button" aria-controls="range-tools" aria-expanded="false">
-                <span>Range</span><strong id="range-label">—</strong>
+          <div class="field-transport-bar" aria-label="Playback and observation">
+            <span id="field-transport-help" class="sr-only">Continue controls Center and any available Tail and Lead panes. Context, Skim, and Loop use the current semantic operands.</span>
+            <div class="transport-actions">
+              <button id="continue" class="field-transport transport-primary" type="button" aria-keyshortcuts="Space" aria-describedby="field-transport-help" title="Continue or pause Center and available Field panes" disabled>
+                <span id="continue-label">Continue</span>
+                <span id="continue-meta" class="control-meta">—</span>
               </button>
+              <button id="context-action" class="transport-action" type="button" data-preview-action="context" aria-keyshortcuts="C" disabled>
+                <span id="context-label">Context</span><span id="context-state" class="control-meta">5 s</span>
+              </button>
+              <button id="skim" class="transport-action" type="button" data-preview-action="skim" aria-keyshortcuts="F" disabled>
+                <span id="skim-label">Skim</span><span id="skim-meta" class="control-meta">—</span>
+              </button>
+              <button id="loop" class="transport-action" type="button" data-preview-action="loop" aria-keyshortcuts="L" disabled>
+                <span id="loop-label">Loop</span><span id="loop-meta" class="control-meta">—</span>
+              </button>
+            </div>
 
-              <div class="state-chip object-state resolution-state">
-                <div><span>Resolution</span><strong id="resolution-label">—</strong></div>
-                <button id="skim" class="object-action" type="button" data-preview-action="skim" aria-keyshortcuts="F" disabled>
-                  <span id="skim-label">Skim</span><span id="skim-meta" class="sr-only">—</span>
-                </button>
+            <div class="transport-readouts">
+              <div class="transport-readout">
+                <span>Current</span><strong id="current-label">—</strong>
               </div>
-
-              <div class="state-chip object-state current-state">
-                <div><span>Current</span><strong id="current-label">—</strong></div>
-                <button id="context-action" class="object-action" type="button" data-preview-action="context" aria-keyshortcuts="C" disabled>
-                  <span id="context-label">Context</span><span id="context-state" class="sr-only">5 s</span>
-                </button>
-              </div>
-
-              <div class="state-chip object-state extent-state interval-state-group">
-                <button id="interval-state" class="extent-value" type="button" aria-controls="section-capture" aria-expanded="false" aria-keyshortcuts="Shift+P" disabled>
-                  <span>Interval</span><strong id="interval-label">—</strong>
-                </button>
-                <div class="extent-actions">
-                  <button id="loop" class="extent-action" type="button" data-preview-action="loop" aria-keyshortcuts="L" disabled>
-                    <span id="loop-label">Loop</span><span id="loop-meta" class="sr-only">—</span>
-                  </button>
-                </div>
-              </div>
-
-              <div id="field-span-state" class="state-chip object-state extent-state field-span-state" hidden>
-                <div class="extent-value">
+              <button id="interval-state" class="transport-readout operand-readout" type="button" aria-controls="section-capture" aria-expanded="false" aria-keyshortcuts="Shift+P" disabled>
+                <span>Interval</span><strong id="interval-label">—</strong><em>Retain</em>
+              </button>
+              <div id="field-span-state" class="transport-readout field-span-state" hidden>
+                <div>
                   <span>Field Span</span><strong id="field-span-label">—</strong>
                 </div>
                 <div class="extent-actions">
@@ -176,11 +137,122 @@
                   <button id="field-span-retain" class="extent-action" type="button" disabled>Retain</button>
                 </div>
               </div>
-
-              <button id="focused-state" class="state-chip state-button" type="button" aria-controls="guide-panel" disabled>
-                <span>Section</span><strong id="focused-label">—</strong>
-              </button>
             </div>
+
+            <div class="transport-status">
+              <span id="field-transport-state" class="field-transport-state">Off</span>
+              <span id="field-rate-state" class="field-rate-state">Tail — · Center 1× · Lead —</span>
+            </div>
+          </div>
+
+          <div id="status" class="status" role="status" aria-live="polite">Load a YouTube video to begin.</div>
+        </section>
+
+        <section class="panel timeline-panel" aria-label="Range and temporal map">
+          <div class="panel-heading timeline-heading">
+            <div>
+              <span class="eyebrow">Range</span>
+              <h2>Temporal map</h2>
+            </div>
+            <div class="timeline-header">
+              <span><small>Cursor</small><strong id="cursor-time" aria-label="Observed position">0:00.000</strong></span>
+              <span><small>Duration</small><strong id="duration-time">0:00.000</strong></span>
+            </div>
+          </div>
+
+          <div id="timeline" class="timeline" aria-label="Temporal map. Click inside Range to go directly to an Address.">
+            <div class="track">
+              <div id="range-fill" class="range-fill"></div>
+              <div id="resolution-fill" class="resolution-fill"></div>
+              <div id="interval-fill" class="interval-fill" hidden></div>
+              <div id="section-preview-fill" class="section-preview-fill" hidden></div>
+              <div id="action-preview-fill" class="action-preview-fill" hidden></div>
+              <div id="field-span-fill" class="field-span-fill" hidden></div>
+            </div>
+            <div id="pin-lane" class="pin-lane" aria-label="Pins"></div>
+            <div id="pin-cluster-menu" class="pin-cluster-menu" role="menu" aria-label="Nearby Pins" hidden></div>
+
+            <button id="range-start-handle" class="marker range-handle" type="button" role="slider" aria-label="Range Start" aria-orientation="horizontal" aria-valuemin="0" aria-valuenow="0"></button>
+            <button id="range-end-handle" class="marker range-handle" type="button" role="slider" aria-label="Range End" aria-orientation="horizontal" aria-valuemin="0" aria-valuenow="0"></button>
+            <span id="resolution-start-marker" class="marker resolution-marker" aria-hidden="true"></span>
+            <span id="resolution-end-marker" class="marker resolution-marker" aria-hidden="true"></span>
+            <span id="backward-target-marker" class="marker target-marker" aria-hidden="true"></span>
+            <span id="forward-target-marker" class="marker target-marker" aria-hidden="true"></span>
+            <span id="current-marker" class="marker current-marker" aria-hidden="true"></span>
+            <span id="cursor-marker" class="marker cursor-marker" aria-hidden="true" hidden></span>
+          </div>
+        </section>
+
+        <div class="command-workspace">
+          <aside class="panel parameter-panel" aria-labelledby="parameters-heading">
+            <div class="panel-heading compact-heading">
+              <div>
+                <span class="eyebrow">Inputs and state</span>
+                <h2 id="parameters-heading">Parameters</h2>
+              </div>
+              <p>Values entered here alter the operands used by the centered operators.</p>
+            </div>
+
+            <button id="range-state" class="parameter-state state-button" type="button" aria-controls="range-tools" aria-expanded="false">
+              <span>Active Range</span><strong id="range-label">—</strong>
+            </button>
+
+            <div id="resolution-state" class="parameter-state">
+              <span>Resolution</span><strong id="resolution-label">—</strong>
+            </div>
+
+            <details id="range-tools" class="tool-disclosure">
+              <summary><span>Range tools</span><span id="range-tools-value">—</span></summary>
+              <div class="compact-actions">
+                <button id="range-start-here" type="button" disabled>Start at Current</button>
+                <button id="range-midpoint" type="button" disabled>Go to Midpoint</button>
+                <button id="range-end-here" type="button" disabled>End at Current</button>
+                <button id="full-video-range" type="button" disabled>Full Video</button>
+              </div>
+            </details>
+
+            <details id="step-settings" class="tool-disclosure step-settings">
+              <summary>
+                <span>Step Reach</span>
+                <strong id="step-setting-value">← 10s | 10s →</strong>
+              </summary>
+              <div class="settings-body step-field-settings">
+                <fieldset>
+                  <legend>Geometry</legend>
+                  <label class="link-setting" for="step-link">
+                    <input id="step-link" type="checkbox" checked disabled>
+                    <span>Link directional Reach</span>
+                  </label>
+                  <label class="number-setting" for="step-backward-seconds">
+                    <span>Backward Reach</span>
+                    <span><input id="step-backward-seconds" type="number" min="0.25" max="300" step="0.25" value="10" disabled> seconds</span>
+                  </label>
+                  <label class="number-setting" for="step-forward-seconds">
+                    <span>Forward Reach</span>
+                    <span><input id="step-forward-seconds" type="number" min="0.25" max="300" step="0.25" value="10" disabled> seconds</span>
+                  </label>
+                </fieldset>
+              </div>
+            </details>
+
+            <details id="observation-settings" class="tool-disclosure observation-settings">
+              <summary><span>Observation</span><span>Context · Skim</span></summary>
+              <div class="compact-settings">
+                <label class="compact-setting" for="context-select">
+                  <span>Context duration</span>
+                  <select id="context-select" disabled>
+                    <option value="0">Off</option>
+                    <option value="3">3 s</option>
+                    <option value="5" selected>5 s</option>
+                    <option value="10">10 s</option>
+                  </select>
+                </label>
+                <label class="compact-setting" for="speed-select">
+                  <span>Skim rate</span>
+                  <select id="speed-select" disabled><option value="1">1×</option></select>
+                </label>
+              </div>
+            </details>
 
             <form id="section-capture" class="capture-bar" hidden>
               <div>
@@ -189,22 +261,44 @@
               </div>
               <label class="sr-only" for="section-label">Section title</label>
               <input id="section-label" type="text" maxlength="100" placeholder="Section title" disabled>
-              <button id="save-section" class="primary" type="submit" disabled>Save Section</button>
-              <button id="cancel-section" type="button">Cancel</button>
+              <div class="capture-actions">
+                <button id="save-section" class="primary" type="submit" disabled>Save Section</button>
+                <button id="cancel-section" type="button">Cancel</button>
+              </div>
             </form>
-          </section>
+
+            <details id="shortcut-help" class="tool-disclosure shortcut-help">
+              <summary id="shortcut-help-summary"><span>Keyboard</span><kbd>?</kbd></summary>
+              <div class="shortcut-grid">
+                <span><kbd>W</kbd> Reopen</span>
+                <span><kbd>A</kbd>/<kbd>D</kbd> Refine</span>
+                <span><kbd>←</kbd>/<kbd>→</kbd> Step</span>
+                <span><kbd>S</kbd> Return</span>
+                <span><kbd>⇧←</kbd>/<kbd>⇧→</kbd> Pins</span>
+                <span><kbd>P</kbd> Pin Current</span>
+                <span><kbd>Space</kbd> Continue/Pause</span>
+                <span><kbd>C</kbd> Context</span>
+                <span><kbd>F</kbd> Skim</span>
+                <span><kbd>L</kbd> Loop</span>
+                <span><kbd>⇧P</kbd> Save Section</span>
+                <span><kbd>G</kbd> Guide</span>
+                <span><kbd>[</kbd>/<kbd>]</kbd> Reach preset</span>
+                <span><kbd>Esc</kbd> Stop or close</span>
+              </div>
+            </details>
+          </aside>
 
           <section class="panel navigation-panel" aria-labelledby="navigation-heading">
-            <div class="panel-heading compact-heading">
+            <div class="panel-heading navigation-heading">
               <div>
-                <span class="eyebrow">Neighborhood</span>
+                <span class="eyebrow">Operator matrix</span>
                 <h2 id="navigation-heading">Navigate</h2>
               </div>
-              <p>Refine resolution, reopen availability, step locally, or use retained Pins.</p>
+              <p>One spatial grammar: reopen, refine, step, return, and cross retained Pins.</p>
             </div>
 
             <div class="navigation-deck">
-              <button id="reopen" class="nav-action spine reopen-action" type="button" data-preview-action="reopen" aria-keyshortcuts="W" disabled>
+              <button id="reopen" class="nav-action reopen-action" type="button" data-preview-action="reopen" aria-keyshortcuts="W" disabled>
                 <span class="action-name"><kbd>W</kbd> Reopen</span>
                 <span id="reopen-meta" class="action-meta">—</span>
               </button>
@@ -214,54 +308,24 @@
                 <span id="backward-meta" class="action-meta">—</span>
               </button>
 
-              <button id="return-action" class="nav-action history-action spine" type="button" aria-keyshortcuts="S Control+Z Meta+Z Backspace" disabled>
-                <span class="action-name"><kbd>S</kbd> Return</span>
-                <span id="return-meta" class="action-meta">Nothing to return to</span>
-              </button>
-
               <button id="refine-forward" class="nav-action primary direction forward" type="button" data-preview-action="forward" aria-keyshortcuts="D" disabled>
                 <span class="action-name"><kbd>D</kbd> Refine Forward</span>
                 <span id="forward-meta" class="action-meta">—</span>
               </button>
 
-              <details id="step-settings" class="step-settings spine">
-                <summary>
-                  <span>Step Reach</span>
-                  <strong id="step-setting-value">← 10s | 10s →</strong>
-                  <kbd>[ ]</kbd>
-                </summary>
-                <div class="settings-popover step-field-settings">
-                  <fieldset>
-                    <legend>Geometry</legend>
-                    <label class="link-setting" for="step-link">
-                      <input id="step-link" type="checkbox" checked disabled>
-                      <span>Link directional Reach</span>
-                    </label>
-                    <label class="number-setting" for="step-backward-seconds">
-                      <span>Backward Reach</span>
-                      <span><input id="step-backward-seconds" type="number" min="0.25" max="300" step="0.25" value="10" disabled> seconds</span>
-                    </label>
-                    <label class="number-setting" for="step-forward-seconds">
-                      <span>Forward Reach</span>
-                      <span><input id="step-forward-seconds" type="number" min="0.25" max="300" step="0.25" value="10" disabled> seconds</span>
-                    </label>
-                  </fieldset>
-                </div>
-              </details>
-
               <button id="step-backward" class="nav-action direction backward" type="button" data-preview-action="stepBackward" aria-keyshortcuts="ArrowLeft" disabled>
                 <span class="action-name"><kbd>←</kbd> Step Backward</span>
                 <span id="step-backward-meta" class="action-meta">—</span>
               </button>
-              <div class="deck-spacer" aria-hidden="true"></div>
+
+              <button id="return-action" class="nav-action history-action" type="button" aria-keyshortcuts="S Control+Z Meta+Z Backspace" disabled>
+                <span class="action-name"><kbd>S</kbd> Return</span>
+                <span id="return-meta" class="action-meta">Nothing to return to</span>
+              </button>
+
               <button id="step-forward" class="nav-action direction forward" type="button" data-preview-action="stepForward" aria-keyshortcuts="ArrowRight" disabled>
                 <span class="action-name"><kbd>→</kbd> Step Forward</span>
                 <span id="step-forward-meta" class="action-meta">—</span>
-              </button>
-
-              <button id="pin-current" class="nav-action spine pin-current-action" type="button" aria-keyshortcuts="P" disabled>
-                <span class="action-name"><kbd>P</kbd> Pin Current</span>
-                <span id="pin-current-meta" class="action-meta">—</span>
               </button>
 
               <button id="pin-backward" class="nav-action direction backward" type="button" data-preview-action="previousPin" aria-keyshortcuts="Shift+ArrowLeft" disabled>
@@ -269,9 +333,9 @@
                 <span id="pin-backward-meta" class="action-meta">—</span>
               </button>
 
-              <button id="pins-access" class="nav-action spine guide-access" type="button" aria-controls="guide-panel">
-                <span class="action-name">Pins</span>
-                <span id="pins-access-meta" class="action-meta">0 retained</span>
+              <button id="pin-current" class="nav-action pin-current-action" type="button" aria-keyshortcuts="P" disabled>
+                <span class="action-name"><kbd>P</kbd> Pin Current</span>
+                <span id="pin-current-meta" class="action-meta">—</span>
               </button>
 
               <button id="pin-forward" class="nav-action direction forward" type="button" data-preview-action="nextPin" aria-keyshortcuts="Shift+ArrowRight" disabled>
@@ -280,103 +344,50 @@
               </button>
             </div>
           </section>
-        </div>
 
-        <div class="secondary-tools">
-          <details id="range-tools" class="tool-disclosure">
-            <summary><span>Range tools</span><span id="range-tools-value">—</span></summary>
-            <div class="compact-actions">
-              <button id="range-start-here" type="button" disabled>Start at Current</button>
-              <button id="range-midpoint" type="button" disabled>Go to Midpoint</button>
-              <button id="range-end-here" type="button" disabled>End at Current</button>
-              <button id="full-video-range" type="button" disabled>Full Video</button>
+          <aside id="guide-panel" class="guide-panel panel" aria-label="Guide" aria-hidden="false">
+            <div class="guide-header">
+              <div>
+                <span class="eyebrow">Retained structure</span>
+                <h2>Guide</h2>
+              </div>
+              <div class="guide-header-actions">
+                <span class="guide-counts"><span id="section-count">0</span> Sections · <span id="pin-count">0</span> Pins</span>
+                <button id="guide-close" class="guide-close" type="button" aria-label="Close Guide">×</button>
+              </div>
             </div>
-          </details>
 
-
-          <details id="observation-settings" class="tool-disclosure observation-settings">
-            <summary><span>Observation settings</span><span>Context · Skim</span></summary>
-            <div class="compact-settings">
-              <label class="compact-setting" for="context-select">
-                <span>Context duration</span>
-                <select id="context-select" disabled>
-                  <option value="0">Off</option>
-                  <option value="3">3 s</option>
-                  <option value="5" selected>5 s</option>
-                  <option value="10">10 s</option>
-                </select>
-              </label>
-              <label class="compact-setting" for="speed-select">
-                <span>Skim rate</span>
-                <select id="speed-select" disabled><option value="1">1×</option></select>
-              </label>
+            <div class="guide-tabs" role="tablist" aria-label="Guide views">
+              <button id="guide-tab-sections" class="guide-tab active" type="button" role="tab" aria-selected="true" aria-controls="guide-sections-panel" tabindex="0">Sections <span id="sections-list-count">0</span></button>
+              <button id="guide-tab-pins" class="guide-tab" type="button" role="tab" aria-selected="false" aria-controls="guide-pins-panel" tabindex="-1">Pins <span id="pins-list-count">0</span></button>
+              <button id="guide-tab-sources" class="guide-tab" type="button" role="tab" aria-selected="false" aria-controls="guide-sources-panel" tabindex="-1">Sources</button>
             </div>
-          </details>
 
-          <details id="shortcut-help" class="tool-disclosure shortcut-help">
-            <summary id="shortcut-help-summary"><span>Keyboard</span><kbd>?</kbd></summary>
-            <div class="shortcut-grid">
-              <span><kbd>W</kbd> Reopen</span>
-              <span><kbd>A</kbd> Refine Backward</span>
-              <span><kbd>S</kbd> Return</span>
-              <span><kbd>D</kbd> Refine Forward</span>
-              <span><kbd>←</kbd>/<kbd>→</kbd> Step</span>
-              <span><kbd>⇧←</kbd>/<kbd>⇧→</kbd> Pin backward/forward</span>
-              <span><kbd>P</kbd> Pin Current</span>
-              <span><kbd>⇧P</kbd> Save Section</span>
-              <span><kbd>C</kbd> Context</span>
-              <span><kbd>Space</kbd> Continue/Pause</span>
-              <span><kbd>F</kbd> Skim</span>
-              <span><kbd>L</kbd> Loop</span>
-              <span><kbd>G</kbd> Guide</span>
-              <span><kbd>[</kbd>/<kbd>]</kbd> Reach preset</span>
-              <span><kbd>Esc</kbd> Stop or close</span>
-            </div>
-          </details>
+            <section id="focused-section" class="focused-section" hidden>
+              <div>
+                <span class="eyebrow">Active Range</span>
+                <strong id="focused-section-title">—</strong>
+                <span id="focused-section-range">—</span>
+              </div>
+              <button id="leave-section" type="button" disabled>Leave</button>
+            </section>
+
+            <section id="guide-sections-panel" class="guide-tab-panel" role="tabpanel" aria-labelledby="guide-tab-sections">
+              <div id="sections-list" class="guide-list"><p class="empty-state">No Sections for this video.</p></div>
+            </section>
+
+            <section id="guide-pins-panel" class="guide-tab-panel" role="tabpanel" aria-labelledby="guide-tab-pins" hidden>
+              <div id="pins-list" class="guide-list"><p class="empty-state">No Pins for this video.</p></div>
+            </section>
+
+            <section id="guide-sources-panel" class="guide-tab-panel source-placeholder" role="tabpanel" aria-labelledby="guide-tab-sources" hidden>
+              <span class="eyebrow">Potential structure</span>
+              <h3>Chapters and transcripts</h3>
+              <p>This boundary is reserved for source-provided potential Pins and Sections. Source records remain external until explicitly retained in the Guide.</p>
+            </section>
+          </aside>
         </div>
       </section>
-
-      <aside id="guide-panel" class="guide-panel" aria-label="Guide" aria-hidden="false">
-        <div class="guide-header">
-          <div>
-            <span class="eyebrow">Retained structure</span>
-            <h2>Guide</h2>
-          </div>
-          <div class="guide-header-actions">
-            <span class="guide-counts"><span id="section-count">0</span> Sections · <span id="pin-count">0</span> Pins</span>
-            <button id="guide-close" class="guide-close" type="button" aria-label="Close Guide">×</button>
-          </div>
-        </div>
-
-        <div class="guide-tabs" role="tablist" aria-label="Guide views">
-          <button id="guide-tab-sections" class="guide-tab active" type="button" role="tab" aria-selected="true" aria-controls="guide-sections-panel" tabindex="0">Sections <span id="sections-list-count">0</span></button>
-          <button id="guide-tab-pins" class="guide-tab" type="button" role="tab" aria-selected="false" aria-controls="guide-pins-panel" tabindex="-1">Pins <span id="pins-list-count">0</span></button>
-          <button id="guide-tab-sources" class="guide-tab" type="button" role="tab" aria-selected="false" aria-controls="guide-sources-panel" tabindex="-1">Sources</button>
-        </div>
-
-        <section id="focused-section" class="focused-section" hidden>
-          <div>
-            <span class="eyebrow">Active Range</span>
-            <strong id="focused-section-title">—</strong>
-            <span id="focused-section-range">—</span>
-          </div>
-          <button id="leave-section" type="button" disabled>Leave</button>
-        </section>
-
-        <section id="guide-sections-panel" class="guide-tab-panel" role="tabpanel" aria-labelledby="guide-tab-sections">
-          <div id="sections-list" class="guide-list"><p class="empty-state">No Sections for this video.</p></div>
-        </section>
-
-        <section id="guide-pins-panel" class="guide-tab-panel" role="tabpanel" aria-labelledby="guide-tab-pins" hidden>
-          <div id="pins-list" class="guide-list"><p class="empty-state">No Pins for this video.</p></div>
-        </section>
-
-        <section id="guide-sources-panel" class="guide-tab-panel source-placeholder" role="tabpanel" aria-labelledby="guide-tab-sources" hidden>
-          <span class="eyebrow">Potential structure</span>
-          <h3>Chapters and transcripts</h3>
-          <p>This boundary is reserved for source-provided potential Pins and Sections. Source records will remain external until explicitly retained in the Guide.</p>
-        </section>
-      </aside>
 
       <button id="guide-scrim" class="guide-scrim" type="button" aria-label="Close Guide" hidden></button>
     </div>

@@ -7,7 +7,8 @@ Read in this order:
 1. `README.md` for the product surface.
 2. `SPEC.md` for semantic invariants.
 3. `IMPLEMENTATION.md` for ownership and module boundaries.
-4. `VALIDATION.md` before changing browser/player behavior.
+4. `INTERFACE.md` for visible-element ownership and the presence test.
+5. `VALIDATION.md` before changing browser/player behavior.
 
 Serve the static application through HTTP:
 
@@ -53,16 +54,17 @@ Then add or update the smallest pure test first. Integration and smoke tests sho
 
 The UI mirrors operator geometry; it is not an independent taxonomy.
 
-- Backward controls remain left.
-- Shared controls remain on the spine.
-- Forward controls remain right.
-- Object-local settings stay with the object they modify.
+- Panoramic media, playback, temporal map, Parameters, operators, and Guide remain distinct ownership regions.
+- The centered matrix contains operators only.
+- Entered values and selectors belong in Parameters or on the object they directly modify.
+- Retained structure belongs only in Guide and timeline Pin markers.
 - One visible control must not imply authority it does not possess.
+- Every visible element must pass the `INTERFACE.md` presence test.
 - Disabled controls must remain legible enough to explain unavailable state.
 - Every interactive element needs an explicit accessible name and a visible focus state.
 - Coarse-pointer targets must be at least `48px` unless a larger invisible hit area is provided.
 
-Desktop is the primary dense layout. Mobile may stack and disclose, but must preserve every operation and remain usable without a keyboard.
+Desktop is the primary panoramic layout. Mobile may stack and disclose, but must preserve every operation and remain usable without a keyboard.
 
 ## 5. Player and asynchronous work
 
