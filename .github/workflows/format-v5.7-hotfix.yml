@@ -1,0 +1,65 @@
+name: Format v5.7 hotfix
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - field-coherence-tests.mjs
+      - .github/workflows/format-v5.7-hotfix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format-check-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/v5.7-deployment-test
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Normalize assertion indentation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('field-coherence-tests.mjs')
+          text = path.read_text()
+          replacements = {
+            '\nconst tailRateControl': '\n  const tailRateControl',
+            '\nconst tailPlayerWrap': '\n  const tailPlayerWrap',
+            '\nconst leadPaneStart': '\n  const leadPaneStart',
+            '\nconst leadRateControl': '\n  const leadRateControl',
+            '\nconst leadPlayerWrap': '\n  const leadPlayerWrap',
+            '\nassert.ok(': '\n  assert.ok(',
+            '\n  tailPaneStart': '\n    tailPaneStart',
+            '\n  leadPaneStart': '\n    leadPaneStart',
+            '\n  "Tail rate': '\n    "Tail rate',
+            '\n  "Lead rate': '\n    "Lead rate',
+            '\n);': '\n  );',
+            '\nassert.match(fieldCss, /\\.step-pane': '\n  assert.match(fieldCss, /\\.step-pane',
+            '\nassert.match(fieldCss, /@media': '\n  assert.match(fieldCss, /@media'
+          }
+          for old, new in replacements.items():
+              text = text.replace(old, new)
+          path.write_text(text)
+          PY
+
+      - name: Run complete repository gate
+        run: npm run check
+
+      - name: Remove workflow and commit formatting cleanup
+        run: |
+          rm .github/workflows/format-v5.7-hotfix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add field-coherence-tests.mjs .github/workflows/format-v5.7-hotfix.yml
+          git commit -m "Normalize v5.7 hotfix test formatting"
+          git push origin HEAD:fix/v5.7-deployment-test
