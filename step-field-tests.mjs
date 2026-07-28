@@ -137,8 +137,10 @@ assert.equal(resolveFieldPhase({
   assert.match(fieldSource, /setAttribute\?\.\("tabindex", "-1"\)/);
   assert.match(fieldSource, /setAttribute\?\.\("aria-hidden", "true"\)/);
   assert.match(fieldSource, /function parkSide\(side, address, \{ force = false \} = \{\}\)/);
-  assert.match(fieldSource, /if \(side\.activated\)[\s\S]*side\.adapter\?\.place\?\.\(target\)[\s\S]*side\.adapter\?\.pause\?\.\(\)[\s\S]*else[\s\S]*side\.adapter\?\.cue\?\.\(side\.videoId, target\)/,
-    "Pre-activation placement may cue, but activated paused sides must seek and pause on their represented frame.");
+  assert.match(fieldSource, /if \(!side\.sourceReady\)[\s\S]*side\.adapter\?\.cue\?\.\(side\.videoId, target\)[\s\S]*return true;[\s\S]*side\.adapter\?\.place\?\.\(target\)[\s\S]*side\.adapter\?\.pause\?\.\(\)/,
+    "A source may be cued only while preparing; source-ready paused sides must seek and pause on their represented frame.");
+  assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*if \(play && side\.sourceReady\)[\s\S]*side\.adapter\?\.play\?\.\(\)/,
+    "Trusted side playback must start only after that side source has reached CUED readiness.");
   assert.match(fieldSource, /render\(snapshot\);[\s\S]*ensurePlayers\(prefs\);/,
     "Side panes must be rendered and measurable before player creation.");
   assert.match(youtubeSource, /DEFAULT_IFRAME_ALLOW[\s\S]*"autoplay"/);

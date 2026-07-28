@@ -133,6 +133,9 @@ export function createStepFieldController({
       adapter: null,
       ready: false,
       activated: false,
+      sourceReady: false,
+      ratesKnown: false,
+      pendingPlay: false,
       videoId: null,
       mode: FIELD_SIDE_MODE.HELD,
       offset: 0,
@@ -247,7 +250,20 @@ export function createStepFieldController({
         },
         onStateChange: name => {
           side.playback = name;
+          if (name === YOUTUBE_STATE.CUED) {
+            side.sourceReady = true;
+            if (Number.isFinite(side.desiredAddress)) side.adapter?.place?.(side.desiredAddress);
+            if (side.pendingPlay && !runtime.suspended) {
+              side.adapter?.play?.();
+              side.playback = "starting";
+            } else if (!runtime.centerWasRunning) {
+              side.adapter?.pause?.();
+            }
+          }
           if ([YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(name)) {
+            side.sourceReady = true;
+            side.ratesKnown = true;
+            side.pendingPlay = false;
             side.activated = true;
             side.blocked = false;
             refreshSideSnapshot(side);
@@ -264,11 +280,15 @@ export function createStepFieldController({
           if (Number.isFinite(Number(rate))) side.actualRate = Number(rate);
         },
         onAutoplayBlocked: () => {
+          side.pendingPlay = false;
           side.blocked = true;
           side.playback = "blocked";
           side.adapter?.pause?.();
         },
         onError: () => {
+          side.pendingPlay = false;
+          side.sourceReady = false;
+          side.ratesKnown = false;
           side.error = true;
           side.ready = false;
           side.playback = "error";
@@ -346,22 +366,22 @@ export function createStepFieldController({
       return false;
     }
 
-    // cue is used only before this iframe has accepted its first trusted play request.
-    // After activation, seek + pause preserves the actual frame instead of returning
-    // the pane to YouTube's source thumbnail.
-    if (side.activated) {
-      side.adapter?.place?.(target);
-      side.adapter?.pause?.();
-      side.playback = YOUTUBE_STATE.PAUSED;
-    } else {
-      // Cue loads the source; the following placement asks YouTube to decode the
-      // represented frame. If that seek briefly starts playback, onStateChange
-      // immediately pauses it while the Field is not running.
-      side.adapter?.cue?.(side.videoId, target);
-      side.adapter?.place?.(target);
-      side.adapter?.pause?.();
-      side.playback = YOUTUBE_STATE.CUED;
+    // Source loading and playback are separate phases. Never issue a fresh cue in
+    // the same stack as playVideo(): YouTube may process that cue after play and
+    // leave the iframe paused. Parking records the target while the one preload cue
+    // settles, then CUED places the decoded frame.
+    if (!side.sourceReady) {
+      if (side.playback !== "loading") {
+        side.playback = "loading";
+        side.adapter?.cue?.(side.videoId, target);
+      }
+      side.lastPlacedAddress = target;
+      side.lastPlaceAt = now;
+      return true;
     }
+    side.adapter?.place?.(target);
+    side.adapter?.pause?.();
+    side.playback = YOUTUBE_STATE.PAUSED;
     side.lastPlacedAddress = target;
     side.lastPlaceAt = now;
     return true;
@@ -453,6 +473,13 @@ export function createStepFieldController({
     side.requestedRate = Number(preferences()[`${side.role}Rate`]);
     refreshSideSnapshot(side);
     const rate = chooseDirectionalRate(side.availableRates, side.requestedRate, side.role);
+    if (rate === null && !side.ratesKnown) {
+      // getAvailablePlaybackRates commonly reports only 1× until the iframe has
+      // actually entered playback. Unknown is not the same as unsupported.
+      side.rateAvailable = true;
+      requestRate(side, 1, force);
+      return undefined;
+    }
     side.rateAvailable = rate !== null;
     if (rate === null) {
       requestRate(side, 1, force);
@@ -536,19 +563,25 @@ export function createStepFieldController({
     requestRate(side, 1, true);
 
     // Stretch is one operation: refold to physical Center, then diverge toward
-    // the configured maximum. The refold does not touch Session Current/Interval.
-    if (side.activated) side.adapter?.place?.(center);
-    else side.adapter?.cue?.(side.videoId, center);
+    // the configured maximum. The source must already be cued before the trusted
+    // play gesture; a cue and play issued together race in the YouTube iframe.
     side.desiredAddress = center;
     side.lastPlacedAddress = center;
     side.lastPlaceAt = Date.now();
-    if (play) {
+    side.pendingPlay = Boolean(play);
+    if (side.sourceReady) {
+      side.adapter?.place?.(center);
+    } else if (side.playback !== "loading") {
+      side.playback = "loading";
+      side.adapter?.cue?.(side.videoId, center);
+    }
+    if (play && side.sourceReady) {
       side.adapter?.play?.();
-      side.activated = true;
       side.playback = "starting";
-    } else {
+    } else if (!play) {
+      side.pendingPlay = false;
       side.adapter?.pause?.();
-      side.playback = side.activated ? YOUTUBE_STATE.PAUSED : YOUTUBE_STATE.CUED;
+      side.playback = side.sourceReady ? YOUTUBE_STATE.PAUSED : "loading";
     }
     return true;
   }
@@ -584,11 +617,18 @@ export function createStepFieldController({
     const prefs = preferences();
     if (!prefs.stepFieldEnabled) return { ready: true, pending: [], available: {} };
     const visible = ["tail", "lead"].filter(role => prefs[`${role}Visible`]);
-    const pending = visible.filter(role => !sides[role].ready && !sides[role].error);
+    const sourceId = getSnapshot?.()?.videoId || null;
+    const pending = visible.filter(role => {
+      const side = sides[role];
+      return !side.error && (!side.ready || side.videoId !== sourceId || !side.sourceReady);
+    });
     return {
       ready: pending.length === 0,
       pending,
-      available: Object.fromEntries(visible.map(role => [role, sides[role].ready && !sides[role].error]))
+      available: Object.fromEntries(visible.map(role => {
+        const side = sides[role];
+        return [role, side.ready && side.videoId === sourceId && side.sourceReady && !side.error];
+      }))
     };
   }
 
@@ -690,13 +730,22 @@ export function createStepFieldController({
   function ensureSidePlaying(side) {
     if (!sideCanRun(side)) return false;
     side.adapter?.mute?.();
-    const state = refreshSideSnapshot(side).state;
-    if (![YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(state)) {
-      side.playback = "starting";
-      side.adapter?.play?.();
-      side.activated = true;
+    if (!side.sourceReady) {
+      side.pendingPlay = true;
+      if (side.playback !== "loading" && side.videoId) {
+        side.playback = "loading";
+        side.adapter?.cue?.(side.videoId, side.desiredAddress ?? runtime.semanticCurrent ?? 0);
+      }
       return false;
     }
+    const state = refreshSideSnapshot(side).state;
+    if (![YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(state)) {
+      side.pendingPlay = true;
+      side.playback = "starting";
+      side.adapter?.play?.();
+      return false;
+    }
+    side.pendingPlay = false;
     return true;
   }
 
@@ -749,6 +798,11 @@ export function createStepFieldController({
 
     ensureSidePlaying(side);
     const rate = requestStretchRate(side);
+    if (rate === undefined) {
+      const actual = measuredOffset(side, center, snapshot);
+      side.offset = clamp(actual, 0, maximum);
+      return { available: true, held: false, offset: side.offset };
+    }
     const confirmed = Number.isFinite(side.actualRate) ? side.actualRate : 1;
     const differential = role === "tail" ? Math.max(0, 1 - confirmed) : Math.max(0, confirmed - 1);
     if (centerDelta > 0 && rate !== null) {
@@ -810,6 +864,7 @@ export function createStepFieldController({
   function sideMeta(role, sideState, target) {
     const side = sides[role];
     if (runtime.suspended) return "Context suspended";
+    if (!side.sourceReady && !side.error) return "Preparing video";
     if (side.blocked) return "Playback blocked — retry Play";
     if (side.error) return "Player unavailable";
     if (!side.rateAvailable && side.mode === FIELD_SIDE_MODE.STRETCHING) return "Rate unavailable — held at target";
@@ -1033,7 +1088,10 @@ export function createStepFieldController({
       side.error = false;
       side.blocked = false;
       side.activated = false;
-      side.playback = "idle";
+      side.sourceReady = false;
+      side.ratesKnown = false;
+      side.pendingPlay = false;
+      side.playback = "loading";
       side.actualRate = 1;
       side.desiredRate = 1;
       side.availableRates = [1];
@@ -1041,9 +1099,10 @@ export function createStepFieldController({
       side.offset = 0;
       side.progressOffset = 0;
       side.targetOffset = configuredOffset(side.role, snapshot);
-      side.desiredAddress = null;
+      side.desiredAddress = snapshot.current;
       side.lastPlacedAddress = null;
       side.adapter.mute?.();
+      side.adapter.cue?.(snapshot.videoId, snapshot.current);
       runtime.forceEstablish = true;
     }
   }

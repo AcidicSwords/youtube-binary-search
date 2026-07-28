@@ -109,7 +109,12 @@ function makeControllerHarness() {
     const adapter = {
       commands,
       mute() { commands.push(["mute"]); },
-      cue(_videoId, address) { commands.push(["cue", address]); time = address; },
+      cue(_videoId, address) {
+        commands.push(["cue", address]);
+        time = address;
+        state = YOUTUBE_STATE.CUED;
+        config.events.onStateChange?.(state);
+      },
       place(address) { commands.push(["place", address]); time = address; },
       play() { commands.push(["play"]); state = YOUTUBE_STATE.PLAYING; config.events.onStateChange?.(state); },
       pause() { commands.push(["pause"]); state = YOUTUBE_STATE.PAUSED; },

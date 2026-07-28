@@ -22,7 +22,12 @@ function element(tagName = "DIV") {
   };
 }
 
-function makeHarness({ rates = [0.5, 1, 2] } = {}) {
+function makeHarness({
+  rates = [0.5, 1, 2],
+  deferredCue = false,
+  delayedPlay = false,
+  ratesAfterPlay = null
+} = {}) {
   const elements = new Map();
   const document = {
     hidden: false,
@@ -67,14 +72,19 @@ function makeHarness({ rates = [0.5, 1, 2] } = {}) {
       cue(_videoId, address) {
         commands.push(["cue", address]);
         time = address;
-        state = YOUTUBE_STATE.CUED;
-        config.events.onStateChange?.(state);
+        if (!deferredCue) {
+          state = YOUTUBE_STATE.CUED;
+          config.events.onStateChange?.(state);
+        }
       },
       place(address) { commands.push(["place", address]); time = address; },
       play() {
         commands.push(["play"]);
-        state = YOUTUBE_STATE.PLAYING;
-        config.events.onStateChange?.(state);
+        if (!delayedPlay) {
+          if (Array.isArray(ratesAfterPlay)) availableRates = [...ratesAfterPlay];
+          state = YOUTUBE_STATE.PLAYING;
+          config.events.onStateChange?.(state);
+        }
       },
       pause() { commands.push(["pause"]); state = YOUTUBE_STATE.PAUSED; },
       setRate(value) {
@@ -89,6 +99,12 @@ function makeHarness({ rates = [0.5, 1, 2] } = {}) {
       setTime(value) { time = value; },
       setState(value) { state = value; config.events.onStateChange?.(value); },
       setRates(value) { availableRates = [...value]; },
+      finishCue() { state = YOUTUBE_STATE.CUED; config.events.onStateChange?.(state); },
+      finishPlay() {
+        if (Array.isArray(ratesAfterPlay)) availableRates = [...ratesAfterPlay];
+        state = YOUTUBE_STATE.PLAYING;
+        config.events.onStateChange?.(state);
+      },
       block() { config.events.onAutoplayBlocked?.(); },
       get time() { return time; },
       get rate() { return rate; },
@@ -228,6 +244,53 @@ function makeHarness({ rates = [0.5, 1, 2] } = {}) {
     };
     h.controller.translateToCurrent(20, { preserve: true });
     assert.equal(h.tail().time, 10, "Leaving a Range boundary must restore the remembered configured Tail extent.");
+  } finally {
+    h.restore();
+  }
+}
+
+
+{
+  const h = makeHarness({
+    rates: [1],
+    deferredCue: true,
+    delayedPlay: true,
+    ratesAfterPlay: [0.5, 1, 2]
+  });
+  try {
+    h.controller.tick();
+    assert.equal(h.controller.activationState().ready, false, "Center Play must wait until visible side sources are cued.");
+    const tailCueCount = h.tail().commands.filter(command => command[0] === "cue").length;
+    const leadCueCount = h.lead().commands.filter(command => command[0] === "cue").length;
+    h.tail().finishCue();
+    h.lead().finishCue();
+    assert.equal(h.controller.activationState().ready, true);
+
+    const started = h.controller.playFromGesture({ center: 50 });
+    assert.deepEqual(started, { tail: true, lead: true });
+    assert.equal(h.tail().commands.filter(command => command[0] === "cue").length, tailCueCount, "Trusted Play must not re-cue Tail.");
+    assert.equal(h.lead().commands.filter(command => command[0] === "cue").length, leadCueCount, "Trusted Play must not re-cue Lead.");
+    assert.deepEqual(h.tail().commands.slice(-2), [["place", 50], ["play"]]);
+    assert.deepEqual(h.lead().commands.slice(-2), [["place", 50], ["play"]]);
+
+    h.snapshot = {
+      ...h.snapshot,
+      transportKind: "playback",
+      center: { ...h.snapshot.center, time: 50.5, state: YOUTUBE_STATE.PLAYING }
+    };
+    h.controller.tick();
+    assert.equal(h.controller.snapshot().tailMode, FIELD_SIDE_MODE.STRETCHING, "Temporary 1× availability must not collapse Tail before playback confirms rates.");
+    assert.equal(h.controller.snapshot().leadMode, FIELD_SIDE_MODE.STRETCHING, "Temporary 1× availability must not collapse Lead before playback confirms rates.");
+
+    h.tail().finishPlay();
+    h.lead().finishPlay();
+    h.snapshot = {
+      ...h.snapshot,
+      center: { ...h.snapshot.center, time: 51, state: YOUTUBE_STATE.PLAYING }
+    };
+    h.controller.tick();
+    assert.equal(h.tail().rate, 0.5);
+    assert.equal(h.lead().rate, 2);
   } finally {
     h.restore();
   }
