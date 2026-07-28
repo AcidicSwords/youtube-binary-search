@@ -50,9 +50,11 @@ Autoplay blocking, buffering, delayed placement, and missing directional rates a
 
 - Context is the only transport that suspends Field playback by definition.
 - Native playback and Loop may drive Held/Stretching sides.
-- Stretch always snaps to Current before forming.
-- Hold during formation commits measured Offset through Session.
-- Pane Step and matrix Step must share `performStep()`.
+- Every ordinary play/unpause starts a fresh Stretch: refold to Current, prime at `1×`, then request the confirmed directional rate.
+- Paused sides must park on their represented frames; thumbnail-only cue state is not a valid settled Field after frame placement is possible.
+- Hold during formation may commit measured Offset through Session Step Reach, but must never write semantic Interval.
+- Context must preserve stored Field geometry and must not remeasure against its transient Cursor.
+- Side video surface, local Step button, and matrix Step must share `performStep()`.
 - Step must preserve the active Interval departure and move only its arrival endpoint; do not recreate the Interval from each Step departure.
 - Held arrow-key Step owns one pending transaction and one Context on keyup.
 - Internal Loop wraps must never invoke Session movement or Context.
@@ -71,6 +73,7 @@ Every form control needs an accessible name; every button declares a type; focus
 - `fuzz-tests.mjs` — deterministic semantic invariants
 - `v5.8-regression-tests.mjs` — stable reader and native playback contracts
 - `step-field-tests.mjs` — Field geometry and source-level wiring
+- `field-runtime-tests.mjs` — explicit address/offset/rate state transitions and edge recovery
 - `field-grammar-tests.mjs` — composed operator grammar
 - `field-bounds-tests.mjs` — Range containment and controller behaviour
 - `field-coherence-tests.mjs` — offset/rate/UI coherence

@@ -393,7 +393,9 @@ function startContext(anchor) {
   }
 
   state.transport = transport;
-  stepField?.pause();
+  // Context observes only Center. Preserve the already-translated Field relation
+  // around the semantic anchor instead of remeasuring against the old Cursor.
+  stepField?.pause({ center: anchor, freeze: false });
   player.setRate(1);
   placePlayer(transport.start);
   if (Math.abs(safeCurrentTime() - transport.start) <= 0.25) transport.enteredWindow = true;
@@ -458,6 +460,9 @@ function settleTransport(options = {}) {
   }
 
   if (active.kind === TRANSPORT_KIND.PLAYBACK) {
+    // Capture the latest physical side offsets before semantic playback
+    // settlement translates the complete Field to the new Current.
+    stepField?.pause({ center: current, freeze: true });
     const result = completePlayback(state.session, {
       current,
       departure: active.departure,
@@ -729,13 +734,13 @@ function startFieldPlaybackFromGesture() {
   // key event. Ask every muted side and Center to play in the same synchronous
   // activation stack; delayed Center state events are too late to transfer that
   // activation to sibling YouTube iframes reliably.
-  stepField?.playFromGesture?.();
+  stepField?.playFromGesture?.({ center: destination, reason: "playback" });
   player.play();
   return true;
 }
 
 function pauseFieldPlayback() {
-  stepField?.pause();
+  stepField?.pause({ center: safeCurrentTime(), freeze: true });
   player.pause();
 }
 
@@ -780,6 +785,7 @@ function startLoopExtent(extent, source = "interval", label = "Interval") {
   placePlayer(extent.start);
   stepField?.translatePhysicalCenter(extent.start, { preserve: true });
   if (Math.abs(safeCurrentTime() - extent.start) <= 0.25) state.transport.enteredWindow = true;
+  stepField?.playFromGesture?.({ center: extent.start, reason: "loop" });
   player.play();
   setStatus(`Looping ${label} ${formatRange(extent)}.`);
   view.render();
@@ -1196,6 +1202,7 @@ function handlePlayerStateChange(name, _rawState, metadata = {}) {
   if (name === YOUTUBE_STATE.ENDED && transportIs(TRANSPORT_KIND.LOOP)) {
     placePlayer(state.transport.start);
     stepField?.translatePhysicalCenter(state.transport.start, { preserve: true });
+    stepField?.playFromGesture?.({ center: state.transport.start, reason: "loop-wrap" });
     player.play();
     return;
   }
@@ -1280,6 +1287,7 @@ function pollPlayer() {
       placePlayer(transport.start);
       stepField?.translatePhysicalCenter(transport.start, { preserve: true });
       player.setRate(1);
+      stepField?.playFromGesture?.({ center: transport.start, reason: "loop-wrap" });
       player.play();
     }
   } else if (transport.kind === TRANSPORT_KIND.PLAYBACK && state.playerState === YOUTUBE_STATE.PLAYING) {

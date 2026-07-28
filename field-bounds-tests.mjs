@@ -146,9 +146,9 @@ function makeControllerHarness() {
   const harness = makeControllerHarness();
   try {
     harness.controller.tick();
-    assert.equal(harness.adapters.get("player-tail").read().time, 50);
-    assert.equal(harness.adapters.get("player-lead").read().time, 50);
-    assert.equal(harness.controller.snapshot().phase, STEP_FIELD_PHASE.COINCIDENT);
+    assert.equal(harness.adapters.get("player-tail").read().time, 40, "Paused Tail must display its represented backward Step frame.");
+    assert.equal(harness.adapters.get("player-lead").read().time, 60, "Paused Lead must display its represented forward Step frame.");
+    assert.equal(harness.controller.snapshot().phase, STEP_FIELD_PHASE.HELD);
 
     harness.controller.stretch("tail");
     assert.equal(harness.controller.snapshot().tailMode, FIELD_SIDE_MODE.STRETCHING);
@@ -192,8 +192,8 @@ function makeControllerHarness() {
     const field = harness.controller.snapshot();
     assert.equal(field.constraint, "both");
     assert.deepEqual(field.envelope, { start: 70, end: 80 });
-    assert.equal(harness.adapters.get("player-tail").read().time, 75);
-    assert.equal(harness.adapters.get("player-lead").read().time, 75);
+    assert.equal(harness.adapters.get("player-tail").read().time, 70, "Range-constrained Tail parks at the available boundary frame.");
+    assert.equal(harness.adapters.get("player-lead").read().time, 80, "Range-constrained Lead parks at the available boundary frame.");
   } finally {
     harness.restore();
   }

@@ -102,7 +102,7 @@ assert.equal(resolveFieldPhase({
 
   for (const id of [
     "step-field", "player-tail", "player", "player-lead", "center-transport-surface",
-    "tail-step-button", "lead-step-button",
+    "tail-player-surface", "lead-player-surface", "tail-step-button", "lead-step-button",
     "tail-field-toggle", "lead-field-toggle", "field-both-toggle",
     "tail-rate-select", "lead-rate-select",
     "step-backward-seconds", "step-forward-seconds",
@@ -116,30 +116,39 @@ assert.equal(resolveFieldPhase({
   assert.match(app, /function selectFieldSide\(selection\)/);
   assert.match(app, /performStep\(selection\.direction, selection\.distance\)/);
   assert.match(app, /function startFieldPlaybackFromGesture\(\)/);
-  assert.match(app, /stepField\?\.playFromGesture\?\.\(\);[\s\S]*player\.play\(\);/,
-    "Parent-owned playback must request both side players and Center in one synchronous gesture stack.");
+  assert.match(app, /stepField\?\.playFromGesture\?\.\(\{ center: destination, reason: "playback" \}\);[\s\S]*player\.play\(\);/,
+    "Parent-owned playback must refold/start both side players and Center in one synchronous gesture stack.");
   assert.match(app, /center-transport-surface/);
-  assert.match(fieldSource, /function playFromGesture\(\)/);
+  assert.match(fieldSource, /function playFromGesture\(options = \{\}\)/);
   assert.match(app, /onHoldOffsets:/);
   assert.match(fieldSource, /const FIELD_SIDE_MODE/);
   assert.match(fieldSource, /function stretch\(role\)/);
-  assert.match(fieldSource, /function hold\(role\)/);
+  assert.match(fieldSource, /function hold\(role, \{ record = true \} = \{\}\)/);
   assert.match(fieldSource, /function toggleBoth\(\)/);
-  assert.match(fieldSource, /side\.adapter\?\.setRate\?\.\(1\);[\s\S]*ensureSidePlaying\(side\)/,
-    "A side must prime at 1× before directional-rate discovery.");
+  assert.match(fieldSource, /function freezeSideForPause\(side, center, snapshot\)/);
+  assert.match(fieldSource, /function translateToCurrent\(current, \{ preserve = true \} = \{\}\)/);
+  assert.match(fieldSource, /const retained = side\.offset > REACH_TOLERANCE \? side\.offset : side\.targetOffset/,
+    "Semantic traversal must translate the stored Field relation instead of remeasuring asynchronous iframe clocks.");
+  assert.match(fieldSource, /Context and semantic gestures are Center-only/);
+  assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*side\.adapter\?\.play\?\.\(\)/,
+    "Every play must refold and prime a side at 1× before directional-rate discovery.");
   assert.match(fieldSource, /mode:\s*"step"/);
   assert.doesNotMatch(fieldSource, /mode:\s*"go"/);
   assert.match(fieldSource, /setAttribute\?\.\("tabindex", "-1"\)/);
   assert.match(fieldSource, /setAttribute\?\.\("aria-hidden", "true"\)/);
-  assert.match(fieldSource, /function parkSide\(side, address\)/);
-  assert.match(fieldSource, /side\.adapter\.cue\?\.\(side\.videoId, address\)/,
-    "Paused side placement must use cueVideoById rather than seekTo.");
+  assert.match(fieldSource, /function parkSide\(side, address, \{ force = false \} = \{\}\)/);
+  assert.match(fieldSource, /if \(side\.activated\)[\s\S]*side\.adapter\?\.place\?\.\(target\)[\s\S]*side\.adapter\?\.pause\?\.\(\)[\s\S]*else[\s\S]*side\.adapter\?\.cue\?\.\(side\.videoId, target\)/,
+    "Pre-activation placement may cue, but activated paused sides must seek and pause on their represented frame.");
   assert.match(fieldSource, /render\(snapshot\);[\s\S]*ensurePlayers\(prefs\);/,
     "Side panes must be rendered and measurable before player creation.");
   assert.match(youtubeSource, /DEFAULT_IFRAME_ALLOW[\s\S]*"autoplay"/);
   assert.match(youtubeSource, /setAttribute\?\.\("allow", options\.iframeAllow \|\| DEFAULT_IFRAME_ALLOW\)/);
   assert.doesNotMatch(html, /class="step-pane-action"/,
-    "YouTube side iframes must remain unobscured; Step uses the dedicated button below each player.");
+    "YouTube side iframes must not be covered by a transparent action element.");
+  assert.match(html, /id="tail-player-surface"[\s\S]*role="button"[\s\S]*id="player-tail"/);
+  assert.match(html, /id="lead-player-surface"[\s\S]*role="button"[\s\S]*id="player-lead"/);
+  assert.match(css, /\.side-player-surface iframe[\s\S]*pointer-events:\s*none/,
+    "Side video surfaces must route clicks to semantic Step instead of independently toggling muted iframes.");
   assert.match(html, /id="center-transport-surface"/,
     "Paused Center must expose a parent-owned playback surface for shared iframe activation.");
   assert.match(layoutCss, /\.center-transport-surface[\s\S]*position:\s*absolute/);
