@@ -102,7 +102,7 @@ Creation and management belong to Guide.
 
 ## 5. Native playback
 
-Center native controls and Space invoke ordinary playback. Starting playback creates a transient playback transaction from the current physical position. Pausing or reaching Range End settles actual movement once through Session:
+A paused Center surface and Space invoke ordinary playback through the parent document. The same trusted gesture requests muted Tail, audible Center, and muted Lead playback synchronously. Once Center enters ordinary playback, the surface withdraws so native YouTube controls remain available. Starting playback creates a transient playback transaction from the current physical position. Pausing or reaching Range End settles actual movement once through Session:
 
 ```text
 physical Cursor movement
@@ -175,4 +175,4 @@ Session: Range, Resolution, Current, Interval, Guide, Focus, Offsets
 Runtime: Cursor, Context, Loop cycle, side mode/rate/playback
 ```
 
-A physical command is never assumed successful merely because it was requested. Adapter events and snapshots are authoritative for actual playback, placement, and rate.
+A physical command is never assumed successful merely because it was requested. Adapter events and snapshots are authoritative for actual playback, placement, and rate. Sibling iframe playback must be requested in the same trusted parent-page gesture; a later Center state callback is not treated as transferable activation.

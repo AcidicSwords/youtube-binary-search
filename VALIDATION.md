@@ -24,8 +24,8 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 
 ### Native playback
 
-- Start/pause through Center iframe and Space.
-- Confirm native pause settles Current and Interval once.
+- Start through the paused Center surface and Space; confirm Tail, Center, and Lead receive play requests in the same event turn.
+- Confirm the shared surface withdraws during ordinary playback, native Center controls remain usable, and native pause restores the surface while settling Current and Interval once.
 - Confirm native scrub settles as Go after the grace period.
 - Confirm crossing Resolution during playback reopens Range scale.
 
@@ -80,7 +80,7 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 - Medium layout places Center above side panes.
 - Phone layout stacks Center, Tail, Lead without horizontal overflow.
 - Every iframe remains at least `200 × 200` CSS pixels.
-- Native Center controls remain usable.
+- Native Center controls remain usable during ordinary playback; the paused shared-start surface is keyboard accessible and clearly labelled.
 - Side controls remain reachable with 48px coarse-pointer targets.
 - Guide opens as a modal sheet, traps focus, restores focus, and respects safe-area padding.
 - Range dragging preserves vertical page scrolling.

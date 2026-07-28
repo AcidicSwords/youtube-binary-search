@@ -70,7 +70,7 @@ Loop wraps use adapter placement directly and never call a Session movement tran
 
 ## 5. Center lifecycle
 
-Native Center `PLAYING` begins a playback transport unless Context or Loop already owns playback. Native `PAUSED` settles the active kind:
+A trusted parent-page Center click or Space command calls Tail, Lead, and Center playback synchronously. Center `PLAYING` then begins a playback transport unless Context or Loop already owns playback. Native `PAUSED` settles the active kind:
 
 - Context restores committed Current.
 - Loop ends without committing internal wraps.
@@ -120,7 +120,7 @@ Section Loop passes the resolved Section extent into the same `startLoopExtent()
 
 ## 9. Rendering and layout
 
-`view.js` derives all labels and enabled states from Session and runtime snapshots. The wide Step Field ratio is `1 : 1.1 : 1`. Below each player are object-local Field controls; no generic playback dock exists. `styles.css` owns the wide application layout and exact 3×3 matrix; `step-field.css` owns only the Field component and narrower stacking.
+`view.js` derives all labels and enabled states from Session and runtime snapshots. The wide Step Field ratio is `1 : 1.1 : 1`. A paused Center surface owns the shared user activation; it withdraws during ordinary playback so native YouTube controls remain usable. Below each player are object-local Field controls; no generic playback dock exists. `styles.css` owns the wide application layout and exact 3×3 matrix; `step-field.css` owns only the Field component and narrower stacking.
 
 ## 10. Persistence
 

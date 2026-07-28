@@ -42,7 +42,7 @@ Add the smallest pure test first. Integration and smoke tests confirm wiring; th
 
 ## 4. Player discipline
 
-Never access `YT.Player` outside `youtube.js`. Treat play, pause, placement, and rate commands as requests. Actual adapter state and events are authoritative.
+Never access `YT.Player` outside `youtube.js`. Treat play, pause, placement, and rate commands as requests. Actual adapter state and events are authoritative. Ordinary Field start must synchronously request Tail, Center, and Lead from the same trusted parent-page click or Space event; do not defer side activation to Center’s later state callback.
 
 Autoplay blocking, buffering, delayed placement, and missing directional rates are ordinary runtime states. They must remain visible and recoverable without mutating Session incorrectly.
 

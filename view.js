@@ -365,6 +365,36 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : semanticCurrent;
 
     elements["cursor-time"].textContent = formatTime(cursor);
+
+    const surface = elements["center-transport-surface"];
+    if (surface) {
+      const currentState = state();
+      const transportKind = currentState.transport.kind;
+      const ordinaryPlayback = transportKind === TRANSPORT_KIND.PLAYBACK;
+      const centerRunning = [YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(currentState.playerState);
+      // Ordinary playback exposes YouTube's native controls after the trusted
+      // parent-page start gesture. Paused/idle Center and composite transports
+      // keep the parent surface so the next action remains synchronously shared.
+      const surfaceOwnsPointer = currentState.videoLoaded && (!ordinaryPlayback || !centerRunning);
+      surface.hidden = !surfaceOwnsPointer;
+      const activation = currentState.field?.activation || null;
+      const preparing = Boolean(activation && !activation.ready);
+      surface.disabled = !currentState.videoLoaded || preparing;
+      const label = transportKind === TRANSPORT_KIND.LOOP
+        ? "Stop Loop"
+        : transportKind === TRANSPORT_KIND.CONTEXT
+          ? "Continue Field"
+          : "Play Field";
+      surface.setAttribute("aria-label", preparing ? "Preparing Field players" : label);
+      surface.setAttribute("aria-pressed", String(ordinaryPlayback && centerRunning));
+      if (elements["center-transport-label"]) {
+        elements["center-transport-label"].textContent = preparing ? "Preparing Field players" : label;
+      }
+      if (elements["center-transport-icon"]) {
+        elements["center-transport-icon"].textContent = transportKind === TRANSPORT_KIND.LOOP ? "■" : "▶";
+      }
+    }
+
     if (state().videoLoaded && currentResolution) {
       const showCursor = moving || physicallyDisplaced;
       elements["cursor-marker"].hidden = !showCursor;
