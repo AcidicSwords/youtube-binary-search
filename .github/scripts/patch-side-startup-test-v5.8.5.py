@@ -32,3 +32,10 @@ replace_once(
       },''',
     "synchronous cue harness"
 )
+
+replace_once(
+    "project-audit.mjs",
+    '''assert.equal(pkg.version, "5.8.4");''',
+    '''assert.equal(pkg.version, "5.8.5");''',
+    "release version assertion"
+)
