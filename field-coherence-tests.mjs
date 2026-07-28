@@ -155,7 +155,7 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   assert.match(fieldCss, /\.pane-field-controls\s*\{[\s\S]*z-index:\s*7/);
   assert.match(
     fieldCss,
-    /@media \(max-width: 680px\)[\s\S]*grid-template-areas:\s*"center"\s*"tail"\s*"lead"/,
+    /@container \(max-width: 680px\)[\s\S]*grid-template-areas:\s*"center"\s*"tail"\s*"lead"/,
     "Phone layout must explicitly stack Center, Tail, Lead without relying on auto-placement."
   );
   assert.match(fieldCss, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);

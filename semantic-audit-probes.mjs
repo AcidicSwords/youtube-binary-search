@@ -53,8 +53,8 @@ finding(
   }
 );
 
-// Step preserves the old refinement count while expanding a sub-frame by many
-// seconds, so "N refinements" ceases to describe the displayed grain.
+// Step deformation must reset the old refinement lineage; otherwise
+// "N refinements" ceases to describe the displayed grain.
 let refined = createSession({ duration: 100, current: 50 });
 for (let index = 0; index < 10; index += 1) {
   const result = refine(refined, index % 2 ? "forward" : "backward");

@@ -43,6 +43,8 @@ function assertSessionInvariant(session) {
     assert.ok(interval.start < interval.end);
     assert.ok(interval.start >= range.start - EPSILON);
     assert.ok(interval.end <= range.end + EPSILON);
+    assert.ok(interval.start >= resolution.L - EPSILON);
+    assert.ok(interval.end <= resolution.R + EPSILON);
     assert.ok(Math.abs(interval.arrival - resolution.C) <= EPSILON, "Interval arrival must remain the active endpoint at Current.");
     assert.ok(Math.abs(interval.start - Math.min(interval.departure, interval.arrival)) <= EPSILON);
     assert.ok(Math.abs(interval.end - Math.max(interval.departure, interval.arrival)) <= EPSILON);
@@ -55,6 +57,8 @@ function assertSessionInvariant(session) {
       assert.ok(["range", "movement"].includes(frame.resolutionBasis));
       assert.ok(frame.resolution.L >= range.start - EPSILON, `${role} begins outside Range.`);
       assert.ok(frame.resolution.R <= range.end + EPSILON, `${role} ends outside Range.`);
+      assert.ok(frame.resolution.L <= interval.start + EPSILON, `${role} does not contain the Loop start.`);
+      assert.ok(frame.resolution.R >= interval.end - EPSILON, `${role} does not contain the Loop end.`);
       assert.ok(Math.abs(frame.resolution.C - address) <= EPSILON);
     }
     assert.deepEqual(interval.arrivalFrame.resolution, resolution, "The active endpoint frame must match current Resolution.");

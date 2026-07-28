@@ -8,6 +8,7 @@ import {
   refine,
   reopen,
   step,
+  completePlayback,
   switchEndpoint,
   returnState
 } from "./session.js";
@@ -60,6 +61,42 @@ switched = switchEndpoint(switched.session);
 assert.equal(switched.session.model.resolution.C, originalInterval.arrival);
 assert.deepEqual(frameOf(switched.session.model), arrivalFrame);
 assert.deepEqual(switched.session.model.interval, originalInterval);
+
+// Playback edits the selected endpoint instead of replacing the Interval that
+// Switch Endpoint is transposing. The opposite endpoint and its search frame
+// survive shrink, extension, and a subsequent switch.
+let played = createSession({ duration: 120, current: 10 });
+played = goTo(played, 50, { operator: "timeline" }).session;
+const frameAtFifty = frameOf(played.model);
+played = switchEndpoint(played).session;
+const playbackOrigin = snapshotModel(played.model);
+played = completePlayback(played, {
+  current: 20,
+  departure: 10,
+  parentNeighborhood: playbackOrigin.resolution,
+  parentResolutionBasis: playbackOrigin.resolutionBasis,
+  returnModel: playbackOrigin
+}).session;
+assert.deepEqual(
+  {
+    start: played.model.interval.start,
+    end: played.model.interval.end,
+    departure: played.model.interval.departure,
+    arrival: played.model.interval.arrival
+  },
+  { start: 20, end: 50, departure: 50, arrival: 20 },
+  "Playback from a switched endpoint must resize the active Interval around the preserved opposite endpoint."
+);
+assert.equal(played.model.resolution.L, playbackOrigin.resolution.L);
+assert.equal(played.model.resolution.C, 20);
+played = switchEndpoint(played).session;
+assert.equal(played.model.resolution.C, 50);
+assert.deepEqual(frameOf(played.model), frameAtFifty);
+assert.deepEqual(
+  { start: played.model.interval.start, end: played.model.interval.end },
+  { start: 20, end: 50 },
+  "Switch Endpoint must not change the playback-deformed extent."
+);
 
 // Reopen changes the active endpoint frame without changing Interval extent.
 // Switching away captures that updated frame; switching back restores it.
@@ -143,7 +180,16 @@ assert.deepEqual(
 );
 stepped = switchEndpoint(stepped).session;
 assert.equal(stepped.model.resolution.C, 60);
-assert.deepEqual(frameOf(stepped.model), frameAtSixty);
+assert.deepEqual(frameOf(stepped.model), {
+  ...frameAtSixty,
+  resolution: {
+    ...frameAtSixty.resolution,
+    L: 15,
+    level: 0
+  }
+});
+assert.ok(stepped.model.resolution.L <= stepped.model.interval.start);
+assert.ok(stepped.model.resolution.R >= stepped.model.interval.end);
 
 // A collapsed Interval has no endpoints to transpose and creates no history.
 let collapsed = createSession({ duration: 100, current: 20 });

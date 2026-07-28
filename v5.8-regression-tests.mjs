@@ -102,8 +102,8 @@ oldEquivalent = reopen(oldEquivalent).session;
 oldEquivalent = refine(oldEquivalent, "forward").session;
 assert.equal(oldEquivalent.model.resolution.C, 330);
 
-// Step preserves the origin Neighborhood and pushes a crossed directional
-// endpoint to retain a half-Step Refine target.
+// Step preserves the origin Neighborhood, pushes only its approached endpoint,
+// and retains a half-Step Refine target after crossing that endpoint.
 let stepped = createSession({ duration: 480, current: 120 });
 stepped = goTo(stepped, 180, { operator: "timeline" }).session; // 120—180—240
 const stepOrigin = snapshotModel(stepped.model);
@@ -112,7 +112,7 @@ stepped = step(stepped, "forward", 20, {
   originResolution: stepOrigin.resolution,
   originResolutionBasis: stepOrigin.resolutionBasis
 }).session;
-assert.deepEqual(stepped.model.resolution, { L: 120, C: 200, R: 240, level: 0 });
+assert.deepEqual(stepped.model.resolution, { L: 120, C: 200, R: 260, level: 0 });
 assert.equal(stepped.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
 stepped = step(stepped, "forward", 100, {
   departure: 180,
@@ -225,7 +225,8 @@ assert.deepEqual(
   pathB.model.interval && { start: pathB.model.interval.start, end: pathB.model.interval.end }
 );
 
-// Native playback preserves local basis inside and reopens beyond it.
+// Native playback preserves local basis, the opposite Interval endpoint, and
+// the receding Resolution side while translating the approached side.
 let continued = createSession({ duration: 480, current: 120 });
 continued = goTo(continued, 180, { operator: "timeline" }).session;
 const continuedReturn = snapshotModel(continued.model);
@@ -234,24 +235,22 @@ continued = completePlayback(continued, {
   departure: 180,
   parentNeighborhood: copy(continued.model.resolution),
   parentResolutionBasis: continued.model.resolutionBasis,
-  crossedResolution: false,
   wrapped: false,
   returnModel: continuedReturn
 }).session;
-assert.deepEqual(continued.model.resolution, { L: 180, C: 200, R: 240, level: 0 });
+assert.deepEqual(continued.model.resolution, { L: 120, C: 200, R: 260, level: 0 });
 assert.equal(continued.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
 continued = completePlayback(continued, {
   current: 300,
   departure: 200,
   parentNeighborhood: copy(continued.model.resolution),
   parentResolutionBasis: continued.model.resolutionBasis,
-  crossedResolution: true,
   wrapped: false,
   returnModel: snapshotModel(continued.model)
 }).session;
-assert.equal(continued.model.resolutionBasis, RESOLUTION_BASIS.RANGE);
-assert.deepEqual(continued.model.resolution, { L: 0, C: 300, R: 480, level: 0 });
-assert.deepEqual({ start: continued.model.interval.start, end: continued.model.interval.end }, { start: 200, end: 300 });
+assert.equal(continued.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
+assert.deepEqual(continued.model.resolution, { L: 120, C: 300, R: 360, level: 0 });
+assert.deepEqual({ start: continued.model.interval.start, end: continued.model.interval.end }, { start: 120, end: 300 });
 
 // Range operations preserve only wholly contained Intervals.
 let ranged = createSession({ duration: 100, current: 20 });
@@ -343,8 +342,8 @@ playbackSession = completePlayback(playbackSession, {
   returnModel: snapshotModel(playbackSession.model)
 }).session;
 assert.equal(playbackSession.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
-assert.deepEqual(playbackSession.model.resolution, { L: 180, C: 195, R: 240, level: 0 });
-assert.deepEqual({ start: playbackSession.model.interval.start, end: playbackSession.model.interval.end }, { start: 180, end: 195 });
+assert.deepEqual(playbackSession.model.resolution, { L: 120, C: 195, R: 255, level: 0 });
+assert.deepEqual({ start: playbackSession.model.interval.start, end: playbackSession.model.interval.end }, { start: 120, end: 195 });
 
 // Geometry compatibility utilities remain callable.
 assert.equal(logSpeed(2, 0), 2);

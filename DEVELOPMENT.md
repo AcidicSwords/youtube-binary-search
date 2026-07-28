@@ -55,10 +55,11 @@ Autoplay blocking, buffering, delayed placement, and missing directional rates a
 - Hold during formation may commit measured Offset through Session Step Reach, but must never write semantic Interval.
 - Context must preserve stored Field geometry and must not remeasure against its transient Cursor.
 - Side video surface, local Step button, and matrix Step must share `performStep()`.
-- Direct Go/playback establishes a replacement Interval. Matrix Refine, Step, and Pin traversal preserve the active Interval departure and departure frame while moving only its arrival endpoint.
-- Step must retain its binary Neighborhood. At a crossed directional endpoint, push that endpoint to one Step beyond Current, clamped to Range, so the next directional Refine is half a Step wherever Range permits.
-- Switch Endpoint must preserve ordered Interval extent, swap its directed roles, and restore the retained frame at the destination.
-- Held arrow-key Step owns one pending transaction and one Context on keyup.
+- Direct Go, Refine, and Pin traversal replace Interval with their own local movement. Step and settled playback preserve the active departure while moving arrival.
+- Step, playback, and Pin traversal leave the receding Neighborhood endpoint fixed and push the approached endpoint. A Step that reaches or crosses the old bound retains one full Step beyond Current, clamped to Range.
+- Every non-null Interval and both stored endpoint frames must satisfy `Interval ⊆ Resolution ⊆ Range`.
+- Switch Endpoint must preserve ordered Interval extent, swap its directed roles, and restore a retained frame containing that unchanged extent.
+- Held Arrow Step owns its repeat timer, one pending transaction, and one Context on keyup; browser repeat events must not control cadence.
 - Internal Loop wraps must never invoke Session movement or Context.
 - Collapsing one Field side must not re-establish the other; combined Field controls operate only on visible sides.
 - Side-player errors must remain recoverable through pane restore or video reload; a retained adapter must never be stranded behind `ready = false`.
@@ -67,7 +68,7 @@ Autoplay blocking, buffering, delayed placement, and missing directional rates a
 
 The interface has four ownership regions: Field, map, operators/parameters, Guide. Do not reintroduce a generic playback dock.
 
-Every form control needs an accessible name; every button declares a type; focus and coarse-pointer targets remain visible and practical. Desktop is primary, but all operations must survive stacking and Guide modal presentation. Use explicit Field grid areas and zero-minimum tracks; fixed child minima may not clip a pane or displace Center when Field is off.
+Every form control needs an accessible name; every button declares a type; focus and coarse-pointer targets remain visible and practical. Desktop is primary, but all operations must survive stacking and Guide modal presentation. Use explicit Field grid areas, an explicit zero-minimum column inside every pane, and player-panel container breakpoints; child minima may not clip a pane or displace Center when Field is off.
 
 ## 7. Tests
 
@@ -77,7 +78,7 @@ Every form control needs an accessible name; every button declares a type; focus
 - `fuzz-tests.mjs` — deterministic semantic invariants
 - `v5.8-regression-tests.mjs` — stable reader and native playback contracts
 - `endpoint-transposition-tests.mjs` — endpoint frames, Switch involution, Step composition, collapsed state, and Undo separation
-- `semantic-composition-tests.mjs` — matrix endpoint editing, direct replacement, Pin endpoints, and truthful availability
+- `semantic-composition-tests.mjs` — distinct Refine, Step, Pin, direct-Go, and Switch ownership plus truthful availability
 - `semantic-audit-probes.mjs` — deterministic regressions for the seven relational-audit discrepancies
 - `semantic-state-space-tests.mjs` — 200,000 mixed operations plus point and arbitrary-Interval reachability (`npm run test:semantic`)
 - `step-field-tests.mjs` — Field geometry and source-level wiring

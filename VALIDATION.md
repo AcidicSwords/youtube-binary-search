@@ -6,7 +6,7 @@
 npm run check
 ```
 
-The gate covers syntax, Session/Undo, endpoint frames and transposition, matrix Interval composition, all seven semantic-audit regressions, Guide, Context/playback/Loop values, source normalization, 25,000-operation fuzzing, native-playback regressions, Field geometry and controller behaviour, DOM/accessibility contracts, repository audits, startup, interaction, Context, and metadata paths.
+The gate covers syntax, Session/Undo, endpoint-frame containment and transposition, distinct operator ownership, all seven semantic-audit regressions, Guide, Context/playback/Loop values, source normalization, 25,000-operation fuzzing, native-playback regressions, Field geometry and controller behaviour, DOM/accessibility contracts, repository audits, startup, interaction, Context, and metadata paths.
 
 The deeper semantic proof is separate:
 
@@ -14,7 +14,7 @@ The deeper semantic proof is separate:
 npm run test:semantic
 ```
 
-It covers 200,000 mixed random operations, 10,000 arbitrary point targets, 10,000 variable-Step Interval trials, and 10,000 arbitrary matrix Interval targets located through Refine at the 40 ms floor.
+It covers 200,000 mixed random operations, 10,000 arbitrary point targets, and 10,000 variable-Step Interval trials while checking `Interval ⊆ Resolution ⊆ Range` in the live frame and both Switch frames.
 
 A passing gate is necessary, not sufficient, because actual YouTube iframe behaviour remains browser- and video-dependent.
 
@@ -36,12 +36,12 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 - Start through the paused Center surface and Space; confirm Tail, Center, and Lead receive play requests in the same event turn.
 - Confirm the shared surface withdraws during ordinary playback, native Center controls remain usable, and native pause restores the surface while settling Current and Interval once.
 - Confirm native scrub settles as Go after the grace period.
-- Confirm crossing Resolution during playback reopens Range scale.
+- Confirm playback leaves the receding Resolution endpoint fixed, pushes only the approached endpoint, and keeps the edited Loop contained.
 
 ### Automatic Context
 
 - Enable each duration and invoke timeline, Refine, Step, side Step, Switch Endpoint, Pin, Section, and Undo traversal.
-- Hold each arrow key through repeated Step events; confirm Current/Interval update during repeat, no intermediate Context starts, and one Context runs on keyup at the final Current.
+- Hold each arrow key while injecting irregular browser repeat events; confirm the application cadence alone advances Current/Interval, no intermediate Context starts, and one Context runs on keyup at the final Current.
 - Confirm Center plays the bounded window and restores Current.
 - Confirm Tail/Lead remain paused and preserve their modes/Offsets.
 - Trigger a new traversal while Context is active; only the new destination remains authoritative.
@@ -69,24 +69,26 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 
 ### Composable Step Interval
 
-- Establish an Interval through Refine, timeline, Pin traversal, and native playback.
+- Establish an Interval through any replacement movement, then verify Step adopts its opposite endpoint as anchor.
 - Step away from its departure and confirm the displayed Interval extends without moving the anchor.
 - Step back into the extent and confirm it shrinks.
 - Cross the anchor and confirm direction reverses while the ordered timeline extent remains valid.
 - Confirm matrix Step, pane click, and local side Step edit the same Interval.
 - Confirm Loop and Save Section consume the resized extent exactly.
 - Undo after each resize and confirm the preceding Current, Resolution, and Interval are restored.
-- Step exactly onto each non-Range binary Neighborhood endpoint and confirm that endpoint advances by one Step and the next directional Refine is half a Step away.
+- Confirm every Step pushes only the approached Neighborhood endpoint while the receding endpoint remains exact.
+- Step exactly onto each non-Range binary Neighborhood endpoint and confirm that endpoint remains one Step beyond Current and the next directional Refine is half a Step away.
 - Repeat past the original endpoint and confirm only Range stops further endpoint pushing.
 
-### Matrix Interval composition
+### Operator ownership and containment
 
-- Reach endpoint A, Switch Endpoint, then locate endpoint B through repeated Refine; confirm A remains fixed while B converges to the Resolution floor.
-- Repeat B traversal across several Section endpoint Pins; confirm the final Interval remains A→B rather than only the last Pin hop.
-- Cross A exactly, then continue; confirm the collapsed Interval redraws from A on the next matrix direction.
+- Establish a large Loop, then Refine; confirm the new Interval is exactly the local refinement traversal rather than an extension of the old Loop.
+- Traverse several Section endpoint Pins; confirm each result is exactly the latest one-hop Pin movement.
+- Confirm Pin Forward/Backward and playback push only the approached refinement endpoint.
+- After every Refine, Step, Pin, playback settlement, Reopen, and Switch, confirm the Loop is contained by active Resolution and both endpoint frames.
 - Invoke a direct timeline or Guide Go and confirm it intentionally replaces the Active Interval.
 - Exhaust Refine away from a Range edge and confirm the UI says `Resolution limit`; Reopen or Step must restore useful scale.
-- Exercise a final side narrower than 80 ms; confirm Refine consumes its still-distinct endpoint rather than exposing an enabled no-op midpoint.
+- Exercise a final side narrower than 80 ms; confirm Refine reports `Resolution limit` rather than exposing an enabled no-op or stranding Current on the endpoint. Apply a linear move and confirm refinement becomes useful again when scale permits.
 - Switch and confirm its meta and hover/focus preview expose the destination endpoint frame before committing.
 
 ### Endpoint Transposition
@@ -94,8 +96,10 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 - Establish Intervals through Refine, timeline/Pin Go, Step, and native playback.
 - Switch Endpoint and confirm `start/end` and rendered extent remain fixed while directed departure/arrival swap.
 - Confirm Current moves to the other endpoint and its retained Resolution frame/basis is restored.
+- Confirm the restored frame contains the complete unchanged Loop.
 - Reopen at one endpoint, switch away and back, and confirm the reopened frame returns.
-- Switch, then Step inward/outward/across the new anchor; confirm Step composes from the transposed departure.
+- Switch, then Step or settle playback inward/outward/across the new anchor; confirm both compose from the transposed departure.
+- Switch, then Refine or traverse a Pin; confirm those operators record their own movement instead of stretching the transposed Loop.
 - Hold an arrow through repeat after switching and confirm one history entry and one Context window.
 - Switch twice and confirm semantic Current, direction, frames, and extent return exactly.
 - Collapse an Interval by stepping onto its anchor and confirm Switch Endpoint is disabled and `S` is a no-op.
@@ -120,6 +124,7 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 
 ## 3. Responsive and mobile
 
+- Resize across each player-panel container breakpoint, including viewport widths just above it where application padding makes the panel narrower; no pane child may exceed its pane and no panes may overlap.
 - Medium layout places Center above side panes.
 - Phone layout stacks Center, Tail, Lead without horizontal overflow.
 - Field-off remains a full-width Center-only projection even when either collapsed-side preference is persisted.

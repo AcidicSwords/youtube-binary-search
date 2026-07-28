@@ -34,7 +34,6 @@ import {
   switchEndpoint as switchSessionEndpoint,
   setRange as setSessionRange,
   previewRange,
-  previewReopen,
   checkpoint,
   focusSection as focusSessionSection,
   leaveSection as leaveSessionSection,
@@ -81,6 +80,8 @@ const STEP_DEBOUNCE_MS = 120;
 const STEP_PRESETS = [0.25, 0.5, 1, 2, 3, 5, 10, 15, 30, 60, 120, 300];
 const CONTEXT_PRE_ROLL_SECONDS = 1;
 const NATIVE_GO_SETTLE_MS = 220;
+const HELD_STEP_INITIAL_DELAY_MS = 250;
+const HELD_STEP_REPEAT_MS = 100;
 const TRANSPORT_START_GRACE_MS = 1600;
 const METADATA_GRACE_MS = 4000;
 const METADATA_RETRY_MS = 150;
@@ -155,6 +156,7 @@ let stepField = null;
 let pendingLoad = null;
 let pollTimer = null;
 let metadataTimer = null;
+let heldStep = null;
 
 function model() {
   return state.session.model;
@@ -470,7 +472,6 @@ function settleTransport(options = {}) {
       departure: active.departure,
       parentNeighborhood: active.parentNeighborhood,
       parentResolutionBasis: active.parentResolutionBasis,
-      crossedResolution: active.crossedResolution,
       returnModel: active.returnModel,
       label: active.label,
       operator: active.operator || "playback"
@@ -534,6 +535,52 @@ function flushPendingStep(options = {}) {
   return { flushed: true, cancelled: false, direction: pending.lastDirection };
 }
 
+function stopHeldStepRepeater() {
+  if (!heldStep) return false;
+  if (heldStep.timer !== null) clearTimeout(heldStep.timer);
+  heldStep = null;
+  return true;
+}
+
+function repeatHeldStep(token) {
+  if (heldStep !== token) return;
+  const moved = performStep(
+    token.direction,
+    reachFor(token.direction),
+    { waitForKeyup: true }
+  );
+  if (!moved || heldStep !== token) {
+    token.timer = null;
+    return;
+  }
+  token.timer = window.setTimeout(
+    () => repeatHeldStep(token),
+    HELD_STEP_REPEAT_MS
+  );
+}
+
+function beginHeldStep(direction, key) {
+  if (heldStep?.key === key) return false;
+  stopHeldStepRepeater();
+  const moved = performStep(direction, reachFor(direction), { waitForKeyup: true });
+  const token = { direction, key, timer: null };
+  heldStep = token;
+  if (moved) {
+    token.timer = window.setTimeout(
+      () => repeatHeldStep(token),
+      HELD_STEP_INITIAL_DELAY_MS
+    );
+  }
+  return moved;
+}
+
+function finishHeldStep(key, options = {}) {
+  if (!heldStep || heldStep.key !== key) return false;
+  stopHeldStepRepeater();
+  completePendingStep({ observe: options.observe !== false });
+  return true;
+}
+
 function completePendingStep(options = {}) {
   const outcome = flushPendingStep({ observe: options.observe !== false });
   if (!outcome.flushed) return outcome;
@@ -552,6 +599,7 @@ function completePendingStep(options = {}) {
 
 function settleBeforeAction(options = {}) {
   clearNativeGo();
+  stopHeldStepRepeater();
   view.closePinClusterMenu();
   view.setPreviewAction(null);
   const replacingContext = options.replacingContext === true;
@@ -609,7 +657,7 @@ function refine(direction) {
     return;
   }
   accept(result, {
-    status: `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; active Interval endpoint updated.`
+    status: `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; Loop now records this local refinement.`
   });
 }
 
@@ -636,7 +684,7 @@ function switchCurrentEndpoint() {
     return;
   }
   accept(result, {
-    status: `Switched to ${formatTime(result.session.model.resolution.C)}; matrix directions now edit the opposite endpoint while extent remains ${formatRange(interval)}.`
+    status: `Switched to ${formatTime(result.session.model.resolution.C)}; Loop remains ${formatRange(interval)} in its restored refinement frame.`
   });
 }
 
@@ -661,9 +709,9 @@ function undoLastAction() {
 }
 
 function performStep(direction, distance = reachFor(direction), options = {}) {
-  if (!state.videoLoaded) return;
+  if (!state.videoLoaded) return false;
   const resolvedDistance = Number(distance);
-  if (!(Number.isFinite(resolvedDistance) && resolvedDistance > 0)) return;
+  if (!(Number.isFinite(resolvedDistance) && resolvedDistance > 0)) return false;
   if (!state.pendingStep) {
     settleBeforeAction({ replacingContext: true });
     const departure = currentResolution().C;
@@ -698,7 +746,7 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
   if (!result.changed) {
     if (!state.pendingStep.started) state.pendingStep = null;
     setStatus(`Step ${direction === "backward" ? "Backward" : "Forward"} is at the Range boundary.`);
-    return;
+    return false;
   }
   state.pendingStep.started = true;
   state.session = result.session;
@@ -712,6 +760,7 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
     }, STEP_DEBOUNCE_MS);
   }
   view.render();
+  return true;
 }
 
 function selectFieldSide(selection) {
@@ -1093,9 +1142,9 @@ function goToAdjacentPin(direction) {
     return;
   }
   moveToAddress(pin.t, {
+    mode: "linear",
     operator: direction === "backward" ? "previousPin" : "nextPin",
     label: direction === "backward" ? "Pin Backward" : "Pin Forward",
-    intervalMode: "edit",
     status: destination => `Moved ${direction} to Pin at ${formatTime(destination)}.`
   });
 }
@@ -1332,19 +1381,6 @@ function pollPlayer() {
       view.renderTransport();
       return;
     }
-    let semanticChanged = false;
-    if (
-      !transport.crossedResolution
-      && (now < transport.parentNeighborhood.L - EPSILON || now > transport.parentNeighborhood.R + EPSILON)
-    ) {
-      transport.crossedResolution = true;
-      const preview = previewReopen(state.session, clamp(now, activeRange().start, activeRange().end));
-      if (preview.changed) {
-        state.session = preview.session;
-        semanticChanged = true;
-      }
-      setStatus(`Playback crossed the current Resolution and reopened Range ${formatRange(activeRange())}.`);
-    }
     if (now < activeRange().start - EPSILON) {
       placePlayer(activeRange().start);
     } else if (now >= activeRange().end - EPSILON) {
@@ -1352,7 +1388,6 @@ function pollPlayer() {
       setStatus("Playback reached Range End.");
       return;
     }
-    if (semanticChanged) view.render();
   } else if (
     !isTransportActive(transport)
     && [YOUTUBE_STATE.PAUSED, YOUTUBE_STATE.CUED].includes(state.playerState)
@@ -2101,8 +2136,8 @@ document.addEventListener("keydown", event => {
   else if (plain && key === "l") { event.preventDefault(); startLoop(); }
   else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && event.key === "ArrowLeft") { event.preventDefault(); goToAdjacentPin("backward"); }
   else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && event.key === "ArrowRight") { event.preventDefault(); goToAdjacentPin("forward"); }
-  else if (plain && event.key === "ArrowLeft") { event.preventDefault(); performStep("backward", reachFor("backward"), { waitForKeyup: true }); }
-  else if (plain && event.key === "ArrowRight") { event.preventDefault(); performStep("forward", reachFor("forward"), { waitForKeyup: true }); }
+  else if (plain && event.key === "ArrowLeft") { event.preventDefault(); beginHeldStep("backward", event.key); }
+  else if (plain && event.key === "ArrowRight") { event.preventDefault(); beginHeldStep("forward", event.key); }
   else if (plain && event.key === "[") { event.preventDefault(); adjustStepPreset(-1); }
   else if (plain && event.key === "]") { event.preventDefault(); adjustStepPreset(1); }
   else if (commandUndo) { event.preventDefault(); undoLastAction(); }
@@ -2111,14 +2146,17 @@ document.addEventListener("keydown", event => {
 
 document.addEventListener("keyup", event => {
   if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-  if (!state.pendingStep?.waitForKeyup) return;
+  if (!heldStep || heldStep.key !== event.key) return;
   event.preventDefault();
-  completePendingStep({ observe: true });
+  finishHeldStep(event.key, { observe: true });
 });
 
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) return;
-  if (state.pendingStep?.waitForKeyup) completePendingStep({ observe: false });
+  if (heldStep) {
+    stopHeldStepRepeater();
+    completePendingStep({ observe: false });
+  }
   if (isTransportActive(state.transport)) {
     settleTransport();
     setStatus("Playback paused because the document became hidden.");
@@ -2126,7 +2164,9 @@ document.addEventListener("visibilitychange", () => {
 });
 
 window.addEventListener("blur", () => {
-  if (state.pendingStep?.waitForKeyup) completePendingStep({ observe: false });
+  if (!heldStep) return;
+  stopHeldStepRepeater();
+  completePendingStep({ observe: false });
 });
 
 window.addEventListener("resize", () => {

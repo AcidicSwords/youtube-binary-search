@@ -42,10 +42,10 @@ assert.equal(currentText(), "Current 0:25.000");
 byId.get("pin-forward").click();
 await flush();
 assert.equal(currentText(), "Current 0:50.000", "Next Pin must traverse through the same movement model.");
-assert.equal(
+assert.match(
   byId.get("section-window").textContent,
-  "No active Interval",
-  "Returning to the retained anchor must collapse the Active Interval."
+  /0:25\.000–0:50\.000/,
+  "Pin traversal must record its own hop rather than inheriting a prior Loop anchor."
 );
 byId.get("pin-backward").click();
 await flush();
@@ -201,8 +201,8 @@ assert.equal(byId.get("step-forward-seconds").value, "8");
 assert.equal(byId.get("field-both-toggle-label").textContent, "Stretch both");
 assert.equal(byId.get("section-window").textContent, intervalBeforeStretch);
 
-// Native pause freezes and parks exact side frames. Playback settlement alone
-// writes the playback Interval; the Field remains a separate physical object.
+// Native pause freezes and parks exact side frames. Playback moves only the
+// selected Interval endpoint; the Field remains a separate physical object.
 center.currentTime = 58;
 tail.currentTime = 54;
 lead.currentTime = 66;
@@ -211,11 +211,22 @@ await flush();
 await poll();
 assert.equal(byId.get("center-transport-surface").hidden, false, "Paused Center must restore the shared activation surface.");
 assert.equal(currentText(), "Current 0:58.000");
-assert.match(byId.get("section-window").textContent, /0:50\.000–0:58\.000/);
+assert.match(byId.get("section-window").textContent, /0:25\.000–0:58\.000/);
 assert.equal(tail.currentTime, 54, "Paused Tail must display its represented backward frame.");
 assert.equal(lead.currentTime, 66, "Paused Lead must display its represented forward frame.");
 assert.equal(tail.state, 2);
 assert.equal(lead.state, 2);
+
+// Playback settlement must not strand Switch Endpoint on the short physical
+// playback segment. It still transposes the preserved Loop endpoints exactly.
+byId.get("switch-endpoint").click();
+await flush();
+assert.equal(currentText(), "Current 0:25.000");
+assert.match(byId.get("section-window").textContent, /0:25\.000–0:58\.000/);
+byId.get("switch-endpoint").click();
+await flush();
+assert.equal(currentText(), "Current 0:58.000");
+assert.match(byId.get("section-window").textContent, /0:25\.000–0:58\.000/);
 
 // Side Step uses the visible pane offset and translates the complete Field.
 // Repeated clicks therefore behave like a temporal slideshow while Step edits
@@ -228,7 +239,7 @@ assert.equal(currentText(), "Current 0:54.000");
 assert.equal(center.currentTime, 54);
 assert.equal(tail.currentTime, 50);
 assert.equal(lead.currentTime, 62);
-assert.match(byId.get("section-window").textContent, /0:50\.000–0:54\.000/);
+assert.match(byId.get("section-window").textContent, /0:25\.000–0:54\.000/);
 
 byId.get("lead-step-button").click();
 await env.delay(150);
@@ -238,7 +249,7 @@ assert.equal(currentText(), "Current 1:02.000");
 assert.equal(center.currentTime, 62);
 assert.equal(tail.currentTime, 58);
 assert.equal(lead.currentTime, 70);
-assert.match(byId.get("section-window").textContent, /0:50\.000–1:02\.000/);
+assert.match(byId.get("section-window").textContent, /0:25\.000–1:02\.000/);
 
 // Space uses the same shared activation and always begins a fresh refold/stretch.
 const tailPlayBeforeSpace = tail.commands.filter(command => command[0] === "play").length;

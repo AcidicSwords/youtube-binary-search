@@ -4,6 +4,7 @@ import {
   RESOLUTION_BASIS,
   clamp,
   contains,
+  containExtent,
   createRoot,
   getTargets,
   refineNeighborhood,
@@ -13,7 +14,7 @@ import {
   canReopen,
   stepTarget,
   stepNeighborhood,
-  settleContinuous
+  translateNeighborhood
 } from "./range-geometry.js";
 import {
   PIN_KIND,
@@ -141,12 +142,25 @@ function resolveEndpointFrame(frame, address, opposite, range) {
   );
 }
 
+function resolveIntervalEndpointFrame(frame, address, opposite, interval, range) {
+  const resolved = resolveEndpointFrame(frame, address, opposite, range);
+  const resolution = containExtent(resolved.resolution, interval, range);
+  return createEndpointFrame(
+    resolution,
+    isRangeNeighborhood(resolution, range)
+      ? RESOLUTION_BASIS.RANGE
+      : resolved.resolutionBasis
+  );
+}
+
 function syncIntervalEndpointFrames(model) {
   if (!model.interval) return;
-  model.interval.departureFrame = resolveEndpointFrame(
+  model.resolution = containExtent(model.resolution, model.interval, model.range);
+  model.interval.departureFrame = resolveIntervalEndpointFrame(
     model.interval.departureFrame,
     model.interval.departure,
     model.interval.arrival,
+    model.interval,
     model.range
   );
   model.interval.arrivalFrame = currentEndpointFrame(model);
@@ -347,10 +361,6 @@ function moveDraft(model, destination, options = {}) {
   const departure = Number.isFinite(options.departure)
     ? options.departure
     : model.resolution.C;
-  const editDeparture = sourceInterval
-    && Math.abs(sourceInterval.arrival - departure) <= EPSILON
-    ? sourceInterval.departure
-    : departure;
   const boundedDestination = clamp(destination, 0, model.duration);
   const opening = openAddress(model, boundedDestination);
   const rangeChanged = opening.changed;
@@ -390,6 +400,20 @@ function moveDraft(model, destination, options = {}) {
     model.resolutionBasis = isRangeNeighborhood(model.resolution, model.range)
       ? RESOLUTION_BASIS.RANGE
       : baseBasis;
+  } else if (options.mode === "linear") {
+    const baseNeighborhood = clone(options.originResolution || model.resolution);
+    const baseBasis = options.originResolutionBasis
+      || model.resolutionBasis
+      || RESOLUTION_BASIS.RANGE;
+    model.resolution = translateNeighborhood(
+      baseNeighborhood,
+      resolvedDestination,
+      model.range
+    );
+    finalDestination = model.resolution.C;
+    model.resolutionBasis = isRangeNeighborhood(model.resolution, model.range)
+      ? RESOLUTION_BASIS.RANGE
+      : baseBasis;
   } else {
     // Direct Go abandons the preceding recursive path while retaining the scale
     // communicated by the actual movement. The crossed Interval forms one side
@@ -406,9 +430,7 @@ function moveDraft(model, destination, options = {}) {
 
   const intervalDeparture = Number.isFinite(options.intervalDeparture)
     ? options.intervalDeparture
-    : options.intervalMode === "edit"
-      ? editDeparture
-      : departure;
+    : departure;
   const inheritedDepartureFrame = sourceInterval
     && Math.abs(sourceInterval.departure - intervalDeparture) <= EPSILON
     ? sourceInterval.departureFrame
@@ -476,7 +498,6 @@ export function refine(session, direction) {
   const backward = direction === "backward";
   return goTo(session, target, {
     mode: "refine",
-    intervalMode: "edit",
     operator: backward ? "refineBackward" : "refineForward",
     label: backward ? "Refine Backward" : "Refine Forward"
   });
@@ -542,10 +563,11 @@ export function switchEndpoint(session) {
     const departure = active.departure;
     const arrival = active.arrival;
     const frameBeingLeft = currentEndpointFrame(draft);
-    const frameBeingEntered = resolveEndpointFrame(
+    const frameBeingEntered = resolveIntervalEndpointFrame(
       active.departureFrame,
       departure,
       arrival,
+      active,
       draft.range
     );
 
@@ -643,10 +665,12 @@ export function leaveSection(session) {
 
 export function completePlayback(session, options) {
   const current = clamp(options.current, session.model.range.start, session.model.range.end);
-  if (
-    Math.abs(current - options.departure) <= EPSILON
-    && !options.crossedResolution
-  ) return unchanged(session, "no-movement");
+  if (Math.abs(current - options.departure) <= EPSILON) {
+    return unchanged(session, "no-movement");
+  }
+  const originModel = snapshotModel(options.returnModel || session.model);
+  const sourceInterval = clone(originModel.interval);
+  const intervalDeparture = stepIntervalAnchor(originModel, sourceInterval);
   const playbackCheckpoint = snapshotModel(options.returnModel || session.model);
   // Playback owns the spatial path captured when it started. Semantic values
   // that may legitimately change while it runs (currently Held Field Reach and
@@ -655,23 +679,27 @@ export function completePlayback(session, options) {
   playbackCheckpoint.stepReach = normalizeStepReach(session.model.stepReach);
   playbackCheckpoint.guide = session.model.guide;
   return commit(session, options.label || "Playback", draft => {
-    draft.resolution = options.crossedResolution
-      ? reopenToRange(current, draft.range)
-      : settleContinuous(options.parentNeighborhood, options.departure, current);
-    draft.resolutionBasis = options.crossedResolution
-      ? RESOLUTION_BASIS.RANGE
-      : options.parentResolutionBasis
-        || options.returnModel?.resolutionBasis
-        || draft.resolutionBasis
-        || RESOLUTION_BASIS.RANGE;
-    const departureFrame = createEndpointFrame(
-      options.returnModel?.resolution || options.parentNeighborhood,
-      options.returnModel?.resolutionBasis
-        || options.parentResolutionBasis
-        || draft.resolutionBasis
+    const parentNeighborhood = clone(
+      options.parentNeighborhood
+      || originModel.resolution
+      || draft.resolution
     );
+    const parentBasis = options.parentResolutionBasis
+      || originModel.resolutionBasis
+      || draft.resolutionBasis
+      || RESOLUTION_BASIS.RANGE;
+    draft.resolution = translateNeighborhood(parentNeighborhood, current, draft.range);
+    draft.resolutionBasis = isRangeNeighborhood(draft.resolution, draft.range)
+      ? RESOLUTION_BASIS.RANGE
+      : parentBasis;
+    const inheritedDepartureFrame = sourceInterval
+      && Math.abs(sourceInterval.departure - intervalDeparture) <= EPSILON
+      ? sourceInterval.departureFrame
+      : null;
+    const departureFrame = clone(inheritedDepartureFrame)
+      || createEndpointFrame(parentNeighborhood, parentBasis);
     draft.interval = createInterval(
-      options.departure,
+      intervalDeparture,
       current,
       options.operator || "playback",
       "continuous",
@@ -864,14 +892,6 @@ export function previewRange(session, start, end, current) {
       rangeChanged: true,
       intervalCleared
     };
-  });
-}
-
-export function previewReopen(session, current) {
-  return amend(session, draft => {
-    draft.resolution = reopenToRange(current, draft.range);
-    draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
-    return { changed: true, place: draft.resolution.C };
   });
 }
 
