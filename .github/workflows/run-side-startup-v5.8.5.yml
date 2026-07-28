@@ -31,7 +31,13 @@ jobs:
         run: python .github/scripts/apply-side-startup-v5.8.5.py
 
       - name: Run complete repository gate
-        run: npm run check
+        shell: bash
+        run: |
+          set +e
+          npm run check > /tmp/side-startup-check.log 2>&1
+          status=$?
+          tail -n 140 /tmp/side-startup-check.log
+          exit $status
 
       - name: Publish clean product branch
         shell: bash
