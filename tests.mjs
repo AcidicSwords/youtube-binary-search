@@ -315,12 +315,27 @@ assert.deepEqual(
 stepped = returnState(stepped).session;
 assert.equal(stepped.model.resolution.C, 50);
 
-// Range deformation preserves the Loop Window.
+// Range deformation preserves the Loop Window while rebasing endpoint frames
+// to the new hard bound.
 let ranged = createSession({ duration: 100, current: 50 });
 ranged = goTo(ranged, 70, { operator: "timeline", label: "Timeline Click" }).session;
 const loopBeforeRange = copy(ranged.model.interval);
 ranged = setRange(ranged, 20, 80, 70, "Set Range").session;
-assert.deepEqual(ranged.model.interval, loopBeforeRange);
+assert.deepEqual(
+  {
+    start: ranged.model.interval.start,
+    end: ranged.model.interval.end,
+    departure: ranged.model.interval.departure,
+    arrival: ranged.model.interval.arrival
+  },
+  {
+    start: loopBeforeRange.start,
+    end: loopBeforeRange.end,
+    departure: loopBeforeRange.departure,
+    arrival: loopBeforeRange.arrival
+  }
+);
+assert.deepEqual(ranged.model.interval.arrivalFrame.resolution, ranged.model.resolution);
 assert.deepEqual(ranged.model.range, { start: 20, end: 80 });
 ranged = setRange(ranged, 60, 80, 70, "Narrow Range").session;
 assert.equal(ranged.model.interval, null, "Range changes clear Intervals they no longer contain.");
@@ -347,14 +362,29 @@ assert.equal(focused.model.focus, null);
 assert.deepEqual(focused.model.range, { start: 0, end: 100 });
 assert.equal(focused.model.resolution.C, 80);
 
-// Unfocus restores only Range and preserves the current Loop Window.
+// Unfocus restores only Range and preserves the current Loop Window while
+// recording the restored active-endpoint frame.
 let focusedAgain = createSession({ duration: 100, current: 20, guide: focusGuide });
 focusedAgain = goTo(focusedAgain, 25, { operator: "timeline", label: "Timeline Click" }).session;
 focusedAgain = focusSection(focusedAgain, focusSectionRecord.id).session;
 const beforeUnfocusLoop = copy(focusedAgain.model.interval);
 focusedAgain = leaveSection(focusedAgain).session;
 assert.deepEqual(focusedAgain.model.range, { start: 0, end: 100 });
-assert.deepEqual(focusedAgain.model.interval, beforeUnfocusLoop);
+assert.deepEqual(
+  {
+    start: focusedAgain.model.interval.start,
+    end: focusedAgain.model.interval.end,
+    departure: focusedAgain.model.interval.departure,
+    arrival: focusedAgain.model.interval.arrival
+  },
+  {
+    start: beforeUnfocusLoop.start,
+    end: beforeUnfocusLoop.end,
+    departure: beforeUnfocusLoop.departure,
+    arrival: beforeUnfocusLoop.arrival
+  }
+);
+assert.deepEqual(focusedAgain.model.interval.arrivalFrame.resolution, focusedAgain.model.resolution);
 
 // Guide operations participate in the same Undo chain.
 let edited = createSession({ duration: 100, current: 40, guide: createGuide("video") });

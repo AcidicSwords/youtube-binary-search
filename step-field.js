@@ -76,8 +76,9 @@ export function fieldShouldSuspend(snapshot) {
 }
 
 export function fieldPreferenceRequiresEstablish(patch) {
-  return ["stepFieldEnabled", "tailVisible", "leadVisible"]
-    .some(key => Object.hasOwn(patch || {}, key));
+  return patch?.stepFieldEnabled === true
+    || patch?.tailVisible === true
+    || patch?.leadVisible === true;
 }
 
 export function createStepFieldController({
@@ -115,6 +116,7 @@ export function createStepFieldController({
     lastCenterTime: null,
     centerWasRunning: false,
     forceEstablish: true,
+    restoreRoles: new Set(),
     suspended: false,
     field: null,
     fieldKey: ""
@@ -156,8 +158,27 @@ export function createStepFieldController({
   }
 
   function changePreferences(patch) {
+    const before = preferences();
     setPreferences?.(patch);
-    if (fieldPreferenceRequiresEstablish(patch)) runtime.forceEstablish = true;
+    const after = preferences();
+    for (const role of ["tail", "lead"]) {
+      const visibilityKey = `${role}Visible`;
+      if (before[visibilityKey] && !after[visibilityKey]) pauseSide(sides[role]);
+      if (!before[visibilityKey] && after[visibilityKey]) runtime.restoreRoles.add(role);
+    }
+    if (before.stepFieldEnabled && !after.stepFieldEnabled) {
+      pauseSides({ freeze: false });
+      runtime.phase = STEP_FIELD_PHASE.OFF;
+      runtime.centerWasRunning = false;
+    } else if (!before.stepFieldEnabled && after.stepFieldEnabled) {
+      for (const role of ["tail", "lead"]) {
+        if (after[`${role}Visible`]) runtime.restoreRoles.add(role);
+      }
+    }
+    if (fieldPreferenceRequiresEstablish(patch) && patch?.stepFieldEnabled === true) {
+      runtime.forceEstablish = true;
+    }
+    publish(getSnapshot?.());
   }
 
   function directionFor(role) {
@@ -489,23 +510,26 @@ export function createStepFieldController({
     return rate;
   }
 
+  function establishSide(side, center, snapshot) {
+    const offset = effectiveOffset(side.role, center, snapshot);
+    side.mode = FIELD_SIDE_MODE.HELD;
+    side.offset = offset;
+    side.progressOffset = offset;
+    side.targetOffset = configuredOffset(side.role, snapshot);
+    side.beforeStretchOffset = offset;
+    pauseSide(side);
+    parkAtRelation(side, center, snapshot, { force: true });
+  }
+
   function establish(snapshot, address = snapshot.current) {
     const center = clamp(address, snapshot.range.start, snapshot.range.end);
-    for (const side of Object.values(sides)) {
-      const offset = effectiveOffset(side.role, center, snapshot);
-      side.mode = FIELD_SIDE_MODE.HELD;
-      side.offset = offset;
-      side.progressOffset = offset;
-      side.targetOffset = configuredOffset(side.role, snapshot);
-      side.beforeStretchOffset = offset;
-      pauseSide(side);
-      parkAtRelation(side, center, snapshot, { force: true });
-    }
+    for (const side of Object.values(sides)) establishSide(side, center, snapshot);
     runtime.structuralKey = structuralKey(snapshot);
     runtime.semanticCurrent = center;
     runtime.lastCenterTime = center;
     runtime.centerWasRunning = false;
     runtime.forceEstablish = false;
+    runtime.restoreRoles.clear();
     runtime.phase = STEP_FIELD_PHASE.HELD;
   }
 
@@ -529,6 +553,7 @@ export function createStepFieldController({
     }
     runtime.structuralKey = structuralKey(snapshot);
     runtime.forceEstablish = false;
+    runtime.restoreRoles.clear();
     publish(snapshot);
   }
 
@@ -711,14 +736,16 @@ export function createStepFieldController({
   }
 
   function toggleBoth() {
-    const allHeld = ["tail", "lead"].every(role => sides[role].mode === FIELD_SIDE_MODE.HELD);
+    const prefs = preferences();
+    const visibleRoles = ["tail", "lead"].filter(role => prefs[`${role}Visible`]);
+    if (!visibleRoles.length) return;
+    const allHeld = visibleRoles.every(role => sides[role].mode === FIELD_SIDE_MODE.HELD);
     if (allHeld) {
-      stretch("tail");
-      stretch("lead");
+      for (const role of visibleRoles) stretch(role);
       return;
     }
     const patch = {};
-    for (const role of ["tail", "lead"]) {
+    for (const role of visibleRoles) {
       if (sides[role].mode !== FIELD_SIDE_MODE.STRETCHING) continue;
       const offset = hold(role, { record: false });
       if (Number.isFinite(offset) && offset > REACH_TOLERANCE) patch[directionFor(role)] = Math.max(0.25, offset);
@@ -983,10 +1010,13 @@ export function createStepFieldController({
       setText(elements[`${role}-meta`], !loaded ? "—" : sideMeta(role, { offset: actual }, { distance: target }));
     }
 
-    const bothHeld = sides.tail.mode === FIELD_SIDE_MODE.HELD && sides.lead.mode === FIELD_SIDE_MODE.HELD;
-    setText(elements["field-both-toggle-label"], bothHeld ? "Stretch both" : "Hold both");
+    const visibleRoles = ["tail", "lead"].filter(role => prefs[`${role}Visible`]);
+    const bothHeld = visibleRoles.length > 0
+      && visibleRoles.every(role => sides[role].mode === FIELD_SIDE_MODE.HELD);
+    const bothLabel = visibleRoles.length === 1 ? "visible side" : "both";
+    setText(elements["field-both-toggle-label"], bothHeld ? `Stretch ${bothLabel}` : `Hold ${bothLabel}`);
     elements["field-both-toggle"]?.setAttribute?.("aria-pressed", String(bothHeld));
-    if (elements["field-both-toggle"]) elements["field-both-toggle"].disabled = !shown;
+    if (elements["field-both-toggle"]) elements["field-both-toggle"].disabled = !shown || !visibleRoles.length;
     setText(elements["field-transport-state"], runtime.suspended
       ? "Context suspended"
       : runtime.phase === STEP_FIELD_PHASE.PARTIAL
@@ -1019,6 +1049,12 @@ export function createStepFieldController({
 
     if (runtime.forceEstablish || runtime.structuralKey !== structuralKey(snapshot)) {
       establish(snapshot, snapshot.current);
+    } else if (runtime.restoreRoles.size) {
+      const center = clamp(snapshot.current, snapshot.range.start, snapshot.range.end);
+      for (const role of runtime.restoreRoles) establishSide(sides[role], center, snapshot);
+      runtime.restoreRoles.clear();
+      runtime.semanticCurrent = center;
+      runtime.lastCenterTime = center;
     } else if (Math.abs((runtime.semanticCurrent ?? snapshot.current) - snapshot.current) > EPSILON) {
       translateToCurrent(snapshot.current, { preserve: true });
     }
@@ -1114,6 +1150,7 @@ export function createStepFieldController({
     runtime.lastCenterTime = null;
     runtime.centerWasRunning = false;
     runtime.forceEstablish = true;
+    runtime.restoreRoles.clear();
     runtime.suspended = false;
     runtime.field = null;
     runtime.fieldKey = "";
@@ -1139,7 +1176,8 @@ export function createStepFieldController({
     hold(role = "both") {
       if (role === "both") {
         const patch = {};
-        for (const name of ["tail", "lead"]) {
+        const prefs = preferences();
+        for (const name of ["tail", "lead"].filter(name => prefs[`${name}Visible`])) {
           const offset = hold(name, { record: false });
           if (Number.isFinite(offset) && offset > REACH_TOLERANCE) {
             patch[directionFor(name)] = Math.max(0.25, offset);
@@ -1150,8 +1188,8 @@ export function createStepFieldController({
     },
     stretch(role = "both") {
       if (role === "both") {
-        stretch("tail");
-        stretch("lead");
+        const prefs = preferences();
+        for (const name of ["tail", "lead"].filter(name => prefs[`${name}Visible`])) stretch(name);
       } else stretch(role);
     },
     snapshot() {

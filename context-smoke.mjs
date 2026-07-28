@@ -127,11 +127,11 @@ assert.equal(
   "Context Off must leave traversal paused at its destination."
 );
 
-// Context contributes no Return entry of its own. Return restores the preceding
+// Context contributes no Undo entry of its own. Undo restores the preceding
 // semantic state rather than any transient pre-roll or end address.
 byId.get("return-action").click();
 await flush();
 assert.equal(currentText(), "Current 1:25.000");
 assert.equal(center.currentTime, 85);
 
-console.log("Context smoke passed: automatic post-traversal observation, held-key Step deferral, delayed placement, Field suspension, replacement traversal, Step during Context, Off, and Return isolation.");
+console.log("Context smoke passed: automatic post-traversal observation, held-key Step deferral, delayed placement, Field suspension, replacement traversal, Step during Context, Off, and Undo isolation.");

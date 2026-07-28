@@ -5,6 +5,7 @@ import {
   reopen,
   step,
   goTo,
+  switchEndpoint,
   setRange,
   returnState,
   pinCurrent,
@@ -45,6 +46,19 @@ function assertSessionInvariant(session) {
     assert.ok(Math.abs(interval.arrival - resolution.C) <= EPSILON, "Interval arrival must remain the active endpoint at Current.");
     assert.ok(Math.abs(interval.start - Math.min(interval.departure, interval.arrival)) <= EPSILON);
     assert.ok(Math.abs(interval.end - Math.max(interval.departure, interval.arrival)) <= EPSILON);
+    for (const [role, address] of [
+      ["departureFrame", interval.departure],
+      ["arrivalFrame", interval.arrival]
+    ]) {
+      const frame = interval[role];
+      assert.ok(frame?.resolution, `Interval ${role} must exist.`);
+      assert.ok(["range", "movement"].includes(frame.resolutionBasis));
+      assert.ok(frame.resolution.L >= range.start - EPSILON, `${role} begins outside Range.`);
+      assert.ok(frame.resolution.R <= range.end + EPSILON, `${role} ends outside Range.`);
+      assert.ok(Math.abs(frame.resolution.C - address) <= EPSILON);
+    }
+    assert.deepEqual(interval.arrivalFrame.resolution, resolution, "The active endpoint frame must match current Resolution.");
+    assert.equal(interval.arrivalFrame.resolutionBasis, resolutionBasis);
   }
 
   if (focus) {
@@ -60,7 +74,7 @@ const OPERATIONS_PER_RUN = 1000;
 for (let run = 0; run < RUNS; run += 1) {
   let session = createSession({ duration: 480, current: random() * 480 });
   for (let index = 0; index < OPERATIONS_PER_RUN; index += 1) {
-    const operation = Math.floor(random() * 12);
+    const operation = Math.floor(random() * 13);
     let result;
 
     if (operation === 0) result = refine(session, "backward");
@@ -86,7 +100,8 @@ for (let run = 0; run < RUNS; run += 1) {
       result = sections.length
         ? focusSection(session, sections[Math.floor(random() * sections.length)].id)
         : { session, changed: false };
-    } else result = leaveSection(session);
+    } else if (operation === 11) result = leaveSection(session);
+    else result = switchEndpoint(session);
 
     if (result?.session) session = result.session;
     assertSessionInvariant(session);

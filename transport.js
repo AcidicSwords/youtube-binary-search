@@ -1,4 +1,4 @@
-// Transient physical playback state. Transport never enters Return history directly.
+// Transient physical playback state. Transport never enters Undo history directly.
 import { EPSILON, clamp } from "./range-geometry.js";
 
 export const TRANSPORT_KIND = Object.freeze({

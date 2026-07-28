@@ -30,6 +30,7 @@ import {
   setStepReach as setSessionStepReach,
   normalizeStepReach,
   reopen as reopenSession,
+  switchEndpoint as switchSessionEndpoint,
   setRange as setSessionRange,
   previewRange,
   previewReopen,
@@ -44,7 +45,7 @@ import {
   deleteGuidePin,
   renameGuideSection,
   deleteGuideSection,
-  returnState as returnSession
+  undo as undoSession
 } from "./session.js";
 import {
   TRANSPORT_KIND,
@@ -618,12 +619,26 @@ function reopenFully() {
   });
 }
 
-function returnLastAction() {
+function switchCurrentEndpoint() {
+  if (!state.videoLoaded) return;
+  settleBeforeAction({ replacingContext: true });
+  const interval = currentInterval();
+  const result = switchSessionEndpoint(state.session);
+  if (!result.changed) {
+    setStatus("There is no active Interval endpoint to switch.");
+    return;
+  }
+  accept(result, {
+    status: `Switched to the other Interval endpoint at ${formatTime(result.session.model.resolution.C)}; extent remains ${formatRange(interval)}.`
+  });
+}
+
+function undoLastAction() {
   settleBeforeAction({ replacingContext: true });
   const departure = currentResolution().C;
-  const result = returnSession(state.session);
+  const result = undoSession(state.session);
   if (!result.changed) {
-    setStatus("There is no preceding state to Return to.");
+    setStatus("There is no preceding state to Undo.");
     return;
   }
   state.session = result.session;
@@ -634,7 +649,7 @@ function returnLastAction() {
   if (Math.abs(destination - departure) > EPSILON && state.contextSeconds > 0) startContext(destination);
   else locateAddress(destination, { preserveField: true });
   view.renderGuide();
-  if (guidePersisted) setStatus(`Returned from ${result.label}.`);
+  if (guidePersisted) setStatus(`Undid ${result.label}.`);
   view.render();
 }
 
@@ -954,7 +969,7 @@ function deletePinById(pinId) {
     action: "delete-pin",
     id: pinId,
     title: "Delete Pin",
-    message: `Delete “${pin.label || formatTime(pin.t)}”? This can be restored only with Return.`,
+    message: `Delete “${pin.label || formatTime(pin.t)}”? This can be restored only with Undo.`,
     showInput: false,
     confirmLabel: "Delete",
     danger: true
@@ -1837,7 +1852,8 @@ elements["full-video-range"].addEventListener("click", () => {
 elements["refine-backward"].addEventListener("click", () => refine("backward"));
 elements["refine-forward"].addEventListener("click", () => refine("forward"));
 elements.reopen.addEventListener("click", reopenFully);
-elements["return-action"].addEventListener("click", returnLastAction);
+elements["switch-endpoint"].addEventListener("click", switchCurrentEndpoint);
+elements["return-action"].addEventListener("click", undoLastAction);
 elements["step-backward"].addEventListener("click", () => performStep("backward"));
 elements["step-forward"].addEventListener("click", () => performStep("forward"));
 elements["pin-backward"].addEventListener("click", () => goToAdjacentPin("backward"));
@@ -2020,7 +2036,7 @@ document.addEventListener("keydown", event => {
   const code = event.code || "";
   const plain = !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
   const spatialKey = expected => plain && (code === `Key${expected.toUpperCase()}` || key === expected);
-  const commandReturn = (event.ctrlKey || event.metaKey)
+  const commandUndo = (event.ctrlKey || event.metaKey)
     && !event.altKey
     && !event.shiftKey
     && key === "z";
@@ -2058,7 +2074,7 @@ document.addEventListener("keydown", event => {
 
   if (spatialKey("w")) { event.preventDefault(); reopenFully(); }
   else if (spatialKey("a")) { event.preventDefault(); refine("backward"); }
-  else if (spatialKey("s")) { event.preventDefault(); returnLastAction(); }
+  else if (spatialKey("s")) { event.preventDefault(); switchCurrentEndpoint(); }
   else if (spatialKey("d")) { event.preventDefault(); refine("forward"); }
   else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && key === "p") {
     event.preventDefault();
@@ -2077,7 +2093,7 @@ document.addEventListener("keydown", event => {
   else if (plain && event.key === "ArrowRight") { event.preventDefault(); performStep("forward", reachFor("forward"), { waitForKeyup: true }); }
   else if (plain && event.key === "[") { event.preventDefault(); adjustStepPreset(-1); }
   else if (plain && event.key === "]") { event.preventDefault(); adjustStepPreset(1); }
-  else if (commandReturn || (plain && event.key === "Backspace")) { event.preventDefault(); returnLastAction(); }
+  else if (commandUndo) { event.preventDefault(); undoLastAction(); }
   else if (plain && event.key === " ") { event.preventDefault(); toggleNativePlayback(); }
 });
 
