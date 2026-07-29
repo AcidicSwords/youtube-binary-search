@@ -726,14 +726,71 @@ export function leaveSection(session) {
   });
 }
 
-export function completePlayback(session, options) {
-  const current = clamp(options.current, session.model.range.start, session.model.range.end);
-  if (Math.abs(current - options.departure) <= EPSILON) {
-    return unchanged(session, "no-movement");
+export function projectPlayback(model, options = {}) {
+  const originModel = snapshotModel(options.returnModel || model);
+  const departure = Number.isFinite(options.departure)
+    ? options.departure
+    : originModel.resolution.C;
+  const requestedCurrent = Number(options.current);
+  const current = clamp(
+    Number.isFinite(requestedCurrent) ? requestedCurrent : departure,
+    model.range.start,
+    model.range.end
+  );
+  const projected = snapshotModel(model);
+  if (Math.abs(current - departure) <= EPSILON) {
+    return {
+      changed: false,
+      current,
+      model: projected
+    };
   }
-  const originModel = snapshotModel(options.returnModel || session.model);
+
   const sourceInterval = clone(originModel.interval);
   const intervalDeparture = stepIntervalAnchor(originModel, sourceInterval);
+  const parentNeighborhood = clone(
+    options.parentNeighborhood
+    || originModel.resolution
+    || projected.resolution
+  );
+  const parentBasis = options.parentResolutionBasis
+    || originModel.resolutionBasis
+    || projected.resolutionBasis
+    || RESOLUTION_BASIS.RANGE;
+  projected.resolution = translateNeighborhood(parentNeighborhood, current, projected.range);
+  projected.resolutionBasis = isRangeNeighborhood(projected.resolution, projected.range)
+    ? RESOLUTION_BASIS.RANGE
+    : parentBasis;
+  const inheritedDepartureFrame = sourceInterval
+    && Math.abs(sourceInterval.departure - intervalDeparture) <= EPSILON
+    ? sourceInterval.departureFrame
+    : null;
+  const departureFrame = clone(inheritedDepartureFrame)
+    || createEndpointFrame(parentNeighborhood, parentBasis);
+  projected.interval = createInterval(
+    intervalDeparture,
+    current,
+    options.operator || "playback",
+    "continuous",
+    {
+      departureFrame,
+      arrivalFrame: currentEndpointFrame(projected)
+    }
+  );
+  syncIntervalEndpointFrames(projected);
+
+  return {
+    changed: true,
+    current,
+    intervalDeparture,
+    model: projected
+  };
+}
+
+export function completePlayback(session, options) {
+  const projection = projectPlayback(session.model, options);
+  if (!projection.changed) return unchanged(session, "no-movement");
+
   const playbackCheckpoint = snapshotModel(options.returnModel || session.model);
   // Playback owns the spatial path captured when it started. Semantic values
   // that may legitimately change while it runs (currently Held Field Reach and
@@ -742,38 +799,12 @@ export function completePlayback(session, options) {
   playbackCheckpoint.stepReach = normalizeStepReach(session.model.stepReach);
   playbackCheckpoint.guide = session.model.guide;
   return commit(session, options.label || "Playback", draft => {
-    const parentNeighborhood = clone(
-      options.parentNeighborhood
-      || originModel.resolution
-      || draft.resolution
-    );
-    const parentBasis = options.parentResolutionBasis
-      || originModel.resolutionBasis
-      || draft.resolutionBasis
-      || RESOLUTION_BASIS.RANGE;
-    draft.resolution = translateNeighborhood(parentNeighborhood, current, draft.range);
-    draft.resolutionBasis = isRangeNeighborhood(draft.resolution, draft.range)
-      ? RESOLUTION_BASIS.RANGE
-      : parentBasis;
-    const inheritedDepartureFrame = sourceInterval
-      && Math.abs(sourceInterval.departure - intervalDeparture) <= EPSILON
-      ? sourceInterval.departureFrame
-      : null;
-    const departureFrame = clone(inheritedDepartureFrame)
-      || createEndpointFrame(parentNeighborhood, parentBasis);
-    draft.interval = createInterval(
-      intervalDeparture,
-      current,
-      options.operator || "playback",
-      "continuous",
-      {
-        departureFrame,
-        arrivalFrame: currentEndpointFrame(draft)
-      }
-    );
+    draft.resolution = clone(projection.model.resolution);
+    draft.resolutionBasis = projection.model.resolutionBasis;
+    draft.interval = clone(projection.model.interval);
     return {
       changed: true,
-      place: current,
+      place: projection.current,
       interval: draft.interval
     };
   }, { returnModel: playbackCheckpoint });

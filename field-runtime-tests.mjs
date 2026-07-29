@@ -58,7 +58,6 @@ function makeHarness({
   };
   const adapters = new Map();
   const holds = [];
-  const selections = [];
 
   function createPlayer(id, config) {
     let time = 0;
@@ -124,7 +123,6 @@ function makeHarness({
     getPreferences: () => preferences,
     setPreferences: patch => { preferences = { ...preferences, ...patch }; },
     onHoldOffsets: patch => holds.push(patch),
-    onSelect: selection => selections.push(selection),
     createPlayer,
     formatTime: value => String(value)
   });
@@ -134,7 +132,6 @@ function makeHarness({
     elements,
     adapters,
     holds,
-    selections,
     get snapshot() { return snapshot; },
     set snapshot(value) { snapshot = value; },
     get preferences() { return preferences; },
@@ -211,8 +208,7 @@ function makeHarness({
     h.controller.translateToCurrent(60, { preserve: true });
     assert.equal(h.tail().time, 59, "Whole-Field translation must preserve Tail's held 1 s offset.");
     assert.equal(h.lead().time, 62, "Whole-Field translation must preserve Lead's held 2 s offset.");
-    h.elements.get("tail-step-button").click();
-    assert.equal(h.selections.at(-1).distance, 1);
+    assert.equal(h.controller.getStepSelection("tail").distance, 1);
   } finally {
     h.restore();
   }

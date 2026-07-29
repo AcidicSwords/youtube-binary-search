@@ -6,7 +6,7 @@
 npm run check
 ```
 
-The gate covers syntax, Session/Undo, endpoint-frame containment and transposition, distinct operator ownership, all seven semantic-audit regressions, Guide, Context/playback/Loop values, source normalization, 25,000-operation fuzzing, native-playback regressions, Field geometry and controller behaviour, DOM/accessibility contracts, repository audits, startup, interaction, Context, and metadata paths.
+The gate covers syntax, Session/Undo, endpoint-frame containment and transposition, distinct operator ownership, all seven semantic-audit regressions, Guide, Context/playback/Loop values, source normalization, 25,000-operation fuzzing, native-playback regressions, Field geometry and controller behaviour, held pointer/key Step gestures, DOM/accessibility contracts, repository audits, startup, interaction, Context, transport-coherence, and metadata paths.
 
 The deeper semantic proof is separate:
 
@@ -37,13 +37,20 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 - Confirm the shared surface withdraws during ordinary playback, native Center controls remain usable, and native pause restores the surface while settling Current and Interval once.
 - Confirm native scrub settles as Go after the grace period.
 - Confirm playback leaves the receding Resolution endpoint fixed, pushes only the approached endpoint, and keeps the edited Loop contained.
+- Confirm Resolution and Working Section deform continuously with Cursor and exactly match their paused settlement.
+- Pause through Space and native controls; each must settle once, and no later poll may freeze the Field again.
+- Rapidly issue Play then Pause, Escape, and a replacement traversal before `PLAYING`; each late confirmation must be consumed without reviving playback.
+- Start Loop during playback; it must consume the visible settled Working Section without an intermediate Center pause.
 
 ### Automatic Context
 
-- Enable each duration and invoke timeline, Refine, Step, side Step, Switch Endpoint, Pin, Section, and Undo traversal.
-- Hold each arrow key while injecting irregular browser repeat events; confirm the application cadence alone advances Current/Interval, no intermediate Context starts, and one Context runs on keyup at the final Current.
+- Enter preset and custom durations, including fractional values and both bounds, then invoke timeline, Refine, Step, side Step, Switch Endpoint, Pin, Section, and Undo traversal.
+- Hold each arrow, matrix Step button, local Step button, and side surface; confirm the application cadence alone advances Current/Interval, no intermediate Context starts, and one Context runs on release at the final Current.
+- Undo once after each held Step and confirm the entire repeated gesture is reverted.
+- Rapidly tap each Step source several times inside the debounce window and confirm one Undo reverts the complete sequence.
 - Confirm Center plays the bounded window and restores Current.
 - Confirm Tail/Lead remain paused and preserve their modes/Offsets.
+- Confirm Hold/Stretch controls are unavailable throughout Context and cannot record its transient Cursor.
 - Trigger a new traversal while Context is active; only the new destination remains authoritative.
 - Set Off and confirm traversal remains paused at destination.
 
@@ -58,7 +65,7 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 - Reach maximum and verify automatic `1×` Held state.
 - Pause Center and confirm both sides are paused on the exact frames their displayed offsets imply.
 - Click each side video surface and local Step button; confirm all equal matrix Step, translate the whole relation, and park again like a slideshow.
-- Confirm Tail controls mirror Lead around Center and no control clips in the narrow three-pane width band.
+- Confirm Tail controls mirror Lead around Center, corresponding controls have identical widths, and no control clips in the narrow three-pane width band.
 - Collapse Tail and confirm Lead keeps its current frame/mode/Offset; repeat in the other direction.
 - With one side collapsed, confirm Hold/Stretch visible side affects only the visible projection and the expanded pane reclaims width.
 - Force a side-player media error, hide/show that pane, and confirm the current source is retried; reload the same video and confirm both panes can recover.
@@ -113,6 +120,7 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 - Establish Interval through each movement class.
 - Start matrix Loop and confirm frozen start/end.
 - Confirm end-to-start wraps do not change Current, Interval, Undo history, or invoke Context.
+- Confirm each wrap places each side once; no pre-wrap out-of-window Field reaction may run first.
 - Pause/stop and restart.
 - Loop a saved Section from Guide and confirm its own frozen extent.
 

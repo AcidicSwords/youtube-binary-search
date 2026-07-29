@@ -16,10 +16,6 @@ export function isTransportActive(transport) {
   return Boolean(transport && transport.kind !== TRANSPORT_KIND.IDLE);
 }
 
-export function isObservationalTransport(transport) {
-  return transport?.kind === TRANSPORT_KIND.CONTEXT;
-}
-
 export function deriveContextWindow(anchor, range, seconds, preRollSeconds = 1) {
   if (!Number.isFinite(anchor) || !range || !Number.isFinite(seconds) || seconds <= EPSILON) {
     return null;
@@ -31,7 +27,8 @@ export function deriveContextWindow(anchor, range, seconds, preRollSeconds = 1) 
 
   const boundedAnchor = clamp(anchor, range.start, range.end);
   const latestStart = Math.max(range.start, range.end - duration);
-  const start = clamp(boundedAnchor - Math.max(0, preRollSeconds), range.start, latestStart);
+  const preRoll = Math.min(duration, Math.max(0, preRollSeconds));
+  const start = clamp(boundedAnchor - preRoll, range.start, latestStart);
   const end = Math.min(range.end, start + duration);
 
   return end - start > EPSILON ? { start, end } : null;

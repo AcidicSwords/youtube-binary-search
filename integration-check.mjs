@@ -12,6 +12,7 @@ const transportSource = read("transport.js");
 const youtubeSource = read("youtube.js");
 const fieldGeometrySource = read("step-field-geometry.js");
 const fieldSource = read("step-field.js");
+const stepGestureSource = read("step-gesture.js");
 
 const htmlIds = new Set([...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]));
 const htmlIdList = [...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]);
@@ -59,6 +60,7 @@ for (const required of [
   "pin-backward", "switch-endpoint", "pin-forward", "return-action",
   "tail-field-toggle", "field-both-toggle", "lead-field-toggle",
   "tail-step-button", "lead-step-button", "step-backward-seconds", "step-forward-seconds",
+  "context-seconds",
   "section-capture", "section-source", "focus-working-section", "save-section", "pin-capture", "pin-current",
   "sections-list", "pins-list", "leave-section"
 ]) assert.ok(htmlIds.has(required), `Missing required projection: ${required}`);
@@ -67,7 +69,9 @@ for (const removedPlaceholder of ["guide-tab-sources", "guide-sources-panel"]) {
   assert.equal(htmlIds.has(removedPlaceholder), false, `Placeholder projection remains: ${removedPlaceholder}`);
 }
 
-const source = [html, app, view, styles, fieldCss, sessionSource, transportSource, fieldSource].join("\n");
+const source = [
+  html, app, view, styles, fieldCss, sessionSource, transportSource, fieldSource, stepGestureSource
+].join("\n");
 for (const obsolete of [
   "selectedMarkId", "selectedSpanId", "draftStartMarkId", "draftEndMarkId", "contextStack",
   "anchorMarkId", "bindPassageStart", "bindPassageEnd", "saveDraftSpan", "roleButton",
@@ -79,6 +83,7 @@ assert.ok(app.includes('from "./guide.js"'), "app.js must use the Guide model.")
 assert.ok(app.includes('from "./transport.js"'), "app.js must use the transport kernel.");
 assert.ok(app.includes('from "./view.js"'), "app.js must delegate DOM projection to view.js.");
 assert.ok(app.includes('from "./range-geometry.js"'), "app.js must use the Range geometry kernel.");
+assert.ok(app.includes('from "./step-gesture.js"'), "app.js must use the shared Step gesture boundary.");
 assert.equal(app.includes('from "./traversal.js"'), false, "Legacy traversal.js import remains.");
 assert.equal(app.includes('from "./structure.js"'), false, "Legacy structure.js import remains.");
 
@@ -119,8 +124,10 @@ assert.match(sessionSource, /syncIntervalEndpointFrames[\s\S]*containExtent\(mod
   "Every committed Loop must be contained by its active refinement frame.");
 assert.match(sessionSource, /resolveIntervalEndpointFrame[\s\S]*containExtent\(resolved\.resolution, interval, range\)/,
   "Both Switch endpoint frames must contain the complete Loop.");
-assert.match(sessionSource, /completePlayback[\s\S]*stepIntervalAnchor[\s\S]*translateNeighborhood/,
-  "Playback must edit the active Loop endpoint while pushing one refinement bound.");
+assert.match(sessionSource, /projectPlayback[\s\S]*stepIntervalAnchor[\s\S]*translateNeighborhood/,
+  "Live and settled playback must share one endpoint-deformation projection.");
+assert.match(sessionSource, /completePlayback[\s\S]*projectPlayback/,
+  "Playback settlement must commit the same projection shown while playing.");
 assert.match(view, /departureFrame[\s\S]*destinationScale[\s\S]*Switch Endpoint/,
   "Switch must expose the destination endpoint frame before traversal.");
 assert.match(view, /refineBlockReason/,
@@ -129,10 +136,10 @@ assert.match(transportSource, /PLAYBACK:\s*"playback"/);
 assert.match(transportSource, /LOOP:\s*"loop"/);
 assert.doesNotMatch(transportSource, /CONTINUE|SKIM/);
 assert.match(app, /result\?\.interval[\s\S]*startContext\(destination\)/, "Context must be automatic after traversal.");
-assert.match(app, /HELD_STEP_INITIAL_DELAY_MS[\s\S]*repeatHeldStep[\s\S]*HELD_STEP_REPEAT_MS/,
-  "Held Arrow Step must own a deterministic repeat cadence.");
-assert.match(app, /transport\.cycles \+= 1[\s\S]*placePlayer\(transport\.start\)[\s\S]*player\.play\(\)/,
-  "Loop wraps must remain physical and immediately unpause.");
+assert.match(app, /createStepGestureController[\s\S]*bindStepPress/,
+  "Keyboard, matrix, and Field Step controls must share one held-gesture owner.");
+assert.match(app, /transport\.cycles \+= 1[\s\S]*placePlayer\(transport\.start\)[\s\S]*resumeAt[\s\S]*player\.play\(\)/,
+  "Loop wraps must rebase the existing Field relation and immediately resume.");
 assert.match(fieldSource, /mode:\s*"step"/);
 assert.doesNotMatch(fieldSource, /mode:\s*"go"/);
 assert.match(youtubeSource, /place\(address, allowSeekAhead = true\)/, "The YouTube adapter must expose placement rather than seek vocabulary.");

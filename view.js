@@ -25,6 +25,7 @@ import {
   TRANSPORT_KIND,
   isTransportActive
 } from "./transport.js";
+import { projectPlayback } from "./session.js";
 import { YOUTUBE_STATE } from "./youtube.js";
 
 export function formatTime(seconds) {
@@ -111,7 +112,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
   }
 
   function percent(time) {
-    return model().duration > 0 ? clamp((time / model().duration) * 100, 0, 100) : 0;
+    if (!(model().duration > 0)) return 0;
+    const raw = clamp((time / model().duration) * 100, 0, 100);
+    return Math.round(raw * 1_000_000) / 1_000_000;
   }
 
   function setMarkerPosition(element, time) {
@@ -399,6 +402,59 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
     elements["cursor-time"].textContent = formatTime(cursor);
 
+    const transport = state().transport;
+    const playbackProjection = transport.kind === TRANSPORT_KIND.PLAYBACK
+      ? projectPlayback(model(), {
+          current: cursor,
+          departure: transport.departure,
+          parentNeighborhood: transport.parentNeighborhood,
+          parentResolutionBasis: transport.parentResolutionBasis,
+          returnModel: transport.returnModel,
+          operator: transport.operator
+        })
+      : null;
+    const livePlayback = Boolean(playbackProjection?.changed);
+    const projectedModel = livePlayback ? playbackProjection.model : model();
+    for (const id of [
+      "resolution-fill",
+      "interval-fill",
+      "resolution-start-marker",
+      "resolution-end-marker"
+    ]) {
+      elements[id].dataset.live = String(livePlayback);
+    }
+    if (state().videoLoaded && projectedModel?.resolution) {
+      setSegment(
+        elements["resolution-fill"],
+        projectedModel.resolution.L,
+        projectedModel.resolution.R
+      );
+      setMarkerPosition(elements["resolution-start-marker"], projectedModel.resolution.L);
+      setMarkerPosition(elements["resolution-end-marker"], projectedModel.resolution.R);
+      elements["interval-fill"].hidden = !projectedModel.interval;
+      if (projectedModel.interval) {
+        setSegment(
+          elements["interval-fill"],
+          projectedModel.interval.start,
+          projectedModel.interval.end
+        );
+      }
+      if (livePlayback) {
+        elements["backward-target-marker"].hidden = true;
+        elements["forward-target-marker"].hidden = true;
+      } else {
+        const projectedTargets = getTargets(projectedModel.resolution);
+        elements["backward-target-marker"].hidden = projectedTargets.backward === null;
+        elements["forward-target-marker"].hidden = projectedTargets.forward === null;
+        if (projectedTargets.backward !== null) {
+          setMarkerPosition(elements["backward-target-marker"], projectedTargets.backward);
+        }
+        if (projectedTargets.forward !== null) {
+          setMarkerPosition(elements["forward-target-marker"], projectedTargets.forward);
+        }
+      }
+    }
+
     const surface = elements["center-transport-surface"];
     if (surface) {
       const currentState = state();
@@ -415,16 +471,18 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       surface.disabled = !currentState.videoLoaded || preparing;
       const label = transportKind === TRANSPORT_KIND.LOOP
         ? "Stop Loop"
-        : transportKind === TRANSPORT_KIND.CONTEXT
-          ? "Continue Field"
+        : ordinaryPlayback
+          ? "Pause Field"
           : "Play Field";
       surface.setAttribute("aria-label", preparing ? "Preparing Field players" : label);
-      surface.setAttribute("aria-pressed", String(ordinaryPlayback && centerRunning));
+      surface.setAttribute("aria-pressed", String(ordinaryPlayback));
       if (elements["center-transport-label"]) {
         elements["center-transport-label"].textContent = preparing ? "Preparing Field players" : label;
       }
       if (elements["center-transport-icon"]) {
-        elements["center-transport-icon"].textContent = transportKind === TRANSPORT_KIND.LOOP ? "■" : "▶";
+        elements["center-transport-icon"].textContent = (
+          transportKind === TRANSPORT_KIND.LOOP || ordinaryPlayback
+        ) ? "■" : "▶";
       }
     }
 
@@ -517,7 +575,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     for (const id of [
       "range-start-here", "range-midpoint", "range-end-here", "full-video-range",
       "step-backward-seconds", "step-forward-seconds",
-      "tail-rate-select", "lead-rate-select", "context-select",
+      "context-seconds",
       "section-source", "section-label", "pin-label"
     ]) {
       if (elements[id]) elements[id].disabled = interactionLocked;
@@ -650,17 +708,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "resolution-end-marker", "current-marker"
     ]) elements[id].hidden = false;
     setSegment(elements["range-fill"], activeRange.start, activeRange.end);
-    setSegment(elements["resolution-fill"], currentResolution.L, currentResolution.R);
     setMarkerPosition(elements["range-start-handle"], activeRange.start);
     setMarkerPosition(elements["range-end-handle"], activeRange.end);
-    setMarkerPosition(elements["resolution-start-marker"], currentResolution.L);
-    setMarkerPosition(elements["resolution-end-marker"], currentResolution.R);
     setMarkerPosition(elements["current-marker"], semanticCurrent);
-
-    elements["backward-target-marker"].hidden = targets.backward === null;
-    elements["forward-target-marker"].hidden = targets.forward === null;
-    if (targets.backward !== null) setMarkerPosition(elements["backward-target-marker"], targets.backward);
-    if (targets.forward !== null) setMarkerPosition(elements["forward-target-marker"], targets.forward);
 
     elements["range-start-handle"].setAttribute("aria-valuemin", "0");
     elements["range-start-handle"].setAttribute("aria-valuemax", String(Math.max(0, activeRange.end - minRangeSeconds)));
@@ -671,8 +721,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["range-end-handle"].setAttribute("aria-valuenow", String(activeRange.end));
     elements["range-end-handle"].setAttribute("aria-valuetext", `${formatTime(activeRange.end)}; Range ends`);
 
-    elements["interval-fill"].hidden = !currentInterval;
-    if (currentInterval) setSegment(elements["interval-fill"], currentInterval.start, currentInterval.end);
     elements["field-span-fill"].hidden = !fieldSpan;
     if (fieldSpan) setSegment(elements["field-span-fill"], fieldSpan.start, fieldSpan.end);
     renderSectionPreview();

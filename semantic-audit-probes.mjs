@@ -170,8 +170,8 @@ finding(
 );
 
 // Establish and activate a 10-second Field at Current 50.
-environment.byId.get("context-select").value = "0";
-environment.byId.get("context-select").dispatch("change");
+environment.byId.get("context-seconds").value = "0";
+environment.byId.get("context-seconds").dispatch("change");
 environment.byId.get("timeline").dispatch("click", { clientX: 500 });
 await environment.flush(5);
 await environment.poll();
@@ -189,8 +189,8 @@ await environment.poll();
 // Start Context at 60 and advance only the Center Cursor. Stored Field offsets
 // should remain 10 seconds; the current controller remeasures Tail against the
 // transient Cursor and shrinks it.
-environment.byId.get("context-select").value = "5";
-environment.byId.get("context-select").dispatch("change");
+environment.byId.get("context-seconds").value = "5";
+environment.byId.get("context-seconds").dispatch("change");
 environment.byId.get("timeline").dispatch("click", { clientX: 600 });
 await environment.flush(8);
 environment.center().currentTime = 59;

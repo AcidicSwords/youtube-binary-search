@@ -88,7 +88,6 @@ function makeControllerHarness() {
   const adapters = new Map();
   const changes = [];
   const holds = [];
-  const selections = [];
   let snapshot = {
     videoLoaded: true,
     videoId: "bounds-test",
@@ -134,13 +133,12 @@ function makeControllerHarness() {
     getSnapshot: () => snapshot,
     onChange: field => changes.push(field),
     onHoldOffsets: offsets => holds.push(offsets),
-    onSelect: selection => selections.push(selection),
     createPlayer,
     formatTime: String
   });
 
   return {
-    controller, adapters, elements, changes, holds, selections,
+    controller, adapters, elements, changes, holds,
     get snapshot() { return snapshot; },
     set snapshot(value) { snapshot = value; },
     restore() { globalThis.YT = previousYT; }
@@ -174,15 +172,33 @@ function makeControllerHarness() {
     assert.equal(harness.controller.snapshot().tailMode, FIELD_SIDE_MODE.HELD);
     assert.equal(harness.holds.at(-1).backward, 3, "Hold freezes measured offset as the new Step distance.");
 
-    harness.elements.get("tail-step-button").click();
-    assert.equal(harness.selections.at(-1).direction, "backward");
-    assert.equal(harness.selections.at(-1).distance, 3, "Side button Step uses the visible differential.");
+    const tailStep = harness.controller.getStepSelection("tail");
+    assert.equal(tailStep.direction, "backward");
+    assert.equal(tailStep.distance, 3, "Side button Step uses the visible differential.");
 
     harness.snapshot = { ...harness.snapshot, transportKind: "context" };
     harness.controller.tick();
     assert.equal(harness.controller.snapshot().phase, STEP_FIELD_PHASE.SUSPENDED);
     assert.equal(harness.adapters.get("player-tail").read().state, YOUTUBE_STATE.PAUSED);
     assert.equal(harness.adapters.get("player-lead").read().state, YOUTUBE_STATE.PAUSED);
+    const suspendedModes = {
+      tail: harness.controller.snapshot().tailMode,
+      lead: harness.controller.snapshot().leadMode
+    };
+    const holdCount = harness.holds.length;
+    harness.elements.get("tail-field-toggle").click();
+    harness.elements.get("field-both-toggle").click();
+    assert.deepEqual(
+      {
+        tail: harness.controller.snapshot().tailMode,
+        lead: harness.controller.snapshot().leadMode
+      },
+      suspendedModes,
+      "Hold/Stretch controls must not reinterpret a transient Context cursor."
+    );
+    assert.equal(harness.holds.length, holdCount);
+    assert.equal(harness.elements.get("tail-field-toggle").disabled, true);
+    assert.equal(harness.elements.get("field-both-toggle").disabled, true);
 
     harness.snapshot = {
       ...harness.snapshot,
@@ -191,9 +207,12 @@ function makeControllerHarness() {
       range: { start: 70, end: 80 },
       center: { ...harness.snapshot.center, time: 75, state: YOUTUBE_STATE.PAUSED }
     };
-    harness.controller.invalidate();
-    assert.equal(harness.changes.at(-1), null);
-    harness.controller.tick();
+    const changesBeforeReset = harness.changes.length;
+    harness.controller.resetAtCurrent();
+    assert.ok(
+      harness.changes.slice(changesBeforeReset).includes(null),
+      "A structural reset must invalidate the prior projected Field before re-establishing it."
+    );
     const field = harness.controller.snapshot();
     assert.equal(field.constraint, "both");
     assert.deepEqual(field.envelope, { start: 70, end: 80 });
@@ -220,7 +239,8 @@ function makeControllerHarness() {
   assert.match(fieldSource, /export function fieldShouldSuspend\(snapshot\)/);
   assert.match(fieldSource, /transportKind === "context"/);
   assert.doesNotMatch(fieldSource, /transportKind === "loop"/);
-  assert.match(fieldSource, /invalidate,/);
+  assert.match(fieldSource, /function resetAtCurrent\(\)[\s\S]*invalidate\(\{ pause: false \}\)/);
+  assert.match(app, /resetField[\s\S]*stepField\?\.resetAtCurrent/);
   assert.doesNotMatch(fieldSource, /snapshot\.resolution/, "Field bounds must not depend on Resolution.");
 }
 

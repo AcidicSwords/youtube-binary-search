@@ -46,13 +46,13 @@ Range is the sole hard temporal boundary. Resolution controls semantic discrimin
 
 ## Native playback and Context
 
-Center is the only audible player and retains native YouTube controls during playback. While paused, a parent-owned Center surface and Space start Center, Tail, and Lead synchronously from one trusted gesture. Every ordinary play/unpause refolds each available side to Center and begins a fresh Stretch toward its configured Offset; once Center is playing, the surface withdraws and YouTube’s native controls remain available. Pausing freezes each side on its represented frame, then settles Center movement once by moving the active Interval endpoint and pushing only the approached Resolution endpoint.
+Center is the only audible player and retains native YouTube controls during playback. While paused, a parent-owned Center surface and Space start Center, Tail, and Lead synchronously from one trusted gesture. Every ordinary play/unpause refolds each available side to Center and begins a fresh Stretch toward its configured Offset; once Center is playing, the surface withdraws and YouTube’s native controls remain available. During playback, Resolution and the Working Section deform continuously with Cursor. Pausing freezes each side once, then commits that exact visible projection by moving the active Interval endpoint and pushing only the approached Resolution endpoint.
 
-Context is not a button. A configured Context window runs automatically after discrete traversal, plays only in Center, restores Center to committed Current, and never activates Tail or Lead.
+Context is not a button. A custom `0–300s` Context window runs automatically after discrete traversal, plays only in Center, restores Center to committed Current, and never activates Tail or Lead.
 
 The matrix has distinct ownership rather than one hidden edit mode. Refine subdivides Resolution conditionally: a destination midpoint inside the Working Section shortens it toward the preserved opposite endpoint, collapsing it on exact endpoint coincidence; a midpoint outside replaces it with the complete new traversal from Current. Pin Forward/Backward pushes the approached Resolution endpoint but replaces Interval with the single Pin hop. Step resizes the existing Interval around its opposite endpoint. Direct timeline/Guide Go replaces Interval. Settled native playback follows Step’s endpoint-edit rule.
 
-Stepping outward extends the operand, stepping inward shrinks it, and crossing the anchor redraws it in the opposite direction. Every Step pushes only the approached Neighborhood endpoint while leaving the receding endpoint fixed. When it reaches or crosses the old directional endpoint, it keeps a full Step beyond Current, clamped to Range, so the next directional Refine remains half a Step away wherever Range permits. Held arrows use an application-owned repeat cadence, form one gesture, and start Context once on keyup.
+Stepping outward extends the operand, stepping inward shrinks it, and crossing the anchor redraws it in the opposite direction. Every Step pushes only the approached Neighborhood endpoint while leaving the receding endpoint fixed. When it reaches or crosses the old directional endpoint, it keeps a full Step beyond Current, clamped to Range, so the next directional Refine remains half a Step away wherever Range permits. Arrow keys, matrix buttons, local Step buttons, and side surfaces share an application-owned hold cadence; one held press is one Undo transaction and starts Context at most once on release. Quick repeated taps also coalesce into one Undo step.
 
 Every Interval endpoint retains a Resolution frame that contains the complete Interval. Switch Endpoint leaves the ordered extent unchanged, makes the other endpoint Current, and restores that endpoint’s frame. Switching twice is an exact involution. A following Step or playback edits from the transposed anchor. Refine uses the same destination-membership rule after transposition: inside shortens (or collapses at coincidence); outside replaces. Pin traversal records its own local movement. A collapsed Interval has nothing to switch.
 
@@ -71,7 +71,7 @@ Each side owns a maximum Offset and a supported directional Rate.
 - **Stretch** snaps the side to Current, primes it at `1×`, then diverges during genuine Center playback until its configured maximum Offset is reached.
 - **Hold** switches the side to `1×` and preserves the measured Offset. Holding midway through Stretch may make that measured Offset the new maximum and Step distance, but never changes the semantic Interval.
 - Clicking a side video surface or its Step button performs the same semantic Step by the visible differential, falling back to the configured maximum Offset. The complete Field translates by that amount and parks again, producing slideshow-like repeated traversal while editing the active Loop Interval.
-- Context suspends the sides without remeasuring or changing their stored relation. The next genuine play refolds and starts a fresh Stretch.
+- Context suspends the sides without remeasuring or changing their stored relation; Hold/Stretch is unavailable until suspension ends. The next genuine play refolds and starts a fresh Stretch.
 - A side-player media error remains recoverable: restoring that pane or reloading the video retries its source instead of leaving the projection permanently unavailable.
 
 Disabling the Field preserves the stable single-player reader and does not create side players.
@@ -84,7 +84,7 @@ Step Backward   | Loop   | Step Forward
 Previous Pin    | Switch Endpoint | Next Pin
 ```
 
-Loop freezes the current Interval when started. It plays to the Interval end, internally returns to the frozen start without changing Session or invoking Context, and unpauses again.
+Loop freezes the current Interval when started. If playback is active, its visible deformation settles first and becomes the Loop without an intervening pause. Loop plays to the Interval end, internally returns to the frozen start without changing Session or invoking Context, rebases each Field side once, and unpauses again.
 
 Undo is intentionally outside the relational matrix and uses the platform-standard Ctrl/Cmd+Z shortcut.
 

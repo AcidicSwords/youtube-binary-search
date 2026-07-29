@@ -168,8 +168,7 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
   }
   const byId = new Map(elements.map(element => [element.id, element]));
 
-  byId.get("context-select").value = "5";
-  for (const value of ["0", "3", "5", "10"]) addOption(byId.get("context-select"), value, value === "0" ? "Off" : `${value} s`);
+  byId.get("context-seconds").value = "5";
   byId.get("section-source").value = "interval";
   addOption(byId.get("section-source"), "interval", "Working Section");
   addOption(byId.get("section-source"), "field-span", "Held Field span");
@@ -237,6 +236,8 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
       this.commands = [];
       this.pendingPlacement = null;
       this.deferNextPlacement = deferredPlacement;
+      this.deferNextPlayState = false;
+      this.pendingPlayState = false;
       this.iframe = new FakeElement(`${id}-iframe`, "IFRAME");
       this.createdWhileFieldOff = byId.get("step-field")?.classList?.contains("field-off") === true;
       players.set(id, this);
@@ -277,6 +278,17 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
     }
     playVideo() {
       this.commands.push(["play"]);
+      if (this.deferNextPlayState) {
+        this.deferNextPlayState = false;
+        this.pendingPlayState = true;
+        return;
+      }
+      this.state = 1;
+      this.emitState(1);
+    }
+    applyPendingPlayState() {
+      if (!this.pendingPlayState) return;
+      this.pendingPlayState = false;
       this.state = 1;
       this.emitState(1);
     }

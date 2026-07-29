@@ -99,7 +99,7 @@ Consequences:
 
 Step also preserves the active binary relation. Every Step leaves the receding Neighborhood endpoint fixed and pushes the approached endpoint by the signed movement. If the destination reaches or crosses the old `L` or `R`, the approached endpoint remains a full Step beyond the new `C`, clamped to Range. Consequently, the next Refine in the Step direction is half a Step away after a crossing whenever Range can contain that headroom. Range remains the sole hard boundary; at Range itself, Refine may necessarily become unavailable.
 
-Each distinct Step gesture is a traversal and may invoke automatic Context. Held arrows use an application-owned initial delay and repeat cadence, ignore browser-generated repeat noise, coalesce into one transaction, update Current and the timeline immediately, and invoke Context once on keyup at the final Current.
+Each distinct Step sequence is a traversal and may invoke automatic Context. Arrow keys, matrix buttons, side buttons, and side-player surfaces share one press contract: the first Step occurs immediately, an application-owned initial delay and repeat cadence drives a hold, and release coalesces the entire held gesture into one Undo transaction and at most one Context window. Quick repeated taps within the short debounce window likewise form one transaction. Browser-generated key repeat noise does not control cadence.
 
 ### Switch Endpoint
 
@@ -128,7 +128,7 @@ play/unpause from start toward end
 → play/unpause again
 ```
 
-The internal end-to-start wrap does not commit Current, redefine Interval, append Undo history, or invoke Context. Reopen does not alter the ordered operand, though it updates the active endpoint frame. Movement operators may establish a later Interval after Loop stops, while Step may resize the current operand before Loop starts.
+The internal end-to-start wrap does not commit Current, redefine Interval, append Undo history, or invoke Context. A wrap rebases each physical Field side once while preserving its relation. Starting Loop during playback first settles the visible playback deformation and freezes that resulting Working Section; the handoff does not insert a pause between transports. Reopen does not alter the ordered operand, though it updates the active endpoint frame. Movement operators may establish a later Interval after Loop stops, while Step may resize the current operand before Loop starts.
 
 ### Pin / Section / Focus
 
@@ -146,7 +146,7 @@ Creation and management belong to Guide.
 
 ## 5. Native playback
 
-A paused Center surface and Space invoke ordinary playback through the parent document. The same trusted gesture first refolds each available side to Center, then requests muted Tail, audible Center, and muted Lead playback synchronously. Every ordinary play/unpause therefore starts a fresh Stretch rather than resuming stale side clocks. Once Center enters ordinary playback, the surface withdraws so native YouTube controls remain available. Starting playback creates a transient playback transaction from the current physical position. Pausing freezes side frames at their represented addresses and settles Center movement once through Session:
+A paused Center surface and Space invoke ordinary playback through the parent document. The same trusted gesture first refolds each available side to Center, then requests muted Tail, audible Center, and muted Lead playback synchronously. Every ordinary play/unpause therefore starts a fresh Stretch rather than resuming stale side clocks. Once Center enters ordinary playback, the surface withdraws so native YouTube controls remain available. Starting playback creates a transient playback transaction from the current physical position. While it runs, the map projects the exact Resolution and Working Section that settlement would produce without committing Session. Pausing freezes side frames at their represented addresses once and settles Center movement once through Session:
 
 ```text
 physical Cursor movement
@@ -158,7 +158,7 @@ Playback uses the Neighborhood captured when playback starts. On settlement it l
 
 ## 6. Automatic Context
 
-Context is a post-traversal policy parameterized by duration.
+Context is a post-traversal policy parameterized by a custom `0–300s` duration; `0` is Off and preset values are suggestions.
 
 After a discrete operation commits a different Current and produces an Interval:
 
@@ -170,7 +170,7 @@ commit Current
 → remain paused until genuine native playback
 ```
 
-A new traversal during Context supersedes the old window and starts Context around the new destination. Context creates no history and does not redefine Interval. Held arrow-key Step suppresses intermediate Context windows and starts one observation only when the key gesture ends.
+A new traversal during Context supersedes the old window and starts Context around the new destination. Changing the duration while Context runs retargets that transient window immediately; even a duration shorter than the one-second default pre-roll must still contain Current. Context creates no history and does not redefine Interval. A held Step suppresses intermediate Context windows and starts one observation only when the key or pointer gesture ends. Hold/Stretch is unavailable during Context because its transient Cursor is not a valid source for a stored Field relation.
 
 ## 7. Step Field
 

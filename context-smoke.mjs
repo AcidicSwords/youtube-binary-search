@@ -89,6 +89,18 @@ await flush();
 assert.equal(center.currentTime, 80);
 assert.equal(center.state, 2);
 
+// Every repeat amended one Step transaction. A single Undo returns to the
+// pre-gesture Current and starts only one observation of that restored state.
+byId.get("return-action").click();
+await flush();
+assert.equal(
+  currentText(),
+  "Current 0:50.000",
+  "Undo must batch the complete held-arrow gesture."
+);
+assert.equal(center.currentTime, 49);
+assert.equal(center.state, 1);
+
 // A new traversal supersedes active Context without restoring the old anchor.
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 250 });
 await flush();
@@ -111,10 +123,18 @@ assert.equal(center.currentTime, 84);
 assert.equal(center.state, 1);
 assert.equal(currentText(), "Current 1:25.000");
 
-// Turning Context off during observation restores Center once. Subsequent
+// Context accepts custom numeric durations; presets are suggestions rather than
+// the complete domain. Turning it off during observation restores Center once.
+byId.get("context-seconds").value = "0.5";
+byId.get("context-seconds").dispatch("change");
+await flush();
+assert.equal(byId.get("context-setting-value").textContent, "0.5 s after traversal");
+assert.equal(center.currentTime, 84.5, "Changing active Context must immediately retarget its bounded window.");
+
+// Subsequent
 // traversal remains paused and does not issue an automatic play command.
-byId.get("context-select").value = "0";
-byId.get("context-select").dispatch("change");
+byId.get("context-seconds").value = "0";
+byId.get("context-seconds").dispatch("change");
 await flush();
 assert.equal(center.currentTime, 85);
 assert.equal(center.state, 2);
