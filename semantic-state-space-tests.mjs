@@ -6,8 +6,10 @@ import {
 import {
   createSession,
   focusSection,
+  focusWorkingSection,
   goTo,
   leaveSection,
+  overwriteGuideSection,
   pinCurrent,
   refine,
   reopen,
@@ -76,11 +78,36 @@ function assertInvariant(session) {
   }
 
   if (focus) {
-    const section = resolveSection(guide, focus.sectionId);
-    assert.ok(section);
-    assert.ok(Math.abs(section.start - range.start) <= EPSILON);
-    assert.ok(Math.abs(section.end - range.end) <= EPSILON);
+    if (focus.kind === "working-section") {
+      assert.ok(focus.extent);
+      assert.ok(Math.abs(focus.extent.start - range.start) <= EPSILON);
+      assert.ok(Math.abs(focus.extent.end - range.end) <= EPSILON);
+    } else {
+      const section = resolveSection(guide, focus.sectionId);
+      assert.ok(section);
+      assert.ok(Math.abs(section.start - range.start) <= EPSILON);
+      assert.ok(Math.abs(section.end - range.end) <= EPSILON);
+    }
   }
+}
+
+function refineExpectation(session, direction) {
+  const current = session.model.resolution.C;
+  const target = getTargets(session.model.resolution)[direction];
+  if (target === null) return null;
+  const interval = session.model.interval;
+  const inside = Boolean(
+    interval
+    && Math.abs(interval.arrival - current) <= EPSILON
+    && Math.abs(interval.departure - current) > EPSILON
+    && target >= interval.start - EPSILON
+    && target <= interval.end + EPSILON
+  );
+  return {
+    relation: inside ? "shorten" : "replace",
+    departure: inside ? interval.departure : current,
+    target
+  };
 }
 
 const RUNS = 100;
@@ -89,7 +116,12 @@ for (let run = 0; run < RUNS; run += 1) {
   let session = createSession({ duration: 600, current: random() * 600 });
   for (let index = 0; index < OPERATIONS_PER_RUN; index += 1) {
     const before = session;
-    const operation = Math.floor(random() * 15);
+    const operation = Math.floor(random() * 17);
+    const expectedRefine = operation === 0
+      ? refineExpectation(session, "backward")
+      : operation === 1
+        ? refineExpectation(session, "forward")
+        : null;
     let result;
     if (operation === 0) result = refine(session, "backward");
     else if (operation === 1) result = refine(session, "forward");
@@ -124,7 +156,13 @@ for (let run = 0; run < RUNS; run += 1) {
         ? focusSection(session, sections[Math.floor(random() * sections.length)].id)
         : { session, changed: false };
     } else if (operation === 13) result = leaveSection(session);
-    else {
+    else if (operation === 14) result = focusWorkingSection(session);
+    else if (operation === 15) {
+      const sections = session.model.guide.sections;
+      result = sections.length
+        ? overwriteGuideSection(session, sections[Math.floor(random() * sections.length)].id)
+        : { session, changed: false };
+    } else {
       // Metamorphic check: Endpoint Transposition must remain an involution for
       // every randomly reached valid Interval, not only hand-authored examples.
       const once = switchEndpoint(session);
@@ -139,6 +177,17 @@ for (let run = 0; run < RUNS; run += 1) {
 
     if (operation === 7 && result.changed) {
       assert.deepEqual(result.session.model, before.history.at(-1).model);
+    }
+    if (expectedRefine && result.changed) {
+      assert.equal(result.refineRelation, expectedRefine.relation);
+      const resultingInterval = result.session.model.interval;
+      if (Math.abs(expectedRefine.departure - expectedRefine.target) <= EPSILON) {
+        assert.equal(resultingInterval, null, "Endpoint coincidence must collapse the Working Section.");
+      } else {
+        assert.ok(resultingInterval);
+        assert.ok(Math.abs(resultingInterval.departure - expectedRefine.departure) <= EPSILON);
+        assert.ok(Math.abs(resultingInterval.arrival - expectedRefine.target) <= EPSILON);
+      }
     }
     if (result.changed) {
       assert.notDeepEqual(result.session.model, before.model);

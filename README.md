@@ -31,13 +31,15 @@ npm run check
 ```text
 Address → Current inside Range
 Current + Resolution → Neighborhood
-direct Go, Refine, or Pin hop → replace Interval with that traversal
+direct Go or Pin hop → replace the Working Section with that traversal
+Refine midpoint outside Working Section → replace it with the new traversal
+Refine midpoint inside Working Section → shorten it toward the opposite endpoint
 Step or settled playback → move the Interval's active endpoint
 linear movement → push the approached Resolution endpoint
 Switch Endpoint → transpose Interval endpoints and restore the other endpoint frame
 Address → Pin
 explicit Extent → Section
-Section → Range through Focus
+Working or retained Section → Range through Focus
 ```
 
 Range is the sole hard temporal boundary. Resolution controls semantic discrimination; it does not clip physical observation. Every non-null Interval is contained by active Resolution, and both endpoint frames contain that same Interval.
@@ -48,11 +50,11 @@ Center is the only audible player and retains native YouTube controls during pla
 
 Context is not a button. A configured Context window runs automatically after discrete traversal, plays only in Center, restores Center to committed Current, and never activates Tail or Lead.
 
-The matrix has distinct ownership rather than one hidden edit mode. Refine subdivides Resolution and replaces Interval with that local refinement traversal. Pin Forward/Backward pushes the approached Resolution endpoint but replaces Interval with the single Pin hop. Step resizes the existing Interval around its opposite endpoint. Direct timeline/Guide Go replaces Interval. Settled native playback follows Step’s endpoint-edit rule.
+The matrix has distinct ownership rather than one hidden edit mode. Refine subdivides Resolution conditionally: a destination midpoint inside the Working Section shortens it toward the preserved opposite endpoint, collapsing it on exact endpoint coincidence; a midpoint outside replaces it with the complete new traversal from Current. Pin Forward/Backward pushes the approached Resolution endpoint but replaces Interval with the single Pin hop. Step resizes the existing Interval around its opposite endpoint. Direct timeline/Guide Go replaces Interval. Settled native playback follows Step’s endpoint-edit rule.
 
 Stepping outward extends the operand, stepping inward shrinks it, and crossing the anchor redraws it in the opposite direction. Every Step pushes only the approached Neighborhood endpoint while leaving the receding endpoint fixed. When it reaches or crosses the old directional endpoint, it keeps a full Step beyond Current, clamped to Range, so the next directional Refine remains half a Step away wherever Range permits. Held arrows use an application-owned repeat cadence, form one gesture, and start Context once on keyup.
 
-Every Interval endpoint retains a Resolution frame that contains the complete Interval. Switch Endpoint leaves the ordered extent unchanged, makes the other endpoint Current, and restores that endpoint’s frame. Switching twice is an exact involution. A following Step or playback edits from the transposed anchor; Refine and Pin traversal intentionally replace the Loop with their own local movement. A collapsed Interval has nothing to switch.
+Every Interval endpoint retains a Resolution frame that contains the complete Interval. Switch Endpoint leaves the ordered extent unchanged, makes the other endpoint Current, and restores that endpoint’s frame. Switching twice is an exact involution. A following Step or playback edits from the transposed anchor. Refine uses the same destination-membership rule after transposition: inside shortens (or collapses at coincidence); outside replaces. Pin traversal records its own local movement. A collapsed Interval has nothing to switch.
 
 ## Step Field
 
@@ -86,7 +88,7 @@ Loop freezes the current Interval when started. It plays to the Interval end, in
 
 Undo is intentionally outside the relational matrix and uses the platform-standard Ctrl/Cmd+Z shortcut.
 
-Pin and Section creation live in Guide beside naming, traversal, Loop, Focus, rename, and deletion. Section endpoints are Pins and participate in matrix Pin traversal even before they receive independent titles.
+The current Loop is a semi-persistent Working Section: it may be focused and left without being saved. Guide provides explicit Save as new and Overwrite retained actions beside naming, traversal, Loop, Focus, rename, and deletion. Section endpoints are Pins and participate in matrix Pin traversal even before they receive independent titles.
 
 ## Keyboard
 

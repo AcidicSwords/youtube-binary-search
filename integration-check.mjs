@@ -59,7 +59,7 @@ for (const required of [
   "pin-backward", "switch-endpoint", "pin-forward", "return-action",
   "tail-field-toggle", "field-both-toggle", "lead-field-toggle",
   "tail-step-button", "lead-step-button", "step-backward-seconds", "step-forward-seconds",
-  "section-capture", "section-source", "save-section", "pin-capture", "pin-current",
+  "section-capture", "section-source", "focus-working-section", "save-section", "pin-capture", "pin-current",
   "sections-list", "pins-list", "leave-section"
 ]) assert.ok(htmlIds.has(required), `Missing required projection: ${required}`);
 
@@ -99,6 +99,7 @@ assert.match(
 assert.match(view, /setAttribute\("role", "menuitem"\)/, "Pin clusters must expose keyboard-addressable menu items.");
 assert.match(view, /setAttribute\("aria-haspopup", "menu"\)/, "Pin clusters must announce their popup relationship.");
 assert.match(view, /dataset\.loopSection/, "Saved Sections must expose Loop in Guide.");
+assert.match(view, /dataset\.overwriteSection/, "Saved Sections must expose explicit Working Section overwrite.");
 assert.equal(/\bseek\s*:/.test(sessionSource), false, "Semantic transaction effects must use placement vocabulary.");
 assert.match(sessionSource, /medium = "direct"/, "Direct movement must use canonical Interval vocabulary.");
 assert.match(sessionSource, /export function completePlayback/, "Native playback must settle through Session.");
@@ -106,8 +107,12 @@ assert.match(sessionSource, /departureFrame:[\s\S]*arrivalFrame:/,
   "Intervals must retain both endpoint search frames.");
 assert.match(sessionSource, /export function switchEndpoint[\s\S]*departure: arrival[\s\S]*arrival: departure/,
   "Endpoint Transposition must swap directed roles in the Session kernel.");
-assert.match(sessionSource, /export function refine[\s\S]*mode:\s*"refine"[\s\S]*operator:/,
-  "Refine must record its own local traversal instead of entering Interval-edit mode.");
+assert.match(sessionSource, /refineIntervalRelation[\s\S]*classifyRefineRelation[\s\S]*relation:\s*"shorten"/,
+  "Refine must preserve the opposite endpoint only when its target remains inside the Loop.");
+assert.match(sessionSource, /export function focusWorkingSection[\s\S]*kind:\s*FOCUS_KIND\.WORKING/,
+  "Working Section Focus must be a Session relation independent from Guide persistence.");
+assert.match(sessionSource, /export function overwriteGuideSection[\s\S]*replaceSectionExtent/,
+  "Retained overwrite must be an explicit Guide transaction.");
 assert.match(app, /function goToAdjacentPin[\s\S]*mode:\s*"linear"/,
   "Matrix Pin traversal must push the approached refinement endpoint.");
 assert.match(sessionSource, /syncIntervalEndpointFrames[\s\S]*containExtent\(model\.resolution, model\.interval, model\.range\)/,

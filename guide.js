@@ -206,6 +206,60 @@ function removeOrphanEndpoint(guide, pinId) {
   }
 }
 
+export function replaceSectionExtent(guide, sectionId, start, end, options = {}) {
+  const section = guide.sections.find(item => item.id === sectionId);
+  if (!section) throw new RangeError("Section not found.");
+
+  const A = clamp(Math.min(start, end), 0, Number.POSITIVE_INFINITY);
+  const B = clamp(Math.max(start, end), 0, Number.POSITIVE_INFINITY);
+  if (!(B > A + EPSILON)) throw new RangeError("A Section requires positive duration.");
+
+  const label = String(options.label ?? section.label ?? "").trim();
+  if (!label) throw new RangeError("A Section requires a title.");
+
+  const existingStart = findPinAt(guide, A);
+  const existingEnd = findPinAt(guide, B);
+  if (
+    existingStart
+    && existingEnd
+    && findDuplicateSection(
+      guide,
+      existingStart.id,
+      existingEnd.id,
+      label,
+      section.id
+    )
+  ) {
+    throw new RangeError("A Section with this title and Extent already exists.");
+  }
+
+  const previousStartPinId = section.startPinId;
+  const previousEndPinId = section.endPinId;
+  const startPin = ensurePin(guide, A, {
+    kind: PIN_KIND.ENDPOINT,
+    provenance: options.provenance ? `${options.provenance}:start` : null
+  }).pin;
+  const endPin = ensurePin(guide, B, {
+    kind: PIN_KIND.ENDPOINT,
+    provenance: options.provenance ? `${options.provenance}:end` : null
+  }).pin;
+
+  section.startPinId = startPin.id;
+  section.endPinId = endPin.id;
+  section.label = label;
+  section.provenance = options.provenance ?? section.provenance ?? null;
+  section.updatedAt = now();
+  guide.updatedAt = section.updatedAt;
+
+  for (const pinId of new Set([previousStartPinId, previousEndPinId])) {
+    if (pinId !== startPin.id && pinId !== endPin.id) {
+      removeOrphanEndpoint(guide, pinId);
+    }
+  }
+
+  return resolveSection(guide, section);
+}
+
 export function deleteSection(guide, sectionId) {
   const section = guide.sections.find(item => item.id === sectionId);
   if (!section) return false;

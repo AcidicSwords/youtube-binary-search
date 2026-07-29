@@ -360,6 +360,12 @@ assert.match(appSource, /originResolution: state\.pendingStep\.originModel\.reso
 assert.match(appSource, /intervalDeparture: state\.pendingStep\.intervalDeparture/, "Pending Step must freeze the Interval anchor across repeat.");
 assert.match(appSource, /document\.addEventListener\("keyup"[\s\S]*completePendingStep/, "Held-key Step must run Context from keyup rather than repeat.");
 assert.match(sessionSource, /stepIntervalAnchor[\s\S]*intervalDeparture/, "Session must separate Step movement departure from the Interval anchor.");
+assert.match(sessionSource, /refineIntervalRelation[\s\S]*classifyRefineRelation[\s\S]*relation:\s*"shorten"/,
+  "Refine must distinguish outside-Loop replacement from inside-Loop shortening.");
+assert.match(sessionSource, /export function focusWorkingSection[\s\S]*FOCUS_KIND\.WORKING/,
+  "The Working Section must be focusable without a Guide record.");
+assert.match(sessionSource, /export function overwriteGuideSection[\s\S]*replaceSectionExtent/,
+  "Guide overwrite must remain an explicit persistence transaction.");
 assert.match(appSource, /Left the focused Section and opened Full Video/, "Composite direct Go must disclose its Range escape.");
 assert.match(appSource, /createPlaybackTransport/, "Native playback must own continuous settlement.");
 assert.doesNotMatch(appSource, /startSkim|createSkimTransport|desiredSkimRate/, "Skim must be removed from the runtime.");

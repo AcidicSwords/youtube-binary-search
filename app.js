@@ -36,11 +36,13 @@ import {
   previewRange,
   checkpoint,
   focusSection as focusSessionSection,
+  focusWorkingSection as focusSessionWorkingSection,
   leaveSection as leaveSessionSection,
   completePlayback,
   pinCurrent as pinSessionCurrent,
   saveIntervalAsSection,
   saveExtentAsSection,
+  overwriteGuideSection,
   renameGuidePin,
   deleteGuidePin,
   renameGuideSection,
@@ -504,7 +506,10 @@ function sameSpatialModel(first, second) {
   const sameFocus = (!firstFocus && !secondFocus) || Boolean(
     firstFocus
     && secondFocus
+    && (firstFocus.kind || "saved-section") === (secondFocus.kind || "saved-section")
     && firstFocus.sectionId === secondFocus.sectionId
+    && Math.abs((firstFocus.extent?.start ?? 0) - (secondFocus.extent?.start ?? 0)) <= EPSILON
+    && Math.abs((firstFocus.extent?.end ?? 0) - (secondFocus.extent?.end ?? 0)) <= EPSILON
     && Math.abs(firstFocus.returnRange.start - secondFocus.returnRange.start) <= EPSILON
     && Math.abs(firstFocus.returnRange.end - secondFocus.returnRange.end) <= EPSILON
   );
@@ -656,8 +661,13 @@ function refine(direction) {
     );
     return;
   }
+  const workingSection = result.interval
+    ? formatRange(result.interval)
+    : `collapsed at ${formatTime(result.destination)}`;
   accept(result, {
-    status: `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; Loop now records this local refinement.`
+    status: result.refineRelation === "shorten"
+      ? `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; the Working Section shortened to ${workingSection}.`
+      : `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; the previous Working Section was replaced by ${workingSection}.`
   });
 }
 
@@ -898,6 +908,25 @@ function focusSection(sectionId) {
   closeCompactGuideAfterSelection();
 }
 
+function focusWorkingSection() {
+  settleBeforeAction();
+  const interval = currentInterval();
+  if (!interval) {
+    setStatus("Establish a Working Section before focusing it.", true);
+    return;
+  }
+  const result = focusSessionWorkingSection(state.session);
+  if (!result.changed) {
+    setStatus("The Working Section already owns the active Range.");
+    return;
+  }
+  accept(result, {
+    renderGuide: true,
+    status: `Focused Working Section ${formatRange(interval)} without saving it.`
+  });
+  stepField?.invalidate();
+}
+
 function leaveSection() {
   settleBeforeAction();
   const result = leaveSessionSection(state.session);
@@ -1045,6 +1074,24 @@ function renameSectionById(sectionId) {
   });
 }
 
+function overwriteSectionById(sectionId) {
+  const section = resolveSection(guide(), sectionId);
+  const working = currentInterval();
+  if (!section) return;
+  if (!working) {
+    setStatus("Establish a Working Section before overwriting a retained Section.", true);
+    return;
+  }
+  openGuideDialog({
+    action: "overwrite-section",
+    id: sectionId,
+    title: "Overwrite Section",
+    message: `Replace “${section.label}” ${formatRange(section)} with Working Section ${formatRange(working)}?`,
+    showInput: false,
+    confirmLabel: "Overwrite"
+  });
+}
+
 function deleteSectionById(sectionId) {
   const section = resolveSection(guide(), sectionId);
   if (!section) return;
@@ -1112,6 +1159,15 @@ function submitGuideDialog(event) {
       : result.reason === "duplicate-section"
         ? "A Section with this title and Extent already exists."
         : "Section title is unchanged.";
+  } else if (action.action === "overwrite-section") {
+    result = overwriteGuideSection(state.session, action.id);
+    status = result.changed
+      ? `Overwrote “${result.value.label}” with Working Section ${formatRange(result.value)}.`
+      : result.reason === "duplicate-section"
+        ? "That overwrite would duplicate an existing Section."
+        : result.reason === "unchanged-section"
+          ? "The retained Section already matches the Working Section."
+          : "Section could not be overwritten.";
   } else if (action.action === "delete-section") {
     result = deleteGuideSection(state.session, action.id);
     status = result.changed ? "Deleted Section." : "Section could not be deleted.";
@@ -1938,6 +1994,7 @@ elements["step-forward-seconds"].addEventListener("change", event => {
 elements["section-capture"].addEventListener("submit", saveCurrentIntervalAsSection);
 elements["section-label"].addEventListener("input", view.render);
 elements["section-source"].addEventListener("change", view.render);
+elements["focus-working-section"].addEventListener("click", focusWorkingSection);
 elements["pin-capture"].addEventListener("submit", pinCurrent);
 elements["pin-label"].addEventListener("input", view.render);
 elements["range-state"].addEventListener("click", toggleRangeTools);
@@ -2020,6 +2077,10 @@ function handleGuideClick(event) {
   if (deletePinButton) return deletePinById(deletePinButton.dataset.deletePin);
   const renameSectionButton = event.target.closest("[data-rename-section]");
   if (renameSectionButton) return renameSectionById(renameSectionButton.dataset.renameSection);
+  const overwriteSectionButton = event.target.closest("[data-overwrite-section]");
+  if (overwriteSectionButton) {
+    return overwriteSectionById(overwriteSectionButton.dataset.overwriteSection);
+  }
   const deleteSectionButton = event.target.closest("[data-delete-section]");
   if (deleteSectionButton) return deleteSectionById(deleteSectionButton.dataset.deleteSection);
 }
