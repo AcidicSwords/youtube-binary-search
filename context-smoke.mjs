@@ -17,7 +17,7 @@ await flush(4);
 const center = env.center();
 const tail = env.tail();
 assert.ok(center && tail, "Center and side players must exist for Context suspension coverage.");
-assert.equal(byId.get("context-setting-value").textContent, "5 s after traversal");
+assert.equal(byId.get("context-setting-value").textContent, "5 s centered on Current");
 
 // Arm Tail Stretch while Center is paused. A traversal must run Context only in
 // Center; the side remains suspended even though it is armed to stretch.
@@ -28,7 +28,7 @@ byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 
 await flush();
 
 assert.equal(currentText(), "Current 0:50.000", "Traversal must commit semantic Current before observation begins.");
-assert.equal(center.pendingPlacement, 49, "Five-second Context must request one second of pre-roll.");
+assert.equal(center.pendingPlacement, 47.5, "Five-second Context must begin half its duration before Current.");
 assert.equal(center.currentTime, 0, "A delayed iframe may temporarily leave physical Cursor behind semantic Current.");
 assert.equal(center.state, 1, "Automatic Context must play Center.");
 assert.equal(byId.get("current-marker").style.left, "50%", "Context must not displace semantic Current.");
@@ -80,7 +80,7 @@ assert.equal(
 assert.equal(center.state, 2);
 dispatchDocument("keyup", { key: "ArrowRight", code: "ArrowRight" });
 await flush();
-assert.equal(center.currentTime, 79);
+assert.equal(center.currentTime, 77.5);
 assert.equal(center.state, 1);
 assert.equal(
   center.commands.filter(command => command[0] === "play").length,
@@ -102,18 +102,18 @@ assert.equal(
   "Current 0:50.000",
   "Undo must batch the complete held-arrow gesture."
 );
-assert.equal(center.currentTime, 49);
+assert.equal(center.currentTime, 47.5);
 assert.equal(center.state, 1);
 
 // A new traversal supersedes active Context without restoring the old anchor.
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 250 });
 await flush();
 assert.equal(currentText(), "Current 0:25.000");
-assert.equal(center.currentTime, 24);
+assert.equal(center.currentTime, 22.5);
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 750 });
 await flush();
 assert.equal(currentText(), "Current 1:15.000");
-assert.equal(center.currentTime, 74, "Replacement Context must begin around the new destination, not restore the old one.");
+assert.equal(center.currentTime, 72.5, "Replacement Context must begin half a window before the new destination.");
 assert.equal(center.state, 1);
 
 // Step remains available during Context. It cancels the previous observation,
@@ -123,7 +123,7 @@ byId.get("step-forward").click();
 assert.equal(currentText(), "Current 1:25.000");
 await env.delay(300);
 await flush();
-assert.equal(center.currentTime, 84);
+assert.equal(center.currentTime, 82.5);
 assert.equal(center.state, 1);
 assert.equal(currentText(), "Current 1:25.000");
 
@@ -132,8 +132,8 @@ assert.equal(currentText(), "Current 1:25.000");
 byId.get("context-seconds").value = "0.5";
 byId.get("context-seconds").dispatch("change");
 await flush();
-assert.equal(byId.get("context-setting-value").textContent, "0.5 s after traversal");
-assert.equal(center.currentTime, 84.5, "Changing active Context must immediately retarget its bounded window.");
+assert.equal(byId.get("context-setting-value").textContent, "0.5 s centered on Current");
+assert.equal(center.currentTime, 84.75, "Changing active Context must immediately retarget its centered window.");
 
 // Subsequent
 // traversal remains paused and does not issue an automatic play command.
@@ -156,7 +156,7 @@ assert.equal(
 );
 
 // Context contributes no Undo entry of its own. Undo restores the preceding
-// semantic state rather than any transient pre-roll or end address.
+// semantic state rather than any transient Context boundary.
 byId.get("return-action").click();
 await flush();
 assert.equal(currentText(), "Current 1:25.000");

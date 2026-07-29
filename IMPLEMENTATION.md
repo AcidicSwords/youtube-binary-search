@@ -83,7 +83,7 @@ Interval ⊆ arrival endpoint frame
 idle | context | playback | loop
 ```
 
-- Context stores anchor and bounded observation window.
+- Context stores an anchor and a bounded observation window split equally around it, with each half clipped independently by Range.
 - Playback stores departure, parent Neighborhood/basis, the active Interval anchor, and Undo model until physical settlement. `projectPlayback()` derives the live Current, Resolution, and Interval without history; `completePlayback()` commits that same projection. Settlement moves that active endpoint, pushes only the approached refinement bound, and merges any intervening Held Offset and Guide state into the checkpoint so history order remains compositional.
 - Loop stores an immutable start/end/source snapshot and a cycle count.
 
@@ -99,7 +99,7 @@ While Context is idle, a trusted parent-page Center click or Space command first
 
 Programmatic placement has a grace record so delayed iframe reporting cannot be mistaken for a native scrub.
 
-Playback-to-Loop is a direct handoff: the old transport is settled without issuing a pause that could arrive after the new play request. Space or the Center surface during Context instead pauses at the physical Cursor and commits it through Session `goTo()` as `contextAccept`; the normal completion path still restores the Context anchor without history.
+Playback-to-Loop is a direct handoff: the old transport is settled without issuing a pause that could arrive after the new play request. Space or the Center surface during Context instead pauses at the physical Cursor and commits it through Session `completePlayback()` as `contextAccept`. Reusing the continuous projection preserves the receding Resolution endpoint and the Working Section’s opposite endpoint while moving their approached endpoints to the accepted Current; it does not seed a direct-Go frame from the short observed crossing. The normal completion path still restores the Context anchor without history.
 
 ## 6. Automatic Context
 
@@ -107,7 +107,7 @@ Playback-to-Loop is a direct handoff: the old transport is settled without issui
 
 Pending rapid Steps suppress intermediate Context and invoke it once after coalescing. `step-gesture.js` centralizes initial delay, repeat cadence, and tap-settlement timing for Arrow keys, matrix buttons, side buttons, and side-player surfaces. Pointer/key down commits the first Step immediately, an application timer owns held repetition, and every repeat immediately places Center while translating the complete Field. Release completes one held transaction and one optional Context window. Quick pointer or keyboard taps inside the settlement boundary amend that same transaction. Pointer capture has a document-level release fallback; focused controls use the same key-down/key-up lifecycle; browser key repeat is ignored. Blur, pointer cancellation, or hidden-document settlement commits the final Step without autoplay.
 
-Context duration is normalized to `0–300s`. Pre-roll is capped by the requested duration, so every fractional window still contains Current. Changing duration during active Context replaces only its transient window and placement; it reuses the already-suspended Field without a pause/play cycle.
+Context duration is normalized to `0–300s`. `deriveContextWindow()` subtracts and adds half that duration around Current, then clips each side independently to Range. It never reallocates a clipped half across the traversal point. Changing duration during active Context replaces only this centered transient window and placement; it reuses the already-suspended Field without a pause/play cycle.
 
 ## 7. Step Field runtime
 

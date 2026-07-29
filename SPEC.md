@@ -165,12 +165,16 @@ After a discrete operation commits a different Current and produces an Interval:
 ```text
 commit Current
 → suspend Tail and Lead
-→ play bounded Center window around Current
+→ play from half-duration behind Current
+→ cross the committed traversal point
+→ play up to half-duration ahead
 → restore Center Cursor to Current
 → remain paused until genuine native playback
 ```
 
-A new traversal during Context supersedes the old window and starts Context around the new destination. Changing the duration while Context runs retargets that transient window immediately; even a duration shorter than the one-second default pre-roll must still contain Current. Ordinary Context creates no history and does not redefine Interval. Space or the Center surface explicitly accepts the presently heard Cursor: Context pauses without restoring its anchor, that Cursor becomes Current through a direct Go, and the resulting movement enters Undo history. Context owns Space even when a traversal button retains focus.
+For duration \(d\), Current \(C\), and active Range \([A,B]\), the physical Context window is \([\max(A,C-d/2),\min(B,C+d/2)]\). Range clips the unavailable half independently; it never shifts surplus duration across Current. Thus every unconstrained Context is bisected by the traversal point and audibly crosses it.
+
+A new traversal during Context supersedes the old window and starts centered on the new destination. Changing the duration while Context runs retargets that transient window immediately while retaining Current as its midpoint whenever Range permits. Ordinary Context creates no history and does not redefine Interval. Space or the Center surface explicitly accepts the presently heard Cursor: Context pauses without restoring its anchor, then settles the anchor-to-Cursor movement through the same continuous projection used by Step and playback. Cursor becomes Current, the Working Section’s opposite endpoint and Resolution’s receding endpoint persist, and only the moving/approached endpoints deform; accepting before the traversal point can extend the Working Section, while accepting after it can shorten the Section. Acceptance never seeds a small direct-Go neighborhood around the heard crossing. The resulting movement enters Undo history. Context owns Space even when a traversal button retains focus.
 
 A held Step suppresses intermediate Context windows and starts one observation only when the key or pointer gesture ends. Each repeat still commits and visibly parks Center, Tail, and Lead at its new Current; only automatic observation and final history settlement are deferred. Rapid taps inside the shared settlement window amend that same transaction. Hold/Stretch is unavailable during Context because its transient Cursor is not a valid source for a stored Field relation.
 

@@ -6,7 +6,7 @@
 npm run check
 ```
 
-The gate covers syntax, Session/Undo, endpoint-frame containment and transposition, distinct operator ownership, all seven semantic-audit regressions, Guide, Context/playback/Loop values, source normalization, 25,000-operation fuzzing, native-playback regressions, Field geometry and controller behaviour, captured/fallback pointer and focused-key Step gestures, human-cadence tap batching, Context Cursor acceptance, replacement-start ownership, DOM/accessibility contracts, repository audits, startup, interaction, Context, transport-coherence, and metadata paths.
+The gate covers syntax, Session/Undo, endpoint-frame containment and transposition, distinct operator ownership, all seven semantic-audit regressions, Guide, Context/playback/Loop values, source normalization, 25,000-operation fuzzing, native-playback regressions, Field geometry and controller behaviour, captured/fallback pointer and focused-key Step gestures, human-cadence tap batching, Context Cursor acceptance without Working Section or Resolution collapse, replacement-start ownership, DOM/accessibility contracts, repository audits, startup, interaction, Context, transport-coherence, and metadata paths.
 
 The deeper semantic proof is separate:
 
@@ -45,6 +45,8 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 ### Automatic Context
 
 - Enter preset and custom durations, including fractional values and both bounds, then invoke timeline, Refine, Step, side Step, Switch Endpoint, Pin, Section, and Undo traversal.
+- Away from Range edges, confirm Context starts exactly half its duration before Current, audibly crosses Current, and ends half its duration after; at either edge, confirm only the unavailable half is clipped.
+- During one Context, press Space before Current and confirm the Working Section extends through the accepted point; Undo, then press Space after Current and confirm the same Working Section shortens without Resolution collapse.
 - Hold each arrow, matrix Step button, local Step button, and side surface; confirm the application cadence alone advances Current/Interval, no intermediate Context starts, and one Context runs on release at the final Current.
 - Undo once after each held Step and confirm the entire repeated gesture is reverted.
 - Rapidly tap each Step source several times inside the debounce window and confirm one Undo reverts the complete sequence.

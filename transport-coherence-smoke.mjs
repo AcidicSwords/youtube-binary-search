@@ -159,11 +159,13 @@ byId.get("timeline").dispatch("click", {
 });
 await flush();
 await poll();
-assert.equal(center.currentTime, 49);
+assert.equal(center.currentTime, 47.5);
 assert.equal(byId.get("field-transport-state").textContent, "Context suspended");
 assert.equal(byId.get("center-transport-label").textContent, "Set Current Here");
 
-center.currentTime = 52;
+// Context crosses the traversal point. Accepting its backward half extends the
+// existing Working Section through the shared continuous deformation.
+center.currentTime = 48;
 await poll();
 assert.equal(
   currentText(),
@@ -171,16 +173,59 @@ assert.equal(
   "Context Cursor must remain transient until explicitly accepted."
 );
 
+const contextExtensionPlaces = {
+  tail: tail.commands.filter(command => command[0] === "place").length,
+  lead: lead.commands.filter(command => command[0] === "place").length
+};
+dispatchDocument("keydown", { key: " ", code: "Space" });
+await flush();
+assert.equal(currentText(), "Current 0:48.000");
+assert.match(byId.get("section-window").textContent, /0:48\.000–1:04\.000/);
+assert.equal(byId.get("resolution-start-marker").style.left, "34%");
+assert.equal(byId.get("resolution-end-marker").style.left, "64%");
+assert.equal(
+  tail.commands.filter(command => command[0] === "place").length,
+  contextExtensionPlaces.tail + 1,
+  "Accepting backward Context must translate Tail once."
+);
+assert.equal(
+  lead.commands.filter(command => command[0] === "place").length,
+  contextExtensionPlaces.lead + 1,
+  "Accepting backward Context must translate Lead once."
+);
+
+// Undo restores the complete pre-accept relation and starts a fresh centered
+// Context. Accepting its forward half then finely shortens that same Section.
+byId.get("return-action").click();
+await flush();
+assert.equal(currentText(), "Current 0:50.000");
+assert.equal(center.currentTime, 47.5);
 const contextCommitPlaces = {
   tail: tail.commands.filter(command => command[0] === "place").length,
   lead: lead.commands.filter(command => command[0] === "place").length
 };
+center.currentTime = 52;
+await poll();
 const focusedTraversal = byId.get("refine-forward");
 focusedTraversal.focus();
 dispatchDocument("keydown", { key: " ", code: "Space" });
 await flush();
 assert.equal(currentText(), "Current 0:52.000");
-assert.match(byId.get("section-window").textContent, /0:50\.000–0:52\.000/);
+assert.match(
+  byId.get("section-window").textContent,
+  /0:52\.000–1:04\.000/,
+  "Accepting Context must move the active Working Section endpoint, not replace it with the tiny observed crossing."
+);
+assert.equal(
+  byId.get("resolution-start-marker").style.left,
+  "36%",
+  "Accepting Context must preserve the receding Resolution endpoint."
+);
+assert.equal(
+  byId.get("resolution-end-marker").style.left,
+  "66%",
+  "Accepting Context must deform the approached Resolution endpoint instead of rebuilding scale around Cursor."
+);
 assert.equal(center.currentTime, 52);
 assert.equal(center.state, 2);
 assert.equal(byId.get("center-transport-label").textContent, "Play Field");
@@ -219,7 +264,7 @@ forward.dispatch("pointerup", { button: 0, pointerId: 41 });
 await env.delay(300);
 await flush();
 assert.equal(currentText(), "Current 0:50.000");
-assert.equal(center.currentTime, 49);
+assert.equal(center.currentTime, 47.5);
 assert.equal(
   center.state,
   1,

@@ -544,7 +544,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : "—";
     elements["pin-current-position"].textContent = currentResolution ? `Current ${formatTime(semanticCurrent)}` : "Current —";
     elements["context-setting-value"].textContent = currentState.contextSeconds > 0
-      ? `${currentState.contextSeconds} s after traversal`
+      ? `${currentState.contextSeconds} s centered on Current`
       : "Off";
 
     const stepReach = currentState.session.model.stepReach || { backward: 10, forward: 10, linked: false };

@@ -128,6 +128,11 @@ assert.match(sessionSource, /projectPlayback[\s\S]*stepIntervalAnchor[\s\S]*tran
   "Live and settled playback must share one endpoint-deformation projection.");
 assert.match(sessionSource, /completePlayback[\s\S]*projectPlayback/,
   "Playback settlement must commit the same projection shown while playing.");
+const contextAcceptanceSource = app.match(/function acceptContextCursor\(\) \{[\s\S]*?^\}/m)?.[0] || "";
+assert.match(contextAcceptanceSource, /completePlayback\(state\.session/,
+  "Context acceptance must reuse continuous endpoint deformation.");
+assert.doesNotMatch(contextAcceptanceSource, /\bgoTo\(/,
+  "Context acceptance must not collapse scale through a direct Go.");
 assert.match(view, /departureFrame[\s\S]*destinationScale[\s\S]*Switch Endpoint/,
   "Switch must expose the destination endpoint frame before traversal.");
 assert.match(view, /refineBlockReason/,
@@ -135,6 +140,11 @@ assert.match(view, /refineBlockReason/,
 assert.match(transportSource, /PLAYBACK:\s*"playback"/);
 assert.match(transportSource, /LOOP:\s*"loop"/);
 assert.doesNotMatch(transportSource, /CONTINUE|SKIM/);
+assert.match(
+  transportSource,
+  /halfDuration\s*=\s*seconds\s*\/\s*2[\s\S]*boundedAnchor\s*-\s*halfDuration[\s\S]*boundedAnchor\s*\+\s*halfDuration/,
+  "Context must bisect its duration around the traversal point."
+);
 assert.match(app, /result\?\.interval[\s\S]*startContext\(destination\)/, "Context must be automatic after traversal.");
 assert.match(app, /createStepGestureController[\s\S]*bindStepPress/,
   "Keyboard, matrix, and Field Step controls must share one held-gesture owner.");
