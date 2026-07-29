@@ -194,6 +194,11 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
     querySelectorAll(selector) {
       if (selector === "[id]") return elements;
       if (selector === "[data-preview-action]") return elements.filter(element => element.dataset.previewAction);
+      const dataSelector = selector.match(/^\[data-([a-z0-9-]+)\]$/i);
+      if (dataSelector) {
+        const key = dataKey(`data-${dataSelector[1]}`);
+        return elements.filter(element => element.dataset[key] !== undefined);
+      }
       return [];
     },
     createElement(tag) { return new FakeElement("", tag.toUpperCase()); },

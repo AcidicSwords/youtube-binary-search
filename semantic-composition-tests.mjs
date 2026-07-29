@@ -35,7 +35,7 @@ function assertLoopContained(session) {
 
 // Refine owns binary subdivision and transforms the Working Section by target
 // membership. An inside midpoint shortens toward the preserved opposite
-// endpoint; an outside midpoint replaces the Loop with the new traversal.
+// endpoint; an outside midpoint replaces the Interval with the new traversal.
 let composed = createSession({ duration: 100, current: 50 });
 composed = goTo(composed, 70, { operator: "directA" }).session;
 const replaced = refine(composed, "forward");
@@ -85,7 +85,7 @@ assert.ok(Math.abs(composed.model.interval.arrival - 90) <= EPSILON);
 
 // Section endpoints are Pin operands. Pin Forward/Back is linear for
 // Resolution, but each Pin hop records its own traversal Interval rather than
-// stretching a Loop across every crossed Pin.
+// stretching a Working Interval across every crossed Pin.
 const guide = createGuide("semantic-composition");
 createSectionFromTimes(guide, 20, 40, { label: "First" });
 createSectionFromTimes(guide, 60, 80, { label: "Second" });
@@ -165,4 +165,4 @@ assert.equal(
   "range-start"
 );
 
-console.log("Semantic composition tests passed: membership-based Refine replacement/shortening, one-sided linear endpoint pushes, Loop containment, and truthful Refine limits.");
+console.log("Semantic composition tests passed: membership-based Refine replacement/shortening, one-sided linear endpoint pushes, Interval containment, and truthful Refine limits.");

@@ -1,100 +1,78 @@
-# Development Guide
+# Development
 
-## 1. Setup
+## Principles
 
-Read `SPEC.md`, `IMPLEMENTATION.md`, and `INTERFACE.md` before changing behaviour. Serve locally:
+1. Source time is canonical.
+2. Traversal Time is derived and pure.
+3. Folding changes navigation and layout, never media continuity.
+4. A gesture creates at most one Undo checkpoint.
+5. Current and Cursor remain distinct.
+6. Semantic Step size and physical Field offsets remain independent.
+7. Shared Pins form a graph; do not invent a stored Section hierarchy.
 
-```bash
-python3 -m http.server 8000
-```
+## Change routing
 
-Run the complete gate:
+- Session/operator law: `session.js`, with pure geometry in `range-geometry.js`
+- Fold union, mapping, Pin stops: `temporal-projection.js`
+- Pin/Section lifecycle and migration: `guide.js`
+- Context/playback runtime: `transport.js`
+- Timeline and Guide projection: `view.js`
+- Timeline input, shortcuts, persistence, adapter coordination: `app.js`
+- Held Step ownership: `step-gesture.js`
+- Field geometry/runtime: `step-field-geometry.js`, `step-field.js`
+- YouTube construction and placement: `youtube.js`
+
+Do not add Fold-specific arithmetic to an operator. Extend the shared projection and prove the mapping first.
+
+## Required semantic discipline
+
+- Keep Range, Current, Cursor, Working Interval, Pins, and Section endpoints in source seconds.
+- Never persist a Fold union, Traversal coordinate, lane, colour, or stagger offset.
+- Do not make playback, Context, or YouTube adapters skip collapsed media.
+- Preserve arbitrary overlap and asymmetrical nesting.
+- Toggle collapse per Section even when several contributors share a Fold.
+- Keep interior Fold positions non-operable; only boundary Pins are vertical stops.
+- Materialize a transposed Section for Focus without mutating its stored flag.
+- Unfold covering contributors for an exact hidden Guide target in the same transaction.
+- Recompute adaptive Step from active projected Range; never from source duration or Field Offset.
+- Hold/Stretch may update only `fieldOffsets`.
+
+## Testing map
+
+- `tests.mjs` — Range geometry and Session transactions
+- `temporal-projection-tests.mjs` — Fold union, maps, layout, materialization
+- `v6-transposition-tests.mjs` — matrix additions, Pin graph, adaptive Step, cascade behavior
+- `transport-tests.mjs` — source Context and proper-Range looping helpers
+- `source-field-tests.mjs` — source player relationships
+- `fuzz-tests.mjs` — 25,000 deterministic semantic operations
+- `v5.8-regression-tests.mjs` — preserved interaction-kernel guarantees
+- `endpoint-transposition-tests.mjs` — endpoint frames and matrix ownership
+- `semantic-composition-tests.mjs` — cross-operator sequences
+- `semantic-audit-probes.mjs` — adversarial semantic regressions
+- `step-gesture-tests.mjs` — cadence, batching, and one-Undo settlement
+- `step-field-tests.mjs` — pure Field geometry
+- `field-runtime-tests.mjs` — controller lifecycle
+- `field-grammar-tests.mjs` — UI ownership
+- `field-bounds-tests.mjs` — hard Range boundaries
+- `field-coherence-tests.mjs` — Step/Offset independence
+- `semantic-state-space-tests.mjs` — extended state-space proof
+
+Smoke tests cover startup, interaction, Context, gestures, transport wrapping, Section folding, and metadata.
+
+## Release workflow
 
 ```bash
 npm run check
+npm run test:semantic
 ```
 
-Node 20 or newer is required. There is no build step or runtime dependency.
+Also inspect desktop and narrow layouts with at least:
 
-## 2. Ownership
+- several open overlapping Sections;
+- one composite Fold;
+- a dense cluster of stacked endpoints;
+- a focused transposed Section;
+- a proper Range during a playback wrap;
+- coarse-pointer hit targets.
 
-- temporal mathematics: `range-geometry.js`
-- semantic transactions, endpoint frames, and Undo: `session.js`
-- Context/playback/Loop runtime values: `transport.js`
-- raw IFrame API: `youtube.js`
-- Field mathematics: `step-field-geometry.js`
-- Tail/Lead execution: `step-field.js`
-- shared held-Step gestures: `step-gesture.js`
-- retained structure: `guide.js`
-- DOM projection: `view.js`
-- composition and persistence: `app.js`
-
-When the same rule appears twice, choose its owner and remove the duplicate.
-
-## 3. Change protocol
-
-State the operator, operand, owner, and effect class before editing:
-
-```text
-semantic | physical | transient | retained | presentational
-```
-
-Add the smallest pure test first. Integration and smoke tests confirm wiring; they do not replace kernel tests.
-
-## 4. Player discipline
-
-Never access `YT.Player` outside `youtube.js`. Treat play, pause, placement, and rate commands as requests. Actual adapter state and events are authoritative. Ordinary Field start must synchronously request Tail, Center, and Lead from the same trusted parent-page click or Space event; do not defer side activation to Center’s later state callback.
-
-Autoplay blocking, buffering, delayed placement, and missing directional rates are ordinary runtime states. They must remain visible and recoverable without mutating Session incorrectly.
-
-## 5. Field discipline
-
-- Context is the only transport that suspends Field playback by definition.
-- Native playback and Loop may drive Held/Stretching sides.
-- Every ordinary play/unpause starts a fresh Stretch: refold to Current, prime at `1×`, then request the confirmed directional rate.
-- Paused sides must park on their represented frames; thumbnail-only cue state is not a valid settled Field after frame placement is possible.
-- Hold during formation may commit measured Offset through Session Step Reach, but must never write semantic Interval.
-- Context must preserve stored Field geometry and must not remeasure against its transient Cursor.
-- Hold/Stretch must be unavailable while Context, Range drag, or pending Step suspends the Field.
-- Side video surface, local Step button, matrix Step, and Arrow keys must share `step-gesture.js` and `performStep()`.
-- Direct Go, Refine, and Pin traversal replace Interval with their own local movement. Step and settled playback preserve the active departure while moving arrival.
-- Step, playback, and Pin traversal leave the receding Neighborhood endpoint fixed and push the approached endpoint. A Step that reaches or crosses the old bound retains one full Step beyond Current, clamped to Range.
-- Every non-null Interval and both stored endpoint frames must satisfy `Interval ⊆ Resolution ⊆ Range`.
-- Switch Endpoint must preserve ordered Interval extent, swap its directed roles, and restore a retained frame containing that unchanged extent.
-- A held Step owns one repeat timer, one pending transaction, and one Context on release; quick taps retain short-window coalescing, and browser repeat events must not control cadence.
-- Playback projection and settlement must use the same pure Session transform.
-- An app-issued pause must settle its intended transport once; delayed internal pause events must never stop a newer transport.
-- Playback-to-Loop must settle before reading the matrix Loop extent and must not pause between transports.
-- Internal Loop wraps must never invoke Session movement or Context, and transport wrap must resolve before Field polling.
-- Collapsing one Field side must not re-establish the other; combined Field controls operate only on visible sides.
-- Side-player errors must remain recoverable through pane restore or video reload; a retained adapter must never be stranded behind `ready = false`.
-
-## 6. UI discipline
-
-The interface has four ownership regions: Field, map, operators/parameters, Guide. Do not reintroduce a generic playback dock.
-
-Every form control needs an accessible name; every button declares a type; focus and coarse-pointer targets remain visible and practical. Desktop is primary, but all operations must survive stacking and Guide modal presentation. Use explicit Field grid areas, an explicit zero-minimum column inside every pane, and player-panel container breakpoints; child minima may not clip a pane or displace Center when Field is off.
-
-## 7. Tests
-
-- `tests.mjs` — geometry, Session, Guide fundamentals
-- `transport-tests.mjs` — Context, playback, Loop values
-- `source-field-tests.mjs` — external structure normalization
-- `fuzz-tests.mjs` — deterministic semantic invariants
-- `v5.8-regression-tests.mjs` — stable reader and native playback contracts
-- `endpoint-transposition-tests.mjs` — endpoint frames, Switch involution, Step composition, collapsed state, and Undo separation
-- `semantic-composition-tests.mjs` — distinct Refine, Step, Pin, direct-Go, and Switch ownership plus truthful availability
-- `semantic-audit-probes.mjs` — deterministic regressions for the seven relational-audit discrepancies
-- `semantic-state-space-tests.mjs` — 200,000 mixed operations plus point and arbitrary-Interval reachability (`npm run test:semantic`)
-- `step-gesture-tests.mjs` — deterministic press, repeat, release, cancellation, and takeover
-- `step-field-tests.mjs` — Field geometry and source-level wiring
-- `field-runtime-tests.mjs` — explicit address/offset/rate state transitions and edge recovery
-- `field-grammar-tests.mjs` — composed operator grammar
-- `field-bounds-tests.mjs` — Range containment and controller behaviour
-- `field-coherence-tests.mjs` — offset/rate/UI coherence
-- audits — DOM, architecture, documentation, CSS, repository hygiene
-- `step-gesture-smoke.mjs` — held-button batching and one-operation Undo
-- `transport-coherence-smoke.mjs` — live projection, single pause, Loop handoff, and one-pass wrap
-- remaining smoke files — startup, integrated interaction, Context, and metadata paths
-
-A branch is ready only after `npm run check` passes and browser-dependent validation remains explicitly separated from automated proof.
+No release is complete while canonical documents, audits, and visible labels describe retired behavior.

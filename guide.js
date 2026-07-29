@@ -17,7 +17,7 @@ function now() {
 
 export function createGuide(videoId = null) {
   return {
-    version: 5,
+    version: 6,
     videoId,
     pins: [],
     sections: [],
@@ -138,8 +138,6 @@ export function createSection(guide, startPinId, endPinId, options = {}) {
   if (!(end.t > start.t + EPSILON)) throw new RangeError("A Section requires distinct Pins.");
 
   const label = String(options.label || options.title || "").trim();
-  if (!label) throw new RangeError("A Section requires a title.");
-
   const duplicate = findDuplicateSection(guide, start.id, end.id, label);
   if (duplicate) return { section: duplicate, created: false };
 
@@ -150,6 +148,7 @@ export function createSection(guide, startPinId, endPinId, options = {}) {
     startPinId: start.id,
     endPinId: end.id,
     label,
+    collapsed: options.collapsed === true,
     provenance: options.provenance || null,
     createdAt,
     updatedAt: Number(options.updatedAt) || createdAt
@@ -182,7 +181,6 @@ export function renameSection(guide, sectionId, label) {
   const section = guide.sections.find(item => item.id === sectionId);
   if (!section) throw new RangeError("Section not found.");
   const text = String(label || "").trim();
-  if (!text) throw new RangeError("A Section requires a title.");
   if (findDuplicateSection(
     guide,
     section.startPinId,
@@ -196,6 +194,135 @@ export function renameSection(guide, sectionId, label) {
   section.updatedAt = now();
   guide.updatedAt = section.updatedAt;
   return section;
+}
+
+export function setSectionCollapsed(guide, sectionId, collapsed) {
+  const section = guide.sections.find(item => item.id === sectionId);
+  if (!section) return { changed: false, reason: "missing-section" };
+  const next = collapsed === true;
+  if (section.collapsed === next) {
+    return {
+      changed: false,
+      reason: next ? "already-collapsed" : "already-expanded",
+      section: resolveSection(guide, section)
+    };
+  }
+  section.collapsed = next;
+  section.updatedAt = now();
+  guide.updatedAt = section.updatedAt;
+  return {
+    changed: true,
+    section: resolveSection(guide, section)
+  };
+}
+
+function pinMovementBounds(guide, pinId, duration = Number.POSITIVE_INFINITY) {
+  let minimum = 0;
+  let maximum = Math.max(0, Number(duration) || 0);
+  for (const source of sectionsForPin(guide, pinId)) {
+    const section = resolveSection(guide, source);
+    if (!section) continue;
+    if (section.startPinId === pinId) {
+      maximum = Math.min(maximum, section.end - EPSILON);
+    }
+    if (section.endPinId === pinId) {
+      minimum = Math.max(minimum, section.start + EPSILON);
+    }
+  }
+  return { minimum, maximum };
+}
+
+export function movePin(guide, pinId, address, duration = Number.POSITIVE_INFINITY) {
+  const pin = getPin(guide, pinId);
+  if (!pin || !Number.isFinite(address)) {
+    return { changed: false, reason: pin ? "invalid-address" : "missing-pin" };
+  }
+  const { minimum, maximum } = pinMovementBounds(guide, pinId, duration);
+  if (maximum < minimum) return { changed: false, reason: "immovable-pin" };
+  const destination = clamp(address, minimum, maximum);
+  if (Math.abs(destination - pin.t) <= EPSILON) {
+    return { changed: false, reason: "unchanged-pin", pin };
+  }
+  pin.t = destination;
+  pin.updatedAt = now();
+  guide.pins = sortPins(guide.pins);
+  guide.updatedAt = pin.updatedAt;
+  return { changed: true, pin, destination };
+}
+
+function translatedPinIds(guide, section) {
+  return new Set([section.startPinId, section.endPinId]);
+}
+
+function sectionTranslationBounds(guide, section, pinIds, duration) {
+  let minimumDelta = -section.start;
+  let maximumDelta = duration - section.end;
+  for (const source of guide.sections) {
+    const resolved = resolveSection(guide, source);
+    if (!resolved) continue;
+    const startMoves = pinIds.has(resolved.startPinId);
+    const endMoves = pinIds.has(resolved.endPinId);
+    if (startMoves === endMoves) continue;
+    if (startMoves) {
+      maximumDelta = Math.min(
+        maximumDelta,
+        resolved.end - EPSILON - resolved.start
+      );
+    } else {
+      minimumDelta = Math.max(
+        minimumDelta,
+        resolved.start + EPSILON - resolved.end
+      );
+    }
+  }
+  return { minimumDelta, maximumDelta };
+}
+
+/**
+ * Translate one Section through its two shared endpoint Pins. Geometric
+ * containment is a query, not ownership: unrelated interior Pins never move.
+ * Every Section incident to either shared endpoint deforms truthfully.
+ */
+export function translateSection(guide, sectionId, requestedDelta, duration) {
+  const section = resolveSection(guide, sectionId);
+  if (!section) return { changed: false, reason: "missing-section" };
+  if (!Number.isFinite(requestedDelta)) {
+    return { changed: false, reason: "invalid-delta" };
+  }
+  const end = Math.max(0, Number(duration) || 0);
+  const pinIds = translatedPinIds(guide, section);
+  const bounds = sectionTranslationBounds(guide, section, pinIds, end);
+  if (bounds.maximumDelta < bounds.minimumDelta) {
+    return { changed: false, reason: "immovable-section" };
+  }
+  const delta = clamp(
+    requestedDelta,
+    bounds.minimumDelta,
+    bounds.maximumDelta
+  );
+  if (Math.abs(delta) <= EPSILON) {
+    return { changed: false, reason: "unchanged-section", section };
+  }
+  const changedAt = now();
+  for (const pin of guide.pins) {
+    if (!pinIds.has(pin.id)) continue;
+    pin.t = clamp(pin.t + delta, 0, end);
+    pin.updatedAt = changedAt;
+  }
+  guide.pins = sortPins(guide.pins);
+  for (const source of guide.sections) {
+    if (
+      pinIds.has(source.startPinId)
+      || pinIds.has(source.endPinId)
+    ) source.updatedAt = changedAt;
+  }
+  guide.updatedAt = changedAt;
+  return {
+    changed: true,
+    delta,
+    section: resolveSection(guide, sectionId),
+    pinIds: [...pinIds]
+  };
 }
 
 function removeOrphanEndpoint(guide, pinId) {
@@ -215,7 +342,6 @@ export function replaceSectionExtent(guide, sectionId, start, end, options = {})
   if (!(B > A + EPSILON)) throw new RangeError("A Section requires positive duration.");
 
   const label = String(options.label ?? section.label ?? "").trim();
-  if (!label) throw new RangeError("A Section requires a title.");
 
   const existingStart = findPinAt(guide, A);
   const existingEnd = findPinAt(guide, B);
@@ -270,24 +396,69 @@ export function deleteSection(guide, sectionId) {
   return true;
 }
 
-export function previousPin(guide, current, range) {
+function projectionCoordinate(projection, source) {
+  return projection?.sourceToTraversal
+    ? projection.sourceToTraversal(source)
+    : source;
+}
+
+function traversalStops(guide, range, projection = null) {
+  if (projection?.orderedPinStops) {
+    return projection.orderedPinStops(range, guide);
+  }
   return visiblePins(guide)
     .filter(pin => pin.t >= range.start - EPSILON && pin.t <= range.end + EPSILON)
-    .filter(pin => pin.t < current - EPSILON)
+    .map(pin => ({
+      ...pin,
+      stopKind: "pin",
+      sourcePin: pin,
+      traversal: pin.t,
+      fold: null
+    }));
+}
+
+export function previousPin(guide, current, range, projection = null) {
+  const coordinate = projectionCoordinate(projection, current);
+  const fold = projection?.foldAtSource?.(current) || null;
+  const stops = traversalStops(guide, range, projection);
+  if (fold) {
+    const withinFold = stops
+      .filter(item =>
+        item.fold === fold
+        && item.t < current - EPSILON
+      )
+      .at(-1);
+    if (withinFold) return withinFold;
+  }
+  return stops
+    .filter(item => item.traversal < coordinate - EPSILON)
     .at(-1) || null;
 }
 
-export function nextPin(guide, current, range) {
-  return visiblePins(guide)
-    .filter(pin => pin.t >= range.start - EPSILON && pin.t <= range.end + EPSILON)
-    .find(pin => pin.t > current + EPSILON) || null;
+export function nextPin(guide, current, range, projection = null) {
+  const coordinate = projectionCoordinate(projection, current);
+  const fold = projection?.foldAtSource?.(current) || null;
+  const stops = traversalStops(guide, range, projection);
+  if (fold) {
+    const withinFold = stops.find(item =>
+      item.fold === fold
+      && item.t > current + EPSILON
+    );
+    if (withinFold) return withinFold;
+  }
+  return stops.find(item => item.traversal > coordinate + EPSILON) || null;
 }
 
 export function sortedSections(guide) {
   return guide.sections
     .map(section => resolveSection(guide, section))
     .filter(Boolean)
-    .sort((a, b) => a.start - b.start || b.end - a.end || a.label.localeCompare(b.label));
+    .sort((a, b) =>
+      a.start - b.start
+      || b.end - a.end
+      || String(a.label || "").localeCompare(String(b.label || ""))
+      || a.id.localeCompare(b.id)
+    );
 }
 
 export function clusterPinsByPixels(pins, duration, width, minimumGap = 16) {
@@ -323,6 +494,7 @@ function kindFromLegacy(pin) {
 
 export function normalizeGuide(parsed, videoId) {
   const guide = createGuide(videoId);
+  const retainsFoldState = Number(parsed?.version) >= 6;
   const sourcePins = Array.isArray(parsed?.pins)
     ? parsed.pins
     : (Array.isArray(parsed?.marks) ? parsed.marks : []);
@@ -359,11 +531,12 @@ export function normalizeGuide(parsed, videoId) {
       startPinId,
       endPinId,
       label: String(source.label || "").trim(),
+      collapsed: retainsFoldState && source.collapsed === true,
       provenance: source.provenance || null,
       createdAt: Number(source.createdAt) || now(),
       updatedAt: Number(source.updatedAt) || Number(source.createdAt) || now()
     };
-    if (section.label && resolveSection({ ...guide, sections: [section] }, section)) guide.sections.push(section);
+    if (resolveSection({ ...guide, sections: [section] }, section)) guide.sections.push(section);
   }
 
   guide.updatedAt = now();
@@ -423,7 +596,7 @@ export function validateGuide(guide, duration) {
       || ids.has(section.id)
       || !section.startPinId
       || !section.endPinId
-      || !String(section.label || "").trim()
+      || typeof section.collapsed !== "boolean"
       || !resolveSection(guide, section)
     ) return false;
     ids.add(section.id);
@@ -492,7 +665,7 @@ export function sanitizeGuide(input, videoId, duration) {
     const firstPinId = idMap.get(sourceSection.startPinId);
     const secondPinId = idMap.get(sourceSection.endPinId);
     const label = String(sourceSection.label || "").trim();
-    if (!firstPinId || !secondPinId || !label || firstPinId === secondPinId) continue;
+    if (!firstPinId || !secondPinId || firstPinId === secondPinId) continue;
 
     const firstPin = getPin(guide, firstPinId);
     const secondPin = getPin(guide, secondPinId);
@@ -509,11 +682,13 @@ export function sanitizeGuide(input, videoId, duration) {
       startPinId,
       endPinId,
       label,
+      collapsed: sourceSection.collapsed === true,
       provenance: sourceSection.provenance || null,
       createdAt: Number(sourceSection.createdAt) || now(),
       updatedAt: Number(sourceSection.updatedAt) || Number(sourceSection.createdAt) || now()
     };
-    if (!resolveSection({ ...guide, sections: [section] }, section)) continue;
+    const resolved = resolveSection({ ...guide, sections: [section] }, section);
+    if (!resolved) continue;
     guide.sections.push(section);
     sectionKeys.add(duplicateKey);
     usedIds.add(section.id);

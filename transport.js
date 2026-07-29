@@ -4,8 +4,7 @@ import { EPSILON, clamp } from "./range-geometry.js";
 export const TRANSPORT_KIND = Object.freeze({
   IDLE: "idle",
   CONTEXT: "context",
-  PLAYBACK: "playback",
-  LOOP: "loop"
+  PLAYBACK: "playback"
 });
 
 export function idleTransport() {
@@ -14,6 +13,28 @@ export function idleTransport() {
 
 export function isTransportActive(transport) {
   return Boolean(transport && transport.kind !== TRANSPORT_KIND.IDLE);
+}
+
+export function transportFieldRange(transport, range) {
+  if (
+    !range
+    || !Number.isFinite(range.start)
+    || !Number.isFinite(range.end)
+  ) return null;
+  return { start: range.start, end: range.end };
+}
+
+export function isProperRange(range, duration) {
+  return Boolean(
+    range
+    && Number.isFinite(range.start)
+    && Number.isFinite(range.end)
+    && Number.isFinite(duration)
+    && (
+      range.start > EPSILON
+      || range.end < duration - EPSILON
+    )
+  );
 }
 
 export function deriveContextWindow(anchor, range, seconds) {
@@ -64,28 +85,19 @@ export function createPlaybackTransport({
     label,
     operator,
     enteredPath: false,
+    cycles: 0,
     startedAt: Date.now()
   };
 }
 
-export function createLoopTransport({ anchor, start, end, source = "interval" }) {
-  if (
-    !Number.isFinite(anchor)
-    || !Number.isFinite(start)
-    || !Number.isFinite(end)
-    || end - start <= EPSILON
-  ) return idleTransport();
-
+export function rebasePlaybackTransport(transport, startedAt = Date.now()) {
+  if (transport?.kind !== TRANSPORT_KIND.PLAYBACK) return transport;
   return {
-    kind: TRANSPORT_KIND.LOOP,
+    ...transport,
     phase: "starting",
-    source,
-    anchor: clamp(anchor, start, end),
-    start,
-    end,
-    enteredWindow: false,
-    cycles: 0,
-    startedAt: Date.now()
+    enteredPath: false,
+    cycles: (transport.cycles || 0) + 1,
+    startedAt
   };
 }
 

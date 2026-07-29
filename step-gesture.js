@@ -192,7 +192,7 @@ export function bindStepPress(element, {
   const onPointerDown = event => {
     if (event.button !== undefined && event.button !== 0) return;
     if (unavailable()) return;
-    const started = controller.begin(id, resolveStep);
+    const started = controller.begin(id, () => resolveStep(event));
     if (!started) {
       // A stale enabled presentation can lose its movement at the exact Range
       // boundary. Suppress the synthesized click so one press never retries the
@@ -226,7 +226,7 @@ export function bindStepPress(element, {
       return;
     }
     if (unavailable()) return;
-    const selection = resolveStep();
+    const selection = resolveStep(event);
     if (selection) tap?.(selection);
   };
   const onKeyDown = event => {
@@ -235,7 +235,7 @@ export function bindStepPress(element, {
     event.stopPropagation?.();
     if (keyboardKey !== null && !controller.isActive(id)) keyboardKey = null;
     if (event.repeat || keyboardKey !== null) return;
-    if (!controller.begin(id, resolveStep)) return;
+    if (!controller.begin(id, () => resolveStep(event))) return;
     keyboardKey = event.key;
     element.classList?.add?.("is-step-held");
   };

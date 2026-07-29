@@ -10,12 +10,15 @@ const grammarCss = read("field-grammar.css");
 const app = read("app.js");
 const view = read("view.js");
 const session = read("session.js");
+const guide = read("guide.js");
+const projection = read("temporal-projection.js");
+const transport = read("transport.js");
 const field = read("step-field.js");
 const fieldGeometry = read("step-field-geometry.js");
 const rangeGeometry = read("range-geometry.js");
 const stepGesture = read("step-gesture.js");
-const transport = read("transport.js");
 const youtube = read("youtube.js");
+
 for (const retiredArtifact of [
   ".v5.2-patch-backup",
   "BRANCH_INSTALL.md",
@@ -28,141 +31,145 @@ for (const retiredArtifact of [
   "traversal.js",
   "v5.2-regression-tests.mjs"
 ]) {
-  assert.equal(existsSync(retiredArtifact), false, `Retired installation artifact remains: ${retiredArtifact}`);
+  assert.equal(existsSync(retiredArtifact), false, `Retired artifact remains: ${retiredArtifact}`);
 }
 
 const docs = Object.fromEntries([
-  "README.md", "SPEC.md", "IMPLEMENTATION.md", "INTERFACE.md", "DEVELOPMENT.md", "VALIDATION.md"
+  "README.md",
+  "SPEC.md",
+  "IMPLEMENTATION.md",
+  "INTERFACE.md",
+  "DEVELOPMENT.md",
+  "VALIDATION.md"
 ].map(path => [path, read(path)]));
 
-assert.equal(pkg.version, "5.8.6");
-assert.equal(docs["SPEC.md"].startsWith("# Binary YouTube Reader — Canonical Specification\n"), true);
-assert.equal(docs["IMPLEMENTATION.md"].startsWith("# Binary YouTube Reader — Canonical Implementation\n"), true);
-assert.equal(docs["INTERFACE.md"].startsWith("# Binary YouTube Reader — Interface Grammar\n"), true);
+assert.equal(pkg.version, "6.0.0");
+assert.ok(docs["SPEC.md"].startsWith("# Binary YouTube Reader — Canonical Specification\n"));
+assert.ok(docs["IMPLEMENTATION.md"].startsWith("# Binary YouTube Reader — Canonical Implementation\n"));
+assert.ok(docs["INTERFACE.md"].startsWith("# Binary YouTube Reader — Interface Grammar\n"));
 for (const name of ["SPEC.md", "IMPLEMENTATION.md", "INTERFACE.md", "DEVELOPMENT.md", "VALIDATION.md"]) {
-  assert.equal(docs["README.md"].includes("`" + name + "`"), true, `README must link ${name}`);
+  assert.ok(docs["README.md"].includes(`\`${name}\``), `README must link ${name}`);
 }
 
 const canonicalText = [html, ...Object.values(docs)].join("\n");
-assert.doesNotMatch(html, /Step size/i, "Visible interface vocabulary must use Offset or Step distance.");
-assert.doesNotMatch(canonicalText, /Canonical (Specification|Implementation) v\d/i, "Canonical documents must not embed stale release authority.");
-assert.doesNotMatch(docs["README.md"], /Application Continue|F\s+Skim|C\s+Context/,
-  "README must describe native playback and automatic Context rather than retired commands.");
+assert.doesNotMatch(canonicalText, /\bApplication Continue\b|\bSkim\b|Fold Point proxy/i);
+assert.doesNotMatch(canonicalText, /Pin Forward\/Backward replaces Interval/i);
+assert.doesNotMatch(html, /id="loop"|id="pin-backward"|id="pin-forward"/);
 
-assert.match(html, /player-panel[\s\S]*timeline-panel[\s\S]*command-workspace/, "Field, map, and command workspace must preserve vertical order.");
-assert.match(html, /command-workspace[\s\S]*parameter-panel[\s\S]*navigation-panel[\s\S]*guide-panel/, "Desktop command workspace must be Parameters | Operators | Guide.");
-assert.doesNotMatch(html, /id="pins-access"|id="focused-state"/, "Removed duplicate surfaces must not return.");
-for (const retired of ["continue", "context-action", "skim", "speed-select", "pin-current-meta", "step-link"]) {
-  assert.doesNotMatch(html, new RegExp(`id="${retired}"`), `Retired UI id remains: ${retired}`);
-}
-assert.match(html, /id="tail-pane"[\s\S]*id="player-tail"[\s\S]*id="tail-step-button"[\s\S]*id="tail-field-toggle"[\s\S]*id="step-backward-seconds"[\s\S]*id="tail-rate-select"/,
-  "Tail controls must mirror Lead from the outside edge toward Center.");
-assert.match(html, /id="lead-pane"[\s\S]*id="player-lead"[\s\S]*id="lead-rate-select"[\s\S]*id="lead-field-toggle"[\s\S]*id="lead-step-button"/,
-  "Lead controls must remain object-local beneath its player.");
-assert.match(html, /id="guide-sections-panel"[\s\S]*id="section-capture"[\s\S]*id="sections-list"/);
-assert.match(html, /id="guide-pins-panel"[\s\S]*id="pin-capture"[\s\S]*id="pins-list"/);
-assert.doesNotMatch(html, /guide-tab-sources|guide-sources-panel|Potential structure/,
-  "Unimplemented Sources must not occupy interface space.");
-assert.doesNotMatch(`${styles}\n${fieldCss}`, /source-placeholder|guide-counts/,
-  "Removed placeholder and duplicate-count projections must not retain CSS.");
-assert.match(styles, /\.guide-tabs\s*\{[\s\S]*grid-template-columns:\s*1fr 1fr/,
-  "The two implemented Guide tabs must not reserve a third empty track.");
-assert.match(html, /<option value="interval">Working Section<\/option>/,
-  "Section creation must name its semi-persistent operand accurately.");
-assert.match(html, /id="focus-working-section"[\s\S]*id="save-section"/,
-  "Working Section focus must remain independent from explicit persistence.");
+assert.match(html, /player-panel[\s\S]*timeline-panel[\s\S]*command-workspace/);
+assert.match(html, /command-workspace[\s\S]*parameter-panel[\s\S]*navigation-panel[\s\S]*guide-panel/);
+assert.match(html, /id="timeline-ruler"[\s\S]*id="section-lane"[\s\S]*id="fold-lane"[\s\S]*id="pin-lane"/);
+assert.match(html, /id="step-size-settings"[\s\S]*id="step-mode-fixed"[\s\S]*id="step-mode-adaptive"/);
+assert.match(html, /data-step-fraction="0\.03125"[\s\S]*data-step-fraction="0\.0625"[\s\S]*data-step-fraction="0\.125"/);
+assert.match(html, /Manual lateral distance/);
+assert.match(html, /active Range’s lateral width/);
+
 assert.match(
-  html,
-  /id="context-seconds"[^>]*type="number"[^>]*min="0"[^>]*max="300"[^>]*step="0\.25"/,
-  "Context must accept bounded custom durations rather than a closed preset list."
+  styles,
+  /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward switch-endpoint step-forward"[\s\S]*"release transpose focus"/
 );
-assert.equal(
-  (html.match(/Ctrl\/⌘ Z/g) || []).length,
-  1,
-  "The keyboard reference must not duplicate Undo."
-);
+for (const area of [
+  "#refine-backward { grid-area: refine-backward; }",
+  "#switch-endpoint { grid-area: switch-endpoint; }",
+  "#release { grid-area: release; }",
+  "#transpose { grid-area: transpose; }",
+  "#focus-toggle { grid-area: focus; }"
+]) assert.ok(styles.includes(area), `Missing matrix area: ${area}`);
 
+assert.match(styles, /\.timeline-fold-axis/);
+assert.match(styles, /\.timeline-fold-pin\.offset-right::before/);
+assert.match(styles, /\.timeline-fold-pin\.offset-left::before/);
+assert.match(styles, /\.timeline-fold-rail\.interval-included/);
+assert.match(styles, /@media \(pointer: coarse\)[\s\S]*\.timeline-fold-pin::after/);
 assert.match(styles, /--control-height:\s*40px/);
-assert.match(styles, /--compact-control-height:\s*32px/);
 assert.match(styles, /--touch:\s*48px/);
-assert.equal((styles.match(/@media \(min-width: 1221px\)/g) || []).length, 1, "Desktop layout must have one owner.");
-assert.doesNotMatch(fieldCss, /@media \(min-width: 1221px\)/, "Step Field CSS must not override application layout.");
-assert.match(styles, /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward loop step-forward"[\s\S]*"pin-backward switch-endpoint pin-forward"/);
-assert.match(
-  fieldCss,
-  /grid-template-areas:\s*"tail center lead"[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1\.1fr\) minmax\(0, 1fr\)/
-);
-assert.match(fieldCss, /\.step-pane\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/,
-  "Pane content tracks must shrink instead of clipping Lead.");
-assert.match(styles, /\.player-panel\s*\{[\s\S]*container-type:\s*inline-size/,
-  "Step Field breakpoints must follow actual panel width.");
+assert.equal((styles.match(/@media \(min-width: 1221px\)/g) || []).length, 1);
+assert.doesNotMatch(fieldCss, /@media \(min-width: 1221px\)/);
 assert.match(fieldCss, /@container \(max-width: 1180px\)/);
-assert.match(fieldCss, /\.pane-field-controls[\s\S]*z-index:\s*7/);
-assert.match(fieldCss, /--field-step-track:[\s\S]*\.tail-field-controls[\s\S]*var\(--field-step-track\)/,
-  "Mirrored controls must share named function-width tracks.");
-assert.match(grammarCss, /field-span-fill/);
-assert.doesNotMatch(grammarCss, /field-transport-bar|transport-actions|transport-readouts|transport-status/,
-  "The retired generic playback dock must not retain CSS ownership.");
+assert.doesNotMatch(grammarCss, /field-transport-bar|transport-actions|transport-readouts/);
 
-for (const dead of [
-  "interaction-grid", "state-strip", "secondary-tools", "pins-access", "focused-state",
-  "deck-spacer", "settings-popover", "guide-access", "capture-bar", "capture-actions",
-  "step-field-settings", "link-setting", "number-setting"
-]) {
-  const selectorPattern = new RegExp(`\\.${dead}(?![A-Za-z0-9_-])`);
-  assert.equal(selectorPattern.test(`${styles}\n${fieldCss}\n${grammarCss}`), false, `Dead CSS selector remains: ${dead}`);
-}
+assert.match(session, /STEP_REACH_MODE[\s\S]*FIXED:\s*"fixed"[\s\S]*ADAPTIVE:\s*"adaptive"/);
+assert.match(session, /DEFAULT_STEP_FRACTION\s*=\s*1\s*\/\s*16/);
+assert.match(session, /export function effectiveStepReach/);
+assert.match(session, /export function additiveRefine/);
+assert.match(session, /export function stepToPin/);
+assert.match(session, /export function releaseInterval/);
+assert.match(session, /export function transposeSection/);
+assert.match(session, /export function goToGuidePin/);
+assert.match(session, /export function goToGuideSection/);
+assert.match(session, /export function switchEndpoint[\s\S]*departure:\s*arrival[\s\S]*arrival:\s*departure/);
 
-assert.match(styles, /@media \(pointer: coarse\)[\s\S]*button,[\s\S]*summary,[\s\S]*input,[\s\S]*select[\s\S]*min-height: var\(--touch\)/);
-assert.match(fieldCss, /@media \(pointer: coarse\)[\s\S]*\.pane-collapse[\s\S]*height: var\(--touch\)/);
+assert.match(guide, /export function setSectionCollapsed/);
+assert.match(guide, /export function sectionsForPin/);
+assert.match(guide, /function translatedPinIds[\s\S]*section\.startPinId[\s\S]*section\.endPinId/);
+assert.doesNotMatch(guide, /fold-topology-conflict|collapsedFrontier/);
 
-assert.doesNotMatch(app, /pins-access|focused-state|createSkimTransport|completeSkim|reachSkimDestination/);
-assert.doesNotMatch(view, /pins-access-meta|focused-label|focused-state|\bskim\b/i);
-assert.doesNotMatch(rangeGeometry, /\bskim\b|logSpeed|chooseSupportedRate/i,
-  "Retired Skim mechanics must not remain in the Range kernel.");
-assert.doesNotMatch(app, /const DEFAULT_FIELD_RESPONSE/, "Field response default must have one owner.");
-assert.match(fieldGeometry, /export const DEFAULT_FIELD_RESPONSE/);
-assert.match(fieldGeometry, /export function normalizeFieldResponse/);
-assert.doesNotMatch(fieldGeometry, /stepSeconds|sideActivationMode/);
-assert.doesNotMatch(field, /globalThis\.YT/, "Step Field must use the YouTube adapter readiness boundary.");
-assert.match(youtube, /export function isYouTubeApiReady/);
-assert.equal((`${app}\n${field}\n${fieldGeometry}`.match(/new\s+(?:globalThis\.)?YT\.Player/g) || []).length, 0);
-assert.equal((youtube.match(/new\s+globalThis\.YT\.Player/g) || []).length, 1);
+assert.match(projection, /export function createTemporalProjection/);
+assert.match(projection, /normalizeFoldUnion/);
+assert.match(projection, /boundaryPins/);
+assert.match(projection, /orderedPinStops/);
+assert.match(projection, /expandedSectionIds/);
+assert.match(projection, /expandedExtents/);
+assert.doesNotMatch(projection, /player|document|window/);
+
 assert.match(transport, /PLAYBACK:\s*"playback"/);
-assert.doesNotMatch(transport, /CONTINUE|SKIM/);
-assert.doesNotMatch(transport, /isObservationalTransport/,
-  "Transport ownership must branch on its explicit kind rather than a redundant classifier.");
+assert.match(transport, /CONTEXT:\s*"context"/);
+assert.match(transport, /export function isProperRange/);
+assert.match(transport, /export function rebasePlaybackTransport/);
+assert.doesNotMatch(transport, /\bLOOP\s*:|CONTINUE|SKIM/);
+
+assert.match(app, /preferences\.fieldOffsets/);
+assert.match(app, /onHoldOffsets:[\s\S]*state\.fieldOffsets\s*=/);
+const holdHandler = app.match(/onHoldOffsets:\s*patch\s*=>\s*\{[\s\S]*?^\s{4}\},/m)?.[0] || "";
+assert.doesNotMatch(holdHandler, /setStepReach|preferences\.stepReach|model\(\)\.stepReach/);
+assert.match(app, /function setStepMode/);
+assert.match(app, /function setStepFraction/);
+assert.match(app, /function wrapPlaybackRange/);
+assert.match(app, /rebasePlaybackTransport\(transport\)/);
+assert.match(app, /function releaseWorkingInterval/);
+assert.match(app, /function transposeWorkingOrSelected/);
+assert.match(app, /function focusOrUnfocus/);
+
+assert.doesNotMatch(app, /createSkimTransport|startLoop|wrapLoopTransport/);
+assert.doesNotMatch(view, /dataset\.loopSection/);
+assert.match(view, /dataset\.sectionCollapse/);
+assert.match(view, /dataset\.sectionExpand/);
+assert.match(view, /dataset\.foldContributors/);
+assert.match(view, /timeline-fold-cursor/);
+assert.match(view, /timeline-ruler-tick/);
+assert.match(view, /hingePins[\s\S]*Math\.max\(18/);
+
 assert.match(stepGesture, /createStepGestureController/);
 assert.match(stepGesture, /bindStepPress/);
-assert.match(app, /createStepGestureController[\s\S]*bindStepPress/);
-assert.doesNotMatch(field, /bindSideStepSurface/,
-  "The Field controller must expose Step geometry without owning a second DOM path.");
-assert.match(session, /export function projectPlayback/);
-assert.match(session, /export function completePlayback[\s\S]*projectPlayback/);
-assert.match(view, /projectPlayback[\s\S]*dataset\.live/);
-assert.match(app, /centerPauseRequest[\s\S]*handoffTransport/);
-assert.match(app, /function startLoop\(\)[\s\S]*handoffTransport[\s\S]*currentInterval\(\)/);
-assert.match(
-  app,
-  /function wrapLoopTransport\([\s\S]*transport\.cycles \+= 1[\s\S]*resumeAt/,
-  "Natural end and polling must share one Loop-wrap implementation."
-);
+assert.doesNotMatch(field, /bindSideStepSurface/);
+assert.match(fieldGeometry, /DEFAULT_FIELD_RESPONSE/);
+assert.doesNotMatch(fieldGeometry, /stepSeconds|sideActivationMode/);
+assert.doesNotMatch(field, /globalThis\.YT/);
+assert.match(youtube, /export function isYouTubeApiReady/);
+assert.equal((youtube.match(/new\s+globalThis\.YT\.Player/g) || []).length, 1);
+assert.doesNotMatch(rangeGeometry, /\bskim\b|logSpeed|chooseSupportedRate/i);
 
-assert.match(pkg.scripts.test, /v5\.8-regression-tests\.mjs/);
-assert.match(pkg.scripts.test, /endpoint-transposition-tests\.mjs/);
-assert.match(pkg.scripts.test, /semantic-composition-tests\.mjs/);
-assert.match(pkg.scripts.test, /semantic-audit-probes\.mjs/);
-assert.match(pkg.scripts.test, /step-gesture-tests\.mjs/);
+for (const required of [
+  "v5.8-regression-tests.mjs",
+  "temporal-projection-tests.mjs",
+  "v6-transposition-tests.mjs",
+  "transport-tests.mjs",
+  "endpoint-transposition-tests.mjs",
+  "semantic-composition-tests.mjs",
+  "semantic-audit-probes.mjs",
+  "step-gesture-tests.mjs",
+  "field-coherence-tests.mjs"
+]) assert.ok(pkg.scripts.test.includes(required), `Missing test gate: ${required}`);
 assert.match(pkg.scripts["test:semantic"], /semantic-state-space-tests\.mjs/);
-assert.match(pkg.scripts.test, /field-runtime-tests\.mjs/);
-assert.doesNotMatch(pkg.scripts.test, /v5\.2-regression-tests\.mjs/);
 assert.match(pkg.scripts.audit, /integration-check\.mjs/);
 assert.match(pkg.scripts.audit, /project-audit\.mjs/);
-assert.match(pkg.scripts.check, /npm run audit/);
-assert.match(pkg.scripts.check, /step-gesture-smoke\.mjs/);
-assert.match(pkg.scripts.check, /transport-coherence-smoke\.mjs/);
-assert.match(docs["IMPLEMENTATION.md"], /step-gesture\.js/);
-assert.match(docs["SPEC.md"], /one Undo transaction/);
-assert.match(docs["VALIDATION.md"], /each wrap places each side once/);
 
-console.log("Project audit passed: v5.8.6 semantics, shared held-Step gestures, live playback projection, single-settlement transport handoffs, one-pass Loop wraps, custom Context, mirrored Field controls, Guide ownership, CSS boundaries, and adapter contracts are coherent.");
+assert.match(docs["SPEC.md"], /Traversal Time/);
+assert.match(docs["SPEC.md"], /source-contiguous/);
+assert.match(docs["SPEC.md"], /one Undo transaction/);
+assert.match(docs["IMPLEMENTATION.md"], /step-gesture\.js/);
+assert.match(docs["IMPLEMENTATION.md"], /temporal-projection\.js/);
+assert.match(docs["VALIDATION.md"], /each wrap rebases each available side at most once/);
+assert.match(docs["VALIDATION.md"], /1\/32[\s\S]*1\/16[\s\S]*1\/8/);
+
+console.log("Project audit passed: v6 matrix, independent Step sizing, transposed Section graph, source-contiguous Range playback, timeline presentation, module boundaries, and canonical documents agree.");

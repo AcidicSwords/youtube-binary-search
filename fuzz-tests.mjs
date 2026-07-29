@@ -59,8 +59,8 @@ function assertSessionInvariant(session) {
       assert.ok(["range", "movement"].includes(frame.resolutionBasis));
       assert.ok(frame.resolution.L >= range.start - EPSILON, `${role} begins outside Range.`);
       assert.ok(frame.resolution.R <= range.end + EPSILON, `${role} ends outside Range.`);
-      assert.ok(frame.resolution.L <= interval.start + EPSILON, `${role} does not contain the Loop start.`);
-      assert.ok(frame.resolution.R >= interval.end - EPSILON, `${role} does not contain the Loop end.`);
+      assert.ok(frame.resolution.L <= interval.start + EPSILON, `${role} does not contain the Interval start.`);
+      assert.ok(frame.resolution.R >= interval.end - EPSILON, `${role} does not contain the Interval end.`);
       assert.ok(Math.abs(frame.resolution.C - address) <= EPSILON);
     }
     assert.deepEqual(interval.arrivalFrame.resolution, resolution, "The active endpoint frame must match current Resolution.");

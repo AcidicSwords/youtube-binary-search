@@ -58,7 +58,6 @@ assert.equal(FIELD_SIDE_MODE.HELD, "held");
 assert.equal(FIELD_SIDE_MODE.STRETCHING, "stretching");
 assert.equal(fieldShouldSuspend({ transportKind: "context" }), true);
 assert.equal(fieldShouldSuspend({ transportKind: "playback" }), false);
-assert.equal(fieldShouldSuspend({ transportKind: "loop" }), false);
 assert.equal(fieldShouldSuspend({ pendingStep: true, transportKind: "idle" }), true);
 assert.equal(fieldShouldSuspend({ dragging: true, transportKind: "idle" }), true);
 assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: false }), false);
@@ -114,7 +113,11 @@ assert.equal(resolveFieldPhase({
 
   assert.match(app, /createStepFieldController/);
   assert.match(app, /createStepGestureController/);
-  assert.match(app, /const sideStep = role => \(\) => stepField\?\.getStepSelection/);
+  assert.match(
+    app,
+    /const sideStep = role => event => \{[\s\S]*stepField\?\.getStepSelection[\s\S]*carryRetained: event\?\.altKey === true \|\| state\.carryModifier/,
+    "Every side Step source must preserve the originating event's carry modifier in the shared transaction."
+  );
   assert.match(app, /bindStepPress\(control/);
   assert.match(app, /performStep\(selection\.direction, selection\.distance/);
   assert.match(app, /function startFieldPlaybackFromGesture\(\)/);

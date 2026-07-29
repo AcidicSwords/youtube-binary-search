@@ -3,8 +3,6 @@ import {
   EPSILON,
   clamp,
   contains,
-  midpoint,
-  getTargets,
   refineBlockReason
 } from "./range-geometry.js";
 import {
@@ -22,16 +20,24 @@ import {
 } from "./guide.js";
 import {
   MIN_RANGE_SECONDS,
+  STEP_REACH_MODE,
   createSession,
   copy,
   snapshotModel,
   goTo,
+  goToGuidePin as goToSessionGuidePin,
+  goToGuideSection as goToSessionGuideSection,
   refine as refineSession,
+  additiveRefine as additiveRefineSession,
   step as stepSession,
+  stepToPin as stepToPinSession,
   setStepReach as setSessionStepReach,
   normalizeStepReach,
+  effectiveStepReach,
   reopen as reopenSession,
   switchEndpoint as switchSessionEndpoint,
+  releaseInterval as releaseSessionInterval,
+  transposeSection as transposeSessionSection,
   setRange as setSessionRange,
   previewRange,
   checkpoint,
@@ -47,15 +53,21 @@ import {
   deleteGuidePin,
   renameGuideSection,
   deleteGuideSection,
+  setGuideSectionCollapsed,
+  moveGuidePin,
+  moveGuideSection,
   undo as undoSession
 } from "./session.js";
+import { projectionForModel } from "./temporal-projection.js";
 import {
   TRANSPORT_KIND,
   idleTransport,
   isTransportActive,
+  transportFieldRange,
+  isProperRange,
   createContextTransport,
-  createLoopTransport,
   createPlaybackTransport,
+  rebasePlaybackTransport,
   withTransportPhase
 } from "./transport.js";
 import {
@@ -75,6 +87,7 @@ import {
 } from "./step-gesture.js";
 import { createView } from "./view.js";
 
+const STORAGE_V6_PREFIX = "binary-youtube-reader:v6:";
 const STORAGE_V5_PREFIX = "binary-youtube-reader:v5:";
 const STORAGE_V4_PREFIX = "binary-youtube-reader:v4:";
 const STORAGE_V3_PREFIX = "binary-youtube-reader:v3:";
@@ -84,6 +97,7 @@ const PREFERENCES_KEY = "binary-youtube-reader:preferences:v1";
 const POLL_MS = 100;
 const STEP_TAP_SETTLE_MS = DEFAULT_STEP_GESTURE_TIMING.tapSettleMs;
 const STEP_PRESETS = [0.25, 0.5, 1, 2, 3, 5, 10, 15, 30, 60, 120, 300];
+const STEP_FRACTIONS = [1 / 32, 1 / 16, 1 / 8];
 const NATIVE_GO_SETTLE_MS = 220;
 const TRANSPORT_START_GRACE_MS = 1600;
 const METADATA_GRACE_MS = 4000;
@@ -112,6 +126,9 @@ function readPreferences() {
     return {
       contextSeconds: normalizeContextSeconds(value?.contextSeconds),
       stepReach: normalizeStepReach(value?.stepReach ?? legacyStep),
+      fieldOffsets: normalizeStepReach(
+        value?.fieldOffsets ?? value?.stepReach ?? legacyStep
+      ),
       stepReachLastEdited: normalizeLastStepReachEdited(value?.stepReachLastEdited),
       fieldResponse: normalizeFieldResponse(value?.fieldResponse),
       stepFieldEnabled: value?.stepFieldEnabled !== false,
@@ -122,6 +139,7 @@ function readPreferences() {
     return {
       contextSeconds: 5,
       stepReach: normalizeStepReach(10),
+      fieldOffsets: normalizeStepReach(10),
       stepReachLastEdited: "forward",
       fieldResponse: { ...DEFAULT_FIELD_RESPONSE },
       stepFieldEnabled: true,
@@ -143,6 +161,7 @@ const state = {
   transport: idleTransport(),
   pendingStep: null,
   lastStepReachEdited: preferences.stepReachLastEdited,
+  fieldOffsets: normalizeStepReach(preferences.fieldOffsets),
   fieldResponse: normalizeFieldResponse(preferences.fieldResponse),
   contextSeconds: preferences.contextSeconds,
   stepFieldEnabled: preferences.stepFieldEnabled,
@@ -150,6 +169,7 @@ const state = {
   leadVisible: preferences.leadVisible,
   dragHandle: null,
   rangeDragOrigin: null,
+  rangeDragProjection: null,
   guideTab: "sections",
   guideOpen: false,
   compactGuide: null,
@@ -157,6 +177,13 @@ const state = {
   nativeGo: null,
   programmaticPlacement: null,
   guideDialog: null,
+  selectedRetained: null,
+  selectedPinIds: [],
+  guideDrag: null,
+  guideClickSuppressed: false,
+  carryModifier: false,
+  shiftLayer: false,
+  shiftKeyHeld: false,
   field: null
 };
 
@@ -180,8 +207,24 @@ function activeRange() {
   return model().range;
 }
 
+function activeFieldRange() {
+  return transportFieldRange(state.transport, activeRange()) || activeRange();
+}
+
 function currentStepReach() {
+  const configured = normalizeStepReach(
+    model()?.stepReach ?? preferences.stepReach
+  );
+  if (!model()?.range) return configured;
+  return effectiveStepReach(configured, activeRange(), temporalProjection());
+}
+
+function configuredStepReach() {
   return normalizeStepReach(model()?.stepReach ?? preferences.stepReach);
+}
+
+function currentFieldOffsets() {
+  return normalizeStepReach(state.fieldOffsets ?? preferences.fieldOffsets);
 }
 
 function reachFor(direction) {
@@ -194,6 +237,24 @@ function guide() {
 
 function currentInterval() {
   return model().interval;
+}
+
+function temporalProjection(options = {}) {
+  return projectionForModel(model(), options);
+}
+
+function fieldProjection() {
+  return temporalProjection();
+}
+
+function projectionTopologyKey(sourceModel) {
+  const projection = projectionForModel(sourceModel);
+  return [
+    projection.effectiveDuration,
+    ...projection.folds.map(fold =>
+      `${fold.start}:${fold.end}`
+    )
+  ].join("|");
 }
 
 function playerSnapshot() {
@@ -219,7 +280,11 @@ const view = createView({
 });
 const { elements, formatTime, formatRange, setStatus } = view;
 
-function storageKey(prefix = STORAGE_V5_PREFIX) {
+function sectionName(section) {
+  return section?.label?.trim() || `Section ${formatRange(section)}`;
+}
+
+function storageKey(prefix = STORAGE_V6_PREFIX) {
   return `${prefix}${state.videoId}`;
 }
 
@@ -242,6 +307,10 @@ function persistPreferences() {
       preferences.stepReach
     );
     preferences.stepReachLastEdited = normalizeLastStepReachEdited(state.lastStepReachEdited);
+    preferences.fieldOffsets = normalizeStepReach(
+      state.fieldOffsets,
+      preferences.fieldOffsets
+    );
     preferences.fieldResponse = normalizeFieldResponse(state.fieldResponse);
     preferences.contextSeconds = state.contextSeconds;
     preferences.stepFieldEnabled = state.stepFieldEnabled;
@@ -252,6 +321,7 @@ function persistPreferences() {
       contextSeconds: preferences.contextSeconds,
       stepReach: preferences.stepReach,
       stepReachLastEdited: preferences.stepReachLastEdited,
+      fieldOffsets: preferences.fieldOffsets,
       fieldResponse: preferences.fieldResponse,
       stepFieldEnabled: preferences.stepFieldEnabled,
       tailVisible: preferences.tailVisible,
@@ -265,6 +335,7 @@ function persistPreferences() {
 function readStoredGuide(duration) {
   if (!state.videoId) return createGuide();
   const candidates = [
+    [STORAGE_V6_PREFIX, raw => normalizeGuide(raw, state.videoId)],
     [STORAGE_V5_PREFIX, raw => normalizeGuide(raw, state.videoId)],
     [STORAGE_V4_PREFIX, raw => normalizeGuide(raw, state.videoId)],
     [STORAGE_V3_PREFIX, raw => normalizeGuide(raw, state.videoId)],
@@ -470,13 +541,172 @@ function applyPlayerEffect(result, options = {}) {
 
 function accept(result, options = {}) {
   if (!result?.changed) return false;
+  const previousModel = model();
   state.session = result.session;
+  state.selectedPinIds = state.selectedPinIds.filter(id =>
+    Boolean(getPin(guide(), id))
+  );
+  if (
+    state.selectedRetained?.kind === "pin"
+      ? !getPin(guide(), state.selectedRetained.id)
+      : state.selectedRetained?.kind === "section"
+        ? !resolveSection(guide(), state.selectedRetained.id)
+        : false
+  ) {
+    state.selectedRetained = null;
+  }
   const guidePersisted = result.guideChanged ? persistGuide() : true;
-  if (options.effect !== false) applyPlayerEffect(result, { observe: options.observe });
-  if (options.renderGuide || result.guideChanged || result.rangeChanged) view.renderGuide();
+  const topologyChanged = projectionTopologyKey(previousModel)
+    !== projectionTopologyKey(model());
+  const projectionAligned = result.projectionChanged === true
+    && topologyChanged;
+  const rangeAligned = result.rangeChanged === true
+    && options.effect !== false;
+  if (rangeAligned) {
+    stepField?.resetAtCurrent?.();
+  } else if (projectionAligned) {
+    stepField?.translateToCurrent(currentResolution().C, { preserve: true });
+  }
+  if (options.effect !== false) {
+    applyPlayerEffect(result, {
+      observe: options.observe,
+      fieldAligned: rangeAligned || projectionAligned
+    });
+  }
+  if (
+    options.renderGuide
+    || result.guideChanged
+    || result.rangeChanged
+    || topologyChanged
+  ) view.renderGuide();
   if (options.status && guidePersisted) setStatus(options.status);
   view.render();
   return true;
+}
+
+function carryRetainedThrough(result, originModel, enabled, selection = state.selectedRetained) {
+  if (
+    !enabled
+    || !selection
+    || !result?.changed
+    || !originModel
+    || !Number.isFinite(result.session?.model?.resolution?.C)
+  ) return result;
+
+  const projection = projectionForModel(originModel);
+  const originCurrent = originModel.resolution.C;
+  const destination = result.session.model.resolution.C;
+  const originCoordinate = projection.sourceToTraversal(originCurrent);
+  const destinationCoordinate = projection.sourceToTraversal(destination);
+  const delta = destinationCoordinate - originCoordinate;
+  const direction = delta < 0 ? "backward" : "forward";
+  let carried = null;
+  let carryClamped = false;
+
+  if (selection.kind === "pin") {
+    const originPin = getPin(originModel.guide, selection.id);
+    if (!originPin) return { ...result, carryFailed: "missing-pin" };
+    if (projection.foldAtSource(originPin.t)) {
+      return { ...result, carryFailed: "hidden-in-fold" };
+    }
+    const requestedCoordinate =
+      projection.sourceToTraversal(originPin.t) + delta;
+    const boundedCoordinate = clamp(
+      requestedCoordinate,
+      0,
+      projection.effectiveDuration
+    );
+    const target = projection.traversalToSource(
+      requestedCoordinate,
+      direction
+    );
+    carried = moveGuidePin(result.session, selection.id, target, {
+      amend: true
+    });
+    carryClamped =
+      Math.abs(requestedCoordinate - boundedCoordinate) > EPSILON
+      || (
+        carried.changed
+        && Math.abs((carried.value?.destination ?? target) - target) > EPSILON
+      );
+  } else if (selection.kind === "section") {
+    const originSection = resolveSection(originModel.guide, selection.id);
+    const currentSection = resolveSection(result.session.model.guide, selection.id);
+    if (!originSection || !currentSection) {
+      return { ...result, carryFailed: "missing-section" };
+    }
+    const coveringFold = projection.folds.find(fold =>
+      originSection.start >= fold.start - EPSILON
+      && originSection.end <= fold.end + EPSILON
+      && !fold.sectionIds.includes(selection.id)
+    );
+    if (coveringFold) {
+      return { ...result, carryFailed: "hidden-in-fold" };
+    }
+    const inverseProjection = projectionForModel(originModel, {
+      expandedSectionIds: [originSection.id]
+    });
+    const requestedCoordinate =
+      projection.sourceToTraversal(originSection.start) + delta;
+    const boundedCoordinate = clamp(
+      requestedCoordinate,
+      0,
+      inverseProjection.effectiveDuration
+    );
+    const targetStart = inverseProjection.traversalToSource(
+      requestedCoordinate,
+      direction
+    );
+    const requestedDelta = targetStart - currentSection.start;
+    carried = moveGuideSection(
+      result.session,
+      selection.id,
+      requestedDelta,
+      { amend: true }
+    );
+    carryClamped =
+      Math.abs(requestedCoordinate - boundedCoordinate) > EPSILON
+      || (
+        carried.changed
+        && Math.abs((carried.value?.delta ?? requestedDelta) - requestedDelta) > EPSILON
+      );
+  }
+
+  if (!carried?.changed) {
+    if (
+      ["unchanged-pin", "unchanged-section"].includes(carried?.reason)
+      && Math.abs(delta) <= EPSILON
+    ) {
+      return result;
+    }
+    return {
+      ...result,
+      carryFailed: carried?.reason || "unavailable"
+    };
+  }
+  return {
+    ...result,
+    session: carried.session,
+    guideChanged: true,
+    projectionChanged: true,
+    rangeChanged: Boolean(result.rangeChanged || carried.rangeChanged),
+    ...(Number.isFinite(carried.place) ? { place: carried.place } : {}),
+    carriedRetained: { ...selection },
+    carryClamped
+  };
+}
+
+function retainedCarryStatus(result) {
+  if (result?.carriedRetained) {
+    return result.carryClamped
+      ? " Carried the selected retained object to its structural boundary."
+      : " Carried the selected retained object with Current.";
+  }
+  return result?.carryFailed
+    ? result.carryFailed === "hidden-in-fold"
+      ? " Unfold or Focus its containing Section before carrying that hidden retained object."
+      : " The selected retained object could not follow Current beyond its structural boundary."
+    : "";
 }
 
 function settleTransport(options = {}) {
@@ -486,6 +716,7 @@ function settleTransport(options = {}) {
   const restoreObservation = options.restoreObservation !== false;
   const issuePause = options.issuePause !== false;
   const handoffField = options.handoffField === true;
+  const shouldRender = options.render !== false;
   const current = clamp(safeCurrentTime(), activeRange().start, activeRange().end);
   const cancelPendingStart = issuePause && active.phase === "starting";
   if (cancelPendingStart) {
@@ -508,16 +739,7 @@ function settleTransport(options = {}) {
       placePlayer(currentResolution().C);
       stepField?.translateToCurrent(currentResolution().C, { preserve: true });
     }
-    view.render();
-    return true;
-  }
-
-  if (active.kind === TRANSPORT_KIND.LOOP) {
-    if (restoreObservation && !handoffField && Number.isFinite(active.anchor)) {
-      placePlayer(active.anchor);
-      stepField?.translateToCurrent(active.anchor, { preserve: true });
-    }
-    view.render();
+    if (shouldRender) view.render();
     return true;
   }
 
@@ -541,19 +763,18 @@ function settleTransport(options = {}) {
       persistPreferences();
       view.renderGuide();
     }
-    view.render();
+    if (shouldRender) view.render();
     return true;
   }
 
-  view.render();
+  if (shouldRender) view.render();
   return true;
 }
 
 function settlePausedTransport() {
   const kind = state.transport.kind;
   if (!settleTransport({ issuePause: false })) return false;
-  if (kind === TRANSPORT_KIND.LOOP) setStatus("Loop stopped.");
-  else if (kind === TRANSPORT_KIND.PLAYBACK) setStatus("Playback paused.");
+  if (kind === TRANSPORT_KIND.PLAYBACK) setStatus("Playback paused.");
   else setStatus("Context stopped.");
   return true;
 }
@@ -597,6 +818,13 @@ function flushPendingStep(options = {}) {
     return { flushed: true, cancelled: true, direction: pending.lastDirection };
   }
 
+  let guidePersisted = true;
+  if (pending.guideChanged) {
+    guidePersisted = persistGuide();
+    view.invalidateTimelinePins();
+    view.renderGuide();
+  }
+
   if (options.effect !== false) {
     applyPlayerEffect({
       place: currentResolution().C,
@@ -607,7 +835,15 @@ function flushPendingStep(options = {}) {
       centerAligned: true
     });
   }
-  return { flushed: true, cancelled: false, direction: pending.lastDirection };
+  return {
+    flushed: true,
+    cancelled: false,
+    direction: pending.lastDirection,
+    guidePersisted,
+    carriedRetained: pending.carriedRetained,
+    carryClamped: pending.carryClamped,
+    carryFailed: pending.carryFailed
+  };
 }
 
 function completePendingStep(options = {}) {
@@ -619,12 +855,14 @@ function completePendingStep(options = {}) {
   const interval = currentInterval();
   const intervalStatus = interval
     ? formatRange(interval)
-    : `collapsed at ${formatTime(currentResolution().C)}`;
-  setStatus(
-    outcome.cancelled
-      ? `Step sequence returned to ${formatTime(currentResolution().C)}; no state was recorded.`
-      : `Stepped ${outcome.direction === "backward" ? "Backward" : "Forward"} to ${formatTime(currentResolution().C)}; Interval ${intervalStatus}.`
-  );
+    : `cleared at ${formatTime(currentResolution().C)}`;
+  if (outcome.guidePersisted !== false) {
+    setStatus(
+      outcome.cancelled
+        ? `Step sequence returned to ${formatTime(currentResolution().C)}; no state was recorded.`
+        : `Stepped ${outcome.direction === "backward" ? "Backward" : "Forward"} to ${formatTime(currentResolution().C)}; Interval ${intervalStatus}.${retainedCarryStatus(outcome)}`
+    );
+  }
   view.render();
   return outcome;
 }
@@ -660,7 +898,10 @@ stepGesture = createStepGestureController({
   perform: selection => performStep(
     selection.direction,
     selection.distance,
-    { waitForGestureEnd: true }
+    {
+      waitForGestureEnd: true,
+      carryRetained: selection.carryRetained === true
+    }
   ),
   finish: detail => {
     if (detail.defer && detail.effect && detail.repeats === 0) {
@@ -706,14 +947,27 @@ function settleBeforeAction(options = {}) {
 function moveToAddress(destination, options = {}) {
   if (!state.videoLoaded || !Number.isFinite(destination)) return false;
   settleBeforeAction({ replacingContext: true });
+  const carry = options.carryRetained === true || state.carryModifier;
+  const carrySelection = state.selectedRetained
+    ? { ...state.selectedRetained }
+    : null;
+  const originModel = snapshotModel(model(), { cloneGuide: carry });
   const departure = currentResolution().C;
-  const result = goTo(state.session, destination, options);
+  let result = typeof options.transaction === "function"
+    ? options.transaction(state.session, destination)
+    : goTo(state.session, destination, options);
   if (!result.changed) {
     locateAddress(departure);
     setStatus(`Already at ${formatTime(departure)}.`);
     view.render();
     return false;
   }
+  result = carryRetainedThrough(
+    result,
+    originModel,
+    carry,
+    carrySelection
+  );
   const resolvedDestination = result.destination;
   const baseStatus = options.status
     ? options.status(resolvedDestination, result)
@@ -726,17 +980,27 @@ function moveToAddress(destination, options = {}) {
         ? "Opened Full Video. "
         : "";
   return accept(result, {
-    renderGuide: result.rangeChanged,
-    status: `${scopePrefix}${baseStatus}`
+    renderGuide: result.rangeChanged || options.renderGuide === true,
+    status: `${scopePrefix}${baseStatus}${retainedCarryStatus(result)}`
   });
 }
 
-function refine(direction) {
+function refine(direction, options = {}) {
   if (!state.videoLoaded) return;
   settleBeforeAction({ replacingContext: true });
-  const result = refineSession(state.session, direction);
+  const carry = options.carryRetained === true || state.carryModifier;
+  const originModel = snapshotModel(model(), { cloneGuide: carry });
+  const additive = options.additive === true;
+  let result = additive
+    ? additiveRefineSession(state.session, direction)
+    : refineSession(state.session, direction);
   if (!result.changed) {
-    const reason = refineBlockReason(currentResolution(), activeRange(), direction);
+    const reason = refineBlockReason(
+      currentResolution(),
+      activeRange(),
+      direction,
+      temporalProjection().metric
+    );
     const label = direction === "backward" ? "Backward" : "Forward";
     setStatus(
       reason === "resolution-limit"
@@ -745,13 +1009,16 @@ function refine(direction) {
     );
     return;
   }
+  result = carryRetainedThrough(result, originModel, carry);
   const workingSection = result.interval
     ? formatRange(result.interval)
-    : `collapsed at ${formatTime(result.destination)}`;
+    : `cleared at ${formatTime(result.destination)}`;
   accept(result, {
-    status: result.refineRelation === "shorten"
-      ? `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; the Working Section shortened to ${workingSection}.`
-      : `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; the previous Working Section was replaced by ${workingSection}.`
+    status: additive
+      ? `Additive Refine ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; retained Working Interval ${workingSection}.${retainedCarryStatus(result)}`
+      : result.refineRelation === "shorten"
+      ? `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; the Working Section shortened to ${workingSection}.${retainedCarryStatus(result)}`
+      : `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; the previous Working Section was replaced by ${workingSection}.${retainedCarryStatus(result)}`
   });
 }
 
@@ -768,22 +1035,109 @@ function reopenFully() {
   });
 }
 
-function switchCurrentEndpoint() {
+function switchCurrentEndpoint(options = {}) {
   if (!state.videoLoaded) return;
   settleBeforeAction({ replacingContext: true });
+  const carry = options.carryRetained === true || state.carryModifier;
+  const originModel = snapshotModel(model(), { cloneGuide: carry });
   const interval = currentInterval();
-  const result = switchSessionEndpoint(state.session);
+  let result = switchSessionEndpoint(state.session);
   if (!result.changed) {
     setStatus("There is no active Interval endpoint to switch.");
     return;
   }
+  result = carryRetainedThrough(result, originModel, carry);
   accept(result, {
-    status: `Switched to ${formatTime(result.session.model.resolution.C)}; Loop remains ${formatRange(interval)} in its restored refinement frame.`
+    status: `Switched to ${formatTime(result.session.model.resolution.C)}; Working Interval remains ${formatRange(interval)} in its restored refinement frame.${retainedCarryStatus(result)}`
   });
+}
+
+function releaseWorkingInterval() {
+  if (!state.videoLoaded) return false;
+  settleBeforeAction();
+  const result = releaseSessionInterval(state.session);
+  if (!result.changed) {
+    setStatus("There is no Working Interval to release.");
+    return false;
+  }
+  return accept(result, {
+    effect: false,
+    status: `Released the Working Interval; Current remains ${formatTime(currentResolution().C)}.`
+  });
+}
+
+function transposeWorkingOrSelected() {
+  if (!state.videoLoaded) return false;
+  settleBeforeAction();
+  const working = currentInterval();
+  const selected = state.selectedRetained?.kind === "section"
+    ? resolveSection(guide(), state.selectedRetained.id)
+    : null;
+  const selectedSectionId = selected
+    && (
+      !working
+      || (
+        Math.abs(selected.start - working.start) <= EPSILON
+        && Math.abs(selected.end - working.end) <= EPSILON
+      )
+    )
+      ? selected.id
+      : null;
+  const result = transposeSessionSection(state.session, selectedSectionId);
+  if (!result.changed) {
+    if (result.reason === "ambiguous-transpose-target") {
+      openGuide("sections");
+      setStatus(`${result.sectionIds?.length || "Several"} Sections share this extent. Select the intended Section, then Transpose.`);
+      return false;
+    }
+    setStatus("Establish a Working Interval or select a Section to transpose.");
+    return false;
+  }
+  state.selectedRetained = {
+    kind: "section",
+    id: result.section.id
+  };
+  view.invalidateTimelinePins();
+  const name = sectionName(result.section);
+  return accept(result, {
+    effect: false,
+    renderGuide: true,
+    status: result.collapsed
+      ? `Transposed “${name}”; its source endpoints remain sequential at one lateral Address.`
+      : `Unfolded “${name}” back into lateral source time.`
+  });
+}
+
+function focusOrUnfocus() {
+  if (!state.videoLoaded) return false;
+  if (model().focus) return leaveSection();
+  const working = currentInterval();
+  if (state.selectedRetained?.kind === "section") {
+    const selected = resolveSection(
+      guide(),
+      state.selectedRetained.id
+    );
+    if (
+      selected
+      && (
+        !working
+        || (
+          Math.abs(selected.start - working.start) <= EPSILON
+          && Math.abs(selected.end - working.end) <= EPSILON
+        )
+      )
+    ) {
+      return focusSection(selected.id);
+    }
+  }
+  if (working) return focusWorkingSection();
+  setStatus("Establish a Working Interval or select a Section before Focus.");
+  return false;
 }
 
 function undoLastAction() {
   settleBeforeAction({ replacingContext: true });
+  const previousModel = model();
   const departure = currentResolution().C;
   const result = undoSession(state.session);
   if (!result.changed) {
@@ -794,11 +1148,22 @@ function undoLastAction() {
   persistPreferences();
   const guidePersisted = result.guideChanged ? persistGuide() : true;
   const destination = currentResolution().C;
-  if (Math.abs(destination - departure) > EPSILON && state.contextSeconds > 0) {
-    stepField?.translateToCurrent(destination, { preserve: true });
+  const currentMoved = Math.abs(destination - departure) > EPSILON;
+  const rangeChanged = Math.abs(previousModel.range.start - activeRange().start) > EPSILON
+    || Math.abs(previousModel.range.end - activeRange().end) > EPSILON;
+  const topologyChanged = projectionTopologyKey(previousModel)
+    !== projectionTopologyKey(model());
+  if (currentMoved && state.contextSeconds > 0) {
+    if (rangeChanged) stepField?.resetAtCurrent?.();
+    else stepField?.translateToCurrent(destination, { preserve: true });
     startContext(destination);
-  } else {
-    locateAddress(destination, { preserveField: true });
+  } else if (currentMoved || rangeChanged) {
+    locateAddress(destination, {
+      preserveField: !rangeChanged,
+      resetField: rangeChanged
+    });
+  } else if (topologyChanged) {
+    stepField?.translateToCurrent(destination, { preserve: true });
   }
   view.renderGuide();
   if (guidePersisted) setStatus(`Undid ${result.label}.`);
@@ -812,7 +1177,8 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
   if (!state.pendingStep) {
     settleBeforeAction({ replacingContext: true });
     const departure = currentResolution().C;
-    const originModel = snapshotModel(model());
+    const carry = options.carryRetained === true || state.carryModifier;
+    const originModel = snapshotModel(model(), { cloneGuide: carry });
     const intervalDeparture = originModel.interval
       && Math.abs(originModel.interval.arrival - departure) <= EPSILON
       ? originModel.interval.departure
@@ -825,13 +1191,22 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
       timer: null,
       started: false,
       lastDirection: direction,
-      waitForGestureEnd: options.waitForGestureEnd === true
+      waitForGestureEnd: options.waitForGestureEnd === true,
+      carryRetained: carry,
+      carrySelection: state.selectedRetained
+        ? { ...state.selectedRetained }
+        : null,
+      guideChanged: false,
+      carriedRetained: false,
+      carryClamped: false,
+      carryFailed: null
     };
   } else {
     state.pendingStep.lastDirection = direction;
     state.pendingStep.waitForGestureEnd ||= options.waitForGestureEnd === true;
   }
 
+  const previousModel = model();
   const result = stepSession(state.session, direction, resolvedDistance, {
     departure: state.pendingStep.departure,
     intervalDeparture: state.pendingStep.intervalDeparture,
@@ -845,9 +1220,25 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
     setStatus(`Step ${direction === "backward" ? "Backward" : "Forward"} is at the Range boundary.`);
     return false;
   }
+  const carried = carryRetainedThrough(
+    result,
+    state.pendingStep.originModel,
+    state.pendingStep.carryRetained,
+    state.pendingStep.carrySelection
+  );
+  state.pendingStep.guideChanged ||= carried.guideChanged === true;
+  state.pendingStep.carriedRetained = Boolean(carried.carriedRetained);
+  state.pendingStep.carryClamped = carried.carryClamped === true;
+  state.pendingStep.carryFailed = carried.carryFailed || null;
   state.pendingStep.started = true;
-  state.session = result.session;
-  stepField?.translateToCurrent(currentResolution().C, { preserve: true });
+  state.session = carried.session;
+  if (
+    projectionTopologyKey(previousModel) !== projectionTopologyKey(model())
+  ) {
+    view.renderGuide();
+  }
+  if (carried.rangeChanged) stepField?.resetAtCurrent?.();
+  else stepField?.translateToCurrent(currentResolution().C, { preserve: true });
   // A pending Step delays only automatic Context and history settlement. Its
   // semantic Current and all three physical panes move immediately, so a held
   // or rapidly tapped sequence remains a visible traversal rather than a marker
@@ -940,13 +1331,14 @@ function acceptContextCursor() {
   const parentNeighborhood = copy(currentResolution());
   const parentResolutionBasis = model().resolutionBasis;
   const returnModel = snapshotModel(model());
+  const returnProjectionKey = projectionTopologyKey(returnModel);
 
   // Context remains transient unless the user explicitly accepts its Cursor.
   // Stop the physical observation without restoring its anchor, then settle
   // the heard movement through the continuous projection. Context acceptance
   // moves the active endpoint through the existing spatial relation; it must
   // not replace that relation with a tiny direct-Go frame around the Cursor.
-  settleTransport({ restoreObservation: false });
+  settleTransport({ restoreObservation: false, render: false });
   clearProgrammaticPlacement();
   const result = completePlayback(state.session, {
     current: destination,
@@ -961,6 +1353,9 @@ function acceptContextCursor() {
   if (result.changed) {
     state.session = result.session;
     stepField?.translateToCurrent(currentResolution().C, { preserve: true });
+    if (returnProjectionKey !== projectionTopologyKey(model())) {
+      view.renderGuide();
+    }
     setStatus(
       `Set Current from Context to ${formatTime(currentResolution().C)}.`
     );
@@ -978,7 +1373,7 @@ function toggleNativePlayback() {
     acceptContextCursor();
     return;
   }
-  if (transportIs(TRANSPORT_KIND.LOOP) || transportIs(TRANSPORT_KIND.PLAYBACK)) {
+  if (transportIs(TRANSPORT_KIND.PLAYBACK)) {
     requestCenterPause();
     return;
   }
@@ -994,64 +1389,23 @@ function toggleNativePlayback() {
   }
 }
 
-function stopActiveLoop() {
-  if (!transportIs(TRANSPORT_KIND.LOOP)) return false;
-  settleTransport();
-  setStatus("Loop stopped.");
-  return true;
+function rangeLoops() {
+  return isProperRange(activeRange(), model().duration);
 }
 
-function wrapLoopTransport(transport = state.transport) {
-  if (transport?.kind !== TRANSPORT_KIND.LOOP) return false;
-  transport.enteredWindow = false;
-  transport.cycles += 1;
-  transport.startedAt = Date.now();
-  placePlayer(transport.start);
+function wrapPlaybackRange(transport = state.transport) {
+  if (
+    transport?.kind !== TRANSPORT_KIND.PLAYBACK
+    || !rangeLoops()
+  ) return false;
+  const range = activeRange();
+  state.transport = rebasePlaybackTransport(transport);
+  placePlayer(range.start);
   player.setRate(1);
-  stepField?.resumeAt?.({ center: transport.start, reason: "loop-wrap" });
+  stepField?.resumeAt?.({ center: range.start, reason: "range-wrap" });
   player.play();
+  view.renderTransport();
   return true;
-}
-
-function beginLoopExtent(extent, source = "interval", label = "Interval") {
-  if (!extent || !(extent.end - extent.start > EPSILON)) {
-    setStatus(`Establish a ${label} before starting Loop.`);
-    return false;
-  }
-
-  state.transport = createLoopTransport({
-    anchor: currentResolution().C,
-    start: extent.start,
-    end: extent.end,
-    source
-  });
-  player.setRate(1);
-  placePlayer(extent.start);
-  if (Math.abs(safeCurrentTime() - extent.start) <= 0.25) state.transport.enteredWindow = true;
-  stepField?.playFromGesture?.({ center: extent.start, reason: "loop" });
-  player.play();
-  setStatus(`Looping ${label} ${formatRange(extent)}.`);
-  view.render();
-  return true;
-}
-
-function startLoopExtent(extent, source = "interval", label = "Interval") {
-  if (stopActiveLoop()) return;
-  if (!extent || !(extent.end - extent.start > EPSILON)) {
-    setStatus(`Establish a ${label} before starting Loop.`);
-    return;
-  }
-  settleBeforeAction({ handoffTransport: true });
-  beginLoopExtent(extent, source, label);
-}
-
-function startLoop() {
-  if (stopActiveLoop()) return;
-  // Playback continuously projects the active endpoint. Settle that projection
-  // before reading the Working Section so Loop always uses the bounds the user
-  // can currently see, never the stale pre-playback extent.
-  settleBeforeAction({ handoffTransport: true });
-  beginLoopExtent(currentInterval(), "interval", "Interval");
 }
 
 function heldFieldSpan() {
@@ -1088,11 +1442,11 @@ function focusSection(sectionId) {
   if (!section) return;
   const result = focusSessionSection(state.session, sectionId);
   if (!result.changed) {
-    setStatus(`“${section.label}” is already the active Range.`);
+    setStatus(`“${sectionName(section)}” is already the active Range.`);
     return;
   }
   acceptRangeTransition(result, {
-    status: `Focused “${section.label}” as Range.`,
+    status: `Focused “${sectionName(section)}” as Range.`,
     closeGuide: true
   });
 }
@@ -1123,6 +1477,108 @@ function leaveSection() {
   });
 }
 
+function setSectionFolded(sectionId, collapsed) {
+  const section = resolveSection(guide(), sectionId);
+  if (!section) return false;
+  const name = sectionName(section);
+  settleBeforeAction();
+  const result = setGuideSectionCollapsed(
+    state.session,
+    sectionId,
+    collapsed
+  );
+  if (!result.changed) {
+    setStatus(
+      `“${name}” is already ${collapsed ? "transposed" : "unfolded"}.`
+    );
+    return false;
+  }
+  state.selectedRetained = { kind: "section", id: sectionId };
+  view.invalidateTimelinePins();
+  const nextProjection = projectionForModel(result.session.model);
+  const activeFold = nextProjection.folds.find(fold =>
+    fold.sectionIds.includes(sectionId)
+  );
+  const remainingCoverage = nextProjection.folds.filter(fold =>
+    fold.start < section.end - EPSILON
+    && fold.end > section.start + EPSILON
+    && !fold.sectionIds.includes(sectionId)
+  );
+  accept(result, {
+    effect: false,
+    renderGuide: true,
+    status: collapsed
+      ? activeFold
+        ? `Transposed “${name}” into a zero-width Fold with ordered endpoint Pins. Playback remains source-contiguous.`
+        : `Stored “${name}” as transposed; the active Focus or a hard Range cut currently materializes it.`
+      : remainingCoverage.length
+        ? `Unfolded “${name}”; ${remainingCoverage.length} overlapping transposed Section${remainingCoverage.length === 1 ? "" : "s"} still cover part of its span.`
+        : `Unfolded “${name}” back into lateral source time.`
+  });
+  return true;
+}
+
+function toggleSectionFold(sectionId) {
+  const section = resolveSection(guide(), sectionId);
+  if (!section) return false;
+  return setSectionFolded(sectionId, !section.collapsed);
+}
+
+function selectedPinExtent() {
+  const pins = state.selectedPinIds
+    .map(id => getPin(guide(), id))
+    .filter(Boolean)
+    .sort((first, second) => first.t - second.t);
+  if (pins.length !== 2 || Math.abs(pins[1].t - pins[0].t) <= EPSILON) {
+    return null;
+  }
+  return {
+    start: pins[0].t,
+    end: pins[1].t,
+    startPinId: pins[0].id,
+    endPinId: pins[1].id
+  };
+}
+
+function togglePinPairSelection(pinId) {
+  if (!getPin(guide(), pinId)) return false;
+  const selected = new Set(state.selectedPinIds);
+  const removing = selected.has(pinId);
+  if (removing) selected.delete(pinId);
+  else {
+    if (selected.size >= 2) selected.clear();
+    selected.add(pinId);
+  }
+  state.selectedPinIds = [...selected];
+  if (removing) {
+    const remaining = state.selectedPinIds.at(-1);
+    if (remaining) {
+      state.selectedRetained = { kind: "pin", id: remaining };
+    } else if (
+      state.selectedRetained?.kind === "pin"
+      && state.selectedRetained.id === pinId
+    ) {
+      state.selectedRetained = null;
+    }
+  } else {
+    state.selectedRetained = { kind: "pin", id: pinId };
+  }
+  if (state.selectedPinIds.length === 2 && elements["section-source"]) {
+    elements["section-source"].value = "selected-pins";
+  }
+  view.renderGuide();
+  view.render();
+  const extent = selectedPinExtent();
+  setStatus(
+    extent
+      ? `Selected two Pins ${formatRange(extent)}. Name and save them as a Section.`
+      : state.selectedPinIds.length
+        ? "Selected one Pin. Shift-click another Pin to form a Section."
+        : "Cleared Pin selection."
+  );
+  return true;
+}
+
 function pinCurrent(event = null) {
   event?.preventDefault?.();
   const label = elements["pin-label"]?.value?.trim?.() || "";
@@ -1134,6 +1590,7 @@ function pinCurrent(event = null) {
     return;
   }
   const { pin } = result.value;
+  state.selectedRetained = { kind: "pin", id: pin.id };
   accept(result, {
     renderGuide: true,
     status: `Pinned Current at ${formatTime(pin.t)}.`
@@ -1146,7 +1603,11 @@ function selectedSectionExtent() {
   const kind = elements["section-source"]?.value || "interval";
   return {
     kind,
-    extent: kind === "field-span" ? heldFieldSpan() : currentInterval()
+    extent: kind === "field-span"
+      ? heldFieldSpan()
+      : kind === "selected-pins"
+        ? selectedPinExtent()
+        : currentInterval()
   };
 }
 
@@ -1155,21 +1616,35 @@ function saveCurrentIntervalAsSection(event = null) {
   const label = elements["section-label"].value.trim();
   const { kind, extent } = selectedSectionExtent();
   if (!extent) return setStatus("Establish the selected Extent before saving a Section.", true);
-  if (!label) return setStatus("A Section requires a title.", true);
   settleBeforeAction();
   const result = kind === "interval"
     ? saveIntervalAsSection(state.session, label)
-    : saveExtentAsSection(state.session, extent, label, "field-span");
+    : saveExtentAsSection(
+      state.session,
+      extent,
+      label,
+      kind === "selected-pins" ? "selected-pins" : "field-span"
+    );
   if (!result.changed) {
     setStatus(
       result.reason === "duplicate-section"
-        ? `Section “${label}” already exists for this Extent.`
+        ? `${label ? `Section “${label}”` : "An untitled Section"} already exists for this Extent.`
         : "The Section could not be saved.",
       result.reason !== "duplicate-section"
     );
     return;
   }
-  accept(result, { renderGuide: true, status: `Saved Section “${label}”.` });
+  if (kind === "selected-pins") state.selectedPinIds = [];
+  state.selectedRetained = {
+    kind: "section",
+    id: result.value.section.id
+  };
+  accept(result, {
+    renderGuide: true,
+    status: label
+      ? `Saved Section “${label}”.`
+      : `Saved untitled Section ${formatRange(extent)}.`
+  });
   elements["section-label"].value = "";
   selectGuideTab("sections");
 }
@@ -1230,15 +1705,14 @@ function deletePinById(pinId) {
   const pin = getPin(guide(), pinId);
   if (!pin) return;
   const references = sectionsForPin(guide(), pinId).length;
-  if (references) {
-    setStatus(`This Pin is used by ${references} Section${references === 1 ? "" : "s"}. Delete those Sections first.`, true);
-    return;
-  }
   openGuideDialog({
     action: "delete-pin",
     id: pinId,
+    cascade: references > 0,
     title: "Delete Pin",
-    message: `Delete “${pin.label || formatTime(pin.t)}”? This can be restored only with Undo.`,
+    message: references
+      ? `Delete “${pin.label || formatTime(pin.t)}” and dissolve the ${references} Section${references === 1 ? "" : "s"} that reference it? This is one Undoable action.`
+      : `Delete “${pin.label || formatTime(pin.t)}”? This can be restored with Undo.`,
     showInput: false,
     confirmLabel: "Delete",
     danger: true
@@ -1270,7 +1744,7 @@ function overwriteSectionById(sectionId) {
     action: "overwrite-section",
     id: sectionId,
     title: "Overwrite Section",
-    message: `Replace “${section.label}” ${formatRange(section)} with Working Section ${formatRange(working)}?`,
+    message: `Replace “${sectionName(section)}” ${formatRange(section)} with Working Section ${formatRange(working)}?`,
     showInput: false,
     confirmLabel: "Overwrite"
   });
@@ -1283,7 +1757,7 @@ function deleteSectionById(sectionId) {
     action: "delete-section",
     id: sectionId,
     title: "Delete Section",
-    message: `Delete “${section.label}”? Unshared endpoint Pins will also be removed.`,
+    message: `Delete “${sectionName(section)}”? Unshared endpoint Pins will also be removed.`,
     showInput: false,
     confirmLabel: "Delete",
     danger: true
@@ -1329,24 +1803,26 @@ function submitGuideDialog(event) {
     result = renameGuidePin(state.session, action.id, value);
     status = result.changed ? "Renamed Pin." : "Pin title is unchanged.";
   } else if (action.action === "delete-pin") {
-    result = deleteGuidePin(state.session, action.id);
-    status = result.changed ? "Deleted Pin." : "Pin could not be deleted.";
+    result = deleteGuidePin(state.session, action.id, {
+      cascade: action.cascade === true
+    });
+    const dissolved = result.value?.dissolvedSectionIds?.length || 0;
+    status = result.changed
+      ? dissolved
+        ? `Deleted Pin and dissolved ${dissolved} Section${dissolved === 1 ? "" : "s"}.`
+        : "Deleted Pin."
+      : "Pin could not be deleted.";
   } else if (action.action === "rename-section") {
-    if (!value) {
-      setStatus("A Section requires a title.", true);
-      elements["guide-dialog-input"].focus?.();
-      return;
-    }
     result = renameGuideSection(state.session, action.id, value);
     status = result.changed
-      ? "Renamed Section."
+      ? value ? "Renamed Section." : "Removed the Section title."
       : result.reason === "duplicate-section"
         ? "A Section with this title and Extent already exists."
         : "Section title is unchanged.";
   } else if (action.action === "overwrite-section") {
     result = overwriteGuideSection(state.session, action.id);
     status = result.changed
-      ? `Overwrote “${result.value.label}” with Working Section ${formatRange(result.value)}.`
+      ? `Overwrote “${sectionName(result.value)}” with Working Section ${formatRange(result.value)}.`
       : result.reason === "duplicate-section"
         ? "That overwrite would duplicate an existing Section."
         : result.reason === "unchanged-section"
@@ -1363,40 +1839,107 @@ function submitGuideDialog(event) {
   restoreGuideMutationFocus(action);
 }
 
-function goToPin(pin, operator = "pin") {
+function goToPin(pin, operator = "pin", options = {}) {
   if (!pin) return;
+  const activeFold = temporalProjection().foldAtSource(pin.t);
+  const endpointVisible = activeFold?.boundaryPinIds?.includes(pin.id);
+  const carry = options.carryRetained === true || state.carryModifier;
+  const hasCarrySelection = carry && Boolean(state.selectedRetained);
+  if (!carry) state.selectedRetained = { kind: "pin", id: pin.id };
   moveToAddress(pin.t, {
     operator,
     label: operator === "pin" ? "Go to Pin" : operator,
-    status: destination => `Current is at Pin ${formatTime(destination)}.`
+    transaction: sourceSession => goToSessionGuidePin(sourceSession, pin.id, {
+      operator,
+      label: operator === "pin" ? "Go to Pin" : operator
+    }),
+    status: (destination, result) => activeFold
+      ? endpointVisible
+        ? `Current is at stacked endpoint Pin ${formatTime(destination)}.`
+        : `Unfolded ${result.unfoldedSectionIds?.length || activeFold.sectionIds.length} covering Section${(result.unfoldedSectionIds?.length || activeFold.sectionIds.length) === 1 ? "" : "s"} and moved to Pin ${formatTime(destination)}.`
+      : `Current is at Pin ${formatTime(destination)}.`,
+    renderGuide: true,
+    carryRetained: carry
   });
+  if (!hasCarrySelection && carry) {
+    state.selectedRetained = { kind: "pin", id: pin.id };
+    view.renderGuide();
+    view.render();
+  }
   closeCompactGuideAfterSelection();
 }
 
-function goToAdjacentPin(direction) {
+function goToAdjacentPin(direction, options = {}) {
+  const projection = temporalProjection();
   const pin = direction === "backward"
-    ? previousPin(guide(), currentResolution().C, activeRange())
-    : nextPin(guide(), currentResolution().C, activeRange());
+    ? previousPin(guide(), currentResolution().C, activeRange(), projection)
+    : nextPin(guide(), currentResolution().C, activeRange(), projection);
   if (!pin) {
     setStatus(`There is no Pin ${direction} within the active Range.`);
-    return;
+    return false;
   }
-  moveToAddress(pin.t, {
-    mode: "linear",
-    operator: direction === "backward" ? "previousPin" : "nextPin",
-    label: direction === "backward" ? "Pin Backward" : "Pin Forward",
-    status: destination => `Moved ${direction} to Pin at ${formatTime(destination)}.`
+  const destinationSelection = pin.stopKind === "section"
+    ? { kind: "section", id: pin.sectionId }
+    : { kind: "pin", id: pin.id };
+  const carry = options.carryRetained === true || state.carryModifier;
+  const hasCarrySelection = carry && Boolean(state.selectedRetained);
+  if (!carry) state.selectedRetained = destinationSelection;
+  settleBeforeAction({ replacingContext: true });
+  const originModel = snapshotModel(model(), { cloneGuide: carry });
+  let result = stepToPinSession(state.session, pin.t, direction);
+  if (!result.changed) {
+    setStatus(`Current is already at that Pin.`);
+    return false;
+  }
+  result = carryRetainedThrough(
+    result,
+    originModel,
+    carry,
+    hasCarrySelection ? state.selectedRetained : null
+  );
+  const accepted = accept(result, {
+    renderGuide: true,
+    status: pin.fold
+      ? `Pin ${direction === "backward" ? "Backward" : "Forward"} to stacked endpoint ${formatTime(pin.t)}; the Fold remains zero-width laterally.${retainedCarryStatus(result)}`
+      : `Pin ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(pin.t)}.${retainedCarryStatus(result)}`
   });
+  if (!hasCarrySelection && carry) {
+    state.selectedRetained = destinationSelection;
+    view.renderGuide();
+    view.render();
+  }
+  return accepted;
 }
 
-function goToSectionMidpoint(sectionId) {
+function goToSectionMidpoint(sectionId, options = {}) {
   const section = resolveSection(guide(), sectionId);
   if (!section) return;
+  const activeFold = temporalProjection().foldAtSource(section.midpoint);
+  const carry = options.carryRetained === true || state.carryModifier;
+  const hasCarrySelection = carry && Boolean(state.selectedRetained);
+  if (!carry) state.selectedRetained = { kind: "section", id: sectionId };
   moveToAddress(section.midpoint, {
     operator: "section",
-    label: `Go to Section “${section.label}”`,
-    status: destination => `Current is at the midpoint of “${section.label}” (${formatTime(destination)}).`
+    label: `Go to Section “${sectionName(section)}”`,
+    transaction: sourceSession => goToSessionGuideSection(
+      sourceSession,
+      sectionId,
+      {
+        operator: "section",
+        label: `Go to Section “${sectionName(section)}”`
+      }
+    ),
+    renderGuide: true,
+    carryRetained: carry,
+    status: (destination, result) => activeFold
+      ? `Unfolded ${result.unfoldedSectionIds?.length || activeFold.sectionIds.length} covering Section${(result.unfoldedSectionIds?.length || activeFold.sectionIds.length) === 1 ? "" : "s"} and moved to the midpoint of “${sectionName(section)}” (${formatTime(destination)}).`
+      : `Current is at the midpoint of “${sectionName(section)}” (${formatTime(destination)}).`
   });
+  if (!hasCarrySelection && carry) {
+    state.selectedRetained = { kind: "section", id: sectionId };
+    view.renderGuide();
+    view.render();
+  }
   closeCompactGuideAfterSelection();
 }
 
@@ -1441,6 +1984,12 @@ function initializeVideo() {
   centerPauseRequest = null;
   state.transport = idleTransport();
   state.pendingStep = null;
+  state.dragHandle = null;
+  state.rangeDragOrigin = null;
+  state.rangeDragProjection = null;
+  state.selectedRetained = null;
+  state.selectedPinIds = [];
+  state.guideDrag = null;
   state.field = null;
   state.availableRates = snapshot.availableRates;
   state.playerState = snapshot.state;
@@ -1471,6 +2020,12 @@ function cuePendingVideo() {
   state.transport = idleTransport();
   state.videoLoaded = false;
   state.videoId = null;
+  state.dragHandle = null;
+  state.rangeDragOrigin = null;
+  state.rangeDragProjection = null;
+  state.selectedRetained = null;
+  state.selectedPinIds = [];
+  state.guideDrag = null;
   stepField?.resetSources?.();
   state.session = createSession({ stepReach: preferences.stepReach });
   view.setPreviewAction(null);
@@ -1540,12 +2095,8 @@ function handlePlayerStateChange(name, _rawState, metadata = {}) {
     return;
   }
 
-  if (name === YOUTUBE_STATE.ENDED && transportIs(TRANSPORT_KIND.LOOP)) {
-    wrapLoopTransport();
-    return;
-  }
-
   if (name === YOUTUBE_STATE.ENDED && transportIs(TRANSPORT_KIND.PLAYBACK)) {
+    if (wrapPlaybackRange()) return;
     settleTransport({ issuePause: false });
     setStatus("Playback reached Range End.");
     return;
@@ -1615,13 +2166,6 @@ function pollPlayer() {
       settleTransport();
       return;
     }
-  } else if (transport.kind === TRANSPORT_KIND.LOOP) {
-    const inside = now >= transport.start - EPSILON && now < transport.end - EPSILON;
-    if (inside) {
-      transport.enteredWindow = true;
-    } else if (transport.enteredWindow || Date.now() - transport.startedAt > TRANSPORT_START_GRACE_MS) {
-      wrapLoopTransport(transport);
-    }
   } else if (transport.kind === TRANSPORT_KIND.PLAYBACK && state.playerState === YOUTUBE_STATE.PLAYING) {
     if (!transport.enteredPath) {
       const entered = now >= transport.departure - NATIVE_POSITION_TOLERANCE_SECONDS
@@ -1640,6 +2184,7 @@ function pollPlayer() {
     if (now < activeRange().start - EPSILON) {
       placePlayer(activeRange().start);
     } else if (now >= activeRange().end - EPSILON) {
+      if (wrapPlaybackRange(transport)) return;
       settleTransport();
       setStatus("Playback reached Range End.");
       return;
@@ -1655,17 +2200,271 @@ function pollPlayer() {
     clearNativeGo();
   }
 
-  // Transport owns discontinuities such as Loop wrap. Resolve those first so
+  // Transport owns discontinuities such as Range wrap. Resolve those first so
   // the Field observes the rebased Center once instead of reacting to the
   // out-of-window frame and then being placed again by the wrap.
   stepField?.tick();
   view.renderTransport();
 }
 
-function timeFromPointer(event) {
+function timeFromPointer(
+  event,
+  projection = temporalProjection(),
+  constrainToRange = false
+) {
   const rect = elements.timeline.getBoundingClientRect();
   if (!Number.isFinite(rect.width) || rect.width <= 0) return currentResolution().C;
-  return clamp((event.clientX - rect.left) / rect.width, 0, 1) * model().duration;
+  const traversal = clamp(
+    (event.clientX - rect.left) / rect.width,
+    0,
+    1
+  ) * projection.effectiveDuration;
+  const direction = traversal < projection.sourceToTraversal(currentResolution().C)
+    ? "backward"
+    : "forward";
+  const source = projection.traversalToSource(traversal, direction);
+  if (!constrainToRange) return source;
+  const range = activeRange();
+  const projectedStart = projection.sourceToTraversal(range.start);
+  const projectedEnd = projection.sourceToTraversal(range.end);
+  if (
+    traversal < Math.min(projectedStart, projectedEnd) - EPSILON
+    || traversal > Math.max(projectedStart, projectedEnd) + EPSILON
+  ) {
+    return source;
+  }
+  // A collapsed point has two source faces. Once the visible coordinate is
+  // inside Range, clamp only that inverse ambiguity so direct traversal cannot
+  // escape through the Fold's excluded face.
+  return clamp(source, range.start, range.end);
+}
+
+function sourceFromPointerInProjection(
+  event,
+  coordinateProjection,
+  originSource,
+  inverseProjection = coordinateProjection
+) {
+  const rect = elements.timeline.getBoundingClientRect();
+  if (!Number.isFinite(rect.width) || rect.width <= 0) return originSource;
+  const traversal = clamp(
+    (event.clientX - rect.left) / rect.width,
+    0,
+    1
+  ) * coordinateProjection.effectiveDuration;
+  const direction = traversal < coordinateProjection.sourceToTraversal(originSource)
+    ? "backward"
+    : "forward";
+  return inverseProjection.traversalToSource(traversal, direction);
+}
+
+function beginGuideDrag(kind, id, event, options = {}) {
+  if (
+    !state.videoLoaded
+    || state.dragHandle
+    || state.guideDrag
+    || (Number.isFinite(event.button) && event.button !== 0)
+  ) return;
+  const pin = kind === "pin" ? getPin(guide(), id) : null;
+  const section = kind === "section" ? resolveSection(guide(), id) : null;
+  if (!pin && !section) return;
+  if (
+    pin
+    && projectionForModel(model()).foldAtSource(pin.t)
+    && options.axis !== "vertical"
+  ) {
+    // Pins inside a Fold are not lateral drag operands. Visible Fold endpoints
+    // opt into the perpendicular drag axis; hidden interior Pins require an
+    // explicit Guide Go, Focus, or Unfold first.
+    return;
+  }
+  state.guideDrag = {
+    kind,
+    id,
+    pointerId: event.pointerId,
+    originClientX: event.clientX,
+    originClientY: event.clientY,
+    axis: options.axis || "horizontal",
+    foldStart: options.foldStart,
+    foldEnd: options.foldEnd,
+    foldRect: options.foldElement?.getBoundingClientRect?.() || null,
+    originSource: pin?.t ?? section.start,
+    originSection: section
+      ? { start: section.start, end: section.end }
+      : null,
+    originModel: null,
+    originHistory: null,
+    projection: projectionForModel(model()),
+    inverseProjection: null,
+    moved: false,
+    changed: false,
+    blockedReason: null,
+    rangeChanged: false
+  };
+  try {
+    elements.timeline.setPointerCapture?.(event.pointerId);
+  } catch {
+    // Document-level release listeners retain the drag lifecycle when pointer
+    // capture is unavailable for this pointer.
+  }
+}
+
+function updateGuideDrag(event) {
+  const drag = state.guideDrag;
+  if (!drag || event.pointerId !== drag.pointerId) return;
+  const distance = drag.axis === "vertical"
+    ? Math.abs(event.clientY - drag.originClientY)
+    : Math.abs(event.clientX - drag.originClientX);
+  if (!drag.moved && distance < 4) return;
+  if (!drag.moved) {
+    // Keep the pointer-down semantic projection authoritative while transport
+    // settles so drag geometry cannot shift beneath the pointer.
+    drag.moved = true;
+    settleBeforeAction();
+    const pin = drag.kind === "pin" ? getPin(guide(), drag.id) : null;
+    const section = drag.kind === "section"
+      ? resolveSection(guide(), drag.id)
+      : null;
+    if (!pin && !section) {
+      drag.blockedReason = "missing-retained-object";
+      return;
+    }
+    drag.originSource = pin?.t ?? section.start;
+    drag.originSection = section
+      ? { start: section.start, end: section.end }
+      : null;
+    drag.originModel = snapshotModel(model(), { cloneGuide: true });
+    drag.originHistory = state.session.history;
+    drag.projection = projectionForModel(drag.originModel);
+    drag.inverseProjection = section
+      ? projectionForModel(drag.originModel, {
+          expandedSectionIds: [section.id]
+        })
+      : drag.projection;
+  }
+  event.preventDefault?.();
+  event.stopPropagation?.();
+
+  let source;
+  if (
+    drag.axis === "vertical"
+    && drag.foldRect
+    && Number.isFinite(drag.foldStart)
+    && Number.isFinite(drag.foldEnd)
+  ) {
+    const rect = drag.foldRect;
+    const secondsPerPixel = rect.height > 0
+      ? (drag.foldEnd - drag.foldStart) / rect.height
+      : 0;
+    source = drag.originSource
+      - (event.clientY - drag.originClientY) * secondsPerPixel;
+  } else {
+    source = sourceFromPointerInProjection(
+      event,
+      drag.projection,
+      drag.originSource,
+      drag.inverseProjection
+    );
+  }
+  const baseSession = {
+    model: drag.originModel,
+    history: drag.originHistory
+  };
+  const result = drag.kind === "pin"
+    ? moveGuidePin(baseSession, drag.id, source, { amend: true })
+    : moveGuideSection(
+        baseSession,
+        drag.id,
+        source - drag.originSection.start,
+        { amend: true }
+      );
+  if (result.changed) {
+    state.session = result.session;
+    drag.changed = true;
+    drag.blockedReason = null;
+    drag.rangeChanged = Boolean(result.rangeChanged);
+  } else if (["unchanged-pin", "unchanged-section"].includes(result.reason)) {
+    state.session = baseSession;
+    drag.changed = false;
+    drag.blockedReason = null;
+    drag.rangeChanged = false;
+  } else {
+    drag.blockedReason = result.reason || "unavailable";
+  }
+  state.selectedRetained = { kind: drag.kind, id: drag.id };
+  view.invalidateTimelinePins();
+  view.renderGuide();
+  view.render();
+}
+
+function finishGuideDrag(event, options = {}) {
+  const drag = state.guideDrag;
+  if (!drag || (event?.pointerId !== undefined && event.pointerId !== drag.pointerId)) {
+    return false;
+  }
+  state.guideDrag = null;
+  try {
+    if (
+      !elements.timeline.hasPointerCapture
+      || elements.timeline.hasPointerCapture(drag.pointerId)
+    ) {
+      elements.timeline.releasePointerCapture?.(drag.pointerId);
+    }
+  } catch {
+    // The document-level release remains authoritative if capture was lost.
+  }
+  if (!drag.moved || options.cancel === true) {
+    if (options.cancel === true && drag.moved) {
+      state.session = {
+        model: drag.originModel,
+        history: drag.originHistory
+      };
+      view.invalidateTimelinePins();
+      view.renderGuide();
+      view.render();
+    }
+    return false;
+  }
+
+  state.guideClickSuppressed = true;
+  window.setTimeout(() => {
+    state.guideClickSuppressed = false;
+  }, 0);
+  if (!drag.changed) {
+    setStatus(
+      drag.blockedReason === "invalid-guide-topology"
+        ? "That move would collapse or reverse one of the linked Sections."
+        : "The retained object stayed at its original Address."
+    );
+    view.render();
+    return false;
+  }
+
+  const label = drag.kind === "pin" ? "Move Pin" : "Move Section";
+  const committed = checkpoint(state.session, label, drag.originModel);
+  state.session = committed.session;
+  const guidePersisted = persistGuide();
+  if (drag.rangeChanged) {
+    locateAddress(currentResolution().C, { resetField: true });
+  } else if (
+    projectionTopologyKey(drag.originModel) !== projectionTopologyKey(model())
+  ) {
+    stepField?.translateToCurrent(currentResolution().C, { preserve: true });
+  }
+  view.invalidateTimelinePins();
+  view.renderGuide();
+  view.render();
+  const value = drag.kind === "pin"
+    ? getPin(guide(), drag.id)
+    : resolveSection(guide(), drag.id);
+  if (guidePersisted) {
+    setStatus(
+      drag.kind === "pin"
+        ? `Moved Pin to ${formatTime(value?.t)}.`
+        : `Moved “${sectionName(value)}” to ${formatRange(value)}.`
+    );
+  }
+  return true;
 }
 
 function handleTimelineClick(event) {
@@ -1676,7 +2475,7 @@ function handleTimelineClick(event) {
     || event.target.closest(".pin-cluster-menu")
   ) return;
   view.closePinClusterMenu();
-  const time = timeFromPointer(event);
+  const time = timeFromPointer(event, temporalProjection(), true);
   if (!contains(activeRange(), time)) {
     setStatus("That Address is outside Range.", true);
     return;
@@ -1684,24 +2483,31 @@ function handleTimelineClick(event) {
   moveToAddress(time, {
     operator: "timeline",
     label: "Timeline Click",
+    carryRetained: event.altKey === true,
     status: destination => `Clicked to ${formatTime(destination)}.`
   });
 }
 
 function beginRangeDrag(kind, event) {
   if (!state.videoLoaded) return;
-  settleBeforeAction();
   event.preventDefault();
   event.stopPropagation();
   state.dragHandle = kind;
+  state.rangeDragProjection = projectionForModel(model());
+  // Range owns the semantic projection visible at pointer-down.
+  settleBeforeAction();
   state.rangeDragOrigin = snapshotModel(model());
+  state.rangeDragProjection = projectionForModel(state.rangeDragOrigin);
   event.currentTarget.setPointerCapture?.(event.pointerId);
 }
 
 function updateRangeDrag(event) {
   if (!state.dragHandle || !state.videoLoaded || !state.rangeDragOrigin) return;
   const origin = state.rangeDragOrigin;
-  const time = timeFromPointer(event);
+  const time = timeFromPointer(
+    event,
+    state.rangeDragProjection || projectionForModel(origin)
+  );
   const start = state.dragHandle === "start"
     ? clamp(time, 0, origin.range.end - MIN_RANGE_SECONDS)
     : origin.range.start;
@@ -1731,6 +2537,7 @@ function finishRangeDrag() {
   );
   state.dragHandle = null;
   state.rangeDragOrigin = null;
+  state.rangeDragProjection = null;
   if (changed) {
     state.session = checkpoint(state.session, "Adjust Range", origin).session;
     locateAddress(currentResolution().C, { resetField: true });
@@ -1747,6 +2554,7 @@ function cancelRangeDrag() {
   const origin = state.rangeDragOrigin;
   state.dragHandle = null;
   state.rangeDragOrigin = null;
+  state.rangeDragProjection = null;
   if (origin) {
     state.session = {
       model: origin,
@@ -1773,7 +2581,14 @@ function adjustRangeHandle(kind, event) {
   let value = kind === "start" ? range.start : range.end;
   if (event.key === "Home") value = kind === "start" ? 0 : range.start + MIN_RANGE_SECONDS;
   else if (event.key === "End") value = kind === "start" ? range.end - MIN_RANGE_SECONDS : model().duration;
-  else value += forward ? amount : -amount;
+  else {
+    value = temporalProjection().sourceStep(
+      value,
+      amount,
+      forward ? "forward" : "backward",
+      { start: 0, end: model().duration }
+    );
+  }
 
   if (kind === "start") {
     value = clamp(value, 0, range.end - MIN_RANGE_SECONDS);
@@ -1809,30 +2624,91 @@ function commitStepReach(nextReach, label, options = {}) {
   }
   state.session = result.session;
   persistPreferences();
-  if (options.translate !== false) {
-    stepField?.translateToCurrent(currentResolution().C, { preserve: true });
-  }
-  setStatus(`${label}: Backward ${result.stepReach.backward}s; Forward ${result.stepReach.forward}s.`);
+  const effective = currentStepReach();
+  setStatus(
+    result.stepReach.mode === STEP_REACH_MODE.ADAPTIVE
+      ? `${label}: 1/${Math.round(1 / result.stepReach.fraction)} of active Range (${effective.forward.toFixed(2)}s lateral).`
+      : `${label}: ${result.stepReach.forward}s.`
+  );
   view.render();
   return true;
 }
 
 function adjustStepPreset(direction) {
-  const current = currentStepReach();
+  const current = configuredStepReach();
+  if (current.mode === STEP_REACH_MODE.ADAPTIVE) {
+    const index = STEP_FRACTIONS.findIndex(value =>
+      Math.abs(value - current.fraction) <= Number.EPSILON
+    );
+    const start = index >= 0 ? index : 1;
+    const nextIndex = clamp(start + direction, 0, STEP_FRACTIONS.length - 1);
+    commitStepReach({
+      ...current,
+      fraction: STEP_FRACTIONS[nextIndex]
+    }, direction < 0 ? "Decrease Adaptive Step" : "Increase Adaptive Step");
+    return;
+  }
+  const amount = presetStep(current.forward, direction);
   commitStepReach({
-    backward: presetStep(current.backward, direction),
-    forward: presetStep(current.forward, direction),
-    linked: current.linked
+    ...current,
+    backward: amount,
+    forward: amount,
+    linked: true
   }, direction < 0 ? "Decrease Step Reach" : "Increase Step Reach");
 }
 
-function changeDirectionalReach(direction, value) {
+function changeStepSeconds(value) {
   const amount = clamp(Number(value), 0.25, 300);
   if (!Number.isFinite(amount)) return;
-  const current = currentStepReach();
+  const current = configuredStepReach();
+  commitStepReach({
+    ...current,
+    backward: amount,
+    forward: amount,
+    linked: true,
+    mode: STEP_REACH_MODE.FIXED
+  }, "Set Step Reach");
+}
+
+function setStepMode(mode) {
+  const current = configuredStepReach();
+  const nextMode = mode === STEP_REACH_MODE.ADAPTIVE
+    ? STEP_REACH_MODE.ADAPTIVE
+    : STEP_REACH_MODE.FIXED;
+  commitStepReach(
+    { ...current, mode: nextMode },
+    nextMode === STEP_REACH_MODE.ADAPTIVE
+      ? "Use Range-relative Step"
+      : "Use Manual Step"
+  );
+}
+
+function setStepFraction(value) {
+  const fraction = Number(value);
+  if (!STEP_FRACTIONS.some(item => Math.abs(item - fraction) <= Number.EPSILON)) return;
+  commitStepReach({
+    ...configuredStepReach(),
+    mode: STEP_REACH_MODE.ADAPTIVE,
+    fraction
+  }, `Set Adaptive Step to 1/${Math.round(1 / fraction)}`);
+}
+
+function changeFieldOffset(direction, value) {
+  const amount = clamp(Number(value), 0.25, 300);
+  if (!Number.isFinite(amount)) return;
   state.lastStepReachEdited = direction;
-  const next = { ...current, [direction]: amount, linked: false };
-  commitStepReach(next, direction === "backward" ? "Set Backward Offset" : "Set Forward Offset");
+  state.fieldOffsets = normalizeStepReach({
+    ...currentFieldOffsets(),
+    [direction]: amount,
+    linked: false,
+    mode: STEP_REACH_MODE.FIXED
+  });
+  persistPreferences();
+  stepField?.translateToCurrent(currentResolution()?.C || 0, {
+    preserve: true
+  });
+  setStatus(`${direction === "backward" ? "Tail" : "Lead"} Field offset set to ${amount}s.`);
+  view.render();
 }
 
 function syncContextControl() {
@@ -1932,6 +2808,7 @@ function stopOrClose() {
   // Escape resolves only the topmost active layer. Repeated presses move outward
   // predictably instead of collapsing unrelated state in one action.
   if (state.dragHandle) return cancelRangeDrag();
+  if (state.guideDrag) return finishGuideDrag(null, { cancel: true });
   if (guideDialogOpen()) return closeGuideDialog();
   if (!elements["pin-cluster-menu"].hidden) {
     view.closePinClusterMenu({ restoreFocus: true });
@@ -1977,11 +2854,14 @@ function initializePlayerApi() {
       videoLoaded: state.videoLoaded,
       videoId: state.videoId,
       current: currentResolution()?.C || 0,
-      range: activeRange(),
-      stepReach: currentStepReach(),
+      range: activeFieldRange(),
+      projection: fieldProjection(),
+      // Step Field offsets are physical observation settings. They are
+      // intentionally independent from the semantic Step Reach.
+      stepReach: currentFieldOffsets(),
       transportKind: state.transport.kind,
       pendingStep: Boolean(state.pendingStep),
-      dragging: Boolean(state.dragHandle),
+      dragging: Boolean(state.dragHandle || state.guideDrag?.moved),
       center: playerSnapshot(),
       playerState: state.playerState
     }),
@@ -2002,15 +2882,17 @@ function initializePlayerApi() {
       persistPreferences();
     },
     onHoldOffsets: patch => {
-      const current = currentStepReach();
-      const next = normalizeStepReach({
+      const current = currentFieldOffsets();
+      state.fieldOffsets = normalizeStepReach({
         backward: Number.isFinite(Number(patch.backward)) ? Number(patch.backward) : current.backward,
         forward: Number.isFinite(Number(patch.forward)) ? Number(patch.forward) : current.forward,
-        linked: false
+        linked: false,
+        mode: STEP_REACH_MODE.FIXED
       }, current);
-      // Holding is a physical Field transition. Recording its measured offset
-      // must not interrupt the Center playback that produced that measurement.
-      commitStepReach(next, "Hold Field Offset", { settle: false, translate: false });
+      // Hold records only the Field relation it measured. Semantic Step Reach
+      // remains untouched, so changing observation never changes navigation.
+      persistPreferences();
+      view.render();
     },
     onChange: fieldState => {
       state.field = fieldState;
@@ -2055,8 +2937,21 @@ elements["youtube-url"].addEventListener("keydown", event => {
 // Timeline and Range
 elements.timeline.addEventListener("click", handleTimelineClick);
 elements.timeline.addEventListener("pointermove", updateRangeDrag);
+elements.timeline.addEventListener("pointermove", updateGuideDrag);
 elements.timeline.addEventListener("pointerup", finishRangeDrag);
+elements.timeline.addEventListener("pointerup", finishGuideDrag);
 elements.timeline.addEventListener("pointercancel", cancelRangeDrag);
+elements.timeline.addEventListener("pointercancel", event => {
+  finishGuideDrag(event, { cancel: true });
+});
+document.addEventListener("pointerup", finishGuideDrag);
+document.addEventListener("pointercancel", event => {
+  finishGuideDrag(event, { cancel: true });
+});
+document.addEventListener("pointermove", event => {
+  if (elements.timeline.contains?.(event.target)) return;
+  updateGuideDrag(event);
+});
 elements["range-start-handle"].addEventListener("pointerdown", event => beginRangeDrag("start", event));
 elements["range-end-handle"].addEventListener("pointerdown", event => beginRangeDrag("end", event));
 elements["range-start-handle"].addEventListener("keydown", event => adjustRangeHandle("start", event));
@@ -2068,10 +2963,22 @@ elements["range-end-handle"].addEventListener("lostpointercapture", event => {
   if (state.dragHandle === "end" && event.buttons === 0) finishRangeDrag();
 });
 elements["pin-lane"].addEventListener("click", event => {
+  if (state.guideClickSuppressed) {
+    event.stopPropagation();
+    return;
+  }
   const pinButton = event.target.closest("[data-pin-go]");
   if (pinButton) {
     event.stopPropagation();
-    goToPin(getPin(guide(), pinButton.dataset.pinGo));
+    if (event.shiftKey) {
+      togglePinPairSelection(pinButton.dataset.pinGo);
+      return;
+    }
+    goToPin(
+      getPin(guide(), pinButton.dataset.pinGo),
+      "pin",
+      { carryRetained: event.altKey === true }
+    );
     return;
   }
   const clusterButton = event.target.closest("[data-cluster-index]");
@@ -2081,12 +2988,127 @@ elements["pin-lane"].addEventListener("click", event => {
     if (cluster) view.openPinClusterMenu(cluster, clusterButton);
   }
 });
+elements["pin-lane"].addEventListener("pointerdown", event => {
+  const pinButton = event.target.closest("[data-pin-go]");
+  if (pinButton) beginGuideDrag("pin", pinButton.dataset.pinGo, event);
+});
+elements["section-lane"].addEventListener("click", event => {
+  if (state.guideClickSuppressed) {
+    event.stopPropagation();
+    return;
+  }
+  const expand = event.target.closest("[data-section-expand]");
+  if (expand) {
+    event.stopPropagation();
+    setSectionFolded(expand.dataset.sectionExpand, false);
+    return;
+  }
+  const collapse = event.target.closest("[data-section-collapse]");
+  if (collapse) {
+    event.stopPropagation();
+    setSectionFolded(collapse.dataset.sectionCollapse, true);
+    return;
+  }
+  const body = event.target.closest("[data-section-drag]");
+  if (body) {
+    event.stopPropagation();
+    state.selectedRetained = {
+      kind: "section",
+      id: body.dataset.sectionDrag
+    };
+    view.renderGuide();
+    view.render();
+    const section = resolveSection(guide(), body.dataset.sectionDrag);
+    setStatus(`Selected ${section?.label || formatRange(section)}.`);
+  }
+});
+elements["section-lane"].addEventListener("pointerdown", event => {
+  const body = event.target.closest("[data-section-drag]");
+  if (body) {
+    beginGuideDrag("section", body.dataset.sectionDrag, event);
+    return;
+  }
+  const sectionPin = event.target.closest("[data-section-expand]");
+  if (sectionPin) {
+    beginGuideDrag("section", sectionPin.dataset.sectionExpand, event);
+  }
+});
+elements["fold-lane"].addEventListener("click", event => {
+  if (state.guideClickSuppressed) {
+    event.stopPropagation();
+    return;
+  }
+  const pin = event.target.closest("[data-pin-go]");
+  if (pin) {
+    event.stopPropagation();
+    if (event.shiftKey) {
+      togglePinPairSelection(pin.dataset.pinGo);
+      return;
+    }
+    goToPin(
+      getPin(guide(), pin.dataset.pinGo),
+      "Fold Endpoint",
+      { carryRetained: event.altKey === true }
+    );
+    return;
+  }
+  const expand = event.target.closest("[data-section-expand]");
+  if (expand) {
+    event.stopPropagation();
+    setSectionFolded(expand.dataset.sectionExpand, false);
+    return;
+  }
+  const contributors = event.target.closest("[data-fold-contributors]");
+  if (contributors) {
+    event.stopPropagation();
+    const ids = contributors.dataset.foldContributors.split(",").filter(Boolean);
+    if (
+      state.selectedRetained?.kind !== "section"
+      || !ids.includes(state.selectedRetained.id)
+    ) state.selectedRetained = null;
+    openGuide("sections");
+    view.renderGuide();
+    view.render();
+    setStatus(`${ids.length} Sections share this Fold. Select the colored rail or Guide row to unfold one.`);
+  }
+});
+elements["fold-lane"].addEventListener("pointerdown", event => {
+  const pin = event.target.closest(".timeline-fold-pin[data-pin-go]");
+  if (pin) {
+    const foldElement = pin.closest(".timeline-fold");
+    beginGuideDrag("pin", pin.dataset.pinGo, event, {
+      axis: "vertical",
+      foldStart: Number(foldElement?.dataset.foldStart),
+      foldEnd: Number(foldElement?.dataset.foldEnd),
+      foldElement
+    });
+    return;
+  }
+  const section = event.target.closest(".timeline-fold-rail[data-section-expand]");
+  if (section) beginGuideDrag("section", section.dataset.sectionExpand, event);
+});
 elements["pin-cluster-menu"].addEventListener("click", event => {
+  if (state.guideClickSuppressed) {
+    event.stopPropagation();
+    return;
+  }
   const button = event.target.closest("[data-pin-go]");
   if (!button) return;
   event.stopPropagation();
+  if (event.shiftKey) {
+    togglePinPairSelection(button.dataset.pinGo);
+    return;
+  }
   view.closePinClusterMenu();
-  goToPin(getPin(guide(), button.dataset.pinGo));
+  goToPin(
+    getPin(guide(), button.dataset.pinGo),
+    "pin",
+    { carryRetained: event.altKey === true }
+  );
+});
+elements["pin-cluster-menu"].addEventListener("pointerdown", event => {
+  const button = event.target.closest("[data-pin-go]");
+  if (button) beginGuideDrag("pin", button.dataset.pinGo, event);
 });
 
 elements["pin-cluster-menu"].addEventListener("keydown", event => {
@@ -2141,11 +3163,15 @@ elements["range-end-here"].addEventListener("click", () => {
     `Set Range End to ${formatTime(currentResolution().C)}.`
   );
 });
-elements["range-midpoint"].addEventListener("click", () => {
-  const middle = midpoint(activeRange().start, activeRange().end);
+elements["range-midpoint"].addEventListener("click", event => {
+  const middle = temporalProjection().sourceMidpoint(
+    activeRange().start,
+    activeRange().end
+  );
   moveToAddress(middle, {
     operator: "rangeMidpoint",
     label: "Go to Range Midpoint",
+    carryRetained: event.altKey === true,
     status: destination => `Moved to Range midpoint at ${formatTime(destination)}.`
   });
 });
@@ -2155,25 +3181,78 @@ elements["full-video-range"].addEventListener("click", () => {
 
 // Navigation and observation
 
-elements["refine-backward"].addEventListener("click", () => refine("backward"));
-elements["refine-forward"].addEventListener("click", () => refine("forward"));
+elements["refine-backward"].addEventListener("click", event => {
+  const additive = event.shiftKey === true || state.shiftLayer;
+  refine("backward", {
+    additive,
+    carryRetained: event.altKey === true
+  });
+  if (state.shiftLayer) {
+    state.shiftLayer = false;
+    view.render();
+  }
+});
+elements["refine-forward"].addEventListener("click", event => {
+  const additive = event.shiftKey === true || state.shiftLayer;
+  refine("forward", {
+    additive,
+    carryRetained: event.altKey === true
+  });
+  if (state.shiftLayer) {
+    state.shiftLayer = false;
+    view.render();
+  }
+});
 elements.reopen.addEventListener("click", reopenFully);
-elements["switch-endpoint"].addEventListener("click", switchCurrentEndpoint);
+elements["switch-endpoint"].addEventListener("click", event => {
+  switchCurrentEndpoint({
+    carryRetained: event.altKey === true
+  });
+});
+elements.release.addEventListener("click", releaseWorkingInterval);
+elements.transpose.addEventListener("click", transposeWorkingOrSelected);
+elements["focus-toggle"].addEventListener("click", focusOrUnfocus);
+elements["shift-layer-toggle"].addEventListener("click", () => {
+  state.shiftLayer = !state.shiftLayer;
+  view.render();
+});
 elements["return-action"].addEventListener("click", undoLastAction);
-elements["pin-backward"].addEventListener("click", () => goToAdjacentPin("backward"));
-elements["pin-forward"].addEventListener("click", () => goToAdjacentPin("forward"));
-elements.loop.addEventListener("click", startLoop);
 elements["center-transport-surface"].addEventListener("click", toggleNativePlayback);
 
 const tapStep = selection => {
   if (!selection) return false;
-  return performStep(selection.direction, selection.distance);
+  if (selection.pinTraversal) {
+    const changed = goToAdjacentPin(selection.direction, {
+      carryRetained: selection.carryRetained === true
+    });
+    if (state.shiftLayer) {
+      state.shiftLayer = false;
+      view.render();
+    }
+    return changed;
+  }
+  return performStep(selection.direction, selection.distance, {
+    carryRetained: selection.carryRetained === true
+  });
 };
-const directionalStep = direction => () => ({
-  direction,
-  distance: reachFor(direction)
-});
-const sideStep = role => () => stepField?.getStepSelection?.(role) || null;
+const directionalStep = direction => event => {
+  const pinTraversal = event?.shiftKey === true || state.shiftLayer;
+  return {
+    direction,
+    pinTraversal,
+    distance: reachFor(direction),
+    carryRetained: event?.altKey === true || state.carryModifier
+  };
+};
+const sideStep = role => event => {
+  const selection = stepField?.getStepSelection?.(role) || null;
+  return selection
+    ? {
+        ...selection,
+        carryRetained: event?.altKey === true || state.carryModifier
+      }
+    : null;
+};
 
 for (const binding of [
   [elements["step-backward"], "matrix:backward", directionalStep("backward"), true],
@@ -2220,11 +3299,25 @@ for (const control of document.querySelectorAll("[data-preview-action]")) {
 
 // Step Field geometry
 elements["step-backward-seconds"].addEventListener("change", event => {
-  changeDirectionalReach("backward", event.target.value);
+  changeFieldOffset("backward", event.target.value);
 });
 elements["step-forward-seconds"].addEventListener("change", event => {
-  changeDirectionalReach("forward", event.target.value);
+  changeFieldOffset("forward", event.target.value);
 });
+elements["step-size-seconds"].addEventListener("change", event => {
+  changeStepSeconds(event.target.value);
+});
+elements["step-mode-fixed"].addEventListener("click", () => {
+  setStepMode(STEP_REACH_MODE.FIXED);
+});
+elements["step-mode-adaptive"].addEventListener("click", () => {
+  setStepMode(STEP_REACH_MODE.ADAPTIVE);
+});
+for (const control of document.querySelectorAll("[data-step-fraction]")) {
+  control.addEventListener("click", () => {
+    setStepFraction(control.dataset.stepFraction);
+  });
+}
 
 // Guide creation and Range affordances
 elements["section-capture"].addEventListener("submit", saveCurrentIntervalAsSection);
@@ -2294,17 +3387,28 @@ function trapCompactGuideFocus(event) {
 
 function handleGuideClick(event) {
   const pinGo = event.target.closest("[data-pin-go]");
-  if (pinGo) return goToPin(getPin(guide(), pinGo.dataset.pinGo));
+  if (pinGo) {
+    return goToPin(
+      getPin(guide(), pinGo.dataset.pinGo),
+      "pin",
+      { carryRetained: event.altKey === true }
+    );
+  }
+  const selectPin = event.target.closest("[data-select-pin]");
+  if (selectPin) return togglePinPairSelection(selectPin.dataset.selectPin);
   const sectionGo = event.target.closest("[data-section-go]");
-  if (sectionGo) return goToSectionMidpoint(sectionGo.dataset.sectionGo);
-  const loopSection = event.target.closest("[data-loop-section]");
-  if (loopSection) {
-    const section = resolveSection(guide(), loopSection.dataset.loopSection);
-    if (section) startLoopExtent(section, `section:${section.id}`, `Section “${section.label}”`);
-    return;
+  if (sectionGo) {
+    return goToSectionMidpoint(
+      sectionGo.dataset.sectionGo,
+      { carryRetained: event.altKey === true }
+    );
   }
   const focus = event.target.closest("[data-focus-section]");
   if (focus) return focusSection(focus.dataset.focusSection);
+  const collapse = event.target.closest("[data-collapse-section]");
+  if (collapse) return setSectionFolded(collapse.dataset.collapseSection, true);
+  const expand = event.target.closest("[data-expand-section]");
+  if (expand) return setSectionFolded(expand.dataset.expandSection, false);
   const leave = event.target.closest("[data-leave-section]");
   if (leave) return leaveSection();
   const renamePinButton = event.target.closest("[data-rename-pin]");
@@ -2352,6 +3456,13 @@ elements["sections-list"].addEventListener("focusout", event => {
 // before a previously focused traversal button can consume it as native button
 // activation. Text editing and modal Guide work retain ordinary keyboard rules.
 document.addEventListener("keydown", event => {
+  if (event.key === "Alt") {
+    state.carryModifier = true;
+  }
+  if (event.key === "Shift" && !state.shiftKeyHeld) {
+    state.shiftKeyHeld = true;
+    view.render();
+  }
   const activeElement = document.activeElement;
   const editing = ["INPUT", "SELECT", "TEXTAREA"].includes(activeElement?.tagName)
     || activeElement?.isContentEditable === true;
@@ -2404,7 +3515,13 @@ document.addEventListener("keydown", event => {
   const key = event.key.toLowerCase();
   const code = event.code || "";
   const plain = !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+  const carryChord = event.altKey
+    && !event.ctrlKey
+    && !event.metaKey
+    && !event.shiftKey;
   const spatialKey = expected => plain && (code === `Key${expected.toUpperCase()}` || key === expected);
+  const carrySpatialKey = expected => carryChord
+    && (code === `Key${expected.toUpperCase()}` || key === expected);
   const commandUndo = (event.ctrlKey || event.metaKey)
     && !event.altKey
     && !event.shiftKey
@@ -2434,17 +3551,63 @@ document.addEventListener("keydown", event => {
   }
   if (!state.videoLoaded) return;
 
-  const repeatableStep = plain
-    && (event.key === "ArrowLeft" || event.key === "ArrowRight");
+  const repeatableStep = (plain || carryChord)
+    && (
+      event.key === "ArrowLeft"
+      || event.key === "ArrowRight"
+      || code === "KeyA"
+      || code === "KeyD"
+    );
   if (event.repeat && !repeatableStep) return;
 
   // Space already activates a focused button or summary natively. Avoid toggling playback twice.
   if (event.key === " " && ["BUTTON", "SUMMARY"].includes(tag)) return;
 
-  if (spatialKey("w")) { event.preventDefault(); reopenFully(); }
-  else if (spatialKey("a")) { event.preventDefault(); refine("backward"); }
-  else if (spatialKey("s")) { event.preventDefault(); switchCurrentEndpoint(); }
-  else if (spatialKey("d")) { event.preventDefault(); refine("forward"); }
+  const shiftedSpatialKey = expected =>
+    event.shiftKey
+    && !event.ctrlKey
+    && !event.metaKey
+    && (code === `Key${expected.toUpperCase()}` || key === expected);
+
+  if (spatialKey("w") || carrySpatialKey("w")) { event.preventDefault(); reopenFully(); }
+  else if (spatialKey("q") || carrySpatialKey("q")) {
+    event.preventDefault();
+    refine("backward", { carryRetained: carryChord });
+  }
+  else if (spatialKey("s") || carrySpatialKey("s")) {
+    event.preventDefault();
+    switchCurrentEndpoint({ carryRetained: carryChord });
+  }
+  else if (spatialKey("e") || carrySpatialKey("e")) {
+    event.preventDefault();
+    refine("forward", { carryRetained: carryChord });
+  }
+  else if (shiftedSpatialKey("q")) {
+    event.preventDefault();
+    refine("backward", {
+      additive: true,
+      carryRetained: event.altKey === true
+    });
+  }
+  else if (shiftedSpatialKey("e")) {
+    event.preventDefault();
+    refine("forward", {
+      additive: true,
+      carryRetained: event.altKey === true
+    });
+  }
+  else if (plain && key === "r") {
+    event.preventDefault();
+    releaseWorkingInterval();
+  }
+  else if (plain && key === "t") {
+    event.preventDefault();
+    transposeWorkingOrSelected();
+  }
+  else if (plain && key === "f") {
+    event.preventDefault();
+    focusOrUnfocus();
+  }
   else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && key === "p") {
     event.preventDefault();
     openGuide("sections");
@@ -2455,16 +3618,37 @@ document.addEventListener("keydown", event => {
     openGuide("pins");
     elements["pin-label"]?.focus?.({ preventScroll: true });
   }
-  else if (plain && key === "l") { event.preventDefault(); startLoop(); }
-  else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && event.key === "ArrowLeft") { event.preventDefault(); goToAdjacentPin("backward"); }
-  else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && event.key === "ArrowRight") { event.preventDefault(); goToAdjacentPin("forward"); }
-  else if (plain && event.key === "ArrowLeft") {
+  else if (shiftedSpatialKey("a") || (
+    event.shiftKey
+    && !event.ctrlKey
+    && !event.metaKey
+    && event.key === "ArrowLeft"
+  )) {
     event.preventDefault();
-    stepGesture.begin("keyboard:ArrowLeft", directionalStep("backward"));
+    goToAdjacentPin("backward", { carryRetained: event.altKey === true });
   }
-  else if (plain && event.key === "ArrowRight") {
+  else if (shiftedSpatialKey("d") || (
+    event.shiftKey
+    && !event.ctrlKey
+    && !event.metaKey
+    && event.key === "ArrowRight"
+  )) {
     event.preventDefault();
-    stepGesture.begin("keyboard:ArrowRight", directionalStep("forward"));
+    goToAdjacentPin("forward", { carryRetained: event.altKey === true });
+  }
+  else if (
+    (plain || carryChord)
+    && (event.key === "ArrowLeft" || code === "KeyA")
+  ) {
+    event.preventDefault();
+    stepGesture.begin(`keyboard:${event.key}`, directionalStep("backward"));
+  }
+  else if (
+    (plain || carryChord)
+    && (event.key === "ArrowRight" || code === "KeyD")
+  ) {
+    event.preventDefault();
+    stepGesture.begin(`keyboard:${event.key}`, directionalStep("forward"));
   }
   else if (plain && event.key === "[") { event.preventDefault(); adjustStepPreset(-1); }
   else if (plain && event.key === "]") { event.preventDefault(); adjustStepPreset(1); }
@@ -2473,7 +3657,21 @@ document.addEventListener("keydown", event => {
 });
 
 document.addEventListener("keyup", event => {
-  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+  if (event.key === "Alt") {
+    state.carryModifier = false;
+    return;
+  }
+  if (event.key === "Shift") {
+    state.shiftKeyHeld = false;
+    view.render();
+    return;
+  }
+  if (
+    event.key !== "ArrowLeft"
+    && event.key !== "ArrowRight"
+    && event.code !== "KeyA"
+    && event.code !== "KeyD"
+  ) return;
   const gestureId = `keyboard:${event.key}`;
   if (!stepGesture.isActive(gestureId)) return;
   event.preventDefault();
@@ -2490,7 +3688,10 @@ document.addEventListener("visibilitychange", () => {
 });
 
 window.addEventListener("blur", () => {
+  state.carryModifier = false;
   stepGesture.cancel({ observe: false });
+  if (state.dragHandle) cancelRangeDrag();
+  if (state.guideDrag) finishGuideDrag(null, { cancel: true });
 });
 
 window.addEventListener("resize", () => {

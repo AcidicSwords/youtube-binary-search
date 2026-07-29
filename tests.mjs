@@ -93,7 +93,7 @@ assert.equal(
     75
   ),
   "replace",
-  "A target beyond the old Loop endpoint must start a new Loop."
+  "A target beyond the old Interval endpoint must start a new Interval."
 );
 assert.equal(
   classifyRefineRelation(
@@ -102,7 +102,7 @@ assert.equal(
     70
   ),
   "shorten",
-  "The Loop-membership rule includes an endpoint landing, which collapses the Loop."
+  "The Interval-membership rule includes an endpoint landing, which collapses the Interval."
 );
 assert.deepEqual(
   getTargets({ L: 0, C: 0.077, R: 1, level: 3 }),
@@ -193,7 +193,7 @@ assert.deepEqual(actionRanges.backward, { start: 60, end: 120 });
 assert.deepEqual(actionRanges.forward, { start: 120, end: 180 });
 assert.deepEqual(actionRanges.stepBackward, { start: 110, end: 120, destination: 110 });
 assert.deepEqual(actionRanges.stepForward, { start: 120, end: 130, destination: 130 });
-assert.deepEqual(actionRanges.loop, { start: 60, end: 120 });
+assert.deepEqual(actionRanges.interval, { start: 60, end: 120 });
 assert.deepEqual(actionRanges.reopen, { start: 0, end: 240, current: 120 });
 
 // Guide: one persistent Address object and linked Sections.
@@ -322,8 +322,8 @@ session = result.session;
 assert.equal(session.model.resolution.C, 50);
 assert.equal(session.model.interval, null);
 
-// Refine has two Loop relations. A midpoint inside the Loop shortens it by
-// retaining the opposite endpoint. A midpoint outside the Loop replaces it
+// Refine has two Interval relations. A midpoint inside the Interval shortens it
+// by retaining the opposite endpoint. A midpoint outside the Interval replaces it
 // with the newly traversed Current-to-midpoint region.
 let membershipBase = createSession({ duration: 100, current: 50 });
 membershipBase = goTo(membershipBase, 70, { operator: "timeline" }).session;
@@ -348,7 +348,7 @@ assert.deepEqual(
     arrival: shortenedRefine.session.model.interval.arrival
   },
   { start: 50, end: 60, departure: 50, arrival: 60 },
-  "A midpoint inside the Loop must retain the opposite endpoint and shorten the Loop."
+  "A midpoint inside the Interval must retain the opposite endpoint and shorten it."
 );
 const transposedReplacement = refine(switchEndpoint(membershipBase).session, "forward");
 assert.equal(transposedReplacement.refineRelation, "replace");
@@ -360,7 +360,7 @@ assert.deepEqual(
     arrival: transposedReplacement.session.model.interval.arrival
   },
   { start: 50, end: 75, departure: 50, arrival: 75 },
-  "A midpoint outside the Loop must replace it with the complete new traversal."
+  "A midpoint outside the Interval must replace it with the complete new traversal."
 );
 
 // Canonical alternating sequence: outside midpoint replaces; inside midpoint
@@ -568,7 +568,7 @@ pushedBackward = step(pushedBackward, "backward", 25).session;
 assert.deepEqual(pushedBackward.model.resolution, { L: 25, C: 50, R: 100, level: 0 });
 assert.deepEqual(getTargets(pushedBackward.model.resolution), { backward: 37.5, forward: 75 });
 
-// Range deformation preserves the Loop Window while rebasing endpoint frames
+// Range deformation preserves the Working Interval while rebasing endpoint frames
 // to the new hard bound.
 let ranged = createSession({ duration: 100, current: 50 });
 ranged = goTo(ranged, 70, { operator: "timeline", label: "Timeline Click" }).session;
@@ -615,7 +615,7 @@ assert.equal(focused.model.focus, null);
 assert.deepEqual(focused.model.range, { start: 0, end: 100 });
 assert.equal(focused.model.resolution.C, 80);
 
-// Unfocus restores only Range and preserves the current Loop Window while
+// Unfocus restores only Range and preserves the current Working Interval while
 // recording the restored active-endpoint frame.
 let focusedAgain = createSession({ duration: 100, current: 20, guide: focusGuide });
 focusedAgain = goTo(focusedAgain, 25, { operator: "timeline", label: "Timeline Click" }).session;
@@ -639,7 +639,7 @@ assert.deepEqual(
 );
 assert.deepEqual(focusedAgain.model.interval.arrivalFrame.resolution, focusedAgain.model.resolution);
 
-// The active Loop is a semi-persistent Working Section. Focus projects it into
+// The active Interval is a semi-persistent Working Section. Focus projects it into
 // Range without retaining it in Guide; Leave preserves the deformed working
 // value, while Save and Overwrite are explicit Guide transactions.
 let working = createSession({ duration: 100, current: 50, guide: createGuide("video") });

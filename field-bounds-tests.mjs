@@ -7,7 +7,6 @@ import {
   deriveFieldBounds,
   fieldShouldSuspend
 } from "./step-field.js";
-import { createLoopTransport } from "./transport.js";
 import { YOUTUBE_STATE } from "./youtube.js";
 
 function assertContained(bounds, range) {
@@ -49,7 +48,6 @@ for (const current of [0, 1, 4, 25, 50, 96, 99, 100]) {
 }
 
 assert.equal(fieldShouldSuspend({ transportKind: "playback" }), false);
-assert.equal(fieldShouldSuspend({ transportKind: "loop" }), false, "Loop is genuine playback and may drive the Field.");
 assert.equal(fieldShouldSuspend({ transport: { kind: "context" } }), true, "Context is Center-only.");
 assert.equal(fieldShouldSuspend({ pendingStep: true }), true);
 assert.equal(fieldShouldSuspend({ rangeDragging: true }), true);
@@ -170,7 +168,7 @@ function makeControllerHarness() {
     harness.adapters.get("player-tail").place(47);
     harness.controller.hold("tail");
     assert.equal(harness.controller.snapshot().tailMode, FIELD_SIDE_MODE.HELD);
-    assert.equal(harness.holds.at(-1).backward, 3, "Hold freezes measured offset as the new Step distance.");
+    assert.equal(harness.holds.at(-1).backward, 3, "Hold freezes the measured physical Field offset.");
 
     const tailStep = harness.controller.getStepSelection("tail");
     assert.equal(tailStep.direction, "backward");
@@ -221,13 +219,6 @@ function makeControllerHarness() {
   } finally {
     harness.restore();
   }
-}
-
-{
-  const captured = Object.freeze({ start: 40, end: 60 });
-  const loop = createLoopTransport({ anchor: 50, ...captured, source: "interval" });
-  assert.deepEqual({ start: loop.start, end: loop.end }, captured);
-  assert.equal(loop.cycles, 0);
 }
 
 {

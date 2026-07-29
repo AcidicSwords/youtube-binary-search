@@ -199,15 +199,22 @@ export function createStepFieldController({
   function effectiveOffset(role, center, snapshot = getSnapshot?.()) {
     const configured = configuredOffset(role, snapshot);
     if (!snapshot?.range) return configured;
-    return role === "tail"
-      ? Math.min(configured, Math.max(0, center - snapshot.range.start))
-      : Math.min(configured, Math.max(0, snapshot.range.end - center));
+    const boundary = role === "tail" ? snapshot.range.start : snapshot.range.end;
+    const available = snapshot.projection?.sourceDistance
+      ? snapshot.projection.sourceDistance(center, boundary)
+      : role === "tail"
+        ? Math.max(0, center - snapshot.range.start)
+        : Math.max(0, snapshot.range.end - center);
+    return Math.min(configured, available);
   }
 
-  function exactAddress(role, center, offset, range) {
-    return role === "tail"
-      ? clamp(center - offset, range.start, range.end)
-      : clamp(center + offset, range.start, range.end);
+  function exactAddress(role, center, offset, range, projection = null) {
+    const direction = role === "tail" ? "backward" : "forward";
+    return projection?.sourceStep
+      ? projection.sourceStep(center, offset, direction, range)
+      : role === "tail"
+        ? clamp(center - offset, range.start, range.end)
+        : clamp(center + offset, range.start, range.end);
   }
 
   function semanticAddress(snapshot, fallback) {
@@ -223,8 +230,10 @@ export function createStepFieldController({
     return fieldShouldSuspend(snapshot) || Boolean(document?.hidden);
   }
 
-  function offsetFromAddress(role, center, address, maximum) {
-    const raw = role === "tail" ? center - address : address - center;
+  function offsetFromAddress(role, center, address, maximum, projection = null) {
+    const raw = projection?.sourceDistance
+      ? projection.sourceDistance(center, address)
+      : role === "tail" ? center - address : address - center;
     return clamp(Math.max(0, raw), 0, Math.max(0, maximum));
   }
 
@@ -427,7 +436,17 @@ export function createStepFieldController({
     const maximum = effectiveOffset(side.role, center, snapshot);
     side.offset = clamp(side.offset, 0, maximum);
     side.progressOffset = clamp(side.progressOffset, 0, maximum);
-    return parkSide(side, exactAddress(side.role, center, side.offset, snapshot.range), { force });
+    return parkSide(
+      side,
+      exactAddress(
+        side.role,
+        center,
+        side.offset,
+        snapshot.range,
+        snapshot.projection
+      ),
+      { force }
+    );
   }
 
   function stabilizeParkedSide(side, center, snapshot) {
@@ -444,7 +463,8 @@ export function createStepFieldController({
       side.role,
       center,
       Number.isFinite(side.desiredAddress) ? side.desiredAddress : observed.time,
-      effectiveOffset(side.role, center, snapshot)
+      effectiveOffset(side.role, center, snapshot),
+      snapshot.projection
     );
   }
 
@@ -639,7 +659,7 @@ export function createStepFieldController({
     return started;
   }
 
-  // An internal Loop wrap continues an existing Field relation. Rebase each
+  // An internal proper-Range wrap continues an existing Field relation. Rebase each
   // side around the wrapped Center, retain its mode/offset, and resume without
   // performing the fresh refold owned by ordinary Play.
   function resumeAt(options = {}) {
@@ -672,7 +692,13 @@ export function createStepFieldController({
       side.offset = clamp(side.offset, 0, maximum);
       side.progressOffset = clamp(side.progressOffset, side.offset, maximum);
       side.targetOffset = configuredOffset(role, snapshot);
-      side.desiredAddress = exactAddress(role, center, side.offset, snapshot.range);
+      side.desiredAddress = exactAddress(
+        role,
+        center,
+        side.offset,
+        snapshot.range,
+        snapshot.projection
+      );
       side.adapter?.mute?.();
       side.adapter?.place?.(side.desiredAddress);
       if (side.mode === FIELD_SIDE_MODE.STRETCHING) {
@@ -727,7 +753,13 @@ export function createStepFieldController({
     const maximum = effectiveOffset(side.role, center, snapshot);
     const observed = refreshSideSnapshot(side);
     if (!Number.isFinite(observed.time)) return clamp(side.progressOffset, 0, maximum);
-    const measured = offsetFromAddress(side.role, center, observed.time, maximum);
+    const measured = offsetFromAddress(
+      side.role,
+      center,
+      observed.time,
+      maximum,
+      snapshot.projection
+    );
     const plausible = Math.abs(measured - side.progressOffset) <= DIRECT_PLACE_TOLERANCE
       || [YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(observed.state);
     return plausible ? measured : clamp(side.progressOffset, 0, maximum);
@@ -754,7 +786,13 @@ export function createStepFieldController({
     side.progressOffset = offset;
     side.targetOffset = record && offset > REACH_TOLERANCE ? offset : configuredOffset(role, snapshot);
     requestRate(side, 1, true);
-    side.desiredAddress = exactAddress(role, center, offset, snapshot.range);
+    side.desiredAddress = exactAddress(
+      role,
+      center,
+      offset,
+      snapshot.range,
+      snapshot.projection
+    );
     if (runtime.centerWasRunning) {
       if (Math.abs(readSide(side).time - side.desiredAddress) > DRIFT_TOLERANCE) side.adapter?.place?.(side.desiredAddress);
       side.adapter?.play?.();
@@ -774,7 +812,13 @@ export function createStepFieldController({
     const observed = refreshSideSnapshot(side);
     let offset = side.offset;
     if ([YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING, YOUTUBE_STATE.PAUSED].includes(observed.state)) {
-      const measured = offsetFromAddress(side.role, center, observed.time, maximum);
+      const measured = offsetFromAddress(
+        side.role,
+        center,
+        observed.time,
+        maximum,
+        snapshot.projection
+      );
       if (measured > REACH_TOLERANCE || side.offset <= REACH_TOLERANCE) offset = measured;
     }
     offset = clamp(offset, 0, maximum);
@@ -874,7 +918,13 @@ export function createStepFieldController({
       side.progressOffset = side.offset;
       requestRate(side, 1);
       ensureSidePlaying(side);
-      const desired = exactAddress(role, center, side.offset, snapshot.range);
+      const desired = exactAddress(
+        role,
+        center,
+        side.offset,
+        snapshot.range,
+        snapshot.projection
+      );
       side.desiredAddress = desired;
       correctRunningSide(side, desired);
       return { available: true, held: true, offset: side.offset };
@@ -897,7 +947,13 @@ export function createStepFieldController({
     side.offset = clamp(actual, 0, maximum);
     const desiredOffset = Math.min(maximum, Math.max(side.progressOffset, side.offset));
     side.progressOffset = desiredOffset;
-    const desired = exactAddress(role, center, desiredOffset, snapshot.range);
+    const desired = exactAddress(
+      role,
+      center,
+      desiredOffset,
+      snapshot.range,
+      snapshot.projection
+    );
     side.desiredAddress = desired;
     correctRunningSide(side, desired);
 
@@ -909,7 +965,13 @@ export function createStepFieldController({
       side.mode = FIELD_SIDE_MODE.HELD;
       side.offset = maximum;
       side.progressOffset = maximum;
-      side.desiredAddress = exactAddress(role, center, maximum, snapshot.range);
+      side.desiredAddress = exactAddress(
+        role,
+        center,
+        maximum,
+        snapshot.range,
+        snapshot.projection
+      );
       if (Math.abs(readSide(side).time - side.desiredAddress) > DRIFT_TOLERANCE) side.adapter?.place?.(side.desiredAddress);
       requestRate(side, 1, true);
       ensureSidePlaying(side);
@@ -937,7 +999,13 @@ export function createStepFieldController({
       distance,
       offset: visibleOffset,
       target: configuredOffset(role, snapshot),
-      address: exactAddress(role, snapshot.current, distance, snapshot.range)
+      address: exactAddress(
+        role,
+        snapshot.current,
+        distance,
+        snapshot.range,
+        snapshot.projection
+      )
     };
   }
 
@@ -967,7 +1035,12 @@ export function createStepFieldController({
       snapshot.range.start,
       snapshot.range.end
     );
-    const targets = live || deriveStepField(center, snapshotReach(snapshot), snapshot.range);
+    const targets = live || deriveStepField(
+      center,
+      snapshotReach(snapshot),
+      snapshot.range,
+      snapshot.projection
+    );
     const states = sideStates || {
       tail: { available: targets.tail.available, held: sides.tail.mode === FIELD_SIDE_MODE.HELD, offset: sides.tail.offset },
       lead: { available: targets.lead.available, held: sides.lead.mode === FIELD_SIDE_MODE.HELD, offset: sides.lead.offset }
@@ -976,8 +1049,20 @@ export function createStepFieldController({
       targets,
       phase: runtime.phase,
       centerAddress: center,
-      tailAddress: exactAddress("tail", center, states.tail.offset, snapshot.range),
-      leadAddress: exactAddress("lead", center, states.lead.offset, snapshot.range),
+      tailAddress: exactAddress(
+        "tail",
+        center,
+        states.tail.offset,
+        snapshot.range,
+        snapshot.projection
+      ),
+      leadAddress: exactAddress(
+        "lead",
+        center,
+        states.lead.offset,
+        snapshot.range,
+        snapshot.projection
+      ),
       tailVisible: prefs.tailVisible,
       leadVisible: prefs.leadVisible,
       tailHeld: states.tail.held,
@@ -1188,7 +1273,12 @@ export function createStepFieldController({
     }
 
     const relationalCenter = runtime.suspended ? snapshot.current : center;
-    const live = deriveStepField(relationalCenter, snapshotReach(snapshot), snapshot.range);
+    const live = deriveStepField(
+      relationalCenter,
+      snapshotReach(snapshot),
+      snapshot.range,
+      snapshot.projection
+    );
     const sideStates = {
       tail: driveSide("tail", relationalCenter, centerDelta, snapshot, centerRunning && !runtime.suspended),
       lead: driveSide("lead", relationalCenter, centerDelta, snapshot, centerRunning && !runtime.suspended)

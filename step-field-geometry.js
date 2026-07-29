@@ -57,19 +57,23 @@ function validateFieldInputs(current, stepReach, range) {
   }
 }
 
-export function deriveFieldBounds({ current, stepReach, range }) {
+export function deriveFieldBounds({ current, stepReach, range, projection = null }) {
   const requested = normalizeFieldReach(stepReach);
   validateFieldInputs(current, requested, range);
 
   const center = clamp(current, range.start, range.end);
-  const backwardReach = Math.min(
-    requested.backward,
-    Math.max(0, center - range.start)
-  );
-  const forwardReach = Math.min(
-    requested.forward,
-    Math.max(0, range.end - center)
-  );
+  const backwardTarget = projection?.sourceStep
+    ? projection.sourceStep(center, requested.backward, "backward", range)
+    : Math.max(range.start, center - requested.backward);
+  const forwardTarget = projection?.sourceStep
+    ? projection.sourceStep(center, requested.forward, "forward", range)
+    : Math.min(range.end, center + requested.forward);
+  const backwardReach = projection?.sourceDistance
+    ? projection.sourceDistance(center, backwardTarget)
+    : Math.max(0, center - backwardTarget);
+  const forwardReach = projection?.sourceDistance
+    ? projection.sourceDistance(center, forwardTarget)
+    : Math.max(0, forwardTarget - center);
   const tailConstrained = backwardReach < requested.backward - EPSILON;
   const leadConstrained = forwardReach < requested.forward - EPSILON;
 
@@ -77,18 +81,18 @@ export function deriveFieldBounds({ current, stepReach, range }) {
     current: center,
     requestedReach: requested,
     tail: {
-      target: center - backwardReach,
+      target: backwardTarget,
       reach: backwardReach,
       constrained: tailConstrained
     },
     lead: {
-      target: center + forwardReach,
+      target: forwardTarget,
       reach: forwardReach,
       constrained: leadConstrained
     },
     envelope: {
-      start: center - backwardReach,
-      end: center + forwardReach
+      start: backwardTarget,
+      end: forwardTarget
     },
     constraint: tailConstrained && leadConstrained
       ? "both"
@@ -100,8 +104,8 @@ export function deriveFieldBounds({ current, stepReach, range }) {
   };
 }
 
-export function deriveStepField(current, stepReach, range) {
-  const bounds = deriveFieldBounds({ current, stepReach, range });
+export function deriveStepField(current, stepReach, range, projection = null) {
+  const bounds = deriveFieldBounds({ current, stepReach, range, projection });
   return {
     center: bounds.current,
     requestedReach: bounds.requestedReach,
