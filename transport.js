@@ -4,8 +4,7 @@ import { EPSILON, clamp } from "./range-geometry.js";
 export const TRANSPORT_KIND = Object.freeze({
   IDLE: "idle",
   CONTEXT: "context",
-  PLAYBACK: "playback",
-  LOOP: "loop"
+  PLAYBACK: "playback"
 });
 
 export function idleTransport() {
@@ -22,46 +21,23 @@ export function transportFieldRange(transport, range) {
     || !Number.isFinite(range.start)
     || !Number.isFinite(range.end)
   ) return null;
-  if (
-    transport?.kind === TRANSPORT_KIND.LOOP
-    && Number.isFinite(transport.start)
-    && Number.isFinite(transport.end)
-  ) {
-    return {
-      start: Math.min(range.start, transport.start),
-      end: Math.max(range.end, transport.end)
-    };
-  }
   return { start: range.start, end: range.end };
 }
 
-/**
- * Source extents that must remain metrically materialized while a physical
- * transport is active. Ordinary playback expands the complete active Range so
- * Center and either Field side always measure contiguous source time, including
- * behind the playback departure. Loop is also physical three-pane playback and
- * therefore expands Range plus any frozen operand beyond it. Context is
- * Center-only and owns its frozen window.
- */
-export function transportMaterializedExtents(transport, range) {
-  if (!transport || !range) return [];
-  if (transport.kind === TRANSPORT_KIND.CONTEXT) {
-    return Number.isFinite(transport.start) && Number.isFinite(transport.end)
-      ? [{ start: transport.start, end: transport.end }]
-      : [];
-  }
-  if (transport.kind === TRANSPORT_KIND.PLAYBACK) {
-    const fieldRange = transportFieldRange(transport, range);
-    return fieldRange ? [fieldRange] : [];
-  }
-  if (transport.kind === TRANSPORT_KIND.LOOP) {
-    const fieldRange = transportFieldRange(transport, range);
-    return fieldRange ? [fieldRange] : [];
-  }
-  return [];
+export function isProperRange(range, duration) {
+  return Boolean(
+    range
+    && Number.isFinite(range.start)
+    && Number.isFinite(range.end)
+    && Number.isFinite(duration)
+    && (
+      range.start > EPSILON
+      || range.end < duration - EPSILON
+    )
+  );
 }
 
-export function deriveContextWindow(anchor, range, seconds, projection = null) {
+export function deriveContextWindow(anchor, range, seconds) {
   if (!Number.isFinite(anchor) || !range || !Number.isFinite(seconds) || seconds <= EPSILON) {
     return null;
   }
@@ -71,18 +47,14 @@ export function deriveContextWindow(anchor, range, seconds, projection = null) {
   // Context is centered on the semantic traversal point. Range clips either
   // half independently rather than shifting surplus duration to the other
   // side, so observation never reaches more than half the setting past Current.
-  const start = projection?.sourceStep
-    ? projection.sourceStep(boundedAnchor, halfDuration, "backward", range)
-    : Math.max(range.start, boundedAnchor - halfDuration);
-  const end = projection?.sourceStep
-    ? projection.sourceStep(boundedAnchor, halfDuration, "forward", range)
-    : Math.min(range.end, boundedAnchor + halfDuration);
+  const start = Math.max(range.start, boundedAnchor - halfDuration);
+  const end = Math.min(range.end, boundedAnchor + halfDuration);
 
   return end - start > EPSILON ? { start, end } : null;
 }
 
-export function createContextTransport({ anchor, range, seconds, projection = null }) {
-  const window = deriveContextWindow(anchor, range, seconds, projection);
+export function createContextTransport({ anchor, range, seconds }) {
+  const window = deriveContextWindow(anchor, range, seconds);
   if (!window) return idleTransport();
   return {
     kind: TRANSPORT_KIND.CONTEXT,
@@ -113,30 +85,19 @@ export function createPlaybackTransport({
     label,
     operator,
     enteredPath: false,
+    cycles: 0,
     startedAt: Date.now()
   };
 }
 
-export function createLoopTransport({ anchor, start, end, source = "interval" }) {
-  if (
-    !Number.isFinite(anchor)
-    || !Number.isFinite(start)
-    || !Number.isFinite(end)
-    || end - start <= EPSILON
-  ) return idleTransport();
-
+export function rebasePlaybackTransport(transport, startedAt = Date.now()) {
+  if (transport?.kind !== TRANSPORT_KIND.PLAYBACK) return transport;
   return {
-    kind: TRANSPORT_KIND.LOOP,
+    ...transport,
     phase: "starting",
-    source,
-    // Anchor is the return address, not a Loop boundary. A retained Section
-    // Loop may observe an extent outside the active semantic Range.
-    anchor,
-    start,
-    end,
-    enteredWindow: false,
-    cycles: 0,
-    startedAt: Date.now()
+    enteredPath: false,
+    cycles: (transport.cycles || 0) + 1,
+    startedAt
   };
 }
 

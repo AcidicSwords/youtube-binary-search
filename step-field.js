@@ -659,7 +659,7 @@ export function createStepFieldController({
     return started;
   }
 
-  // An internal Loop wrap continues an existing Field relation. Rebase each
+  // An internal proper-Range wrap continues an existing Field relation. Rebase each
   // side around the wrapped Center, retain its mode/offset, and resume without
   // performing the fresh refold owned by ordinary Play.
   function resumeAt(options = {}) {

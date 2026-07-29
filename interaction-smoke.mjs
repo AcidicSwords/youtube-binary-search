@@ -19,6 +19,18 @@ assert.equal(byId.get("duration-time").textContent, "1:40.000");
 byId.get("context-seconds").value = "0";
 byId.get("context-seconds").dispatch("change");
 
+// Step size is a first-class semantic setting. Adaptive presets are immediate,
+// Range-relative, and reversible back to the independent manual value.
+byId.get("step-mode-adaptive").click();
+await flush();
+assert.equal(byId.get("step-size-summary").textContent, "1/16 Range · 6.25s");
+byId.get("step-fraction-8").click();
+await flush();
+assert.equal(byId.get("step-size-summary").textContent, "1/8 Range · 12.5s");
+byId.get("step-mode-fixed").click();
+await flush();
+assert.equal(byId.get("step-size-summary").textContent, "10s manual");
+
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 500 });
 await flush();
 assert.equal(currentText(), "Current 0:50.000", "Timeline traversal must commit Current.");
@@ -39,20 +51,21 @@ await flush();
 assert.equal(byId.get("pins-list-count").textContent, "2");
 assert.equal(currentText(), "Current 0:25.000");
 
-byId.get("pin-forward").click();
+// Release the direct-Go extent, then use the Shift layer to traverse Pins.
+byId.get("release").click();
+dispatchDocument("keydown", { key: "D", code: "KeyD", shiftKey: true });
 await flush();
 assert.equal(currentText(), "Current 0:50.000", "Next Pin must traverse through the same movement model.");
 assert.match(
   byId.get("section-window").textContent,
   /0:25\.000–0:50\.000/,
-  "Pin traversal must record its own hop rather than inheriting a prior Loop anchor."
+  "Pin traversal must establish the same retained anchor as Step."
 );
-assert.match(byId.get("backward-meta").textContent, /^shorten loop to /,
-  "Refine meta must disclose Loop shortening before invocation.");
-byId.get("pin-backward").click();
+assert.match(byId.get("backward-meta").textContent, /^shorten Interval · to /,
+  "Refine meta must disclose Interval shortening before invocation.");
+byId.get("switch-endpoint").click();
 await flush();
 assert.equal(currentText(), "Current 0:25.000");
-assert.match(byId.get("section-window").textContent, /0:25\.000–0:50\.000/);
 byId.get("switch-endpoint").click();
 await flush();
 assert.equal(currentText(), "Current 0:50.000");
@@ -64,7 +77,6 @@ await env.delay(150);
 await flush();
 assert.equal(currentText(), "Current 1:00.000");
 assert.match(byId.get("section-window").textContent, /0:25\.000–1:00\.000/);
-assert.match(byId.get("loop-meta").textContent, /0:25\.000–1:00\.000/);
 byId.get("step-backward").click();
 await env.delay(150);
 await flush();
@@ -89,7 +101,7 @@ dispatchDocument("keydown", { key: "z", code: "KeyZ", ctrlKey: true });
 await flush();
 assert.equal(currentText(), "Current 0:50.000");
 
-// The current Loop can own Range as an unsaved Working Section. Leaving restores
+// The current Working Interval can own Range without being saved. Leaving restores
 // the preceding Range without adding anything to Guide.
 byId.get("focus-working-section").click();
 await flush();
@@ -111,7 +123,8 @@ await flush();
 assert.equal(byId.get("sections-list-count").textContent, "1");
 const sectionNodes = descendants(byId.get("sections-list"));
 assert.ok(sectionNodes.some(node => node.textContent === "Quarter to middle"));
-assert.ok(sectionNodes.some(node => node.dataset.loopSection), "Saved Sections must expose their own Loop action.");
+assert.ok(sectionNodes.some(node => node.dataset.collapseSection), "Saved Sections must expose Transpose.");
+assert.ok(sectionNodes.some(node => node.dataset.focusSection), "Saved Sections must expose Focus.");
 assert.ok(sectionNodes.some(node => node.dataset.overwriteSection), "Saved Sections must expose explicit Working Section overwrite.");
 
 // Overwrite is explicit and preserves the retained identity. Undo restores the
@@ -140,23 +153,7 @@ await flush();
 assert.match(byId.get("section-window").textContent, /0:25\.000–0:50\.000/);
 byId.get("guide-tab-sections").blur();
 
-// Matrix Loop freezes the current Interval. Its internal wrap is physical only:
-// semantic Current and the consumed Interval remain unchanged.
 const center = env.center();
-byId.get("loop").click();
-await flush();
-assert.equal(byId.get("loop-label").textContent, "Stop Loop");
-assert.equal(center.currentTime, 25);
-assert.equal(center.state, 1);
-center.currentTime = 50;
-await poll();
-assert.equal(center.currentTime, 25, "Loop must wrap to its frozen start.");
-assert.equal(currentText(), "Current 0:50.000", "Loop wraps must not commit a new Current.");
-assert.match(byId.get("loop-meta").textContent, /0:25\.000–0:50\.000/);
-center.pauseVideo();
-await flush();
-assert.equal(byId.get("loop-label").textContent, "Loop");
-assert.equal(center.currentTime, 50, "Stopping Loop restores its semantic anchor.");
 
 // Tail and Lead are ready before the paused Center surface accepts ordinary
 // playback. Once activated, every paused side is parked on the exact frame it
@@ -232,9 +229,10 @@ byId.get("tail-field-toggle").click(); // Stretch -> Hold at 4 s
 await flush();
 assert.equal(center.state, 1, "Holding a side must not interrupt Center playback.");
 assert.equal(tail.rate, 1, "Held Tail must match Center at 1x.");
-assert.equal(byId.get("step-backward-seconds").value, "4", "Explicit Hold adopts its visible offset as backward Step size.");
+assert.equal(byId.get("step-backward-seconds").value, "4", "Explicit Hold adopts its visible physical Tail offset.");
+assert.equal(byId.get("step-size-seconds").value, "10", "Hold must not overwrite semantic Step size.");
 assert.equal(byId.get("section-window").textContent, intervalBeforeStretch,
-  "Hold may update Step Reach but must not rewrite Interval.");
+  "Hold must update neither semantic Step Reach nor Interval.");
 
 byId.get("field-both-toggle").click(); // Hold remaining Lead at 8 s
 await flush();
@@ -260,7 +258,7 @@ assert.equal(tail.state, 2);
 assert.equal(lead.state, 2);
 
 // Playback settlement must not strand Switch Endpoint on the short physical
-// playback segment. It still transposes the preserved Loop endpoints exactly.
+// playback segment. It still transposes the preserved Interval endpoints exactly.
 byId.get("switch-endpoint").click();
 await flush();
 assert.equal(currentText(), "Current 0:25.000");
@@ -317,6 +315,9 @@ assert.equal(lead.state, 2);
 assert.equal(byId.has("continue"), false);
 assert.equal(byId.has("context-action"), false);
 assert.equal(byId.has("skim"), false);
-assert.equal(byId.get("loop").classList.contains("loop-action"), true);
+assert.equal(byId.has("loop"), false);
+assert.equal(byId.get("release").classList.contains("lifecycle-action"), true);
+assert.equal(byId.get("transpose").classList.contains("lifecycle-action"), true);
+assert.equal(byId.get("focus-toggle").classList.contains("lifecycle-action"), true);
 
-console.log("Interaction smoke passed: membership-based Refine preview, unsaved Working Focus, explicit Section overwrite, Endpoint Transposition, separate Undo, Guide retention, composable Step intervals, collapse isolation, frozen Loop, shared activation, deterministic refold/stretch, confirmed rates, exact paused frames, Hold isolation, whole-Field side Step, and Space playback.");
+console.log("Interaction smoke passed: Shift Pin traversal, membership-based Refine preview, unsaved Working Focus, explicit Section overwrite, Switch involution, separate Undo, Guide retention, composable Step intervals, shared activation, deterministic refold/stretch, confirmed rates, independent Hold offsets, whole-Field side Step, and Space playback.");

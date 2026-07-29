@@ -18,17 +18,25 @@ import {
   normalizeFieldResponse
 } from "./step-field.js";
 
-assert.deepEqual(normalizeStepReach(8), { backward: 8, forward: 8, linked: true });
+assert.deepEqual(normalizeStepReach(8), {
+  backward: 8,
+  forward: 8,
+  linked: true,
+  mode: "fixed",
+  fraction: 1 / 16
+});
 assert.deepEqual(normalizeDirectionalReach({ backward: 5, forward: 15, linked: false }), {
   backward: 5, forward: 15, linked: false
 });
 assert.deepEqual(normalizeStepReach({ backward: 5, forward: 15, linked: true }), {
-  backward: 15, forward: 15, linked: true
+  backward: 15, forward: 15, linked: true, mode: "fixed", fraction: 1 / 16
 });
 assert.deepEqual(normalizeStepReach({ backward: 0.01, forward: 900, linked: false }), {
   backward: MIN_STEP_REACH_SECONDS,
   forward: MAX_STEP_REACH_SECONDS,
-  linked: false
+  linked: false,
+  mode: "fixed",
+  fraction: 1 / 16
 });
 assert.equal(fieldPreferenceRequiresEstablish({ tailRate: 0.75 }), false);
 assert.equal(fieldPreferenceRequiresEstablish({ leadRate: 1.5 }), false);
@@ -48,9 +56,13 @@ assert.deepEqual(normalizeFieldResponse({ tailRate: 2, leadRate: 0.5 }), { tailR
   assert.equal(result.destination, 110, "Directional Steps form an explicit ratchet when offsets differ.");
 
   result = setStepReach(session, { backward: 10, forward: 10, linked: true });
-  assert.deepEqual(result.session.model.stepReach, { backward: 10, forward: 10, linked: true });
+  assert.deepEqual(result.session.model.stepReach, {
+    backward: 10, forward: 10, linked: true, mode: "fixed", fraction: 1 / 16
+  });
   const restored = returnState(result.session);
-  assert.deepEqual(restored.session.model.stepReach, { backward: 5, forward: 15, linked: false });
+  assert.deepEqual(restored.session.model.stepReach, {
+    backward: 5, forward: 15, linked: false, mode: "fixed", fraction: 1 / 16
+  });
 }
 
 {
@@ -171,8 +183,12 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   );
   assert.match(fieldCss, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);
   assert.match(app, /setStepReach as setSessionStepReach/);
-  assert.match(app, /stepReach: currentStepReach\(\)/);
-  assert.match(app, /onHoldOffsets:[\s\S]*commitStepReach/);
+  assert.match(app, /stepReach: currentFieldOffsets\(\)/);
+  assert.match(app, /onHoldOffsets:[\s\S]*state\.fieldOffsets = normalizeStepReach/);
+  assert.doesNotMatch(
+    app.match(/onHoldOffsets: patch => \{[\s\S]*?\n    \},\n    onChange:/)?.[0] || "",
+    /commitStepReach|setSessionStepReach/
+  );
   assert.match(
     app,
     /performStep\(selection\.direction, selection\.distance,\s*\{[\s\S]*carryRetained: selection\.carryRetained === true/,
@@ -185,11 +201,11 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
     "Playback must refold and prime each side at 1× before directional divergence.");
   assert.match(field, /function driveSide\(role, center, centerDelta, snapshot, centerRunning\)[\s\S]*requestStretchRate\(side\)/,
     "Running Stretch must reconcile to a supported confirmed directional rate.");
-  assert.match(view, /session\.model\.stepReach/);
+  assert.match(view, /effectiveStepReach/);
   assert.match(app, /preferences\.stepReach = normalizeStepReach/);
   assert.match(implementation, /^# Binary YouTube Reader — Canonical Implementation/m);
   assert.doesNotMatch(readme, /Application Continue/);
-  assert.doesNotMatch(readme, /Step Size/);
+  assert.match(readme, /Step size|Step Size/);
 }
 
-console.log("Field coherence tests passed: offsets own Step geometry, native playback owns activation, and Field controls remain local.");
+console.log("Field coherence tests passed: semantic Step size and physical Field offsets remain independent.");

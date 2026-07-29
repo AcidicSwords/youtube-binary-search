@@ -1,26 +1,10 @@
 // Pure source-time <-> traversal-time projection.
 //
-// Media, retained Pins, and Section endpoints remain anchored to source time.
-// Collapsed Sections remove only their interior measure from the traversal
-// timeline. Playback can temporarily materialize selected source extents by
-// supplying them as expandedExtents.
+// Source time is the only stored truth. Collapsed Sections contribute their
+// normalized union to a derived traversal metric: every Fold has zero lateral
+// measure while retaining its complete ordered source extent orthogonally.
 import { EPSILON, clamp } from "./range-geometry.js";
-import { resolveSection, sortedSections } from "./guide.js";
-
-function overlapsInterior(first, second) {
-  return first.start < second.end - EPSILON
-    && second.start < first.end - EPSILON;
-}
-
-function containsExtent(outer, inner) {
-  return outer.start <= inner.start + EPSILON
-    && outer.end >= inner.end - EPSILON;
-}
-
-function sameExtent(first, second) {
-  return Math.abs(first.start - second.start) <= EPSILON
-    && Math.abs(first.end - second.end) <= EPSILON;
-}
+import { getPin, resolveSection, sortedSections, visiblePins } from "./guide.js";
 
 function normalizedExtent(extent) {
   if (
@@ -34,90 +18,125 @@ function normalizedExtent(extent) {
   };
 }
 
-function shouldMaterialize(section, expandedSections, expandedExtents) {
-  if (expandedSections.some(expanded => containsExtent(section, expanded))) return true;
-  return expandedExtents.some(extent => overlapsInterior(section, extent));
+function overlapsInterior(first, second) {
+  return first.start < second.end - EPSILON
+    && second.start < first.end - EPSILON;
 }
 
-function resolvedExpandedSections(guide, ids) {
-  return [...new Set(ids || [])]
+function containsInterior(extent, address) {
+  return Number.isFinite(address)
+    && address > extent.start + EPSILON
+    && address < extent.end - EPSILON;
+}
+
+function affinityUsesStart(affinity) {
+  return affinity === "backward"
+    || affinity === "lower"
+    || affinity === "start"
+    || affinity === "before";
+}
+
+function uniqueById(items) {
+  const seen = new Set();
+  return items.filter(item => {
+    if (!item?.id || seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
+}
+
+function activeCollapsedSections(guide, options = {}) {
+  const explicitlyExpanded = new Set(options.expandedSectionIds || []);
+  const expandedSections = [...explicitlyExpanded]
     .map(id => resolveSection(guide, id))
     .filter(Boolean);
+  const expandedExtents = (options.expandedExtents || [])
+    .map(normalizedExtent)
+    .filter(Boolean);
+
+  return sortedSections(guide).filter(section => {
+    if (!section.collapsed || explicitlyExpanded.has(section.id)) return false;
+    if (expandedSections.some(expanded => overlapsInterior(section, expanded))) {
+      return false;
+    }
+    return !expandedExtents.some(extent => overlapsInterior(section, extent));
+  });
 }
 
-function groupEqualFrontierSections(sections) {
+function normalizeFoldUnion(sections) {
   const groups = [];
   for (const section of sections) {
-    const existing = groups.find(group => sameExtent(group, section));
-    if (existing) {
-      existing.sections.push(section);
-      existing.sectionIds.push(section.id);
+    const last = groups.at(-1);
+    if (!last || section.start > last.end + EPSILON) {
+      groups.push({
+        start: section.start,
+        end: section.end,
+        sections: [section]
+      });
       continue;
     }
-    groups.push({
-      start: section.start,
-      end: section.end,
-      sections: [section],
-      sectionIds: [section.id]
-    });
+    last.end = Math.max(last.end, section.end);
+    last.sections.push(section);
   }
   return groups;
 }
 
-/**
- * Compile the currently visible collapsed frontier.
- *
- * Collapsed Sections are laminar: disjoint, nested, or equal. A collapsed
- * ancestor represents its complete subtree; descendant fold states remain
- * stored and reappear when that ancestor expands. Equal extents share one
- * contraction while retaining each Section identity.
- */
-function collapsedFrontier(guide, options = {}) {
-  const expandedSections = resolvedExpandedSections(
-    guide,
-    options.expandedSectionIds
+function foldBoundaryPins(guide, sections) {
+  return uniqueById(
+    sections.flatMap(section => [
+      getPin(guide, section.startPinId),
+      getPin(guide, section.endPinId)
+    ]).filter(Boolean)
+  ).sort((first, second) =>
+    first.t - second.t
+    || first.createdAt - second.createdAt
+    || first.id.localeCompare(second.id)
   );
-  const expandedExtents = (options.expandedExtents || [])
-    .map(normalizedExtent)
-    .filter(Boolean);
-  const collapsed = sortedSections(guide)
-    .filter(section => section.collapsed === true)
-    .filter(section => !shouldMaterialize(
-      section,
-      expandedSections,
-      expandedExtents
-    ));
-
-  const frontier = collapsed.filter(section => !collapsed.some(other =>
-    other.id !== section.id
-    && !sameExtent(other, section)
-    && containsExtent(other, section)
-  ));
-  return groupEqualFrontierSections(frontier)
-    .sort((first, second) => first.start - second.start || first.end - second.end);
 }
 
-function createIdentityProjection(duration) {
+function createIdentityProjection(duration, guide = null) {
   const end = Math.max(0, Number(duration) || 0);
-  return {
+  const sourceToTraversal = value => clamp(Number(value) || 0, 0, end);
+  const traversalToSource = value => clamp(Number(value) || 0, 0, end);
+  const sourceStep = (current, seconds, direction, range) => {
+    const amount = Number(seconds);
+    if (!Number.isFinite(amount) || amount < 0) {
+      throw new TypeError("Traversal Step requires a non-negative duration.");
+    }
+    const delta = direction === "backward"
+      ? -amount
+      : direction === "forward"
+        ? amount
+        : NaN;
+    if (!Number.isFinite(delta)) throw new TypeError(`Unknown direction: ${direction}`);
+    return clamp(current + delta, range.start, range.end);
+  };
+  const orderedPinStops = range => visiblePins(guide || { pins: [] })
+    .filter(pin => pin.t >= range.start - EPSILON && pin.t <= range.end + EPSILON)
+    .map(pin => ({
+      ...pin,
+      sourcePin: pin,
+      stopKind: "pin",
+      traversal: pin.t,
+      fold: null
+    }));
+  return Object.freeze({
     duration: end,
     effectiveDuration: end,
-    folds: [],
-    sourceToTraversal(value) {
-      return clamp(Number(value) || 0, 0, end);
-    },
-    traversalToSource(value) {
-      return clamp(Number(value) || 0, 0, end);
-    },
+    folds: Object.freeze([]),
+    sourceToTraversal,
+    traversalToSource,
     sourceDistance(first, second) {
-      return Math.abs((Number(second) || 0) - (Number(first) || 0));
+      return Math.abs(sourceToTraversal(second) - sourceToTraversal(first));
     },
     sourceMidpoint(first, second) {
       return first + (second - first) / 2;
     },
-    sourceStep(current, seconds, direction, range) {
-      const delta = direction === "backward" ? -seconds : seconds;
-      return clamp(current + delta, range.start, range.end);
+    sourceStep,
+    stepTarget: sourceStep,
+    sourceToLayout(source) {
+      const bounded = sourceToTraversal(source);
+      return { source: bounded, traversal: bounded, fold: null, vertical: null };
     },
     projectExtent(extent) {
       return extent ? { start: extent.start, end: extent.end } : null;
@@ -128,15 +147,9 @@ function createIdentityProjection(duration) {
     foldAtTraversal() {
       return null;
     },
+    orderedPinStops,
     metric: null
-  };
-}
-
-function affinityUsesStart(affinity) {
-  return affinity === "backward"
-    || affinity === "lower"
-    || affinity === "start"
-    || affinity === "before";
+  });
 }
 
 /**
@@ -149,23 +162,32 @@ export function createTemporalProjection({
   expandedExtents = []
 } = {}) {
   const end = Math.max(0, Number(duration) || 0);
-  if (!guide?.sections?.length) return createIdentityProjection(end);
+  if (!guide?.sections?.length) return createIdentityProjection(end, guide);
 
-  const frontier = collapsedFrontier(guide, {
+  const activeSections = activeCollapsedSections(guide, {
     expandedSectionIds,
     expandedExtents
   });
-  if (!frontier.length) return createIdentityProjection(end);
+  if (!activeSections.length) return createIdentityProjection(end, guide);
 
   let removed = 0;
-  const folds = frontier.map(group => {
-    const sourceDuration = group.end - group.start;
-    const traversal = group.start - removed;
+  const folds = normalizeFoldUnion(activeSections).map(group => {
+    const start = clamp(group.start, 0, end);
+    const finish = clamp(group.end, 0, end);
+    const sourceDuration = Math.max(0, finish - start);
+    const traversal = start - removed;
     removed += sourceDuration;
+    const sections = Object.freeze([...group.sections]);
+    const boundaryPins = Object.freeze(foldBoundaryPins(guide, sections));
     return Object.freeze({
-      ...group,
+      start,
+      end: finish,
+      traversal,
       sourceDuration,
-      traversal
+      sections,
+      sectionIds: Object.freeze(sections.map(section => section.id)),
+      boundaryPins,
+      boundaryPinIds: Object.freeze(boundaryPins.map(pin => pin.id))
     });
   });
   const effectiveDuration = Math.max(0, end - removed);
@@ -209,9 +231,7 @@ export function createTemporalProjection({
   }
 
   function sourceDistance(first, second) {
-    return Math.abs(
-      sourceToTraversal(second) - sourceToTraversal(first)
-    );
+    return Math.abs(sourceToTraversal(second) - sourceToTraversal(first));
   }
 
   function sourceMidpoint(first, second, affinity = null) {
@@ -226,28 +246,54 @@ export function createTemporalProjection({
     );
   }
 
+  /**
+   * Step translates through the quotient metric. A Fold contributes no
+   * lateral distance, and directional affinity resolves an exact landing to
+   * the outward endpoint. Starting on any point of the quotient similarly
+   * exits through the directional face before Reach is applied. Shift+Step is
+   * the separate operation that can visit every stacked endpoint in sequence.
+   */
   function sourceStep(current, seconds, direction, range) {
     const amount = Number(seconds);
     if (!Number.isFinite(amount) || amount < 0) {
       throw new TypeError("Traversal Step requires a non-negative duration.");
     }
-    if (amount === 0) return clamp(current, range.start, range.end);
-    const start = sourceToTraversal(range.start);
-    const finish = sourceToTraversal(range.end);
-    const origin = sourceToTraversal(current);
-    const destination = direction === "backward"
-      ? Math.max(start, origin - amount)
-      : direction === "forward"
-        ? Math.min(finish, origin + amount)
-        : NaN;
-    if (!Number.isFinite(destination)) {
+    if (direction !== "backward" && direction !== "forward") {
       throw new TypeError(`Unknown direction: ${direction}`);
     }
+    if (amount === 0) return clamp(current, range.start, range.end);
+
+    const sign = direction === "backward" ? -1 : 1;
+    const minimum = sourceToTraversal(range.start);
+    const maximum = sourceToTraversal(range.end);
+    const originFold = foldAtSource(current);
+    let destination = sourceToTraversal(current) + sign * amount;
+
+    // Starting anywhere on the quotient exits through the directional face
+    // before applying Reach.
+    if (originFold) {
+      destination = originFold.traversal + sign * amount;
+    }
+
+    destination = clamp(destination, minimum, maximum);
     return clamp(
       traversalToSource(destination, direction),
       range.start,
       range.end
     );
+  }
+
+  function sourceToLayout(value) {
+    const source = clamp(Number(value) || 0, 0, end);
+    const fold = foldAtSource(source);
+    return {
+      source,
+      traversal: sourceToTraversal(source),
+      fold,
+      vertical: fold
+        ? clamp((source - fold.start) / Math.max(fold.sourceDuration, EPSILON), 0, 1)
+        : null
+    };
   }
 
   function projectExtent(extent) {
@@ -258,6 +304,30 @@ export function createTemporalProjection({
     };
   }
 
+  function orderedPinStops(range, sourceGuide = guide) {
+    const boundaryIds = new Set(folds.flatMap(fold => fold.boundaryPinIds));
+    return visiblePins(sourceGuide)
+      .filter(pin => pin.t >= range.start - EPSILON && pin.t <= range.end + EPSILON)
+      .map(pin => {
+        const fold = foldAtSource(pin.t);
+        if (fold && !boundaryIds.has(pin.id)) return null;
+        return {
+          ...pin,
+          sourcePin: pin,
+          stopKind: fold ? "fold-endpoint" : "pin",
+          traversal: sourceToTraversal(pin.t),
+          fold
+        };
+      })
+      .filter(Boolean)
+      .sort((first, second) =>
+        first.traversal - second.traversal
+        || first.t - second.t
+        || first.createdAt - second.createdAt
+        || first.id.localeCompare(second.id)
+      );
+  }
+
   const metric = Object.freeze({
     toCoordinate: sourceToTraversal,
     fromCoordinate: traversalToSource
@@ -266,55 +336,86 @@ export function createTemporalProjection({
   return Object.freeze({
     duration: end,
     effectiveDuration,
-    folds,
+    folds: Object.freeze(folds),
     sourceToTraversal,
     traversalToSource,
     sourceDistance,
     sourceMidpoint,
     sourceStep,
+    stepTarget: sourceStep,
+    sourceToLayout,
     projectExtent,
     foldAtSource,
     foldAtTraversal,
+    orderedPinStops,
     metric
   });
 }
 
-function projectionExpandedSectionIds(model) {
-  const ids = [];
-  if (model?.focus?.kind === "saved-section" && model.focus.sectionId) {
-    ids.push(model.focus.sectionId);
-  }
-  if (model?.guide && model?.range) {
-    const semanticBoundaries = [
-      model.range.start,
-      model.range.end,
-      model.resolution?.L,
-      model.resolution?.R,
-      model.interval?.start,
-      model.interval?.end,
-      model.interval?.departure,
-      model.interval?.arrival
-    ].filter(Number.isFinite);
-    for (const section of sortedSections(model.guide)) {
-      if (!section.collapsed) continue;
-      const cutsInterior = semanticBoundaries.some(boundary =>
-        boundary > section.start + EPSILON
-        && boundary < section.end - EPSILON
-      );
-      if (cutsInterior) ids.push(section.id);
+function projectionMaterialization(model) {
+  const expandedSectionIds = new Set();
+  if (!model?.guide) return { expandedSectionIds: [], expandedExtents: [] };
+
+  const structural = createTemporalProjection({
+    duration: model.duration,
+    guide: model.guide
+  });
+
+  const expandFold = fold => {
+    for (const id of fold?.sectionIds || []) expandedSectionIds.add(id);
+  };
+
+  if (model.focus?.kind === "saved-section" && model.focus.sectionId) {
+    const focused = resolveSection(model.guide, model.focus.sectionId);
+    if (focused) {
+      // A selected retained Section must become an ordinary lateral Range.
+      // Expand every contributor in a Fold that covers any of its span.
+      for (const fold of structural.folds) {
+        if (overlapsInterior(fold, focused)) expandFold(fold);
+      }
+    }
+  } else if (model.focus?.kind === "working-section" && model.focus.extent) {
+    // A wider ad-hoc Working Range may keep unrelated Folds. Materialize only
+    // when it names the exact extent of an existing collapsed Section.
+    const exact = sortedSections(model.guide).filter(section =>
+      section.collapsed
+      && Math.abs(section.start - model.focus.extent.start) <= EPSILON
+      && Math.abs(section.end - model.focus.extent.end) <= EPSILON
+    );
+    for (const section of exact) {
+      expandFold(structural.folds.find(fold =>
+        fold.sectionIds.includes(section.id)
+      ));
     }
   }
-  return [...new Set(ids)];
+
+  // A hard admissible boundary must never be hidden in a Fold. Current,
+  // Resolution, and Working endpoints may remain exact latent source state.
+  if (model.range) {
+    for (const address of [model.range.start, model.range.end]) {
+      const fold = structural.foldAtSource(address);
+      if (fold && containsInterior(fold, address)) expandFold(fold);
+    }
+  }
+
+  return {
+    expandedSectionIds: [...expandedSectionIds],
+    expandedExtents: []
+  };
 }
 
 export function projectionForModel(model, options = {}) {
+  const materialized = projectionMaterialization(model);
   return createTemporalProjection({
     duration: model?.duration,
     guide: model?.guide,
     expandedSectionIds: [
-      ...projectionExpandedSectionIds(model),
+      ...materialized.expandedSectionIds,
       ...(options.expandedSectionIds || [])
     ],
-    expandedExtents: options.expandedExtents || []
+    expandedExtents: [
+      ...materialized.expandedExtents,
+      ...(options.expandedExtents || [])
+    ]
   });
 }

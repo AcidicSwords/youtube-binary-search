@@ -138,8 +138,6 @@ export function createSection(guide, startPinId, endPinId, options = {}) {
   if (!(end.t > start.t + EPSILON)) throw new RangeError("A Section requires distinct Pins.");
 
   const label = String(options.label || options.title || "").trim();
-  if (!label) throw new RangeError("A Section requires a title.");
-
   const duplicate = findDuplicateSection(guide, start.id, end.id, label);
   if (duplicate) return { section: duplicate, created: false };
 
@@ -183,7 +181,6 @@ export function renameSection(guide, sectionId, label) {
   const section = guide.sections.find(item => item.id === sectionId);
   if (!section) throw new RangeError("Section not found.");
   const text = String(label || "").trim();
-  if (!text) throw new RangeError("A Section requires a title.");
   if (findDuplicateSection(
     guide,
     section.startPinId,
@@ -199,44 +196,6 @@ export function renameSection(guide, sectionId, label) {
   return section;
 }
 
-function sectionContains(outer, inner) {
-  return outer.start <= inner.start + EPSILON
-    && outer.end >= inner.end - EPSILON;
-}
-
-function sectionsCross(first, second) {
-  if (
-    !first
-    || !second
-    || first.end <= second.start + EPSILON
-    || second.end <= first.start + EPSILON
-  ) return false;
-  return !sectionContains(first, second) && !sectionContains(second, first);
-}
-
-function sectionsTouchAsSiblings(first, second) {
-  if (sectionContains(first, second) || sectionContains(second, first)) {
-    return false;
-  }
-  return Math.abs(first.end - second.start) <= EPSILON
-    || Math.abs(second.end - first.start) <= EPSILON;
-}
-
-function collapsedSectionConflicts(guide, sectionOrId) {
-  const target = resolveSection(guide, sectionOrId);
-  if (!target) return [];
-  return guide.sections
-    .filter(section => section.id !== target.id && section.collapsed === true)
-    .map(section => resolveSection(guide, section))
-    .filter(section =>
-      section
-      && (
-        sectionsCross(target, section)
-        || sectionsTouchAsSiblings(target, section)
-      )
-    );
-}
-
 export function setSectionCollapsed(guide, sectionId, collapsed) {
   const section = guide.sections.find(item => item.id === sectionId);
   if (!section) return { changed: false, reason: "missing-section" };
@@ -247,16 +206,6 @@ export function setSectionCollapsed(guide, sectionId, collapsed) {
       reason: next ? "already-collapsed" : "already-expanded",
       section: resolveSection(guide, section)
     };
-  }
-  if (next) {
-    const conflicts = collapsedSectionConflicts(guide, section);
-    if (conflicts.length) {
-      return {
-        changed: false,
-        reason: "fold-topology-conflict",
-        conflicts
-      };
-    }
   }
   section.collapsed = next;
   section.updatedAt = now();
@@ -302,14 +251,7 @@ export function movePin(guide, pinId, address, duration = Number.POSITIVE_INFINI
 }
 
 function translatedPinIds(guide, section) {
-  return new Set(
-    guide.pins
-      .filter(pin =>
-        pin.t >= section.start - EPSILON
-        && pin.t <= section.end + EPSILON
-      )
-      .map(pin => pin.id)
-  );
+  return new Set([section.startPinId, section.endPinId]);
 }
 
 function sectionTranslationBounds(guide, section, pinIds, duration) {
@@ -337,9 +279,9 @@ function sectionTranslationBounds(guide, section, pinIds, duration) {
 }
 
 /**
- * Translate one Section as a retained subtree. Its endpoint Pins and every Pin
- * spatially contained by it move by the same delta. Relations that share those
- * Pins deform from those shared objects rather than being copied.
+ * Translate one Section through its two shared endpoint Pins. Geometric
+ * containment is a query, not ownership: unrelated interior Pins never move.
+ * Every Section incident to either shared endpoint deforms truthfully.
  */
 export function translateSection(guide, sectionId, requestedDelta, duration) {
   const section = resolveSection(guide, sectionId);
@@ -400,7 +342,6 @@ export function replaceSectionExtent(guide, sectionId, start, end, options = {})
   if (!(B > A + EPSILON)) throw new RangeError("A Section requires positive duration.");
 
   const label = String(options.label ?? section.label ?? "").trim();
-  if (!label) throw new RangeError("A Section requires a title.");
 
   const existingStart = findPinAt(guide, A);
   const existingEnd = findPinAt(guide, B);
@@ -462,63 +403,62 @@ function projectionCoordinate(projection, source) {
 }
 
 function traversalStops(guide, range, projection = null) {
-  const pins = visiblePins(guide)
+  if (projection?.orderedPinStops) {
+    return projection.orderedPinStops(range, guide);
+  }
+  return visiblePins(guide)
     .filter(pin => pin.t >= range.start - EPSILON && pin.t <= range.end + EPSILON)
-    .filter(pin => !projection?.foldAtSource?.(pin.t))
     .map(pin => ({
       ...pin,
       stopKind: "pin",
       sourcePin: pin,
-      traversal: projectionCoordinate(projection, pin.t)
+      traversal: pin.t,
+      fold: null
     }));
-  const folds = (projection?.folds || [])
-    .filter(fold =>
-      fold.start >= range.start - EPSILON
-      && fold.end <= range.end + EPSILON
-    )
-    .map(fold => ({
-      id: `section-proxy:${fold.sectionIds.join("+")}`,
-      stopKind: "section",
-      sectionId: fold.sectionIds[0],
-      sectionIds: [...fold.sectionIds],
-      label: fold.sections[0]?.label || "Section",
-      start: fold.start,
-      end: fold.end,
-      t: fold.end,
-      traversal: fold.traversal,
-      fold
-    }));
-  return [...pins, ...folds]
-    .sort((first, second) =>
-      first.traversal - second.traversal
-      || (first.stopKind === "section" ? -1 : 1)
-    );
 }
 
 export function previousPin(guide, current, range, projection = null) {
   const coordinate = projectionCoordinate(projection, current);
-  const stop = traversalStops(guide, range, projection)
+  const fold = projection?.foldAtSource?.(current) || null;
+  const stops = traversalStops(guide, range, projection);
+  if (fold) {
+    const withinFold = stops
+      .filter(item =>
+        item.fold === fold
+        && item.t < current - EPSILON
+      )
+      .at(-1);
+    if (withinFold) return withinFold;
+  }
+  return stops
     .filter(item => item.traversal < coordinate - EPSILON)
     .at(-1) || null;
-  return stop?.stopKind === "section"
-    ? { ...stop, t: stop.start, direction: "backward" }
-    : stop;
 }
 
 export function nextPin(guide, current, range, projection = null) {
   const coordinate = projectionCoordinate(projection, current);
-  const stop = traversalStops(guide, range, projection)
-    .find(item => item.traversal > coordinate + EPSILON) || null;
-  return stop?.stopKind === "section"
-    ? { ...stop, t: stop.end, direction: "forward" }
-    : stop;
+  const fold = projection?.foldAtSource?.(current) || null;
+  const stops = traversalStops(guide, range, projection);
+  if (fold) {
+    const withinFold = stops.find(item =>
+      item.fold === fold
+      && item.t > current + EPSILON
+    );
+    if (withinFold) return withinFold;
+  }
+  return stops.find(item => item.traversal > coordinate + EPSILON) || null;
 }
 
 export function sortedSections(guide) {
   return guide.sections
     .map(section => resolveSection(guide, section))
     .filter(Boolean)
-    .sort((a, b) => a.start - b.start || b.end - a.end || a.label.localeCompare(b.label));
+    .sort((a, b) =>
+      a.start - b.start
+      || b.end - a.end
+      || String(a.label || "").localeCompare(String(b.label || ""))
+      || a.id.localeCompare(b.id)
+    );
 }
 
 export function clusterPinsByPixels(pins, duration, width, minimumGap = 16) {
@@ -596,7 +536,7 @@ export function normalizeGuide(parsed, videoId) {
       createdAt: Number(source.createdAt) || now(),
       updatedAt: Number(source.updatedAt) || Number(source.createdAt) || now()
     };
-    if (section.label && resolveSection({ ...guide, sections: [section] }, section)) guide.sections.push(section);
+    if (resolveSection({ ...guide, sections: [section] }, section)) guide.sections.push(section);
   }
 
   guide.updatedAt = now();
@@ -656,20 +596,10 @@ export function validateGuide(guide, duration) {
       || ids.has(section.id)
       || !section.startPinId
       || !section.endPinId
-      || !String(section.label || "").trim()
       || typeof section.collapsed !== "boolean"
       || !resolveSection(guide, section)
     ) return false;
     ids.add(section.id);
-  }
-  const collapsed = sortedSections(guide).filter(section => section.collapsed);
-  for (let first = 0; first < collapsed.length; first += 1) {
-    for (let second = first + 1; second < collapsed.length; second += 1) {
-      if (
-        sectionsCross(collapsed[first], collapsed[second])
-        || sectionsTouchAsSiblings(collapsed[first], collapsed[second])
-      ) return false;
-    }
   }
   return true;
 }
@@ -735,7 +665,7 @@ export function sanitizeGuide(input, videoId, duration) {
     const firstPinId = idMap.get(sourceSection.startPinId);
     const secondPinId = idMap.get(sourceSection.endPinId);
     const label = String(sourceSection.label || "").trim();
-    if (!firstPinId || !secondPinId || !label || firstPinId === secondPinId) continue;
+    if (!firstPinId || !secondPinId || firstPinId === secondPinId) continue;
 
     const firstPin = getPin(guide, firstPinId);
     const secondPin = getPin(guide, secondPinId);
@@ -759,24 +689,6 @@ export function sanitizeGuide(input, videoId, duration) {
     };
     const resolved = resolveSection({ ...guide, sections: [section] }, section);
     if (!resolved) continue;
-    if (
-      section.collapsed
-      && guide.sections
-        .filter(existing => existing.collapsed)
-        .map(existing => resolveSection(guide, existing))
-        .some(existing =>
-          existing
-          && (
-            sectionsCross(resolved, existing)
-            || sectionsTouchAsSiblings(resolved, existing)
-          )
-        )
-    ) {
-      // Crossing or directly adjacent sibling Sections remain valid retained
-      // relations, but cannot own ambiguous collapsed inverses together.
-      // Preserve the Section and recover it expanded rather than discarding it.
-      section.collapsed = false;
-    }
     guide.sections.push(section);
     sectionKeys.add(duplicateKey);
     usedIds.add(section.id);

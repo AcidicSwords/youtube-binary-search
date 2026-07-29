@@ -24,10 +24,13 @@ import {
 import { projectionForModel } from "./temporal-projection.js";
 import {
   TRANSPORT_KIND,
-  isTransportActive,
-  transportMaterializedExtents
+  isTransportActive
 } from "./transport.js";
-import { projectPlayback } from "./session.js";
+import {
+  STEP_REACH_MODE,
+  effectiveStepReach,
+  projectPlayback
+} from "./session.js";
 import { YOUTUBE_STATE } from "./youtube.js";
 
 export function formatTime(seconds) {
@@ -103,6 +106,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
   };
   const transportIs = kind => state().transport.kind === kind;
 
+  function sectionLabel(section) {
+    return section?.label?.trim() || `Section ${formatRange(section)}`;
+  }
+
   function pinLabel(pin) {
     if (pin.label?.trim()) return pin.label.trim();
     const references = sectionsForPin(guide(), pin.id)
@@ -111,7 +118,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     if (references.length === 1) {
       const section = references[0];
       const role = section.startPinId === pin.id ? "Start" : "End";
-      return `${role} of ${section.label}`;
+      return `${role} of ${sectionLabel(section)}`;
     }
     if (references.length > 1) return `${references.length}-Section endpoint`;
     return pin.kind === PIN_KIND.ENDPOINT ? "Section endpoint" : "Unnamed Pin";
@@ -122,12 +129,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     if (state().guideDrag?.moved && state().guideDrag.projection) {
       return state().guideDrag.projection;
     }
-    return projectionForModel(model(), {
-      expandedExtents: transportMaterializedExtents(
-        state().transport,
-        range()
-      )
-    });
+    return projectionForModel(model());
   }
 
   function setStatus(message, isError = false) {
@@ -234,135 +236,306 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     return palette[Math.abs(hash) % palette.length];
   }
 
-  function sectionDepth(section, sections) {
-    return sections.filter(other =>
-      other.id !== section.id
-      && other.start <= section.start + EPSILON
-      && other.end >= section.end - EPSILON
-      && (
-        other.start < section.start - EPSILON
-        || other.end > section.end + EPSILON
-      )
-    ).length;
+  function formatRulerTime(seconds) {
+    return formatTime(seconds).replace(/\.000$/, "");
+  }
+
+  function renderTimelineRuler(projection) {
+    const ruler = elements["timeline-ruler"];
+    if (!ruler) return;
+    ruler.replaceChildren();
+    for (let index = 0; index <= 4; index += 1) {
+      const traversal = projection.effectiveDuration * index / 4;
+      const source = projection.traversalToSource(
+        traversal,
+        index === 0 ? "backward" : "forward"
+      );
+      const tick = document.createElement("span");
+      tick.className = "timeline-ruler-tick";
+      if (index === 0 || index === 4) tick.classList.add("edge");
+      tick.style.left = `${index * 25}%`;
+      const label = document.createElement("time");
+      label.textContent = formatRulerTime(source);
+      tick.appendChild(label);
+      ruler.appendChild(tick);
+    }
+  }
+
+  function packSectionLanes(entries, limit = 5) {
+    const laneEnds = [];
+    for (const entry of entries) {
+      let lane = laneEnds.findIndex(end => entry.projected.start > end + EPSILON);
+      if (lane < 0) lane = laneEnds.length;
+      lane = Math.min(lane, limit - 1);
+      laneEnds[lane] = Math.max(laneEnds[lane] ?? 0, entry.projected.end);
+      entry.lane = lane;
+    }
+    return entries;
+  }
+
+  function intervalContainsSection(section) {
+    const working = interval();
+    return Boolean(
+      working
+      && working.start <= section.start + EPSILON
+      && working.end >= section.end - EPSILON
+    );
+  }
+
+  function intervalContainsPin(pin) {
+    const working = interval();
+    return Boolean(
+      working
+      && pin.t >= working.start - EPSILON
+      && pin.t <= working.end + EPSILON
+    );
   }
 
   function renderTimelineSections(projection) {
-    const lane = elements["section-lane"];
-    if (!lane) return;
-    lane.replaceChildren();
+    const sectionLane = elements["section-lane"];
+    const foldLane = elements["fold-lane"];
+    if (!sectionLane || !foldLane) return;
+    sectionLane.replaceChildren();
+    foldLane.replaceChildren();
+    renderTimelineRuler(projection);
+
     const sections = sortedSections(guide());
     const activeIds = new Set(
       projection.folds.flatMap(fold => fold.sectionIds)
     );
-    const renderedFolds = new Set();
-
-    for (const section of sections) {
-      const coveringFold = projection.folds.find(fold =>
-        section.start >= fold.start - EPSILON
-        && section.end <= fold.end + EPSILON
-        && !fold.sectionIds.includes(section.id)
+    const openEntries = sections
+      .filter(section => !activeIds.has(section.id))
+      .map(section => ({
+        section,
+        projected: projection.projectExtent(section)
+      }))
+      .filter(entry =>
+        entry.projected
+        && entry.projected.end - entry.projected.start > EPSILON
+      )
+      .sort((first, second) =>
+        first.projected.start - second.projected.start
+        || first.projected.end - second.projected.end
       );
-      if (coveringFold) continue;
 
+    for (const entry of packSectionLanes(openEntries)) {
+      const { section, projected, lane } = entry;
       const color = sectionColor(section.id);
-      const depth = Math.min(4, sectionDepth(section, sections));
-      if (activeIds.has(section.id)) {
-        const fold = projection.folds.find(item =>
-          item.sectionIds.includes(section.id)
-        );
-        if (renderedFolds.has(fold)) continue;
-        renderedFolds.add(fold);
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "timeline-section-pin";
-        button.dataset.sectionExpand = section.id;
-        button.dataset.sectionExpandGroup = fold.sectionIds.join(",");
-        button.style.left = `${(
-          fold.traversal / Math.max(projection.effectiveDuration, EPSILON)
-        ) * 100}%`;
-        setStyleProperty(button, "--section-color", color);
-        setStyleProperty(button, "--section-depth", String(depth));
-        if (
-          state().selectedRetained?.kind === "section"
-          && fold.sectionIds.includes(state().selectedRetained.id)
-        ) {
-          button.classList.add("retained-selected");
-        }
-        button.setAttribute(
-          "aria-label",
-          fold.sectionIds.length > 1
-            ? `Expand ${fold.sectionIds.length} coincident Sections, ${formatRange(section)}`
-            : `Expand Section ${section.label}, ${formatRange(section)}`
-        );
-        const foldedLabel = fold.sectionIds.length > 1
-          ? `${fold.sectionIds.length} coincident Sections`
-          : section.label;
-        button.title = `${foldedLabel} · folded ${formatRange(section)}\nClick to expand; drag to translate the retained subtree.`;
-        const label = document.createElement("span");
-        label.className = "timeline-section-pin-label";
-        label.textContent = foldedLabel;
-        button.appendChild(label);
-        lane.appendChild(button);
-        continue;
-      }
-
-      const projected = projection.projectExtent(section);
-      if (!projected || projected.end - projected.start <= EPSILON) continue;
+      const selected = state().selectedRetained?.kind === "section"
+        && state().selectedRetained.id === section.id;
+      const left = projected.start / Math.max(projection.effectiveDuration, EPSILON) * 100;
+      const width = (
+        (projected.end - projected.start)
+        / Math.max(projection.effectiveDuration, EPSILON)
+      ) * 100;
       const span = document.createElement("span");
       span.className = "timeline-section-span";
       if (section.collapsed) span.classList.add("materialized");
-      if (
-        state().selectedRetained?.kind === "section"
-        && state().selectedRetained.id === section.id
-      ) {
-        span.classList.add("retained-selected");
-      }
-      span.style.left = `${(
-        projected.start / Math.max(projection.effectiveDuration, EPSILON)
-      ) * 100}%`;
-      span.style.width = `${(
-        (projected.end - projected.start)
-        / Math.max(projection.effectiveDuration, EPSILON)
-      ) * 100}%`;
+      if (selected) span.classList.add("retained-selected");
+      span.style.left = `${left}%`;
+      span.style.width = `${width}%`;
       setStyleProperty(span, "--section-color", color);
-      setStyleProperty(span, "--section-depth", String(depth));
+      setStyleProperty(span, "--section-lane", String(lane));
       span.setAttribute("aria-hidden", "true");
 
+      const body = document.createElement("button");
+      body.type = "button";
+      body.className = "timeline-section-body";
+      body.dataset.sectionDrag = section.id;
+      body.style.left = `${left}%`;
+      body.style.width = `${width}%`;
+      setStyleProperty(body, "--section-color", color);
+      setStyleProperty(body, "--section-lane", String(lane));
+      if (selected) body.classList.add("retained-selected");
+      body.setAttribute(
+        "aria-label",
+        `Select and move ${sectionLabel(section)}, ${formatRange(section)}`
+      );
+      body.title = `${sectionLabel(section)} · drag to translate its shared endpoint Pins`;
+
+      const hinge = document.createElement("button");
+      hinge.type = "button";
+      hinge.className = "timeline-section-fold";
+      if (selected) hinge.classList.add("retained-selected");
+      if (section.collapsed) {
+        hinge.classList.add("materialized");
+        hinge.dataset.sectionExpand = section.id;
+      } else {
+        hinge.dataset.sectionCollapse = section.id;
+      }
       const midpoint = projection.sourceMidpoint(section.start, section.end);
-      const midpointPosition = `${(
+      hinge.style.left = `${
         projection.sourceToTraversal(midpoint)
         / Math.max(projection.effectiveDuration, EPSILON)
-      ) * 100}%`;
-      if (section.collapsed) {
-        const materialized = document.createElement("span");
-        materialized.className = "timeline-section-materialized";
-        materialized.style.left = midpointPosition;
-        setStyleProperty(materialized, "--section-color", color);
-        setStyleProperty(materialized, "--section-depth", String(depth));
-        materialized.setAttribute("aria-hidden", "true");
-        materialized.title = `“${section.label}” remains folded and will return to one Section Pin when materialization ends.`;
-        lane.append(span, materialized);
-      } else {
-        const collapse = document.createElement("button");
-        collapse.type = "button";
-        collapse.className = "timeline-section-fold";
+        * 100
+      }%`;
+      setStyleProperty(hinge, "--section-color", color);
+      setStyleProperty(hinge, "--section-lane", String(lane));
+      hinge.setAttribute(
+        "aria-label",
+        `${section.collapsed ? "Unfold" : "Transpose"} ${sectionLabel(section)}, ${formatRange(section)}`
+      );
+      hinge.title = `${section.collapsed ? "Unfold" : "Transpose"} ${sectionLabel(section)}`;
+      sectionLane.append(span, body, hinge);
+    }
+
+    const timelineWidth = Math.max(1, elements.timeline.clientWidth || 1);
+    for (const fold of projection.folds) {
+      const root = document.createElement("div");
+      root.className = "timeline-fold";
+      root.style.left = `${
+        fold.traversal / Math.max(projection.effectiveDuration, EPSILON) * 100
+      }%`;
+      const height = clamp(
+        timelineWidth * fold.sourceDuration / Math.max(model().duration, EPSILON),
+        48,
+        148
+      );
+      setStyleProperty(root, "--fold-height", `${height}px`);
+      root.dataset.foldStart = String(fold.start);
+      root.dataset.foldEnd = String(fold.end);
+
+      const axis = document.createElement("span");
+      axis.className = "timeline-fold-axis";
+      axis.setAttribute("aria-hidden", "true");
+      root.appendChild(axis);
+
+      const duration = document.createElement("span");
+      duration.className = "timeline-fold-duration";
+      duration.textContent = formatDuration(fold.sourceDuration);
+      duration.setAttribute("aria-hidden", "true");
+      root.appendChild(duration);
+
+      const cursor = document.createElement("span");
+      cursor.className = "timeline-fold-cursor";
+      cursor.hidden = true;
+      cursor.setAttribute("aria-hidden", "true");
+      root.appendChild(cursor);
+
+      const current = document.createElement("span");
+      current.className = "timeline-fold-current";
+      current.hidden = true;
+      current.setAttribute("aria-hidden", "true");
+      root.appendChild(current);
+
+      const railSpacing = Math.min(
+        7,
+        32 / Math.max(1, fold.sections.length - 1)
+      );
+      const railCenter = (fold.sections.length - 1) / 2;
+      for (const [railIndex, section] of fold.sections.entries()) {
+        const rail = document.createElement("button");
+        rail.type = "button";
+        rail.className = "timeline-fold-rail";
+        rail.dataset.sectionExpand = section.id;
+        const startRatio = (section.start - fold.start) / Math.max(fold.sourceDuration, EPSILON);
+        const endRatio = (section.end - fold.start) / Math.max(fold.sourceDuration, EPSILON);
+        setStyleProperty(rail, "--rail-top", `${(1 - endRatio) * 100}%`);
+        setStyleProperty(rail, "--rail-height", `${(endRatio - startRatio) * 100}%`);
+        setStyleProperty(
+          rail,
+          "--rail-offset",
+          `${(railIndex - railCenter) * railSpacing}px`
+        );
+        setStyleProperty(rail, "--section-color", sectionColor(section.id));
+        if (intervalContainsSection(section)) rail.classList.add("interval-included");
         if (
           state().selectedRetained?.kind === "section"
           && state().selectedRetained.id === section.id
-        ) {
-          collapse.classList.add("retained-selected");
-        }
-        collapse.dataset.sectionCollapse = section.id;
-        collapse.style.left = midpointPosition;
-        setStyleProperty(collapse, "--section-color", color);
-        setStyleProperty(collapse, "--section-depth", String(depth));
-        collapse.setAttribute(
+        ) rail.classList.add("retained-selected");
+        rail.setAttribute(
           "aria-label",
-          `Fold Section ${section.label} into one Section Pin`
+          `Unfold ${sectionLabel(section)}, ${formatRange(section)}`
         );
-        collapse.title = `Fold “${section.label}”`;
-        lane.append(span, collapse);
+        rail.title = `${sectionLabel(section)} · ${formatRange(section)}\nClick to unfold only this Section.`;
+        root.appendChild(rail);
       }
+
+      const endpointLayout = fold.boundaryPins
+        .map(pin => {
+          const ratio = (
+            pin.t - fold.start
+          ) / Math.max(fold.sourceDuration, EPSILON);
+          return {
+            pin,
+            ratio,
+            y: (1 - ratio) * height,
+            offset: 0
+          };
+        })
+        .sort((first, second) => first.y - second.y);
+      for (let start = 0; start < endpointLayout.length;) {
+        let end = start + 1;
+        while (
+          end < endpointLayout.length
+          && endpointLayout[end].y - endpointLayout[end - 1].y < 18
+        ) end += 1;
+        const group = endpointLayout.slice(start, end);
+        const spacing = group.length > 1
+          ? Math.min(14, 36 / (group.length - 1))
+          : 0;
+        group.forEach((entry, index) => {
+          entry.offset = (index - (group.length - 1) / 2) * spacing;
+        });
+        start = end;
+      }
+      // The hinge owns the axis intersection. If a nested/asymmetric Section
+      // contributes a Pin at that same source height, move only its visual
+      // button sideways and retain a connector to the exact rail position.
+      // This keeps both controls selectable without changing source geometry.
+      const hingePins = endpointLayout.filter(entry =>
+        Math.abs(entry.y - height / 2) < 16
+      );
+      hingePins.forEach((entry, index) => {
+        const side = index % 2 === 0 ? -1 : 1;
+        entry.offset = side * Math.max(18, Math.abs(entry.offset));
+      });
+
+      for (const { pin, ratio, offset } of endpointLayout) {
+        const endpoint = document.createElement("button");
+        endpoint.type = "button";
+        endpoint.className = "timeline-fold-pin";
+        endpoint.dataset.pinGo = pin.id;
+        setStyleProperty(endpoint, "--pin-position", `${(1 - ratio) * 100}%`);
+        setStyleProperty(endpoint, "--pin-offset", `${offset}px`);
+        setStyleProperty(endpoint, "--pin-link-width", `${Math.abs(offset)}px`);
+        if (offset > 0.5) endpoint.classList.add("offset-right");
+        if (offset < -0.5) endpoint.classList.add("offset-left");
+        if (intervalContainsPin(pin)) endpoint.classList.add("interval-contained");
+        if (state().selectedPinIds?.includes(pin.id)) endpoint.classList.add("pair-selected");
+        if (
+          state().selectedRetained?.kind === "pin"
+          && state().selectedRetained.id === pin.id
+        ) endpoint.classList.add("retained-selected");
+        endpoint.setAttribute(
+          "aria-label",
+          `${pinLabel(pin)} at ${formatTime(pin.t)}; stacked Fold endpoint`
+        );
+        endpoint.title = `${pinLabel(pin)} · ${formatTime(pin.t)}`;
+        root.appendChild(endpoint);
+      }
+
+      const hinge = document.createElement("button");
+      hinge.type = "button";
+      hinge.className = "timeline-fold-hinge";
+      if (fold.sectionIds.length === 1) {
+        hinge.dataset.sectionExpand = fold.sectionIds[0];
+        hinge.setAttribute(
+          "aria-label",
+          `Unfold ${sectionLabel(fold.sections[0])}`
+        );
+      } else {
+        hinge.dataset.foldContributors = fold.sectionIds.join(",");
+        hinge.setAttribute(
+          "aria-label",
+          `Choose one of ${fold.sectionIds.length} transposed Sections`
+        );
+      }
+      hinge.title = fold.sectionIds.length === 1
+        ? `Unfold ${sectionLabel(fold.sections[0])}`
+        : `${fold.sectionIds.length} Sections share this Fold; select a colored rail.`;
+      root.appendChild(hinge);
+      foldLane.appendChild(root);
     }
   }
 
@@ -370,15 +543,13 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const width = Math.max(1, elements.timeline.clientWidth || 1);
     const activeRange = range();
     const projection = timelineProjection();
-    const semanticProjection = projectionForModel(model());
     const pins = visiblePins(guide())
       .filter(pin => contains(activeRange, pin.t))
       .filter(pin => !projection.foldAtSource(pin.t))
       .map(pin => ({
         ...pin,
         sourceT: pin.t,
-        t: projection.sourceToTraversal(pin.t),
-        retainedFold: semanticProjection.foldAtSource(pin.t)
+        t: projection.sourceToTraversal(pin.t)
       }));
     const sectionKey = sortedSections(guide())
       .map(section =>
@@ -394,13 +565,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       .map(fold => `${fold.start}:${fold.end}:${fold.sectionIds.join("+")}`)
       .join(",");
     const pinKey = pins
-      .map(pin =>
-        `${pin.id}:${pin.t}:${pin.label}:${
-          pin.retainedFold?.sectionIds?.join("+") || ""
-        }`
-      )
+      .map(pin => `${pin.id}:${pin.t}:${pin.label}`)
       .join(",");
-    const key = `${activeRange.start}|${activeRange.end}|${width}|${projection.effectiveDuration}|${foldKey}|${sectionKey}|${selectedKey}|${pinKey}`;
+    const intervalKey = interval()
+      ? `${interval().start}:${interval().end}`
+      : "none";
+    const key = `${activeRange.start}|${activeRange.end}|${width}|${projection.effectiveDuration}|${foldKey}|${sectionKey}|${selectedKey}|${intervalKey}|${pinKey}`;
     if (key === renderedPinKey) return;
     renderedPinKey = key;
     closePinClusterMenu();
@@ -432,9 +602,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
             sectionColor(endpointSections[0].id)
           );
         }
-        if (pin.retainedFold) {
-          button.classList.add("transport-materialized");
-        }
         if (state().selectedPinIds?.includes(pin.id)) {
           button.classList.add("pair-selected");
         }
@@ -442,11 +609,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           state().selectedRetained?.kind === "pin"
           && state().selectedRetained.id === pin.id
         ) button.classList.add("retained-selected");
-        const description = `${pinLabel(pin)} at ${formatTime(pin.sourceT)}${
-          pin.retainedFold
-            ? `; retained inside folded Section ${pin.retainedFold.sections[0]?.label || "Section"}`
-            : ""
-        }`;
+        const description = `${pinLabel(pin)} at ${formatTime(pin.sourceT)}`;
         button.setAttribute("aria-label", description);
         button.title = description;
       } else {
@@ -508,6 +671,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           && !fold.sectionIds.includes(section.id)
         );
         const materialized = section.collapsed && !activeFold && !coveringFold;
+        const withoutSection = section.collapsed
+          ? projectionForModel(model(), {
+              expandedSectionIds: [section.id]
+            })
+          : null;
+        const stillCovered = withoutSection?.folds?.filter(fold =>
+          fold.start < section.end - EPSILON
+          && fold.end > section.start + EPSILON
+        ) || [];
         const item = document.createElement("article");
         item.className = "guide-item section-item";
         item.dataset.sectionPreviewId = section.id;
@@ -518,6 +690,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           state().selectedRetained?.kind === "section"
           && state().selectedRetained.id === section.id
         ) item.classList.add("retained-selected");
+        setStyleProperty(item, "--section-color", sectionColor(section.id));
 
         const main = document.createElement("button");
         main.type = "button";
@@ -526,13 +699,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         const title = document.createElement("span");
         title.className = "guide-item-title";
         const projectionNote = activeFold
-          ? "Folded"
+          ? stillCovered.length > 0
+            ? `Transposed · overlaps ${stillCovered.length} other Fold${stillCovered.length === 1 ? "" : "s"}`
+            : "Transposed"
           : coveringFold
-            ? `Inside ${coveringFold.sections[0]?.label || "folded Section"}`
+            ? `Inside ${sectionLabel(coveringFold.sections[0])}`
             : materialized
               ? "Materialized"
               : "";
-        title.textContent = `${section.label}${projectionNote ? ` · ${projectionNote}` : ""}`;
+        title.textContent = `${sectionLabel(section)}${projectionNote ? ` · ${projectionNote}` : ""}`;
         const time = document.createElement("span");
         time.className = "guide-item-time";
         time.textContent = `${formatRange(section)} · ${formatDuration(section.end - section.start)}`;
@@ -549,18 +724,14 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           focus.dataset.focusSection = section.id;
           focus.textContent = "Focus";
         }
-        const loop = document.createElement("button");
-        loop.type = "button";
-        loop.dataset.loopSection = section.id;
-        loop.textContent = "Loop";
         const fold = document.createElement("button");
         fold.type = "button";
         if (section.collapsed) {
           fold.dataset.expandSection = section.id;
-          fold.textContent = "Expand";
+          fold.textContent = "Unfold";
         } else {
           fold.dataset.collapseSection = section.id;
-          fold.textContent = "Fold";
+          fold.textContent = "Transpose";
         }
         const overwrite = document.createElement("button");
         overwrite.type = "button";
@@ -576,7 +747,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         remove.dataset.deleteSection = section.id;
         remove.textContent = "Delete";
         remove.className = "danger-text";
-        actions.append(focus, loop, fold, overwrite, rename, remove);
+        actions.append(focus, fold, overwrite, rename, remove);
 
         const endpoints = document.createElement("div");
         endpoints.className = "section-endpoints";
@@ -622,7 +793,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         time.className = "guide-item-time";
         time.textContent = `${formatTime(pin.t)}${
           containingFold
-            ? ` · inside ${containingFold.sections[0]?.label || "folded Section"}`
+            ? ` · inside ${sectionLabel(containingFold.sections[0])}`
             : ""
         }`;
         main.append(title, time);
@@ -645,9 +816,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         remove.textContent = "Delete";
         remove.className = "danger-text";
         const references = sectionsForPin(guide(), pin.id).length;
-        remove.disabled = references > 0;
         if (references) {
-          remove.title = `Used by ${references} Section${references === 1 ? "" : "s"}`;
+          remove.textContent = "Delete…";
+          remove.title = `Also dissolves ${references} referencing Section${references === 1 ? "" : "s"} after confirmation`;
         }
         actions.append(select, rename, remove);
         item.append(main, actions);
@@ -660,7 +831,13 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
   }
 
   function renderActionPreview(actionModel, structural) {
-    let actionRange = previewAction && actionModel ? actionModel[previewAction] : null;
+    const shiftedDirectional = (state().shiftLayer || state().shiftKeyHeld)
+      && ["stepBackward", "stepForward"].includes(previewAction);
+    let actionRange = shiftedDirectional
+      ? structural?.[previewAction] || null
+      : previewAction && actionModel
+        ? actionModel[previewAction]
+        : null;
     if (!actionRange && structural) actionRange = structural[previewAction] || null;
     elements["action-preview-fill"].hidden = !actionRange;
     if (!actionRange) {
@@ -697,6 +874,38 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : semanticCurrent;
 
     elements["cursor-time"].textContent = formatTime(cursor);
+    for (const foldElement of elements["fold-lane"]?.querySelectorAll?.(".timeline-fold") || []) {
+      const start = Number(foldElement.dataset.foldStart);
+      const end = Number(foldElement.dataset.foldEnd);
+      const duration = Math.max(EPSILON, end - start);
+      const cursorMarker = foldElement.querySelector?.(".timeline-fold-cursor");
+      const currentMarker = foldElement.querySelector?.(".timeline-fold-current");
+      const cursorInside = moving
+        && cursor > start + EPSILON
+        && cursor < end - EPSILON;
+      const currentInside = semanticCurrent >= start - EPSILON
+        && semanticCurrent <= end + EPSILON;
+      if (cursorMarker) {
+        cursorMarker.hidden = !cursorInside;
+        if (cursorInside) {
+          setStyleProperty(
+            cursorMarker,
+            "--fold-marker-position",
+            `${(1 - (cursor - start) / duration) * 100}%`
+          );
+        }
+      }
+      if (currentMarker) {
+        currentMarker.hidden = !currentInside;
+        if (currentInside) {
+          setStyleProperty(
+            currentMarker,
+            "--fold-marker-position",
+            `${(1 - (semanticCurrent - start) / duration) * 100}%`
+          );
+        }
+      }
+    }
 
     const transport = state().transport;
     const playbackProjection = transport.kind === TRANSPORT_KIND.PLAYBACK
@@ -769,13 +978,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       const activation = currentState.field?.activation || null;
       const preparing = Boolean(activation && !activation.ready);
       surface.disabled = !currentState.videoLoaded || preparing;
-      const label = transportKind === TRANSPORT_KIND.LOOP
-        ? "Stop Loop"
-        : contextObservation
-          ? "Set Current Here"
-          : ordinaryPlayback
-            ? "Pause Field"
-            : "Play Field";
+      const label = contextObservation
+        ? "Set Current Here"
+        : ordinaryPlayback
+          ? "Pause Field"
+          : "Play Field";
       surface.setAttribute("aria-label", preparing ? "Preparing Field players" : label);
       surface.setAttribute("aria-pressed", String(ordinaryPlayback));
       if (elements["center-transport-label"]) {
@@ -783,7 +990,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       }
       if (elements["center-transport-icon"]) {
         elements["center-transport-icon"].textContent = (
-          transportKind === TRANSPORT_KIND.LOOP || contextObservation || ordinaryPlayback
+          contextObservation || ordinaryPlayback
         ) ? "■" : "▶";
       }
     }
@@ -800,6 +1007,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
   function render() {
     const currentState = state();
     const loaded = currentState.videoLoaded;
+    const shiftLayer = currentState.shiftLayer || currentState.shiftKeyHeld;
     const activeRange = range();
     const currentResolution = resolution();
     const currentInterval = interval();
@@ -808,8 +1016,13 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const fieldSpan = field?.span?.held && field.span.available
       ? { start: field.span.start, end: field.span.end }
       : null;
-    const loopActive = transportIs(TRANSPORT_KIND.LOOP);
     const semanticCurrent = currentResolution?.C ?? 0;
+    const configuredReach = model().stepReach;
+    const effectiveReach = effectiveStepReach(
+      configuredReach,
+      activeRange,
+      projection
+    );
     const targets = currentResolution
       ? getTargets(currentResolution, projection.metric)
       : { backward: null, forward: null };
@@ -819,7 +1032,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           activeRange,
           currentInterval,
           semanticCurrent,
-          currentState.session.model.stepReach,
+          effectiveReach,
           projection.metric
         )
       : null;
@@ -830,13 +1043,24 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? nextPin(guide(), semanticCurrent, activeRange, projection)
       : null;
     const switchFrame = currentInterval?.departureFrame?.resolution;
+    const selectedForPreview = currentState.selectedRetained?.kind === "section"
+      ? resolveSection(guide(), currentState.selectedRetained.id)
+      : null;
     const structuralPresentation = currentResolution ? {
       previousPin: previous ? { start: previous.t, end: semanticCurrent } : null,
       nextPin: next ? { start: semanticCurrent, end: next.t } : null,
+      stepBackward: shiftLayer && previous
+        ? { start: previous.t, end: semanticCurrent }
+        : null,
+      stepForward: shiftLayer && next
+        ? { start: semanticCurrent, end: next.t }
+        : null,
       switchEndpoint: switchFrame
         ? { start: switchFrame.L, end: switchFrame.R }
         : currentInterval,
-      loop: currentInterval
+      release: currentInterval,
+      transpose: currentInterval || selectedForPreview,
+      focus: currentInterval || selectedForPreview
     } : null;
     const focused = focusedProjection();
 
@@ -868,9 +1092,46 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? `${currentState.contextSeconds} s centered on Current`
       : "Off";
 
-    const stepReach = currentState.session.model.stepReach || { backward: 10, forward: 10, linked: false };
-    elements["step-backward-seconds"].value = String(stepReach.backward);
-    elements["step-forward-seconds"].value = String(stepReach.forward);
+    const fieldOffsets = currentState.fieldOffsets
+      || { backward: 10, forward: 10 };
+    elements["step-backward-seconds"].value = String(fieldOffsets.backward);
+    elements["step-forward-seconds"].value = String(fieldOffsets.forward);
+    elements["step-size-seconds"].value = String(configuredReach.forward);
+    const adaptiveStep = configuredReach.mode === STEP_REACH_MODE.ADAPTIVE;
+    elements["step-size-summary"].textContent = adaptiveStep
+      ? `1/${Math.round(1 / configuredReach.fraction)} Range${
+          loaded ? ` · ${formatDuration(effectiveReach.forward)}` : ""
+        }`
+      : `${formatDuration(configuredReach.forward)} manual`;
+    elements["step-mode-fixed"].setAttribute("aria-pressed", String(!adaptiveStep));
+    elements["step-mode-adaptive"].setAttribute("aria-pressed", String(adaptiveStep));
+    elements["step-size-seconds"].disabled = adaptiveStep;
+    for (const control of document.querySelectorAll("[data-step-fraction]")) {
+      const selected = Math.abs(
+        Number(control.dataset.stepFraction) - configuredReach.fraction
+      ) <= Number.EPSILON;
+      control.setAttribute("aria-pressed", String(selected));
+      control.disabled = false;
+    }
+
+    elements["shift-layer-toggle"].setAttribute("aria-pressed", String(shiftLayer));
+    elements["shift-layer-state"].textContent = shiftLayer ? "On" : "Off";
+    elements["refine-backward-label"].textContent = shiftLayer
+      ? "Additive Refine Backward"
+      : "Refine Backward";
+    elements["refine-forward-label"].textContent = shiftLayer
+      ? "Additive Refine Forward"
+      : "Refine Forward";
+    elements["step-backward-label"].textContent = shiftLayer
+      ? "Pin Backward"
+      : "Step Backward";
+    elements["step-forward-label"].textContent = shiftLayer
+      ? "Pin Forward"
+      : "Step Forward";
+    elements["refine-backward"].classList.toggle("shifted-action", shiftLayer);
+    elements["refine-forward"].classList.toggle("shifted-action", shiftLayer);
+    elements["step-backward"].classList.toggle("shifted-action", shiftLayer);
+    elements["step-forward"].classList.toggle("shifted-action", shiftLayer);
 
     let sectionKind = elements["section-source"].value || "interval";
     const selectedPins = (currentState.selectedPinIds || [])
@@ -918,7 +1179,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
     elements["focused-section"].hidden = !focused;
     if (focused) {
-      elements["focused-section-title"].textContent = focused.label;
+      elements["focused-section-title"].textContent = focused.label?.trim()
+        || (focusedSectionId() ? sectionLabel(focused) : "Working Section");
       elements["focused-section-range"].textContent = formatRange(focused);
     } else {
       elements["focused-section-title"].textContent = "—";
@@ -935,9 +1197,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       if (elements[id]) elements[id].disabled = interactionLocked;
     }
 
-    elements["save-section"].disabled = interactionLocked
-      || !sectionExtent
-      || !elements["section-label"].value.trim();
+    elements["save-section"].disabled = interactionLocked || !sectionExtent;
     const workingFocus = model().focus?.kind === "working-section";
     const workingAlreadyOwnsRange = workingFocus
       && currentInterval
@@ -959,18 +1219,31 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements.reopen.disabled = interactionLocked || !actionModel?.reopen;
     elements["return-action"].disabled = !loaded || !currentState.session.history.length;
     elements["switch-endpoint"].disabled = interactionLocked || !currentInterval;
-    elements["step-backward"].disabled = interactionLocked || !actionModel?.stepBackward;
-    elements["step-forward"].disabled = interactionLocked || !actionModel?.stepForward;
-    elements["pin-backward"].disabled = interactionLocked || !previous;
-    elements["pin-forward"].disabled = interactionLocked || !next;
+    elements["step-backward"].disabled = interactionLocked
+      || (shiftLayer ? !previous : !actionModel?.stepBackward);
+    elements["step-forward"].disabled = interactionLocked
+      || (shiftLayer ? !next : !actionModel?.stepForward);
+    elements.release.disabled = interactionLocked || !currentInterval;
+    const selectedSection = currentState.selectedRetained?.kind === "section"
+      ? resolveSection(guide(), currentState.selectedRetained.id)
+      : null;
+    const foldAtCurrent = projection.foldAtSource(semanticCurrent);
+    elements.transpose.disabled = interactionLocked || !(
+      currentInterval
+      || selectedSection
+      || foldAtCurrent?.sectionIds?.length === 1
+    );
+    elements["focus-toggle"].disabled = interactionLocked || !(
+      focused
+      || currentInterval
+      || selectedSection
+    );
+    elements["shift-layer-toggle"].disabled = interactionLocked;
 
     const currentPin = currentResolution ? findPinAt(guide(), semanticCurrent) : null;
     const alreadyPinned = currentPin?.kind === PIN_KIND.EXPLICIT;
     elements["pin-current"].disabled = interactionLocked || (alreadyPinned && !elements["pin-label"].value.trim());
-    elements.loop.disabled = interactionLocked || (!currentInterval && !loopActive);
-    elements.loop.classList.toggle("is-active", loopActive);
-    elements.loop.setAttribute("aria-pressed", String(loopActive));
-    elements["loop-label"].textContent = loopActive ? "Stop Loop" : "Loop";
+    elements["focus-toggle-label"].textContent = focused ? "Unfocus" : "Focus";
 
     const atFullVideo = loaded
       && Math.abs(activeRange.start) <= EPSILON
@@ -996,14 +1269,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? currentState.session.history.at(-1).label
       : "Nothing to undo";
     const activeFold = projection.foldAtSource(semanticCurrent);
-    const foldEndpoint = activeFold
-      && currentInterval
-      && activeFold.start >= activeRange.start - EPSILON
-      && activeFold.end <= activeRange.end + EPSILON
-      && (
-        currentInterval.departure < activeFold.start - EPSILON
-        || currentInterval.departure > activeFold.end + EPSILON
-      );
     const destinationFrame = currentInterval?.departureFrame;
     const destinationScale = destinationFrame?.resolution
       ? formatDuration(destinationFrame.resolution.R - destinationFrame.resolution.L)
@@ -1012,13 +1277,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "switch-endpoint",
       "switch-endpoint-meta",
       "Switch Endpoint",
-      foldEndpoint
-        ? `${
-            currentInterval.foldEndpoint?.included === false
-              ? "include"
-              : "exclude"
-          } ${activeFold.sections[0]?.label || "Section"} · ⇧S switches Working endpoint`
-        : currentInterval
+      currentInterval
         ? `to ${formatTime(currentInterval.departure)}${destinationScale ? ` · ${destinationScale} ${destinationFrame.resolutionBasis === RESOLUTION_BASIS.RANGE ? "Range" : "movement"} scale` : ""}`
         : "No Interval"
     );
@@ -1034,7 +1293,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "Refine Backward",
       targets.backward === null
         ? backwardBlock === "resolution-limit" ? "Resolution limit" : "Range start"
-        : `${classifyRefineRelation(currentInterval, semanticCurrent, targets.backward)} loop to ${formatTime(targets.backward)}`
+        : shiftLayer
+          ? `retain anchor · to ${formatTime(targets.backward)}`
+          : `${classifyRefineRelation(currentInterval, semanticCurrent, targets.backward)} Interval · to ${formatTime(targets.backward)}`
     );
     setActionMeta(
       "refine-forward",
@@ -1042,30 +1303,52 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "Refine Forward",
       targets.forward === null
         ? forwardBlock === "resolution-limit" ? "Resolution limit" : "Range end"
-        : `${classifyRefineRelation(currentInterval, semanticCurrent, targets.forward)} loop to ${formatTime(targets.forward)}`
+        : shiftLayer
+          ? `retain anchor · to ${formatTime(targets.forward)}`
+          : `${classifyRefineRelation(currentInterval, semanticCurrent, targets.forward)} Interval · to ${formatTime(targets.forward)}`
     );
     elements["reopen-meta"].textContent = actionModel?.reopen
       ? `${formatDuration(
           projection.sourceDistance(activeRange.start, activeRange.end)
         )} traversal available`
       : "Range-level resolution";
-    elements["loop-meta"].textContent = currentInterval ? formatRange(currentInterval) : "No Interval";
     elements["step-backward-meta"].textContent = actionModel?.stepBackward
-      ? `to ${formatTime(actionModel.stepBackward.destination)}`
-      : "Range start";
+      ? shiftLayer
+        ? previous
+          ? `${formatTime(previous.t)} · ${pinLabel(previous)}`
+          : "No Pin backward"
+        : `${formatDuration(effectiveReach.backward)} · to ${formatTime(actionModel.stepBackward.destination)}`
+      : shiftLayer && previous
+        ? `${formatTime(previous.t)} · ${pinLabel(previous)}`
+        : "Range start";
     elements["step-forward-meta"].textContent = actionModel?.stepForward
-      ? `to ${formatTime(actionModel.stepForward.destination)}`
-      : "Range end";
-    elements["pin-backward-meta"].textContent = previous
-      ? previous.stopKind === "section"
-        ? `${formatRange(previous)} · ${previous.label} (folded)`
-        : `${formatTime(previous.t)} · ${pinLabel(previous)}`
-      : "No Pin backward";
-    elements["pin-forward-meta"].textContent = next
-      ? next.stopKind === "section"
-        ? `${formatRange(next)} · ${next.label} (folded)`
-        : `${formatTime(next.t)} · ${pinLabel(next)}`
-      : "No Pin forward";
+      ? shiftLayer
+        ? next
+          ? `${formatTime(next.t)} · ${pinLabel(next)}`
+          : "No Pin forward"
+        : `${formatDuration(effectiveReach.forward)} · to ${formatTime(actionModel.stepForward.destination)}`
+      : shiftLayer && next
+        ? `${formatTime(next.t)} · ${pinLabel(next)}`
+        : "Range end";
+    elements["release-meta"].textContent = currentInterval
+      ? formatRange(currentInterval)
+      : "No Interval";
+    const transposeTarget = currentInterval || selectedSection
+      || (
+        activeFold?.sectionIds?.length === 1
+          ? resolveSection(guide(), activeFold.sectionIds[0])
+          : null
+      );
+    elements["transpose-meta"].textContent = transposeTarget
+      ? `${transposeTarget.collapsed ? "unfold" : "transpose"} ${formatRange(transposeTarget)}`
+      : "No target";
+    elements["focus-toggle-meta"].textContent = focused
+      ? `restore ${formatRange(model().focus.returnRange)}`
+      : currentInterval
+        ? formatRange(currentInterval)
+        : selectedSection
+          ? formatRange(selectedSection)
+          : "No target";
 
     if (!loaded || !currentResolution) {
       for (const id of [

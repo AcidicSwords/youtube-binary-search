@@ -63,7 +63,7 @@ assert.deepEqual(frameOf(switched.session.model), arrivalFrame);
 assert.deepEqual(switched.session.model.interval, originalInterval);
 
 // Refine after transposition may pass the preserved opposite endpoint. Because
-// that target is outside the current Loop, the old Loop is discarded and the
+// that target is outside the current Interval, the old Interval is discarded and the
 // complete Current-to-midpoint traversal becomes the Working Section.
 let overrun = createSession({ duration: 100, current: 50 });
 overrun = goTo(overrun, 70, { operator: "timeline" }).session;
@@ -247,17 +247,22 @@ assert.deepEqual(legacy.model.interval.arrivalFrame.resolution, createRoot(0, 20
 const html = readFileSync(new URL("./index.html", import.meta.url), "utf8");
 const app = readFileSync(new URL("./app.js", import.meta.url), "utf8");
 const styles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
-assert.match(html, /id="pin-backward"[\s\S]*id="switch-endpoint"[\s\S]*id="pin-forward"/);
+assert.match(
+  html,
+  /id="refine-backward"[\s\S]*id="reopen"[\s\S]*id="refine-forward"[\s\S]*id="step-backward"[\s\S]*id="switch-endpoint"[\s\S]*id="step-forward"[\s\S]*id="release"[\s\S]*id="transpose"[\s\S]*id="focus-toggle"/
+);
 assert.match(html, /id="return-action"[\s\S]*Control\+Z Meta\+Z/);
 assert.match(
   app,
   /spatialKey\("s"\)[\s\S]*switchCurrentEndpoint\(\{ carryRetained: carryChord \}\)/
 );
-assert.match(
+assert.doesNotMatch(
   app,
-  /event\.shiftKey[\s\S]{0,180}key === "s"[\s\S]{0,180}switchCurrentEndpoint\(\{[\s\S]{0,120}forceInterval: true/,
-  "Plain S may toggle a folded Section face; Shift+S must retain direct Working endpoint transposition."
+  /forceInterval|foldedEndpoint/,
+  "Switch Endpoint must remain one exact involution without Fold-specific modes."
 );
-assert.match(styles, /"pin-backward switch-endpoint pin-forward"/);
+assert.match(styles, /"refine-backward reopen refine-forward"/);
+assert.match(styles, /"step-backward switch-endpoint step-forward"/);
+assert.match(styles, /"release transpose focus"/);
 
-console.log("Endpoint Transposition v5.8.6 tests passed: endpoint frames, involution, membership-based Refine replacement, Step composition, collapse, Undo separation, and matrix wiring.");
+console.log("Endpoint Transposition tests passed: endpoint frames, involution, Refine membership, Step composition, collapse, Undo separation, and v6 matrix wiring.");

@@ -8,7 +8,6 @@ import {
   deriveObservedField
 } from "./step-field-geometry.js";
 import { createSession, saveExtentAsSection } from "./session.js";
-import { createLoopTransport } from "./transport.js";
 
 const targets = deriveStepField(50, { backward: 10, forward: 10, linked: true }, { start: 0, end: 100 });
 const unfolding = deriveObservedField({
@@ -71,24 +70,21 @@ assert.equal(session.model.guide.sections.length, 1);
 assert.equal(session.model.guide.pins.length, 2);
 assert.equal(session.model.guide.sections[0].provenance, "field-span");
 
-const loop = createLoopTransport({ anchor: 50, start: 40, end: 60, source: "section:test" });
-assert.deepEqual({ start: loop.start, end: loop.end }, { start: 40, end: 60 });
-assert.equal(loop.source, "section:test");
-assert.equal(loop.cycles, 0);
-
 const html = readFileSync("index.html", "utf8");
 const app = readFileSync("app.js", "utf8");
 const fieldSource = readFileSync("step-field.js", "utf8");
 const css = readFileSync("field-grammar.css", "utf8");
 const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 
-for (const retired of ["continue", "context-action", "skim", "speed-select", "field-span-loop", "field-span-retain"]) {
+for (const retired of ["continue", "context-action", "skim", "speed-select", "field-span-loop", "field-span-retain", "loop"]) {
   assert.doesNotMatch(html, new RegExp(`id=["']${retired}["']`), `Retired playback control remains: ${retired}`);
 }
 for (const id of [
-  "loop", "field-transport-state", "field-both-toggle", "field-span-fill",
+  "field-transport-state", "field-both-toggle", "field-span-fill",
   "tail-field-toggle", "lead-field-toggle", "tail-step-button", "lead-step-button",
-  "section-capture", "section-source", "pin-capture", "pin-current"
+  "section-capture", "section-source", "pin-capture", "pin-current",
+  "release", "transpose", "focus-toggle", "shift-layer-toggle",
+  "step-size-seconds", "step-mode-fixed", "step-mode-adaptive"
 ]) assert.match(html, new RegExp(`id=["']${id}["']`), `Missing v5.8 Field/Guide control: ${id}`);
 
 assert.match(app, /function applyPlayerEffect\(result[\s\S]*result\?\.interval[\s\S]*startContext\(destination\)/,
@@ -98,15 +94,19 @@ assert.match(
   /const sideStep = role => event => \{[\s\S]*stepField\?\.getStepSelection[\s\S]*carryRetained: event\?\.altKey === true \|\| state\.carryModifier/
 );
 assert.match(app, /bindStepPress\(control[\s\S]*tap:\s*tapStep/);
-assert.match(app, /function beginLoopExtent\(extent[\s\S]*createLoopTransport/);
 assert.match(
   app,
-  /function startLoop\(\)[\s\S]*settleBeforeAction\(\{ handoffTransport: true \}\)[\s\S]*beginLoopExtent\(currentInterval\(\)/,
-  "Matrix Loop must settle live playback before reading its Working Section."
+  /function rangeLoops\(\)[\s\S]*isProperRange\(activeRange\(\), model\(\)\.duration\)/,
+  "Every proper Range must be the stable playback loop operand."
 );
-assert.match(app, /transport\.cycles \+= 1[\s\S]*placePlayer\(transport\.start\)[\s\S]*resumeAt[\s\S]*player\.play\(\)/,
-  "Loop wrap must rebase the frozen Field relation and unpause without a Session transaction.");
-assert.match(app, /data-loop-section/);
+assert.match(app, /function wrapPlaybackRange\([\s\S]*rebasePlaybackTransport\(transport\)[\s\S]*placePlayer\(range\.start\)[\s\S]*resumeAt[\s\S]*player\.play\(\)/,
+  "Range wrap must rebase the Field without a Session transaction.");
+assert.doesNotMatch(app, /createLoopTransport|TRANSPORT_KIND\.LOOP|data-loop-section/);
+assert.doesNotMatch(
+  app,
+  /transportMaterializedExtents|expandedExtents/,
+  "Playback and Context must not mutate Fold projection."
+);
 assert.match(app, /saveExtentAsSection/);
 assert.doesNotMatch(app, /createSkimTransport|completeSkim|reachSkimDestination/);
 assert.match(fieldSource, /FIELD_SIDE_MODE/);
@@ -118,9 +118,14 @@ assert.match(
 assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*side\.offset = 0[\s\S]*requestRate\(side, 1, true\)[\s\S]*(?:adapter\?\.place|adapter\?\.cue)[\s\S]*side\.adapter\?\.play/,
   "Every running Stretch must refold to Center at 1× before future divergence.");
 assert.match(fieldSource, /function hold\(role, \{ record = true \} = \{\}\)[\s\S]*onHoldOffsets/,
-  "Holding mid-stretch may commit the measured physical offset as the new Step distance without touching Interval.");
-assert.match(app, /commitStepReach\(next, "Hold Field Offset", \{ settle: false, translate: false \}\)/,
-  "Holding a Field offset must not interrupt the Center playback that produced it.");
+  "Holding mid-stretch may retain the measured physical Field relation.");
+assert.match(app, /onHoldOffsets: patch => \{[\s\S]*state\.fieldOffsets = normalizeStepReach/,
+  "Hold must update only physical Field offsets.");
+assert.doesNotMatch(
+  app.match(/onHoldOffsets: patch => \{[\s\S]*?\n    \},\n    onChange:/)?.[0] || "",
+  /commitStepReach|setSessionStepReach/,
+  "Hold must never overwrite semantic Step size."
+);
 assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*side\.adapter\?\.play/,
   "Side playback must prime at 1× inside the same Stretch transition.");
 assert.match(fieldSource, /function driveSide\(role, center, centerDelta, snapshot, centerRunning\)[\s\S]*requestStretchRate\(side\)/,
@@ -131,4 +136,4 @@ assert.match(css, /field-span-fill/);
 assert.match(packageJson.scripts.test, /field-grammar-tests\.mjs/);
 assert.match(packageJson.scripts.check, /step-field-geometry\.js/);
 
-console.log("Field grammar tests passed: automatic Context, safe side-player parking, Hold/Stretch, side Step, frozen Loop, and Guide retention.");
+console.log("Field grammar tests passed: automatic Context, independent Hold/Stretch offsets, Range looping, side Step, and Guide retention.");

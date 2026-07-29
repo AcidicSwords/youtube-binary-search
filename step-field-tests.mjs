@@ -58,7 +58,6 @@ assert.equal(FIELD_SIDE_MODE.HELD, "held");
 assert.equal(FIELD_SIDE_MODE.STRETCHING, "stretching");
 assert.equal(fieldShouldSuspend({ transportKind: "context" }), true);
 assert.equal(fieldShouldSuspend({ transportKind: "playback" }), false);
-assert.equal(fieldShouldSuspend({ transportKind: "loop" }), false);
 assert.equal(fieldShouldSuspend({ pendingStep: true, transportKind: "idle" }), true);
 assert.equal(fieldShouldSuspend({ dragging: true, transportKind: "idle" }), true);
 assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: false }), false);

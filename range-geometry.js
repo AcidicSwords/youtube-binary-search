@@ -136,10 +136,10 @@ export function classifyRefineRelation(interval, current, target) {
     ? interval.end
     : Math.max(interval.departure, interval.arrival);
 
-  // Membership is the complete rule. A midpoint anywhere in the active Loop,
-  // including its opposite endpoint, shortens that Loop. An endpoint landing
-  // collapses it. Only a midpoint beyond the ordered extent starts a new
-  // traversal from Current and discards the previous Loop.
+  // Membership is the complete rule. A midpoint anywhere in the active
+  // Working Interval, including its opposite endpoint, shortens that Interval.
+  // An endpoint landing collapses it. Only a midpoint beyond the ordered
+  // extent starts a new traversal from Current and discards the old Interval.
   return target >= start - EPSILON && target <= end + EPSILON
     ? "shorten"
     : "replace";
@@ -516,7 +516,7 @@ export function getActionRanges(
     stepForward: forwardCoordinate > currentCoordinate + EPSILON
       ? { start: neighborhood.C, end: stepForward, destination: stepForward }
       : null,
-    loop: interval?.end > interval?.start
+    interval: interval?.end > interval?.start
       ? { start: interval.start, end: interval.end }
       : null
   };

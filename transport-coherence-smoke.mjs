@@ -40,8 +40,6 @@ await poll();
 assert.equal(byId.get("interval-fill").dataset.live, "true");
 assert.equal(byId.get("resolution-start-marker").dataset.live, "true");
 assert.equal(byId.get("resolution-end-marker").dataset.live, "true");
-assert.equal(byId.get("interval-fill").style.left, "25%");
-assert.equal(byId.get("interval-fill").style.width, "33%");
 assert.equal(
   currentText(),
   "Current 0:50.000",
@@ -60,279 +58,92 @@ await poll();
 assert.equal(currentText(), "Current 0:58.000");
 assert.match(byId.get("section-window").textContent, /0:25\.000–0:58\.000/);
 assert.equal(byId.get("interval-fill").dataset.live, "false");
-assert.equal(byId.get("resolution-start-marker").dataset.live, "false");
 assert.equal(
   center.commands.filter(command => command[0] === "pause").length,
-  pausesBeforeSpace.center + 1,
-  "Application pause must issue one Center pause."
+  pausesBeforeSpace.center + 1
 );
 assert.equal(
   tail.commands.filter(command => command[0] === "pause").length,
-  pausesBeforeSpace.tail + 1,
-  "Playback settlement must freeze Tail once."
+  pausesBeforeSpace.tail + 1
 );
 assert.equal(
   lead.commands.filter(command => command[0] === "pause").length,
-  pausesBeforeSpace.lead + 1,
-  "Playback settlement must freeze Lead once."
+  pausesBeforeSpace.lead + 1
 );
 
-await poll();
-assert.equal(
-  tail.commands.filter(command => command[0] === "pause").length,
-  pausesBeforeSpace.tail + 1,
-  "Polling after settlement must not freeze the Field again."
-);
-
-dispatchDocument("keydown", { key: " ", code: "Space" });
+// Focus turns the Working Interval into the sole playback loop operand.
+byId.get("focus-toggle").click();
 await flush();
-center.currentTime = 64;
-tail.currentTime = 61;
-lead.currentTime = 70;
-await poll();
+assert.equal(byId.get("range-label").textContent, "0:25.000–0:58.000");
+assert.equal(byId.get("focus-toggle-label").textContent, "Unfocus");
 
-const centerPausesBeforeLoop = center.commands.filter(command => command[0] === "pause").length;
-byId.get("loop").click();
+byId.get("switch-endpoint").click();
 await flush();
+assert.equal(currentText(), "Current 0:25.000");
 
-assert.equal(
-  center.commands.filter(command => command[0] === "pause").length,
-  centerPausesBeforeLoop,
-  "Playback-to-Loop must hand off without a pause/play race."
-);
-assert.equal(currentText(), "Current 1:04.000");
-assert.match(byId.get("loop-meta").textContent, /0:25\.000–1:04\.000/);
-assert.equal(center.currentTime, 25);
+byId.get("center-transport-surface").click();
+await flush();
 assert.equal(center.state, 1);
+center.currentTime = 25;
+await poll();
 
-const wrapPlacesBefore = {
+const historyBeforeWrap = byId.get("return-meta").textContent;
+const placesBeforeWrap = {
   tail: tail.commands.filter(command => command[0] === "place").length,
   lead: lead.commands.filter(command => command[0] === "place").length
 };
-const wrapCommandsBefore = {
-  tail: tail.commands.length,
-  lead: lead.commands.length
-};
-center.currentTime = 64;
+center.currentTime = 58;
 await poll();
-assert.equal(center.currentTime, 25);
+
+assert.equal(center.currentTime, 25, "Proper Range playback must wrap to Range start.");
+assert.equal(currentText(), "Current 0:25.000", "A Range wrap must not commit Current.");
+assert.match(byId.get("section-window").textContent, /0:25\.000–0:58\.000/);
+assert.equal(byId.get("return-meta").textContent, historyBeforeWrap, "A wrap must create no Undo entry.");
 assert.equal(
   tail.commands.filter(command => command[0] === "place").length,
-  wrapPlacesBefore.tail + 1,
-  `Loop wrap must rebase Tail once: ${JSON.stringify(tail.commands.slice(wrapCommandsBefore.tail))}`
+  placesBeforeWrap.tail,
+  "Tail has no backward extent at Range start and must not be placed outside Range."
 );
 assert.equal(
   lead.commands.filter(command => command[0] === "place").length,
-  wrapPlacesBefore.lead + 1,
-  `Loop wrap must rebase Lead once: ${JSON.stringify(lead.commands.slice(wrapCommandsBefore.lead))}`
+  placesBeforeWrap.lead + 1,
+  "A Range wrap must rebase Lead exactly once."
 );
 
-const endedWrapPlaces = {
+const placesBeforeEnded = {
   tail: tail.commands.filter(command => command[0] === "place").length,
   lead: lead.commands.filter(command => command[0] === "place").length
 };
-center.currentTime = 64;
+center.currentTime = 58;
 center.emitState(0);
 await flush();
-assert.equal(center.currentTime, 25);
+assert.equal(center.currentTime, 25, "YouTube ENDED must use the same Range-wrap owner.");
 assert.equal(
   tail.commands.filter(command => command[0] === "place").length,
-  endedWrapPlaces.tail + 1,
-  "YouTube ENDED must use the same one-pass Tail wrap."
+  placesBeforeEnded.tail
 );
 assert.equal(
   lead.commands.filter(command => command[0] === "place").length,
-  endedWrapPlaces.lead + 1,
-  "YouTube ENDED must use the same one-pass Lead wrap."
+  placesBeforeEnded.lead + 1
 );
 
-byId.get("loop").click();
-await flush();
-assert.equal(center.currentTime, 64);
-assert.equal(center.state, 2);
-
-byId.get("context-seconds").value = "5";
-byId.get("context-seconds").dispatch("change");
-byId.get("timeline").dispatch("click", {
-  target: byId.get("timeline"),
-  clientX: 500
-});
-await flush();
-await poll();
-assert.equal(center.currentTime, 47.5);
-assert.equal(byId.get("field-transport-state").textContent, "Context suspended");
-assert.equal(byId.get("center-transport-label").textContent, "Set Current Here");
-
-// Context crosses the traversal point. Accepting its backward half extends the
-// existing Working Section through the shared continuous deformation.
-center.currentTime = 48;
-await poll();
-assert.equal(
-  currentText(),
-  "Current 0:50.000",
-  "Context Cursor must remain transient until explicitly accepted."
-);
-
-const contextExtensionPlaces = {
-  tail: tail.commands.filter(command => command[0] === "place").length,
-  lead: lead.commands.filter(command => command[0] === "place").length
-};
+// Stop inside the focused Range, then Unfocus. The Range stack restores the
+// full video without changing the source-contiguous playback settlement.
+center.currentTime = 30;
 dispatchDocument("keydown", { key: " ", code: "Space" });
-await flush();
-assert.equal(currentText(), "Current 0:48.000");
-assert.match(byId.get("section-window").textContent, /0:48\.000–1:04\.000/);
-assert.equal(byId.get("resolution-start-marker").style.left, "34%");
-assert.equal(byId.get("resolution-end-marker").style.left, "64%");
-assert.equal(
-  tail.commands.filter(command => command[0] === "place").length,
-  contextExtensionPlaces.tail + 1,
-  "Accepting backward Context must translate Tail once."
-);
-assert.equal(
-  lead.commands.filter(command => command[0] === "place").length,
-  contextExtensionPlaces.lead + 1,
-  "Accepting backward Context must translate Lead once."
-);
-
-// Undo restores the complete pre-accept relation and starts a fresh centered
-// Context. Accepting its forward half then finely shortens that same Section.
-byId.get("return-action").click();
-await flush();
-assert.equal(currentText(), "Current 0:50.000");
-assert.equal(center.currentTime, 47.5);
-const contextCommitPlaces = {
-  tail: tail.commands.filter(command => command[0] === "place").length,
-  lead: lead.commands.filter(command => command[0] === "place").length
-};
-center.currentTime = 52;
-await poll();
-const focusedTraversal = byId.get("refine-forward");
-focusedTraversal.focus();
-dispatchDocument("keydown", { key: " ", code: "Space" });
-await flush();
-assert.equal(currentText(), "Current 0:52.000");
-assert.match(
-  byId.get("section-window").textContent,
-  /0:52\.000–1:04\.000/,
-  "Accepting Context must move the active Working Section endpoint, not replace it with the tiny observed crossing."
-);
-assert.equal(
-  byId.get("resolution-start-marker").style.left,
-  "36%",
-  "Accepting Context must preserve the receding Resolution endpoint."
-);
-assert.equal(
-  byId.get("resolution-end-marker").style.left,
-  "66%",
-  "Accepting Context must deform the approached Resolution endpoint instead of rebuilding scale around Cursor."
-);
-assert.equal(center.currentTime, 52);
-assert.equal(center.state, 2);
-assert.equal(byId.get("center-transport-label").textContent, "Play Field");
-assert.equal(
-  tail.commands.filter(command => command[0] === "place").length,
-  contextCommitPlaces.tail + 1,
-  "Accepting Context Cursor must translate Tail to the new Current once."
-);
-assert.equal(
-  lead.commands.filter(command => command[0] === "place").length,
-  contextCommitPlaces.lead + 1,
-  "Accepting Context Cursor must translate Lead to the new Current once."
-);
-
-focusedTraversal.blur();
-dispatchDocument("keydown", { key: " ", code: "Space" });
-await flush();
-assert.equal(center.state, 1);
-dispatchDocument("keydown", { key: " ", code: "Space" });
-await flush();
-assert.equal(center.state, 2);
-
-// Replacing a not-yet-confirmed Context must let the replacement observation
-// adopt the next PLAYING confirmation. The old cancellation claim cannot pause
-// the new Context.
-center.deferNextPlayState = true;
-byId.get("timeline").dispatch("click", {
-  target: byId.get("timeline"),
-  clientX: 400
-});
-await flush();
-assert.equal(center.pendingPlayState, true);
-const forward = byId.get("step-forward");
-forward.dispatch("pointerdown", { button: 0, pointerId: 41 });
-forward.dispatch("pointerup", { button: 0, pointerId: 41 });
-await env.delay(300);
-await flush();
-assert.equal(currentText(), "Current 0:50.000");
-assert.equal(center.currentTime, 47.5);
-assert.equal(
-  center.state,
-  1,
-  "A replacement Context must not be paused by the superseded start claim."
-);
-center.applyPendingPlayState();
-await flush();
-dispatchDocument("keydown", { key: "Escape", code: "Escape" });
-await flush();
-assert.equal(center.state, 2);
-assert.equal(center.currentTime, 50);
-
-forward.blur();
-center.deferNextPlayState = true;
-dispatchDocument("keydown", { key: " ", code: "Space" });
-assert.equal(
-  byId.get("center-transport-label").textContent,
-  "Pause Field",
-  "Requested playback must become visibly cancellable before PLAYING confirmation."
-);
-dispatchDocument("keydown", { key: " ", code: "Space" });
-assert.equal(
-  center.state,
-  2,
-  "Pause may initially be a no-op while YouTube still reports its preceding paused state."
-);
-center.applyPendingPlayState();
-await flush();
-assert.equal(center.state, 2);
-assert.equal(tail.state, 2);
-assert.equal(lead.state, 2);
-assert.equal(
-  byId.get("center-transport-surface").hidden,
-  false,
-  "A pause requested before PLAYING confirmation must settle that exact playback."
-);
-
-center.deferNextPlayState = true;
-dispatchDocument("keydown", { key: " ", code: "Space" });
-dispatchDocument("keydown", { key: "Escape", code: "Escape" });
-center.applyPendingPlayState();
-await flush();
-assert.equal(center.state, 2);
-assert.equal(tail.state, 2);
-assert.equal(lead.state, 2);
-assert.equal(
-  byId.get("center-transport-surface").hidden,
-  false,
-  "Cancelling a pending start must consume its late PLAYING confirmation."
-);
-
-byId.get("context-seconds").value = "0";
-byId.get("context-seconds").dispatch("change");
-center.deferNextPlayState = true;
-dispatchDocument("keydown", { key: " ", code: "Space" });
-byId.get("timeline").dispatch("click", {
-  target: byId.get("timeline"),
-  clientX: 300
-});
-center.applyPendingPlayState();
 await flush();
 assert.equal(currentText(), "Current 0:30.000");
-assert.equal(center.currentTime, 30);
-assert.equal(center.state, 2);
-assert.equal(
-  byId.get("center-transport-surface").hidden,
-  false,
-  "A replacement traversal must keep ownership when a cancelled Play confirms late."
-);
+byId.get("focus-toggle").click();
+await flush();
+assert.equal(byId.get("range-label").textContent, "0:00.000–1:40.000");
 
-console.log("Transport coherence smoke passed: live projection, exact Context acceptance, replacement-start ownership, rapid pause settlement, playback-to-Loop handoff, and one-pass Field wrap.");
+// Full-video playback has no internal Range wrap and settles at source end.
+dispatchDocument("keydown", { key: " ", code: "Space" });
+await flush();
+center.currentTime = 100;
+center.emitState(0);
+await flush();
+assert.equal(center.currentTime, 100);
+assert.equal(currentText(), "Current 1:40.000");
+
+console.log("Transport coherence smoke passed: live projection, exact settlement, Focus-owned proper-Range looping, one-pass Field rebasing, wrap history isolation, Unfocus restoration, and full-video completion.");

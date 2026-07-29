@@ -385,7 +385,7 @@ assert.match(
 );
 assert.match(sessionSource, /stepIntervalAnchor[\s\S]*intervalDeparture/, "Session must separate Step movement departure from the Interval anchor.");
 assert.match(sessionSource, /refineIntervalRelation[\s\S]*classifyRefineRelation[\s\S]*relation:\s*"shorten"/,
-  "Refine must distinguish outside-Loop replacement from inside-Loop shortening.");
+  "Refine must distinguish outside-Interval replacement from inside-Interval shortening.");
 assert.match(sessionSource, /export function focusWorkingSection[\s\S]*FOCUS_KIND\.WORKING/,
   "The Working Section must be focusable without a Guide record.");
 assert.match(sessionSource, /export function overwriteGuideSection[\s\S]*replaceSectionExtent/,
@@ -398,4 +398,4 @@ assert.doesNotMatch(viewSource, /skim/i, "The projection layer must not expose r
 assert.match(viewSource, /focused-section-title"\]\.textContent = "—"/, "View must clear stale focused Section text.");
 assert.match(cssSource, /\[hidden\]\s*\{\s*display:\s*none\s*!important;/, "Hidden state must override component display rules.");
 
-console.log("v5.8.6 comprehensive regression tests passed: direct scale, Refine, endpoint frames, composable Step intervals, native playback, Range, Focus, Guide, Loop boundaries, and Undo.");
+console.log("v5.8.6 comprehensive regression tests passed: direct scale, Refine, endpoint frames, composable Step intervals, native playback, Range, Focus, Guide, Interval boundaries, and Undo.");

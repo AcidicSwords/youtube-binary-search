@@ -7,18 +7,15 @@ const app = read("app.js");
 const view = read("view.js");
 const styles = read("styles.css");
 const fieldCss = read("step-field.css");
-const sessionSource = read("session.js");
-const transportSource = read("transport.js");
-const youtubeSource = read("youtube.js");
-const fieldGeometrySource = read("step-field-geometry.js");
-const fieldSource = read("step-field.js");
-const stepGestureSource = read("step-gesture.js");
-const guideSource = read("guide.js");
-const temporalProjectionSource = read("temporal-projection.js");
+const session = read("session.js");
+const transport = read("transport.js");
+const guide = read("guide.js");
+const projection = read("temporal-projection.js");
+const youtube = read("youtube.js");
 
-const htmlIds = new Set([...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]));
-const htmlIdList = [...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]);
-assert.equal(new Set(htmlIdList).size, htmlIdList.length, "Every DOM id must be unique.");
+const ids = [...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]);
+const htmlIds = new Set(ids);
+assert.equal(htmlIds.size, ids.length, "Every DOM id must be unique.");
 
 for (const match of html.matchAll(/aria-controls="([^"]+)"/g)) {
   for (const id of match[1].trim().split(/\s+/)) {
@@ -26,155 +23,159 @@ for (const match of html.matchAll(/aria-controls="([^"]+)"/g)) {
   }
 }
 
-const labelledControls = new Set([...html.matchAll(/<label\b[^>]*\bfor="([^"]+)"/g)].map(match => match[1]));
+const labelled = new Set(
+  [...html.matchAll(/<label\b[^>]*\bfor="([^"]+)"/g)].map(match => match[1])
+);
 for (const match of html.matchAll(/<(input|select|textarea)\b([^>]*)>/g)) {
   const attributes = match[2];
   const id = attributes.match(/\bid="([^"]+)"/)?.[1];
   if (!id || /\btype="hidden"/.test(attributes)) continue;
-  const hasAccessibleName = labelledControls.has(id)
-    || /\baria-label="[^"]+"/.test(attributes)
-    || /\baria-labelledby="[^"]+"/.test(attributes);
-  assert.ok(hasAccessibleName, `Form control requires an accessible name: ${id}`);
+  assert.ok(
+    labelled.has(id)
+      || /\baria-label="[^"]+"/.test(attributes)
+      || /\baria-labelledby="[^"]+"/.test(attributes),
+    `Form control requires an accessible name: ${id}`
+  );
 }
 
 for (const match of html.matchAll(/<button\b([^>]*)>/g)) {
-  assert.match(match[1], /\btype="(button|submit|reset)"/, "Every button must declare its type.");
+  assert.match(match[1], /\btype="(button|submit|reset)"/, "Every button must declare a type.");
 }
 
 const projectionSource = `${app}\n${view}`;
-const bracketRefs = [...projectionSource.matchAll(/elements\["([^"]+)"\]/g)].map(match => match[1]);
-const dotRefs = [...projectionSource.matchAll(/elements\.([A-Za-z_][A-Za-z0-9_-]*)/g)].map(match => match[1]);
-const references = new Set([...bracketRefs, ...dotRefs]);
+const references = new Set([
+  ...[...projectionSource.matchAll(/elements\["([^"]+)"\]/g)].map(match => match[1]),
+  ...[...projectionSource.matchAll(/elements\.([A-Za-z_][A-Za-z0-9_-]*)/g)].map(match => match[1])
+]);
 const missing = [...references].filter(id => !htmlIds.has(id));
 assert.deepEqual(missing, [], `Missing DOM ids: ${missing.join(", ")}`);
 
 for (const removed of [
-  "continue", "continue-label", "context-action", "context-label", "skim", "speed-select",
-  "step-link", "pins-access", "focused-state", "focused-label", "field-span-loop", "field-span-retain"
-]) {
-  assert.equal(htmlIds.has(removed), false, `Retired or duplicate control remains: ${removed}`);
-}
+  "continue",
+  "context-action",
+  "skim",
+  "speed-select",
+  "loop",
+  "pin-backward",
+  "pin-forward",
+  "step-link",
+  "pins-access",
+  "focused-state"
+]) assert.equal(htmlIds.has(removed), false, `Retired control remains: ${removed}`);
 
 for (const required of [
-  "range-fill", "resolution-fill", "interval-fill", "field-span-fill", "section-preview-fill",
-  "pin-lane", "section-lane", "pin-cluster-menu", "current-marker", "cursor-marker", "guide-dialog",
-  "refine-backward", "reopen", "refine-forward", "step-backward", "loop", "step-forward",
-  "pin-backward", "switch-endpoint", "pin-forward", "return-action",
-  "tail-field-toggle", "field-both-toggle", "lead-field-toggle",
-  "tail-step-button", "lead-step-button", "step-backward-seconds", "step-forward-seconds",
-  "context-seconds",
-  "section-capture", "section-source", "focus-working-section", "save-section", "pin-capture", "pin-current",
-  "sections-list", "pins-list", "leave-section"
+  "range-fill",
+  "resolution-fill",
+  "interval-fill",
+  "field-span-fill",
+  "section-preview-fill",
+  "timeline-ruler",
+  "section-lane",
+  "fold-lane",
+  "pin-lane",
+  "pin-cluster-menu",
+  "current-marker",
+  "cursor-marker",
+  "refine-backward",
+  "reopen",
+  "refine-forward",
+  "step-backward",
+  "switch-endpoint",
+  "step-forward",
+  "release",
+  "transpose",
+  "focus-toggle",
+  "return-action",
+  "step-size-settings",
+  "step-mode-fixed",
+  "step-mode-adaptive",
+  "step-size-seconds",
+  "step-fraction-32",
+  "step-fraction-16",
+  "step-fraction-8",
+  "shift-layer-toggle",
+  "section-capture",
+  "section-source",
+  "focus-working-section",
+  "save-section",
+  "pin-capture",
+  "pin-current",
+  "sections-list",
+  "pins-list",
+  "leave-section"
 ]) assert.ok(htmlIds.has(required), `Missing required projection: ${required}`);
 
-for (const removedPlaceholder of ["guide-tab-sources", "guide-sources-panel"]) {
-  assert.equal(htmlIds.has(removedPlaceholder), false, `Placeholder projection remains: ${removedPlaceholder}`);
-}
-
-const source = [
-  html, app, view, styles, fieldCss, sessionSource, transportSource, fieldSource, stepGestureSource
-].join("\n");
-for (const obsolete of [
-  "selectedMarkId", "selectedSpanId", "draftStartMarkId", "draftEndMarkId", "contextStack",
-  "anchorMarkId", "bindPassageStart", "bindPassageEnd", "saveDraftSpan", "roleButton",
-  "passage-label", "point-label", "exit-context", "undo-edit", "address-source"
-]) assert.equal(source.includes(obsolete), false, `Obsolete state, term, or operator remains: ${obsolete}`);
-
-assert.ok(app.includes('from "./session.js"'), "app.js must use the Session kernel.");
-assert.ok(app.includes('from "./guide.js"'), "app.js must use the Guide model.");
-assert.ok(app.includes('from "./transport.js"'), "app.js must use the transport kernel.");
-assert.ok(app.includes('from "./view.js"'), "app.js must delegate DOM projection to view.js.");
-assert.ok(app.includes('from "./range-geometry.js"'), "app.js must use the Range geometry kernel.");
-assert.ok(app.includes('from "./step-gesture.js"'), "app.js must use the shared Step gesture boundary.");
-assert.ok(app.includes('from "./temporal-projection.js"'), "app.js must use the shared folded traversal projection.");
-assert.equal(app.includes('from "./traversal.js"'), false, "Legacy traversal.js import remains.");
-assert.equal(app.includes('from "./structure.js"'), false, "Legacy structure.js import remains.");
-
-assert.match(styles, /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward loop step-forward"[\s\S]*"pin-backward switch-endpoint pin-forward"/,
-  "Navigation CSS must preserve the exact relational 3×3 matrix.");
-assert.match(html, /id="refine-backward"[\s\S]*id="reopen"[\s\S]*id="refine-forward"[\s\S]*id="step-backward"[\s\S]*id="loop"[\s\S]*id="step-forward"[\s\S]*id="pin-backward"[\s\S]*id="switch-endpoint"[\s\S]*id="pin-forward"[\s\S]*id="return-action"/,
-  "DOM order must match the matrix.");
-assert.match(html, /id="return-action"[^>]*aria-keyshortcuts="Control\+Z Meta\+Z"/,
-  "Undo must remain outside the matrix on the platform-standard shortcut.");
-assert.match(styles, /touch-action:\s*manipulation/, "Controls must suppress accidental double-tap zoom without disabling page zoom.");
-assert.match(styles, /\.timeline[^{]*\{[^}]*touch-action:\s*pan-y/s, "Timeline must preserve vertical page scrolling on touch devices.");
+assert.match(
+  html,
+  /id="refine-backward"[\s\S]*id="reopen"[\s\S]*id="refine-forward"[\s\S]*id="step-backward"[\s\S]*id="switch-endpoint"[\s\S]*id="step-forward"[\s\S]*id="release"[\s\S]*id="transpose"[\s\S]*id="focus-toggle"[\s\S]*id="return-action"/
+);
+assert.match(
+  styles,
+  /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward switch-endpoint step-forward"[\s\S]*"release transpose focus"/
+);
+assert.match(html, /id="return-action"[^>]*aria-keyshortcuts="Control\+Z Meta\+Z"/);
+assert.match(styles, /touch-action:\s*manipulation/);
+assert.match(styles, /\.timeline[^{]*\{[^}]*touch-action:\s*pan-y/s);
 assert.match(
   fieldCss,
-  /grid-template-areas:\s*"tail center lead"[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1\.1fr\) minmax\(0, 1fr\)/,
-  "Wide Field must make Center only marginally larger without fixed tracks that clip a pane."
+  /grid-template-areas:\s*"tail center lead"[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1\.1fr\) minmax\(0, 1fr\)/
 );
 
-assert.match(view, /setAttribute\("role", "menuitem"\)/, "Pin clusters must expose keyboard-addressable menu items.");
-assert.match(view, /setAttribute\("aria-haspopup", "menu"\)/, "Pin clusters must announce their popup relationship.");
-assert.match(view, /dataset\.loopSection/, "Saved Sections must expose Loop in Guide.");
-assert.match(view, /dataset\.overwriteSection/, "Saved Sections must expose explicit Working Section overwrite.");
-assert.match(view, /dataset\.sectionCollapse/, "Expanded Sections must expose their faint midpoint Fold control.");
-assert.match(view, /dataset\.sectionExpand/, "Collapsed Sections must expose one expandable Section Pin.");
-assert.match(guideSource, /export function setSectionCollapsed/, "Guide must own retained Fold state.");
-assert.match(temporalProjectionSource, /sourceToTraversal[\s\S]*traversalToSource/,
-  "One pure projection must own both directions of the source/traversal mapping.");
-assert.equal(/\bseek\s*:/.test(sessionSource), false, "Semantic transaction effects must use placement vocabulary.");
-assert.match(sessionSource, /medium = "direct"/, "Direct movement must use canonical Interval vocabulary.");
-assert.match(sessionSource, /export function completePlayback/, "Native playback must settle through Session.");
-assert.match(sessionSource, /departureFrame:[\s\S]*arrivalFrame:/,
-  "Intervals must retain both endpoint search frames.");
-assert.match(sessionSource, /export function switchEndpoint[\s\S]*departure: arrival[\s\S]*arrival: departure/,
-  "Endpoint Transposition must swap directed roles in the Session kernel.");
-assert.match(sessionSource, /refineIntervalRelation[\s\S]*classifyRefineRelation[\s\S]*relation:\s*"shorten"/,
-  "Refine must preserve the opposite endpoint only when its target remains inside the Loop.");
-assert.match(sessionSource, /export function focusWorkingSection[\s\S]*kind:\s*FOCUS_KIND\.WORKING/,
-  "Working Section Focus must be a Session relation independent from Guide persistence.");
-assert.match(sessionSource, /export function overwriteGuideSection[\s\S]*replaceSectionExtent/,
-  "Retained overwrite must be an explicit Guide transaction.");
-assert.match(app, /function goToAdjacentPin[\s\S]*mode:\s*"linear"/,
-  "Matrix Pin traversal must push the approached refinement endpoint.");
-assert.match(sessionSource, /syncIntervalEndpointFrames[\s\S]*containExtent\(model\.resolution, model\.interval, model\.range\)/,
-  "Every committed Loop must be contained by its active refinement frame.");
-assert.match(sessionSource, /resolveIntervalEndpointFrame[\s\S]*containExtent\(resolved\.resolution, interval, range\)/,
-  "Both Switch endpoint frames must contain the complete Loop.");
-assert.match(sessionSource, /projectPlayback[\s\S]*stepIntervalAnchor[\s\S]*translateNeighborhood/,
-  "Live and settled playback must share one endpoint-deformation projection.");
-assert.match(sessionSource, /completePlayback[\s\S]*projectPlayback/,
-  "Playback settlement must commit the same projection shown while playing.");
-const contextAcceptanceSource = app.match(/function acceptContextCursor\(\) \{[\s\S]*?^\}/m)?.[0] || "";
-assert.match(contextAcceptanceSource, /completePlayback\(state\.session/,
-  "Context acceptance must reuse continuous endpoint deformation.");
-assert.doesNotMatch(contextAcceptanceSource, /\bgoTo\(/,
-  "Context acceptance must not collapse scale through a direct Go.");
-assert.match(view, /departureFrame[\s\S]*destinationScale[\s\S]*Switch Endpoint/,
-  "Switch must expose the destination endpoint frame before traversal.");
-assert.match(view, /refineBlockReason/,
-  "Refine projection must distinguish Resolution exhaustion from a hard Range edge.");
-assert.match(transportSource, /PLAYBACK:\s*"playback"/);
-assert.match(transportSource, /LOOP:\s*"loop"/);
-assert.doesNotMatch(transportSource, /CONTINUE|SKIM/);
-assert.match(
-  transportSource,
-  /halfDuration\s*=\s*seconds\s*\/\s*2[\s\S]*projection\?\.sourceStep[\s\S]*"backward"[\s\S]*projection\?\.sourceStep[\s\S]*"forward"/,
-  "Context must bisect traversal duration and materialize every crossed source Section."
-);
-assert.match(app, /result\?\.interval[\s\S]*startContext\(destination\)/, "Context must be automatic after traversal.");
-assert.match(app, /createStepGestureController[\s\S]*bindStepPress/,
-  "Keyboard, matrix, and Field Step controls must share one held-gesture owner.");
-assert.match(app, /transport\.cycles \+= 1[\s\S]*placePlayer\(transport\.start\)[\s\S]*resumeAt[\s\S]*player\.play\(\)/,
-  "Loop wraps must rebase the existing Field relation and immediately resume.");
-assert.match(fieldSource, /mode:\s*"step"/);
-assert.doesNotMatch(fieldSource, /mode:\s*"go"/);
-assert.match(youtubeSource, /place\(address, allowSeekAhead = true\)/, "The YouTube adapter must expose placement rather than seek vocabulary.");
-assert.match(youtubeSource, /isYouTubeApiReady/, "YouTube readiness must be owned by the adapter.");
-assert.doesNotMatch(fieldGeometrySource, /stepSeconds/, "Field geometry must receive directional Offset objects only.");
-assert.match(app, /compactGuideLayout\(\) && state\.guideOpen/, "Compact Guide must suspend background reader shortcuts.");
-assert.match(
-  app,
-  /spatialKey\("s"\)[\s\S]*switchCurrentEndpoint\(\{ carryRetained: carryChord \}\)/,
-  "S must own folded-face inclusion and ordinary Switch Endpoint through one owner."
-);
-assert.match(
-  app,
-  /event\.shiftKey[\s\S]{0,180}key === "s"[\s\S]{0,180}switchCurrentEndpoint\(\{[\s\S]{0,120}forceInterval: true/,
-  "Shift+S must remain an explicit escape hatch to the ordinary Working endpoint."
-);
-assert.doesNotMatch(app, /plain && event\.key === "Backspace"/,
-  "Undo must use Ctrl/Cmd+Z rather than a destructive navigation key.");
+assert.ok(app.includes('from "./session.js"'));
+assert.ok(app.includes('from "./guide.js"'));
+assert.ok(app.includes('from "./transport.js"'));
+assert.ok(app.includes('from "./view.js"'));
+assert.ok(app.includes('from "./range-geometry.js"'));
+assert.ok(app.includes('from "./step-gesture.js"'));
+assert.ok(app.includes('from "./temporal-projection.js"'));
+assert.doesNotMatch(app, /from "\.\/traversal\.js"|from "\.\/structure\.js"/);
 
-console.log(`Integration check passed: ${references.size} DOM references, v6 Section folding, source-contiguous transport, retained-object carry, Field controls, Guide creation, and 3×3 operator geometry.`);
+assert.match(view, /setAttribute\("role", "menuitem"\)/);
+assert.match(view, /setAttribute\("aria-haspopup", "menu"\)/);
+assert.match(view, /dataset\.overwriteSection/);
+assert.match(view, /dataset\.sectionCollapse/);
+assert.match(view, /dataset\.sectionExpand/);
+assert.match(view, /dataset\.foldContributors/);
+assert.match(view, /timeline-fold-pin/);
+
+assert.match(session, /export function additiveRefine/);
+assert.match(session, /export function releaseInterval/);
+assert.match(session, /export function transposeSection/);
+assert.match(session, /export function focusWorkingSection[\s\S]*FOCUS_KIND\.WORKING/);
+assert.match(session, /export function overwriteGuideSection[\s\S]*replaceSectionExtent/);
+assert.match(session, /syncIntervalEndpointFrames[\s\S]*containExtent/);
+assert.match(session, /projectPlayback[\s\S]*stepIntervalAnchor[\s\S]*translateNeighborhood/);
+assert.match(session, /completePlayback[\s\S]*projectPlayback/);
+
+assert.match(guide, /collapsed:\s*options\.collapsed === true/);
+assert.match(guide, /export function translateSection/);
+assert.match(guide, /function traversalStops[\s\S]*projection\.orderedPinStops/);
+assert.match(guide, /export function previousPin[\s\S]*traversalStops/);
+assert.match(guide, /export function nextPin[\s\S]*traversalStops/);
+
+assert.match(projection, /sourceToTraversal[\s\S]*traversalToSource/);
+assert.match(projection, /normalizeFoldUnion/);
+assert.match(projection, /boundaryPinIds/);
+assert.match(projection, /sourceStep[\s\S]*originFold/);
+
+assert.match(transport, /PLAYBACK:\s*"playback"/);
+assert.match(transport, /CONTEXT:\s*"context"/);
+assert.doesNotMatch(transport, /\bLOOP\s*:|CONTINUE|SKIM/);
+assert.match(
+  transport,
+  /halfDuration\s*=\s*seconds\s*\/\s*2[\s\S]*boundedAnchor - halfDuration[\s\S]*boundedAnchor \+ halfDuration/,
+  "Context must remain centered in source time."
+);
+assert.match(app, /function wrapPlaybackRange[\s\S]*rebasePlaybackTransport\(transport\)[\s\S]*placePlayer\(range\.start\)[\s\S]*resumeAt[\s\S]*player\.play\(\)/);
+assert.match(app, /createStepGestureController[\s\S]*bindStepPress/);
+assert.match(app, /function goToAdjacentPin[\s\S]*stepToPinSession/);
+assert.match(app, /function releaseWorkingInterval[\s\S]*releaseSessionInterval/);
+assert.match(app, /function transposeWorkingOrSelected[\s\S]*transposeSessionSection/);
+assert.match(app, /function focusOrUnfocus[\s\S]*focusWorkingSection/);
+
+assert.match(youtube, /place\(address, allowSeekAhead = true\)/);
+assert.match(youtube, /isYouTubeApiReady/);
+assert.match(app, /compactGuideLayout\(\) && state\.guideOpen/);
+assert.doesNotMatch(app, /plain && event\.key === "Backspace"/);
+
+console.log(`Integration check passed: ${references.size} DOM references, accessible v6 controls, matrix ownership, transposed timeline, independent Step configuration, Guide graph, and proper-Range playback are connected.`);

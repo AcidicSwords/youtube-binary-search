@@ -62,11 +62,11 @@ for (let index = 0; index < 5; index += 1) {
   dispatchDocument("keydown", { key: "ArrowRight", code: "ArrowRight", repeat: true });
 }
 assert.equal(currentText(), "Current 1:00.000");
-assert.equal(byId.get("loop-meta").textContent, "0:00.000–1:00.000");
+assert.match(byId.get("section-window").textContent, /0:00\.000–1:00\.000/);
 await env.delay(375);
 await flush();
 assert.equal(currentText(), "Current 1:20.000");
-assert.equal(byId.get("loop-meta").textContent, "0:00.000–1:20.000");
+assert.match(byId.get("section-window").textContent, /0:00\.000–1:20\.000/);
 assert.equal(
   center.commands.filter(command => command[0] === "play").length,
   playsBeforeHeldStep,
