@@ -7,6 +7,7 @@ import {
   midpoint,
   createRoot,
   getTargets,
+  classifyRefineRelation,
   descend,
   refineNeighborhood,
   seedNeighborhoodFromMovement,
@@ -34,6 +35,7 @@ import {
   createSectionFromTimes,
   resolveSection,
   renameSection,
+  replaceSectionExtent,
   deleteSection,
   previousPin,
   nextPin,
@@ -46,6 +48,7 @@ import {
   validateGuide
 } from "./guide.js";
 import {
+  FOCUS_KIND,
   createSession,
   copy,
   snapshotModel,
@@ -57,14 +60,17 @@ import {
   previewRange,
   checkpoint,
   focusSection,
+  focusWorkingSection,
   leaveSection,
   completePlayback,
   pinCurrent,
   saveIntervalAsSection,
+  overwriteGuideSection,
   renameGuidePin,
   deleteGuidePin,
   renameGuideSection,
   deleteGuideSection,
+  switchEndpoint,
   returnState
 } from "./session.js";
 import { parseTimeValue, parseYouTubeUrl } from "./youtube.js";
@@ -74,6 +80,22 @@ import { formatTime, formatDuration } from "./view.js";
 const root = createRoot(0, 60, 180);
 assert.deepEqual(root, { L: 0, C: 60, R: 180, level: 0 });
 assert.deepEqual(getTargets(root), { backward: 30, forward: 120 });
+assert.equal(
+  classifyRefineRelation(
+    { departure: 70, arrival: 50 },
+    50,
+    75
+  ),
+  "fold"
+);
+assert.equal(
+  classifyRefineRelation(
+    { departure: 50, arrival: 70 },
+    70,
+    80
+  ),
+  "cross"
+);
 assert.deepEqual(
   getTargets({ L: 0, C: 0.077, R: 1, level: 3 }),
   { backward: null, forward: 0.5385 },
@@ -193,7 +215,7 @@ assert.equal(deletePin(guide, pinA.id).deleted, false);
 assert.equal(deletePin(guide, pinA.id).references, 1);
 
 const generated = createSectionFromTimes(guide, 30, 40, { label: "Generated", provenance: "test" });
-const generatedSection = resolveSection(guide, generated.section.id);
+let generatedSection = resolveSection(guide, generated.section.id);
 assert.equal(generatedSection.start, 30);
 assert.equal(generatedSection.end, 40);
 assert.equal(
@@ -201,6 +223,15 @@ assert.equal(
   true,
   "Section endpoint Pins must remain visible and traversable."
 );
+const replacedEndPinId = generatedSection.endPinId;
+generatedSection = replaceSectionExtent(guide, generatedSection.id, 30, 45, {
+  provenance: "working:test"
+});
+assert.equal(generatedSection.start, 30);
+assert.equal(generatedSection.end, 45);
+assert.equal(generatedSection.id, generated.section.id);
+assert.equal(generatedSection.label, "Generated");
+assert.equal(getPin(guide, replacedEndPinId), null, "Overwrite must remove an unshared retired endpoint.");
 assert.equal(deleteSection(guide, generatedSection.id), true);
 assert.equal(getPin(guide, generatedSection.startPinId), null);
 assert.equal(getPin(guide, generatedSection.endPinId), null);
@@ -285,6 +316,47 @@ result = returnState(session);
 session = result.session;
 assert.equal(session.model.resolution.C, 50);
 assert.equal(session.model.interval, null);
+
+// Refine has two Loop relations. Moving away crosses unlooped space and stores
+// that local crossing; moving toward the opposite endpoint folds the Working
+// Section and retains the complementary side.
+let foldedRefine = createSession({ duration: 100, current: 50 });
+foldedRefine = goTo(foldedRefine, 70, { operator: "timeline" }).session;
+const crossedRefine = refine(foldedRefine, "forward");
+assert.equal(crossedRefine.refineRelation, "cross");
+assert.deepEqual(
+  {
+    start: crossedRefine.session.model.interval.start,
+    end: crossedRefine.session.model.interval.end,
+    departure: crossedRefine.session.model.interval.departure,
+    arrival: crossedRefine.session.model.interval.arrival
+  },
+  { start: 70, end: 80, departure: 70, arrival: 80 }
+);
+const shortenedRefine = refine(foldedRefine, "backward");
+assert.equal(shortenedRefine.refineRelation, "fold");
+assert.deepEqual(
+  {
+    start: shortenedRefine.session.model.interval.start,
+    end: shortenedRefine.session.model.interval.end,
+    departure: shortenedRefine.session.model.interval.departure,
+    arrival: shortenedRefine.session.model.interval.arrival
+  },
+  { start: 50, end: 60, departure: 50, arrival: 60 },
+  "A shortening Refine must retain the side opposite the traversed fold."
+);
+const transposedFold = refine(switchEndpoint(foldedRefine).session, "forward");
+assert.equal(transposedFold.refineRelation, "fold");
+assert.deepEqual(
+  {
+    start: transposedFold.session.model.interval.start,
+    end: transposedFold.session.model.interval.end,
+    departure: transposedFold.session.model.interval.departure,
+    arrival: transposedFold.session.model.interval.arrival
+  },
+  { start: 70, end: 75, departure: 70, arrival: 75 },
+  "A Refine that folds past the opposite endpoint must keep only the overrun side."
+);
 
 // Direct placement is total over finite input and cannot create out-of-video state.
 let boundedMove = createSession({ duration: 100, current: 50 });
@@ -445,6 +517,110 @@ assert.deepEqual(
   }
 );
 assert.deepEqual(focusedAgain.model.interval.arrivalFrame.resolution, focusedAgain.model.resolution);
+
+// The active Loop is a semi-persistent Working Section. Focus projects it into
+// Range without retaining it in Guide; Leave preserves the deformed working
+// value, while Save and Overwrite are explicit Guide transactions.
+let working = createSession({ duration: 100, current: 50, guide: createGuide("video") });
+working = goTo(working, 70, { operator: "timeline" }).session;
+const workingBeforeFocus = copy(working.model.interval);
+working = focusWorkingSection(working).session;
+assert.equal(working.model.focus.kind, FOCUS_KIND.WORKING);
+assert.deepEqual(working.model.focus.extent, { start: 50, end: 70 });
+assert.deepEqual(working.model.range, { start: 50, end: 70 });
+assert.deepEqual(
+  {
+    start: working.model.interval.start,
+    end: working.model.interval.end,
+    departure: working.model.interval.departure,
+    arrival: working.model.interval.arrival
+  },
+  {
+    start: workingBeforeFocus.start,
+    end: workingBeforeFocus.end,
+    departure: workingBeforeFocus.departure,
+    arrival: workingBeforeFocus.arrival
+  }
+);
+assert.equal(working.model.guide.sections.length, 0, "Focus must not save the Working Section.");
+
+working = refine(working, "backward").session;
+assert.deepEqual(
+  { start: working.model.interval.start, end: working.model.interval.end },
+  { start: 50, end: 60 }
+);
+working = focusWorkingSection(working).session;
+assert.deepEqual(working.model.range, { start: 50, end: 60 });
+assert.deepEqual(working.model.focus.extent, { start: 50, end: 60 });
+assert.deepEqual(working.model.focus.returnRange, { start: 0, end: 100 });
+working = leaveSection(working).session;
+assert.equal(working.model.focus, null);
+assert.deepEqual(working.model.range, { start: 0, end: 100 });
+assert.deepEqual(
+  { start: working.model.interval.start, end: working.model.interval.end },
+  { start: 50, end: 60 },
+  "Leave must preserve the unsaved Working Section."
+);
+assert.equal(working.model.guide.sections.length, 0);
+
+working = saveIntervalAsSection(working, "Working").session;
+const retainedWorkingId = working.model.guide.sections[0].id;
+working = step(working, "forward", 10).session;
+const overwriteResult = overwriteGuideSection(working, retainedWorkingId);
+assert.equal(overwriteResult.changed, true);
+working = overwriteResult.session;
+const overwrittenWorking = resolveSection(working.model.guide, retainedWorkingId);
+assert.equal(overwrittenWorking.id, retainedWorkingId);
+assert.equal(overwrittenWorking.label, "Working");
+assert.deepEqual(
+  { start: overwrittenWorking.start, end: overwrittenWorking.end },
+  { start: 50, end: 70 }
+);
+assert.equal(working.model.guide.sections.length, 1, "Overwrite must preserve retained Section identity.");
+working = returnState(working).session;
+assert.deepEqual(
+  {
+    start: resolveSection(working.model.guide, retainedWorkingId).start,
+    end: resolveSection(working.model.guide, retainedWorkingId).end
+  },
+  { start: 50, end: 60 },
+  "Undo must restore the preceding retained Extent."
+);
+
+const focusedOverwriteGuide = createGuide("video");
+const focusedOverwriteTarget = createSectionFromTimes(
+  focusedOverwriteGuide,
+  10,
+  30,
+  { label: "Editable" }
+).section;
+let focusedOverwrite = createSession({
+  duration: 100,
+  current: 20,
+  guide: focusedOverwriteGuide
+});
+focusedOverwrite = goTo(focusedOverwrite, 25, { operator: "timeline" }).session;
+focusedOverwrite = focusSection(focusedOverwrite, focusedOverwriteTarget.id).session;
+const focusedOverwriteResult = overwriteGuideSection(
+  focusedOverwrite,
+  focusedOverwriteTarget.id
+);
+assert.equal(focusedOverwriteResult.changed, true);
+assert.equal(focusedOverwriteResult.rangeChanged, true);
+focusedOverwrite = focusedOverwriteResult.session;
+assert.equal(focusedOverwrite.model.focus.kind, FOCUS_KIND.SAVED);
+assert.equal(focusedOverwrite.model.focus.sectionId, focusedOverwriteTarget.id);
+assert.deepEqual(focusedOverwrite.model.range, { start: 20, end: 25 });
+assert.deepEqual(
+  {
+    start: focusedOverwrite.model.interval.start,
+    end: focusedOverwrite.model.interval.end
+  },
+  { start: 20, end: 25 },
+  "Overwriting the focused retained Section must keep Range and Working Section coherent."
+);
+focusedOverwrite = leaveSection(focusedOverwrite).session;
+assert.deepEqual(focusedOverwrite.model.range, { start: 0, end: 100 });
 
 // Guide operations participate in the same Undo chain.
 let edited = createSession({ duration: 100, current: 40, guide: createGuide("video") });

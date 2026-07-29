@@ -7,6 +7,7 @@ import {
   containExtent,
   createRoot,
   getTargets,
+  classifyRefineRelation,
   refineNeighborhood,
   seedNeighborhoodFromMovement,
   isRangeNeighborhood,
@@ -28,6 +29,7 @@ import {
   createSectionFromTimes,
   findDuplicateSection,
   renameSection,
+  replaceSectionExtent,
   deleteSection,
   resolveSection
 } from "./guide.js";
@@ -36,6 +38,10 @@ export const HISTORY_LIMIT = 100;
 export const MIN_RANGE_SECONDS = 0.25;
 export const MIN_STEP_REACH_SECONDS = 0.25;
 export const MAX_STEP_REACH_SECONDS = 300;
+export const FOCUS_KIND = Object.freeze({
+  SAVED: "saved-section",
+  WORKING: "working-section"
+});
 
 export const DEFAULT_STEP_REACH = Object.freeze({
   backward: 10,
@@ -238,8 +244,19 @@ function appendHistory(history, entry) {
   return next.length > HISTORY_LIMIT ? next.slice(next.length - HISTORY_LIMIT) : next;
 }
 
+function focusKind(focus) {
+  if (!focus) return null;
+  if (focus.kind === FOCUS_KIND.WORKING) return FOCUS_KIND.WORKING;
+  if (focus.kind === FOCUS_KIND.SAVED || focus.sectionId) return FOCUS_KIND.SAVED;
+  return null;
+}
+
 function reconcileFocusDraft(model) {
-  if (!model.focus || resolveSection(model.guide, model.focus.sectionId)) {
+  if (
+    !model.focus
+    || focusKind(model.focus) === FOCUS_KIND.WORKING
+    || resolveSection(model.guide, model.focus.sectionId)
+  ) {
     return { changed: false, moved: false, intervalCleared: false };
   }
 
@@ -481,6 +498,7 @@ function moveDraft(model, destination, options = {}) {
     leftFocus: opening.leftFocus,
     openedFullVideo: opening.openedFullVideo,
     ...(historyLabel ? { historyLabel } : {}),
+    ...(options.refineRelation ? { refineRelation: options.refineRelation } : {}),
     interval: model.interval,
     place: model.resolution.C
   };
@@ -492,14 +510,26 @@ export function goTo(session, destination, options = {}) {
   return options.amend ? amend(session, perform) : commit(session, label, perform, options);
 }
 
+function refineIntervalRelation(model, target) {
+  const current = model.resolution.C;
+  const interval = model.interval;
+  const relation = classifyRefineRelation(interval, current, target);
+  return relation === "fold"
+    ? { departure: interval.departure, relation: "fold" }
+    : { departure: current, relation: "cross" };
+}
+
 export function refine(session, direction) {
   const target = getTargets(session.model.resolution)[direction];
   if (target === null) return unchanged(session, "no-destination");
   const backward = direction === "backward";
+  const intervalRelation = refineIntervalRelation(session.model, target);
   return goTo(session, target, {
     mode: "refine",
     operator: backward ? "refineBackward" : "refineForward",
-    label: backward ? "Refine Backward" : "Refine Forward"
+    label: backward ? "Refine Backward" : "Refine Forward",
+    intervalDeparture: intervalRelation.departure,
+    refineRelation: intervalRelation.relation
   });
 }
 
@@ -617,7 +647,8 @@ export function focusSection(session, sectionId) {
   const section = resolveSection(session.model.guide, sectionId);
   if (!section) return unchanged(session, "missing-section");
   if (
-    session.model.focus?.sectionId === sectionId
+    focusKind(session.model.focus) === FOCUS_KIND.SAVED
+    && session.model.focus?.sectionId === sectionId
     && Math.abs(session.model.range.start - section.start) <= EPSILON
     && Math.abs(session.model.range.end - section.end) <= EPSILON
   ) return unchanged(session, "already-focused");
@@ -626,7 +657,7 @@ export function focusSection(session, sectionId) {
     const resolved = resolveSection(draft.guide, sectionId);
     const departure = draft.resolution.C;
     const returnRange = draft.focus?.returnRange || clone(draft.range);
-    draft.focus = { sectionId, returnRange };
+    draft.focus = { kind: FOCUS_KIND.SAVED, sectionId, returnRange };
     draft.range = { start: resolved.start, end: resolved.end };
     const current = contains(draft.range, departure) ? departure : resolved.midpoint;
     draft.resolution = createRoot(resolved.start, current, resolved.end);
@@ -639,6 +670,38 @@ export function focusSection(session, sectionId) {
       rangeChanged: true,
       intervalCleared,
       ...(moved ? { place: current } : {})
+    };
+  });
+}
+
+export function focusWorkingSection(session) {
+  const interval = session.model.interval;
+  if (!interval) return unchanged(session, "no-interval");
+  if (
+    focusKind(session.model.focus) === FOCUS_KIND.WORKING
+    && Math.abs(session.model.range.start - interval.start) <= EPSILON
+    && Math.abs(session.model.range.end - interval.end) <= EPSILON
+  ) return unchanged(session, "already-focused");
+
+  return commit(session, "Focus Working Section", draft => {
+    const working = clone(draft.interval);
+    if (!working) return { changed: false, reason: "no-interval" };
+    const departure = draft.resolution.C;
+    const returnRange = draft.focus?.returnRange || clone(draft.range);
+    draft.focus = {
+      kind: FOCUS_KIND.WORKING,
+      extent: { start: working.start, end: working.end },
+      returnRange
+    };
+    draft.range = { start: working.start, end: working.end };
+    const current = clamp(departure, working.start, working.end);
+    draft.resolution = createRoot(working.start, current, working.end);
+    draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
+    return {
+      changed: true,
+      rangeChanged: true,
+      workingSection: clone(draft.focus.extent),
+      ...(Math.abs(current - departure) > EPSILON ? { place: current } : {})
     };
   });
 }
@@ -784,6 +847,65 @@ export function saveIntervalAsSection(session, label) {
     label,
     `interval:${session.model.interval.operator}`
   );
+}
+
+export function overwriteGuideSection(session, sectionId) {
+  const section = resolveSection(session.model.guide, sectionId);
+  const interval = session.model.interval;
+  if (!section) return unchanged(session, "missing-section");
+  if (!interval) return unchanged(session, "no-interval");
+
+  const sameExtent = Math.abs(section.start - interval.start) <= EPSILON
+    && Math.abs(section.end - interval.end) <= EPSILON;
+  if (sameExtent) return unchanged(session, "unchanged-section", { value: section });
+
+  const startPin = findPinAt(session.model.guide, interval.start);
+  const endPin = findPinAt(session.model.guide, interval.end);
+  if (
+    startPin
+    && endPin
+    && findDuplicateSection(
+      session.model.guide,
+      startPin.id,
+      endPin.id,
+      section.label,
+      section.id
+    )
+  ) {
+    return unchanged(session, "duplicate-section", { value: section });
+  }
+
+  return commit(session, `Overwrite “${section.label}”`, draft => {
+    const value = replaceSectionExtent(
+      draft.guide,
+      sectionId,
+      draft.interval.start,
+      draft.interval.end,
+      { provenance: `working:${draft.interval.operator}` }
+    );
+    const focusedTarget = focusKind(draft.focus) === FOCUS_KIND.SAVED
+      && draft.focus.sectionId === sectionId;
+    let moved = false;
+    let intervalCleared = false;
+
+    if (focusedTarget) {
+      const departure = draft.resolution.C;
+      draft.range = { start: value.start, end: value.end };
+      const current = clamp(departure, value.start, value.end);
+      draft.resolution = createRoot(value.start, current, value.end);
+      draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
+      moved = Math.abs(current - departure) > EPSILON;
+      intervalCleared = clearIntervalOutsideRange(draft);
+    }
+
+    return {
+      changed: true,
+      guideChanged: true,
+      value,
+      ...(focusedTarget ? { rangeChanged: true, intervalCleared } : {}),
+      ...(moved ? { place: draft.resolution.C } : {})
+    };
+  }, { guideEdit: true });
 }
 
 export function renameGuidePin(session, pinId, label) {

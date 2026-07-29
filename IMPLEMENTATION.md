@@ -43,6 +43,8 @@ Semantic truth is immutable Session state. Physical player commands are requests
 }
 ```
 
+`focus` is either `null`, a retained-Section reference plus `returnRange`, or a Working Section Extent plus `returnRange`. The latter is Session-only and never serializes into Guide.
+
 `stepReach` is the persisted maximum Field Offset and default Step distance. Runtime no longer broadens this API to accept obsolete scalar values; legacy preference migration normalizes at the persistence boundary.
 
 The Interval is directed even though it renders as an ordered extent:
@@ -54,7 +56,7 @@ Interval.departureFrame = Resolution/basis retained at the anchor
 Interval.arrivalFrame = active Resolution/basis at Current
 ```
 
-Operator ownership is explicit. Direct Go, Refine, and Pin traversal replace Interval with their actual movement. Step and settled playback preserve a usable existing departure and edit only arrival. `moveDraft()` keeps movement departure separate from `intervalDeparture`: ordinary movement departure records local traversal, while the explicit Interval departure is used only by endpoint-editing operators. No persistent hidden mode selects behavior.
+Operator ownership is explicit. Direct Go and Pin traversal replace Interval with their actual movement. Step and settled playback preserve a usable existing departure and edit only arrival. Refine derives its Interval departure relationally: moving away from the existing departure uses preceding Current and records the new unlooped crossing; moving toward the existing departure retains that endpoint and therefore stores the side complementary to the fold. Passing the departure keeps only the overrun. `moveDraft()` keeps movement departure separate from `intervalDeparture`, so this relation is explicit in the transaction rather than selected by a hidden mode.
 
 `stepNeighborhood()` retains the gesture-origin binary frame, leaves the receding endpoint fixed, and advances the approached endpoint by the signed Step. When the destination reaches or crosses the old directional endpoint, it retains `Current ± stepReach`, clamped to Range. `translateNeighborhood()` applies the same one-sided rule to playback and Pin hops. Scale deformation resets refinement lineage. Full-Range geometry is canonicalized to Range basis, so Session and view share one Reopen predicate.
 
@@ -142,10 +144,14 @@ Pane collapse is projection-local. Hiding a side pauses it immediately without r
 
 ## 8. Guide integration
 
-Guide tabs own creation and management:
+The current Interval is projected as a semi-persistent Working Section. `focusWorkingSection()` stores a frozen focus Extent plus the containing return Range, installs that Extent as Range, and does not edit Guide. `leaveSection()` restores the containing Range while Session retains the latest Working Section.
+
+Guide tabs own explicit persistence and management:
 
 - Pins tab: title + Pin Current, then Go/Rename/Delete.
-- Sections tab: source extent + title + Save, then Go/Focus/Loop/Rename/Delete.
+- Sections tab: source extent + title + Save and Focus Working, then Go/Focus/Loop/Overwrite/Rename/Delete.
+
+`overwriteGuideSection()` replaces the selected Section’s endpoint references through `replaceSectionExtent()`. It preserves Section ID, title, creation time, shared Pins, and Undo identity; newly orphaned anonymous endpoint Pins are removed. If the overwritten Section owns Range, that Range is atomically rebased to the new Extent.
 
 Section Loop passes the resolved Section extent into the same `startLoopExtent()` used by matrix Loop. Matrix Loop consumes only the Active Interval.
 

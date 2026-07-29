@@ -103,6 +103,28 @@ export function getTargets(neighborhood) {
   };
 }
 
+export function classifyRefineRelation(interval, current, target) {
+  if (
+    !interval
+    || !Number.isFinite(current)
+    || !Number.isFinite(target)
+    || !Number.isFinite(interval.departure)
+    || !Number.isFinite(interval.arrival)
+    || Math.abs(interval.arrival - current) > EPSILON
+    || Math.abs(interval.departure - current) <= EPSILON
+  ) return "cross";
+
+  const movement = target - current;
+  const opposite = interval.departure - current;
+  return (
+    movement > EPSILON && opposite > EPSILON
+  ) || (
+    movement < -EPSILON && opposite < -EPSILON
+  )
+    ? "fold"
+    : "cross";
+}
+
 export function refineBlockReason(neighborhood, range, direction) {
   assertNeighborhood(neighborhood);
   if (!range || !Number.isFinite(range.start) || !Number.isFinite(range.end)) {

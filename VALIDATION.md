@@ -82,7 +82,9 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 
 ### Operator ownership and containment
 
-- Establish a large Loop, then Refine; confirm the new Interval is exactly the local refinement traversal rather than an extension of the old Loop.
+- Establish a Loop and Refine away from its opposite endpoint; confirm the new Working Section is exactly the unlooped crossing.
+- Refine toward the opposite endpoint; confirm the Working Section keeps the complementary side rather than the traversed fold.
+- Switch to an endpoint whose next Refine passes the opposite endpoint; confirm the old Loop cancels and only the overrun survives.
 - Traverse several Section endpoint Pins; confirm each result is exactly the latest one-hop Pin movement.
 - Confirm Pin Forward/Backward and playback push only the approached refinement endpoint.
 - After every Refine, Step, Pin, playback settlement, Reopen, and Switch, confirm the Loop is contained by active Resolution and both endpoint frames.
@@ -99,7 +101,7 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 - Confirm the restored frame contains the complete unchanged Loop.
 - Reopen at one endpoint, switch away and back, and confirm the reopened frame returns.
 - Switch, then Step or settle playback inward/outward/across the new anchor; confirm both compose from the transposed departure.
-- Switch, then Refine or traverse a Pin; confirm those operators record their own movement instead of stretching the transposed Loop.
+- Switch, then Refine away from the transposed anchor and confirm a local crossing; Refine toward/past it and confirm complementary folding. Traverse a Pin and confirm it records its own movement.
 - Hold an arrow through repeat after switching and confirm one history entry and one Context window.
 - Switch twice and confirm semantic Current, direction, frames, and extent return exactly.
 - Collapse an Interval by stepping onto its anchor and confirm Switch Endpoint is disabled and `S` is a no-op.
@@ -116,7 +118,10 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 ### Guide
 
 - Create titled/untitled Pins from Pins tab.
-- Create Sections from Interval and Held Field span.
+- Focus and Leave the unsaved Working Section; confirm it owns Range temporarily, survives Leave, and does not change Guide.
+- Create Sections from Working Section and Held Field span.
+- Overwrite a retained Section from the Working Section; confirm ID/title survive, retired anonymous endpoint Pins are removed, persistence updates, and Undo restores the prior Extent.
+- Overwrite a currently focused retained Section and confirm Range, Working Section containment, Focus, and the return Range remain coherent.
 - Confirm every Section endpoint appears as a Pin target and participates in previous/next traversal.
 - Attempt case-only duplicate Section titles on the same Extent and confirm runtime and reload preserve the same single identity.
 - Exercise Go, Focus, Loop, Rename, Delete, and Leave.

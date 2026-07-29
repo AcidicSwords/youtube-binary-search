@@ -769,7 +769,7 @@ kbd {
 
 .guide-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 5px;
   padding: 8px;
   border-bottom: 1px solid var(--line);
@@ -869,6 +869,7 @@ kbd {
 
 .guide-item-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 5px;
   padding: 0 8px 8px;
 }
@@ -1155,8 +1156,14 @@ kbd {
 }
 
 .section-create-form .guide-create-heading,
-.section-create-form .primary {
+.section-create-actions {
   grid-column: 1 / -1;
+}
+
+.section-create-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
 }
 
 @media (max-width: 680px) {
@@ -1166,7 +1173,7 @@ kbd {
   }
   .pin-create-form .guide-create-heading,
   .section-create-form .guide-create-heading,
-  .section-create-form .primary {
+  .section-create-actions {
     grid-column: 1;
   }
 }

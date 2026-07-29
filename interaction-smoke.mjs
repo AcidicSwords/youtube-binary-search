@@ -47,6 +47,8 @@ assert.match(
   /0:25\.000–0:50\.000/,
   "Pin traversal must record its own hop rather than inheriting a prior Loop anchor."
 );
+assert.match(byId.get("backward-meta").textContent, /^fold to /,
+  "Refine meta must disclose complementary folding before invocation.");
 byId.get("pin-backward").click();
 await flush();
 assert.equal(currentText(), "Current 0:25.000");
@@ -87,7 +89,20 @@ dispatchDocument("keydown", { key: "z", code: "KeyZ", ctrlKey: true });
 await flush();
 assert.equal(currentText(), "Current 0:50.000");
 
-// Guide owns Section creation and names the exact current Interval.
+// The current Loop can own Range as an unsaved Working Section. Leaving restores
+// the preceding Range without adding anything to Guide.
+byId.get("focus-working-section").click();
+await flush();
+assert.equal(byId.get("range-label").textContent, "0:25.000–0:50.000");
+assert.equal(byId.get("focused-section-title").textContent, "Working Section");
+assert.equal(byId.get("sections-list-count").textContent, "0");
+byId.get("leave-section").click();
+await flush();
+assert.equal(byId.get("range-label").textContent, "0:00.000–1:40.000");
+assert.equal(byId.get("sections-list-count").textContent, "0");
+assert.match(byId.get("section-window").textContent, /0:25\.000–0:50\.000/);
+
+// Guide owns explicit Section persistence and names the exact Working Section.
 byId.get("section-source").value = "interval";
 byId.get("section-label").value = "Quarter to middle";
 byId.get("section-label").dispatch("input");
@@ -97,6 +112,33 @@ assert.equal(byId.get("sections-list-count").textContent, "1");
 const sectionNodes = descendants(byId.get("sections-list"));
 assert.ok(sectionNodes.some(node => node.textContent === "Quarter to middle"));
 assert.ok(sectionNodes.some(node => node.dataset.loopSection), "Saved Sections must expose their own Loop action.");
+assert.ok(sectionNodes.some(node => node.dataset.overwriteSection), "Saved Sections must expose explicit Working Section overwrite.");
+
+// Overwrite is explicit and preserves the retained identity. Undo restores the
+// retained Extent, then the preceding Working Section deformation.
+byId.get("step-forward").click();
+await env.delay(150);
+await flush();
+assert.match(byId.get("section-window").textContent, /0:25\.000–1:00\.000/);
+const overwriteButton = sectionNodes.find(node => node.dataset.overwriteSection);
+byId.get("sections-list").dispatch("click", { target: overwriteButton });
+assert.equal(byId.get("guide-dialog-title").textContent, "Overwrite Section");
+byId.get("guide-dialog-form").dispatch("submit");
+await flush();
+assert.ok(
+  descendants(byId.get("sections-list")).some(node => /0:25\.000–1:00\.000/.test(node.textContent)),
+  "Overwrite must update the retained Section Extent."
+);
+dispatchDocument("keydown", { key: "z", code: "KeyZ", ctrlKey: true });
+await flush();
+assert.ok(
+  descendants(byId.get("sections-list")).some(node => /0:25\.000–0:50\.000/.test(node.textContent)),
+  "Undo must restore the retained Section Extent."
+);
+dispatchDocument("keydown", { key: "z", code: "KeyZ", ctrlKey: true });
+await flush();
+assert.match(byId.get("section-window").textContent, /0:25\.000–0:50\.000/);
+byId.get("guide-tab-sections").blur();
 
 // Matrix Loop freezes the current Interval. Its internal wrap is physical only:
 // semantic Current and the consumed Interval remain unchanged.
@@ -277,4 +319,4 @@ assert.equal(byId.has("context-action"), false);
 assert.equal(byId.has("skim"), false);
 assert.equal(byId.get("loop").classList.contains("loop-action"), true);
 
-console.log("Interaction smoke passed: Endpoint Transposition, separate Undo, Guide retention, composable Step intervals, collapse isolation, frozen Loop, shared activation, deterministic refold/stretch, confirmed rates, exact paused frames, Hold isolation, whole-Field side Step, and Space playback.");
+console.log("Interaction smoke passed: complementary Refine preview, unsaved Working Focus, explicit Section overwrite, Endpoint Transposition, separate Undo, Guide retention, composable Step intervals, collapse isolation, frozen Loop, shared activation, deterministic refold/stretch, confirmed rates, exact paused frames, Hold isolation, whole-Field side Step, and Space playback.");

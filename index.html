@@ -236,7 +236,7 @@
                 <span class="eyebrow">Operator matrix</span>
                 <h2 id="navigation-heading">Navigate</h2>
               </div>
-              <p>Refine and Pin record local moves; Step and playback resize Loop; Switch transposes it unchanged.</p>
+              <p>Refine crosses or folds the Working Section; Step and playback resize it; Switch transposes it unchanged.</p>
             </div>
 
             <div class="navigation-deck">
@@ -319,14 +319,17 @@
                 </div>
                 <label for="section-source">Source
                   <select id="section-source" disabled>
-                    <option value="interval">Active Interval</option>
+                    <option value="interval">Working Section</option>
                     <option value="field-span">Held Field span</option>
                   </select>
                 </label>
                 <label for="section-label">Title
                   <input id="section-label" type="text" maxlength="100" placeholder="Section title" disabled>
                 </label>
-                <button id="save-section" class="primary" type="submit" aria-keyshortcuts="Shift+P" disabled>Save Section</button>
+                <div class="section-create-actions">
+                  <button id="focus-working-section" type="button" disabled>Focus Working</button>
+                  <button id="save-section" class="primary" type="submit" aria-keyshortcuts="Shift+P" disabled>Save Section</button>
+                </div>
               </form>
               <div id="sections-list" class="guide-list"><p class="empty-state">No Sections for this video.</p></div>
             </section>

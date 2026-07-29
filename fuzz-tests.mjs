@@ -11,6 +11,8 @@ import {
   pinCurrent,
   saveIntervalAsSection,
   focusSection,
+  focusWorkingSection,
+  overwriteGuideSection,
   leaveSection
 } from "./session.js";
 import { validateGuide, resolveSection } from "./guide.js";
@@ -66,10 +68,16 @@ function assertSessionInvariant(session) {
   }
 
   if (focus) {
-    const section = resolveSection(guide, focus.sectionId);
-    assert.ok(section, "A focused Section must still exist in Guide.");
-    assert.ok(Math.abs(section.start - range.start) <= EPSILON);
-    assert.ok(Math.abs(section.end - range.end) <= EPSILON);
+    if (focus.kind === "working-section") {
+      assert.ok(focus.extent, "A Working Section focus must retain its projected Extent.");
+      assert.ok(Math.abs(focus.extent.start - range.start) <= EPSILON);
+      assert.ok(Math.abs(focus.extent.end - range.end) <= EPSILON);
+    } else {
+      const section = resolveSection(guide, focus.sectionId);
+      assert.ok(section, "A focused retained Section must still exist in Guide.");
+      assert.ok(Math.abs(section.start - range.start) <= EPSILON);
+      assert.ok(Math.abs(section.end - range.end) <= EPSILON);
+    }
   }
 }
 
@@ -78,7 +86,7 @@ const OPERATIONS_PER_RUN = 1000;
 for (let run = 0; run < RUNS; run += 1) {
   let session = createSession({ duration: 480, current: random() * 480 });
   for (let index = 0; index < OPERATIONS_PER_RUN; index += 1) {
-    const operation = Math.floor(random() * 13);
+    const operation = Math.floor(random() * 15);
     let result;
 
     if (operation === 0) result = refine(session, "backward");
@@ -105,7 +113,14 @@ for (let run = 0; run < RUNS; run += 1) {
         ? focusSection(session, sections[Math.floor(random() * sections.length)].id)
         : { session, changed: false };
     } else if (operation === 11) result = leaveSection(session);
-    else result = switchEndpoint(session);
+    else if (operation === 12) result = switchEndpoint(session);
+    else if (operation === 13) result = focusWorkingSection(session);
+    else {
+      const sections = session.model.guide.sections;
+      result = sections.length
+        ? overwriteGuideSection(session, sections[Math.floor(random() * sections.length)].id)
+        : { session, changed: false };
+    }
 
     if (result?.session) session = result.session;
     assertSessionInvariant(session);

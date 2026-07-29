@@ -6,8 +6,10 @@ import {
 import {
   createSession,
   focusSection,
+  focusWorkingSection,
   goTo,
   leaveSection,
+  overwriteGuideSection,
   pinCurrent,
   refine,
   reopen,
@@ -76,10 +78,16 @@ function assertInvariant(session) {
   }
 
   if (focus) {
-    const section = resolveSection(guide, focus.sectionId);
-    assert.ok(section);
-    assert.ok(Math.abs(section.start - range.start) <= EPSILON);
-    assert.ok(Math.abs(section.end - range.end) <= EPSILON);
+    if (focus.kind === "working-section") {
+      assert.ok(focus.extent);
+      assert.ok(Math.abs(focus.extent.start - range.start) <= EPSILON);
+      assert.ok(Math.abs(focus.extent.end - range.end) <= EPSILON);
+    } else {
+      const section = resolveSection(guide, focus.sectionId);
+      assert.ok(section);
+      assert.ok(Math.abs(section.start - range.start) <= EPSILON);
+      assert.ok(Math.abs(section.end - range.end) <= EPSILON);
+    }
   }
 }
 
@@ -89,7 +97,7 @@ for (let run = 0; run < RUNS; run += 1) {
   let session = createSession({ duration: 600, current: random() * 600 });
   for (let index = 0; index < OPERATIONS_PER_RUN; index += 1) {
     const before = session;
-    const operation = Math.floor(random() * 15);
+    const operation = Math.floor(random() * 17);
     let result;
     if (operation === 0) result = refine(session, "backward");
     else if (operation === 1) result = refine(session, "forward");
@@ -124,7 +132,13 @@ for (let run = 0; run < RUNS; run += 1) {
         ? focusSection(session, sections[Math.floor(random() * sections.length)].id)
         : { session, changed: false };
     } else if (operation === 13) result = leaveSection(session);
-    else {
+    else if (operation === 14) result = focusWorkingSection(session);
+    else if (operation === 15) {
+      const sections = session.model.guide.sections;
+      result = sections.length
+        ? overwriteGuideSection(session, sections[Math.floor(random() * sections.length)].id)
+        : { session, changed: false };
+    } else {
       // Metamorphic check: Endpoint Transposition must remain an involution for
       // every randomly reached valid Interval, not only hand-authored examples.
       const once = switchEndpoint(session);

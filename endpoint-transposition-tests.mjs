@@ -62,6 +62,30 @@ assert.equal(switched.session.model.resolution.C, originalInterval.arrival);
 assert.deepEqual(frameOf(switched.session.model), arrivalFrame);
 assert.deepEqual(switched.session.model.interval, originalInterval);
 
+// Refine after transposition may pass the preserved opposite endpoint. That is
+// a fold, so the opposite endpoint survives and only the overrun becomes the
+// Working Section; the traversed old side must not be retained.
+let folded = createSession({ duration: 100, current: 50 });
+folded = goTo(folded, 70, { operator: "timeline" }).session;
+folded = switchEndpoint(folded).session;
+const foldedResult = refine(folded, "forward");
+assert.equal(foldedResult.refineRelation, "fold");
+assert.deepEqual(
+  {
+    start: foldedResult.session.model.interval.start,
+    end: foldedResult.session.model.interval.end,
+    departure: foldedResult.session.model.interval.departure,
+    arrival: foldedResult.session.model.interval.arrival
+  },
+  { start: 70, end: 75, departure: 70, arrival: 75 }
+);
+assert.deepEqual(foldedResult.session.model.resolution, {
+  L: 50,
+  C: 75,
+  R: 100,
+  level: 1
+});
+
 // Playback edits the selected endpoint instead of replacing the Interval that
 // Switch Endpoint is transposing. The opposite endpoint and its search frame
 // survive shrink, extension, and a subsequent switch.
@@ -228,4 +252,4 @@ assert.match(html, /id="return-action"[\s\S]*Control\+Z Meta\+Z/);
 assert.match(app, /spatialKey\("s"\)[\s\S]*switchCurrentEndpoint\(\)/);
 assert.match(styles, /"pin-backward switch-endpoint pin-forward"/);
 
-console.log("Endpoint Transposition v5.8.6 tests passed: endpoint frames, involution, Step composition, collapse, Undo separation, and matrix wiring.");
+console.log("Endpoint Transposition v5.8.6 tests passed: endpoint frames, involution, complementary Refine fold-over, Step composition, collapse, Undo separation, and matrix wiring.");

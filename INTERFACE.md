@@ -39,7 +39,7 @@ The map spans the same width as the viewer and shows:
 - Resolution;
 - semantic Current;
 - physical Cursor during playback/Context/Loop;
-- Active Interval, replaced by local Go/Refine/Pin movements and resized by Step or settled playback;
+- Working Section / Active Interval, replaced by local Go/Pin movements, crossed or folded by Refine, and resized by Step or settled playback;
 - Held Field span;
 - Pins;
 - action and Section previews.
@@ -67,11 +67,13 @@ Previous Pin    | Switch Endpoint | Next Pin
 
 The layout expresses relations, not keyboard geometry.
 
-- Row 1 acts on Resolution; each Refine records its own local traversal as the new Interval.
+- Row 1 acts on Resolution and the Working Section relation: Refine away records an unlooped crossing, while Refine toward the opposite endpoint folds and retains the complementary side.
 - Row 2 acts on movement and its active Interval: Step resizes the operand and Loop consumes its frozen extent.
 - Row 3 crosses retained Addresses one Pin hop at a time, or transposes the current Interval’s endpoints unchanged.
 - Loop is central because surrounding movement operators establish the Interval it consumes and Step directly extends or shrinks that operand. It is genuine bounded playback with internal non-committing wraps.
-- Switch Endpoint is central because it crosses the active Interval without changing its ordered extent. It restores a destination Resolution frame that contains the same Loop. Subsequent Step or playback may edit from the transposed anchor; Refine and Pin traversal replace the Loop with their own movements. Its meta reports the destination Address, retained scale, and basis; its timeline preview shows that destination frame.
+- Switch Endpoint is central because it crosses the active Interval without changing its ordered extent. It restores a destination Resolution frame that contains the same Loop. Subsequent Step or playback may edit from the transposed anchor; Refine conditionally crosses away from or folds toward it, while Pin traversal records its own movement. Its meta reports the destination Address, retained scale, and basis; its timeline preview shows that destination frame.
+
+Each available Refine meta names `cross` or `fold` before its destination, so the retained-side consequence is visible before invocation.
 
 Pin Current and Save Section do not belong in the matrix; they create retained records and therefore belong in Guide.
 
@@ -87,9 +89,11 @@ Creation row: Current, optional title, Pin Current. Every Section endpoint is al
 
 ### Sections
 
-Creation row: source (`Active Interval` or `Held Field span`), title, Save Section. Each retained Section exposes Go, Focus, Loop, Rename, Delete. Equal endpoints and titles are duplicate identity case-insensitively, so runtime and reloaded Guide state cannot disagree.
+The Active Interval appears here as the semi-persistent **Working Section**. It exposes Focus Working independently of persistence: Focus installs its current Extent as Range, and Leave restores the containing Range without creating a Guide record.
 
-Focused Section state and Leave remain in Guide because Focus makes a retained Section own Range.
+Creation row: source (`Working Section` or `Held Field span`), title, Save Section. Each retained Section exposes Go, Focus, Loop, Overwrite, Rename, and Delete. Overwrite copies the current Working Section into that retained identity; it is never implied by Focus. Equal endpoints and titles are duplicate identity case-insensitively, so runtime and reloaded Guide state cannot disagree.
+
+Focused Section state and Leave remain in Guide because Focus makes either a Working or retained Section own Range.
 
 Unimplemented Sources do not appear. Range extent is shown once in Parameters rather than repeated in the Range-tools disclosure; Guide totals remain on the closed toggle and individual tabs rather than a third combined header readout.
 

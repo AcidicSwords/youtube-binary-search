@@ -20,27 +20,6 @@ import {
   visiblePins
 } from "./guide.js";
 
-function locateWithRefine(session, target) {
-  let current = session;
-  let operations = 0;
-  while (Math.abs(current.model.resolution.C - target) > EPSILON) {
-    const direction = target < current.model.resolution.C ? "backward" : "forward";
-    const result = refine(current, direction);
-    assert.equal(result.changed, true, "A bracketed target must remain refinable.");
-    current = result.session;
-    assert.ok(
-      Math.abs(
-        (current.model.resolution.C - current.model.resolution.L)
-        - (current.model.resolution.R - current.model.resolution.C)
-      ) <= EPSILON,
-      "Every successful Refine must leave Current centered between its two endpoints."
-    );
-    operations += 1;
-    assert.ok(operations < 32, "Binary location must converge.");
-  }
-  return current;
-}
-
 function assertLoopContained(session) {
   const { interval, range, resolution } = session.model;
   assert.ok(interval);
@@ -54,27 +33,52 @@ function assertLoopContained(session) {
   }
 }
 
-// Refine owns Resolution and records its own traversal Interval. It must not
-// stretch an older Loop Interval merely because Switch selected its endpoint.
-const P = 40;
-const A = 70;
-const B = 13.375;
-let composed = createSession({ duration: 100, current: P });
-composed = goTo(composed, A, { operator: "directA" }).session;
-composed = switchEndpoint(composed).session;
-const beforeRefine = composed.model.resolution.C;
-composed = locateWithRefine(composed, B);
-assert.ok(Math.abs(composed.model.interval.departure - A) > EPSILON);
-assert.ok(Math.abs(composed.model.interval.arrival - B) <= EPSILON);
-assert.ok(Math.abs(composed.model.interval.departure - beforeRefine) > EPSILON);
-assert.ok(
-  composed.model.interval.end - composed.model.interval.start
-    < Math.abs(A - B),
-  "The final Refine traversal must replace, not extend, the older Loop Interval."
+// Refine owns binary subdivision and transforms the Working Section according
+// to the side it crosses. Away from the opposite endpoint it records a new
+// local crossing; toward that endpoint it folds and retains the complementary
+// side, including only the overrun when the target passes the endpoint.
+let composed = createSession({ duration: 100, current: 50 });
+composed = goTo(composed, 70, { operator: "directA" }).session;
+const crossed = refine(composed, "forward");
+assert.equal(crossed.refineRelation, "cross");
+assert.deepEqual(
+  {
+    start: crossed.session.model.interval.start,
+    end: crossed.session.model.interval.end,
+    departure: crossed.session.model.interval.departure,
+    arrival: crossed.session.model.interval.arrival
+  },
+  { start: 70, end: 80, departure: 70, arrival: 80 }
 );
+
+const shortened = refine(composed, "backward");
+assert.equal(shortened.refineRelation, "fold");
+assert.deepEqual(
+  {
+    start: shortened.session.model.interval.start,
+    end: shortened.session.model.interval.end,
+    departure: shortened.session.model.interval.departure,
+    arrival: shortened.session.model.interval.arrival
+  },
+  { start: 50, end: 60, departure: 50, arrival: 60 }
+);
+
+const foldedPast = refine(switchEndpoint(composed).session, "forward");
+assert.equal(foldedPast.refineRelation, "fold");
+assert.deepEqual(
+  {
+    start: foldedPast.session.model.interval.start,
+    end: foldedPast.session.model.interval.end,
+    departure: foldedPast.session.model.interval.departure,
+    arrival: foldedPast.session.model.interval.arrival
+  },
+  { start: 70, end: 75, departure: 70, arrival: 75 }
+);
+assertLoopContained(foldedPast.session);
 
 // A direct Go remains a replacement boundary rather than silently inheriting
 // the matrix anchor.
+composed = foldedPast.session;
 const beforeDirect = composed.model.resolution.C;
 composed = goTo(composed, 90, { operator: "timeline" }).session;
 assert.ok(Math.abs(composed.model.interval.departure - beforeDirect) <= EPSILON);
@@ -162,4 +166,4 @@ assert.equal(
   "range-start"
 );
 
-console.log("Semantic composition tests passed: distinct operator ownership, one-sided linear endpoint pushes, Loop containment, and truthful Refine limits.");
+console.log("Semantic composition tests passed: complementary Refine folding, local crossings, one-sided linear endpoint pushes, Loop containment, and truthful Refine limits.");

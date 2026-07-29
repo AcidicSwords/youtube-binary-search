@@ -61,8 +61,12 @@ assert.doesNotMatch(html, /guide-tab-sources|guide-sources-panel|Potential struc
   "Unimplemented Sources must not occupy interface space.");
 assert.doesNotMatch(`${styles}\n${fieldCss}`, /source-placeholder|guide-counts/,
   "Removed placeholder and duplicate-count projections must not retain CSS.");
-assert.match(html, /<option value="interval">Active Interval<\/option>/,
-  "Section creation must name its editable operand accurately.");
+assert.match(styles, /\.guide-tabs\s*\{[\s\S]*grid-template-columns:\s*1fr 1fr/,
+  "The two implemented Guide tabs must not reserve a third empty track.");
+assert.match(html, /<option value="interval">Working Section<\/option>/,
+  "Section creation must name its semi-persistent operand accurately.");
+assert.match(html, /id="focus-working-section"[\s\S]*id="save-section"/,
+  "Working Section focus must remain independent from explicit persistence.");
 
 assert.match(styles, /--control-height:\s*40px/);
 assert.match(styles, /--compact-control-height:\s*32px/);
@@ -120,4 +124,4 @@ assert.match(pkg.scripts.audit, /integration-check\.mjs/);
 assert.match(pkg.scripts.audit, /project-audit\.mjs/);
 assert.match(pkg.scripts.check, /npm run audit/);
 
-console.log("Project audit passed: v5.8.6 Endpoint Transposition, distinct operator ownership, Loop containment, semantic repairs, mirrored Field controls, collapse isolation, native playback settlement, Guide ownership, operator geometry, CSS boundaries, and adapter contracts are coherent.");
+console.log("Project audit passed: v5.8.6 Endpoint Transposition, complementary Refine folding, Working Section lifecycle, Loop containment, semantic repairs, mirrored Field controls, collapse isolation, native playback settlement, Guide ownership, operator geometry, CSS boundaries, and adapter contracts are coherent.");

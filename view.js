@@ -5,6 +5,7 @@ import {
   contains,
   midpoint,
   getTargets,
+  classifyRefineRelation,
   getActionRanges,
   refineBlockReason,
   RESOLUTION_BASIS
@@ -80,7 +81,23 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
   const range = () => model().range;
   const guide = () => model().guide;
   const interval = () => model().interval;
-  const focusedSectionId = () => model().focus?.sectionId || null;
+  const focusedSectionId = () => (
+    model().focus?.kind === "working-section"
+      ? null
+      : model().focus?.sectionId || null
+  );
+  const focusedProjection = () => {
+    const focus = model().focus;
+    if (!focus) return null;
+    if (focus.kind === "working-section") {
+      return {
+        label: "Working Section",
+        start: focus.extent?.start ?? model().range.start,
+        end: focus.extent?.end ?? model().range.end
+      };
+    }
+    return resolveSection(guide(), focus.sectionId);
+  };
   const transportIs = kind => state().transport.kind === kind;
 
   function pinLabel(pin) {
@@ -264,6 +281,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         loop.type = "button";
         loop.dataset.loopSection = section.id;
         loop.textContent = "Loop";
+        const overwrite = document.createElement("button");
+        overwrite.type = "button";
+        overwrite.dataset.overwriteSection = section.id;
+        overwrite.textContent = "Overwrite";
+        overwrite.disabled = !interval();
         const rename = document.createElement("button");
         rename.type = "button";
         rename.dataset.renameSection = section.id;
@@ -273,7 +295,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         remove.dataset.deleteSection = section.id;
         remove.textContent = "Delete";
         remove.className = "danger-text";
-        actions.append(focus, loop, rename, remove);
+        actions.append(focus, loop, overwrite, rename, remove);
 
         const endpoints = document.createElement("div");
         endpoints.className = "section-endpoints";
@@ -448,7 +470,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         : currentInterval,
       loop: currentInterval
     } : null;
-    const focused = resolveSection(guide(), focusedSectionId());
+    const focused = focusedProjection();
 
     elements["duration-time"].textContent = formatTime(model().duration);
     elements["range-label"].textContent = loaded ? formatRange(activeRange) : "—";
@@ -468,15 +490,19 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["step-backward-seconds"].value = String(stepReach.backward);
     elements["step-forward-seconds"].value = String(stepReach.forward);
 
-    const sectionKind = elements["section-source"].value || "interval";
-    const sectionExtent = sectionKind === "field-span" ? fieldSpan : currentInterval;
-    elements["section-window"].textContent = sectionExtent
-      ? `${sectionKind === "field-span" ? "Field" : "Interval"} ${formatRange(sectionExtent)}`
-      : `No ${sectionKind === "field-span" ? "Held Field span" : "active Interval"}`;
+    let sectionKind = elements["section-source"].value || "interval";
+    let sectionExtent = sectionKind === "field-span" ? fieldSpan : currentInterval;
     const sourceOptions = [...elements["section-source"].options];
     const fieldOption = sourceOptions.find(option => option.value === "field-span");
     if (fieldOption) fieldOption.disabled = !fieldSpan;
-    if (sectionKind === "field-span" && !fieldSpan) elements["section-source"].value = currentInterval ? "interval" : "field-span";
+    if (sectionKind === "field-span" && !fieldSpan && currentInterval) {
+      elements["section-source"].value = "interval";
+      sectionKind = "interval";
+      sectionExtent = currentInterval;
+    }
+    elements["section-window"].textContent = sectionExtent
+      ? `${sectionKind === "field-span" ? "Field" : "Working Section"} ${formatRange(sectionExtent)}`
+      : `No ${sectionKind === "field-span" ? "Held Field span" : "Working Section"}`;
 
     elements["focused-section"].hidden = !focused;
     if (focused) {
@@ -500,7 +526,22 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["save-section"].disabled = interactionLocked
       || !sectionExtent
       || !elements["section-label"].value.trim();
+    const workingFocus = model().focus?.kind === "working-section";
+    const workingAlreadyOwnsRange = workingFocus
+      && currentInterval
+      && Math.abs(activeRange.start - currentInterval.start) <= EPSILON
+      && Math.abs(activeRange.end - currentInterval.end) <= EPSILON;
+    elements["focus-working-section"].textContent = workingFocus
+      ? "Refocus Working"
+      : "Focus Working";
+    elements["focus-working-section"].disabled = interactionLocked
+      || sectionKind !== "interval"
+      || !currentInterval
+      || workingAlreadyOwnsRange;
     elements["leave-section"].disabled = interactionLocked || !focused;
+    for (const control of elements["sections-list"].querySelectorAll?.("[data-overwrite-section]") || []) {
+      control.disabled = interactionLocked || !currentInterval;
+    }
     elements["refine-backward"].disabled = interactionLocked || targets.backward === null;
     elements["refine-forward"].disabled = interactionLocked || targets.forward === null;
     elements.reopen.disabled = interactionLocked || !actionModel?.reopen;
@@ -563,7 +604,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "Refine Backward",
       targets.backward === null
         ? backwardBlock === "resolution-limit" ? "Resolution limit" : "Range start"
-        : `to ${formatTime(targets.backward)}`
+        : `${classifyRefineRelation(currentInterval, semanticCurrent, targets.backward)} to ${formatTime(targets.backward)}`
     );
     setActionMeta(
       "refine-forward",
@@ -571,7 +612,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "Refine Forward",
       targets.forward === null
         ? forwardBlock === "resolution-limit" ? "Resolution limit" : "Range end"
-        : `to ${formatTime(targets.forward)}`
+        : `${classifyRefineRelation(currentInterval, semanticCurrent, targets.forward)} to ${formatTime(targets.forward)}`
     );
     elements["reopen-meta"].textContent = actionModel?.reopen
       ? `${formatDuration(activeRange.end - activeRange.start)} available`
