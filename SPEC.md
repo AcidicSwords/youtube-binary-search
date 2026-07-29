@@ -58,16 +58,18 @@ Selects one child of the active Neighborhood, commits its midpoint as Current, a
 Refine owns subdivision and transforms the Working Section according to one geometric test:
 
 ```text
-target is inside the existing Working Section, including an endpoint
-→ shorten the existing Working Section
-→ Working Section = preserved departure ↔ target
+before Refine: C = Current, M = destination midpoint, O = opposite Loop endpoint
 
-target is outside the existing Working Section
+M is inside the existing Working Section, including an endpoint
+→ shorten the existing Working Section
+→ Working Section = M ↔ O, directed O → M
+
+M is outside the existing Working Section
 → disregard the existing Working Section
-→ Working Section = preceding Current ↔ target
+→ Working Section = C ↔ M, directed C → M
 ```
 
-The destination midpoint’s membership is decisive; movement direction relative to the old endpoint is not. An inside midpoint increases Resolution while retaining the untraversed remainder of the old Loop. Landing exactly on the opposite endpoint shortens the Loop to zero and collapses it. Once a midpoint passes outside an endpoint, the complete new traversal replaces the old Loop. Both non-null results remain inside the selected child Neighborhood, so Current stays centered and binary point-location retains its ordinary convergence.
+The selected child Neighborhood and its boundaries are determined only by the Refine direction. Loop membership does not alter that subdivision; it determines which side of the subdivision is retained as the Working Section. The destination midpoint’s membership is decisive, not movement direction relative to the old endpoint. An inside midpoint increases Resolution while retaining the midpoint-to-opposite-endpoint remainder of the old Loop, never the Current-to-midpoint traversal. Landing exactly on the opposite endpoint shortens the Loop to zero and collapses it. Once a midpoint passes outside an endpoint, the complete preceding-Current-to-midpoint traversal replaces the old Loop. Both non-null results remain inside the selected child Neighborhood, so Current stays centered and binary point-location retains its ordinary convergence.
 
 ### Reopen
 

@@ -375,40 +375,56 @@ membershipRefine = refine(membershipRefine, "backward").session;
 assert.deepEqual(
   {
     current: membershipRefine.model.resolution.C,
+    L: membershipRefine.model.resolution.L,
+    R: membershipRefine.model.resolution.R,
     start: membershipRefine.model.interval.start,
-    end: membershipRefine.model.interval.end
+    end: membershipRefine.model.interval.end,
+    departure: membershipRefine.model.interval.departure,
+    arrival: membershipRefine.model.interval.arrival
   },
-  { current: 25, start: 25, end: 50 }
+  { current: 25, L: 0, R: 50, start: 25, end: 50, departure: 50, arrival: 25 }
 );
 const replacedBackward = refine(membershipRefine, "backward");
 assert.equal(replacedBackward.refineRelation, "replace");
 assert.deepEqual(
   {
     current: replacedBackward.session.model.resolution.C,
+    L: replacedBackward.session.model.resolution.L,
+    R: replacedBackward.session.model.resolution.R,
     start: replacedBackward.session.model.interval.start,
-    end: replacedBackward.session.model.interval.end
+    end: replacedBackward.session.model.interval.end,
+    departure: replacedBackward.session.model.interval.departure,
+    arrival: replacedBackward.session.model.interval.arrival
   },
-  { current: 12.5, start: 12.5, end: 25 }
+  { current: 12.5, L: 0, R: 25, start: 12.5, end: 25, departure: 25, arrival: 12.5 }
 );
 const shortenedForward = refine(membershipRefine, "forward");
 assert.equal(shortenedForward.refineRelation, "shorten");
 assert.deepEqual(
   {
     current: shortenedForward.session.model.resolution.C,
+    L: shortenedForward.session.model.resolution.L,
+    R: shortenedForward.session.model.resolution.R,
     start: shortenedForward.session.model.interval.start,
-    end: shortenedForward.session.model.interval.end
+    end: shortenedForward.session.model.interval.end,
+    departure: shortenedForward.session.model.interval.departure,
+    arrival: shortenedForward.session.model.interval.arrival
   },
-  { current: 37.5, start: 37.5, end: 50 }
+  { current: 37.5, L: 25, R: 50, start: 37.5, end: 50, departure: 50, arrival: 37.5 }
 );
 const replacedAgain = refine(shortenedForward.session, "backward");
 assert.equal(replacedAgain.refineRelation, "replace");
 assert.deepEqual(
   {
     current: replacedAgain.session.model.resolution.C,
+    L: replacedAgain.session.model.resolution.L,
+    R: replacedAgain.session.model.resolution.R,
     start: replacedAgain.session.model.interval.start,
-    end: replacedAgain.session.model.interval.end
+    end: replacedAgain.session.model.interval.end,
+    departure: replacedAgain.session.model.interval.departure,
+    arrival: replacedAgain.session.model.interval.arrival
   },
-  { current: 31.25, start: 31.25, end: 37.5 }
+  { current: 31.25, L: 25, R: 37.5, start: 31.25, end: 37.5, departure: 37.5, arrival: 31.25 }
 );
 
 let mirroredMembership = createSession({ duration: 100, current: 50 });
@@ -416,40 +432,56 @@ mirroredMembership = refine(mirroredMembership, "forward").session;
 assert.deepEqual(
   {
     current: mirroredMembership.model.resolution.C,
+    L: mirroredMembership.model.resolution.L,
+    R: mirroredMembership.model.resolution.R,
     start: mirroredMembership.model.interval.start,
-    end: mirroredMembership.model.interval.end
+    end: mirroredMembership.model.interval.end,
+    departure: mirroredMembership.model.interval.departure,
+    arrival: mirroredMembership.model.interval.arrival
   },
-  { current: 75, start: 50, end: 75 }
+  { current: 75, L: 50, R: 100, start: 50, end: 75, departure: 50, arrival: 75 }
 );
 const replacedForward = refine(mirroredMembership, "forward");
 assert.equal(replacedForward.refineRelation, "replace");
 assert.deepEqual(
   {
     current: replacedForward.session.model.resolution.C,
+    L: replacedForward.session.model.resolution.L,
+    R: replacedForward.session.model.resolution.R,
     start: replacedForward.session.model.interval.start,
-    end: replacedForward.session.model.interval.end
+    end: replacedForward.session.model.interval.end,
+    departure: replacedForward.session.model.interval.departure,
+    arrival: replacedForward.session.model.interval.arrival
   },
-  { current: 87.5, start: 75, end: 87.5 }
+  { current: 87.5, L: 75, R: 100, start: 75, end: 87.5, departure: 75, arrival: 87.5 }
 );
 const shortenedBackward = refine(mirroredMembership, "backward");
 assert.equal(shortenedBackward.refineRelation, "shorten");
 assert.deepEqual(
   {
     current: shortenedBackward.session.model.resolution.C,
+    L: shortenedBackward.session.model.resolution.L,
+    R: shortenedBackward.session.model.resolution.R,
     start: shortenedBackward.session.model.interval.start,
-    end: shortenedBackward.session.model.interval.end
+    end: shortenedBackward.session.model.interval.end,
+    departure: shortenedBackward.session.model.interval.departure,
+    arrival: shortenedBackward.session.model.interval.arrival
   },
-  { current: 62.5, start: 50, end: 62.5 }
+  { current: 62.5, L: 50, R: 75, start: 50, end: 62.5, departure: 50, arrival: 62.5 }
 );
 const mirroredReplace = refine(shortenedBackward.session, "forward");
 assert.equal(mirroredReplace.refineRelation, "replace");
 assert.deepEqual(
   {
     current: mirroredReplace.session.model.resolution.C,
+    L: mirroredReplace.session.model.resolution.L,
+    R: mirroredReplace.session.model.resolution.R,
     start: mirroredReplace.session.model.interval.start,
-    end: mirroredReplace.session.model.interval.end
+    end: mirroredReplace.session.model.interval.end,
+    departure: mirroredReplace.session.model.interval.departure,
+    arrival: mirroredReplace.session.model.interval.arrival
   },
-  { current: 68.75, start: 62.5, end: 68.75 }
+  { current: 68.75, L: 62.5, R: 75, start: 62.5, end: 68.75, departure: 62.5, arrival: 68.75 }
 );
 
 // Direct placement is total over finite input and cannot create out-of-video state.
