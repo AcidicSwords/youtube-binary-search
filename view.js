@@ -459,6 +459,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     if (surface) {
       const currentState = state();
       const transportKind = currentState.transport.kind;
+      const contextObservation = transportKind === TRANSPORT_KIND.CONTEXT;
       const ordinaryPlayback = transportKind === TRANSPORT_KIND.PLAYBACK;
       const centerRunning = [YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(currentState.playerState);
       // Ordinary playback exposes YouTube's native controls after the trusted
@@ -471,9 +472,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       surface.disabled = !currentState.videoLoaded || preparing;
       const label = transportKind === TRANSPORT_KIND.LOOP
         ? "Stop Loop"
-        : ordinaryPlayback
-          ? "Pause Field"
-          : "Play Field";
+        : contextObservation
+          ? "Set Current Here"
+          : ordinaryPlayback
+            ? "Pause Field"
+            : "Play Field";
       surface.setAttribute("aria-label", preparing ? "Preparing Field players" : label);
       surface.setAttribute("aria-pressed", String(ordinaryPlayback));
       if (elements["center-transport-label"]) {
@@ -481,7 +484,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       }
       if (elements["center-transport-icon"]) {
         elements["center-transport-icon"].textContent = (
-          transportKind === TRANSPORT_KIND.LOOP || ordinaryPlayback
+          transportKind === TRANSPORT_KIND.LOOP || contextObservation || ordinaryPlayback
         ) ? "■" : "▶";
       }
     }

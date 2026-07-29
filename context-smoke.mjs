@@ -72,7 +72,11 @@ assert.equal(
   playsBeforeHeldStep,
   "Held-key repeats must not start intermediate Context playback."
 );
-assert.equal(center.currentTime, 50);
+assert.equal(
+  center.currentTime,
+  80,
+  "Held Step must park Center at each committed Current while Context remains deferred."
+);
 assert.equal(center.state, 2);
 dispatchDocument("keyup", { key: "ArrowRight", code: "ArrowRight" });
 await flush();
@@ -117,7 +121,7 @@ assert.equal(center.state, 1);
 // coalescing completes.
 byId.get("step-forward").click();
 assert.equal(currentText(), "Current 1:25.000");
-await env.delay(150);
+await env.delay(300);
 await flush();
 assert.equal(center.currentTime, 84);
 assert.equal(center.state, 1);

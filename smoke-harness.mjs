@@ -70,11 +70,19 @@ export class FakeElement {
       relatedTarget: init.relatedTarget || null,
       defaultPrevented: false,
       propagationStopped: false,
+      immediatePropagationStopped: false,
       preventDefault() { this.defaultPrevented = true; },
       stopPropagation() { this.propagationStopped = true; },
+      stopImmediatePropagation() {
+        this.immediatePropagationStopped = true;
+        this.propagationStopped = true;
+      },
       ...init
     };
-    for (const listener of this.listeners.get(type) || []) listener(event);
+    for (const listener of this.listeners.get(type) || []) {
+      listener(event);
+      if (event.immediatePropagationStopped) break;
+    }
     return event;
   }
   click() { return this.dispatch("click"); }
@@ -325,9 +333,16 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
       target: init.target || documentStub,
       preventDefault() { this.defaultPrevented = true; },
       stopPropagation() { this.propagationStopped = true; },
+      stopImmediatePropagation() {
+        this.immediatePropagationStopped = true;
+        this.propagationStopped = true;
+      },
       ...init
     };
-    for (const listener of documentListeners.get(type) || []) listener(event);
+    for (const listener of documentListeners.get(type) || []) {
+      listener(event);
+      if (event.immediatePropagationStopped) break;
+    }
     return event;
   };
 

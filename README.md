@@ -48,11 +48,11 @@ Range is the sole hard temporal boundary. Resolution controls semantic discrimin
 
 Center is the only audible player and retains native YouTube controls during playback. While paused, a parent-owned Center surface and Space start Center, Tail, and Lead synchronously from one trusted gesture. Every ordinary play/unpause refolds each available side to Center and begins a fresh Stretch toward its configured Offset; once Center is playing, the surface withdraws and YouTube’s native controls remain available. During playback, Resolution and the Working Section deform continuously with Cursor. Pausing freezes each side once, then commits that exact visible projection by moving the active Interval endpoint and pushing only the approached Resolution endpoint.
 
-Context is not a button. A custom `0–300s` Context window runs automatically after discrete traversal, plays only in Center, restores Center to committed Current, and never activates Tail or Lead.
+Context is not a button. A custom `0–300s` Context window runs automatically after discrete traversal, plays only in Center, restores Center to committed Current, and never activates Tail or Lead. Pressing Space or the Center surface while Context is running stops at the heard Cursor and commits that address as Current through a direct Go; ordinary Context completion remains transient.
 
 The matrix has distinct ownership rather than one hidden edit mode. Refine subdivides Resolution conditionally: a destination midpoint inside the Working Section shortens it toward the preserved opposite endpoint, collapsing it on exact endpoint coincidence; a midpoint outside replaces it with the complete new traversal from Current. Pin Forward/Backward pushes the approached Resolution endpoint but replaces Interval with the single Pin hop. Step resizes the existing Interval around its opposite endpoint. Direct timeline/Guide Go replaces Interval. Settled native playback follows Step’s endpoint-edit rule.
 
-Stepping outward extends the operand, stepping inward shrinks it, and crossing the anchor redraws it in the opposite direction. Every Step pushes only the approached Neighborhood endpoint while leaving the receding endpoint fixed. When it reaches or crosses the old directional endpoint, it keeps a full Step beyond Current, clamped to Range, so the next directional Refine remains half a Step away wherever Range permits. Arrow keys, matrix buttons, local Step buttons, and side surfaces share an application-owned hold cadence; one held press is one Undo transaction and starts Context at most once on release. Quick repeated taps also coalesce into one Undo step.
+Stepping outward extends the operand, stepping inward shrinks it, and crossing the anchor redraws it in the opposite direction. Every Step pushes only the approached Neighborhood endpoint while leaving the receding endpoint fixed. When it reaches or crosses the old directional endpoint, it keeps a full Step beyond Current, clamped to Range, so the next directional Refine remains half a Step away wherever Range permits. Arrow keys, matrix buttons, local Step buttons, and side surfaces share an application-owned hold cadence; each repeat immediately parks Center and both sides at the new Current, while one held press remains one Undo transaction and starts Context at most once on release. Human-speed rapid taps share the short settlement window and likewise produce one Undo step and one final Context window.
 
 Every Interval endpoint retains a Resolution frame that contains the complete Interval. Switch Endpoint leaves the ordered extent unchanged, makes the other endpoint Current, and restores that endpoint’s frame. Switching twice is an exact involution. A following Step or playback edits from the transposed anchor. Refine uses the same destination-membership rule after transposition: inside shortens (or collapses at coincidence); outside replaces. Pin traversal records its own local movement. A collapsed Interval has nothing to switch.
 
@@ -99,7 +99,7 @@ L              Loop current Interval
 Shift+← / →    Previous / next Pin
 S              Switch Endpoint
 Ctrl/Cmd+Z     Undo
-Space          Shared Field play/pause
+Space          Shared Field play/pause; during Context, set Cursor as Current
 P              Open Pins creation in Guide
 Shift+P        Open Sections creation in Guide
 G              Guide

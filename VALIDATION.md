@@ -6,7 +6,7 @@
 npm run check
 ```
 
-The gate covers syntax, Session/Undo, endpoint-frame containment and transposition, distinct operator ownership, all seven semantic-audit regressions, Guide, Context/playback/Loop values, source normalization, 25,000-operation fuzzing, native-playback regressions, Field geometry and controller behaviour, held pointer/key Step gestures, DOM/accessibility contracts, repository audits, startup, interaction, Context, transport-coherence, and metadata paths.
+The gate covers syntax, Session/Undo, endpoint-frame containment and transposition, distinct operator ownership, all seven semantic-audit regressions, Guide, Context/playback/Loop values, source normalization, 25,000-operation fuzzing, native-playback regressions, Field geometry and controller behaviour, captured/fallback pointer and focused-key Step gestures, human-cadence tap batching, Context Cursor acceptance, replacement-start ownership, DOM/accessibility contracts, repository audits, startup, interaction, Context, transport-coherence, and metadata paths.
 
 The deeper semantic proof is separate:
 
