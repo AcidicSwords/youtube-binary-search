@@ -16,26 +16,24 @@ export function isTransportActive(transport) {
   return Boolean(transport && transport.kind !== TRANSPORT_KIND.IDLE);
 }
 
-export function deriveContextWindow(anchor, range, seconds, preRollSeconds = 1) {
+export function deriveContextWindow(anchor, range, seconds) {
   if (!Number.isFinite(anchor) || !range || !Number.isFinite(seconds) || seconds <= EPSILON) {
     return null;
   }
 
-  const rangeDuration = Math.max(0, range.end - range.start);
-  const duration = Math.min(seconds, rangeDuration);
-  if (duration <= EPSILON) return null;
-
   const boundedAnchor = clamp(anchor, range.start, range.end);
-  const latestStart = Math.max(range.start, range.end - duration);
-  const preRoll = Math.min(duration, Math.max(0, preRollSeconds));
-  const start = clamp(boundedAnchor - preRoll, range.start, latestStart);
-  const end = Math.min(range.end, start + duration);
+  const halfDuration = seconds / 2;
+  // Context is centered on the semantic traversal point. Range clips either
+  // half independently rather than shifting surplus duration to the other
+  // side, so observation never reaches more than half the setting past Current.
+  const start = Math.max(range.start, boundedAnchor - halfDuration);
+  const end = Math.min(range.end, boundedAnchor + halfDuration);
 
   return end - start > EPSILON ? { start, end } : null;
 }
 
-export function createContextTransport({ anchor, range, seconds, preRollSeconds = 1 }) {
-  const window = deriveContextWindow(anchor, range, seconds, preRollSeconds);
+export function createContextTransport({ anchor, range, seconds }) {
+  const window = deriveContextWindow(anchor, range, seconds);
   if (!window) return idleTransport();
   return {
     kind: TRANSPORT_KIND.CONTEXT,

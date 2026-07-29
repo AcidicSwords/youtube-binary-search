@@ -84,7 +84,6 @@ const PREFERENCES_KEY = "binary-youtube-reader:preferences:v1";
 const POLL_MS = 100;
 const STEP_TAP_SETTLE_MS = DEFAULT_STEP_GESTURE_TIMING.tapSettleMs;
 const STEP_PRESETS = [0.25, 0.5, 1, 2, 3, 5, 10, 15, 30, 60, 120, 300];
-const CONTEXT_PRE_ROLL_SECONDS = 1;
 const NATIVE_GO_SETTLE_MS = 220;
 const TRANSPORT_START_GRACE_MS = 1600;
 const METADATA_GRACE_MS = 4000;
@@ -420,8 +419,7 @@ function startContext(anchor, options = {}) {
   const transport = createContextTransport({
     anchor,
     range: activeRange(),
-    seconds: state.contextSeconds,
-    preRollSeconds: CONTEXT_PRE_ROLL_SECONDS
+    seconds: state.contextSeconds
   });
 
   if (transport.kind === TRANSPORT_KIND.IDLE) {
@@ -939,13 +937,23 @@ function acceptContextCursor() {
     activeRange().end
   );
   const departure = currentResolution().C;
+  const parentNeighborhood = copy(currentResolution());
+  const parentResolutionBasis = model().resolutionBasis;
+  const returnModel = snapshotModel(model());
 
   // Context remains transient unless the user explicitly accepts its Cursor.
-  // Stop the physical observation without restoring its anchor, then commit the
-  // heard position through the same direct-Go kernel used by timeline selection.
+  // Stop the physical observation without restoring its anchor, then settle
+  // the heard movement through the continuous projection. Context acceptance
+  // moves the active endpoint through the existing spatial relation; it must
+  // not replace that relation with a tiny direct-Go frame around the Cursor.
   settleTransport({ restoreObservation: false });
   clearProgrammaticPlacement();
-  const result = goTo(state.session, destination, {
+  const result = completePlayback(state.session, {
+    current: destination,
+    departure,
+    parentNeighborhood,
+    parentResolutionBasis,
+    returnModel,
     operator: "contextAccept",
     label: "Set Current from Context"
   });
@@ -953,7 +961,6 @@ function acceptContextCursor() {
   if (result.changed) {
     state.session = result.session;
     stepField?.translateToCurrent(currentResolution().C, { preserve: true });
-    if (result.rangeChanged) view.renderGuide();
     setStatus(
       `Set Current from Context to ${formatTime(currentResolution().C)}.`
     );
