@@ -249,7 +249,15 @@ const app = readFileSync(new URL("./app.js", import.meta.url), "utf8");
 const styles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
 assert.match(html, /id="pin-backward"[\s\S]*id="switch-endpoint"[\s\S]*id="pin-forward"/);
 assert.match(html, /id="return-action"[\s\S]*Control\+Z Meta\+Z/);
-assert.match(app, /spatialKey\("s"\)[\s\S]*switchCurrentEndpoint\(\)/);
+assert.match(
+  app,
+  /spatialKey\("s"\)[\s\S]*switchCurrentEndpoint\(\{ carryRetained: carryChord \}\)/
+);
+assert.match(
+  app,
+  /event\.shiftKey[\s\S]{0,180}key === "s"[\s\S]{0,180}switchCurrentEndpoint\(\{[\s\S]{0,120}forceInterval: true/,
+  "Plain S may toggle a folded Section face; Shift+S must retain direct Working endpoint transposition."
+);
 assert.match(styles, /"pin-backward switch-endpoint pin-forward"/);
 
 console.log("Endpoint Transposition v5.8.6 tests passed: endpoint frames, involution, membership-based Refine replacement, Step composition, collapse, Undo separation, and matrix wiring.");

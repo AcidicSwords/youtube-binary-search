@@ -41,10 +41,16 @@ The map spans the same width as the viewer and shows:
 - physical Cursor during playback/Context/Loop;
 - Working Section / Active Interval, replaced by local Go/Pin movements or an outside Refine, shortened by an inside Refine, resized by Step, and continuously projected through playback before identical settlement;
 - Held Field span;
-- Pins;
+- ordinary Pins and linked Section endpoint Pins;
+- expanded Section colour spans with faint midpoint Fold controls;
+- collapsed Section Pins representing complete source intervals;
 - action and Section previews.
 
 Without both Current and Cursor, physical observation could be mistaken for semantic commitment. Without Interval, Loop and Section-source identity would be hidden.
+
+The map’s horizontal coordinate is Traversal Time. Source timestamps remain on labels. When retained Folds shorten the traversal metric, duration and Resolution readouts distinguish traversal from source measure, for example `2:45 traversal · 3:00 source`. Ordinary playback and Loop expand the complete active Range for the three-pane Field; a retained Section Loop outside it also expands the physical envelope through its frozen operand. Center-only Context expands its source window; Focus and partial-Range cuts expose the required interior. Cursor and Field motion therefore remain continuous through material that is atomic only to semantic traversal.
+
+An expanded Section presents one coloured line from Start Pin to End Pin. Its midpoint contains a subtle diamond Fold control. The colour repeats on its endpoint Pins and Guide item. Folding replaces the span, endpoint Pins, and every contained timeline Pin with one larger labelled Section Pin. Click that Section Pin to expand; coincident Sections share one proxy and expand together. Drag the proxy to translate the complete retained subtree. Drag an expanded endpoint Pin to deform all Sections sharing it. Visible markers remain small, but their pointer hit regions are larger. Pointer capture and document-level release fallback ensure a drag finishes once even if release occurs outside the marker. The Field suspends during retained-object drag so live polling cannot compete with topology preview.
 
 ## 4. Parameters
 
@@ -69,9 +75,9 @@ The layout expresses relations, not keyboard geometry.
 
 - Row 1 acts on Resolution and the Working Section relation: a destination midpoint inside the Loop shortens it toward its opposite endpoint, with endpoint coincidence collapsing it; an exterior midpoint replaces it with the new traversal.
 - Row 2 acts on movement and its active Interval: Step resizes the operand and Loop consumes its frozen extent.
-- Row 3 crosses retained Addresses one Pin hop at a time, or transposes the current Interval’s endpoints unchanged.
+- Row 3 crosses visible retained Addresses one Pin hop at a time, or acts on the active endpoint relation. A collapsed Section is one Pin stop; forward/backward arrival chooses its far source face so its complete Section enters the Working Section.
 - Loop is central because surrounding movement operators establish the Interval it consumes and Step directly extends or shrinks that operand. It is genuine bounded playback with internal non-committing wraps.
-- Switch Endpoint is central because it crosses the active Interval without changing its ordered extent. It restores a destination Resolution frame that contains the same Loop. Subsequent Step or playback may edit from the transposed anchor; Refine shortens only for a midpoint still inside that Loop and otherwise replaces it, while Pin traversal records its own movement. Its meta reports the destination Address, retained scale, and basis; its timeline preview shows that destination frame.
+- Switch Endpoint is central because it crosses the active Interval without changing its ordered extent. At a folded endpoint, plain `S` first toggles whether the complete Section is included or excluded while its displayed point stays fixed; the meta states that relation. `Shift+S` always forces ordinary endpoint transposition. Outside that Fold relation, Switch restores a destination Resolution frame that contains the same Loop. Subsequent Step or playback may edit from the transposed anchor; Refine shortens only for a midpoint still inside that Loop and otherwise replaces it, while Pin traversal records its own movement.
 
 Each available Refine meta names `shorten loop` or `replace loop` before its destination, so the retained-side consequence is visible before invocation.
 
@@ -85,13 +91,19 @@ Guide is the complete retained-structure surface.
 
 ### Pins
 
-Creation row: Current, optional title, Pin Current. Every Section endpoint is also a Pin and is available to timeline and matrix traversal. Each retained Pin exposes Go and Rename; Delete is unavailable while a Section references it.
+Creation row: Current, optional title, Pin Current. Every Section endpoint is also a Pin and is available to timeline and matrix traversal when not hidden by an active Fold. Each retained Pin exposes Go, Select/Unselect, and Rename; Delete is unavailable while a Section references it. Two selected Pins automatically become the proposed `Two selected Pins` Section source. A Pin retained inside a Fold remains listed and labelled with its containing Section, but Go resolves to the visible Section Point until that Fold is expanded or focused.
 
 ### Sections
 
 The Active Interval appears here as the semi-persistent **Working Section**. It exposes Focus Working independently of persistence: Focus installs its current Extent as Range, and Leave restores the containing Range without creating a Guide record.
 
-Creation row: source (`Working Section` or `Held Field span`), title, Save Section. Each retained Section exposes Go, Focus, Loop, Overwrite, Rename, and Delete. Overwrite copies the current Working Section into that retained identity; it is never implied by Focus. Equal endpoints and titles are duplicate identity case-insensitively, so runtime and reloaded Guide state cannot disagree.
+Creation row: source (`Working Section`, `Held Field span`, or `Two selected Pins`), title, Save Section. Each retained Section exposes Go, Focus, Loop, Fold/Expand, Overwrite, Rename, and Delete. Overwrite copies the current Working Section into that retained identity; it is never implied by Focus. Equal endpoints and titles are duplicate identity case-insensitively, so runtime and reloaded Guide state cannot disagree.
+
+Fold state is explicit in the item title. `Folded` means the Section owns a retained Section Point at semantic rest. `Inside …` means a folded ancestor owns that point. `Materialized` means the retained folded flag remains set while Focus or a structural semantic boundary—Range, a Resolution edge, or Working Section—exposes the source interior. Transient playback materialization does not rewrite this retained label. Current alone may remain an exact latent Address at the point. Focusing a folded Section is the intentional dive-in operation; Leave restores its containing Range and prior Fold frontier.
+
+Crossing expanded Sections are allowed. Attempting to Fold one across an already Folded Section yields a precise conflict message and no mutation. Adjacent siblings sharing only one endpoint also require one expanded boundary so they cannot claim incompatible faces at the same coordinate. Nested Sections retain independent Fold states. Deleting or expanding a parent reveals the children exactly as they were.
+
+The selected retained object has one cross-operator modifier: Alt/Option plus Refine, Step, Switch, timeline/Guide Go, or Pin traversal moves that Pin or complete Section subtree by the same Traversal Time delta. A child hidden by a folded parent remains owned by that parent proxy and must be expanded or focused before it can move independently. The original selection is retained through the transaction, structural limits are reported, and Undo restores both the primary movement and retained object together.
 
 Focused Section state and Leave remain in Guide because Focus makes either a Working or retained Section own Range.
 
@@ -106,6 +118,6 @@ Unimplemented Sources do not appear. Range extent is shown once in Parameters ra
 - Pane placement is explicit rather than DOM-auto-flowed; Field-off remains Center-only and no grid track may force horizontal clipping.
 - Breakpoints follow player-panel width, not viewport width, so outer padding or embedding cannot strand Lead in a clipped three-pane band.
 - Guide becomes a modal sheet below 900px.
-- Coarse-pointer controls preserve the shared 48px target.
+- Coarse-pointer controls preserve the shared 48px target; visually faint Fold controls use expanded invisible hit regions rather than becoming visually heavy.
 
 Responsive changes may alter placement, never ownership or meaning.

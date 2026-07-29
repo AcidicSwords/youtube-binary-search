@@ -13,6 +13,8 @@ const youtubeSource = read("youtube.js");
 const fieldGeometrySource = read("step-field-geometry.js");
 const fieldSource = read("step-field.js");
 const stepGestureSource = read("step-gesture.js");
+const guideSource = read("guide.js");
+const temporalProjectionSource = read("temporal-projection.js");
 
 const htmlIds = new Set([...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]));
 const htmlIdList = [...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]);
@@ -55,7 +57,7 @@ for (const removed of [
 
 for (const required of [
   "range-fill", "resolution-fill", "interval-fill", "field-span-fill", "section-preview-fill",
-  "pin-lane", "pin-cluster-menu", "current-marker", "cursor-marker", "guide-dialog",
+  "pin-lane", "section-lane", "pin-cluster-menu", "current-marker", "cursor-marker", "guide-dialog",
   "refine-backward", "reopen", "refine-forward", "step-backward", "loop", "step-forward",
   "pin-backward", "switch-endpoint", "pin-forward", "return-action",
   "tail-field-toggle", "field-both-toggle", "lead-field-toggle",
@@ -84,6 +86,7 @@ assert.ok(app.includes('from "./transport.js"'), "app.js must use the transport 
 assert.ok(app.includes('from "./view.js"'), "app.js must delegate DOM projection to view.js.");
 assert.ok(app.includes('from "./range-geometry.js"'), "app.js must use the Range geometry kernel.");
 assert.ok(app.includes('from "./step-gesture.js"'), "app.js must use the shared Step gesture boundary.");
+assert.ok(app.includes('from "./temporal-projection.js"'), "app.js must use the shared folded traversal projection.");
 assert.equal(app.includes('from "./traversal.js"'), false, "Legacy traversal.js import remains.");
 assert.equal(app.includes('from "./structure.js"'), false, "Legacy structure.js import remains.");
 
@@ -105,6 +108,11 @@ assert.match(view, /setAttribute\("role", "menuitem"\)/, "Pin clusters must expo
 assert.match(view, /setAttribute\("aria-haspopup", "menu"\)/, "Pin clusters must announce their popup relationship.");
 assert.match(view, /dataset\.loopSection/, "Saved Sections must expose Loop in Guide.");
 assert.match(view, /dataset\.overwriteSection/, "Saved Sections must expose explicit Working Section overwrite.");
+assert.match(view, /dataset\.sectionCollapse/, "Expanded Sections must expose their faint midpoint Fold control.");
+assert.match(view, /dataset\.sectionExpand/, "Collapsed Sections must expose one expandable Section Pin.");
+assert.match(guideSource, /export function setSectionCollapsed/, "Guide must own retained Fold state.");
+assert.match(temporalProjectionSource, /sourceToTraversal[\s\S]*traversalToSource/,
+  "One pure projection must own both directions of the source/traversal mapping.");
 assert.equal(/\bseek\s*:/.test(sessionSource), false, "Semantic transaction effects must use placement vocabulary.");
 assert.match(sessionSource, /medium = "direct"/, "Direct movement must use canonical Interval vocabulary.");
 assert.match(sessionSource, /export function completePlayback/, "Native playback must settle through Session.");
@@ -142,8 +150,8 @@ assert.match(transportSource, /LOOP:\s*"loop"/);
 assert.doesNotMatch(transportSource, /CONTINUE|SKIM/);
 assert.match(
   transportSource,
-  /halfDuration\s*=\s*seconds\s*\/\s*2[\s\S]*boundedAnchor\s*-\s*halfDuration[\s\S]*boundedAnchor\s*\+\s*halfDuration/,
-  "Context must bisect its duration around the traversal point."
+  /halfDuration\s*=\s*seconds\s*\/\s*2[\s\S]*projection\?\.sourceStep[\s\S]*"backward"[\s\S]*projection\?\.sourceStep[\s\S]*"forward"/,
+  "Context must bisect traversal duration and materialize every crossed source Section."
 );
 assert.match(app, /result\?\.interval[\s\S]*startContext\(destination\)/, "Context must be automatic after traversal.");
 assert.match(app, /createStepGestureController[\s\S]*bindStepPress/,
@@ -156,9 +164,17 @@ assert.match(youtubeSource, /place\(address, allowSeekAhead = true\)/, "The YouT
 assert.match(youtubeSource, /isYouTubeApiReady/, "YouTube readiness must be owned by the adapter.");
 assert.doesNotMatch(fieldGeometrySource, /stepSeconds/, "Field geometry must receive directional Offset objects only.");
 assert.match(app, /compactGuideLayout\(\) && state\.guideOpen/, "Compact Guide must suspend background reader shortcuts.");
-assert.match(app, /spatialKey\("s"\)[\s\S]*switchCurrentEndpoint\(\)/,
-  "S must own Switch Endpoint.");
+assert.match(
+  app,
+  /spatialKey\("s"\)[\s\S]*switchCurrentEndpoint\(\{ carryRetained: carryChord \}\)/,
+  "S must own folded-face inclusion and ordinary Switch Endpoint through one owner."
+);
+assert.match(
+  app,
+  /event\.shiftKey[\s\S]{0,180}key === "s"[\s\S]{0,180}switchCurrentEndpoint\(\{[\s\S]{0,120}forceInterval: true/,
+  "Shift+S must remain an explicit escape hatch to the ordinary Working endpoint."
+);
 assert.doesNotMatch(app, /plain && event\.key === "Backspace"/,
   "Undo must use Ctrl/Cmd+Z rather than a destructive navigation key.");
 
-console.log(`Integration check passed: ${references.size} DOM references, native playback, automatic Context, Field controls, Guide creation, and 3×3 operator geometry.`);
+console.log(`Integration check passed: ${references.size} DOM references, v6 Section folding, source-contiguous transport, retained-object carry, Field controls, Guide creation, and 3×3 operator geometry.`);

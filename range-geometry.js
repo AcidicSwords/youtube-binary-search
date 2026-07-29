@@ -21,6 +21,16 @@ export function midpoint(start, end) {
   return start + (end - start) / 2;
 }
 
+function metricCoordinate(metric, address) {
+  return metric?.toCoordinate ? metric.toCoordinate(address) : address;
+}
+
+function metricAddress(metric, coordinate, affinity) {
+  return metric?.fromCoordinate
+    ? metric.fromCoordinate(coordinate, affinity)
+    : coordinate;
+}
+
 export function createRoot(start, current, end, level = 0) {
   return assertNeighborhood({ L: start, C: clamp(current, start, end), R: end, level });
 }
@@ -89,15 +99,20 @@ export function containExtent(neighborhood, extent, range) {
   });
 }
 
-export function getTargets(neighborhood) {
+export function getTargets(neighborhood, metric = null) {
   assertNeighborhood(neighborhood);
-  const backward = midpoint(neighborhood.L, neighborhood.C);
-  const forward = midpoint(neighborhood.C, neighborhood.R);
+  const L = metricCoordinate(metric, neighborhood.L);
+  const C = metricCoordinate(metric, neighborhood.C);
+  const R = metricCoordinate(metric, neighborhood.R);
+  const backwardCoordinate = midpoint(L, C);
+  const forwardCoordinate = midpoint(C, R);
+  const backward = metricAddress(metric, backwardCoordinate, "backward");
+  const forward = metricAddress(metric, forwardCoordinate, "forward");
   return {
-    backward: backward < neighborhood.C - EPSILON
+    backward: backwardCoordinate < C - EPSILON
       ? backward
       : null,
-    forward: forward > neighborhood.C + EPSILON
+    forward: forwardCoordinate > C + EPSILON
       ? forward
       : null
   };
@@ -130,12 +145,12 @@ export function classifyRefineRelation(interval, current, target) {
     : "replace";
 }
 
-export function refineBlockReason(neighborhood, range, direction) {
+export function refineBlockReason(neighborhood, range, direction, metric = null) {
   assertNeighborhood(neighborhood);
   if (!range || !Number.isFinite(range.start) || !Number.isFinite(range.end)) {
     throw new TypeError("Refine availability requires a valid Range.");
   }
-  const targets = getTargets(neighborhood);
+  const targets = getTargets(neighborhood, metric);
   if (targets[direction] !== null) return null;
   if (direction === "backward") {
     return neighborhood.C <= range.start + EPSILON
@@ -202,7 +217,7 @@ export function refineNeighborhood(neighborhood, destination, range) {
  * same scale and clipped to Range. This preserves the scale communicated by Go
  * without changing Range or conflating Neighborhood with Interval.
  */
-export function seedNeighborhoodFromMovement(departure, arrival, range) {
+export function seedNeighborhoodFromMovement(departure, arrival, range, metric = null) {
   if (!Number.isFinite(departure) || !Number.isFinite(arrival)) {
     throw new TypeError("Movement-seeded Resolution requires finite Addresses.");
   }
@@ -212,20 +227,34 @@ export function seedNeighborhoodFromMovement(departure, arrival, range) {
 
   const A = clamp(departure, range.start, range.end);
   const C = clamp(arrival, range.start, range.end);
-  const scale = Math.abs(C - A);
+  const rangeStart = metricCoordinate(metric, range.start);
+  const rangeEnd = metricCoordinate(metric, range.end);
+  const departureCoordinate = metricCoordinate(metric, A);
+  const currentCoordinate = metricCoordinate(metric, C);
+  const scale = Math.abs(currentCoordinate - departureCoordinate);
   if (scale <= EPSILON) return createRoot(range.start, C, range.end);
 
-  if (C > A) {
+  if (currentCoordinate > departureCoordinate) {
+    const rightCoordinate = Math.min(rangeEnd, currentCoordinate + scale);
     return assertNeighborhood({
       L: A,
       C,
-      R: Math.min(range.end, C + scale),
+      R: clamp(
+        metricAddress(metric, rightCoordinate, "upper"),
+        range.start,
+        range.end
+      ),
       level: 0
     });
   }
 
+  const leftCoordinate = Math.max(rangeStart, currentCoordinate - scale);
   return assertNeighborhood({
-    L: Math.max(range.start, C - scale),
+    L: clamp(
+      metricAddress(metric, leftCoordinate, "lower"),
+      range.start,
+      range.end
+    ),
     C,
     R: A,
     level: 0
@@ -271,15 +300,38 @@ export function normalizeDirectionalReach(value, fallback = 10) {
   };
 }
 
-export function stepTarget(current, seconds, direction, range) {
+export function stepTarget(current, seconds, direction, range, metric = null) {
   if (!Number.isFinite(current) || !Number.isFinite(seconds) || seconds <= 0) {
     throw new TypeError("Step requires a finite Current and a positive duration.");
   }
   if (!range || !Number.isFinite(range.start) || !Number.isFinite(range.end)) {
     throw new TypeError("Step requires a valid Range.");
   }
-  if (direction === "backward") return clamp(current - seconds, range.start, range.end);
-  if (direction === "forward") return clamp(current + seconds, range.start, range.end);
+  const minimum = metricCoordinate(metric, range.start);
+  const maximum = metricCoordinate(metric, range.end);
+  const origin = metricCoordinate(metric, current);
+  if (direction === "backward") {
+    return clamp(
+      metricAddress(
+        metric,
+        clamp(origin - seconds, minimum, maximum),
+        "backward"
+      ),
+      range.start,
+      range.end
+    );
+  }
+  if (direction === "forward") {
+    return clamp(
+      metricAddress(
+        metric,
+        clamp(origin + seconds, minimum, maximum),
+        "forward"
+      ),
+      range.start,
+      range.end
+    );
+  }
   throw new TypeError(`Unknown direction: ${direction}`);
 }
 
@@ -287,7 +339,8 @@ export function stepNeighborhood(
   neighborhood,
   destination,
   range,
-  stepSeconds = Math.abs(destination - neighborhood.C)
+  stepSeconds = Math.abs(destination - neighborhood.C),
+  metric = null
 ) {
   assertNeighborhood(neighborhood);
   if (!Number.isFinite(destination)) throw new TypeError("Step destination must be finite.");
@@ -306,16 +359,42 @@ export function stepNeighborhood(
   // approached refinement endpoint. If the Step reaches or crosses that bound,
   // retain a full Step beyond Current so the next directional Refine remains
   // available at half-Step scale (unless Range is the hard stop).
-  const delta = C - neighborhood.C;
+  const currentCoordinate = metricCoordinate(metric, neighborhood.C);
+  const destinationCoordinate = metricCoordinate(metric, C);
+  const leftCoordinate = metricCoordinate(metric, neighborhood.L);
+  const rightCoordinate = metricCoordinate(metric, neighborhood.R);
+  const rangeStart = metricCoordinate(metric, range.start);
+  const rangeEnd = metricCoordinate(metric, range.end);
+  const delta = destinationCoordinate - currentCoordinate;
   if (delta > EPSILON) {
-    const translated = neighborhood.R + delta;
-    const crossed = C >= neighborhood.R - EPSILON ? C + reach : translated;
-    next.R = Math.min(range.end, Math.max(translated, crossed));
+    const translated = rightCoordinate + delta;
+    const crossed = destinationCoordinate >= rightCoordinate - EPSILON
+      ? destinationCoordinate + reach
+      : translated;
+    next.R = clamp(
+      metricAddress(
+        metric,
+        Math.min(rangeEnd, Math.max(translated, crossed)),
+        "upper"
+      ),
+      range.start,
+      range.end
+    );
     next.level = 0;
   } else if (delta < -EPSILON) {
-    const translated = neighborhood.L + delta;
-    const crossed = C <= neighborhood.L + EPSILON ? C - reach : translated;
-    next.L = Math.max(range.start, Math.min(translated, crossed));
+    const translated = leftCoordinate + delta;
+    const crossed = destinationCoordinate <= leftCoordinate + EPSILON
+      ? destinationCoordinate - reach
+      : translated;
+    next.L = clamp(
+      metricAddress(
+        metric,
+        Math.max(rangeStart, Math.min(translated, crossed)),
+        "lower"
+      ),
+      range.start,
+      range.end
+    );
     next.level = 0;
   }
 
@@ -332,7 +411,7 @@ export function stepNeighborhood(
  * one active endpoint through the existing Resolution rather than opening a
  * new Resolution around its departure and arrival.
  */
-export function translateNeighborhood(neighborhood, destination, range) {
+export function translateNeighborhood(neighborhood, destination, range, metric = null) {
   assertNeighborhood(neighborhood);
   if (!Number.isFinite(destination)) {
     throw new TypeError("Linear destination must be a finite number.");
@@ -347,7 +426,13 @@ export function translateNeighborhood(neighborhood, destination, range) {
   }
 
   const C = clamp(destination, range.start, range.end);
-  const delta = C - neighborhood.C;
+  const currentCoordinate = metricCoordinate(metric, neighborhood.C);
+  const destinationCoordinate = metricCoordinate(metric, C);
+  const leftCoordinate = metricCoordinate(metric, neighborhood.L);
+  const rightCoordinate = metricCoordinate(metric, neighborhood.R);
+  const rangeStart = metricCoordinate(metric, range.start);
+  const rangeEnd = metricCoordinate(metric, range.end);
+  const delta = destinationCoordinate - currentCoordinate;
   const next = {
     L: neighborhood.L,
     C,
@@ -356,11 +441,21 @@ export function translateNeighborhood(neighborhood, destination, range) {
   };
 
   if (delta > EPSILON) {
-    next.R = Math.min(range.end, neighborhood.R + delta);
-    if (next.R > neighborhood.R + EPSILON) next.level = 0;
+    const translated = Math.min(rangeEnd, rightCoordinate + delta);
+    next.R = clamp(
+      metricAddress(metric, translated, "upper"),
+      range.start,
+      range.end
+    );
+    if (translated > rightCoordinate + EPSILON) next.level = 0;
   } else if (delta < -EPSILON) {
-    next.L = Math.max(range.start, neighborhood.L + delta);
-    if (next.L < neighborhood.L - EPSILON) next.level = 0;
+    const translated = Math.max(rangeStart, leftCoordinate + delta);
+    next.L = clamp(
+      metricAddress(metric, translated, "lower"),
+      range.start,
+      range.end
+    );
+    if (translated < leftCoordinate - EPSILON) next.level = 0;
   }
 
   return assertNeighborhood(next);
@@ -385,10 +480,11 @@ export function getActionRanges(
   range,
   interval = null,
   current = neighborhood.C,
-  stepReach = 10
+  stepReach = 10,
+  metric = null
 ) {
   assertNeighborhood(neighborhood);
-  const targets = getTargets(neighborhood);
+  const targets = getTargets(neighborhood, metric);
   const backwardNeighborhood = targets.backward === null
     ? null
     : descend(neighborhood, "backward", targets.backward, range);
@@ -397,8 +493,11 @@ export function getActionRanges(
     : descend(neighborhood, "forward", targets.forward, range);
   const reopened = canReopen(neighborhood, range) ? reopenToRange(current, range) : null;
   const reach = normalizeDirectionalReach(stepReach);
-  const stepBackward = stepTarget(neighborhood.C, reach.backward, "backward", range);
-  const stepForward = stepTarget(neighborhood.C, reach.forward, "forward", range);
+  const stepBackward = stepTarget(neighborhood.C, reach.backward, "backward", range, metric);
+  const stepForward = stepTarget(neighborhood.C, reach.forward, "forward", range, metric);
+  const currentCoordinate = metricCoordinate(metric, neighborhood.C);
+  const backwardCoordinate = metricCoordinate(metric, stepBackward);
+  const forwardCoordinate = metricCoordinate(metric, stepForward);
 
   return {
     targets,
@@ -411,10 +510,10 @@ export function getActionRanges(
     reopen: reopened
       ? { start: reopened.L, end: reopened.R, current: reopened.C }
       : null,
-    stepBackward: stepBackward < neighborhood.C - EPSILON
+    stepBackward: backwardCoordinate < currentCoordinate - EPSILON
       ? { start: stepBackward, end: neighborhood.C, destination: stepBackward }
       : null,
-    stepForward: stepForward > neighborhood.C + EPSILON
+    stepForward: forwardCoordinate > currentCoordinate + EPSILON
       ? { start: neighborhood.C, end: stepForward, destination: stepForward }
       : null,
     loop: interval?.end > interval?.start

@@ -93,7 +93,10 @@ for (const id of [
 
 assert.match(app, /function applyPlayerEffect\(result[\s\S]*result\?\.interval[\s\S]*startContext\(destination\)/,
   "Committed traversal must invoke automatic Context when enabled.");
-assert.match(app, /const sideStep = role => \(\) => stepField\?\.getStepSelection/);
+assert.match(
+  app,
+  /const sideStep = role => event => \{[\s\S]*stepField\?\.getStepSelection[\s\S]*carryRetained: event\?\.altKey === true \|\| state\.carryModifier/
+);
 assert.match(app, /bindStepPress\(control[\s\S]*tap:\s*tapStep/);
 assert.match(app, /function beginLoopExtent\(extent[\s\S]*createLoopTransport/);
 assert.match(

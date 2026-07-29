@@ -349,7 +349,7 @@ kbd {
 
 .timeline {
   position: relative;
-  height: 70px;
+  height: 94px;
   margin: 0 6px;
   touch-action: pan-y pinch-zoom;
   cursor: crosshair;
@@ -357,7 +357,7 @@ kbd {
 
 .track {
   position: absolute;
-  inset: 25px 0 auto;
+  inset: 31px 0 auto;
   height: 12px;
   overflow: hidden;
   border: 1px solid #394558;
@@ -403,7 +403,7 @@ kbd {
 
 .marker {
   position: absolute;
-  top: 17px;
+  top: 23px;
   z-index: 5;
   transform: translateX(-50%);
 }
@@ -440,7 +440,7 @@ kbd {
 
 .target-marker {
   height: 19px;
-  top: 21px;
+  top: 27px;
   background: #a58dd0;
 }
 
@@ -448,7 +448,7 @@ kbd {
   z-index: 8;
   width: 3px;
   height: 34px;
-  top: 14px;
+  top: 20px;
   background: #fff;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.11);
 }
@@ -457,7 +457,7 @@ kbd {
   z-index: 9;
   width: 2px;
   height: 24px;
-  top: 19px;
+  top: 25px;
   background: var(--accent);
   box-shadow: 0 0 0 2px rgba(121, 168, 255, 0.13);
 }
@@ -468,9 +468,136 @@ kbd {
   pointer-events: none;
 }
 
+.section-lane {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.timeline-section-span {
+  position: absolute;
+  top: calc(3px + var(--section-depth, 0) * 5px);
+  height: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--section-color) 72%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--section-color) 34%, transparent);
+  pointer-events: none;
+}
+
+.timeline-section-fold {
+  position: absolute;
+  top: calc(15px + var(--section-depth, 0) * 2px);
+  z-index: 7;
+  width: 12px;
+  height: 12px;
+  min-height: 12px;
+  padding: 0;
+  transform: translateX(-50%) rotate(45deg);
+  border: 1px solid color-mix(in srgb, var(--section-color) 75%, #fff);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--section-color) 30%, #0c1119);
+  opacity: 0.58;
+  pointer-events: auto;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.timeline-section-fold::after,
+.timeline-section-pin::after {
+  position: absolute;
+  content: "";
+}
+
+.timeline-section-fold::after {
+  inset: -12px;
+}
+
+.timeline-section-fold:hover,
+.timeline-section-fold:focus-visible {
+  opacity: 1;
+}
+
+.timeline-section-fold.retained-selected {
+  opacity: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.timeline-section-span.retained-selected {
+  height: 5px;
+  background: var(--section-color);
+  box-shadow: 0 0 0 2px rgba(121, 168, 255, 0.34);
+}
+
+.timeline-section-span.materialized {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      var(--section-color) 0 5px,
+      transparent 5px 9px
+    );
+}
+
+.timeline-section-materialized {
+  position: absolute;
+  top: calc(16px + var(--section-depth, 0) * 2px);
+  width: 8px;
+  height: 8px;
+  transform: translateX(-50%) rotate(45deg);
+  border: 1px dashed var(--section-color);
+  border-radius: 2px;
+  opacity: 0.62;
+  pointer-events: none;
+}
+
+.timeline-section-pin {
+  position: absolute;
+  top: calc(55px + var(--section-depth, 0) * 2px);
+  z-index: 9;
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  transform: translateX(-50%) rotate(45deg);
+  border: 2px solid color-mix(in srgb, var(--section-color) 75%, #fff);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--section-color) 72%, #111824);
+  box-shadow: 0 0 0 3px rgba(5, 8, 13, 0.78);
+  pointer-events: auto;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.timeline-section-pin::after {
+  inset: -9px;
+}
+
+.timeline-section-pin.retained-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 5px;
+}
+
+.timeline-section-pin-label {
+  position: absolute;
+  left: 18px;
+  top: -4px;
+  max-width: 150px;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px #05080d;
+  white-space: nowrap;
+  transform: rotate(-45deg);
+  transform-origin: left center;
+  pointer-events: none;
+}
+
 .timeline-pin {
   position: absolute;
-  top: 45px;
+  top: 67px;
   width: 18px;
   height: 18px;
   min-height: 18px;
@@ -483,6 +610,27 @@ kbd {
   pointer-events: auto;
 }
 
+.timeline-pin.pair-selected {
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(246, 200, 110, 0.5);
+}
+
+.timeline-pin.retained-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.timeline-pin.section-endpoint-pin {
+  border: 2px solid var(--endpoint-color);
+  background: color-mix(in srgb, var(--endpoint-color) 64%, var(--pin));
+  box-shadow: 0 0 0 2px rgba(5, 8, 13, 0.78);
+}
+
+.timeline-pin.transport-materialized {
+  border-style: dashed;
+  opacity: 0.72;
+}
+
 .timeline-pin::after {
   content: "";
   position: absolute;
@@ -492,7 +640,7 @@ kbd {
 .timeline-pin.cluster {
   width: 24px;
   height: 24px;
-  top: 42px;
+  top: 64px;
 }
 
 .timeline-pin-count {
@@ -507,7 +655,7 @@ kbd {
 
 .pin-cluster-menu {
   position: absolute;
-  top: 66px;
+  top: 90px;
   z-index: 30;
   width: 270px;
   max-height: 240px;
@@ -862,6 +1010,22 @@ kbd {
 }
 
 .guide-item.focused { border-color: rgba(121, 168, 255, 0.6); }
+.guide-item.retained-selected {
+  border-color: rgba(121, 168, 255, 0.76);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.guide-item.pair-selected {
+  border-color: rgba(246, 200, 110, 0.72);
+  box-shadow: inset 3px 0 0 var(--pin);
+}
+.section-item.collapsed {
+  background:
+    linear-gradient(90deg, rgba(82, 199, 184, 0.09), transparent 45%),
+    #0d1219;
+}
+.section-item.materialized {
+  border-style: dashed;
+}
 
 .guide-item-main {
   display: grid;
@@ -1119,6 +1283,22 @@ kbd {
   .timeline-pin {
     width: 22px;
     height: 22px;
+  }
+
+  .timeline-section-fold {
+    min-height: 12px;
+  }
+
+  .timeline-section-fold::after {
+    inset: -18px;
+  }
+
+  .timeline-section-pin {
+    min-height: 22px;
+  }
+
+  .timeline-section-pin::after {
+    inset: -13px;
   }
 }
 

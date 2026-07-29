@@ -6,7 +6,7 @@
 npm run check
 ```
 
-The gate covers syntax, Session/Undo, endpoint-frame containment and transposition, distinct operator ownership, all seven semantic-audit regressions, Guide, Context/playback/Loop values, source normalization, 25,000-operation fuzzing, native-playback regressions, Field geometry and controller behaviour, captured/fallback pointer and focused-key Step gestures, human-cadence tap batching, Context Cursor acceptance without Working Section or Resolution collapse, replacement-start ownership, DOM/accessibility contracts, repository audits, startup, interaction, Context, transport-coherence, and metadata paths.
+The gate covers syntax, Session/Undo, endpoint-frame containment and transposition, distinct operator ownership, all seven semantic-audit regressions, Guide, Source Time ↔ Traversal Time projection, nested Fold topology, Focus/Range materialization, folded face inclusion, migration, retained subtree movement, Context/playback/Loop source continuity, source normalization, 25,000-operation fuzzing, native-playback regressions, Field geometry and controller behaviour, captured/fallback pointer and focused-key Step gestures, human-cadence tap batching, Context Cursor acceptance without Working Section or Resolution collapse, replacement-start ownership, DOM/accessibility contracts, repository audits, startup, interaction, Context, Section folding, transport-coherence, and metadata paths.
 
 The deeper semantic proof is separate:
 
@@ -31,6 +31,26 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 - Undo sits below the matrix and advertises Ctrl/Cmd+Z; `S` invokes Switch Endpoint.
 - Pin and Section creation appear only in Guide.
 
+### Temporal Fold and retained structure
+
+- Save `0:30–0:45` as a Section in a three-minute source and Fold it. Confirm the map reports `2:45 traversal · 3:00 source`.
+- Confirm its two endpoint Pins, midpoint Fold control, and every contained Pin disappear from the timeline and are replaced by one coloured labelled Section Pin.
+- Step across it from both directions. Confirm one traversal unit crosses the point, Current resolves to the far source face, and the Working Section includes the complete `0:30–0:45`.
+- At the folded Working endpoint, press `S` twice and confirm include/exclude toggles the complete source Section while the visible point does not move. Press `Shift+S` and confirm ordinary Working endpoint transposition still occurs.
+- Invoke Refine, Range midpoint, timeline Go, Pin Forward/Backward, and Tail/Lead Step around the Fold. Confirm every destination agrees with the same Traversal Time projection.
+- Click the Section Pin and confirm the source span, Start/End Pins, and retained internal Pins return. Click the faint midpoint marker and confirm they fold again.
+- Drag an expanded endpoint. Confirm every Section sharing that Pin deforms and one Undo restores all references.
+- Drag the collapsed Section Pin. Confirm both endpoints and every contained retained Pin translate by one delta, nested relations remain valid, and one Undo restores the subtree.
+- Select any two distinct Pins, choose `Two selected Pins`, save, and confirm the Section references those exact Pins.
+- Select a retained Pin or Section, hold Alt/Option, and exercise Refine, Step, Switch, direct Go, and Pin traversal. Confirm Current and the selected object use the same signed projected delta and Undo restores both in one action. Select a child hidden by a folded parent and confirm it stays owned by the parent until Focus/Expand exposes it.
+- Fold nested parent and child Sections. Confirm the parent owns one visible point; expanding or deleting it reveals the child’s prior Fold state.
+- Retain two crossing Sections and two adjacent siblings sharing one endpoint. Confirm either relation may fold alone, but folding its conflict produces no partial mutation. Confirm coincident folded Sections share one proxy and expand together in one Undoable action.
+- Set Range to exclude a Fold at only its start or end face. Confirm Step, Refine, Pin traversal, Switch, timeline click, and Field offsets never resolve through the opposite face outside Range.
+- Focus a folded child. Confirm the child and every required ancestor materialize, Range becomes the complete child source extent, and Leave restores the prior Fold frontier.
+- Drag a Range boundary into a folded interior. Confirm the Section materializes while cut and refolds when the cut is removed.
+- Pause playback, accept Context, and native-scrub inside a folded interior. Confirm the exact source Address is retained, the Section materializes while Resolution/Working Section cuts it, and no partial source relation is hidden behind one Fold Point. Confirm Current alone can remain latent at the point and Focus→Leave restores the parent Fold.
+- Reload a v6 Guide and confirm Fold state persists. Load a v5 Guide and confirm every migrated Section starts expanded.
+
 ### Native playback
 
 - Start through the paused Center surface and Space; confirm Tail, Center, and Lead receive play requests in the same event turn.
@@ -41,6 +61,7 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 - Pause through Space and native controls; each must settle once, and no later poll may freeze the Field again.
 - Rapidly issue Play then Pause, Escape, and a replacement traversal before `PLAYING`; each late confirmation must be consumed without reviving playback.
 - Start Loop during playback; it must consume the visible settled Working Section without an intermediate Center pause.
+- Play across a folded Section. Confirm Center plays every source frame with no `start → end` seek, the complete active Range materializes so both Field sides also use contiguous source distance, and the retained Fold returns after settlement.
 
 ### Automatic Context
 
@@ -55,6 +76,7 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 - Confirm Hold/Stretch controls are unavailable throughout Context and cannot record its transient Cursor.
 - Trigger a new traversal while Context is active; only the new destination remains authoritative.
 - Set Off and confirm traversal remains paused at destination.
+- Center Context on or beside a Fold Point. Confirm each half is measured in Traversal Time, the complete crossed source Section is heard continuously, and the stored Fold state returns afterward.
 
 ### Step Field
 
@@ -125,17 +147,19 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 - Confirm each wrap places each side once; no pre-wrap out-of-window Field reaction may run first.
 - Pause/stop and restart.
 - Loop a saved Section from Guide and confirm its own frozen extent.
+- Loop a folded Section and a larger Interval crossing it. Confirm every cycle plays the full source material and wraps only at the frozen source end.
+- Loop a retained Section outside active Range. Confirm the physical timeline/Field envelope includes both extents during Loop and stopping returns Center to the semantic address from which Loop began.
 
 ### Guide
 
 - Create titled/untitled Pins from Pins tab.
 - Focus and Leave the unsaved Working Section; confirm it owns Range temporarily, survives Leave, and does not change Guide.
-- Create Sections from Working Section and Held Field span.
+- Create Sections from Working Section, Held Field span, and two selected Pins.
 - Overwrite a retained Section from the Working Section; confirm ID/title survive, retired anonymous endpoint Pins are removed, persistence updates, and Undo restores the prior Extent.
 - Overwrite a currently focused retained Section and confirm Range, Working Section containment, Focus, and the return Range remain coherent.
-- Confirm every Section endpoint appears as a Pin target and participates in previous/next traversal.
+- Confirm every expanded Section endpoint appears as a Pin target and participates in previous/next traversal; when folded, its complete subtree becomes one Section Pin target.
 - Attempt case-only duplicate Section titles on the same Extent and confirm runtime and reload preserve the same single identity.
-- Exercise Go, Focus, Loop, Rename, Delete, and Leave.
+- Exercise Go, Focus, Loop, Fold/Expand, endpoint drag, Section drag, Rename, Delete, and Leave.
 - Reload and replace video; Guide remains video-specific.
 
 ## 3. Responsive and mobile
@@ -147,6 +171,7 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 - Every iframe remains at least `200 × 200` CSS pixels.
 - Native Center controls remain usable during ordinary playback; the paused shared-start surface is keyboard accessible and clearly labelled.
 - Side controls remain reachable with 48px coarse-pointer targets.
+- Faint Fold controls and Section Pins retain practical coarse-pointer hit areas without obscuring neighbouring markers.
 - Guide opens as a modal sheet, traps focus, restores focus, and respects safe-area padding.
 - Range dragging preserves vertical page scrolling.
 

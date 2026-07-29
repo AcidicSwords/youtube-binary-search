@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="theme-color" content="#0e1116">
-  <meta name="description" content="Read YouTube videos as ordered spatial ranges using refinement, Pins, and Sections.">
+  <meta name="description" content="Read YouTube videos as ordered spatial ranges using refinement, linked Pins, and foldable Sections.">
   <title>Binary YouTube Reader</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
@@ -18,7 +18,7 @@
       <div class="brand-block">
         <div>
           <h1>Binary YouTube Reader</h1>
-          <p>Resolve a video spatially, retain Addresses as Pins, and focus bounded Sections as the active Range.</p>
+          <p>Resolve a video spatially, link Addresses as Pins and Sections, and fold retained intervals into traversable points.</p>
         </div>
       </div>
       <div class="load-actions">
@@ -143,7 +143,7 @@
             </div>
           </div>
 
-          <div id="timeline" class="timeline" aria-label="Temporal map. Click inside Range to go directly to an Address.">
+          <div id="timeline" class="timeline" aria-label="Temporal map in traversal time. Click inside Range to go directly to a visible Address.">
             <div class="track">
               <div id="range-fill" class="range-fill"></div>
               <div id="resolution-fill" class="resolution-fill"></div>
@@ -152,6 +152,7 @@
               <div id="action-preview-fill" class="action-preview-fill" hidden></div>
               <div id="field-span-fill" class="field-span-fill" hidden></div>
             </div>
+            <div id="section-lane" class="section-lane" aria-label="Sections"></div>
             <div id="pin-lane" class="pin-lane" aria-label="Pins"></div>
             <div id="pin-cluster-menu" class="pin-cluster-menu" role="menu" aria-label="Nearby Pins" hidden></div>
 
@@ -208,7 +209,7 @@
                     <option value="10"></option>
                   </datalist>
                 </label>
-                <p class="setting-note">Plays up to half before and half after each traversal point. Tail and Lead remain suspended until native Center playback resumes.</p>
+                <p class="setting-note">Plays up to half before and half after each traversal point, including the complete source material of any crossed Fold. Tail and Lead remain suspended until native Center playback resumes.</p>
               </div>
             </details>
 
@@ -219,7 +220,10 @@
                 <span><kbd>A</kbd>/<kbd>D</kbd> Refine</span>
                 <span><kbd>←</kbd>/<kbd>→</kbd> Step</span>
                 <span><kbd>S</kbd> Switch Endpoint</span>
+                <span><kbd>⇧S</kbd> Force Working Endpoint</span>
                 <span><kbd>⇧←</kbd>/<kbd>⇧→</kbd> Pins</span>
+                <span><kbd>F</kbd> Fold / expand selected Section</span>
+                <span><kbd>Alt</kbd> Carry selected retained object</span>
                 <span><kbd>P</kbd> Pin Current in Guide</span>
                 <span><kbd>Space</kbd> Native play/pause</span>
                 <span><kbd>L</kbd> Loop current Interval</span>
@@ -237,7 +241,7 @@
                 <span class="eyebrow">Operator matrix</span>
                 <h2 id="navigation-heading">Navigate</h2>
               </div>
-              <p>Refine replaces or shortens the Working Section by midpoint membership; Step and playback resize it; Switch transposes it unchanged.</p>
+              <p>Operators share traversal distance: folded Sections act as one point, while playback remains source-contiguous through them.</p>
             </div>
 
             <div class="navigation-deck">
@@ -322,6 +326,7 @@
                   <select id="section-source" disabled>
                     <option value="interval">Working Section</option>
                     <option value="field-span">Held Field span</option>
+                    <option value="selected-pins">Two selected Pins</option>
                   </select>
                 </label>
                 <label for="section-label">Title

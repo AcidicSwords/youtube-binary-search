@@ -19,6 +19,7 @@ Node 20 or newer is required. There is no build step or runtime dependency.
 ## 2. Ownership
 
 - temporal mathematics: `range-geometry.js`
+- Source Time ↔ Traversal Time and Fold materialization: `temporal-projection.js`
 - semantic transactions, endpoint frames, and Undo: `session.js`
 - Context/playback/Loop runtime values: `transport.js`
 - raw IFrame API: `youtube.js`
@@ -55,7 +56,7 @@ Autoplay blocking, buffering, delayed placement, and missing directional rates a
 - Paused sides must park on their represented frames; thumbnail-only cue state is not a valid settled Field after frame placement is possible.
 - Hold during formation may commit measured Offset through Session Step Reach, but must never write semantic Interval.
 - Context must preserve stored Field geometry and must not remeasure against its transient Cursor.
-- Hold/Stretch must be unavailable while Context, Range drag, or pending Step suspends the Field.
+- Hold/Stretch must be unavailable while Context, Range/Guide drag, or pending Step suspends the Field.
 - Side video surface, local Step button, matrix Step, and Arrow keys must share `step-gesture.js` and `performStep()`.
 - Direct Go, Refine, and Pin traversal replace Interval with their own local movement. Step and settled playback preserve the active departure while moving arrival.
 - Step, playback, and Pin traversal leave the receding Neighborhood endpoint fixed and push the approached endpoint. A Step that reaches or crosses the old bound retains one full Step beyond Current, clamped to Range.
@@ -69,15 +70,30 @@ Autoplay blocking, buffering, delayed placement, and missing directional rates a
 - Collapsing one Field side must not re-establish the other; combined Field controls operate only on visible sides.
 - Side-player errors must remain recoverable through pane restore or video reload; a retained adapter must never be stranded behind `ready = false`.
 
-## 6. UI discipline
+## 6. Fold discipline
+
+- Persist every Address, Pin, Section endpoint, Range, and Session checkpoint in Source Time.
+- Route operator distance, midpoint, timeline percentage, Pin stop order, and Field Offset through `temporal-projection.js`; never add local `if (collapsed)` arithmetic to an operator.
+- Treat a Fold Point as one traversal coordinate with directional source affinity. Forward selects the end face; backward selects the start face.
+- Treat playback, Context, Loop, and all physical player addresses as source-contiguous. Ordinary playback and Loop materialize all of active Range for the three-pane Field; Center-only Context materializes its frozen source extent. Never seek across a Fold as an implementation shortcut.
+- Preserve the laminar collapsed frontier. Crossing or adjacent sibling Sections may coexist only while at least one is expanded; coincident Sections share one proxy.
+- Clamp directional Fold inverses back to Source Range. A face outside Range is never a route around the sole hard boundary.
+- Preserve descendant Fold flags when a parent folds. Expanding or deleting the parent must reveal the retained child state.
+- Any Range, Resolution edge, or Interval boundary inside a folded interior—and Focus of a folded Section—must materialize the required source interior without changing the retained `collapsed` flag. Current alone may remain as a latent exact source Address at the Fold Point.
+- Section endpoint Pins are shared objects. Drag and modifier carry must deform references through those objects, validate topology, and create one Undo checkpoint.
+- Pin/Section carry composes after the primary movement from one frozen origin. Never replace the selected object with a traversal destination before calculating the carry.
+- A projection-only mutation may rebase the physical Field once, but it must not move Current, start Context, or create a second history entry.
+
+## 7. UI discipline
 
 The interface has four ownership regions: Field, map, operators/parameters, Guide. Do not reintroduce a generic playback dock.
 
 Every form control needs an accessible name; every button declares a type; focus and coarse-pointer targets remain visible and practical. Desktop is primary, but all operations must survive stacking and Guide modal presentation. Use explicit Field grid areas, an explicit zero-minimum column inside every pane, and player-panel container breakpoints; child minima may not clip a pane or displace Center when Field is off.
 
-## 7. Tests
+## 8. Tests
 
 - `tests.mjs` — geometry, Session, Guide fundamentals
+- `temporal-projection-tests.mjs` — contracted distance, directional inverse, nested Fold frontier, Focus/Range materialization, migration, subtree movement, and Section-face inclusion
 - `transport-tests.mjs` — Context, playback, Loop values
 - `source-field-tests.mjs` — external structure normalization
 - `fuzz-tests.mjs` — deterministic semantic invariants
@@ -95,6 +111,7 @@ Every form control needs an accessible name; every button declares a type; focus
 - audits — DOM, architecture, documentation, CSS, repository hygiene
 - `step-gesture-smoke.mjs` — held-button batching and one-operation Undo
 - `transport-coherence-smoke.mjs` — live projection, single pause, Loop handoff, and one-pass wrap
+- `section-folding-smoke.mjs` — Fold/Expand UI, source-contiguous playback and Loop, Focus/Leave, two-Pin Sections, drag/Undo, and modifier carry
 - remaining smoke files — startup, integrated interaction, Context, and metadata paths
 
 A branch is ready only after `npm run check` passes and browser-dependent validation remains explicitly separated from automated proof.

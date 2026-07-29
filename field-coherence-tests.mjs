@@ -173,7 +173,11 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   assert.match(app, /setStepReach as setSessionStepReach/);
   assert.match(app, /stepReach: currentStepReach\(\)/);
   assert.match(app, /onHoldOffsets:[\s\S]*commitStepReach/);
-  assert.match(app, /performStep\(selection\.direction, selection\.distance\)/);
+  assert.match(
+    app,
+    /performStep\(selection\.direction, selection\.distance,\s*\{[\s\S]*carryRetained: selection\.carryRetained === true/,
+    "All Step surfaces must preserve the shared semantic transaction while optionally carrying a retained Pin or Section."
+  );
   assert.match(app, /stepField\?\.translateToCurrent/);
   assert.match(field, /DEFAULT_FIELD_RESPONSE/);
   assert.match(field, /onAutoplayBlocked:[\s\S]*playback = "blocked"/);

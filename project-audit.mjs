@@ -16,6 +16,8 @@ const rangeGeometry = read("range-geometry.js");
 const stepGesture = read("step-gesture.js");
 const transport = read("transport.js");
 const youtube = read("youtube.js");
+const guide = read("guide.js");
+const temporalProjection = read("temporal-projection.js");
 for (const retiredArtifact of [
   ".v5.2-patch-backup",
   "BRANCH_INSTALL.md",
@@ -35,7 +37,7 @@ const docs = Object.fromEntries([
   "README.md", "SPEC.md", "IMPLEMENTATION.md", "INTERFACE.md", "DEVELOPMENT.md", "VALIDATION.md"
 ].map(path => [path, read(path)]));
 
-assert.equal(pkg.version, "5.8.6");
+assert.equal(pkg.version, "6.0.0");
 assert.equal(docs["SPEC.md"].startsWith("# Binary YouTube Reader — Canonical Specification\n"), true);
 assert.equal(docs["IMPLEMENTATION.md"].startsWith("# Binary YouTube Reader — Canonical Implementation\n"), true);
 assert.equal(docs["INTERFACE.md"].startsWith("# Binary YouTube Reader — Interface Grammar\n"), true);
@@ -69,6 +71,10 @@ assert.match(styles, /\.guide-tabs\s*\{[\s\S]*grid-template-columns:\s*1fr 1fr/,
   "The two implemented Guide tabs must not reserve a third empty track.");
 assert.match(html, /<option value="interval">Working Section<\/option>/,
   "Section creation must name its semi-persistent operand accurately.");
+assert.match(html, /<option value="selected-pins">Two selected Pins<\/option>/,
+  "Any two selected Pins must be available as one linked Section.");
+assert.match(html, /id="section-lane"/,
+  "Expanded Section spans and collapsed Section Pins require one dedicated timeline lane.");
 assert.match(html, /id="focus-working-section"[\s\S]*id="save-section"/,
   "Working Section focus must remain independent from explicit persistence.");
 assert.match(
@@ -115,6 +121,8 @@ for (const dead of [
 
 assert.match(styles, /@media \(pointer: coarse\)[\s\S]*button,[\s\S]*summary,[\s\S]*input,[\s\S]*select[\s\S]*min-height: var\(--touch\)/);
 assert.match(fieldCss, /@media \(pointer: coarse\)[\s\S]*\.pane-collapse[\s\S]*height: var\(--touch\)/);
+assert.match(styles, /\.timeline-section-fold::after[\s\S]*inset:\s*-18px/,
+  "The faint Fold marker must retain a practical coarse-pointer hit area.");
 
 assert.doesNotMatch(app, /pins-access|focused-state|createSkimTransport|completeSkim|reachSkimDestination/);
 assert.doesNotMatch(view, /pins-access-meta|focused-label|focused-state|\bskim\b/i);
@@ -139,7 +147,10 @@ assert.doesNotMatch(field, /bindSideStepSurface/,
   "The Field controller must expose Step geometry without owning a second DOM path.");
 assert.match(session, /export function projectPlayback/);
 assert.match(session, /export function completePlayback[\s\S]*projectPlayback/);
+assert.match(session, /projectionForModel/);
 assert.match(view, /projectPlayback[\s\S]*dataset\.live/);
+assert.match(view, /dataset\.sectionCollapse/);
+assert.match(view, /dataset\.sectionExpand/);
 assert.match(app, /centerPauseRequest[\s\S]*handoffTransport/);
 assert.match(app, /function startLoop\(\)[\s\S]*handoffTransport[\s\S]*currentInterval\(\)/);
 assert.match(
@@ -149,6 +160,7 @@ assert.match(
 );
 
 assert.match(pkg.scripts.test, /v5\.8-regression-tests\.mjs/);
+assert.match(pkg.scripts.test, /temporal-projection-tests\.mjs/);
 assert.match(pkg.scripts.test, /endpoint-transposition-tests\.mjs/);
 assert.match(pkg.scripts.test, /semantic-composition-tests\.mjs/);
 assert.match(pkg.scripts.test, /semantic-audit-probes\.mjs/);
@@ -161,8 +173,18 @@ assert.match(pkg.scripts.audit, /project-audit\.mjs/);
 assert.match(pkg.scripts.check, /npm run audit/);
 assert.match(pkg.scripts.check, /step-gesture-smoke\.mjs/);
 assert.match(pkg.scripts.check, /transport-coherence-smoke\.mjs/);
+assert.match(pkg.scripts.check, /section-folding-smoke\.mjs/);
 assert.match(docs["IMPLEMENTATION.md"], /step-gesture\.js/);
+assert.match(docs["IMPLEMENTATION.md"], /temporal-projection\.js/);
 assert.match(docs["SPEC.md"], /one Undo transaction/);
+assert.match(docs["SPEC.md"], /Traversal Time/);
+assert.match(docs["SPEC.md"], /source-contiguous/);
 assert.match(docs["VALIDATION.md"], /each wrap places each side once/);
+assert.match(guide, /collapsed:\s*options\.collapsed === true/);
+assert.match(guide, /fold-topology-conflict/);
+assert.match(temporalProjection, /export function createTemporalProjection/);
+assert.match(temporalProjection, /expandedExtents/);
+assert.doesNotMatch(temporalProjection, /player|document|window/,
+  "Temporal projection must remain a pure semantic/presentation mapping.");
 
-console.log("Project audit passed: v5.8.6 semantics, shared held-Step gestures, live playback projection, single-settlement transport handoffs, one-pass Loop wraps, custom Context, mirrored Field controls, Guide ownership, CSS boundaries, and adapter contracts are coherent.");
+console.log("Project audit passed: v6 temporal folding, shared retained objects, source-contiguous playback, folded traversal, held-Step gestures, transport handoffs, mirrored Field controls, Guide ownership, CSS boundaries, and adapter contracts are coherent.");
