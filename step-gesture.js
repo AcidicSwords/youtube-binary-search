@@ -3,7 +3,8 @@
 
 export const DEFAULT_STEP_GESTURE_TIMING = Object.freeze({
   initialDelayMs: 250,
-  repeatMs: 100
+  repeatMs: 100,
+  tapSettleMs: 240
 });
 
 function positiveDelay(value, fallback) {
@@ -158,7 +159,10 @@ export function bindStepPress(element, {
   }
 
   let pointerId = null;
+  let keyboardKey = null;
   let suppressPointerClickUntil = 0;
+  let suppressKeyboardClickUntil = 0;
+  const eventRoot = element.ownerDocument || globalThis.document;
 
   const unavailable = () => Boolean(
     element.disabled
@@ -199,7 +203,12 @@ export function bindStepPress(element, {
     event.preventDefault?.();
     pointerId = Number.isFinite(event.pointerId) ? event.pointerId : 1;
     element.focus?.({ preventScroll: true });
-    element.setPointerCapture?.(pointerId);
+    try {
+      element.setPointerCapture?.(pointerId);
+    } catch {
+      // Document-level release listeners below retain a complete press lifecycle
+      // when a browser cannot capture this particular pointer.
+    }
     element.classList?.add?.("is-step-held");
   };
   const onPointerUp = event => finishPointer(event, true);
@@ -209,7 +218,10 @@ export function bindStepPress(element, {
   };
   const onClick = event => {
     const pointerClick = Number(event.detail) > 0;
-    if (pointerClick && Date.now() <= suppressPointerClickUntil) {
+    const suppress = pointerClick
+      ? Date.now() <= suppressPointerClickUntil
+      : Date.now() <= suppressKeyboardClickUntil;
+    if (suppress) {
       event.preventDefault?.();
       return;
     }
@@ -221,8 +233,20 @@ export function bindStepPress(element, {
     if (!keyboardActivation || !["Enter", " "].includes(event.key) || unavailable()) return;
     event.preventDefault?.();
     event.stopPropagation?.();
-    const selection = resolveStep();
-    if (selection) tap?.(selection);
+    if (keyboardKey !== null && !controller.isActive(id)) keyboardKey = null;
+    if (event.repeat || keyboardKey !== null) return;
+    if (!controller.begin(id, resolveStep)) return;
+    keyboardKey = event.key;
+    element.classList?.add?.("is-step-held");
+  };
+  const onKeyUp = event => {
+    if (!keyboardActivation || keyboardKey === null || event.key !== keyboardKey) return;
+    event.preventDefault?.();
+    event.stopPropagation?.();
+    keyboardKey = null;
+    suppressKeyboardClickUntil = Date.now() + 600;
+    controller.end(id, { observe: true, defer: true });
+    element.classList?.remove?.("is-step-held");
   };
 
   element.addEventListener("pointerdown", onPointerDown);
@@ -230,7 +254,13 @@ export function bindStepPress(element, {
   element.addEventListener("pointercancel", onPointerCancel);
   element.addEventListener("lostpointercapture", onLostPointerCapture);
   element.addEventListener("click", onClick);
-  if (keyboardActivation) element.addEventListener("keydown", onKeyDown);
+  eventRoot?.addEventListener?.("pointerup", onPointerUp);
+  eventRoot?.addEventListener?.("pointercancel", onPointerCancel);
+  if (keyboardActivation) {
+    element.addEventListener("keydown", onKeyDown);
+    element.addEventListener("keyup", onKeyUp);
+    eventRoot?.addEventListener?.("keyup", onKeyUp);
+  }
 
   return () => {
     element.removeEventListener?.("pointerdown", onPointerDown);
@@ -238,6 +268,12 @@ export function bindStepPress(element, {
     element.removeEventListener?.("pointercancel", onPointerCancel);
     element.removeEventListener?.("lostpointercapture", onLostPointerCapture);
     element.removeEventListener?.("click", onClick);
-    if (keyboardActivation) element.removeEventListener?.("keydown", onKeyDown);
+    eventRoot?.removeEventListener?.("pointerup", onPointerUp);
+    eventRoot?.removeEventListener?.("pointercancel", onPointerCancel);
+    if (keyboardActivation) {
+      element.removeEventListener?.("keydown", onKeyDown);
+      element.removeEventListener?.("keyup", onKeyUp);
+      eventRoot?.removeEventListener?.("keyup", onKeyUp);
+    }
   };
 }

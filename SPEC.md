@@ -146,7 +146,7 @@ Creation and management belong to Guide.
 
 ## 5. Native playback
 
-A paused Center surface and Space invoke ordinary playback through the parent document. The same trusted gesture first refolds each available side to Center, then requests muted Tail, audible Center, and muted Lead playback synchronously. Every ordinary play/unpause therefore starts a fresh Stretch rather than resuming stale side clocks. Once Center enters ordinary playback, the surface withdraws so native YouTube controls remain available. Starting playback creates a transient playback transaction from the current physical position. While it runs, the map projects the exact Resolution and Working Section that settlement would produce without committing Session. Pausing freezes side frames at their represented addresses once and settles Center movement once through Session:
+While Context is idle, a paused Center surface and Space invoke ordinary playback through the parent document. The same trusted gesture first refolds each available side to Center, then requests muted Tail, audible Center, and muted Lead playback synchronously. Every ordinary play/unpause therefore starts a fresh Stretch rather than resuming stale side clocks. Once Center enters ordinary playback, the surface withdraws so native YouTube controls remain available. Starting playback creates a transient playback transaction from the current physical position. While it runs, the map projects the exact Resolution and Working Section that settlement would produce without committing Session. Pausing freezes side frames at their represented addresses once and settles Center movement once through Session:
 
 ```text
 physical Cursor movement
@@ -170,7 +170,9 @@ commit Current
 → remain paused until genuine native playback
 ```
 
-A new traversal during Context supersedes the old window and starts Context around the new destination. Changing the duration while Context runs retargets that transient window immediately; even a duration shorter than the one-second default pre-roll must still contain Current. Context creates no history and does not redefine Interval. A held Step suppresses intermediate Context windows and starts one observation only when the key or pointer gesture ends. Hold/Stretch is unavailable during Context because its transient Cursor is not a valid source for a stored Field relation.
+A new traversal during Context supersedes the old window and starts Context around the new destination. Changing the duration while Context runs retargets that transient window immediately; even a duration shorter than the one-second default pre-roll must still contain Current. Ordinary Context creates no history and does not redefine Interval. Space or the Center surface explicitly accepts the presently heard Cursor: Context pauses without restoring its anchor, that Cursor becomes Current through a direct Go, and the resulting movement enters Undo history. Context owns Space even when a traversal button retains focus.
+
+A held Step suppresses intermediate Context windows and starts one observation only when the key or pointer gesture ends. Each repeat still commits and visibly parks Center, Tail, and Lead at its new Current; only automatic observation and final history settlement are deferred. Rapid taps inside the shared settlement window amend that same transaction. Hold/Stretch is unavailable during Context because its transient Cursor is not a valid source for a stored Field relation.
 
 ## 7. Step Field
 

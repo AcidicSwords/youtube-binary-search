@@ -161,30 +161,78 @@ await flush();
 await poll();
 assert.equal(center.currentTime, 49);
 assert.equal(byId.get("field-transport-state").textContent, "Context suspended");
+assert.equal(byId.get("center-transport-label").textContent, "Set Current Here");
 
-const contextHandoffPlaces = {
+center.currentTime = 52;
+await poll();
+assert.equal(
+  currentText(),
+  "Current 0:50.000",
+  "Context Cursor must remain transient until explicitly accepted."
+);
+
+const contextCommitPlaces = {
   tail: tail.commands.filter(command => command[0] === "place").length,
   lead: lead.commands.filter(command => command[0] === "place").length
 };
+const focusedTraversal = byId.get("refine-forward");
+focusedTraversal.focus();
 dispatchDocument("keydown", { key: " ", code: "Space" });
 await flush();
-assert.equal(center.currentTime, 50);
-assert.equal(center.state, 1);
+assert.equal(currentText(), "Current 0:52.000");
+assert.match(byId.get("section-window").textContent, /0:50\.000–0:52\.000/);
+assert.equal(center.currentTime, 52);
+assert.equal(center.state, 2);
+assert.equal(byId.get("center-transport-label").textContent, "Play Field");
 assert.equal(
   tail.commands.filter(command => command[0] === "place").length,
-  contextHandoffPlaces.tail + 1,
-  "Context-to-playback must establish Tail only once."
+  contextCommitPlaces.tail + 1,
+  "Accepting Context Cursor must translate Tail to the new Current once."
 );
 assert.equal(
   lead.commands.filter(command => command[0] === "place").length,
-  contextHandoffPlaces.lead + 1,
-  "Context-to-playback must establish Lead only once."
+  contextCommitPlaces.lead + 1,
+  "Accepting Context Cursor must translate Lead to the new Current once."
 );
 
+focusedTraversal.blur();
+dispatchDocument("keydown", { key: " ", code: "Space" });
+await flush();
+assert.equal(center.state, 1);
 dispatchDocument("keydown", { key: " ", code: "Space" });
 await flush();
 assert.equal(center.state, 2);
 
+// Replacing a not-yet-confirmed Context must let the replacement observation
+// adopt the next PLAYING confirmation. The old cancellation claim cannot pause
+// the new Context.
+center.deferNextPlayState = true;
+byId.get("timeline").dispatch("click", {
+  target: byId.get("timeline"),
+  clientX: 400
+});
+await flush();
+assert.equal(center.pendingPlayState, true);
+const forward = byId.get("step-forward");
+forward.dispatch("pointerdown", { button: 0, pointerId: 41 });
+forward.dispatch("pointerup", { button: 0, pointerId: 41 });
+await env.delay(300);
+await flush();
+assert.equal(currentText(), "Current 0:50.000");
+assert.equal(center.currentTime, 49);
+assert.equal(
+  center.state,
+  1,
+  "A replacement Context must not be paused by the superseded start claim."
+);
+center.applyPendingPlayState();
+await flush();
+dispatchDocument("keydown", { key: "Escape", code: "Escape" });
+await flush();
+assert.equal(center.state, 2);
+assert.equal(center.currentTime, 50);
+
+forward.blur();
 center.deferNextPlayState = true;
 dispatchDocument("keydown", { key: " ", code: "Space" });
 assert.equal(
@@ -242,4 +290,4 @@ assert.equal(
   "A replacement traversal must keep ownership when a cancelled Play confirms late."
 );
 
-console.log("Transport coherence smoke passed: live bound projection, rapid single pause settlement, direct Context/Loop handoffs, and one-pass Field wrap.");
+console.log("Transport coherence smoke passed: live projection, exact Context acceptance, replacement-start ownership, rapid pause settlement, playback-to-Loop handoff, and one-pass Field wrap.");

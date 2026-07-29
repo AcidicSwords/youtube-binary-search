@@ -91,7 +91,7 @@ Loop wraps use adapter placement directly and never call a Session movement tran
 
 ## 5. Center lifecycle
 
-A trusted parent-page Center click or Space command first establishes a starting playback transport, refolds each available side to the physical Center, primes it at `1×`, and calls Tail, Lead, and Center playback synchronously. A native Center `PLAYING` event begins the transport when no parent request already owns it. An application pause records the exact logical transport it intends to stop; if Pause arrives before the iframe confirms `PLAYING`, the pending transport reissues that owned command on confirmation. Replacement actions retain a cancellation claim over that late confirmation while proceeding with their own placement. Matching `PAUSED` settles immediately, while stale programmatic pause events cannot stop a newer transport. Settlement captures the latest side offsets once:
+While Context is idle, a trusted parent-page Center click or Space command first establishes a starting playback transport, refolds each available side to the physical Center, primes it at `1×`, and calls Tail, Lead, and Center playback synchronously. A native Center `PLAYING` event begins the transport when no parent request already owns it. An application pause records the exact logical transport it intends to stop; if Pause arrives before the iframe confirms `PLAYING`, the pending transport reissues that owned command on confirmation. Replacement actions retain a cancellation claim over that late confirmation while proceeding with their own placement. A replacement Context adopts the next confirmation at its newly placed address, so a superseded cancellation cannot pause it. Matching `PAUSED` settles immediately, while stale programmatic pause events cannot stop a newer transport. Settlement captures the latest side offsets once:
 
 - Context restores committed Current.
 - Loop ends without committing internal wraps.
@@ -99,13 +99,13 @@ A trusted parent-page Center click or Space command first establishes a starting
 
 Programmatic placement has a grace record so delayed iframe reporting cannot be mistaken for a native scrub.
 
-Context-to-playback and playback-to-Loop are direct handoffs: the old transport is settled without issuing a pause that could arrive after the new play request.
+Playback-to-Loop is a direct handoff: the old transport is settled without issuing a pause that could arrive after the new play request. Space or the Center surface during Context instead pauses at the physical Cursor and commits it through Session `goTo()` as `contextAccept`; the normal completion path still restores the Context anchor without history.
 
 ## 6. Automatic Context
 
 `applyPlayerEffect()` receives a changed Session result. When the result includes an Interval and Context duration is non-zero, it translates the complete Field to the new Current, parks the sides without remeasurement, and starts Center-only Context. Otherwise it places Center and the translated Field at Current.
 
-Pending rapid Steps suppress intermediate Context and invoke it once after coalescing. `step-gesture.js` gives Arrow keys, matrix buttons, side buttons, and side-player surfaces one press lifecycle. Pointer/key down commits the first Step immediately, an application timer owns held repetition, and release completes one held transaction and one optional Context window. Quick pointer or keyboard taps retain the short debounce boundary, so a rapid repeated sequence also shares one transaction. Browser key repeat is ignored. Blur, pointer cancellation, or hidden-document settlement commits the final Step without autoplay.
+Pending rapid Steps suppress intermediate Context and invoke it once after coalescing. `step-gesture.js` centralizes initial delay, repeat cadence, and tap-settlement timing for Arrow keys, matrix buttons, side buttons, and side-player surfaces. Pointer/key down commits the first Step immediately, an application timer owns held repetition, and every repeat immediately places Center while translating the complete Field. Release completes one held transaction and one optional Context window. Quick pointer or keyboard taps inside the settlement boundary amend that same transaction. Pointer capture has a document-level release fallback; focused controls use the same key-down/key-up lifecycle; browser key repeat is ignored. Blur, pointer cancellation, or hidden-document settlement commits the final Step without autoplay.
 
 Context duration is normalized to `0–300s`. Pre-roll is capped by the requested duration, so every fractional window still contains Current. Changing duration during active Context replaces only its transient window and placement; it reuses the already-suspended Field without a pause/play cycle.
 

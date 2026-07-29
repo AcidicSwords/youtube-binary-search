@@ -69,6 +69,7 @@ import {
   normalizeFieldResponse
 } from "./step-field.js";
 import {
+  DEFAULT_STEP_GESTURE_TIMING,
   bindStepPress,
   createStepGestureController
 } from "./step-gesture.js";
@@ -81,7 +82,7 @@ const STORAGE_V2_PREFIX = "binary-youtube-reader:v2:";
 const STORAGE_V1_PREFIX = "binary-youtube-reader:v1:";
 const PREFERENCES_KEY = "binary-youtube-reader:preferences:v1";
 const POLL_MS = 100;
-const STEP_DEBOUNCE_MS = 120;
+const STEP_TAP_SETTLE_MS = DEFAULT_STEP_GESTURE_TIMING.tapSettleMs;
 const STEP_PRESETS = [0.25, 0.5, 1, 2, 3, 5, 10, 15, 30, 60, 120, 300];
 const CONTEXT_PRE_ROLL_SECONDS = 1;
 const NATIVE_GO_SETTLE_MS = 220;
@@ -398,7 +399,8 @@ function scheduleNativeGo(address) {
 function locateAddress(address, {
   preserveField = false,
   resetField = false,
-  fieldAligned = false
+  fieldAligned = false,
+  centerAligned = false
 } = {}) {
   if (!player || !Number.isFinite(address)) return;
   clearNativeGo();
@@ -406,7 +408,7 @@ function locateAddress(address, {
   state.transport = idleTransport();
   player.pause();
   player.setRate(1);
-  placePlayer(address);
+  if (!centerAligned) placePlayer(address);
   if (resetField) {
     stepField?.resetAtCurrent?.();
   } else if (!fieldAligned) {
@@ -427,6 +429,10 @@ function startContext(anchor, options = {}) {
     return;
   }
 
+  // A new Context owns the next PLAYING confirmation at its newly placed
+  // address. Any cancellation claim from the transport it superseded is now
+  // obsolete; retaining it would let rapid Step pause this replacement window.
+  centerPauseRequest = null;
   state.transport = options.retarget && state.playerState === YOUTUBE_STATE.PLAYING
     ? withTransportPhase(transport, "playing")
     : transport;
@@ -459,7 +465,8 @@ function applyPlayerEffect(result, options = {}) {
   }
   locateAddress(destination, {
     preserveField: true,
-    fieldAligned: options.fieldAligned === true
+    fieldAligned: options.fieldAligned === true,
+    centerAligned: options.centerAligned === true
   });
 }
 
@@ -598,7 +605,8 @@ function flushPendingStep(options = {}) {
       interval: currentInterval()
     }, {
       observe: options.observe,
-      fieldAligned: true
+      fieldAligned: true,
+      centerAligned: true
     });
   }
   return { flushed: true, cancelled: false, direction: pending.lastDirection };
@@ -629,7 +637,7 @@ function deferPendingStepCompletion(options = {}) {
   state.pendingStep.waitForGestureEnd = false;
   state.pendingStep.timer = window.setTimeout(() => {
     completePendingStep({ observe: options.observe !== false });
-  }, STEP_DEBOUNCE_MS);
+  }, STEP_TAP_SETTLE_MS);
   return true;
 }
 
@@ -842,13 +850,18 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
   state.pendingStep.started = true;
   state.session = result.session;
   stepField?.translateToCurrent(currentResolution().C, { preserve: true });
+  // A pending Step delays only automatic Context and history settlement. Its
+  // semantic Current and all three physical panes move immediately, so a held
+  // or rapidly tapped sequence remains a visible traversal rather than a marker
+  // moving over a stale Center frame.
+  placePlayer(currentResolution().C);
 
   clearTimeout(state.pendingStep.timer);
   state.pendingStep.timer = null;
   if (!state.pendingStep.waitForGestureEnd) {
     state.pendingStep.timer = window.setTimeout(() => {
       completePendingStep({ observe: true });
-    }, STEP_DEBOUNCE_MS);
+    }, STEP_TAP_SETTLE_MS);
   }
   view.render();
   return true;
@@ -918,17 +931,44 @@ function requestCenterPause() {
   return true;
 }
 
+function acceptContextCursor() {
+  if (!transportIs(TRANSPORT_KIND.CONTEXT)) return false;
+  const destination = clamp(
+    safeCurrentTime(),
+    activeRange().start,
+    activeRange().end
+  );
+  const departure = currentResolution().C;
+
+  // Context remains transient unless the user explicitly accepts its Cursor.
+  // Stop the physical observation without restoring its anchor, then commit the
+  // heard position through the same direct-Go kernel used by timeline selection.
+  settleTransport({ restoreObservation: false });
+  clearProgrammaticPlacement();
+  const result = goTo(state.session, destination, {
+    operator: "contextAccept",
+    label: "Set Current from Context"
+  });
+
+  if (result.changed) {
+    state.session = result.session;
+    stepField?.translateToCurrent(currentResolution().C, { preserve: true });
+    if (result.rangeChanged) view.renderGuide();
+    setStatus(
+      `Set Current from Context to ${formatTime(currentResolution().C)}.`
+    );
+  } else {
+    stepField?.translateToCurrent(departure, { preserve: true });
+    setStatus(`Context stopped at Current ${formatTime(departure)}.`);
+  }
+  view.render();
+  return true;
+}
+
 function toggleNativePlayback() {
   if (!state.videoLoaded) return;
   if (transportIs(TRANSPORT_KIND.CONTEXT)) {
-    // Context already owns a running Center. Hand it directly to ordinary
-    // playback without issuing a pause that can arrive after the new Play.
-    settleTransport({
-      issuePause: false,
-      restoreObservation: false,
-      handoffField: true
-    });
-    startFieldPlaybackFromGesture();
+    acceptContextCursor();
     return;
   }
   if (transportIs(TRANSPORT_KIND.LOOP) || transportIs(TRANSPORT_KIND.PLAYBACK)) {
@@ -2129,10 +2169,10 @@ const directionalStep = direction => () => ({
 const sideStep = role => () => stepField?.getStepSelection?.(role) || null;
 
 for (const binding of [
-  [elements["step-backward"], "matrix:backward", directionalStep("backward"), false],
-  [elements["step-forward"], "matrix:forward", directionalStep("forward"), false],
-  [elements["tail-step-button"], "field-button:tail", sideStep("tail"), false],
-  [elements["lead-step-button"], "field-button:lead", sideStep("lead"), false],
+  [elements["step-backward"], "matrix:backward", directionalStep("backward"), true],
+  [elements["step-forward"], "matrix:forward", directionalStep("forward"), true],
+  [elements["tail-step-button"], "field-button:tail", sideStep("tail"), true],
+  [elements["lead-step-button"], "field-button:lead", sideStep("lead"), true],
   [elements["tail-player-surface"], "field-surface:tail", sideStep("tail"), true],
   [elements["lead-player-surface"], "field-surface:lead", sideStep("lead"), true]
 ]) {
@@ -2300,6 +2340,31 @@ elements["sections-list"].addEventListener("focusout", event => {
   view.setPreviewSection(null);
   view.render();
 });
+
+// Context is an active listening surface, so its Space command owns the key
+// before a previously focused traversal button can consume it as native button
+// activation. Text editing and modal Guide work retain ordinary keyboard rules.
+document.addEventListener("keydown", event => {
+  const activeElement = document.activeElement;
+  const editing = ["INPUT", "SELECT", "TEXTAREA"].includes(activeElement?.tagName)
+    || activeElement?.isContentEditable === true;
+  const plainSpace = (event.key === " " || event.code === "Space")
+    && !event.ctrlKey
+    && !event.metaKey
+    && !event.altKey
+    && !event.shiftKey;
+  if (
+    !plainSpace
+    || event.repeat
+    || editing
+    || guideDialogOpen()
+    || !transportIs(TRANSPORT_KIND.CONTEXT)
+  ) return;
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation?.();
+  acceptContextCursor();
+}, true);
 
 // Keyboard: spatial cluster W/A/S/D, directional arrows, and observation keys.
 document.addEventListener("keydown", event => {
