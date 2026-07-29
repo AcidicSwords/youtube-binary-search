@@ -150,8 +150,19 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   assert.match(html, /id=["']lead-pane["'][\s\S]*id=["']player-lead["'][\s\S]*id=["']lead-rate-select["']/);
   assert.doesNotMatch(fieldCss, /\.step-pane-action/, "Side players must not use a transparent overlay element.");
   assert.match(fieldCss, /\.side-player-surface iframe[\s\S]*pointer-events:\s*none/);
-  assert.match(field, /bindSideStepSurface\("tail"\)/);
-  assert.match(field, /bindSideStepSurface\("lead"\)/);
+  assert.match(
+    fieldCss,
+    /\.pane-field-controls\s*\{[\s\S]*--field-step-track:[\s\S]*grid-template-columns:\s*var\(--field-rate-track\)\s*var\(--field-offset-track\)\s*var\(--field-mode-track\)\s*var\(--field-step-track\)/
+  );
+  assert.match(
+    fieldCss,
+    /\.tail-field-controls\s*\{[\s\S]*grid-template-columns:\s*var\(--field-step-track\)\s*var\(--field-mode-track\)\s*var\(--field-offset-track\)\s*var\(--field-rate-track\)/,
+    "Mirrored Tail/Lead controls must map equal functions to equal track sizes."
+  );
+  assert.doesNotMatch(field, /bindSideStepSurface/,
+    "Step Field must expose geometry while the application owns the shared Step gesture.");
+  assert.match(app, /tail-player-surface[\s\S]*bindStepPress\(control/);
+  assert.match(app, /lead-player-surface[\s\S]*bindStepPress\(control/);
   assert.match(fieldCss, /\.pane-field-controls\s*\{[\s\S]*z-index:\s*7/);
   assert.match(
     fieldCss,

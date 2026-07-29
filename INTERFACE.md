@@ -29,17 +29,17 @@ Tail and Lead are constitutive projections, not thumbnails. On wide desktop the 
 
 No separate playback dock, Context button, or Skim button appears here. Clicking paused Center or pressing Space refolds available sides and starts all three players through one parent-owned gesture; once ordinary playback begins, the surface withdraws and Center’s native YouTube controls are exposed. When paused, each side shows its represented frame. Side iframe pointer input is disabled so clicking the visible side surface performs semantic Step rather than independently toggling a muted player. Context is configured elsewhere and runs automatically.
 
-Side controls mirror across Center. Tail reads from its outside edge toward Center as `Step | Hold/Stretch | Offset | Rate`; Lead reads from Center toward its outside edge as `Rate | Offset | Hold/Stretch | Step`. Collapsing one side pauses and removes only that projection; it must not refold or reset the still-visible side. Restoring a pane may also retry a failed side source. Center’s combined Hold/Stretch action applies only to visible sides.
+Side controls mirror across Center. Tail reads from its outside edge toward Center as `Step | Hold/Stretch | Offset | Rate`; Lead reads from Center toward its outside edge as `Rate | Offset | Hold/Stretch | Step`. Each mirrored function uses the same track width on both sides. Press-and-hold on either Step button or side surface follows the same repeat and one-Undo gesture as the matrix Step. Collapsing one side pauses and removes only that projection; it must not refold or reset the still-visible side. Restoring a pane may also retry a failed side source. Center’s combined Hold/Stretch action applies only to visible sides and is unavailable while Context suspends the Field.
 
 ## 3. Temporal map
 
 The map spans the same width as the viewer and shows:
 
 - Range and editable handles;
-- Resolution;
+- Resolution, continuously projected through ordinary playback;
 - semantic Current;
 - physical Cursor during playback/Context/Loop;
-- Working Section / Active Interval, replaced by local Go/Pin movements or an outside Refine, shortened by an inside Refine, and resized by Step or settled playback;
+- Working Section / Active Interval, replaced by local Go/Pin movements or an outside Refine, shortened by an inside Refine, resized by Step, and continuously projected through playback before identical settlement;
 - Held Field span;
 - Pins;
 - action and Section previews.
@@ -52,7 +52,7 @@ The left panel contains non-operator values:
 
 - textual Range and Range tools;
 - textual Resolution;
-- automatic Center-only Context duration;
+- custom automatic Center-only Context duration (`0–300s`, with presets as suggestions);
 - keyboard reference.
 
 Directional Offset and side Rate remain object-local beneath Tail and Lead rather than being duplicated here.

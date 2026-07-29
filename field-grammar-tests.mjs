@@ -93,16 +93,25 @@ for (const id of [
 
 assert.match(app, /function applyPlayerEffect\(result[\s\S]*result\?\.interval[\s\S]*startContext\(destination\)/,
   "Committed traversal must invoke automatic Context when enabled.");
-assert.match(app, /function selectFieldSide\(selection\)[\s\S]*performStep\(selection\.direction, selection\.distance\)/);
-assert.match(app, /function startLoopExtent\(extent[\s\S]*createLoopTransport/);
-assert.match(app, /transport\.cycles \+= 1[\s\S]*placePlayer\(transport\.start\)[\s\S]*player\.play\(\)/,
-  "Loop wrap must place at the frozen start and unpause without a Session transaction.");
+assert.match(app, /const sideStep = role => \(\) => stepField\?\.getStepSelection/);
+assert.match(app, /bindStepPress\(control[\s\S]*tap:\s*tapStep/);
+assert.match(app, /function beginLoopExtent\(extent[\s\S]*createLoopTransport/);
+assert.match(
+  app,
+  /function startLoop\(\)[\s\S]*settleBeforeAction\(\{ handoffTransport: true \}\)[\s\S]*beginLoopExtent\(currentInterval\(\)/,
+  "Matrix Loop must settle live playback before reading its Working Section."
+);
+assert.match(app, /transport\.cycles \+= 1[\s\S]*placePlayer\(transport\.start\)[\s\S]*resumeAt[\s\S]*player\.play\(\)/,
+  "Loop wrap must rebase the frozen Field relation and unpause without a Session transaction.");
 assert.match(app, /data-loop-section/);
 assert.match(app, /saveExtentAsSection/);
 assert.doesNotMatch(app, /createSkimTransport|completeSkim|reachSkimDestination/);
 assert.match(fieldSource, /FIELD_SIDE_MODE/);
-assert.match(fieldSource, /function stretch\(role\)[\s\S]*beginStretch\(side, center, snapshot, \{ play: centerRunning && !runtime\.suspended \}\)/,
-  "Stretch must delegate to the deterministic refold-then-diverge transition.");
+assert.match(
+  fieldSource,
+  /function stretch\(role\)[\s\S]*suspendedNow = suspensionRequired\(snapshot\)[\s\S]*beginStretch\(side, center, snapshot, \{ play: centerRunning && !suspendedNow \}\)/,
+  "Stretch must use live suspension state before delegating to the deterministic refold-then-diverge transition."
+);
 assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*side\.offset = 0[\s\S]*requestRate\(side, 1, true\)[\s\S]*(?:adapter\?\.place|adapter\?\.cue)[\s\S]*side\.adapter\?\.play/,
   "Every running Stretch must refold to Center at 1× before future divergence.");
 assert.match(fieldSource, /function hold\(role, \{ record = true \} = \{\}\)[\s\S]*onHoldOffsets/,

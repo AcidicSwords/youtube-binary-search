@@ -9,8 +9,11 @@ const fieldCss = read("step-field.css");
 const grammarCss = read("field-grammar.css");
 const app = read("app.js");
 const view = read("view.js");
+const session = read("session.js");
 const field = read("step-field.js");
 const fieldGeometry = read("step-field-geometry.js");
+const rangeGeometry = read("range-geometry.js");
+const stepGesture = read("step-gesture.js");
 const transport = read("transport.js");
 const youtube = read("youtube.js");
 for (const retiredArtifact of [
@@ -22,7 +25,8 @@ for (const retiredArtifact of [
   "SHA256SUMS",
   "TEST_REPORT.md",
   "structure.js",
-  "traversal.js"
+  "traversal.js",
+  "v5.2-regression-tests.mjs"
 ]) {
   assert.equal(existsSync(retiredArtifact), false, `Retired installation artifact remains: ${retiredArtifact}`);
 }
@@ -67,6 +71,16 @@ assert.match(html, /<option value="interval">Working Section<\/option>/,
   "Section creation must name its semi-persistent operand accurately.");
 assert.match(html, /id="focus-working-section"[\s\S]*id="save-section"/,
   "Working Section focus must remain independent from explicit persistence.");
+assert.match(
+  html,
+  /id="context-seconds"[^>]*type="number"[^>]*min="0"[^>]*max="300"[^>]*step="0\.25"/,
+  "Context must accept bounded custom durations rather than a closed preset list."
+);
+assert.equal(
+  (html.match(/Ctrl\/⌘ Z/g) || []).length,
+  1,
+  "The keyboard reference must not duplicate Undo."
+);
 
 assert.match(styles, /--control-height:\s*40px/);
 assert.match(styles, /--compact-control-height:\s*32px/);
@@ -84,6 +98,8 @@ assert.match(styles, /\.player-panel\s*\{[\s\S]*container-type:\s*inline-size/,
   "Step Field breakpoints must follow actual panel width.");
 assert.match(fieldCss, /@container \(max-width: 1180px\)/);
 assert.match(fieldCss, /\.pane-field-controls[\s\S]*z-index:\s*7/);
+assert.match(fieldCss, /--field-step-track:[\s\S]*\.tail-field-controls[\s\S]*var\(--field-step-track\)/,
+  "Mirrored controls must share named function-width tracks.");
 assert.match(grammarCss, /field-span-fill/);
 assert.doesNotMatch(grammarCss, /field-transport-bar|transport-actions|transport-readouts|transport-status/,
   "The retired generic playback dock must not retain CSS ownership.");
@@ -102,6 +118,8 @@ assert.match(fieldCss, /@media \(pointer: coarse\)[\s\S]*\.pane-collapse[\s\S]*h
 
 assert.doesNotMatch(app, /pins-access|focused-state|createSkimTransport|completeSkim|reachSkimDestination/);
 assert.doesNotMatch(view, /pins-access-meta|focused-label|focused-state|\bskim\b/i);
+assert.doesNotMatch(rangeGeometry, /\bskim\b|logSpeed|chooseSupportedRate/i,
+  "Retired Skim mechanics must not remain in the Range kernel.");
 assert.doesNotMatch(app, /const DEFAULT_FIELD_RESPONSE/, "Field response default must have one owner.");
 assert.match(fieldGeometry, /export const DEFAULT_FIELD_RESPONSE/);
 assert.match(fieldGeometry, /export function normalizeFieldResponse/);
@@ -112,16 +130,39 @@ assert.equal((`${app}\n${field}\n${fieldGeometry}`.match(/new\s+(?:globalThis\.)
 assert.equal((youtube.match(/new\s+globalThis\.YT\.Player/g) || []).length, 1);
 assert.match(transport, /PLAYBACK:\s*"playback"/);
 assert.doesNotMatch(transport, /CONTINUE|SKIM/);
+assert.doesNotMatch(transport, /isObservationalTransport/,
+  "Transport ownership must branch on its explicit kind rather than a redundant classifier.");
+assert.match(stepGesture, /createStepGestureController/);
+assert.match(stepGesture, /bindStepPress/);
+assert.match(app, /createStepGestureController[\s\S]*bindStepPress/);
+assert.doesNotMatch(field, /bindSideStepSurface/,
+  "The Field controller must expose Step geometry without owning a second DOM path.");
+assert.match(session, /export function projectPlayback/);
+assert.match(session, /export function completePlayback[\s\S]*projectPlayback/);
+assert.match(view, /projectPlayback[\s\S]*dataset\.live/);
+assert.match(app, /centerPauseRequest[\s\S]*handoffTransport/);
+assert.match(app, /function startLoop\(\)[\s\S]*handoffTransport[\s\S]*currentInterval\(\)/);
+assert.match(
+  app,
+  /function wrapLoopTransport\([\s\S]*transport\.cycles \+= 1[\s\S]*resumeAt/,
+  "Natural end and polling must share one Loop-wrap implementation."
+);
 
 assert.match(pkg.scripts.test, /v5\.8-regression-tests\.mjs/);
 assert.match(pkg.scripts.test, /endpoint-transposition-tests\.mjs/);
 assert.match(pkg.scripts.test, /semantic-composition-tests\.mjs/);
 assert.match(pkg.scripts.test, /semantic-audit-probes\.mjs/);
+assert.match(pkg.scripts.test, /step-gesture-tests\.mjs/);
 assert.match(pkg.scripts["test:semantic"], /semantic-state-space-tests\.mjs/);
 assert.match(pkg.scripts.test, /field-runtime-tests\.mjs/);
 assert.doesNotMatch(pkg.scripts.test, /v5\.2-regression-tests\.mjs/);
 assert.match(pkg.scripts.audit, /integration-check\.mjs/);
 assert.match(pkg.scripts.audit, /project-audit\.mjs/);
 assert.match(pkg.scripts.check, /npm run audit/);
+assert.match(pkg.scripts.check, /step-gesture-smoke\.mjs/);
+assert.match(pkg.scripts.check, /transport-coherence-smoke\.mjs/);
+assert.match(docs["IMPLEMENTATION.md"], /step-gesture\.js/);
+assert.match(docs["SPEC.md"], /one Undo transaction/);
+assert.match(docs["VALIDATION.md"], /each wrap places each side once/);
 
-console.log("Project audit passed: v5.8.6 Endpoint Transposition, membership-based Refine replacement/shortening, Working Section lifecycle, Loop containment, semantic repairs, mirrored Field controls, collapse isolation, native playback settlement, Guide ownership, operator geometry, CSS boundaries, and adapter contracts are coherent.");
+console.log("Project audit passed: v5.8.6 semantics, shared held-Step gestures, live playback projection, single-settlement transport handoffs, one-pass Loop wraps, custom Context, mirrored Field controls, Guide ownership, CSS boundaries, and adapter contracts are coherent.");

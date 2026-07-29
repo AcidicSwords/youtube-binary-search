@@ -1,0 +1,81 @@
+import assert from "node:assert/strict";
+import { createSmokeEnvironment } from "./smoke-harness.mjs";
+
+const env = createSmokeEnvironment();
+const { byId, flush, poll, currentText } = env;
+
+await import("./app.js");
+window.onYouTubeIframeAPIReady();
+await flush();
+
+byId.get("youtube-url").value = "https://youtu.be/dQw4w9WgXcQ";
+byId.get("load-video").click();
+await flush(5);
+await poll();
+
+byId.get("context-seconds").value = "0";
+byId.get("context-seconds").dispatch("change");
+byId.get("timeline").dispatch("click", {
+  target: byId.get("timeline"),
+  clientX: 500
+});
+await flush();
+assert.equal(currentText(), "Current 0:50.000");
+
+const forward = byId.get("step-forward");
+forward.dispatch("pointerdown", { button: 0, pointerId: 7 });
+assert.equal(currentText(), "Current 1:00.000", "Pointer press must Step immediately.");
+assert.equal(forward.classList.contains("is-step-held"), true);
+
+await env.delay(375);
+await flush();
+assert.equal(
+  currentText(),
+  "Current 1:20.000",
+  "A held button must repeat on the application cadence rather than browser click timing."
+);
+
+const sidePlacesBeforeRelease = {
+  tail: env.tail().commands.filter(command => command[0] === "place").length,
+  lead: env.lead().commands.filter(command => command[0] === "place").length
+};
+forward.dispatch("pointerup", { button: 0, pointerId: 7 });
+await flush();
+assert.equal(forward.classList.contains("is-step-held"), false);
+assert.equal(env.center().currentTime, 80);
+assert.equal(
+  env.tail().commands.filter(command => command[0] === "place").length,
+  sidePlacesBeforeRelease.tail,
+  "Gesture settlement must not translate Tail a second time."
+);
+assert.equal(
+  env.lead().commands.filter(command => command[0] === "place").length,
+  sidePlacesBeforeRelease.lead,
+  "Gesture settlement must not translate Lead a second time."
+);
+
+byId.get("return-action").click();
+await flush();
+assert.equal(
+  currentText(),
+  "Current 0:50.000",
+  "Undo must revert the entire held-button Step gesture in one operation."
+);
+assert.equal(env.center().currentTime, 50);
+
+for (const pointerId of [8, 9]) {
+  forward.dispatch("pointerdown", { button: 0, pointerId });
+  forward.dispatch("pointerup", { button: 0, pointerId });
+}
+assert.equal(currentText(), "Current 1:10.000");
+await env.delay(150);
+await flush();
+byId.get("return-action").click();
+await flush();
+assert.equal(
+  currentText(),
+  "Current 0:50.000",
+  "Undo must also revert a rapid sequence of repeated Step taps."
+);
+
+console.log("Step gesture smoke passed: held-button repeat plus rapid-tap coalescing, each with one-operation Undo.");

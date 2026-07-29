@@ -53,7 +53,6 @@ import {
   TRANSPORT_KIND,
   idleTransport,
   isTransportActive,
-  isObservationalTransport,
   createContextTransport,
   createLoopTransport,
   createPlaybackTransport,
@@ -69,6 +68,10 @@ import {
   createStepFieldController,
   normalizeFieldResponse
 } from "./step-field.js";
+import {
+  bindStepPress,
+  createStepGestureController
+} from "./step-gesture.js";
 import { createView } from "./view.js";
 
 const STORAGE_V5_PREFIX = "binary-youtube-reader:v5:";
@@ -82,13 +85,19 @@ const STEP_DEBOUNCE_MS = 120;
 const STEP_PRESETS = [0.25, 0.5, 1, 2, 3, 5, 10, 15, 30, 60, 120, 300];
 const CONTEXT_PRE_ROLL_SECONDS = 1;
 const NATIVE_GO_SETTLE_MS = 220;
-const HELD_STEP_INITIAL_DELAY_MS = 250;
-const HELD_STEP_REPEAT_MS = 100;
 const TRANSPORT_START_GRACE_MS = 1600;
 const METADATA_GRACE_MS = 4000;
 const METADATA_RETRY_MS = 150;
 const PROGRAMMATIC_PLACEMENT_GRACE_MS = 2000;
 const NATIVE_POSITION_TOLERANCE_SECONDS = 0.25;
+const MAX_CONTEXT_SECONDS = 300;
+
+function normalizeContextSeconds(value, fallback = 5) {
+  if (value === null || value === undefined || String(value).trim() === "") return fallback;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return clamp(numeric, 0, MAX_CONTEXT_SECONDS);
+}
 
 function normalizeLastStepReachEdited(value) {
   return value === "backward" ? "backward" : "forward";
@@ -101,9 +110,7 @@ function readPreferences() {
       ? Number(value.stepSeconds)
       : 10;
     return {
-      contextSeconds: [0, 3, 5, 10].includes(Number(value?.contextSeconds))
-        ? Number(value.contextSeconds)
-        : 5,
+      contextSeconds: normalizeContextSeconds(value?.contextSeconds),
       stepReach: normalizeStepReach(value?.stepReach ?? legacyStep),
       stepReachLastEdited: normalizeLastStepReachEdited(value?.stepReachLastEdited),
       fieldResponse: normalizeFieldResponse(value?.fieldResponse),
@@ -158,7 +165,8 @@ let stepField = null;
 let pendingLoad = null;
 let pollTimer = null;
 let metadataTimer = null;
-let heldStep = null;
+let stepGesture = null;
+let centerPauseRequest = null;
 
 function model() {
   return state.session.model;
@@ -282,6 +290,18 @@ function transportIs(kind) {
   return state.transport.kind === kind;
 }
 
+function pauseRequestOwns(transport) {
+  const request = centerPauseRequest;
+  if (!request || !transport) return false;
+  if (request.transport === transport) return true;
+  return Boolean(
+    request.kind !== TRANSPORT_KIND.IDLE
+    && request.kind === transport.kind
+    && Number.isFinite(request.startedAt)
+    && request.startedAt === transport.startedAt
+  );
+}
+
 function clearNativeGo() {
   if (state.nativeGo?.timer) clearTimeout(state.nativeGo.timer);
   state.nativeGo = null;
@@ -375,17 +395,26 @@ function scheduleNativeGo(address) {
   state.nativeGo = candidate;
 }
 
-function locateAddress(address, { preserveField = false } = {}) {
+function locateAddress(address, {
+  preserveField = false,
+  resetField = false,
+  fieldAligned = false
+} = {}) {
   if (!player || !Number.isFinite(address)) return;
   clearNativeGo();
+  if (!centerPauseRequest?.cancelOnPlaying) centerPauseRequest = null;
   state.transport = idleTransport();
   player.pause();
   player.setRate(1);
   placePlayer(address);
-  stepField?.translateToCurrent(address, { preserve: preserveField });
+  if (resetField) {
+    stepField?.resetAtCurrent?.();
+  } else if (!fieldAligned) {
+    stepField?.translateToCurrent(address, { preserve: preserveField });
+  }
 }
 
-function startContext(anchor) {
+function startContext(anchor, options = {}) {
   const transport = createContextTransport({
     anchor,
     range: activeRange(),
@@ -398,14 +427,19 @@ function startContext(anchor) {
     return;
   }
 
-  state.transport = transport;
+  state.transport = options.retarget && state.playerState === YOUTUBE_STATE.PLAYING
+    ? withTransportPhase(transport, "playing")
+    : transport;
   // Context observes only Center. Preserve the already-translated Field relation
   // around the semantic anchor instead of remeasuring against the old Cursor.
-  stepField?.pause({ center: anchor, freeze: false });
+  // Retargeting an active Context reuses its already-suspended Field.
+  if (!options.retarget) stepField?.pause({ center: anchor, freeze: false });
   player.setRate(1);
   placePlayer(transport.start);
-  if (Math.abs(safeCurrentTime() - transport.start) <= 0.25) transport.enteredWindow = true;
-  player.play();
+  if (Math.abs(safeCurrentTime() - transport.start) <= 0.25) {
+    state.transport.enteredWindow = true;
+  }
+  if (!options.retarget || state.playerState !== YOUTUBE_STATE.PLAYING) player.play();
 }
 
 function applyPlayerEffect(result, options = {}) {
@@ -416,12 +450,17 @@ function applyPlayerEffect(result, options = {}) {
     : result?.interval?.arrival;
   if (!Number.isFinite(destination)) return;
 
-  stepField?.translateToCurrent(destination, { preserve: true });
   if (observe && state.contextSeconds > 0 && result?.interval) {
+    if (!options.fieldAligned) {
+      stepField?.translateToCurrent(destination, { preserve: true });
+    }
     startContext(destination);
     return;
   }
-  locateAddress(destination, { preserveField: true });
+  locateAddress(destination, {
+    preserveField: true,
+    fieldAligned: options.fieldAligned === true
+  });
 }
 
 function accept(result, options = {}) {
@@ -441,14 +480,26 @@ function settleTransport(options = {}) {
 
   const restoreObservation = options.restoreObservation !== false;
   const issuePause = options.issuePause !== false;
+  const handoffField = options.handoffField === true;
   const current = clamp(safeCurrentTime(), activeRange().start, activeRange().end);
+  const cancelPendingStart = issuePause && active.phase === "starting";
+  if (cancelPendingStart) {
+    centerPauseRequest = {
+      transport: active,
+      kind: active.kind,
+      startedAt: active.startedAt,
+      cancelOnPlaying: true
+    };
+  } else if (pauseRequestOwns(active)) {
+    centerPauseRequest = null;
+  }
   state.transport = idleTransport();
 
   if (issuePause) player.pause();
   player.setRate(1);
 
   if (active.kind === TRANSPORT_KIND.CONTEXT) {
-    if (restoreObservation && currentResolution()) {
+    if (restoreObservation && !handoffField && currentResolution()) {
       placePlayer(currentResolution().C);
       stepField?.translateToCurrent(currentResolution().C, { preserve: true });
     }
@@ -457,7 +508,7 @@ function settleTransport(options = {}) {
   }
 
   if (active.kind === TRANSPORT_KIND.LOOP) {
-    if (restoreObservation && Number.isFinite(active.anchor)) {
+    if (restoreObservation && !handoffField && Number.isFinite(active.anchor)) {
       placePlayer(active.anchor);
       stepField?.translateToCurrent(active.anchor, { preserve: true });
     }
@@ -466,9 +517,10 @@ function settleTransport(options = {}) {
   }
 
   if (active.kind === TRANSPORT_KIND.PLAYBACK) {
-    // Capture the latest physical side offsets before semantic playback
-    // settlement translates the complete Field to the new Current.
-    stepField?.pause({ center: current, freeze: true });
+    // Ordinary pause freezes the visible Field once. A direct handoff skips
+    // that intermediate formation because the next transport will establish
+    // its own Field around the newly settled Current in the same action.
+    if (!handoffField) stepField?.pause({ center: current, freeze: true });
     const result = completePlayback(state.session, {
       current,
       departure: active.departure,
@@ -480,7 +532,7 @@ function settleTransport(options = {}) {
     });
     if (result.changed) {
       state.session = result.session;
-      stepField?.translateToCurrent(current, { preserve: true });
+      if (!handoffField) stepField?.translateToCurrent(current, { preserve: true });
       persistPreferences();
       view.renderGuide();
     }
@@ -489,6 +541,15 @@ function settleTransport(options = {}) {
   }
 
   view.render();
+  return true;
+}
+
+function settlePausedTransport() {
+  const kind = state.transport.kind;
+  if (!settleTransport({ issuePause: false })) return false;
+  if (kind === TRANSPORT_KIND.LOOP) setStatus("Loop stopped.");
+  else if (kind === TRANSPORT_KIND.PLAYBACK) setStatus("Playback paused.");
+  else setStatus("Context stopped.");
   return true;
 }
 
@@ -535,59 +596,19 @@ function flushPendingStep(options = {}) {
     applyPlayerEffect({
       place: currentResolution().C,
       interval: currentInterval()
-    }, { observe: options.observe });
+    }, {
+      observe: options.observe,
+      fieldAligned: true
+    });
   }
   return { flushed: true, cancelled: false, direction: pending.lastDirection };
 }
 
-function stopHeldStepRepeater() {
-  if (!heldStep) return false;
-  if (heldStep.timer !== null) clearTimeout(heldStep.timer);
-  heldStep = null;
-  return true;
-}
-
-function repeatHeldStep(token) {
-  if (heldStep !== token) return;
-  const moved = performStep(
-    token.direction,
-    reachFor(token.direction),
-    { waitForKeyup: true }
-  );
-  if (!moved || heldStep !== token) {
-    token.timer = null;
-    return;
-  }
-  token.timer = window.setTimeout(
-    () => repeatHeldStep(token),
-    HELD_STEP_REPEAT_MS
-  );
-}
-
-function beginHeldStep(direction, key) {
-  if (heldStep?.key === key) return false;
-  stopHeldStepRepeater();
-  const moved = performStep(direction, reachFor(direction), { waitForKeyup: true });
-  const token = { direction, key, timer: null };
-  heldStep = token;
-  if (moved) {
-    token.timer = window.setTimeout(
-      () => repeatHeldStep(token),
-      HELD_STEP_INITIAL_DELAY_MS
-    );
-  }
-  return moved;
-}
-
-function finishHeldStep(key, options = {}) {
-  if (!heldStep || heldStep.key !== key) return false;
-  stopHeldStepRepeater();
-  completePendingStep({ observe: options.observe !== false });
-  return true;
-}
-
 function completePendingStep(options = {}) {
-  const outcome = flushPendingStep({ observe: options.observe !== false });
+  const outcome = flushPendingStep({
+    observe: options.observe !== false,
+    effect: options.effect !== false
+  });
   if (!outcome.flushed) return outcome;
   const interval = currentInterval();
   const intervalStatus = interval
@@ -602,20 +623,77 @@ function completePendingStep(options = {}) {
   return outcome;
 }
 
+function deferPendingStepCompletion(options = {}) {
+  if (!state.pendingStep) return false;
+  clearTimeout(state.pendingStep.timer);
+  state.pendingStep.waitForGestureEnd = false;
+  state.pendingStep.timer = window.setTimeout(() => {
+    completePendingStep({ observe: options.observe !== false });
+  }, STEP_DEBOUNCE_MS);
+  return true;
+}
+
+function setStepGesturePresentation({ active, selection }) {
+  const direction = active ? selection?.direction : null;
+  for (const [id, controlDirection] of [
+    ["step-backward", "backward"],
+    ["tail-step-button", "backward"],
+    ["tail-player-surface", "backward"],
+    ["step-forward", "forward"],
+    ["lead-step-button", "forward"],
+    ["lead-player-surface", "forward"]
+  ]) {
+    elements[id]?.classList?.toggle?.(
+      "is-step-held",
+      Boolean(active && direction === controlDirection)
+    );
+  }
+}
+
+stepGesture = createStepGestureController({
+  perform: selection => performStep(
+    selection.direction,
+    selection.distance,
+    { waitForGestureEnd: true }
+  ),
+  finish: detail => {
+    if (detail.defer && detail.effect && detail.repeats === 0) {
+      deferPendingStepCompletion({ observe: detail.observe });
+      return;
+    }
+    completePendingStep({
+      observe: detail.observe,
+      effect: detail.effect
+    });
+  },
+  onActiveChange: setStepGesturePresentation
+});
+
 function settleBeforeAction(options = {}) {
   clearNativeGo();
-  stopHeldStepRepeater();
+  stepGesture?.cancel({ finalize: false });
   view.closePinClusterMenu();
   view.setPreviewAction(null);
   const replacingContext = options.replacingContext === true;
+  const handoffTransport = options.handoffTransport === true;
   // A following command supersedes the pending Step's automatic Context. The
   // coalesced semantic Step is retained, but no transient observation is started
   // only to be cancelled by the next command.
   flushPendingStep({ effect: false });
-  if (transportIs(TRANSPORT_KIND.CONTEXT) && replacingContext) {
-    settleTransport({ restoreObservation: false });
+  if (
+    transportIs(TRANSPORT_KIND.CONTEXT)
+    && (replacingContext || handoffTransport)
+  ) {
+    settleTransport({
+      restoreObservation: false,
+      issuePause: !handoffTransport,
+      handoffField: handoffTransport
+    });
   } else {
-    settleTransport();
+    settleTransport({
+      issuePause: !handoffTransport,
+      handoffField: handoffTransport
+    });
   }
 }
 
@@ -710,9 +788,12 @@ function undoLastAction() {
   persistPreferences();
   const guidePersisted = result.guideChanged ? persistGuide() : true;
   const destination = currentResolution().C;
-  stepField?.translateToCurrent(destination, { preserve: true });
-  if (Math.abs(destination - departure) > EPSILON && state.contextSeconds > 0) startContext(destination);
-  else locateAddress(destination, { preserveField: true });
+  if (Math.abs(destination - departure) > EPSILON && state.contextSeconds > 0) {
+    stepField?.translateToCurrent(destination, { preserve: true });
+    startContext(destination);
+  } else {
+    locateAddress(destination, { preserveField: true });
+  }
   view.renderGuide();
   if (guidePersisted) setStatus(`Undid ${result.label}.`);
   view.render();
@@ -738,11 +819,11 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
       timer: null,
       started: false,
       lastDirection: direction,
-      waitForKeyup: options.waitForKeyup === true
+      waitForGestureEnd: options.waitForGestureEnd === true
     };
   } else {
     state.pendingStep.lastDirection = direction;
-    state.pendingStep.waitForKeyup ||= options.waitForKeyup === true;
+    state.pendingStep.waitForGestureEnd ||= options.waitForGestureEnd === true;
   }
 
   const result = stepSession(state.session, direction, resolvedDistance, {
@@ -764,18 +845,13 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
 
   clearTimeout(state.pendingStep.timer);
   state.pendingStep.timer = null;
-  if (!state.pendingStep.waitForKeyup) {
+  if (!state.pendingStep.waitForGestureEnd) {
     state.pendingStep.timer = window.setTimeout(() => {
       completePendingStep({ observe: true });
     }, STEP_DEBOUNCE_MS);
   }
   view.render();
   return true;
-}
-
-function selectFieldSide(selection) {
-  if (!state.videoLoaded || !selection) return;
-  performStep(selection.direction, selection.distance);
 }
 
 function startNativePlaybackSession() {
@@ -805,12 +881,22 @@ function startNativePlaybackSession() {
 
 function startFieldPlaybackFromGesture() {
   if (!state.videoLoaded) return false;
+  settleBeforeAction({ handoffTransport: true });
   clearNativeGo();
   clearProgrammaticPlacement();
+  centerPauseRequest = null;
   const destination = currentResolution().C;
   if (Math.abs(safeCurrentTime() - destination) > NATIVE_POSITION_TOLERANCE_SECONDS) {
     placePlayer(destination);
   }
+  state.transport = createPlaybackTransport({
+    departure: destination,
+    parentNeighborhood: copy(currentResolution()),
+    parentResolutionBasis: model().resolutionBasis,
+    returnModel: snapshotModel(model()),
+    label: "Playback",
+    operator: "playback"
+  });
   // This function is called directly from a trusted parent-page click or Space
   // key event. Ask every muted side and Center to play in the same synchronous
   // activation stack; delayed Center state events are too late to transfer that
@@ -820,42 +906,72 @@ function startFieldPlaybackFromGesture() {
   return true;
 }
 
-function pauseFieldPlayback() {
-  stepField?.pause({ center: safeCurrentTime(), freeze: true });
+function requestCenterPause() {
+  const transport = state.transport;
+  if (!isTransportActive(transport)) return false;
+  centerPauseRequest = {
+    transport,
+    kind: transport.kind,
+    startedAt: transport.startedAt
+  };
   player.pause();
+  return true;
 }
 
 function toggleNativePlayback() {
   if (!state.videoLoaded) return;
   if (transportIs(TRANSPORT_KIND.CONTEXT)) {
-    settleTransport();
+    // Context already owns a running Center. Hand it directly to ordinary
+    // playback without issuing a pause that can arrive after the new Play.
+    settleTransport({
+      issuePause: false,
+      restoreObservation: false,
+      handoffField: true
+    });
     startFieldPlaybackFromGesture();
     return;
   }
   if (transportIs(TRANSPORT_KIND.LOOP) || transportIs(TRANSPORT_KIND.PLAYBACK)) {
-    pauseFieldPlayback();
+    requestCenterPause();
     return;
   }
   const snapshot = playerSnapshot();
   if ([YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(snapshot.state)) {
-    pauseFieldPlayback();
+    // Native controls can start Center before the corresponding PLAYING event
+    // reaches the parent. Materialize that playback transaction first so this
+    // Pause has one explicit owner.
+    startNativePlaybackSession();
+    requestCenterPause();
   } else {
     startFieldPlaybackFromGesture();
   }
 }
 
-function startLoopExtent(extent, source = "interval", label = "Interval") {
+function stopActiveLoop() {
+  if (!transportIs(TRANSPORT_KIND.LOOP)) return false;
+  settleTransport();
+  setStatus("Loop stopped.");
+  return true;
+}
+
+function wrapLoopTransport(transport = state.transport) {
+  if (transport?.kind !== TRANSPORT_KIND.LOOP) return false;
+  transport.enteredWindow = false;
+  transport.cycles += 1;
+  transport.startedAt = Date.now();
+  placePlayer(transport.start);
+  player.setRate(1);
+  stepField?.resumeAt?.({ center: transport.start, reason: "loop-wrap" });
+  player.play();
+  return true;
+}
+
+function beginLoopExtent(extent, source = "interval", label = "Interval") {
   if (!extent || !(extent.end - extent.start > EPSILON)) {
     setStatus(`Establish a ${label} before starting Loop.`);
-    return;
-  }
-  if (transportIs(TRANSPORT_KIND.LOOP)) {
-    settleTransport();
-    setStatus("Loop stopped.");
-    return;
+    return false;
   }
 
-  settleBeforeAction();
   state.transport = createLoopTransport({
     anchor: currentResolution().C,
     start: extent.start,
@@ -864,21 +980,48 @@ function startLoopExtent(extent, source = "interval", label = "Interval") {
   });
   player.setRate(1);
   placePlayer(extent.start);
-  stepField?.translatePhysicalCenter(extent.start, { preserve: true });
   if (Math.abs(safeCurrentTime() - extent.start) <= 0.25) state.transport.enteredWindow = true;
   stepField?.playFromGesture?.({ center: extent.start, reason: "loop" });
   player.play();
   setStatus(`Looping ${label} ${formatRange(extent)}.`);
   view.render();
+  return true;
+}
+
+function startLoopExtent(extent, source = "interval", label = "Interval") {
+  if (stopActiveLoop()) return;
+  if (!extent || !(extent.end - extent.start > EPSILON)) {
+    setStatus(`Establish a ${label} before starting Loop.`);
+    return;
+  }
+  settleBeforeAction({ handoffTransport: true });
+  beginLoopExtent(extent, source, label);
 }
 
 function startLoop() {
-  startLoopExtent(currentInterval(), "interval", "Interval");
+  if (stopActiveLoop()) return;
+  // Playback continuously projects the active endpoint. Settle that projection
+  // before reading the Working Section so Loop always uses the bounds the user
+  // can currently see, never the stale pre-playback extent.
+  settleBeforeAction({ handoffTransport: true });
+  beginLoopExtent(currentInterval(), "interval", "Interval");
 }
 
 function heldFieldSpan() {
   const span = state.field?.span;
   return span?.held && span.available ? { start: span.start, end: span.end } : null;
+}
+
+function acceptRangeTransition(result, { status, closeGuide = false } = {}) {
+  const accepted = accept(result, {
+    effect: false,
+    renderGuide: true,
+    status
+  });
+  if (!accepted) return false;
+  locateAddress(currentResolution().C, { resetField: true });
+  if (closeGuide) closeCompactGuideAfterSelection();
+  return true;
 }
 
 function setRange(start, end, current, label, status) {
@@ -889,9 +1032,7 @@ function setRange(start, end, current, label, status) {
     else setStatus("Range must remain within the video and have positive duration.", true);
     return false;
   }
-  const accepted = accept(result, { renderGuide: true, status, observe: false });
-  stepField?.invalidate();
-  return accepted;
+  return acceptRangeTransition(result, { status });
 }
 
 function focusSection(sectionId) {
@@ -903,9 +1044,10 @@ function focusSection(sectionId) {
     setStatus(`“${section.label}” is already the active Range.`);
     return;
   }
-  accept(result, { renderGuide: true, status: `Focused “${section.label}” as Range.` });
-  stepField?.invalidate();
-  closeCompactGuideAfterSelection();
+  acceptRangeTransition(result, {
+    status: `Focused “${section.label}” as Range.`,
+    closeGuide: true
+  });
 }
 
 function focusWorkingSection() {
@@ -920,23 +1062,18 @@ function focusWorkingSection() {
     setStatus("The Working Section already owns the active Range.");
     return;
   }
-  accept(result, {
-    renderGuide: true,
+  acceptRangeTransition(result, {
     status: `Focused Working Section ${formatRange(interval)} without saving it.`
   });
-  stepField?.invalidate();
 }
 
 function leaveSection() {
   settleBeforeAction();
   const result = leaveSessionSection(state.session);
   if (!result.changed) return;
-  accept(result, {
-    renderGuide: true,
-    observe: false,
+  acceptRangeTransition(result, {
     status: `Restored Range ${formatRange(result.session.model.range)}.`
   });
-  stepField?.invalidate();
 }
 
 function pinCurrent(event = null) {
@@ -1254,6 +1391,7 @@ function initializeVideo() {
     stepReach: preferences.stepReach
   });
   state.videoLoaded = true;
+  centerPauseRequest = null;
   state.transport = idleTransport();
   state.pendingStep = null;
   state.field = null;
@@ -1282,6 +1420,7 @@ function cuePendingVideo() {
   flushPendingStep({ effect: false });
   if (guideDialogOpen()) closeGuideDialog({ restoreFocus: false });
   view.closePinClusterMenu();
+  centerPauseRequest = null;
   state.transport = idleTransport();
   state.videoLoaded = false;
   state.videoId = null;
@@ -1309,8 +1448,20 @@ function handlePlayerStateChange(name, _rawState, metadata = {}) {
   }
 
   if (name === YOUTUBE_STATE.PLAYING) {
+    if (centerPauseRequest?.cancelOnPlaying) {
+      centerPauseRequest = null;
+      player.pause();
+      view.renderTransport();
+      return;
+    }
     if (isTransportActive(state.transport)) {
       state.transport = withTransportPhase(state.transport, "playing");
+      // Pause can be requested while YouTube still reports its preceding
+      // paused/cued state. Reissue the owned command once the iframe confirms
+      // that it can consume Pause.
+      if (centerPauseRequest && pauseRequestOwns(state.transport)) {
+        player.pause();
+      }
       view.render();
       return;
     }
@@ -1318,25 +1469,32 @@ function handlePlayerStateChange(name, _rawState, metadata = {}) {
     return;
   }
 
+  if (
+    name === YOUTUBE_STATE.PAUSED
+    && centerPauseRequest
+    && pauseRequestOwns(state.transport)
+    && isTransportActive(state.transport)
+  ) {
+    settlePausedTransport();
+    return;
+  }
+
+  // Programmatic pauses normally arrive after their owner has already become
+  // idle or handed Center to another transport. They must not settle that newer
+  // transport. Only the explicit pause intent above may consume one.
   if (name === YOUTUBE_STATE.PAUSED && metadata.internal) {
+    centerPauseRequest = null;
     view.renderTransport();
     return;
   }
 
   if (name === YOUTUBE_STATE.PAUSED && isTransportActive(state.transport)) {
-    const kind = state.transport.kind;
-    settleTransport({ issuePause: false });
-    if (kind === TRANSPORT_KIND.LOOP) setStatus("Loop stopped.");
-    else if (kind === TRANSPORT_KIND.PLAYBACK) setStatus("Playback paused.");
-    else setStatus("Context stopped.");
+    settlePausedTransport();
     return;
   }
 
   if (name === YOUTUBE_STATE.ENDED && transportIs(TRANSPORT_KIND.LOOP)) {
-    placePlayer(state.transport.start);
-    stepField?.translatePhysicalCenter(state.transport.start, { preserve: true });
-    stepField?.playFromGesture?.({ center: state.transport.start, reason: "loop-wrap" });
-    player.play();
+    wrapLoopTransport();
     return;
   }
 
@@ -1364,6 +1522,7 @@ function handlePlayerError(code) {
   pendingLoad = null;
   state.videoLoaded = false;
   state.playerState = YOUTUBE_STATE.UNKNOWN;
+  centerPauseRequest = null;
   state.transport = idleTransport();
   view.render();
   const messages = {
@@ -1378,8 +1537,10 @@ function handlePlayerError(code) {
 }
 
 function pollPlayer() {
-  stepField?.tick();
-  if (!state.videoLoaded || !player || !state.playerReady) return;
+  if (!state.videoLoaded || !player || !state.playerReady) {
+    stepField?.tick();
+    return;
+  }
   const now = safeCurrentTime();
   const transport = state.transport;
   const programmaticPlacementActive = programmaticPlacementOwns(now);
@@ -1389,9 +1550,7 @@ function pollPlayer() {
     && transport.phase === "playing"
     && state.playerState === YOUTUBE_STATE.PAUSED
   ) {
-    const kind = transport.kind;
-    settleTransport({ issuePause: false });
-    setStatus(`${kind === TRANSPORT_KIND.PLAYBACK ? "Playback" : kind === TRANSPORT_KIND.LOOP ? "Loop" : "Context"} paused.`);
+    settlePausedTransport();
     return;
   }
 
@@ -1414,14 +1573,7 @@ function pollPlayer() {
     if (inside) {
       transport.enteredWindow = true;
     } else if (transport.enteredWindow || Date.now() - transport.startedAt > TRANSPORT_START_GRACE_MS) {
-      transport.enteredWindow = false;
-      transport.cycles += 1;
-      transport.startedAt = Date.now();
-      placePlayer(transport.start);
-      stepField?.translatePhysicalCenter(transport.start, { preserve: true });
-      player.setRate(1);
-      stepField?.playFromGesture?.({ center: transport.start, reason: "loop-wrap" });
-      player.play();
+      wrapLoopTransport(transport);
     }
   } else if (transport.kind === TRANSPORT_KIND.PLAYBACK && state.playerState === YOUTUBE_STATE.PLAYING) {
     if (!transport.enteredPath) {
@@ -1434,6 +1586,7 @@ function pollPlayer() {
         player.setRate(1);
         player.play();
       }
+      stepField?.tick();
       view.renderTransport();
       return;
     }
@@ -1455,6 +1608,10 @@ function pollPlayer() {
     clearNativeGo();
   }
 
+  // Transport owns discontinuities such as Loop wrap. Resolve those first so
+  // the Field observes the rebased Center once instead of reacting to the
+  // out-of-window frame and then being placed again by the wrap.
+  stepField?.tick();
   view.renderTransport();
 }
 
@@ -1529,9 +1686,8 @@ function finishRangeDrag() {
   state.rangeDragOrigin = null;
   if (changed) {
     state.session = checkpoint(state.session, "Adjust Range", origin).session;
-    locateAddress(currentResolution().C);
+    locateAddress(currentResolution().C, { resetField: true });
     view.renderGuide();
-    stepField?.invalidate();
     setStatus(`Range set to ${formatRange(activeRange())}.`);
   } else if (origin) {
     state.session = { model: origin, history: state.session.history };
@@ -1633,7 +1789,7 @@ function changeDirectionalReach(direction, value) {
 }
 
 function syncContextControl() {
-  elements["context-select"].value = String(state.contextSeconds);
+  elements["context-seconds"].value = String(state.contextSeconds);
 }
 
 function selectGuideTab(tab, { focus = false } = {}) {
@@ -1798,7 +1954,6 @@ function initializePlayerApi() {
       }
       persistPreferences();
     },
-    onSelect: selectFieldSide,
     onHoldOffsets: patch => {
       const current = currentStepReach();
       const next = normalizeStepReach({
@@ -1958,18 +2113,52 @@ elements["refine-forward"].addEventListener("click", () => refine("forward"));
 elements.reopen.addEventListener("click", reopenFully);
 elements["switch-endpoint"].addEventListener("click", switchCurrentEndpoint);
 elements["return-action"].addEventListener("click", undoLastAction);
-elements["step-backward"].addEventListener("click", () => performStep("backward"));
-elements["step-forward"].addEventListener("click", () => performStep("forward"));
 elements["pin-backward"].addEventListener("click", () => goToAdjacentPin("backward"));
 elements["pin-forward"].addEventListener("click", () => goToAdjacentPin("forward"));
 elements.loop.addEventListener("click", startLoop);
 elements["center-transport-surface"].addEventListener("click", toggleNativePlayback);
-elements["context-select"].addEventListener("change", event => {
-  state.contextSeconds = Number(event.target.value || 0);
+
+const tapStep = selection => {
+  if (!selection) return false;
+  return performStep(selection.direction, selection.distance);
+};
+const directionalStep = direction => () => ({
+  direction,
+  distance: reachFor(direction)
+});
+const sideStep = role => () => stepField?.getStepSelection?.(role) || null;
+
+for (const binding of [
+  [elements["step-backward"], "matrix:backward", directionalStep("backward"), false],
+  [elements["step-forward"], "matrix:forward", directionalStep("forward"), false],
+  [elements["tail-step-button"], "field-button:tail", sideStep("tail"), false],
+  [elements["lead-step-button"], "field-button:lead", sideStep("lead"), false],
+  [elements["tail-player-surface"], "field-surface:tail", sideStep("tail"), true],
+  [elements["lead-player-surface"], "field-surface:lead", sideStep("lead"), true]
+]) {
+  const [control, id, resolveStep, keyboardActivation] = binding;
+  bindStepPress(control, {
+    id,
+    controller: stepGesture,
+    resolveStep,
+    tap: tapStep,
+    keyboardActivation
+  });
+}
+
+elements["context-seconds"].addEventListener("change", event => {
+  const previous = state.contextSeconds;
+  state.contextSeconds = normalizeContextSeconds(event.target.value, previous);
+  event.target.value = String(state.contextSeconds);
   persistPreferences();
-  if (transportIs(TRANSPORT_KIND.CONTEXT) && state.contextSeconds === 0) {
-    settleTransport();
-    setStatus("Automatic Context turned off.");
+  if (transportIs(TRANSPORT_KIND.CONTEXT)) {
+    if (state.contextSeconds === 0) {
+      settleTransport();
+      setStatus("Automatic Context turned off.");
+    } else {
+      startContext(currentResolution().C, { retarget: true });
+      setStatus(`Automatic Context updated to ${state.contextSeconds}s.`);
+    }
   }
   view.render();
 });
@@ -2197,8 +2386,14 @@ document.addEventListener("keydown", event => {
   else if (plain && key === "l") { event.preventDefault(); startLoop(); }
   else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && event.key === "ArrowLeft") { event.preventDefault(); goToAdjacentPin("backward"); }
   else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && event.key === "ArrowRight") { event.preventDefault(); goToAdjacentPin("forward"); }
-  else if (plain && event.key === "ArrowLeft") { event.preventDefault(); beginHeldStep("backward", event.key); }
-  else if (plain && event.key === "ArrowRight") { event.preventDefault(); beginHeldStep("forward", event.key); }
+  else if (plain && event.key === "ArrowLeft") {
+    event.preventDefault();
+    stepGesture.begin("keyboard:ArrowLeft", directionalStep("backward"));
+  }
+  else if (plain && event.key === "ArrowRight") {
+    event.preventDefault();
+    stepGesture.begin("keyboard:ArrowRight", directionalStep("forward"));
+  }
   else if (plain && event.key === "[") { event.preventDefault(); adjustStepPreset(-1); }
   else if (plain && event.key === "]") { event.preventDefault(); adjustStepPreset(1); }
   else if (commandUndo) { event.preventDefault(); undoLastAction(); }
@@ -2207,17 +2402,15 @@ document.addEventListener("keydown", event => {
 
 document.addEventListener("keyup", event => {
   if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-  if (!heldStep || heldStep.key !== event.key) return;
+  const gestureId = `keyboard:${event.key}`;
+  if (!stepGesture.isActive(gestureId)) return;
   event.preventDefault();
-  finishHeldStep(event.key, { observe: true });
+  stepGesture.end(gestureId, { observe: true });
 });
 
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) return;
-  if (heldStep) {
-    stopHeldStepRepeater();
-    completePendingStep({ observe: false });
-  }
+  stepGesture.cancel({ observe: false });
   if (isTransportActive(state.transport)) {
     settleTransport();
     setStatus("Playback paused because the document became hidden.");
@@ -2225,9 +2418,7 @@ document.addEventListener("visibilitychange", () => {
 });
 
 window.addEventListener("blur", () => {
-  if (!heldStep) return;
-  stopHeldStepRepeater();
-  completePendingStep({ observe: false });
+  stepGesture.cancel({ observe: false });
 });
 
 window.addEventListener("resize", () => {

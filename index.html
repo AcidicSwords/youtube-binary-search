@@ -197,14 +197,16 @@
             <details id="observation-settings" class="tool-disclosure observation-settings">
               <summary><span>Automatic Context</span><span id="context-setting-value">5 s after traversal</span></summary>
               <div class="compact-settings">
-                <label class="compact-setting" for="context-select">
+                <label class="compact-setting" for="context-seconds">
                   <span>Center-only duration</span>
-                  <select id="context-select" disabled>
-                    <option value="0">Off</option>
-                    <option value="3">3 s</option>
-                    <option value="5" selected>5 s</option>
-                    <option value="10">10 s</option>
-                  </select>
+                  <input id="context-seconds" type="number" min="0" max="300" step="0.25"
+                    value="5" list="context-presets" inputmode="decimal" disabled>
+                  <datalist id="context-presets">
+                    <option value="0" label="Off"></option>
+                    <option value="3"></option>
+                    <option value="5"></option>
+                    <option value="10"></option>
+                  </datalist>
                 </label>
                 <p class="setting-note">Runs after discrete traversal. Tail and Lead remain suspended until native Center playback resumes.</p>
               </div>
@@ -217,7 +219,6 @@
                 <span><kbd>A</kbd>/<kbd>D</kbd> Refine</span>
                 <span><kbd>←</kbd>/<kbd>→</kbd> Step</span>
                 <span><kbd>S</kbd> Switch Endpoint</span>
-                <span><kbd>Ctrl/⌘ Z</kbd> Undo</span>
                 <span><kbd>⇧←</kbd>/<kbd>⇧→</kbd> Pins</span>
                 <span><kbd>P</kbd> Pin Current in Guide</span>
                 <span><kbd>Space</kbd> Native play/pause</span>

@@ -417,29 +417,8 @@ export function getActionRanges(
     stepForward: stepForward > neighborhood.C + EPSILON
       ? { start: neighborhood.C, end: stepForward, destination: stepForward }
       : null,
-    skim: targets.forward === null ? null : { start: neighborhood.C, end: targets.forward },
     loop: interval?.end > interval?.start
       ? { start: interval.start, end: interval.end }
       : null
   };
-}
-
-// Retained for compatibility with external imports; Skim no longer uses a
-// progress-dependent curve because YouTube exposes only a small boosted range.
-export function logSpeed(maxRate, progress) {
-  return Math.pow(Math.max(1, maxRate), 1 - clamp(progress, 0, 1));
-}
-
-export function chooseSupportedRate(availableRates, desiredRate) {
-  const rates = [...new Set(availableRates)]
-    .filter(rate => Number.isFinite(rate) && rate >= 1)
-    .sort((a, b) => a - b);
-
-  if (!rates.length) return 1;
-  let chosen = rates[0];
-  for (const rate of rates) {
-    if (rate <= desiredRate + 1e-9) chosen = rate;
-    else break;
-  }
-  return chosen;
 }

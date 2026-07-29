@@ -18,9 +18,7 @@ import {
   stepNeighborhood,
   translateNeighborhood,
   settleContinuous,
-  getActionRanges,
-  logSpeed,
-  chooseSupportedRate
+  getActionRanges
 } from "./range-geometry.js";
 import {
   PIN_KIND,
@@ -197,9 +195,6 @@ assert.deepEqual(actionRanges.stepBackward, { start: 110, end: 120, destination:
 assert.deepEqual(actionRanges.stepForward, { start: 120, end: 130, destination: 130 });
 assert.deepEqual(actionRanges.loop, { start: 60, end: 120 });
 assert.deepEqual(actionRanges.reopen, { start: 0, end: 240, current: 120 });
-assert.equal(logSpeed(8, 0), 8);
-assert.equal(logSpeed(8, 1), 1);
-assert.equal(chooseSupportedRate([0.25, 0.5, 1, 1.5, 2], 1.8), 1.5);
 
 // Guide: one persistent Address object and linked Sections.
 const guide = createGuide("video-1");

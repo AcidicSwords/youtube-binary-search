@@ -16,8 +16,8 @@ assert.equal(byId.get("duration-time").textContent, "1:40.000");
 
 // Keep this smoke focused on direct interaction; automatic Context has its own
 // dedicated smoke test.
-byId.get("context-select").value = "0";
-byId.get("context-select").dispatch("change");
+byId.get("context-seconds").value = "0";
+byId.get("context-seconds").dispatch("change");
 
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 500 });
 await flush();

@@ -113,9 +113,10 @@ assert.equal(resolveFieldPhase({
   }
 
   assert.match(app, /createStepFieldController/);
-  assert.match(app, /onSelect:\s*selectFieldSide/);
-  assert.match(app, /function selectFieldSide\(selection\)/);
-  assert.match(app, /performStep\(selection\.direction, selection\.distance\)/);
+  assert.match(app, /createStepGestureController/);
+  assert.match(app, /const sideStep = role => \(\) => stepField\?\.getStepSelection/);
+  assert.match(app, /bindStepPress\(control/);
+  assert.match(app, /performStep\(selection\.direction, selection\.distance/);
   assert.match(app, /function startFieldPlaybackFromGesture\(\)/);
   assert.match(app, /stepField\?\.playFromGesture\?\.\(\{ center: destination, reason: "playback" \}\);[\s\S]*player\.play\(\);/,
     "Parent-owned playback must refold/start both side players and Center in one synchronous gesture stack.");

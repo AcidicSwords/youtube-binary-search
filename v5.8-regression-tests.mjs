@@ -6,9 +6,7 @@ import {
   createRoot,
   getTargets,
   seedNeighborhoodFromMovement,
-  isRangeNeighborhood,
-  logSpeed,
-  chooseSupportedRate
+  isRangeNeighborhood
 } from "./range-geometry.js";
 import {
   createGuide,
@@ -31,6 +29,7 @@ import {
   deleteGuideSection,
   renameGuidePin,
   returnState,
+  projectPlayback,
   completePlayback
 } from "./session.js";
 
@@ -334,21 +333,42 @@ assert.equal(reconciled.focusReconciled, true);
 // Native playback is the sole continuous settlement operation.
 let playbackSession = createSession({ duration: 480, current: 120 });
 playbackSession = goTo(playbackSession, 180, { operator: "timeline" }).session;
-playbackSession = completePlayback(playbackSession, {
+const playbackOrigin = snapshotModel(playbackSession.model);
+const playbackOptions = {
   current: 195,
   departure: 180,
   parentNeighborhood: copy(playbackSession.model.resolution),
   parentResolutionBasis: playbackSession.model.resolutionBasis,
   returnModel: snapshotModel(playbackSession.model)
-}).session;
+};
+const playbackProjection = projectPlayback(playbackSession.model, playbackOptions);
+assert.deepEqual(
+  playbackSession.model,
+  playbackOrigin,
+  "Live playback projection must not mutate Session before settlement."
+);
+playbackSession = completePlayback(playbackSession, playbackOptions).session;
 assert.equal(playbackSession.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
 assert.deepEqual(playbackSession.model.resolution, { L: 120, C: 195, R: 255, level: 0 });
 assert.deepEqual({ start: playbackSession.model.interval.start, end: playbackSession.model.interval.end }, { start: 120, end: 195 });
+assert.deepEqual(playbackProjection.model.resolution, playbackSession.model.resolution);
+assert.equal(playbackProjection.model.resolutionBasis, playbackSession.model.resolutionBasis);
+for (const key of ["start", "end", "departure", "arrival", "operator", "mode"]) {
+  assert.deepEqual(
+    playbackProjection.model.interval[key],
+    playbackSession.model.interval[key],
+    `Live and settled playback must agree on Interval ${key}.`
+  );
+}
+assert.deepEqual(
+  playbackProjection.model.interval.departureFrame,
+  playbackSession.model.interval.departureFrame
+);
+assert.deepEqual(
+  playbackProjection.model.interval.arrivalFrame,
+  playbackSession.model.interval.arrivalFrame
+);
 
-// Geometry compatibility utilities remain callable.
-assert.equal(logSpeed(2, 0), 2);
-assert.equal(logSpeed(2, 1), 1);
-assert.equal(chooseSupportedRate([1, 1.5, 2], 1.8), 1.5);
 assert.ok(EPSILON > 0);
 
 // Repository-level contracts for the narrow UI/application patches.
@@ -358,7 +378,11 @@ const viewSource = readFileSync(new URL("./view.js", import.meta.url), "utf8");
 const cssSource = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
 assert.match(appSource, /originResolution: state\.pendingStep\.originModel\.resolution/, "Rapid Step must derive spatial state from its origin.");
 assert.match(appSource, /intervalDeparture: state\.pendingStep\.intervalDeparture/, "Pending Step must freeze the Interval anchor across repeat.");
-assert.match(appSource, /document\.addEventListener\("keyup"[\s\S]*completePendingStep/, "Held-key Step must run Context from keyup rather than repeat.");
+assert.match(
+  appSource,
+  /createStepGestureController\([\s\S]*finish:[\s\S]*completePendingStep/,
+  "Every held Step gesture must settle its repeated movement as one transaction."
+);
 assert.match(sessionSource, /stepIntervalAnchor[\s\S]*intervalDeparture/, "Session must separate Step movement departure from the Interval anchor.");
 assert.match(sessionSource, /refineIntervalRelation[\s\S]*classifyRefineRelation[\s\S]*relation:\s*"shorten"/,
   "Refine must distinguish outside-Loop replacement from inside-Loop shortening.");
