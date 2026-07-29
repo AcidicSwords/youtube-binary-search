@@ -124,4 +124,4 @@ assert.match(pkg.scripts.audit, /integration-check\.mjs/);
 assert.match(pkg.scripts.audit, /project-audit\.mjs/);
 assert.match(pkg.scripts.check, /npm run audit/);
 
-console.log("Project audit passed: v5.8.6 Endpoint Transposition, complementary Refine folding, Working Section lifecycle, Loop containment, semantic repairs, mirrored Field controls, collapse isolation, native playback settlement, Guide ownership, operator geometry, CSS boundaries, and adapter contracts are coherent.");
+console.log("Project audit passed: v5.8.6 Endpoint Transposition, membership-based Refine replacement/shortening, Working Section lifecycle, Loop containment, semantic repairs, mirrored Field controls, collapse isolation, native playback settlement, Guide ownership, operator geometry, CSS boundaries, and adapter contracts are coherent.");

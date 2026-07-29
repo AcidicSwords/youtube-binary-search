@@ -604,7 +604,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "Refine Backward",
       targets.backward === null
         ? backwardBlock === "resolution-limit" ? "Resolution limit" : "Range start"
-        : `${classifyRefineRelation(currentInterval, semanticCurrent, targets.backward)} to ${formatTime(targets.backward)}`
+        : `${classifyRefineRelation(currentInterval, semanticCurrent, targets.backward)} loop to ${formatTime(targets.backward)}`
     );
     setActionMeta(
       "refine-forward",
@@ -612,7 +612,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "Refine Forward",
       targets.forward === null
         ? forwardBlock === "resolution-limit" ? "Resolution limit" : "Range end"
-        : `${classifyRefineRelation(currentInterval, semanticCurrent, targets.forward)} to ${formatTime(targets.forward)}`
+        : `${classifyRefineRelation(currentInterval, semanticCurrent, targets.forward)} loop to ${formatTime(targets.forward)}`
     );
     elements["reopen-meta"].textContent = actionModel?.reopen
       ? `${formatDuration(activeRange.end - activeRange.start)} available`

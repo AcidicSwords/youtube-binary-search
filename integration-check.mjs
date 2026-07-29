@@ -107,8 +107,8 @@ assert.match(sessionSource, /departureFrame:[\s\S]*arrivalFrame:/,
   "Intervals must retain both endpoint search frames.");
 assert.match(sessionSource, /export function switchEndpoint[\s\S]*departure: arrival[\s\S]*arrival: departure/,
   "Endpoint Transposition must swap directed roles in the Session kernel.");
-assert.match(sessionSource, /refineIntervalRelation[\s\S]*classifyRefineRelation[\s\S]*relation:\s*"fold"/,
-  "Refine must preserve the complementary side when its movement folds toward the opposite endpoint.");
+assert.match(sessionSource, /refineIntervalRelation[\s\S]*classifyRefineRelation[\s\S]*relation:\s*"shorten"/,
+  "Refine must preserve the opposite endpoint only when its target remains inside the Loop.");
 assert.match(sessionSource, /export function focusWorkingSection[\s\S]*kind:\s*FOCUS_KIND\.WORKING/,
   "Working Section Focus must be a Session relation independent from Guide persistence.");
 assert.match(sessionSource, /export function overwriteGuideSection[\s\S]*replaceSectionExtent/,

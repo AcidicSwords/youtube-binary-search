@@ -514,9 +514,9 @@ function refineIntervalRelation(model, target) {
   const current = model.resolution.C;
   const interval = model.interval;
   const relation = classifyRefineRelation(interval, current, target);
-  return relation === "fold"
-    ? { departure: interval.departure, relation: "fold" }
-    : { departure: current, relation: "cross" };
+  return relation === "shorten"
+    ? { departure: interval.departure, relation: "shorten" }
+    : { departure: current, relation: "replace" };
 }
 
 export function refine(session, direction) {

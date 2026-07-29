@@ -91,6 +91,25 @@ function assertInvariant(session) {
   }
 }
 
+function refineExpectation(session, direction) {
+  const current = session.model.resolution.C;
+  const target = getTargets(session.model.resolution)[direction];
+  if (target === null) return null;
+  const interval = session.model.interval;
+  const inside = Boolean(
+    interval
+    && Math.abs(interval.arrival - current) <= EPSILON
+    && Math.abs(interval.departure - current) > EPSILON
+    && target >= interval.start - EPSILON
+    && target <= interval.end + EPSILON
+  );
+  return {
+    relation: inside ? "shorten" : "replace",
+    departure: inside ? interval.departure : current,
+    target
+  };
+}
+
 const RUNS = 100;
 const OPERATIONS_PER_RUN = 2000;
 for (let run = 0; run < RUNS; run += 1) {
@@ -98,6 +117,11 @@ for (let run = 0; run < RUNS; run += 1) {
   for (let index = 0; index < OPERATIONS_PER_RUN; index += 1) {
     const before = session;
     const operation = Math.floor(random() * 17);
+    const expectedRefine = operation === 0
+      ? refineExpectation(session, "backward")
+      : operation === 1
+        ? refineExpectation(session, "forward")
+        : null;
     let result;
     if (operation === 0) result = refine(session, "backward");
     else if (operation === 1) result = refine(session, "forward");
@@ -153,6 +177,17 @@ for (let run = 0; run < RUNS; run += 1) {
 
     if (operation === 7 && result.changed) {
       assert.deepEqual(result.session.model, before.history.at(-1).model);
+    }
+    if (expectedRefine && result.changed) {
+      assert.equal(result.refineRelation, expectedRefine.relation);
+      const resultingInterval = result.session.model.interval;
+      if (Math.abs(expectedRefine.departure - expectedRefine.target) <= EPSILON) {
+        assert.equal(resultingInterval, null, "Endpoint coincidence must collapse the Working Section.");
+      } else {
+        assert.ok(resultingInterval);
+        assert.ok(Math.abs(resultingInterval.departure - expectedRefine.departure) <= EPSILON);
+        assert.ok(Math.abs(resultingInterval.arrival - expectedRefine.target) <= EPSILON);
+      }
     }
     if (result.changed) {
       assert.notDeepEqual(result.session.model, before.model);

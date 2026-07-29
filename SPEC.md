@@ -34,8 +34,8 @@ Interval.arrivalFrame = current Resolution and basis
 Interval ⊆ active Resolution ⊆ Range
 both Interval endpoint frames contain the complete Interval and remain inside Range
 Step and settled playback preserve a usable Interval.departure
-Refine away from Interval.departure records its new unlooped crossing
-Refine toward Interval.departure retains the complementary folded side
+Refine to a midpoint outside Interval replaces it with the new traversal
+Refine to a midpoint inside Interval shortens it toward the opposite endpoint
 Pin Forward/Backward replaces Interval with its own Pin hop
 Step, playback, and Pin traversal push only the approached Resolution endpoint
 Context never activates Tail or Lead
@@ -55,19 +55,19 @@ Commits Current to a bounded Address and establishes a replacement Interval from
 
 Selects one child of the active Neighborhood, commits its midpoint as Current, and increases discrimination. The result keeps Current centered between two refinement endpoints and therefore exposes two child midpoints whenever both sides remain above the 40 ms identity floor. If a directional midpoint is within that floor, Refine is unavailable on that side until a linear operator restores scale; it never consumes an endpoint and leaves Current stranded on the bound.
 
-Refine owns subdivision and transforms the Working Section according to the relation it crosses:
+Refine owns subdivision and transforms the Working Section according to one geometric test:
 
 ```text
-target moves away from Interval.departure
-→ cross unlooped space
-→ Working Section = preceding Current ↔ target
-
-target moves toward Interval.departure
-→ fold across the existing Working Section
+target is inside the existing Working Section, including an endpoint
+→ shorten the existing Working Section
 → Working Section = preserved departure ↔ target
+
+target is outside the existing Working Section
+→ disregard the existing Working Section
+→ Working Section = preceding Current ↔ target
 ```
 
-The second rule retains the side complementary to the traversed fold. If target passes the preserved departure, the old extent cancels and only the overrun survives on the other side. This conditional ownership keeps the resulting Working Section inside the selected child Neighborhood, so Current remains centered and binary point-location retains its ordinary convergence.
+The destination midpoint’s membership is decisive; movement direction relative to the old endpoint is not. An inside midpoint increases Resolution while retaining the untraversed remainder of the old Loop. Landing exactly on the opposite endpoint shortens the Loop to zero and collapses it. Once a midpoint passes outside an endpoint, the complete new traversal replaces the old Loop. Both non-null results remain inside the selected child Neighborhood, so Current stays centered and binary point-location retains its ordinary convergence.
 
 ### Reopen
 
@@ -92,7 +92,7 @@ Consequences:
 - Step toward the anchor shrinks it.
 - Step across the anchor redraws it in the opposite direction.
 - Landing exactly on the anchor collapses the Interval; the next Step redraws from that same Current.
-- Direct Go and Pin traversal establish replacement Intervals from their actual movements. Refine establishes a local crossing when moving away from the Working Section and preserves the opposite endpoint when folding toward it.
+- Direct Go and Pin traversal establish replacement Intervals from their actual movements. Refine likewise replaces the Working Section when its midpoint lies outside it, but preserves the opposite endpoint when the midpoint lies inside and shortens it, collapsing at exact endpoint coincidence.
 - Settled native playback shares Step’s endpoint-edit rule and preserves the active departure.
 
 Step also preserves the active binary relation. Every Step leaves the receding Neighborhood endpoint fixed and pushes the approached endpoint by the signed movement. If the destination reaches or crosses the old `L` or `R`, the approached endpoint remains a full Step beyond the new `C`, clamped to Range. Consequently, the next Refine in the Step direction is half a Step away after a crossing whenever Range can contain that headroom. Range remains the sole hard boundary; at Range itself, Refine may necessarily become unavailable.
@@ -108,7 +108,7 @@ Interval (departure A, arrival B = Current)
 → Interval (departure B, arrival A = Current)
 ```
 
-`Interval.start` and `Interval.end` do not change. The frame being left is stored at its endpoint and the frame retained at the destination is restored as active Resolution. Both frames are enlarged only when necessary to contain the unchanged Interval. Switching twice therefore restores the same Current, directed Interval, and endpoint frames. Step and settled playback after switching edit from the newly transposed departure anchor. A following Refine either records an unlooped crossing away from that anchor or folds toward it while retaining the complementary side; Pin traversal records its own local movement. A null/collapsed Interval has no endpoints and Switch Endpoint is unavailable.
+`Interval.start` and `Interval.end` do not change. The frame being left is stored at its endpoint and the frame retained at the destination is restored as active Resolution. Both frames are enlarged only when necessary to contain the unchanged Interval. Switching twice therefore restores the same Current, directed Interval, and endpoint frames. Step and settled playback after switching edit from the newly transposed departure anchor. A following Refine shortens when its destination midpoint remains inside the transposed Loop, including collapse at the opposite endpoint; otherwise it replaces the Loop with its new traversal. Pin traversal records its own local movement. A null/collapsed Interval has no endpoints and Switch Endpoint is unavailable.
 
 Switch Endpoint is a traversal and may invoke automatic Context.
 

@@ -82,19 +82,29 @@ assert.deepEqual(root, { L: 0, C: 60, R: 180, level: 0 });
 assert.deepEqual(getTargets(root), { backward: 30, forward: 120 });
 assert.equal(
   classifyRefineRelation(
-    { departure: 70, arrival: 50 },
+    { start: 50, end: 70, departure: 70, arrival: 50 },
     50,
-    75
+    60
   ),
-  "fold"
+  "shorten"
 );
 assert.equal(
   classifyRefineRelation(
-    { departure: 50, arrival: 70 },
-    70,
-    80
+    { start: 50, end: 70, departure: 70, arrival: 50 },
+    50,
+    75
   ),
-  "cross"
+  "replace",
+  "A target beyond the old Loop endpoint must start a new Loop."
+);
+assert.equal(
+  classifyRefineRelation(
+    { start: 50, end: 70, departure: 70, arrival: 50 },
+    50,
+    70
+  ),
+  "shorten",
+  "The Loop-membership rule includes an endpoint landing, which collapses the Loop."
 );
 assert.deepEqual(
   getTargets({ L: 0, C: 0.077, R: 1, level: 3 }),
@@ -317,24 +327,24 @@ session = result.session;
 assert.equal(session.model.resolution.C, 50);
 assert.equal(session.model.interval, null);
 
-// Refine has two Loop relations. Moving away crosses unlooped space and stores
-// that local crossing; moving toward the opposite endpoint folds the Working
-// Section and retains the complementary side.
-let foldedRefine = createSession({ duration: 100, current: 50 });
-foldedRefine = goTo(foldedRefine, 70, { operator: "timeline" }).session;
-const crossedRefine = refine(foldedRefine, "forward");
-assert.equal(crossedRefine.refineRelation, "cross");
+// Refine has two Loop relations. A midpoint inside the Loop shortens it by
+// retaining the opposite endpoint. A midpoint outside the Loop replaces it
+// with the newly traversed Current-to-midpoint region.
+let membershipBase = createSession({ duration: 100, current: 50 });
+membershipBase = goTo(membershipBase, 70, { operator: "timeline" }).session;
+const outsideRefine = refine(membershipBase, "forward");
+assert.equal(outsideRefine.refineRelation, "replace");
 assert.deepEqual(
   {
-    start: crossedRefine.session.model.interval.start,
-    end: crossedRefine.session.model.interval.end,
-    departure: crossedRefine.session.model.interval.departure,
-    arrival: crossedRefine.session.model.interval.arrival
+    start: outsideRefine.session.model.interval.start,
+    end: outsideRefine.session.model.interval.end,
+    departure: outsideRefine.session.model.interval.departure,
+    arrival: outsideRefine.session.model.interval.arrival
   },
   { start: 70, end: 80, departure: 70, arrival: 80 }
 );
-const shortenedRefine = refine(foldedRefine, "backward");
-assert.equal(shortenedRefine.refineRelation, "fold");
+const shortenedRefine = refine(membershipBase, "backward");
+assert.equal(shortenedRefine.refineRelation, "shorten");
 assert.deepEqual(
   {
     start: shortenedRefine.session.model.interval.start,
@@ -343,19 +353,103 @@ assert.deepEqual(
     arrival: shortenedRefine.session.model.interval.arrival
   },
   { start: 50, end: 60, departure: 50, arrival: 60 },
-  "A shortening Refine must retain the side opposite the traversed fold."
+  "A midpoint inside the Loop must retain the opposite endpoint and shorten the Loop."
 );
-const transposedFold = refine(switchEndpoint(foldedRefine).session, "forward");
-assert.equal(transposedFold.refineRelation, "fold");
+const transposedReplacement = refine(switchEndpoint(membershipBase).session, "forward");
+assert.equal(transposedReplacement.refineRelation, "replace");
 assert.deepEqual(
   {
-    start: transposedFold.session.model.interval.start,
-    end: transposedFold.session.model.interval.end,
-    departure: transposedFold.session.model.interval.departure,
-    arrival: transposedFold.session.model.interval.arrival
+    start: transposedReplacement.session.model.interval.start,
+    end: transposedReplacement.session.model.interval.end,
+    departure: transposedReplacement.session.model.interval.departure,
+    arrival: transposedReplacement.session.model.interval.arrival
   },
-  { start: 70, end: 75, departure: 70, arrival: 75 },
-  "A Refine that folds past the opposite endpoint must keep only the overrun side."
+  { start: 50, end: 75, departure: 50, arrival: 75 },
+  "A midpoint outside the Loop must replace it with the complete new traversal."
+);
+
+// Canonical alternating sequence: outside midpoint replaces; inside midpoint
+// shortens; the next outside midpoint replaces again.
+let membershipRefine = createSession({ duration: 100, current: 50 });
+membershipRefine = refine(membershipRefine, "backward").session;
+assert.deepEqual(
+  {
+    current: membershipRefine.model.resolution.C,
+    start: membershipRefine.model.interval.start,
+    end: membershipRefine.model.interval.end
+  },
+  { current: 25, start: 25, end: 50 }
+);
+const replacedBackward = refine(membershipRefine, "backward");
+assert.equal(replacedBackward.refineRelation, "replace");
+assert.deepEqual(
+  {
+    current: replacedBackward.session.model.resolution.C,
+    start: replacedBackward.session.model.interval.start,
+    end: replacedBackward.session.model.interval.end
+  },
+  { current: 12.5, start: 12.5, end: 25 }
+);
+const shortenedForward = refine(membershipRefine, "forward");
+assert.equal(shortenedForward.refineRelation, "shorten");
+assert.deepEqual(
+  {
+    current: shortenedForward.session.model.resolution.C,
+    start: shortenedForward.session.model.interval.start,
+    end: shortenedForward.session.model.interval.end
+  },
+  { current: 37.5, start: 37.5, end: 50 }
+);
+const replacedAgain = refine(shortenedForward.session, "backward");
+assert.equal(replacedAgain.refineRelation, "replace");
+assert.deepEqual(
+  {
+    current: replacedAgain.session.model.resolution.C,
+    start: replacedAgain.session.model.interval.start,
+    end: replacedAgain.session.model.interval.end
+  },
+  { current: 31.25, start: 31.25, end: 37.5 }
+);
+
+let mirroredMembership = createSession({ duration: 100, current: 50 });
+mirroredMembership = refine(mirroredMembership, "forward").session;
+assert.deepEqual(
+  {
+    current: mirroredMembership.model.resolution.C,
+    start: mirroredMembership.model.interval.start,
+    end: mirroredMembership.model.interval.end
+  },
+  { current: 75, start: 50, end: 75 }
+);
+const replacedForward = refine(mirroredMembership, "forward");
+assert.equal(replacedForward.refineRelation, "replace");
+assert.deepEqual(
+  {
+    current: replacedForward.session.model.resolution.C,
+    start: replacedForward.session.model.interval.start,
+    end: replacedForward.session.model.interval.end
+  },
+  { current: 87.5, start: 75, end: 87.5 }
+);
+const shortenedBackward = refine(mirroredMembership, "backward");
+assert.equal(shortenedBackward.refineRelation, "shorten");
+assert.deepEqual(
+  {
+    current: shortenedBackward.session.model.resolution.C,
+    start: shortenedBackward.session.model.interval.start,
+    end: shortenedBackward.session.model.interval.end
+  },
+  { current: 62.5, start: 50, end: 62.5 }
+);
+const mirroredReplace = refine(shortenedBackward.session, "forward");
+assert.equal(mirroredReplace.refineRelation, "replace");
+assert.deepEqual(
+  {
+    current: mirroredReplace.session.model.resolution.C,
+    start: mirroredReplace.session.model.interval.start,
+    end: mirroredReplace.session.model.interval.end
+  },
+  { current: 68.75, start: 62.5, end: 68.75 }
 );
 
 // Direct placement is total over finite input and cannot create out-of-video state.

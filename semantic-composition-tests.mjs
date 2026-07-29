@@ -33,26 +33,25 @@ function assertLoopContained(session) {
   }
 }
 
-// Refine owns binary subdivision and transforms the Working Section according
-// to the side it crosses. Away from the opposite endpoint it records a new
-// local crossing; toward that endpoint it folds and retains the complementary
-// side, including only the overrun when the target passes the endpoint.
+// Refine owns binary subdivision and transforms the Working Section by target
+// membership. An inside midpoint shortens toward the preserved opposite
+// endpoint; an outside midpoint replaces the Loop with the new traversal.
 let composed = createSession({ duration: 100, current: 50 });
 composed = goTo(composed, 70, { operator: "directA" }).session;
-const crossed = refine(composed, "forward");
-assert.equal(crossed.refineRelation, "cross");
+const replaced = refine(composed, "forward");
+assert.equal(replaced.refineRelation, "replace");
 assert.deepEqual(
   {
-    start: crossed.session.model.interval.start,
-    end: crossed.session.model.interval.end,
-    departure: crossed.session.model.interval.departure,
-    arrival: crossed.session.model.interval.arrival
+    start: replaced.session.model.interval.start,
+    end: replaced.session.model.interval.end,
+    departure: replaced.session.model.interval.departure,
+    arrival: replaced.session.model.interval.arrival
   },
   { start: 70, end: 80, departure: 70, arrival: 80 }
 );
 
 const shortened = refine(composed, "backward");
-assert.equal(shortened.refineRelation, "fold");
+assert.equal(shortened.refineRelation, "shorten");
 assert.deepEqual(
   {
     start: shortened.session.model.interval.start,
@@ -63,22 +62,22 @@ assert.deepEqual(
   { start: 50, end: 60, departure: 50, arrival: 60 }
 );
 
-const foldedPast = refine(switchEndpoint(composed).session, "forward");
-assert.equal(foldedPast.refineRelation, "fold");
+const replacedPast = refine(switchEndpoint(composed).session, "forward");
+assert.equal(replacedPast.refineRelation, "replace");
 assert.deepEqual(
   {
-    start: foldedPast.session.model.interval.start,
-    end: foldedPast.session.model.interval.end,
-    departure: foldedPast.session.model.interval.departure,
-    arrival: foldedPast.session.model.interval.arrival
+    start: replacedPast.session.model.interval.start,
+    end: replacedPast.session.model.interval.end,
+    departure: replacedPast.session.model.interval.departure,
+    arrival: replacedPast.session.model.interval.arrival
   },
-  { start: 70, end: 75, departure: 70, arrival: 75 }
+  { start: 50, end: 75, departure: 50, arrival: 75 }
 );
-assertLoopContained(foldedPast.session);
+assertLoopContained(replacedPast.session);
 
 // A direct Go remains a replacement boundary rather than silently inheriting
 // the matrix anchor.
-composed = foldedPast.session;
+composed = replacedPast.session;
 const beforeDirect = composed.model.resolution.C;
 composed = goTo(composed, 90, { operator: "timeline" }).session;
 assert.ok(Math.abs(composed.model.interval.departure - beforeDirect) <= EPSILON);
@@ -166,4 +165,4 @@ assert.equal(
   "range-start"
 );
 
-console.log("Semantic composition tests passed: complementary Refine folding, local crossings, one-sided linear endpoint pushes, Loop containment, and truthful Refine limits.");
+console.log("Semantic composition tests passed: membership-based Refine replacement/shortening, one-sided linear endpoint pushes, Loop containment, and truthful Refine limits.");

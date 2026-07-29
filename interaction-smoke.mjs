@@ -47,8 +47,8 @@ assert.match(
   /0:25\.000–0:50\.000/,
   "Pin traversal must record its own hop rather than inheriting a prior Loop anchor."
 );
-assert.match(byId.get("backward-meta").textContent, /^fold to /,
-  "Refine meta must disclose complementary folding before invocation.");
+assert.match(byId.get("backward-meta").textContent, /^shorten loop to /,
+  "Refine meta must disclose Loop shortening before invocation.");
 byId.get("pin-backward").click();
 await flush();
 assert.equal(currentText(), "Current 0:25.000");
@@ -319,4 +319,4 @@ assert.equal(byId.has("context-action"), false);
 assert.equal(byId.has("skim"), false);
 assert.equal(byId.get("loop").classList.contains("loop-action"), true);
 
-console.log("Interaction smoke passed: complementary Refine preview, unsaved Working Focus, explicit Section overwrite, Endpoint Transposition, separate Undo, Guide retention, composable Step intervals, collapse isolation, frozen Loop, shared activation, deterministic refold/stretch, confirmed rates, exact paused frames, Hold isolation, whole-Field side Step, and Space playback.");
+console.log("Interaction smoke passed: membership-based Refine preview, unsaved Working Focus, explicit Section overwrite, Endpoint Transposition, separate Undo, Guide retention, composable Step intervals, collapse isolation, frozen Loop, shared activation, deterministic refold/stretch, confirmed rates, exact paused frames, Hold isolation, whole-Field side Step, and Space playback.");

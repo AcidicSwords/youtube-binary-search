@@ -360,8 +360,8 @@ assert.match(appSource, /originResolution: state\.pendingStep\.originModel\.reso
 assert.match(appSource, /intervalDeparture: state\.pendingStep\.intervalDeparture/, "Pending Step must freeze the Interval anchor across repeat.");
 assert.match(appSource, /document\.addEventListener\("keyup"[\s\S]*completePendingStep/, "Held-key Step must run Context from keyup rather than repeat.");
 assert.match(sessionSource, /stepIntervalAnchor[\s\S]*intervalDeparture/, "Session must separate Step movement departure from the Interval anchor.");
-assert.match(sessionSource, /refineIntervalRelation[\s\S]*classifyRefineRelation[\s\S]*relation:\s*"fold"/,
-  "Refine must distinguish an unlooped crossing from a complementary fold.");
+assert.match(sessionSource, /refineIntervalRelation[\s\S]*classifyRefineRelation[\s\S]*relation:\s*"shorten"/,
+  "Refine must distinguish outside-Loop replacement from inside-Loop shortening.");
 assert.match(sessionSource, /export function focusWorkingSection[\s\S]*FOCUS_KIND\.WORKING/,
   "The Working Section must be focusable without a Guide record.");
 assert.match(sessionSource, /export function overwriteGuideSection[\s\S]*replaceSectionExtent/,

@@ -82,9 +82,10 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 
 ### Operator ownership and containment
 
-- Establish a Loop and Refine away from its opposite endpoint; confirm the new Working Section is exactly the unlooped crossing.
-- Refine toward the opposite endpoint; confirm the Working Section keeps the complementary side rather than the traversed fold.
-- Switch to an endpoint whose next Refine passes the opposite endpoint; confirm the old Loop cancels and only the overrun survives.
+- Establish `25–50` with Current at `25`, Refine Backward, and confirm the outside midpoint replaces it with `12.5–25`, Current `12.5`.
+- Return to `25–50` with Current at `25`, Refine Forward, and confirm the inside midpoint shortens it to `37.5–50`, Current `37.5`.
+- Refine Backward from that state and confirm the outside midpoint replaces it with `31.25–37.5`, Current `31.25`.
+- Switch to an endpoint whose next Refine passes the opposite endpoint; confirm the old Loop is discarded and the complete Current-to-midpoint traversal replaces it.
 - Traverse several Section endpoint Pins; confirm each result is exactly the latest one-hop Pin movement.
 - Confirm Pin Forward/Backward and playback push only the approached refinement endpoint.
 - After every Refine, Step, Pin, playback settlement, Reopen, and Switch, confirm the Loop is contained by active Resolution and both endpoint frames.
@@ -101,7 +102,7 @@ A passing gate is necessary, not sufficient, because actual YouTube iframe behav
 - Confirm the restored frame contains the complete unchanged Loop.
 - Reopen at one endpoint, switch away and back, and confirm the reopened frame returns.
 - Switch, then Step or settle playback inward/outward/across the new anchor; confirm both compose from the transposed departure.
-- Switch, then Refine away from the transposed anchor and confirm a local crossing; Refine toward/past it and confirm complementary folding. Traverse a Pin and confirm it records its own movement.
+- Switch, then Refine to a midpoint inside the transposed Loop and confirm shortening; Refine to one outside or beyond it and confirm full traversal replacement. Traverse a Pin and confirm it records its own movement.
 - Hold an arrow through repeat after switching and confirm one history entry and one Context window.
 - Switch twice and confirm semantic Current, direction, frames, and extent return exactly.
 - Collapse an Interval by stepping onto its anchor and confirm Switch Endpoint is disabled and `S` is a no-op.

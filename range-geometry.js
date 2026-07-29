@@ -112,17 +112,22 @@ export function classifyRefineRelation(interval, current, target) {
     || !Number.isFinite(interval.arrival)
     || Math.abs(interval.arrival - current) > EPSILON
     || Math.abs(interval.departure - current) <= EPSILON
-  ) return "cross";
+  ) return "replace";
 
-  const movement = target - current;
-  const opposite = interval.departure - current;
-  return (
-    movement > EPSILON && opposite > EPSILON
-  ) || (
-    movement < -EPSILON && opposite < -EPSILON
-  )
-    ? "fold"
-    : "cross";
+  const start = Number.isFinite(interval.start)
+    ? interval.start
+    : Math.min(interval.departure, interval.arrival);
+  const end = Number.isFinite(interval.end)
+    ? interval.end
+    : Math.max(interval.departure, interval.arrival);
+
+  // Membership is the complete rule. A midpoint anywhere in the active Loop,
+  // including its opposite endpoint, shortens that Loop. An endpoint landing
+  // collapses it. Only a midpoint beyond the ordered extent starts a new
+  // traversal from Current and discards the previous Loop.
+  return target >= start - EPSILON && target <= end + EPSILON
+    ? "shorten"
+    : "replace";
 }
 
 export function refineBlockReason(neighborhood, range, direction) {

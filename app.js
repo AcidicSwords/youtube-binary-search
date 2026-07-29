@@ -665,9 +665,9 @@ function refine(direction) {
     ? formatRange(result.interval)
     : `collapsed at ${formatTime(result.destination)}`;
   accept(result, {
-    status: result.refineRelation === "fold"
-      ? `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; the Working Section folded to ${workingSection}.`
-      : `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; the new crossing is Working Section ${workingSection}.`
+    status: result.refineRelation === "shorten"
+      ? `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; the Working Section shortened to ${workingSection}.`
+      : `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; the previous Working Section was replaced by ${workingSection}.`
   });
 }
 

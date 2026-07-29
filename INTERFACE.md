@@ -39,7 +39,7 @@ The map spans the same width as the viewer and shows:
 - Resolution;
 - semantic Current;
 - physical Cursor during playback/Context/Loop;
-- Working Section / Active Interval, replaced by local Go/Pin movements, crossed or folded by Refine, and resized by Step or settled playback;
+- Working Section / Active Interval, replaced by local Go/Pin movements or an outside Refine, shortened by an inside Refine, and resized by Step or settled playback;
 - Held Field span;
 - Pins;
 - action and Section previews.
@@ -67,13 +67,13 @@ Previous Pin    | Switch Endpoint | Next Pin
 
 The layout expresses relations, not keyboard geometry.
 
-- Row 1 acts on Resolution and the Working Section relation: Refine away records an unlooped crossing, while Refine toward the opposite endpoint folds and retains the complementary side.
+- Row 1 acts on Resolution and the Working Section relation: a destination midpoint inside the Loop shortens it toward its opposite endpoint, with endpoint coincidence collapsing it; an exterior midpoint replaces it with the new traversal.
 - Row 2 acts on movement and its active Interval: Step resizes the operand and Loop consumes its frozen extent.
 - Row 3 crosses retained Addresses one Pin hop at a time, or transposes the current Interval’s endpoints unchanged.
 - Loop is central because surrounding movement operators establish the Interval it consumes and Step directly extends or shrinks that operand. It is genuine bounded playback with internal non-committing wraps.
-- Switch Endpoint is central because it crosses the active Interval without changing its ordered extent. It restores a destination Resolution frame that contains the same Loop. Subsequent Step or playback may edit from the transposed anchor; Refine conditionally crosses away from or folds toward it, while Pin traversal records its own movement. Its meta reports the destination Address, retained scale, and basis; its timeline preview shows that destination frame.
+- Switch Endpoint is central because it crosses the active Interval without changing its ordered extent. It restores a destination Resolution frame that contains the same Loop. Subsequent Step or playback may edit from the transposed anchor; Refine shortens only for a midpoint still inside that Loop and otherwise replaces it, while Pin traversal records its own movement. Its meta reports the destination Address, retained scale, and basis; its timeline preview shows that destination frame.
 
-Each available Refine meta names `cross` or `fold` before its destination, so the retained-side consequence is visible before invocation.
+Each available Refine meta names `shorten loop` or `replace loop` before its destination, so the retained-side consequence is visible before invocation.
 
 Pin Current and Save Section do not belong in the matrix; they create retained records and therefore belong in Guide.
 

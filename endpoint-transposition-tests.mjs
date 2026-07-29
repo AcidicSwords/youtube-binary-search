@@ -62,24 +62,24 @@ assert.equal(switched.session.model.resolution.C, originalInterval.arrival);
 assert.deepEqual(frameOf(switched.session.model), arrivalFrame);
 assert.deepEqual(switched.session.model.interval, originalInterval);
 
-// Refine after transposition may pass the preserved opposite endpoint. That is
-// a fold, so the opposite endpoint survives and only the overrun becomes the
-// Working Section; the traversed old side must not be retained.
-let folded = createSession({ duration: 100, current: 50 });
-folded = goTo(folded, 70, { operator: "timeline" }).session;
-folded = switchEndpoint(folded).session;
-const foldedResult = refine(folded, "forward");
-assert.equal(foldedResult.refineRelation, "fold");
+// Refine after transposition may pass the preserved opposite endpoint. Because
+// that target is outside the current Loop, the old Loop is discarded and the
+// complete Current-to-midpoint traversal becomes the Working Section.
+let overrun = createSession({ duration: 100, current: 50 });
+overrun = goTo(overrun, 70, { operator: "timeline" }).session;
+overrun = switchEndpoint(overrun).session;
+const overrunResult = refine(overrun, "forward");
+assert.equal(overrunResult.refineRelation, "replace");
 assert.deepEqual(
   {
-    start: foldedResult.session.model.interval.start,
-    end: foldedResult.session.model.interval.end,
-    departure: foldedResult.session.model.interval.departure,
-    arrival: foldedResult.session.model.interval.arrival
+    start: overrunResult.session.model.interval.start,
+    end: overrunResult.session.model.interval.end,
+    departure: overrunResult.session.model.interval.departure,
+    arrival: overrunResult.session.model.interval.arrival
   },
-  { start: 70, end: 75, departure: 70, arrival: 75 }
+  { start: 50, end: 75, departure: 50, arrival: 75 }
 );
-assert.deepEqual(foldedResult.session.model.resolution, {
+assert.deepEqual(overrunResult.session.model.resolution, {
   L: 50,
   C: 75,
   R: 100,
@@ -252,4 +252,4 @@ assert.match(html, /id="return-action"[\s\S]*Control\+Z Meta\+Z/);
 assert.match(app, /spatialKey\("s"\)[\s\S]*switchCurrentEndpoint\(\)/);
 assert.match(styles, /"pin-backward switch-endpoint pin-forward"/);
 
-console.log("Endpoint Transposition v5.8.6 tests passed: endpoint frames, involution, complementary Refine fold-over, Step composition, collapse, Undo separation, and matrix wiring.");
+console.log("Endpoint Transposition v5.8.6 tests passed: endpoint frames, involution, membership-based Refine replacement, Step composition, collapse, Undo separation, and matrix wiring.");
