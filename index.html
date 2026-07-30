@@ -150,6 +150,7 @@
               <div id="resolution-fill" class="resolution-fill"></div>
               <div id="interval-fill" class="interval-fill" hidden></div>
               <div id="section-preview-fill" class="section-preview-fill" hidden></div>
+              <div id="preview-resolution-fill" class="preview-resolution-fill" hidden></div>
               <div id="action-preview-fill" class="action-preview-fill" hidden></div>
               <div id="field-span-fill" class="field-span-fill" hidden></div>
             </div>
@@ -166,6 +167,11 @@
             <span id="forward-target-marker" class="marker target-marker" aria-hidden="true"></span>
             <span id="current-marker" class="marker current-marker" aria-hidden="true"></span>
             <span id="cursor-marker" class="marker cursor-marker" aria-hidden="true" hidden></span>
+            <span id="preview-resolution-start-marker" class="marker preview-resolution-marker" aria-hidden="true" hidden></span>
+            <span id="preview-resolution-end-marker" class="marker preview-resolution-marker" aria-hidden="true" hidden></span>
+            <span id="preview-backward-target-marker" class="marker preview-target-marker" aria-hidden="true" hidden></span>
+            <span id="preview-forward-target-marker" class="marker preview-target-marker" aria-hidden="true" hidden></span>
+            <span id="preview-current-marker" class="marker preview-current-marker" aria-hidden="true" hidden></span>
           </div>
         </section>
 
@@ -213,11 +219,13 @@
 
             <details id="range-tools" class="tool-disclosure">
               <summary><span>Range tools</span></summary>
-              <div class="compact-actions">
-                <button id="range-start-here" type="button" disabled>Start at Current</button>
+              <div class="compact-actions range-actions">
+                <button id="go-range-start" type="button" disabled>Go to Start</button>
                 <button id="range-midpoint" type="button" disabled>Go to Midpoint</button>
-                <button id="range-end-here" type="button" disabled>End at Current</button>
+                <button id="go-range-end" type="button" disabled>Go to End</button>
+                <button id="range-start-here" type="button" disabled>Set Start Here</button>
                 <button id="full-video-range" type="button" disabled>Full Video</button>
+                <button id="range-end-here" type="button" disabled>Set End Here</button>
               </div>
             </details>
 
@@ -246,7 +254,7 @@
                 <span><kbd>Q</kbd>/<kbd>E</kbd> Refine</span>
                 <span><kbd>A</kbd>/<kbd>D</kbd> Step</span>
                 <span><kbd>S</kbd> Switch Endpoint</span>
-                <span><kbd>⇧Q</kbd>/<kbd>⇧E</kbd> Additive Refine</span>
+                <span><kbd>⇧Q</kbd>/<kbd>⇧E</kbd> Local Refine</span>
                 <span><kbd>⇧A</kbd>/<kbd>⇧D</kbd> Pins</span>
                 <span><kbd>R</kbd> Release Interval</span>
                 <span><kbd>T</kbd> Transpose</span>
@@ -257,6 +265,8 @@
                 <span><kbd>⇧P</kbd> Save Section in Guide</span>
                 <span><kbd>G</kbd> Guide</span>
                 <span><kbd>[</kbd>/<kbd>]</kbd> Step size</span>
+                <span><kbd>Z</kbd> Undo</span>
+                <span><kbd>C</kbd> Redo</span>
                 <span><kbd>Esc</kbd> Stop or close</span>
               </div>
             </details>
@@ -277,7 +287,7 @@
             </div>
 
             <div class="navigation-deck">
-              <button id="refine-backward" class="nav-action primary direction backward" type="button" data-preview-action="backward" aria-keyshortcuts="Q Shift+Q" disabled>
+              <button id="refine-backward" class="nav-action primary direction backward" type="button" data-preview-action="refineBackward" aria-keyshortcuts="Q Shift+Q" disabled>
                 <span class="action-name"><kbd>Q</kbd> <span id="refine-backward-label">Refine Backward</span></span>
                 <span id="backward-meta" class="action-meta">—</span>
               </button>
@@ -285,7 +295,7 @@
                 <span class="action-name"><kbd>W</kbd> Reopen</span>
                 <span id="reopen-meta" class="action-meta">—</span>
               </button>
-              <button id="refine-forward" class="nav-action primary direction forward" type="button" data-preview-action="forward" aria-keyshortcuts="E Shift+E" disabled>
+              <button id="refine-forward" class="nav-action primary direction forward" type="button" data-preview-action="refineForward" aria-keyshortcuts="E Shift+E" disabled>
                 <span class="action-name"><kbd>E</kbd> <span id="refine-forward-label">Refine Forward</span></span>
                 <span id="forward-meta" class="action-meta">—</span>
               </button>
@@ -317,10 +327,16 @@
               </button>
             </div>
 
-            <button id="return-action" class="history-action undo-action" type="button" aria-keyshortcuts="Control+Z Meta+Z" disabled>
-              <span class="action-name"><kbd>Ctrl/⌘ Z</kbd> Undo</span>
-              <span id="return-meta" class="action-meta">Nothing to undo</span>
-            </button>
+            <div class="history-actions">
+              <button id="return-action" class="history-action undo-action" type="button" aria-keyshortcuts="Z" disabled>
+                <span class="action-name"><kbd>Z</kbd> Undo</span>
+                <span id="return-meta" class="action-meta">Nothing to undo</span>
+              </button>
+              <button id="redo-action" class="history-action redo-action" type="button" aria-keyshortcuts="C" disabled>
+                <span class="action-name"><kbd>C</kbd> Redo</span>
+                <span id="redo-meta" class="action-meta">Nothing to redo</span>
+              </button>
+            </div>
           </section>
 
           <aside id="guide-panel" class="guide-panel panel" aria-label="Guide" aria-hidden="false">

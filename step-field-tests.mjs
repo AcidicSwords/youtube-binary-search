@@ -125,10 +125,11 @@ assert.equal(resolveFieldPhase({
     "Parent-owned playback must refold/start both side players and Center in one synchronous gesture stack.");
   assert.match(app, /center-transport-surface/);
   assert.match(fieldSource, /function playFromGesture\(options = \{\}\)/);
-  assert.match(app, /onHoldOffsets:/);
+  assert.doesNotMatch(app, /onHoldOffsets:/);
+  assert.doesNotMatch(fieldSource, /onHoldOffsets/);
   assert.match(fieldSource, /const FIELD_SIDE_MODE/);
   assert.match(fieldSource, /function stretch\(role\)/);
-  assert.match(fieldSource, /function hold\(role, \{ record = true \} = \{\}\)/);
+  assert.match(fieldSource, /function hold\(role\)/);
   assert.match(fieldSource, /function toggleBoth\(\)/);
   assert.match(fieldSource, /function freezeSideForPause\(side, center, snapshot\)/);
   assert.match(fieldSource, /function translateToCurrent\(current, \{ preserve = true \} = \{\}\)/);

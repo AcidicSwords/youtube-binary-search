@@ -49,9 +49,10 @@ assert.equal(withTransportPhase(playback, "playing").phase, "playing");
 assert.equal(isProperRange({ start: 0, end: 100 }, 100), false);
 assert.equal(isProperRange({ start: 10, end: 100 }, 100), true);
 assert.equal(isProperRange({ start: 0, end: 90 }, 100), true);
-const wrapped = rebasePlaybackTransport(playback, 1234);
+const wrapped = rebasePlaybackTransport(playback, 10, 1234);
 assert.equal(wrapped.cycles, 1);
 assert.equal(wrapped.enteredPath, false);
+assert.equal(wrapped.entry, 10);
 assert.equal(wrapped.startedAt, 1234);
 assert.equal(playback.cycles, 0, "Range wrap metadata is immutable and Session-independent");
 

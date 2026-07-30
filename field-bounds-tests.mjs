@@ -85,7 +85,6 @@ function makeControllerHarness() {
   };
   const adapters = new Map();
   const changes = [];
-  const holds = [];
   let snapshot = {
     videoLoaded: true,
     videoId: "bounds-test",
@@ -130,13 +129,12 @@ function makeControllerHarness() {
     document,
     getSnapshot: () => snapshot,
     onChange: field => changes.push(field),
-    onHoldOffsets: offsets => holds.push(offsets),
     createPlayer,
     formatTime: String
   });
 
   return {
-    controller, adapters, elements, changes, holds,
+    controller, adapters, elements, changes,
     get snapshot() { return snapshot; },
     set snapshot(value) { snapshot = value; },
     restore() { globalThis.YT = previousYT; }
@@ -168,7 +166,6 @@ function makeControllerHarness() {
     harness.adapters.get("player-tail").place(47);
     harness.controller.hold("tail");
     assert.equal(harness.controller.snapshot().tailMode, FIELD_SIDE_MODE.HELD);
-    assert.equal(harness.holds.at(-1).backward, 3, "Hold freezes the measured physical Field offset.");
 
     const tailStep = harness.controller.getStepSelection("tail");
     assert.equal(tailStep.direction, "backward");
@@ -183,7 +180,6 @@ function makeControllerHarness() {
       tail: harness.controller.snapshot().tailMode,
       lead: harness.controller.snapshot().leadMode
     };
-    const holdCount = harness.holds.length;
     harness.elements.get("tail-field-toggle").click();
     harness.elements.get("field-both-toggle").click();
     assert.deepEqual(
@@ -194,7 +190,6 @@ function makeControllerHarness() {
       suspendedModes,
       "Hold/Stretch controls must not reinterpret a transient Context cursor."
     );
-    assert.equal(harness.holds.length, holdCount);
     assert.equal(harness.elements.get("tail-field-toggle").disabled, true);
     assert.equal(harness.elements.get("field-both-toggle").disabled, true);
 

@@ -34,10 +34,10 @@ import {
 } from "./session.js";
 
 const range = { start: 0, end: 480 };
-assert.deepEqual(seedNeighborhoodFromMovement(120, 180, range), { L: 120, C: 180, R: 240, level: 0 });
-assert.deepEqual(seedNeighborhoodFromMovement(180, 120, range), { L: 60, C: 120, R: 180, level: 0 });
-assert.deepEqual(seedNeighborhoodFromMovement(430, 470, range), { L: 430, C: 470, R: 480, level: 0 });
-assert.deepEqual(seedNeighborhoodFromMovement(40, 10, range), { L: 0, C: 10, R: 40, level: 0 });
+assert.deepEqual(seedNeighborhoodFromMovement(120, 180, range), { L: 0, C: 180, R: 300, level: 0 });
+assert.deepEqual(seedNeighborhoodFromMovement(180, 120, range), { L: 0, C: 120, R: 300, level: 0 });
+assert.deepEqual(seedNeighborhoodFromMovement(430, 470, range), { L: 350, C: 470, R: 480, level: 0 });
+assert.deepEqual(seedNeighborhoodFromMovement(40, 10, range), { L: 0, C: 10, R: 100, level: 0 });
 assert.equal(isRangeNeighborhood(createRoot(0, 120, 480), range), true);
 assert.equal(isRangeNeighborhood(seedNeighborhoodFromMovement(120, 180, range), range), false);
 
@@ -47,14 +47,14 @@ let moved = goTo(session, 180, { operator: "timeline", label: "Timeline Click" }
 assert.equal(moved.changed, true);
 session = moved.session;
 assert.deepEqual({ start: session.model.interval.start, end: session.model.interval.end }, { start: 120, end: 180 });
-assert.deepEqual(session.model.resolution, { L: 120, C: 180, R: 240, level: 0 });
+assert.deepEqual(session.model.resolution, { L: 0, C: 180, R: 300, level: 0 });
 assert.equal(session.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
-assert.deepEqual(getTargets(session.model.resolution), { backward: 150, forward: 210 });
+assert.deepEqual(getTargets(session.model.resolution), { backward: 90, forward: 240 });
 
 // Refine subdivides the movement-seeded Neighborhood and Undo restores it.
 const beforeRefine = snapshotModel(session.model);
 session = refine(session, "backward").session;
-assert.equal(session.model.resolution.C, 150);
+assert.equal(session.model.resolution.C, 90);
 assert.equal(session.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
 session = returnState(session).session;
 assert.deepEqual(session.model.resolution, beforeRefine.resolution);
@@ -82,7 +82,7 @@ assert.deepEqual(
 );
 assert.deepEqual(session.model.interval.arrivalFrame.resolution, session.model.resolution);
 session = returnState(session).session;
-assert.deepEqual(session.model.resolution, { L: 120, C: 180, R: 240, level: 0 });
+assert.deepEqual(session.model.resolution, { L: 0, C: 180, R: 300, level: 0 });
 
 // Same-address Go is a true no-op; it never substitutes for Reopen.
 const sameBefore = snapshotModel(session.model);
@@ -101,17 +101,17 @@ oldEquivalent = reopen(oldEquivalent).session;
 oldEquivalent = refine(oldEquivalent, "forward").session;
 assert.equal(oldEquivalent.model.resolution.C, 330);
 
-// Step preserves the origin Neighborhood, pushes only its approached endpoint,
-// and retains a half-Step Refine target after crossing that endpoint.
+// Step preserves the origin Neighborhood and keeps its approached endpoint fixed
+// while the prospective midpoint still has a full Step of headroom.
 let stepped = createSession({ duration: 480, current: 120 });
-stepped = goTo(stepped, 180, { operator: "timeline" }).session; // 120—180—240
+stepped = goTo(stepped, 180, { operator: "timeline" }).session; // 0—180—300
 const stepOrigin = snapshotModel(stepped.model);
 stepped = step(stepped, "forward", 20, {
   departure: 180,
   originResolution: stepOrigin.resolution,
   originResolutionBasis: stepOrigin.resolutionBasis
 }).session;
-assert.deepEqual(stepped.model.resolution, { L: 120, C: 200, R: 260, level: 0 });
+assert.deepEqual(stepped.model.resolution, { L: 0, C: 200, R: 300, level: 0 });
 assert.equal(stepped.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
 stepped = step(stepped, "forward", 100, {
   departure: 180,
@@ -119,9 +119,9 @@ stepped = step(stepped, "forward", 100, {
   originResolutionBasis: stepOrigin.resolutionBasis,
   amend: true
 }).session;
-assert.deepEqual(stepped.model.resolution, { L: 120, C: 300, R: 400, level: 0 });
-assert.equal(stepped.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
-assert.deepEqual(getTargets(stepped.model.resolution), { backward: 210, forward: 350 });
+assert.deepEqual(stepped.model.resolution, { L: 0, C: 300, R: 480, level: 0 });
+assert.equal(stepped.model.resolutionBasis, RESOLUTION_BASIS.RANGE);
+assert.deepEqual(getTargets(stepped.model.resolution), { backward: 150, forward: 390 });
 assert.deepEqual(
   { start: stepped.model.interval.start, end: stepped.model.interval.end },
   { start: 120, end: 300 },
@@ -131,8 +131,8 @@ assert.deepEqual(
 let boundaryPush = createSession({ duration: 100, current: 50 });
 boundaryPush = refine(boundaryPush, "backward").session;
 boundaryPush = step(boundaryPush, "forward", 25).session;
-assert.deepEqual(boundaryPush.model.resolution, { L: 0, C: 50, R: 75, level: 0 });
-assert.equal(getTargets(boundaryPush.model.resolution).forward, 62.5);
+assert.deepEqual(boundaryPush.model.resolution, { L: 0, C: 50, R: 100, level: 0 });
+assert.equal(getTargets(boundaryPush.model.resolution).forward, 75);
 
 // Step edits the active Interval around its original departure anchor.
 let drawnInterval = createSession({ duration: 100, current: 20 });
@@ -198,13 +198,13 @@ pathA = step(pathA, "forward", 15, {
   originResolution: pathOrigin.resolution,
   originResolutionBasis: pathOrigin.resolutionBasis
 }).session;
-pathA = step(pathA, "forward", 20, {
+pathA = step(pathA, "forward", 15, {
   departure: 40,
   originResolution: pathOrigin.resolution,
   originResolutionBasis: pathOrigin.resolutionBasis,
   amend: true
 }).session;
-pathA = step(pathA, "backward", 20, {
+pathA = step(pathA, "backward", 15, {
   departure: 40,
   originResolution: pathOrigin.resolution,
   originResolutionBasis: pathOrigin.resolutionBasis,
@@ -237,7 +237,7 @@ continued = completePlayback(continued, {
   wrapped: false,
   returnModel: continuedReturn
 }).session;
-assert.deepEqual(continued.model.resolution, { L: 120, C: 200, R: 260, level: 0 });
+assert.deepEqual(continued.model.resolution, { L: 0, C: 200, R: 320, level: 0 });
 assert.equal(continued.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
 continued = completePlayback(continued, {
   current: 300,
@@ -248,7 +248,7 @@ continued = completePlayback(continued, {
   returnModel: snapshotModel(continued.model)
 }).session;
 assert.equal(continued.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
-assert.deepEqual(continued.model.resolution, { L: 120, C: 300, R: 360, level: 0 });
+assert.deepEqual(continued.model.resolution, { L: 0, C: 300, R: 420, level: 0 });
 assert.deepEqual({ start: continued.model.interval.start, end: continued.model.interval.end }, { start: 120, end: 300 });
 
 // Range operations preserve only wholly contained Intervals.
@@ -300,7 +300,7 @@ assert.equal(outside.leftFocus, true);
 assert.equal(outside.label, "Leave Section + Timeline Click");
 assert.equal(outside.session.model.focus, null);
 assert.deepEqual(outside.session.model.range, { start: 0, end: 480 });
-assert.deepEqual(outside.session.model.resolution, { L: 150, C: 300, R: 450, level: 0 });
+assert.deepEqual(outside.session.model.resolution, { L: 0, C: 300, R: 480, level: 0 });
 assert.deepEqual({ start: outside.session.model.interval.start, end: outside.session.model.interval.end }, { start: 150, end: 300 });
 
 // Focused Section deletion clears Focus and presentation state; Undo restores all.
@@ -349,7 +349,7 @@ assert.deepEqual(
 );
 playbackSession = completePlayback(playbackSession, playbackOptions).session;
 assert.equal(playbackSession.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
-assert.deepEqual(playbackSession.model.resolution, { L: 120, C: 195, R: 255, level: 0 });
+assert.deepEqual(playbackSession.model.resolution, { L: 0, C: 195, R: 315, level: 0 });
 assert.deepEqual({ start: playbackSession.model.interval.start, end: playbackSession.model.interval.end }, { start: 120, end: 195 });
 assert.deepEqual(playbackProjection.model.resolution, playbackSession.model.resolution);
 assert.equal(playbackProjection.model.resolutionBasis, playbackSession.model.resolutionBasis);

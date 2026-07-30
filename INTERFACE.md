@@ -29,10 +29,10 @@ The temporal map uses lateral Traversal Time while its ruler labels remain sourc
 Visual order:
 
 ```text
-source ruler
 open Section lanes
-Fold rails and endpoint Pins
+Fold stage and endpoint Pins
 main Range / Resolution track
+source ruler
 free and shared Pins
 ```
 
@@ -49,6 +49,8 @@ A Fold is one vertical axis at its lateral knot:
 
 The Working Interval highlights an included Fold rail only when both of that Section’s endpoint Pins are contained. Current sits on an exact endpoint when that endpoint is selected. Cursor may move continuously along the rail during playback; that observation does not create a vertical navigation mode.
 
+The timeline grows to fit actual Section lanes and Fold height. Nearby Fold controls are collision-packed and connected back to their exact lateral knot. Major and minor source-time guides adapt to available width; Range boundaries and Fold faces remain labelled without sharing hit regions.
+
 ## Operator matrix
 
 ```text
@@ -60,7 +62,7 @@ R Release             T Transpose        F Focus / Unfocus
 The Shift layer relabels only the directional families:
 
 ```text
-Shift+Q/E   Additive Refine
+Shift+Q/E   Local Refine
 Shift+A/D   Previous / Next Pin
 ```
 
@@ -84,6 +86,8 @@ Each Section row exposes Go, Focus, Transpose/Unfold, Overwrite, Rename, and Del
 
 Selection is lightweight and visible. Clicking an open span or Fold contributor selects that Section. Clicking an endpoint selects its Pin. Composite Fold actions never silently choose the first contributor.
 
+Range Start and Range End are visible navigation guides and synthetic Previous/Next Pin stops. The Range tools distinguish moving to a boundary from setting that boundary.
+
 ## Focus and playback
 
 Focus clamps Range. If the target is transposed, its span materializes so it can be traversed normally. Unfocus restores the containing Range and prior transposition.
@@ -101,7 +105,7 @@ Center → Rate · Offset · Hold/Stretch · Step → Lead outside
 
 Center alone is audible. Side panes are muted projections. Hiding one side releases only that projection and lets the remaining pane reclaim width.
 
-Hold/Stretch is unavailable while Context, a semantic drag, or a pending Step suspends the Field. A transient Cursor can therefore never be recorded as a persistent relation.
+Hold/Stretch is unavailable while Context, a semantic drag, or a pending Step suspends the Field. Hold and Stretch change live playback state only; the Offset controls change only through explicit input. A transient Cursor can therefore never be recorded as a configured relation.
 
 ## Accessibility and touch
 
@@ -111,4 +115,4 @@ Hold/Stretch is unavailable while Context, a semantic drag, or a pending Step su
 - Timeline preserves vertical page scrolling.
 - Visible markers keep compact geometry while coarse-pointer hit areas meet the touch target.
 - Fold colour is supplemented by shape, placement, labels, and state text.
-- Undo remains the platform-standard `Ctrl/⌘ Z`.
+- Plain `Z` is Undo and plain `C` is Redo.

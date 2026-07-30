@@ -52,6 +52,7 @@ import {
   snapshotModel,
   goTo,
   refine,
+  localRefine,
   step,
   reopen,
   setRange,
@@ -118,11 +119,11 @@ assert.equal(midpoint(120, 180), 150);
 assert.equal(clamp(12, 0, 10), 10);
 assert.deepEqual(
   seedNeighborhoodFromMovement(60, 90, { start: 0, end: 180 }),
-  { L: 60, C: 90, R: 120, level: 0 }
+  { L: 0, C: 90, R: 150, level: 0 }
 );
 assert.deepEqual(
   seedNeighborhoodFromMovement(90, 60, { start: 0, end: 180 }),
-  { L: 30, C: 60, R: 90, level: 0 }
+  { L: 0, C: 60, R: 150, level: 0 }
 );
 assert.equal(isRangeNeighborhood(createRoot(0, 60, 180), { start: 0, end: 180 }), true);
 assert.throws(() => descend(root, "forward", 30), /follow Current/);
@@ -135,22 +136,22 @@ assert.equal(stepTarget(60, 10, "backward", { start: 0, end: 180 }), 50);
 assert.equal(stepTarget(175, 10, "forward", { start: 0, end: 180 }), 180);
 assert.deepEqual(
   stepNeighborhood({ L: 30, C: 60, R: 90, level: 2 }, 70, { start: 0, end: 180 }),
-  { L: 30, C: 70, R: 100, level: 0 },
-  "Every forward Step must push only the approached refinement endpoint."
+  { L: 30, C: 70, R: 90, level: 2 },
+  "Step must leave the approached endpoint fixed when its midpoint still has one full Step of headroom."
 );
 assert.deepEqual(
-  stepNeighborhood({ L: 30, C: 60, R: 90, level: 2 }, 100, { start: 0, end: 180 }),
-  { L: 30, C: 100, R: 140, level: 0 }
+  stepNeighborhood({ L: 30, C: 60, R: 90, level: 2 }, 100, { start: 0, end: 180 }, 10),
+  { L: 30, C: 100, R: 120, level: 0 }
 );
 assert.deepEqual(
   stepNeighborhood({ L: 30, C: 60, R: 90, level: 2 }, 50, { start: 0, end: 180 }),
-  { L: 20, C: 50, R: 90, level: 0 },
-  "Every backward Step must push only the approached refinement endpoint."
+  { L: 30, C: 50, R: 90, level: 2 },
+  "Backward Step obeys the same midpoint guard."
 );
 assert.deepEqual(
   stepNeighborhood({ L: 0, C: 25, R: 50, level: 1 }, 50, { start: 0, end: 100 }, 25),
-  { L: 0, C: 50, R: 75, level: 0 },
-  "Step landing on a refinement endpoint must push that endpoint one Step beyond Current."
+  { L: 0, C: 50, R: 100, level: 0 },
+  "Once the guard is reached, the approached endpoint preserves one-Step midpoint headroom."
 );
 assert.equal(
   getTargets(stepNeighborhood(
@@ -159,8 +160,8 @@ assert.equal(
     { start: 0, end: 100 },
     25
   )).forward,
-  62.5,
-  "The next directional Refine must remain half a Step away."
+  75,
+  "The next directional Refine must remain one full Step away."
 );
 assert.deepEqual(
   translateNeighborhood(
@@ -322,12 +323,13 @@ session = result.session;
 assert.equal(session.model.resolution.C, 50);
 assert.equal(session.model.interval, null);
 
-// Refine has two Interval relations. A midpoint inside the Interval shortens it
-// by retaining the opposite endpoint. A midpoint outside the Interval replaces it
-// with the newly traversed Current-to-midpoint region.
+// Shift+Refine has two Interval relations. A midpoint inside the Interval
+// shortens it by retaining the opposite endpoint. A midpoint outside replaces
+// it with the newly traversed Current-to-midpoint region. Direct Go's five-times
+// frame puts both initial midpoints outside the mapped Interval.
 let membershipBase = createSession({ duration: 100, current: 50 });
 membershipBase = goTo(membershipBase, 70, { operator: "timeline" }).session;
-const outsideRefine = refine(membershipBase, "forward");
+const outsideRefine = localRefine(membershipBase, "forward");
 assert.equal(outsideRefine.refineRelation, "replace");
 assert.deepEqual(
   {
@@ -336,21 +338,21 @@ assert.deepEqual(
     departure: outsideRefine.session.model.interval.departure,
     arrival: outsideRefine.session.model.interval.arrival
   },
-  { start: 70, end: 80, departure: 70, arrival: 80 }
+  { start: 70, end: 85, departure: 70, arrival: 85 }
 );
-const shortenedRefine = refine(membershipBase, "backward");
-assert.equal(shortenedRefine.refineRelation, "shorten");
+const backwardReplacement = localRefine(membershipBase, "backward");
+assert.equal(backwardReplacement.refineRelation, "replace");
 assert.deepEqual(
   {
-    start: shortenedRefine.session.model.interval.start,
-    end: shortenedRefine.session.model.interval.end,
-    departure: shortenedRefine.session.model.interval.departure,
-    arrival: shortenedRefine.session.model.interval.arrival
+    start: backwardReplacement.session.model.interval.start,
+    end: backwardReplacement.session.model.interval.end,
+    departure: backwardReplacement.session.model.interval.departure,
+    arrival: backwardReplacement.session.model.interval.arrival
   },
-  { start: 50, end: 60, departure: 50, arrival: 60 },
-  "A midpoint inside the Interval must retain the opposite endpoint and shorten it."
+  { start: 40, end: 70, departure: 70, arrival: 40 },
+  "An adjacent midpoint outside the central mapped Interval must record the complete new traversal."
 );
-const transposedReplacement = refine(switchEndpoint(membershipBase).session, "forward");
+const transposedReplacement = localRefine(switchEndpoint(membershipBase).session, "forward");
 assert.equal(transposedReplacement.refineRelation, "replace");
 assert.deepEqual(
   {
@@ -366,7 +368,7 @@ assert.deepEqual(
 // Canonical alternating sequence: outside midpoint replaces; inside midpoint
 // shortens; the next outside midpoint replaces again.
 let membershipRefine = createSession({ duration: 100, current: 50 });
-membershipRefine = refine(membershipRefine, "backward").session;
+membershipRefine = localRefine(membershipRefine, "backward").session;
 assert.deepEqual(
   {
     current: membershipRefine.model.resolution.C,
@@ -379,7 +381,7 @@ assert.deepEqual(
   },
   { current: 25, L: 0, R: 50, start: 25, end: 50, departure: 50, arrival: 25 }
 );
-const replacedBackward = refine(membershipRefine, "backward");
+const replacedBackward = localRefine(membershipRefine, "backward");
 assert.equal(replacedBackward.refineRelation, "replace");
 assert.deepEqual(
   {
@@ -393,7 +395,7 @@ assert.deepEqual(
   },
   { current: 12.5, L: 0, R: 25, start: 12.5, end: 25, departure: 25, arrival: 12.5 }
 );
-const shortenedForward = refine(membershipRefine, "forward");
+const shortenedForward = localRefine(membershipRefine, "forward");
 assert.equal(shortenedForward.refineRelation, "shorten");
 assert.deepEqual(
   {
@@ -407,7 +409,7 @@ assert.deepEqual(
   },
   { current: 37.5, L: 25, R: 50, start: 37.5, end: 50, departure: 50, arrival: 37.5 }
 );
-const replacedAgain = refine(shortenedForward.session, "backward");
+const replacedAgain = localRefine(shortenedForward.session, "backward");
 assert.equal(replacedAgain.refineRelation, "replace");
 assert.deepEqual(
   {
@@ -423,7 +425,7 @@ assert.deepEqual(
 );
 
 let mirroredMembership = createSession({ duration: 100, current: 50 });
-mirroredMembership = refine(mirroredMembership, "forward").session;
+mirroredMembership = localRefine(mirroredMembership, "forward").session;
 assert.deepEqual(
   {
     current: mirroredMembership.model.resolution.C,
@@ -436,7 +438,7 @@ assert.deepEqual(
   },
   { current: 75, L: 50, R: 100, start: 50, end: 75, departure: 50, arrival: 75 }
 );
-const replacedForward = refine(mirroredMembership, "forward");
+const replacedForward = localRefine(mirroredMembership, "forward");
 assert.equal(replacedForward.refineRelation, "replace");
 assert.deepEqual(
   {
@@ -450,7 +452,7 @@ assert.deepEqual(
   },
   { current: 87.5, L: 75, R: 100, start: 75, end: 87.5, departure: 75, arrival: 87.5 }
 );
-const shortenedBackward = refine(mirroredMembership, "backward");
+const shortenedBackward = localRefine(mirroredMembership, "backward");
 assert.equal(shortenedBackward.refineRelation, "shorten");
 assert.deepEqual(
   {
@@ -464,7 +466,7 @@ assert.deepEqual(
   },
   { current: 62.5, L: 50, R: 75, start: 50, end: 62.5, departure: 50, arrival: 62.5 }
 );
-const mirroredReplace = refine(shortenedBackward.session, "forward");
+const mirroredReplace = localRefine(shortenedBackward.session, "forward");
 assert.equal(mirroredReplace.refineRelation, "replace");
 assert.deepEqual(
   {
@@ -495,11 +497,11 @@ assert.equal(session.model.guide, guideBeforeNavigation, "Navigation must not cl
 assert.equal(session.model.resolution.C, 20);
 assert.deepEqual(
   session.model.resolution,
-  { L: 0, C: 20, R: 50, level: 0 },
-  "Direct Go must establish Current independently of recursive Resolution and retain movement scale."
+  { L: 0, C: 20, R: 100, level: 0 },
+  "Direct Go must establish Current independently and clip its five-times movement frame to Range."
 );
-assert.equal(session.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
-assert.deepEqual(getTargets(session.model.resolution), { backward: 10, forward: 35 });
+assert.equal(session.model.resolutionBasis, RESOLUTION_BASIS.RANGE);
+assert.deepEqual(getTargets(session.model.resolution), { backward: 10, forward: 60 });
 assert.deepEqual(
   { start: session.model.interval.start, end: session.model.interval.end },
   { start: 20, end: 50 }
@@ -512,10 +514,10 @@ assert.equal(directFromRefined.model.resolution.level, 2);
 directFromRefined = goTo(directFromRefined, 10, { operator: "timeline", label: "Timeline Click" }).session;
 assert.deepEqual(
   directFromRefined.model.resolution,
-  { L: 0, C: 10, R: 87.5, level: 0 },
-  "Direct Go must discard the preceding recursive path while retaining the scale of the new movement."
+  { L: 0, C: 10, R: 100, level: 0 },
+  "Direct Go must discard the preceding recursive path and clip the new movement frame to Range."
 );
-assert.equal(directFromRefined.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
+assert.equal(directFromRefined.model.resolutionBasis, RESOLUTION_BASIS.RANGE);
 const reopenedDirect = reopen(directFromRefined).session;
 assert.deepEqual(reopenedDirect.model.resolution, { L: 0, C: 10, R: 100, level: 0 });
 assert.equal(reopenedDirect.model.resolutionBasis, RESOLUTION_BASIS.RANGE);
@@ -554,19 +556,20 @@ assert.deepEqual(
 stepped = returnState(stepped).session;
 assert.equal(stepped.model.resolution.C, 50);
 
-// Step pushes a reached binary endpoint instead of collapsing the next Refine.
+// Step pushes an approached binary endpoint only once its midpoint has reached
+// the one-Step guard, preserving one complete Step of useful Refine headroom.
 let pushedNeighborhood = createSession({ duration: 100, current: 50 });
 pushedNeighborhood = refine(pushedNeighborhood, "backward").session;
 assert.deepEqual(pushedNeighborhood.model.resolution, { L: 0, C: 25, R: 50, level: 1 });
 pushedNeighborhood = step(pushedNeighborhood, "forward", 25).session;
-assert.deepEqual(pushedNeighborhood.model.resolution, { L: 0, C: 50, R: 75, level: 0 });
-assert.deepEqual(getTargets(pushedNeighborhood.model.resolution), { backward: 25, forward: 62.5 });
+assert.deepEqual(pushedNeighborhood.model.resolution, { L: 0, C: 50, R: 100, level: 0 });
+assert.deepEqual(getTargets(pushedNeighborhood.model.resolution), { backward: 25, forward: 75 });
 
 let pushedBackward = createSession({ duration: 100, current: 50 });
 pushedBackward = refine(pushedBackward, "forward").session;
 pushedBackward = step(pushedBackward, "backward", 25).session;
-assert.deepEqual(pushedBackward.model.resolution, { L: 25, C: 50, R: 100, level: 0 });
-assert.deepEqual(getTargets(pushedBackward.model.resolution), { backward: 37.5, forward: 75 });
+assert.deepEqual(pushedBackward.model.resolution, { L: 0, C: 50, R: 100, level: 0 });
+assert.deepEqual(getTargets(pushedBackward.model.resolution), { backward: 25, forward: 75 });
 
 // Range deformation preserves the Working Interval while rebasing endpoint frames
 // to the new hard bound.

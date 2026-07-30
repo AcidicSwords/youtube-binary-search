@@ -31,7 +31,7 @@ clone current model
 → publish effects for adapter composition
 ```
 
-Held Step, drag, cascade deletion, Fold/Unfold, hidden-object Go, and Focus/Unfocus amend one origin snapshot and settle as one Undo transaction.
+Held Step, drag, cascade deletion, Fold/Unfold, hidden-object Go, and Focus/Unfocus amend one origin snapshot and settle as one Undo transaction. Session owns both bounded `history` and `future`; a new commit clears `future`, while `undo()` and `redo()` move exact checkpoints between them.
 
 `stepReach` is semantic and stores `{ mode, backward, forward, fraction }`. Physical Field offsets are a separate preference value. `effectiveStepReach()` is the sole adaptive conversion boundary and receives the current temporal projection.
 
@@ -56,16 +56,15 @@ The inverse mapping uses direction at a Fold coordinate. Plain Step translates c
 
 ## Refine and interval composition
 
-Ordinary `refine()` delegates target and child-frame calculation to the established Range kernel.
+Both Refine variants delegate target and child-frame calculation to the established Range kernel.
 
-`additiveRefine()` invokes the same movement, then replaces only the interval/frame decision:
+Plain `refine()` retains the existing Step departure when usable, otherwise the pre-movement Current. It contains the resulting extent by expanding only the receding frame bound and preserves the refinement level.
 
-- retain the existing Step departure when it is usable;
-- otherwise retain the pre-movement Current;
-- contain the resulting extent by expanding its receding frame bound;
-- do not reset the refinement level.
+`localRefine()` is the Shift variant. It applies the established midpoint-membership law: an inside target shortens toward the opposite endpoint, and an outside target replaces the Working Interval.
 
-`step()`, `stepToPin()`, and settled playback share the same interval-anchor helper. `switchEndpoint()` is a strict role swap; folded endpoint choice is represented by which exact Pin is Current, never a hidden side mode.
+`step()` and `stepToPin()` share the same interval-anchor helper and one prospective-midpoint guard. They keep the approached endpoint fixed until another Step would leave less than one Reach of midpoint headroom. Settled playback has separate union-only interval ownership. `switchEndpoint()` is a strict boundary selection; folded endpoint choice is represented by which exact Pin is Current, never a hidden side mode.
+
+Direct Timeline/Guide Go first resolves any Focus/Full-Video scope change, then routes through `seedNeighborhoodFromMovement()` using the resulting projection. The complete movement becomes the Working Interval; its projected width supplies two equal margins on each side, producing a five-times movement frame before Range clipping. The shared constructor is the only owner of this scale law. A zero-lateral Fold-face hop bypasses reseeding and retains the prior frame.
 
 ## Guide graph
 
@@ -85,13 +84,15 @@ idle | context | playback
 
 Context stores one frozen source window centered on its anchor and never consults Fold geometry. Playback stores source start/end, phase, and cycle count.
 
-A proper active Range loops. `rebasePlaybackTransport()` creates the next cycle without touching Session. The application places Center at Range start, rebases the existing Field relation once, and resumes. Full-video playback settles at its natural end.
+A proper active Range loops. `rebasePlaybackTransport()` creates the next cycle without touching Session and records Range start as that cycle’s watchdog entry instead of retaining the original mid-Range departure. The application places Center at Range start, rebases the existing Field relation once, and resumes. Full-video playback settles at its natural end.
 
-Playback projection and settlement both use `projectPlayback()`; this prevents the visible Working Interval and committed result from diverging.
+Playback projection and settlement both use `projectPlayback()`. It unions prior Working coverage with watched source segments, so live and committed coverage can only remain equal or grow.
 
 ## Field
 
-Field Offset is physical state. `step-field.js` may report measured offsets when Hold occurs, but `app.js` records them only in `fieldOffsets`. It never calls `setStepReach()` from Hold or Stretch.
+Field Offset is configured physical state. Only explicit Offset input updates `fieldOffsets`. Hold and Stretch maintain runtime side state without reporting or persisting their measured relation, and neither can call `setStepReach()`.
+
+Field target placement and measurement are always source-time arithmetic. Fold projection is applied only when those exact addresses are drawn; a non-injective Fold coordinate never enters Field physics.
 
 All semantic Step surfaces resolve through `step-gesture.js`. A repeated press parks Center, Tail, and Lead at each committed Current, keeps one history origin, and starts automatic Context at most once after settlement.
 
@@ -99,15 +100,17 @@ All semantic Step surfaces resolve through `step-gesture.js`. A repeated press p
 
 `view.js` renders:
 
-- a five-marker source timestamp ruler positioned in Traversal Time;
-- Range, Resolution, action previews, and Working Interval;
-- greedily lane-packed open Sections;
-- maximal Fold axes with per-Section contributor rails;
-- staggered but source-accurate dense endpoint Pins;
+- adaptive major/minor source timestamp guides positioned in Traversal Time;
+- Range, Resolution, exact dry-run action previews, and Working Interval;
+- greedily lane-packed open Sections with no fixed lane cap;
+- maximal Fold axes with per-Section contributor rails in a separate dynamic-height band;
+- collision-packed, source-accurate endpoint Pins and connectors;
 - Current and source-contiguous playback Cursor;
 - visible free/shared Pins.
 
 The Fold rail is presentation of source order, not an operator track. Only boundary Pin buttons are operands.
+
+`previewTransition()` routes presentation through the exact Session operator used for commit. The view draws its resulting Current, Resolution endpoints/midpoints, and Working Interval rather than maintaining parallel preview arithmetic.
 
 Timeline input stays in `app.js`:
 
@@ -118,6 +121,7 @@ Timeline input stays in `app.js`:
 - Fold endpoint: exact Pin Go/drag;
 - horizontal Fold rail drag: translate that Section;
 - Range handles: update Range without rewriting Guide.
+- Range Start/End controls: move to or set a boundary as distinct actions; Pin traversal also sees them as synthetic stops.
 
 Pointer capture and document fallback give each drag exactly one terminal event.
 

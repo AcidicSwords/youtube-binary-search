@@ -14,7 +14,7 @@ import {
 } from "./guide.js";
 import {
   STEP_REACH_MODE,
-  additiveRefine,
+  refine,
   createSession,
   deleteGuidePin,
   effectiveStepReach,
@@ -147,18 +147,18 @@ function foldedGuide(...extents) {
   assert.equal(session.model.resolution.C, 46);
 }
 
-// Additive Refine retains the departure anchor in the active asymmetric frame.
+// Plain Refine retains the departure anchor in the active asymmetric frame.
 {
   let session = createSession({ duration: 100, current: 50 });
-  session = additiveRefine(session, "backward").session;
-  session = additiveRefine(session, "backward").session;
-  close(session.model.resolution.L, 0, "Additive Refine backward bound");
-  close(session.model.resolution.C, 12.5, "Additive Refine Current");
-  close(session.model.resolution.R, 50, "Additive Refine retained forward bound");
-  close(session.model.interval.departure, 50, "Additive Refine anchor");
-  close(session.model.interval.arrival, 12.5, "Additive Refine arrival");
+  session = refine(session, "backward").session;
+  session = refine(session, "backward").session;
+  close(session.model.resolution.L, 0, "Refine backward bound");
+  close(session.model.resolution.C, 12.5, "Refine Current");
+  close(session.model.resolution.R, 50, "Refine retained forward bound");
+  close(session.model.interval.departure, 50, "Refine anchor");
+  close(session.model.interval.arrival, 12.5, "Refine arrival");
 
-  session = additiveRefine(session, "forward").session;
+  session = refine(session, "forward").session;
   close(session.model.resolution.C, 31.25, "Asymmetric forward midpoint");
   close(session.model.interval.departure, 50, "Reverse retains original anchor");
 

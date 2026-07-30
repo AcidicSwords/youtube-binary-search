@@ -212,10 +212,18 @@ export function refineNeighborhood(neighborhood, destination, range) {
 }
 
 /**
- * Establish a local two-sided Neighborhood from an actual movement. The crossed
- * Interval occupies one side of Current; the opposite side is generated at the
- * same scale and clipped to Range. This preserves the scale communicated by Go
- * without changing Range or conflating Neighborhood with Interval.
+ * Establish a local two-sided Neighborhood from an actual movement.
+ *
+ * The crossed Working Interval is the central fifth of the new frame in the
+ * active metric: two Interval-width margins precede it and two follow it.
+ * Clipping at Range may remove unavailable margin, but never shifts the
+ * Interval or invents distance on the other side. Current remains the arrival
+ * endpoint, so both directional refinement midpoints exist whenever Range
+ * actually has space on both sides.
+ *
+ * A zero-distance movement cannot communicate a lateral scale. Callers that
+ * distinguish stacked Fold-face hops preserve their existing frame before
+ * reaching this fallback.
  */
 export function seedNeighborhoodFromMovement(departure, arrival, range, metric = null) {
   if (!Number.isFinite(departure) || !Number.isFinite(arrival)) {
@@ -231,24 +239,14 @@ export function seedNeighborhoodFromMovement(departure, arrival, range, metric =
   const rangeEnd = metricCoordinate(metric, range.end);
   const departureCoordinate = metricCoordinate(metric, A);
   const currentCoordinate = metricCoordinate(metric, C);
-  const scale = Math.abs(currentCoordinate - departureCoordinate);
+  const intervalStart = Math.min(departureCoordinate, currentCoordinate);
+  const intervalEnd = Math.max(departureCoordinate, currentCoordinate);
+  const scale = intervalEnd - intervalStart;
   if (scale <= EPSILON) return createRoot(range.start, C, range.end);
 
-  if (currentCoordinate > departureCoordinate) {
-    const rightCoordinate = Math.min(rangeEnd, currentCoordinate + scale);
-    return assertNeighborhood({
-      L: A,
-      C,
-      R: clamp(
-        metricAddress(metric, rightCoordinate, "upper"),
-        range.start,
-        range.end
-      ),
-      level: 0
-    });
-  }
-
-  const leftCoordinate = Math.max(rangeStart, currentCoordinate - scale);
+  const margin = scale * 2;
+  const leftCoordinate = Math.max(rangeStart, intervalStart - margin);
+  const rightCoordinate = Math.min(rangeEnd, intervalEnd + margin);
   return assertNeighborhood({
     L: clamp(
       metricAddress(metric, leftCoordinate, "lower"),
@@ -256,7 +254,11 @@ export function seedNeighborhoodFromMovement(departure, arrival, range, metric =
       range.end
     ),
     C,
-    R: A,
+    R: clamp(
+      metricAddress(metric, rightCoordinate, "upper"),
+      range.start,
+      range.end
+    ),
     level: 0
   });
 }
@@ -355,10 +357,13 @@ export function stepNeighborhood(
     level: neighborhood.level ?? 0
   };
 
-  // Step is linear: it preserves the endpoint being left and pushes only the
-  // approached refinement endpoint. If the Step reaches or crosses that bound,
-  // retain a full Step beyond Current so the next directional Refine remains
-  // available at half-Step scale (unless Range is the hard stop).
+  // Step is linear, but Resolution does not translate with every movement.
+  // The endpoint being left is fixed. The approached endpoint is fixed until
+  // the *prospective* directional midpoint is no farther than one Step from
+  // Current. From that threshold onward, advance only that endpoint far enough
+  // to keep the next directional midpoint one Step ahead (unless Range clips
+  // it). Evaluating the prospective frame makes coalesced/reversed Step
+  // gestures depend only on their net destination rather than tap cadence.
   const currentCoordinate = metricCoordinate(metric, neighborhood.C);
   const destinationCoordinate = metricCoordinate(metric, C);
   const leftCoordinate = metricCoordinate(metric, neighborhood.L);
@@ -366,36 +371,62 @@ export function stepNeighborhood(
   const rangeStart = metricCoordinate(metric, range.start);
   const rangeEnd = metricCoordinate(metric, range.end);
   const delta = destinationCoordinate - currentCoordinate;
-  if (delta > EPSILON) {
-    const translated = rightCoordinate + delta;
-    const crossed = destinationCoordinate >= rightCoordinate - EPSILON
-      ? destinationCoordinate + reach
-      : translated;
+  const sourceDelta = C - neighborhood.C;
+  const movingForward = delta > EPSILON
+    || (Math.abs(delta) <= EPSILON && sourceDelta > EPSILON);
+  const movingBackward = delta < -EPSILON
+    || (Math.abs(delta) <= EPSILON && sourceDelta < -EPSILON);
+
+  if (movingForward) {
+    const prospectiveHalfSpan = Math.max(
+      0,
+      rightCoordinate - destinationCoordinate
+    ) / 2;
+    const crossedSourceBound = C > neighborhood.R + EPSILON;
+    const guardReached = prospectiveHalfSpan <= reach + EPSILON
+      || destinationCoordinate >= rightCoordinate - EPSILON
+      || crossedSourceBound;
+    if (!guardReached) return assertNeighborhood(next);
+    const guardedCoordinate = Math.max(
+      rightCoordinate,
+      destinationCoordinate + reach * 2
+    );
     next.R = clamp(
       metricAddress(
         metric,
-        Math.min(rangeEnd, Math.max(translated, crossed)),
+        Math.min(rangeEnd, guardedCoordinate),
         "upper"
       ),
       range.start,
       range.end
     );
-    next.level = 0;
-  } else if (delta < -EPSILON) {
-    const translated = leftCoordinate + delta;
-    const crossed = destinationCoordinate <= leftCoordinate + EPSILON
-      ? destinationCoordinate - reach
-      : translated;
+    if (next.R < C) next.R = C;
+    if (next.R > neighborhood.R + EPSILON) next.level = 0;
+  } else if (movingBackward) {
+    const prospectiveHalfSpan = Math.max(
+      0,
+      destinationCoordinate - leftCoordinate
+    ) / 2;
+    const crossedSourceBound = C < neighborhood.L - EPSILON;
+    const guardReached = prospectiveHalfSpan <= reach + EPSILON
+      || destinationCoordinate <= leftCoordinate + EPSILON
+      || crossedSourceBound;
+    if (!guardReached) return assertNeighborhood(next);
+    const guardedCoordinate = Math.min(
+      leftCoordinate,
+      destinationCoordinate - reach * 2
+    );
     next.L = clamp(
       metricAddress(
         metric,
-        Math.max(rangeStart, Math.min(translated, crossed)),
+        Math.max(rangeStart, guardedCoordinate),
         "lower"
       ),
       range.start,
       range.end
     );
-    next.level = 0;
+    if (next.L > C) next.L = C;
+    if (next.L < neighborhood.L - EPSILON) next.level = 0;
   }
 
   return assertNeighborhood(next);

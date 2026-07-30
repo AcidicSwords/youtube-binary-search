@@ -113,7 +113,8 @@ assert.match(
   styles,
   /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward switch-endpoint step-forward"[\s\S]*"release transpose focus"/
 );
-assert.match(html, /id="return-action"[^>]*aria-keyshortcuts="Control\+Z Meta\+Z"/);
+assert.match(html, /id="return-action"[^>]*aria-keyshortcuts="Z"/);
+assert.match(html, /id="redo-action"[^>]*aria-keyshortcuts="C"/);
 assert.match(styles, /touch-action:\s*manipulation/);
 assert.match(styles, /\.timeline[^{]*\{[^}]*touch-action:\s*pan-y/s);
 assert.match(
@@ -138,13 +139,14 @@ assert.match(view, /dataset\.sectionExpand/);
 assert.match(view, /dataset\.foldContributors/);
 assert.match(view, /timeline-fold-pin/);
 
-assert.match(session, /export function additiveRefine/);
+assert.match(session, /export function localRefine/);
+assert.match(session, /export function refine[\s\S]*refineRelation:\s*"retain"/);
 assert.match(session, /export function releaseInterval/);
 assert.match(session, /export function transposeSection/);
 assert.match(session, /export function focusWorkingSection[\s\S]*FOCUS_KIND\.WORKING/);
 assert.match(session, /export function overwriteGuideSection[\s\S]*replaceSectionExtent/);
 assert.match(session, /syncIntervalEndpointFrames[\s\S]*containExtent/);
-assert.match(session, /projectPlayback[\s\S]*stepIntervalAnchor[\s\S]*translateNeighborhood/);
+assert.match(session, /projectPlayback[\s\S]*translateNeighborhood[\s\S]*sourceInterval\?\.start[\s\S]*sourceInterval\?\.end/);
 assert.match(session, /completePlayback[\s\S]*projectPlayback/);
 
 assert.match(guide, /collapsed:\s*options\.collapsed === true/);
@@ -166,7 +168,7 @@ assert.match(
   /halfDuration\s*=\s*seconds\s*\/\s*2[\s\S]*boundedAnchor - halfDuration[\s\S]*boundedAnchor \+ halfDuration/,
   "Context must remain centered in source time."
 );
-assert.match(app, /function wrapPlaybackRange[\s\S]*rebasePlaybackTransport\(transport\)[\s\S]*placePlayer\(range\.start\)[\s\S]*resumeAt[\s\S]*player\.play\(\)/);
+assert.match(app, /function wrapPlaybackRange[\s\S]*rebasePlaybackTransport\(transport,\s*range\.start\)[\s\S]*placePlayer\(range\.start\)[\s\S]*resumeAt[\s\S]*player\.play\(\)/);
 assert.match(app, /createStepGestureController[\s\S]*bindStepPress/);
 assert.match(app, /function goToAdjacentPin[\s\S]*stepToPinSession/);
 assert.match(app, /function releaseWorkingInterval[\s\S]*releaseSessionInterval/);

@@ -57,23 +57,18 @@ function validateFieldInputs(current, stepReach, range) {
   }
 }
 
-export function deriveFieldBounds({ current, stepReach, range, projection = null }) {
+export function deriveFieldBounds({ current, stepReach, range }) {
   const requested = normalizeFieldReach(stepReach);
   validateFieldInputs(current, requested, range);
 
   const center = clamp(current, range.start, range.end);
-  const backwardTarget = projection?.sourceStep
-    ? projection.sourceStep(center, requested.backward, "backward", range)
-    : Math.max(range.start, center - requested.backward);
-  const forwardTarget = projection?.sourceStep
-    ? projection.sourceStep(center, requested.forward, "forward", range)
-    : Math.min(range.end, center + requested.forward);
-  const backwardReach = projection?.sourceDistance
-    ? projection.sourceDistance(center, backwardTarget)
-    : Math.max(0, center - backwardTarget);
-  const forwardReach = projection?.sourceDistance
-    ? projection.sourceDistance(center, forwardTarget)
-    : Math.max(0, forwardTarget - center);
+  // Field offsets are physical source-time relations. Folding is a navigation
+  // projection only and must never collapse, expand, or redirect Tail/Lead
+  // placement or Hold/Stretch measurement.
+  const backwardTarget = Math.max(range.start, center - requested.backward);
+  const forwardTarget = Math.min(range.end, center + requested.forward);
+  const backwardReach = Math.max(0, center - backwardTarget);
+  const forwardReach = Math.max(0, forwardTarget - center);
   const tailConstrained = backwardReach < requested.backward - EPSILON;
   const leadConstrained = forwardReach < requested.forward - EPSILON;
 
@@ -104,8 +99,8 @@ export function deriveFieldBounds({ current, stepReach, range, projection = null
   };
 }
 
-export function deriveStepField(current, stepReach, range, projection = null) {
-  const bounds = deriveFieldBounds({ current, stepReach, range, projection });
+export function deriveStepField(current, stepReach, range) {
+  const bounds = deriveFieldBounds({ current, stepReach, range });
   return {
     center: bounds.current,
     requestedReach: bounds.requestedReach,
