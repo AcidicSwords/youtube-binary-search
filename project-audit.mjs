@@ -11,7 +11,7 @@ const app = read("app.js");
 const view = read("view.js");
 const session = read("session.js");
 const guide = read("guide.js");
-const projection = read("temporal-projection.js");
+const projection = read("timeline-projection.js");
 const transport = read("transport.js");
 const field = read("step-field.js");
 const fieldGeometry = read("step-field-geometry.js");
@@ -43,7 +43,7 @@ const docs = Object.fromEntries([
   "VALIDATION.md"
 ].map(path => [path, read(path)]));
 
-assert.equal(pkg.version, "6.0.0");
+assert.equal(pkg.version, "7.0.0");
 assert.ok(docs["SPEC.md"].startsWith("# Binary YouTube Reader — Canonical Specification\n"));
 assert.ok(docs["IMPLEMENTATION.md"].startsWith("# Binary YouTube Reader — Canonical Implementation\n"));
 assert.ok(docs["INTERFACE.md"].startsWith("# Binary YouTube Reader — Interface Grammar\n"));
@@ -58,30 +58,39 @@ assert.doesNotMatch(html, /id="loop"|id="pin-backward"|id="pin-forward"/);
 
 assert.match(html, /player-panel[\s\S]*timeline-panel[\s\S]*command-workspace/);
 assert.match(html, /command-workspace[\s\S]*parameter-panel[\s\S]*navigation-panel[\s\S]*guide-panel/);
-assert.match(html, /id="timeline-ruler"[\s\S]*id="section-lane"[\s\S]*id="fold-lane"[\s\S]*id="pin-lane"/);
+assert.match(html, /id="timeline-ruler"[\s\S]*id="section-lane"[\s\S]*id="pin-lane"/);
+assert.doesNotMatch(html, /id="fold-lane"/);
 assert.match(html, /id="step-size-settings"[\s\S]*id="step-mode-fixed"[\s\S]*id="step-mode-adaptive"/);
 assert.match(html, /data-step-fraction="0\.03125"[\s\S]*data-step-fraction="0\.0625"[\s\S]*data-step-fraction="0\.125"/);
 assert.match(html, /Manual lateral distance/);
-assert.match(html, /active Range’s lateral width/);
+assert.match(html, /active Range’s weighted timeline width/);
+const deformOptions = html.match(
+  /<select id="deform-weight-select"[\s\S]*?>([\s\S]*?)<\/select>/
+)?.[1];
+assert.ok(deformOptions, "Deform requires a visible timeline-weight selector.");
+assert.deepEqual(
+  [...deformOptions.matchAll(/<option value="([^"]+)"/g)].map(match => match[1]),
+  ["0.25", "0.5", "0.75", "1", "1.25", "1.5", "1.75", "2"],
+  "Deform must copy the familiar Tail/Lead scale exactly."
+);
 
 assert.match(
   styles,
-  /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward switch-endpoint step-forward"[\s\S]*"release transpose focus"/
+  /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward switch-endpoint step-forward"[\s\S]*"release deform focus"/
 );
 for (const area of [
   "#refine-backward { grid-area: refine-backward; }",
   "#switch-endpoint { grid-area: switch-endpoint; }",
   "#release { grid-area: release; }",
-  "#transpose { grid-area: transpose; }",
+  ".deform-control { grid-area: deform; }",
   "#focus-toggle { grid-area: focus; }"
 ]) assert.ok(styles.includes(area), `Missing matrix area: ${area}`);
 
-assert.match(styles, /\.timeline-fold-axis/);
-assert.match(styles, /\.timeline-fold-pin\.offset-right::before/);
-assert.match(styles, /\.timeline-fold-pin\.offset-left::before/);
-assert.match(styles, /\.timeline-fold-rail\.interval-included/);
-assert.match(styles, /@media \(pointer: coarse\)[\s\S]*\.timeline-fold-pin,[\s\S]*\.timeline-fold-hinge[\s\S]*width:\s*22px[\s\S]*\.timeline-fold-rail[\s\S]*width:\s*9px/);
-assert.doesNotMatch(styles, /\.timeline-fold-(?:pin|hinge|rail)::after/);
+assert.match(styles, /\.timeline-section-span\.compressed[\s\S]*linear-gradient/);
+assert.match(styles, /\.timeline-section-span\.expanded[\s\S]*linear-gradient/);
+assert.match(styles, /\.timeline-section-weight/);
+assert.match(styles, /\.guide-section-weight/);
+assert.doesNotMatch(styles, /\.timeline-fold-/);
 assert.match(styles, /--control-height:\s*40px/);
 assert.match(styles, /--touch:\s*48px/);
 assert.equal((styles.match(/@media \(min-width: 1221px\)/g) || []).length, 1);
@@ -96,22 +105,24 @@ assert.match(session, /export function localRefine/);
 assert.match(session, /export function refine/);
 assert.match(session, /export function stepToPin/);
 assert.match(session, /export function releaseInterval/);
-assert.match(session, /export function transposeSection/);
+assert.match(session, /export function deformSection/);
+assert.match(session, /export function setGuideSectionWeight/);
 assert.match(session, /export function goToGuidePin/);
 assert.match(session, /export function goToGuideSection/);
 assert.match(session, /export function switchEndpoint[\s\S]*nextSide[\s\S]*departure:\s*retainedDeparture[\s\S]*arrival:\s*departure/);
 
-assert.match(guide, /export function setSectionCollapsed/);
+assert.match(guide, /SECTION_WEIGHT_VALUES[\s\S]*0\.25[\s\S]*2/);
+assert.match(guide, /export function setSectionWeight/);
 assert.match(guide, /export function sectionsForPin/);
 assert.match(guide, /function translatedPinIds[\s\S]*section\.startPinId[\s\S]*section\.endPinId/);
 assert.doesNotMatch(guide, /fold-topology-conflict|collapsedFrontier/);
 
-assert.match(projection, /export function createTemporalProjection/);
-assert.match(projection, /normalizeFoldUnion/);
-assert.match(projection, /boundaryPins/);
+assert.match(projection, /export function createTimelineProjection/);
+assert.match(projection, /buildSegments/);
+assert.match(projection, /contributors\.reduce[\s\S]*product \* activeWeight/);
 assert.match(projection, /orderedPinStops/);
-assert.match(projection, /expandedSectionIds/);
-assert.match(projection, /expandedExtents/);
+assert.match(projection, /weightAtSource/);
+assert.doesNotMatch(projection, /affinity|materializ|collapse|fold/i);
 assert.doesNotMatch(projection, /player|document|window/);
 
 assert.match(transport, /PLAYBACK:\s*"playback"/);
@@ -129,17 +140,18 @@ assert.match(app, /function setStepFraction/);
 assert.match(app, /function wrapPlaybackRange/);
 assert.match(app, /rebasePlaybackTransport\(transport,\s*range\.start\)/);
 assert.match(app, /function releaseWorkingInterval/);
-assert.match(app, /function transposeWorkingOrSelected/);
+assert.match(app, /function deformWorkingOrSelected/);
+assert.match(app, /function changeSectionWeight/);
 assert.match(app, /function focusOrUnfocus/);
 
 assert.doesNotMatch(app, /createSkimTransport|startLoop|wrapLoopTransport/);
 assert.doesNotMatch(view, /dataset\.loopSection/);
-assert.match(view, /dataset\.sectionCollapse/);
-assert.match(view, /dataset\.sectionExpand/);
-assert.match(view, /dataset\.foldContributors/);
-assert.match(view, /timeline-fold-cursor/);
+assert.match(view, /dataset\.sectionWeight/);
+assert.match(view, /timeline-section-span/);
+assert.match(view, /SECTION_WEIGHT_VALUES/);
+assert.doesNotMatch(view, /timeline-fold|foldContributors|sectionCollapse|sectionExpand/);
 assert.match(view, /timeline-ruler-tick/);
-assert.match(view, /hingePins[\s\S]*Math\.max\(18/);
+assert.match(view, /packTimelineSectionLanes/);
 
 assert.match(stepGesture, /createStepGestureController/);
 assert.match(stepGesture, /bindStepPress/);
@@ -153,8 +165,9 @@ assert.doesNotMatch(rangeGeometry, /\bskim\b|logSpeed|chooseSupportedRate/i);
 
 for (const required of [
   "v5.8-regression-tests.mjs",
-  "temporal-projection-tests.mjs",
-  "v6-transposition-tests.mjs",
+  "timeline-projection-tests.mjs",
+  "v7-deformation-tests.mjs",
+  "v7-coherence-tests.mjs",
   "transport-tests.mjs",
   "endpoint-transposition-tests.mjs",
   "semantic-composition-tests.mjs",
@@ -166,12 +179,13 @@ assert.match(pkg.scripts["test:semantic"], /semantic-state-space-tests\.mjs/);
 assert.match(pkg.scripts.audit, /integration-check\.mjs/);
 assert.match(pkg.scripts.audit, /project-audit\.mjs/);
 
-assert.match(docs["SPEC.md"], /Traversal Time/);
+assert.match(docs["SPEC.md"], /Timeline Space/);
 assert.match(docs["SPEC.md"], /source-contiguous/);
 assert.match(docs["SPEC.md"], /one Undo transaction/);
 assert.match(docs["IMPLEMENTATION.md"], /step-gesture\.js/);
-assert.match(docs["IMPLEMENTATION.md"], /temporal-projection\.js/);
+assert.match(docs["IMPLEMENTATION.md"], /timeline-projection\.js/);
+assert.match(docs["IMPLEMENTATION.md"], /positive spatial/);
 assert.match(docs["VALIDATION.md"], /each wrap rebases each available side at most once/);
 assert.match(docs["VALIDATION.md"], /1\/32[\s\S]*1\/16[\s\S]*1\/8/);
 
-console.log("Project audit passed: v6 matrix, independent Step sizing, transposed Section graph, source-contiguous Range playback, timeline presentation, module boundaries, and canonical documents agree.");
+console.log("Project audit passed: v7 matrix, independent Step sizing, weighted Section graph, source-contiguous Range playback, timeline presentation, module boundaries, and canonical documents agree.");

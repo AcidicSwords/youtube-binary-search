@@ -83,7 +83,7 @@ for (const id of [
   "field-transport-state", "field-both-toggle", "field-span-fill",
   "tail-field-toggle", "lead-field-toggle", "tail-step-button", "lead-step-button",
   "section-capture", "section-source", "pin-capture", "pin-current",
-  "release", "transpose", "focus-toggle", "shift-layer-toggle",
+  "release", "deform", "deform-weight-select", "focus-toggle", "shift-layer-toggle",
   "step-size-seconds", "step-mode-fixed", "step-mode-adaptive"
 ]) assert.match(html, new RegExp(`id=["']${id}["']`), `Missing v5.8 Field/Guide control: ${id}`);
 
@@ -105,7 +105,7 @@ assert.doesNotMatch(app, /createLoopTransport|TRANSPORT_KIND\.LOOP|data-loop-sec
 assert.doesNotMatch(
   app,
   /transportMaterializedExtents|expandedExtents/,
-  "Playback and Context must not mutate Fold projection."
+  "Playback and Context must not mutate timeline weighting."
 );
 assert.match(app, /saveExtentAsSection/);
 assert.doesNotMatch(app, /createSkimTransport|completeSkim|reachSkimDestination/);

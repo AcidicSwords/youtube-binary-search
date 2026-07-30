@@ -182,6 +182,10 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
   addOption(byId.get("section-source"), "field-span", "Held Field span");
   addOption(byId.get("tail-rate-select"), "1", "Loading");
   addOption(byId.get("lead-rate-select"), "1", "Loading");
+  for (const weight of [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]) {
+    addOption(byId.get("deform-weight-select"), weight, `${weight}×`);
+  }
+  byId.get("deform-weight-select").value = "0.5";
 
   const documentListeners = new Map();
   const body = new FakeElement("body", "BODY");

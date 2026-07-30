@@ -3,54 +3,55 @@
 ## Principles
 
 1. Source time is canonical.
-2. Traversal Time is derived and pure.
-3. Folding changes navigation and layout, never media continuity.
-4. A gesture creates at most one Undo checkpoint.
-5. Current and Cursor remain distinct.
-6. Semantic Step size and physical Field offsets remain independent.
-7. Shared Pins form a graph; do not invent a stored Section hierarchy.
+2. Timeline Space is derived, positive, and pure.
+3. Section weight changes map geometry only.
+4. Playback, Context, and Field geometry remain source-time systems.
+5. A gesture creates at most one Undo checkpoint.
+6. Current and Cursor remain distinct.
+7. Step Reach, Field Offset, and Section weight have separate ownership.
+8. Shared Pins form a graph; do not invent a stored Section hierarchy.
 
 ## Change routing
 
 - Session/operator law: `session.js`, with pure geometry in `range-geometry.js`
-- Fold union, mapping, Pin stops: `temporal-projection.js`
-- Pin/Section lifecycle and migration: `guide.js`
+- Section density, mapping, and Pin positions: `timeline-projection.js`
+- Pin/Section lifecycle, weight validation, and migration: `guide.js`
 - Context/playback runtime: `transport.js`
 - Timeline and Guide projection: `view.js`
-- Timeline input, shortcuts, persistence, adapter coordination: `app.js`
+- Timeline input, shortcuts, persistence, adapters: `app.js`
 - Held Step ownership: `step-gesture.js`
 - Field geometry/runtime: `step-field-geometry.js`, `step-field.js`
 - YouTube construction and placement: `youtube.js`
 
-Do not add Fold-specific arithmetic to an operator. Extend the shared projection and prove the mapping first.
+Do not add Section-coverage branches to an operator. Extend the shared positive projection and prove its mapping first.
 
 ## Required semantic discipline
 
 - Keep Range, Current, Cursor, Working Interval, Pins, and Section endpoints in source seconds.
-- Never persist a Fold union, Traversal coordinate, lane, colour, or stagger offset.
-- Do not make playback, Context, or YouTube adapters skip collapsed media.
-- Preserve arbitrary overlap and asymmetrical nesting.
-- Toggle collapse per Section even when several contributors share a Fold.
-- Keep interior Fold positions non-operable; only boundary Pins are vertical stops.
-- Materialize a transposed Section for Focus without mutating its stored flag.
-- Unfold covering contributors for an exact hidden Guide target in the same transaction.
-- Recompute adaptive Step from active projected Range; never from source duration or Field Offset.
-- Hold/Stretch are runtime-only and may update neither `fieldOffsets` nor `stepReach`.
+- Persist only a canonical Section factor, never Timeline Space, segment products, lane placement, or gradient state.
+- Keep every effective density strictly positive.
+- Compose overlapping Section factors deterministically and without priority.
+- Never make playback, Context, YouTube adapters, or Field geometry consult Section weights.
+- Preserve arbitrary overlap, asymmetric nesting, shared endpoints, and coincident extents.
+- Recompute adaptive Step from active weighted Range width, never from source duration or Field Offset.
+- Keep fixed Step Reach unchanged when Section geometry changes.
+- Hold and Stretch may update neither `fieldOffsets`, `stepReach`, nor Guide.
+- Timeline and Guide weight selectors must call the same Session transaction.
 
 ## Testing map
 
 - `tests.mjs` — Range geometry and Session transactions
-- `temporal-projection-tests.mjs` — Fold union, maps, layout, materialization
-- `v6-transposition-tests.mjs` — matrix additions, Pin graph, adaptive Step, cascade behavior
-- `v6-coherence-tests.mjs` — guarded Step, swapped Refine, Fold Fields/stops, monotonic playback, Redo, exact previews, dense layout
-- `transport-tests.mjs` — source Context and proper-Range looping helpers
+- `timeline-projection-tests.mjs` — canonical factors, maps, inverses, overlap composition, Pin order, migration
+- `v7-deformation-tests.mjs` — Deform ownership, adaptive Step, Guide graph, nested weights
+- `v7-coherence-tests.mjs` — guarded Step, Refine roles, source Field behavior, monotonic playback, Redo, exact previews, lane packing
+- `transport-tests.mjs` — source Context and proper-Range looping
 - `source-field-tests.mjs` — source player relationships
-- `fuzz-tests.mjs` — 25,000 deterministic semantic operations
+- `fuzz-tests.mjs` — deterministic semantic operations
 - `v5.8-regression-tests.mjs` — preserved interaction-kernel guarantees
 - `endpoint-transposition-tests.mjs` — endpoint frames and matrix ownership
 - `semantic-composition-tests.mjs` — cross-operator sequences
-- `semantic-audit-probes.mjs` — adversarial semantic regressions
-- `step-gesture-tests.mjs` — cadence, batching, and one-Undo settlement
+- `semantic-audit-probes.mjs` — adversarial regressions
+- `step-gesture-tests.mjs` — cadence, batching, one-Undo settlement
 - `step-field-tests.mjs` — pure Field geometry
 - `field-runtime-tests.mjs` — controller lifecycle
 - `field-grammar-tests.mjs` — UI ownership
@@ -58,7 +59,7 @@ Do not add Fold-specific arithmetic to an operator. Extend the shared projection
 - `field-coherence-tests.mjs` — Step/Offset independence
 - `semantic-state-space-tests.mjs` — extended state-space proof
 
-Smoke tests cover startup, interaction, Context, gestures, transport wrapping, Section folding, and metadata.
+Smoke tests cover startup, interaction, Context, gestures, transport wrapping, Section weighting, and metadata.
 
 ## Release workflow
 
@@ -67,13 +68,13 @@ npm run check
 npm run test:semantic
 ```
 
-Also inspect desktop and narrow layouts with at least:
+Also inspect wide, narrow, and coarse-pointer layouts with:
 
-- several open overlapping Sections;
-- one composite Fold;
-- a dense cluster of stacked endpoints;
-- a focused transposed Section;
-- a proper Range during a playback wrap;
-- coarse-pointer hit targets.
+- all eight Section weights;
+- overlapping, nested, crossing, and coincident Sections;
+- dense Section lanes and Pin clusters;
+- compressed and expanded gradients;
+- a focused weighted Section;
+- a proper Range during playback wrap.
 
-No release is complete while canonical documents, audits, and visible labels describe retired behavior.
+No release is complete while canonical documents, audits, visible labels, or file names describe retired behavior.

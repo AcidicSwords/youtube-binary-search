@@ -25,9 +25,9 @@ function metricCoordinate(metric, address) {
   return metric?.toCoordinate ? metric.toCoordinate(address) : address;
 }
 
-function metricAddress(metric, coordinate, affinity) {
+function metricAddress(metric, coordinate) {
   return metric?.fromCoordinate
-    ? metric.fromCoordinate(coordinate, affinity)
+    ? metric.fromCoordinate(coordinate)
     : coordinate;
 }
 
@@ -106,8 +106,8 @@ export function getTargets(neighborhood, metric = null) {
   const R = metricCoordinate(metric, neighborhood.R);
   const backwardCoordinate = midpoint(L, C);
   const forwardCoordinate = midpoint(C, R);
-  const backward = metricAddress(metric, backwardCoordinate, "backward");
-  const forward = metricAddress(metric, forwardCoordinate, "forward");
+  const backward = metricAddress(metric, backwardCoordinate);
+  const forward = metricAddress(metric, forwardCoordinate);
   return {
     backward: backwardCoordinate < C - EPSILON
       ? backward
@@ -248,9 +248,7 @@ export function refineNeighborhood(neighborhood, destination, range) {
  * endpoint, so both directional refinement midpoints exist whenever Range
  * actually has space on both sides.
  *
- * A zero-distance movement cannot communicate a lateral scale. Callers that
- * distinguish stacked Fold-face hops preserve their existing frame before
- * reaching this fallback.
+ * A zero-distance movement cannot communicate a lateral scale.
  */
 export function seedNeighborhoodFromMovement(departure, arrival, range, metric = null) {
   if (!Number.isFinite(departure) || !Number.isFinite(arrival)) {
@@ -276,13 +274,13 @@ export function seedNeighborhoodFromMovement(departure, arrival, range, metric =
   const rightCoordinate = Math.min(rangeEnd, intervalEnd + margin);
   return assertNeighborhood({
     L: clamp(
-      metricAddress(metric, leftCoordinate, "lower"),
+      metricAddress(metric, leftCoordinate),
       range.start,
       range.end
     ),
     C,
     R: clamp(
-      metricAddress(metric, rightCoordinate, "upper"),
+      metricAddress(metric, rightCoordinate),
       range.start,
       range.end
     ),
@@ -343,8 +341,7 @@ export function stepTarget(current, seconds, direction, range, metric = null) {
     return clamp(
       metricAddress(
         metric,
-        clamp(origin - seconds, minimum, maximum),
-        "backward"
+        clamp(origin - seconds, minimum, maximum)
       ),
       range.start,
       range.end
@@ -354,8 +351,7 @@ export function stepTarget(current, seconds, direction, range, metric = null) {
     return clamp(
       metricAddress(
         metric,
-        clamp(origin + seconds, minimum, maximum),
-        "forward"
+        clamp(origin + seconds, minimum, maximum)
       ),
       range.start,
       range.end
@@ -421,8 +417,7 @@ export function stepNeighborhood(
     next.R = clamp(
       metricAddress(
         metric,
-        Math.min(rangeEnd, guardedCoordinate),
-        "upper"
+        Math.min(rangeEnd, guardedCoordinate)
       ),
       range.start,
       range.end
@@ -446,8 +441,7 @@ export function stepNeighborhood(
     next.L = clamp(
       metricAddress(
         metric,
-        Math.max(rangeStart, guardedCoordinate),
-        "lower"
+        Math.max(rangeStart, guardedCoordinate)
       ),
       range.start,
       range.end
@@ -501,7 +495,7 @@ export function translateNeighborhood(neighborhood, destination, range, metric =
   if (delta > EPSILON) {
     const translated = Math.min(rangeEnd, rightCoordinate + delta);
     next.R = clamp(
-      metricAddress(metric, translated, "upper"),
+      metricAddress(metric, translated),
       range.start,
       range.end
     );
@@ -509,7 +503,7 @@ export function translateNeighborhood(neighborhood, destination, range, metric =
   } else if (delta < -EPSILON) {
     const translated = Math.max(rangeStart, leftCoordinate + delta);
     next.L = clamp(
-      metricAddress(metric, translated, "lower"),
+      metricAddress(metric, translated),
       range.start,
       range.end
     );

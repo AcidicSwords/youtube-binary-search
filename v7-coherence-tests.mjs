@@ -28,19 +28,16 @@ import {
   previousPin,
   nextPin
 } from "./guide.js";
-import { projectionForModel } from "./temporal-projection.js";
+import { projectionForModel } from "./timeline-projection.js";
 import { deriveStepField } from "./step-field-geometry.js";
 import {
   createPlaybackTransport,
   rebasePlaybackTransport
 } from "./transport.js";
-import {
-  packTimelineSectionLanes,
-  computeTimelineFoldLayout
-} from "./view.js";
+import { packTimelineSectionLanes } from "./view.js";
 
 // Direct placement gives the new Working Interval two equal margins on each
-// side in Traversal Time: the unclipped Resolution is exactly five Interval
+// side in Timeline Space: the unclipped Resolution is exactly five Interval
 // widths. Range clipping removes only unavailable margin.
 assert.deepEqual(
   seedNeighborhoodFromMovement(40, 50, { start: 0, end: 100 }),
@@ -55,10 +52,10 @@ assert.deepEqual(
   { L: 0, C: 15, R: 35, level: 0 }
 );
 {
-  const metricGuide = createGuide("movement-frame-fold");
+  const metricGuide = createGuide("movement-frame-weight");
   createSectionFromTimes(metricGuide, 430, 445, {
-    label: "Metric Fold",
-    collapsed: true
+    label: "Weighted Section",
+    weight: 0.5
   });
   const metricSession = createSession({
     duration: 1000,
@@ -72,13 +69,13 @@ assert.deepEqual(
     { start: 0, end: 1000 },
     metric
   );
-  assert.deepEqual(frame, { L: 230, C: 500, R: 670, level: 0 });
+  assert.deepEqual(frame, { L: 215, C: 500, R: 685, level: 0 });
   assert.equal(
     metric.toCoordinate(frame.R) - metric.toCoordinate(frame.L),
     5 * (
       metric.toCoordinate(500) - metric.toCoordinate(400)
     ),
-    "The five-times law is measured in Traversal Time across a Fold."
+    "The five-times law is measured in weighted timeline space."
   );
 }
 
@@ -210,55 +207,55 @@ for (const [action, direct] of [
   assert.deepEqual(retained.model, before, `${action} preview must not mutate its source Session.`);
 }
 
-// Field geometry is source-time geometry even while its Center is inside a Fold.
-const foldedGuide = createGuide("coherence-fold");
-createSectionFromTimes(foldedGuide, 30, 45, {
-  label: "Fold",
-  collapsed: true
+// Timeline weight does not rewrite the source addresses stored by other models.
+const weightedGuide = createGuide("coherence-weight");
+createSectionFromTimes(weightedGuide, 30, 45, {
+  label: "Compressed",
+  weight: 0.5
 });
-const foldedSession = createSession({
+const weightedSession = createSession({
   duration: 100,
   current: 35,
-  guide: foldedGuide
+  guide: weightedGuide
 });
-const foldedProjection = projectionForModel(foldedSession.model);
+const weightedProjection = projectionForModel(weightedSession.model);
 const field = deriveStepField(
   35,
   { backward: 10, forward: 10, linked: true },
   { start: 0, end: 100 },
-  foldedProjection
+  weightedProjection
 );
 assert.deepEqual(
   { tail: field.tail.target, lead: field.lead.target },
   { tail: 25, lead: 45 }
 );
 
-// Plain Step crosses the zero-width Fold atomically; Shift+Step exposes the
-// ordered faces and then the synthetic Range boundary.
-let foldWalk = createSession({
+// Plain Step follows the positive density while Shift+Step visits the ordinary
+// ordered endpoint Pins and then the synthetic Range boundary.
+let weightedWalk = createSession({
   duration: 100,
   current: 29,
-  guide: foldedGuide,
+  guide: weightedGuide,
   stepReach: 1
 });
-foldWalk = step(foldWalk, "forward", 1).session;
-assert.equal(foldWalk.model.resolution.C, 45);
-assert.ok(foldWalk.model.interval.start <= 30);
-assert.ok(foldWalk.model.interval.end >= 45);
-assert.ok(foldWalk.model.resolution.L <= foldWalk.model.interval.start);
-assert.ok(foldWalk.model.resolution.R >= foldWalk.model.interval.end);
-assert.notEqual(getTargets(foldWalk.model.resolution, projectionForModel(foldWalk.model).metric).forward, null);
+weightedWalk = step(weightedWalk, "forward", 1).session;
+assert.equal(weightedWalk.model.resolution.C, 30);
+assert.ok(weightedWalk.model.interval.start <= 29);
+assert.ok(weightedWalk.model.interval.end >= 30);
+assert.ok(weightedWalk.model.resolution.L <= weightedWalk.model.interval.start);
+assert.ok(weightedWalk.model.resolution.R >= weightedWalk.model.interval.end);
+assert.notEqual(getTargets(weightedWalk.model.resolution, projectionForModel(weightedWalk.model).metric).forward, null);
 
-const foldProjection = projectionForModel(createSession({
+const weightedPinProjection = projectionForModel(createSession({
   duration: 100,
   current: 29,
-  guide: foldedGuide
+  guide: weightedGuide
 }).model);
-const lowerFace = nextPin(foldedGuide, 29, { start: 0, end: 100 }, foldProjection);
-const upperFace = nextPin(foldedGuide, lowerFace.t, { start: 0, end: 100 }, foldProjection);
-const rangeEnd = nextPin(foldedGuide, upperFace.t, { start: 0, end: 100 }, foldProjection);
+const sectionStart = nextPin(weightedGuide, 29, { start: 0, end: 100 }, weightedPinProjection);
+const sectionEnd = nextPin(weightedGuide, sectionStart.t, { start: 0, end: 100 }, weightedPinProjection);
+const rangeEnd = nextPin(weightedGuide, sectionEnd.t, { start: 0, end: 100 }, weightedPinProjection);
 assert.deepEqual(
-  [lowerFace.t, upperFace.t, rangeEnd.t],
+  [sectionStart.t, sectionEnd.t, rangeEnd.t],
   [30, 45, 100]
 );
 assert.equal(rangeEnd.stopKind, "range-boundary");
@@ -266,11 +263,11 @@ assert.equal(rangeEnd.stopKind, "range-boundary");
 let pinWalk = createSession({
   duration: 100,
   current: 29,
-  guide: foldedGuide,
+  guide: weightedGuide,
   stepReach: 1
 });
-pinWalk = stepToPin(pinWalk, lowerFace.t, "forward", { stepSeconds: 1 }).session;
-pinWalk = stepToPin(pinWalk, upperFace.t, "forward", { stepSeconds: 1 }).session;
+pinWalk = stepToPin(pinWalk, sectionStart.t, "forward", { stepSeconds: 1 }).session;
+pinWalk = stepToPin(pinWalk, sectionEnd.t, "forward", { stepSeconds: 1 }).session;
 assert.deepEqual(
   { start: pinWalk.model.interval.start, end: pinWalk.model.interval.end },
   { start: 29, end: 45 }
@@ -361,8 +358,7 @@ assert.deepEqual(redone.model, edited.model);
 assert.equal(redone.history.length, edited.history.length);
 assert.equal(redone.future.length, 0);
 
-// Timeline packing has no arbitrary lane cap and disjoint Fold hit regions are
-// guaranteed whenever the surface has enough physical room.
+// Timeline packing has no arbitrary lane cap.
 const packed = packTimelineSectionLanes(Array.from({ length: 7 }, (_, index) => ({
   id: `section-${index}`,
   projected: { start: 10, end: 20 }
@@ -370,19 +366,22 @@ const packed = packTimelineSectionLanes(Array.from({ length: 7 }, (_, index) => 
 assert.equal(packed.laneCount, 7);
 assert.deepEqual(packed.entries.map(entry => entry.lane), [0, 1, 2, 3, 4, 5, 6]);
 
-const foldLayout = computeTimelineFoldLayout([
-  { traversal: 48, sourceDuration: 4, sections: [{}] },
-  { traversal: 49, sourceDuration: 16, sections: [{}, {}] },
-  { traversal: 50, sourceDuration: 9, sections: [{}] }
-], 600, 100);
-for (let index = 1; index < foldLayout.length; index += 1) {
-  const previous = foldLayout[index - 1];
-  const current = foldLayout[index];
-  assert.ok(
-    previous.x + previous.width / 2 + 6
-      <= current.x - current.width / 2 + Number.EPSILON
-  );
-}
-assert.ok(foldLayout[1].height > foldLayout[0].height);
+// Short, adjacent Sections must also reserve the visible width of their weight
+// selectors. Edge controls stay inside the map instead of overlapping or
+// clipping beyond it.
+const packedControls = packTimelineSectionLanes([
+  { id: "edge-a", projected: { start: 0, end: 1 } },
+  { id: "edge-b", projected: { start: 2, end: 3 } },
+  { id: "far", projected: { start: 20, end: 21 } }
+], {
+  timelineExtent: 100,
+  controlExtent: 10
+});
+assert.deepEqual(
+  packedControls.entries.map(entry => entry.lane),
+  [0, 1, 0]
+);
+assert.equal(packedControls.entries[0].controlCoordinate, 5);
+assert.equal(packedControls.entries[1].controlCoordinate, 5);
 
-console.log("v6 coherence tests passed: guarded Step, swapped Refine, exact previews, source Fields, Fold stops, monotonic playback, history, and collision-aware timeline layout.");
+console.log("Coherence tests passed: guarded Step, swapped Refine, exact previews, weighted navigation, monotonic playback, history, and uncapped timeline lanes.");

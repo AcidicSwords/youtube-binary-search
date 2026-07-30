@@ -26,7 +26,10 @@ import {
   renamePin,
   deletePin,
   sectionsForPin,
-  setSectionCollapsed,
+  DEFAULT_DEFORM_WEIGHT,
+  isSectionWeight,
+  normalizeSectionWeight,
+  setSectionWeight,
   movePin,
   translateSection,
   createSectionFromTimes,
@@ -37,7 +40,7 @@ import {
   resolveSection,
   validateGuide
 } from "./guide.js";
-import { projectionForModel } from "./temporal-projection.js";
+import { projectionForModel } from "./timeline-projection.js";
 
 export const HISTORY_LIMIT = 100;
 export const MIN_RANGE_SECONDS = 0.25;
@@ -126,8 +129,8 @@ export function normalizeStepReach(value, fallback = DEFAULT_STEP_REACH) {
 export function effectiveStepReach(value, range, projection = null) {
   const configured = normalizeStepReach(value);
   if (configured.mode !== STEP_REACH_MODE.ADAPTIVE) return configured;
-  const width = projection?.sourceDistance
-    ? projection.sourceDistance(range.start, range.end)
+  const width = projection?.timelineDistance
+    ? projection.timelineDistance(range.start, range.end)
     : Math.abs(range.end - range.start);
   const candidate = width * configured.fraction;
   const amount = clamp(
@@ -554,10 +557,8 @@ function moveDraft(model, destination, options = {}) {
     : model.resolution.C;
   const boundedDestination = clamp(destination, 0, model.duration);
   const opening = openAddress(model, boundedDestination);
-  // Leaving Focus or opening Full Video can change both Range and which
-  // transposed Sections are materialized. Every movement target and frame must
-  // therefore use the resulting topography, not the projection that existed
-  // before the composite Go resolved its scope.
+  // Leaving Focus or opening Full Video can change the active Range. Derive the
+  // movement frame only after that composite scope transition is complete.
   const metric = projectionForModel(model).metric;
   const rangeChanged = opening.changed;
   const resolvedDestination = clamp(boundedDestination, model.range.start, model.range.end);
@@ -616,49 +617,15 @@ function moveDraft(model, destination, options = {}) {
     // Direct Go abandons the preceding recursive path while retaining the scale
     // communicated by the actual movement. The crossed Interval forms one side
     // of the next Neighborhood; Reopen restores Range-level availability.
-    //
-    // A hop between stacked Fold faces has source movement but zero lateral
-    // distance, so no movement scale can be inferred from it. Preserve and
-    // contain the existing frame in that one case rather than spuriously
-    // reopening Resolution to Range.
-    const projectedDestination = metric?.toCoordinate
-      ? metric.toCoordinate(resolvedDestination)
-      : resolvedDestination;
-    const projectedDeparture = metric?.toCoordinate
-      ? metric.toCoordinate(departure)
-      : departure;
-    const projectedDistance = Math.abs(projectedDestination - projectedDeparture);
-    if (
-      projectedDistance <= EPSILON
-      && Math.abs(resolvedDestination - departure) > EPSILON
-    ) {
-      const direction = resolvedDestination < departure ? "backward" : "forward";
-      const reach = effectiveStepReach(
-        model.stepReach,
-        model.range,
-        projectionForModel(model)
-      )[direction];
-      model.resolution = stepNeighborhood(
-        model.resolution,
-        resolvedDestination,
-        model.range,
-        reach,
-        metric
-      );
-      model.resolutionBasis = isRangeNeighborhood(model.resolution, model.range)
-        ? RESOLUTION_BASIS.RANGE
-        : model.resolutionBasis || RESOLUTION_BASIS.MOVEMENT;
-    } else {
-      model.resolution = seedNeighborhoodFromMovement(
-        departure,
-        resolvedDestination,
-        model.range,
-        metric
-      );
-      model.resolutionBasis = isRangeNeighborhood(model.resolution, model.range)
-        ? RESOLUTION_BASIS.RANGE
-        : RESOLUTION_BASIS.MOVEMENT;
-    }
+    model.resolution = seedNeighborhoodFromMovement(
+      departure,
+      resolvedDestination,
+      model.range,
+      metric
+    );
+    model.resolutionBasis = isRangeNeighborhood(model.resolution, model.range)
+      ? RESOLUTION_BASIS.RANGE
+      : RESOLUTION_BASIS.MOVEMENT;
   }
 
   const intervalDeparture = Number.isFinite(options.intervalDeparture)
@@ -735,71 +702,21 @@ export function goTo(session, destination, options = {}) {
 export function goToGuidePin(session, pinId, options = {}) {
   const pin = getPin(session.model.guide, pinId);
   if (!pin) return unchanged(session, "missing-pin");
-  const fold = projectionForModel(session.model).foldAtSource(pin.t);
-  const hidden = Boolean(fold && !fold.boundaryPinIds.includes(pin.id));
-  if (!hidden) {
-    return goTo(session, pin.t, {
-      ...options,
-      operator: options.operator || "pin",
-      label: options.label || "Go to Pin"
-    });
-  }
-
-  return commit(session, options.label || "Unfold + Go to Pin", draft => {
-    const unfoldedSectionIds = [];
-    for (const sectionId of fold.sectionIds) {
-      const value = setSectionCollapsed(draft.guide, sectionId, false);
-      if (value.changed) unfoldedSectionIds.push(sectionId);
-    }
-    const movement = moveDraft(draft, pin.t, {
-      ...options,
-      operator: options.operator || "pin"
-    });
-    return {
-      ...movement,
-      changed: true,
-      guideChanged: true,
-      projectionChanged: true,
-      unfoldedSectionIds,
-      destination: pin.t,
-      place: pin.t
-    };
-  }, { guideEdit: true });
+  return goTo(session, pin.t, {
+    ...options,
+    operator: options.operator || "pin",
+    label: options.label || "Go to Pin"
+  });
 }
 
 export function goToGuideSection(session, sectionId, options = {}) {
   const section = resolveSection(session.model.guide, sectionId);
   if (!section) return unchanged(session, "missing-section");
-  const destination = section.midpoint;
-  const fold = projectionForModel(session.model).foldAtSource(destination);
-  if (!fold) {
-    return goTo(session, destination, {
-      ...options,
-      operator: options.operator || "section",
-      label: options.label || "Go to Section"
-    });
-  }
-
-  return commit(session, options.label || "Unfold + Go to Section", draft => {
-    const unfoldedSectionIds = [];
-    for (const contributorId of fold.sectionIds) {
-      const value = setSectionCollapsed(draft.guide, contributorId, false);
-      if (value.changed) unfoldedSectionIds.push(contributorId);
-    }
-    const movement = moveDraft(draft, destination, {
-      ...options,
-      operator: options.operator || "section"
-    });
-    return {
-      ...movement,
-      changed: true,
-      guideChanged: true,
-      projectionChanged: true,
-      unfoldedSectionIds,
-      destination,
-      place: destination
-    };
-  }, { guideEdit: true });
+  return goTo(session, section.midpoint, {
+    ...options,
+    operator: options.operator || "section",
+    label: options.label || "Go to Section"
+  });
 }
 
 function refineIntervalRelation(model, target) {
@@ -866,7 +783,7 @@ export function step(session, direction, seconds = null, options = {}) {
     session.model.range
   );
   if (
-    projection.sourceDistance(target, session.model.resolution.C) <= EPSILON
+    projection.timelineDistance(target, session.model.resolution.C) <= EPSILON
   ) return unchanged(session, "range-edge");
   const backward = direction === "backward";
   const intervalDeparture = Number.isFinite(options.intervalDeparture)
@@ -1016,7 +933,15 @@ function sectionDisplayName(section) {
   return section?.label?.trim() || "Untitled Section";
 }
 
-export function transposeSection(session, sectionId = null) {
+export function deformSection(
+  session,
+  sectionId = null,
+  weight = DEFAULT_DEFORM_WEIGHT
+) {
+  if (!isSectionWeight(weight)) {
+    return unchanged(session, "invalid-section-weight");
+  }
+  const nextWeight = normalizeSectionWeight(weight);
   const interval = session.model.interval;
   if (sectionId && !resolveSection(session.model.guide, sectionId)) {
     return unchanged(session, "missing-section");
@@ -1027,7 +952,7 @@ export function transposeSection(session, sectionId = null) {
       .filter(section => sameExtent(section, interval))
     : [];
   if (!sectionId && exactMatches.length > 1) {
-    return unchanged(session, "ambiguous-transpose-target", {
+    return unchanged(session, "ambiguous-deform-target", {
       sectionIds: exactMatches.map(section => section.id)
     });
   }
@@ -1035,22 +960,11 @@ export function transposeSection(session, sectionId = null) {
     ? resolveSection(session.model.guide, sectionId)
     : exactMatches[0] || null;
 
-  if (!target && !interval) {
-    const fold = projectionForModel(session.model)
-      .foldAtSource(session.model.resolution.C);
-    if (fold?.sectionIds?.length === 1) {
-      target = resolveSection(session.model.guide, fold.sectionIds[0]);
-    } else if (fold?.sectionIds?.length > 1) {
-      return unchanged(session, "ambiguous-transpose-target", {
-        sectionIds: [...fold.sectionIds]
-      });
-    }
-  }
-  if (!target && !interval) return unchanged(session, "no-transpose-target");
+  if (!target && !interval) return unchanged(session, "no-deform-target");
 
   const label = target
-    ? `${target.collapsed ? "Unfold" : "Transpose"} “${sectionDisplayName(target)}”`
-    : "Transpose Working Interval";
+    ? `Set “${sectionDisplayName(target)}” to ${nextWeight}×`
+    : `Deform Working Interval to ${nextWeight}×`;
   return commit(session, label, draft => {
     let resolved = target
       ? resolveSection(draft.guide, target.id)
@@ -1065,17 +979,17 @@ export function transposeSection(session, sectionId = null) {
         working.end,
         {
           label: "",
-          collapsed: true,
-          provenance: `transpose:${working.operator}`
+          weight: nextWeight,
+          provenance: `deform:${working.operator}`
         }
       );
       resolved = resolveSection(draft.guide, value.section.id);
       created = value.created;
     } else {
-      const value = setSectionCollapsed(
+      const value = setSectionWeight(
         draft.guide,
         resolved.id,
-        !resolved.collapsed
+        nextWeight
       );
       if (!value.changed) return value;
       resolved = value.section;
@@ -1083,11 +997,10 @@ export function transposeSection(session, sectionId = null) {
     return {
       changed: true,
       guideChanged: true,
-      projectionChanged: true,
       value: resolved,
       section: resolved,
       created,
-      collapsed: resolved.collapsed
+      weight: resolved.weight
     };
   }, { guideEdit: true });
 }
@@ -1430,7 +1343,7 @@ export function overwriteGuideSection(session, sectionId) {
       { provenance: `working:${draft.interval.operator}` }
     );
     if (!validateGuide(draft.guide, draft.duration)) {
-      return { changed: false, reason: "invalid-guide-topology" };
+      return { changed: false, reason: "invalid-guide-geometry" };
     }
     const focusedTarget = focusKind(draft.focus) === FOCUS_KIND.SAVED
       && draft.focus.sectionId === sectionId;
@@ -1450,7 +1363,6 @@ export function overwriteGuideSection(session, sectionId) {
     return {
       changed: true,
       guideChanged: true,
-      projectionChanged: true,
       value,
       ...(focusedTarget ? { rangeChanged: true, intervalCleared } : {}),
       ...(moved ? { place: draft.resolution.C } : {})
@@ -1487,7 +1399,6 @@ export function deleteGuidePin(session, pinId, options = {}) {
     return {
       changed: value.deleted === true || sectionIds.length > 0,
       guideChanged: true,
-      projectionChanged: sectionIds.length > 0,
       value: {
         ...value,
         dissolvedSectionIds: sectionIds
@@ -1540,19 +1451,20 @@ function rebaseFocusedGuideSection(model) {
   };
 }
 
-export function setGuideSectionCollapsed(session, sectionId, collapsed) {
+export function setGuideSectionWeight(session, sectionId, weight) {
   const section = resolveSection(session.model.guide, sectionId);
   if (!section) return unchanged(session, "missing-section");
-  const label = collapsed
-    ? `Transpose “${sectionDisplayName(section)}”`
-    : `Unfold “${sectionDisplayName(section)}”`;
+  if (!isSectionWeight(weight)) {
+    return unchanged(session, "invalid-section-weight");
+  }
+  const nextWeight = normalizeSectionWeight(weight);
+  const label = `Set “${sectionDisplayName(section)}” to ${nextWeight}×`;
   return commit(session, label, draft => {
-    const value = setSectionCollapsed(draft.guide, sectionId, collapsed);
+    const value = setSectionWeight(draft.guide, sectionId, nextWeight);
     if (!value.changed) return value;
     return {
       changed: true,
       guideChanged: true,
-      projectionChanged: true,
       value: value.section
     };
   }, { guideEdit: true });
@@ -1564,13 +1476,12 @@ export function moveGuidePin(session, pinId, address, options = {}) {
     const value = movePin(draft.guide, pinId, address, draft.duration);
     if (!value.changed) return value;
     if (!validateGuide(draft.guide, draft.duration)) {
-      return { changed: false, reason: "invalid-guide-topology" };
+      return { changed: false, reason: "invalid-guide-geometry" };
     }
     const focus = rebaseFocusedGuideSection(draft);
     return {
       changed: true,
       guideChanged: true,
-      projectionChanged: true,
       value,
       rangeChanged: focus.rangeChanged,
       intervalCleared: focus.intervalCleared,
@@ -1594,13 +1505,12 @@ export function moveGuideSection(session, sectionId, requestedDelta, options = {
     );
     if (!value.changed) return value;
     if (!validateGuide(draft.guide, draft.duration)) {
-      return { changed: false, reason: "invalid-guide-topology" };
+      return { changed: false, reason: "invalid-guide-geometry" };
     }
     const focus = rebaseFocusedGuideSection(draft);
     return {
       changed: true,
       guideChanged: true,
-      projectionChanged: true,
       value,
       rangeChanged: focus.rangeChanged,
       intervalCleared: focus.intervalCleared,
@@ -1636,7 +1546,6 @@ export function deleteGuideSection(session, sectionId) {
     return {
       changed,
       guideChanged: changed,
-      projectionChanged: changed,
       ...(wasFocused ? { rangeChanged: true } : {}),
       ...(moved ? { place: draft.resolution.C } : {})
     };
