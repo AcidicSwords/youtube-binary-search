@@ -136,7 +136,8 @@ assert.match(app, /key === "p"[\s\S]*saveCurrentIntervalAsSection\(event,[\s\S]*
 assert.match(app, /plain && key === "p"[\s\S]*pinCurrent\(event,\s*\{\s*useFormLabel:\s*false\s*\}\)/);
 assert.doesNotMatch(app, /key === "p"[\s\S]{0,180}openGuide\("(?:pins|sections)"\)/);
 assert.match(view, /guideTitleActions[\s\S]*guide-title-rename[\s\S]*guide-title-delete/);
-assert.match(view, /Relink \$\{role === "start" \? "Start" : "End"\}/);
+assert.match(view, /Unlink \$\{role === "start" \? "Start" : "End"\}/);
+assert.doesNotMatch(view, /Relink|data\.linkSectionEndpoint/);
 assert.doesNotMatch(view, /guide-item-more|guide-secondary-actions|More actions for/);
 assert.doesNotMatch(styles, /\.guide-item-more|\.guide-secondary-actions/);
 assert.match(view, /dataset\.pinDrag\s*=\s*pin\.id/);
@@ -165,9 +166,15 @@ assert.match(
   /@media \(pointer: coarse\)[\s\S]*\.timeline-section-body[\s\S]*var\(--touch\)/
 );
 assert.match(styles, /\.timeline-pin[\s\S]*width:\s*var\(--pin-hit-size\)/);
+assert.match(styles, /\.timeline-pin\.snap-target::before[\s\S]*var\(--success\)/);
 assert.doesNotMatch(styles, /\.timeline-fold-/);
 assert.match(styles, /--control-height:\s*40px/);
 assert.match(styles, /--touch:\s*48px/);
+assert.match(styles, /\.navigation-deck\s*\{[\s\S]*aspect-ratio:\s*1[\s\S]*grid-template-rows:\s*repeat\(3/);
+assert.match(styles, /\.tool-disclosure > summary\s*\{[\s\S]*font-size:\s*0\.72rem[\s\S]*font-weight:\s*650/);
+assert.match(styles, /\.tool-disclosure > summary span \+ span[\s\S]*font:\s*600 0\.7rem/);
+assert.doesNotMatch(styles, /\.tool-disclosure > summary span:last-child/);
+assert.match(styles, /@media \(min-width: 1240px\)[\s\S]*\.parameter-panel\s*\{[\s\S]*grid-template-columns:\s*1fr/);
 assert.equal((styles.match(/@media \(min-width: 1240px\)/g) || []).length, 2);
 assert.equal((fieldCss.match(/@media \(min-width: 1240px\)/g) || []).length, 1);
 assert.match(fieldCss, /@container \(max-width: 860px\)/);
@@ -186,14 +193,19 @@ assert.match(session, /export function goToGuidePin/);
 assert.match(session, /export function goToGuideSection/);
 assert.match(session, /export function workFromExtent/);
 assert.match(session, /export function unlinkGuideSectionEndpoint/);
-assert.match(session, /export function linkGuideSectionEndpoint/);
+assert.match(session, /export function linkGuidePins/);
 assert.match(session, /export function switchEndpoint[\s\S]*nextSide[\s\S]*departure:\s*retainedDeparture[\s\S]*arrival:\s*departure/);
 
 assert.match(guide, /SECTION_WEIGHT_VALUES[\s\S]*0\.25[\s\S]*2/);
 assert.match(guide, /export function setSectionWeight/);
 assert.match(guide, /export function sectionsForPin/);
 assert.match(guide, /export function unlinkSectionEndpoint/);
-assert.match(guide, /export function linkSectionEndpoint/);
+assert.match(guide, /export function canLinkPins/);
+assert.match(guide, /export function linkPins/);
+assert.doesNotMatch(guide, /provenance:\s*`unlink:/);
+assert.match(app, /PIN_SNAP_DISTANCE_PX\s*=\s*16/);
+assert.match(app, /function pinSnapCandidate[\s\S]*canLinkPins[\s\S]*snapTargetPinId/);
+assert.match(app, /linkGuidePins\([\s\S]*drag\.snapTargetPinId[\s\S]*"Link Pins"/);
 assert.match(guide, /function translatedPinIds[\s\S]*section\.startPinId[\s\S]*section\.endPinId/);
 assert.doesNotMatch(guide, /fold-topology-conflict|collapsedFrontier/);
 

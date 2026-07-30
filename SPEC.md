@@ -183,9 +183,17 @@ does not create or alter the Working Interval. Selection changes no Pin identity
 
 Sections move together at a bound only when they reference the same Pin ID.
 Unlinking one Section endpoint creates an independent coincident Pin and rewires
-only that edge; Relink restores its original shared Pin, including after the
-independent endpoint has moved. Unlink preserves the source Address and Section
-weight; Relink adopts the shared Pin's current Address.
+only that edge. Unlink preserves source Address and Section weight and stores no
+hidden return target. A referenced Pin links only through direct spatial
+manipulation after its edge is independent: while it is dragged within a
+16-pixel acquisition radius of another valid Pin, that Pin becomes a candidate.
+The candidate must remain stable for 450 ms before it arms; release then aligns
+and merges the source identity into the target. Leaving the radius, crossing to
+another candidate, or releasing before arming commits ordinary movement only.
+A Pin already shared by multiple Sections cannot be a link source; Unlink first
+chooses the one edge whose ownership may change. A link is
+rejected if it would collapse or reverse a Section, duplicate a Section, or
+silently discard a conflicting non-empty Pin title.
 
 ### Reopen
 
@@ -762,6 +770,15 @@ Every registered semantic operator must be exercised in:
 ### 13.1 Matrix and hierarchy
 
 `view.js` derives the operator matrix from grammar metadata:
+
+The rendered matrix is geometrically square. Its three equal columns encode
+backward, neutral, and forward roles while its three equal rows encode
+discrimination, traversal, and lifecycle; neither semantic axis may be
+visually compressed relative to the other.
+Within each cell, the shortcut is a stable corner anchor, the operator identity
+is centered and may balance across two lines, and consequence metadata occupies
+a separate compact two-line region. Dynamic labels may change words but not
+this hierarchy.
 
 ```text
 row 0  discriminate

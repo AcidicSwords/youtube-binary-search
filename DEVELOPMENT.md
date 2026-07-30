@@ -10,6 +10,7 @@
 6. Current and Cursor remain distinct.
 7. Step Reach, Field Offset, and Section weight have separate ownership.
 8. Shared Pins form a graph; do not invent a stored Section hierarchy.
+9. Pin linking is visible spatial acquisition; do not persist a hidden return target.
 
 ## Change routing
 
@@ -33,6 +34,9 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
 - Compose overlapping Section factors deterministically and without priority.
 - Never make playback, Context, YouTube adapters, or Field geometry consult Section weights.
 - Preserve arbitrary overlap, asymmetric nesting, shared endpoints, and coincident extents.
+- Unlink must preserve Address and require confirmation. Link must start from
+  one independent endpoint, visibly arm after deliberate dwell on a valid
+  target, and merge Pin identity only on release.
 - Recompute adaptive Step from active weighted Range width, never from source duration or Field Offset.
 - Keep fixed Step Reach unchanged when Section geometry changes.
 - Hold and Stretch may update neither `fieldOffsets`, `stepReach`, nor Guide.
@@ -59,7 +63,7 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
 - `semantic-state-space-tests.mjs` — extended state-space proof
 
 Smoke tests cover startup, persistent Guide selection, Guide-relative
-endpoint/profile drag, operational Pin clusters, Context, gestures, transport
+endpoint/profile drag, spatial Pin unlink/link, operational Pin clusters, Context, gestures, transport
 wrapping, Section weighting, palette contracts, and metadata. Static palette,
 hit-region, and preview-layer ownership belongs to `project-audit.mjs`; live
 visual judgment belongs to `VALIDATION.md`.

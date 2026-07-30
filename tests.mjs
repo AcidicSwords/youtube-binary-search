@@ -28,7 +28,7 @@ import {
   renamePin,
   getPin,
   sectionsForPin,
-  coincidentPins,
+  canLinkPins,
   visiblePins,
   deletePin,
   movePin,
@@ -36,7 +36,7 @@ import {
   createSectionFromTimes,
   resolveSection,
   unlinkSectionEndpoint,
-  linkSectionEndpoint,
+  linkPins,
   renameSection,
   replaceSectionExtent,
   deleteSection,
@@ -76,7 +76,7 @@ import {
   deleteGuideSection,
   moveGuidePin,
   unlinkGuideSectionEndpoint,
-  linkGuideSectionEndpoint,
+  linkGuidePins,
   switchEndpoint,
   returnState
 } from "./session.js";
@@ -294,8 +294,8 @@ assert.equal(clustered.length, 2);
 assert.equal(clustered[0].pins.length, 2);
 
 // Shared endpoint identity is explicit graph ownership. Unlink clones one
-// Section's endpoint at the same Address; Link reunites it with the coincident
-// shared Pin. Version-seven persistence must preserve the independent identity.
+// Section's endpoint at the same Address without storing a hidden return path.
+// Spatial Link merges that Pin into the coincident target chosen by the drag.
 const ownershipGuide = createGuide("ownership");
 const ownershipA = ensurePin(ownershipGuide, 10, { kind: PIN_KIND.ENDPOINT }).pin;
 const ownershipB = ensurePin(ownershipGuide, 20, { kind: PIN_KIND.ENDPOINT }).pin;
@@ -313,6 +313,11 @@ const ownershipSecond = createSection(
   { label: "Second" }
 ).section;
 assert.equal(sectionsForPin(ownershipGuide, ownershipB.id).length, 2);
+assert.equal(
+  canLinkPins(ownershipGuide, ownershipB.id, ownershipA.id).reason,
+  "shared-source-pin",
+  "A shared junction must be Unlinked before one edge can be spatially linked elsewhere."
+);
 const unlinkedOwnership = unlinkSectionEndpoint(
   ownershipGuide,
   ownershipSecond.id,
@@ -321,10 +326,15 @@ const unlinkedOwnership = unlinkSectionEndpoint(
 assert.equal(unlinkedOwnership.changed, true);
 assert.equal(unlinkedOwnership.section.start, 20);
 assert.notEqual(unlinkedOwnership.section.startPinId, ownershipB.id);
-assert.equal(coincidentPins(
-  ownershipGuide,
-  unlinkedOwnership.section.startPinId
-).some(pin => pin.id === ownershipB.id), true);
+assert.equal(unlinkedOwnership.pin.provenance, "unlink");
+assert.equal(
+  canLinkPins(
+    ownershipGuide,
+    unlinkedOwnership.section.startPinId,
+    ownershipB.id
+  ).allowed,
+  true
+);
 const persistedOwnership = sanitizeGuide(
   JSON.parse(JSON.stringify(ownershipGuide)),
   "ownership",
@@ -335,13 +345,13 @@ assert.notEqual(
   resolveSection(persistedOwnership, ownershipFirst.id).endPinId,
   resolveSection(persistedOwnership, ownershipSecond.id).startPinId
 );
-const relinkedOwnership = linkSectionEndpoint(
+const linkedOwnership = linkPins(
   ownershipGuide,
-  ownershipSecond.id,
-  "start"
+  unlinkedOwnership.section.startPinId,
+  ownershipB.id
 );
-assert.equal(relinkedOwnership.changed, true);
-assert.equal(relinkedOwnership.section.startPinId, ownershipB.id);
+assert.equal(linkedOwnership.changed, true);
+assert.equal(resolveSection(ownershipGuide, ownershipSecond.id).startPinId, ownershipB.id);
 assert.equal(ownershipGuide.pins.length, 3);
 const independentlyUnlinked = unlinkSectionEndpoint(
   ownershipGuide,
@@ -351,14 +361,31 @@ const independentlyUnlinked = unlinkSectionEndpoint(
 movePin(ownershipGuide, independentlyUnlinked.section.startPinId, 22, 40);
 assert.equal(resolveSection(ownershipGuide, ownershipFirst.id).end, 20);
 assert.equal(resolveSection(ownershipGuide, ownershipSecond.id).start, 22);
-const relinkedAfterMovement = linkSectionEndpoint(
-  ownershipGuide,
-  ownershipSecond.id,
-  "start"
+assert.equal(
+  canLinkPins(
+    ownershipGuide,
+    independentlyUnlinked.section.startPinId,
+    ownershipB.id
+  ).allowed,
+  true
 );
-assert.equal(relinkedAfterMovement.changed, true);
-assert.equal(relinkedAfterMovement.section.start, 20);
-assert.equal(relinkedAfterMovement.section.startPinId, ownershipB.id);
+assert.equal(
+  linkPins(
+    ownershipGuide,
+    independentlyUnlinked.section.startPinId,
+    ownershipB.id
+  ).reason,
+  "pins-not-coincident"
+);
+movePin(ownershipGuide, independentlyUnlinked.section.startPinId, 20, 40);
+const linkedAfterSnap = linkPins(
+  ownershipGuide,
+  independentlyUnlinked.section.startPinId,
+  ownershipB.id
+);
+assert.equal(linkedAfterSnap.changed, true);
+assert.equal(resolveSection(ownershipGuide, ownershipSecond.id).start, 20);
+assert.equal(resolveSection(ownershipGuide, ownershipSecond.id).startPinId, ownershipB.id);
 assert.equal(ownershipGuide.pins.length, 3);
 
 const normalizedV3 = normalizeGuide({
@@ -458,10 +485,14 @@ let ownershipSession = createSession({
   current: 20,
   guide: persistedOwnership
 });
-let ownershipResult = linkGuideSectionEndpoint(
+const persistedSecondStart = resolveSection(
+  persistedOwnership,
+  ownershipSecond.id
+).startPinId;
+let ownershipResult = linkGuidePins(
   ownershipSession,
-  ownershipSecond.id,
-  "start"
+  persistedSecondStart,
+  ownershipB.id
 );
 assert.equal(ownershipResult.changed, true);
 ownershipSession = ownershipResult.session;

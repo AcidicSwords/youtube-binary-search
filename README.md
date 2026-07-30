@@ -24,6 +24,9 @@ Step Backward     Switch Endpoint    Step Forward
 Release           Deform             Focus / Unfocus
 ```
 
+The rendered matrix is square so its three semantic rows and three directional
+columns have equal visual weight.
+
 The keyboard has the same shape:
 
 ```text
@@ -109,7 +112,10 @@ collapsible right rail has two exclusive modes: full-height Guide, or Operators
 with Parameters. Guide and the operator controls never compete for vertical
 space. Collapse either mode to leave Viewer and Timeline as one panoramic
 surface; reopen Guide with its header control or `G` for exact weights and
-endpoint editing.
+endpoint editing. Unlink separates one shared Section endpoint; drag that Pin
+onto another Pin's visible candidate, pause until it arms, then release to link
+their ownership again. Unlink asks for confirmation; proximity alone never
+changes the graph.
 
 ## Playback, Context, and Field
 

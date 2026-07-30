@@ -18,6 +18,9 @@ Parameters expose Active Range, Context duration, and Step Reach. Resolution rem
 - **Manual** exposes editable spatial units.
 - **Range-relative** exposes `1/32`, `1/16`, and `1/8`.
 - The summary shows the stored mode and current effective distance.
+- Single labels share one compact sans-serif level; trailing state values share
+  one compact monospaced level. A one-label disclosure is never styled as a
+  value merely because it is also its last child.
 
 Tail/Lead Offset fields remain beside their players. Field Offset never relabels or rewrites Step Reach or Section weight.
 
@@ -99,6 +102,10 @@ The timeline packs actual overlap into a bounded five-lane visual band. Major an
 
 ## Operator matrix
 
+The nine operators occupy a square 3×3 matrix. Equal row and column geometry
+keeps backward/neutral/forward placement and discriminate/traverse/lifecycle
+placement equally legible; no axis is visually privileged.
+
 ```text
 Q Refine Backward     W Reopen           E Refine Forward
 A Step Backward       S Switch Endpoint  D Step Forward
@@ -123,7 +130,10 @@ existing interval therefore selects its complementary half.
 
 Touch users can latch Shift. Mouse, keyboard, compact Field controls, and side-player surfaces invoke the same semantic operators.
 
-Operator buttons expose destination or consequence in concise metadata. Disabled controls state a concrete reason.
+Each cell fixes its key in the upper-left, centers a balanced operator label,
+and reserves two compact lines below for destination or consequence. The key,
+identity, and current effect therefore remain distinct when labels change under
+Shift or Focus. Disabled controls state a concrete reason.
 
 `P` immediately Pins Current. `Shift+P` immediately saves the Working Interval
 as an untitled Section. These are creation commands, not shortcuts into the
@@ -141,7 +151,7 @@ Section creation accepts:
 
 Titles are optional. Each Section row exposes selection, Focus, Weight, and
 both endpoint Pins. Compact Rename and Delete controls sit beside the title;
-applicable Unlink/Relink controls sit with Focus and Weight. Direct endpoint and
+applicable Unlink controls sit with Focus and Weight. Direct endpoint and
 whole-profile dragging make a separate replacement action redundant. A selected
 Pin row exposes the same full-map track and draggable node as Section endpoints,
 with Rename and Delete beside its title. On the Timeline, the visible Pin
@@ -157,8 +167,15 @@ between them to translate the complete
 Section; click an endpoint to Go. Every Guide drag updates the Timeline in the
 same gesture. Endpoint node weight and Pin metadata expose how many Sections
 share each Pin. Unlink clones only this Section's endpoint at the same Address,
-so subsequent movement is independent; Relink reconnects it to the original
-shared Pin even after independent movement. Timeline and Guide Section clicks share one selection
+so subsequent movement is independent. Linking is spatial rather than a
+separate command: confirm Unlink, then drag its independent endpoint Pin within
+16 pixels of another valid Pin. An amber candidate means ordinary movement is
+still active; hold on that same target for 450 ms to arm a green acquisition
+ring, then release to merge ownership. Passing through, leaving the radius, or
+releasing before arming only moves the Pin. A shared junction must first be
+Unlinked so one deliberate edge—not every connected Section—is the link source.
+No original relationship is remembered.
+Timeline and Guide Section clicks share one selection
 transaction: the Section becomes the Working Interval and Current returns to
 its midpoint. When the Working Interval's bounds coincide with Pins, those Pins
 are selected automatically. If they bound one existing Section, Deform and

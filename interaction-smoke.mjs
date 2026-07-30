@@ -168,6 +168,137 @@ assert.equal(
   "1",
   "A selected Section must accept consecutive edits without reselection."
 );
+
+// Linking is the spatial inverse of Unlink. Unlink gives one Section its own
+// coincident endpoint; dragging that Pin into the target's snap radius merges
+// ownership again as the same single Undoable gesture.
+byId.get("timeline").dispatch("click", {
+  target: byId.get("timeline"),
+  clientX: 750
+});
+await flush();
+byId.get("section-label").value = "Link test";
+byId.get("section-capture").dispatch("submit");
+await flush();
+assert.equal(byId.get("sections-list-count").textContent, "2");
+const guideItemNamed = name => descendants(byId.get("sections-list"))
+  .find(node =>
+    node.classList.contains("guide-item")
+    && descendants(node).some(child =>
+      child.classList.contains("guide-item-title")
+      && child.textContent === name
+    )
+  );
+const originalSectionMain = descendants(guideItemNamed("Quarter to middle"))
+  .find(node => node.dataset.sectionGo);
+byId.get("sections-list").dispatch("click", { target: originalSectionMain });
+await flush();
+const unlinkEnd = descendants(byId.get("sections-list"))
+  .find(node =>
+    node.dataset.unlinkSectionEndpoint
+    && node.dataset.sectionEndpoint === "end"
+  );
+assert.ok(unlinkEnd, "A shared Section endpoint must expose Unlink.");
+byId.get("sections-list").dispatch("click", { target: unlinkEnd });
+await flush();
+assert.equal(
+  byId.get("pins-list-count").textContent,
+  "3",
+  "Opening Unlink must not change graph ownership before confirmation."
+);
+assert.equal(byId.get("guide-dialog-title").textContent, "Unlink End Pin");
+byId.get("guide-dialog-form").dispatch("submit");
+await flush();
+assert.equal(byId.get("pins-list-count").textContent, "4");
+const independentEnd = descendants(byId.get("sections-list"))
+  .find(node =>
+    node.dataset.pinDrag
+    && node.dataset.dragSection
+    && /^End Pin/.test(node["aria-label"] || "")
+  );
+assert.ok(independentEnd, "Unlink must leave the independent endpoint directly draggable.");
+independentEnd.closest(".section-endpoints").clientWidth = 500;
+byId.get("sections-list").dispatch("pointerdown", {
+  target: independentEnd,
+  clientX: 500,
+  pointerId: 62,
+  button: 0,
+  buttons: 1
+});
+dispatchDocument("pointermove", {
+  target: independentEnd,
+  clientX: 507,
+  pointerId: 62,
+  button: 0,
+  buttons: 1
+});
+await flush();
+assert.ok(
+  descendants(byId.get("pin-lane"))
+    .some(node => node.classList.contains("snap-target")),
+  "Entering the snap radius must visibly identify a possible ownership target."
+);
+assert.ok(
+  !descendants(byId.get("pin-lane"))
+    .some(node => node.classList.contains("snap-armed")),
+  "Merely crossing the snap radius must not arm a structural link."
+);
+dispatchDocument("pointermove", {
+  target: independentEnd,
+  clientX: 530,
+  pointerId: 62,
+  button: 0,
+  buttons: 1
+});
+await flush();
+assert.ok(
+  !descendants(byId.get("pin-lane"))
+    .some(node => node.classList.contains("snap-target")),
+  "Leaving the radius must clear the candidate without linking."
+);
+dispatchDocument("pointermove", {
+  target: independentEnd,
+  clientX: 507,
+  pointerId: 62,
+  button: 0,
+  buttons: 1
+});
+await env.delay(500);
+await flush();
+assert.ok(
+  descendants(byId.get("pin-lane"))
+    .some(node => node.classList.contains("snap-armed")),
+  "Holding over one candidate must arm the deliberate release-to-link gesture."
+);
+dispatchDocument("pointerup", {
+  target: independentEnd,
+  clientX: 507,
+  pointerId: 62,
+  button: 0,
+  buttons: 0
+});
+await flush();
+assert.equal(byId.get("pins-list-count").textContent, "3");
+assert.match(byId.get("status").textContent, /Linked with/);
+assert.ok(
+  descendants(byId.get("sections-list"))
+    .some(node =>
+      node.dataset.unlinkSectionEndpoint
+      && node.dataset.sectionEndpoint === "end"
+    ),
+  "A snapped endpoint must immediately expose Unlink as the inverse action."
+);
+const linkTestDelete = descendants(guideItemNamed("Link test"))
+  .find(node => node.dataset.deleteSection);
+byId.get("sections-list").dispatch("click", { target: linkTestDelete });
+byId.get("guide-dialog-form").dispatch("submit");
+await flush();
+assert.equal(byId.get("sections-list-count").textContent, "1");
+byId.get("sections-list").dispatch("click", {
+  target: descendants(guideItemNamed("Quarter to middle"))
+    .find(node => node.dataset.sectionGo)
+});
+await flush();
 byId.get("guide-tab-sections").blur();
 
 const center = env.center();
@@ -668,4 +799,4 @@ byId.get("focus-toggle").focus();
 dispatchDocument("pointerup", { target: byId.get("focus-toggle"), pointerId: 8 });
 assert.equal(env.document.activeElement, null, "Pointer activation must not leave a control visually selected.");
 
-console.log("Interaction smoke passed: direct P/Shift+P creation, retained Section editing, Guide-scaled endpoint/whole-Section drag previews, operational clustered Pins, Shift Pin traversal, local Refine preview, unsaved Working Focus, Switch involution, Undo/Redo ownership, composable Step intervals, shared activation, deterministic refold/stretch, immutable configured offsets, whole-Field side Step, universal Space playback, and coherent focus release.");
+console.log("Interaction smoke passed: direct P/Shift+P creation, retained Section editing, spatial Pin unlink/link, Guide-scaled endpoint/whole-Section drag previews, operational clustered Pins, Shift Pin traversal, local Refine preview, unsaved Working Focus, Switch involution, Undo/Redo ownership, composable Step intervals, shared activation, deterministic refold/stretch, immutable configured offsets, whole-Field side Step, universal Space playback, and coherent focus release.");

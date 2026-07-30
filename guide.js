@@ -119,15 +119,6 @@ function sectionEndpointKey(role) {
   return role === "start" ? "startPinId" : role === "end" ? "endPinId" : null;
 }
 
-export function coincidentPins(guide, pinId, epsilon = EPSILON) {
-  const pin = getPin(guide, pinId);
-  if (!pin) return [];
-  return sortPins(guide.pins).filter(candidate =>
-    candidate.id !== pin.id
-    && Math.abs(candidate.t - pin.t) <= epsilon
-  );
-}
-
 export function unlinkSectionEndpoint(guide, sectionId, role) {
   const section = guide.sections.find(item => item.id === sectionId);
   const key = sectionEndpointKey(role);
@@ -150,7 +141,7 @@ export function unlinkSectionEndpoint(guide, sectionId, role) {
     t: source.t,
     label: "",
     kind: PIN_KIND.ENDPOINT,
-    provenance: `unlink:${sectionId}:${role}:${source.id}`,
+    provenance: "unlink",
     createdAt: changedAt,
     updatedAt: changedAt
   };
@@ -167,57 +158,93 @@ export function unlinkSectionEndpoint(guide, sectionId, role) {
   };
 }
 
-export function linkSectionEndpoint(guide, sectionId, role) {
-  const section = guide.sections.find(item => item.id === sectionId);
-  const key = sectionEndpointKey(role);
-  if (!section || !key) {
+export function canLinkPins(guide, sourcePinId, targetPinId) {
+  const source = getPin(guide, sourcePinId);
+  const target = getPin(guide, targetPinId);
+  if (!source || !target) {
     return {
-      changed: false,
-      reason: section ? "invalid-endpoint-role" : "missing-section"
+      allowed: false,
+      reason: source ? "missing-target-pin" : "missing-source-pin"
     };
   }
-  const source = getPin(guide, section[key]);
-  if (!source) return { changed: false, reason: "missing-pin" };
-  const provenance = String(source.provenance || "").split(":");
-  const originalPinId = provenance[0] === "unlink"
-    && provenance[1] === sectionId
-    && provenance[2] === role
-    ? provenance[3]
-    : null;
-  const original = originalPinId ? getPin(guide, originalPinId) : null;
-  const target = original || coincidentPins(guide, source.id)
-    .sort((first, second) =>
-      sectionsForPin(guide, second.id).length
-      - sectionsForPin(guide, first.id).length
-      || first.createdAt - second.createdAt
-    )[0];
-  if (!target) return { changed: false, reason: "no-coincident-pin" };
-
-  const nextStartPinId = role === "start" ? target.id : section.startPinId;
-  const nextEndPinId = role === "end" ? target.id : section.endPinId;
-  const nextStart = getPin(guide, nextStartPinId);
-  const nextEnd = getPin(guide, nextEndPinId);
-  if (!nextStart || !nextEnd || nextEnd.t <= nextStart.t + EPSILON) {
-    return { changed: false, reason: "invalid-link-geometry" };
+  if (source.id === target.id) {
+    return { allowed: false, reason: "same-pin" };
   }
-  if (findDuplicateSection(
-    guide,
-    nextStartPinId,
-    nextEndPinId,
-    section.label,
-    section.id
-  )) return { changed: false, reason: "duplicate-section" };
+  const sections = sectionsForPin(guide, source.id);
+  if (!sections.length) {
+    return { allowed: false, reason: "unreferenced-source-pin" };
+  }
+  if (sections.length > 1) {
+    return { allowed: false, reason: "shared-source-pin" };
+  }
+  for (const section of sections) {
+    const startPinId = section.startPinId === source.id
+      ? target.id
+      : section.startPinId;
+    const endPinId = section.endPinId === source.id
+      ? target.id
+      : section.endPinId;
+    const start = getPin(guide, startPinId);
+    const end = getPin(guide, endPinId);
+    if (
+      !start
+      || !end
+      || start.id === end.id
+      || end.t <= start.t + EPSILON
+    ) {
+      return { allowed: false, reason: "invalid-link-geometry" };
+    }
+    if (findDuplicateSection(
+      guide,
+      startPinId,
+      endPinId,
+      section.label,
+      section.id
+    )) {
+      return { allowed: false, reason: "duplicate-section" };
+    }
+  }
+  if (
+    source.label?.trim()
+    && target.label?.trim()
+    && source.label.trim() !== target.label.trim()
+  ) {
+    return { allowed: false, reason: "label-conflict" };
+  }
+  return { allowed: true, source, target, sections };
+}
+
+export function linkPins(guide, sourcePinId, targetPinId) {
+  const link = canLinkPins(guide, sourcePinId, targetPinId);
+  if (!link.allowed) return { changed: false, reason: link.reason };
+  if (Math.abs(link.source.t - link.target.t) > EPSILON) {
+    return { changed: false, reason: "pins-not-coincident" };
+  }
 
   const changedAt = now();
-  section[key] = target.id;
-  section.updatedAt = changedAt;
+  for (const section of link.sections) {
+    if (section.startPinId === link.source.id) {
+      section.startPinId = link.target.id;
+    }
+    if (section.endPinId === link.source.id) {
+      section.endPinId = link.target.id;
+    }
+    section.updatedAt = changedAt;
+  }
+  if (!link.target.label?.trim() && link.source.label?.trim()) {
+    link.target.label = link.source.label.trim();
+  }
+  if (link.source.kind === PIN_KIND.EXPLICIT) {
+    link.target.kind = PIN_KIND.EXPLICIT;
+  }
+  link.target.updatedAt = changedAt;
+  guide.pins = guide.pins.filter(pin => pin.id !== link.source.id);
   guide.updatedAt = changedAt;
-  removeOrphanEndpoint(guide, source.id);
   return {
     changed: true,
-    pin: target,
-    section: resolveSection(guide, section),
-    previousPinId: source.id
+    pin: link.target,
+    linkedPinId: link.source.id,
+    sectionIds: link.sections.map(section => section.id)
   };
 }
 

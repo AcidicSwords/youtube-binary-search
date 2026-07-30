@@ -16,7 +16,6 @@ import {
   getPin,
   visiblePins,
   sectionsForPin,
-  coincidentPins,
   resolveSection,
   previousPin,
   nextPin,
@@ -281,7 +280,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     text.textContent = `${formatTime(pin.t)} ${pin.label || ""}`.trim();
     text.className = "sr-only";
     button.append(roleLabel, text);
-    const description = `${role} Pin at ${formatTime(pin.t)}; drag to adjust the Section bound, click to Go; ${references} Section${references === 1 ? "" : "s"}`;
+    const description = `${role} Pin at ${formatTime(pin.t)}; drag to adjust the Section bound${references === 1 ? " and pause over another Pin, then release to link" : ""}, click to Go; ${references} Section${references === 1 ? "" : "s"}`;
     button.setAttribute("aria-label", description);
     button.title = description;
     return button;
@@ -305,7 +304,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     text.className = "sr-only";
     text.textContent = `${formatTime(pin.t)} ${pin.label || ""}`.trim();
     button.append(roleLabel, text);
-    const description = `${pinLabel(pin)} at ${formatTime(pin.t)}; drag to move on the full temporal map, click to Go`;
+    const description = `${pinLabel(pin)} at ${formatTime(pin.t)}; drag to move on the full temporal map${references === 1 ? " and pause over another Pin, then release to link" : ""}, click to Go`;
     button.setAttribute("aria-label", description);
     button.title = description;
     return button;
@@ -351,6 +350,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         button.classList.add("retained-selected");
         button.setAttribute("aria-current", "true");
       }
+      if (pin.id === state().guideDrag?.snapTargetPinId) {
+        button.classList.add("snap-target");
+        if (state().guideDrag?.snapArmed) button.classList.add("snap-armed");
+      }
       button.title = `${pinLabel(pin)} at ${formatTime(pin.sourceT ?? pin.t)}; click to select`;
       button.append(label, time);
       const drag = document.createElement("button");
@@ -362,9 +365,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       }
       drag.setAttribute(
         "aria-label",
-        `Move ${pinLabel(pin)} from ${formatTime(pin.sourceT ?? pin.t)}`
+        `Move ${pinLabel(pin)} from ${formatTime(pin.sourceT ?? pin.t)}${sectionsForPin(guide(), pin.id).length === 1 ? "; pause over another Pin, then release to link" : ""}`
       );
-      drag.title = "Drag horizontally to move this exact Pin";
+      drag.title = sectionsForPin(guide(), pin.id).length === 1
+        ? "Drag horizontally; pause over another Pin, then release to link"
+        : "Drag horizontally to move this exact Pin";
       drag.textContent = "â†”";
       row.append(button, drag);
       menu.appendChild(row);
@@ -683,7 +688,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const intervalKey = interval()
       ? `${interval().start}:${interval().end}`
       : "none";
-    const key = `${activeRange.start}|${activeRange.end}|${width}|${sectionLaneHeight}|${pinClusterGap}|${projection.timelineExtent}|${sectionKey}|${selectedKey}|${intervalKey}|${pinKey}`;
+    const snapKey = `${state().guideDrag?.snapTargetPinId || "none"}:${
+      state().guideDrag?.snapArmed === true ? "armed" : "candidate"
+    }`;
+    const key = `${activeRange.start}|${activeRange.end}|${width}|${sectionLaneHeight}|${pinClusterGap}|${projection.timelineExtent}|${sectionKey}|${selectedKey}|${intervalKey}|${snapKey}|${pinKey}`;
     if (key === renderedPinKey) return;
     renderedPinKey = key;
     const clusterDrag = state().guideDrag?.origin === "cluster-menu";
@@ -725,7 +733,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           state().selectedRetained?.kind === "pin"
           && state().selectedRetained.id === pin.id
         ) button.classList.add("retained-selected");
-        const description = `${pinLabel(pin)} at ${formatTime(pin.sourceT)}; click to move Current here, drag to move the Pin`;
+        if (pin.id === state().guideDrag?.snapTargetPinId) {
+          button.classList.add("snap-target");
+          if (state().guideDrag?.snapArmed) button.classList.add("snap-armed");
+        }
+        const description = `${pinLabel(pin)} at ${formatTime(pin.sourceT)}; click to move Current here, drag to move the Pin${references === 1 ? ", pause over another Pin and release to link" : ""}`;
         button.setAttribute("aria-label", description);
         button.title = description;
       } else {
@@ -737,6 +749,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         if (
           cluster.pins.some(pin => state().selectedPinIds?.includes(pin.id))
         ) button.classList.add("extent-selected");
+        if (
+          cluster.pins.some(pin => pin.id === state().guideDrag?.snapTargetPinId)
+        ) {
+          button.classList.add("snap-target");
+          if (state().guideDrag?.snapArmed) button.classList.add("snap-armed");
+        }
         const references = cluster.pins.reduce(
           (total, pin) => total + sectionsForPin(guide(), pin.id).length,
           0
@@ -890,32 +908,14 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           ["start", section.startPin, startReferences],
           ["end", section.endPin, endReferences]
         ]) {
-          const candidates = coincidentPins(guide(), pin.id);
-          const provenance = String(pin.provenance || "").split(":");
-          const originalPinId = provenance[0] === "unlink"
-            && provenance[1] === section.id
-            && provenance[2] === role
-            ? provenance[3]
-            : null;
-          const originalPin = originalPinId
-            ? getPin(guide(), originalPinId)
-            : null;
-          if (references <= 1 && !candidates.length && !originalPin) continue;
+          if (references <= 1) continue;
           const link = document.createElement("button");
           link.type = "button";
           link.className = "guide-action guide-action-link";
           link.dataset.sectionEndpoint = role;
-          if (references > 1) {
-            link.dataset.unlinkSectionEndpoint = section.id;
-            link.textContent = `Unlink ${role === "start" ? "Start" : "End"}`;
-            link.title = `Give this Section an independent ${role} Pin at the same Address`;
-          } else {
-            link.dataset.linkSectionEndpoint = section.id;
-            link.textContent = `Relink ${role === "start" ? "Start" : "End"}`;
-            link.title = originalPin
-              ? `Reconnect this Section to its original shared ${role} Pin`
-              : `Reconnect this Section to the coincident shared ${role} Pin`;
-          }
+          link.dataset.unlinkSectionEndpoint = section.id;
+          link.textContent = `Unlink ${role === "start" ? "Start" : "End"}`;
+          link.title = `Give this Section an independent ${role} Pin at the same Address; drag it onto another Pin to link`;
           endpointLinks.push(link);
         }
         actions.append(focus, weightControl, ...endpointLinks);
@@ -960,6 +960,13 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         setStyleProperty(item, "--reference-weight", String(Math.min(3, references)));
         if (extentSelected) item.classList.add("extent-selected");
         if (selected) item.classList.add("retained-selected");
+        if (pin.id === state().guideDrag?.snapTargetPinId) {
+          item.classList.add("snap-target");
+          if (state().guideDrag?.snapArmed) item.classList.add("snap-armed");
+        }
+        if (pin.id === state().guideDrag?.id && state().guideDrag?.snapTargetPinId) {
+          item.classList.add("snap-source");
+        }
         const main = document.createElement("button");
         main.type = "button";
         main.className = "guide-item-main";

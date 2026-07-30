@@ -38,7 +38,7 @@ import {
   deleteSection,
   resolveSection,
   unlinkSectionEndpoint,
-  linkSectionEndpoint,
+  linkPins,
   validateGuide
 } from "./guide.js";
 import { projectionForModel } from "./timeline-projection.js";
@@ -1570,14 +1570,11 @@ export function moveGuideSection(session, sectionId, requestedDelta, options = {
     );
 }
 
-function changeSectionEndpointLink(session, sectionId, role, linked) {
+export function unlinkGuideSectionEndpoint(session, sectionId, role) {
   const section = resolveSection(session.model.guide, sectionId);
   if (!section) return unchanged(session, "missing-section");
-  const label = `${linked ? "Relink" : "Unlink"} ${role === "start" ? "Start" : "End"} Pin`;
-  return commit(session, label, draft => {
-    const value = linked
-      ? linkSectionEndpoint(draft.guide, sectionId, role)
-      : unlinkSectionEndpoint(draft.guide, sectionId, role);
+  return commit(session, `Unlink ${role === "start" ? "Start" : "End"} Pin`, draft => {
+    const value = unlinkSectionEndpoint(draft.guide, sectionId, role);
     if (!value.changed) return value;
     const focus = rebaseFocusedGuideSection(draft);
     return {
@@ -1591,12 +1588,26 @@ function changeSectionEndpointLink(session, sectionId, role, linked) {
   }, { guideEdit: true });
 }
 
-export function unlinkGuideSectionEndpoint(session, sectionId, role) {
-  return changeSectionEndpointLink(session, sectionId, role, false);
-}
-
-export function linkGuideSectionEndpoint(session, sectionId, role) {
-  return changeSectionEndpointLink(session, sectionId, role, true);
+export function linkGuidePins(session, sourcePinId, targetPinId, options = {}) {
+  const perform = draft => {
+    const value = linkPins(draft.guide, sourcePinId, targetPinId);
+    if (!value.changed) return value;
+    if (!validateGuide(draft.guide, draft.duration)) {
+      return { changed: false, reason: "invalid-guide-geometry" };
+    }
+    const focus = rebaseFocusedGuideSection(draft);
+    return {
+      changed: true,
+      guideChanged: true,
+      value,
+      rangeChanged: focus.rangeChanged,
+      intervalCleared: focus.intervalCleared,
+      ...(focus.moved ? { place: draft.resolution.C } : {})
+    };
+  };
+  return options.amend
+    ? amend(session, perform, { guideEdit: true })
+    : commit(session, options.label || "Link Pins", perform, { guideEdit: true });
 }
 
 export function deleteGuideSection(session, sectionId) {

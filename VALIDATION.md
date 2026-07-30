@@ -68,10 +68,14 @@
 - Repeat beside each Range boundary and confirm clipping removes only unavailable margin.
 - Drag a Guide Section profile; only its endpoint Pins should translate.
 - Drag a shared Pin; every referencing Section should update.
-- Unlink one shared Section endpoint; move it and confirm the other Section no
-  longer moves. Reload, confirm the independent Pins remain distinct, then
-  Relink and confirm the endpoint returns to its original shared Pin and shared
-  movement is restored.
+- Choose Unlink on one shared Section endpoint and confirm graph ownership does
+  not change until the dialog is confirmed. Move the independent endpoint and
+  confirm the other Section no longer moves. Reload and confirm the Pins remain
+  distinct. Drag toward a valid Pin: outside 16 pixels it remains free; inside,
+  the target is an amber candidate. Cross it quickly or release immediately and
+  confirm only ordinary movement occurs. Hold on one candidate for at least
+  450 ms; it must turn green, and release must merge ownership. Undo restores
+  the complete independent pre-drag state in one action.
 - Establish a Working Interval whose Start and End coincide with Pins; confirm
   both endpoint Pins select automatically.
 - Click the visible center of a Timeline Pin; confirm Current moves to it
@@ -147,6 +151,11 @@
 - Confirm Current, Cursor, actual/preview Working Interval, Resolution, and selected state remain distinguishable.
 - At 1440px wide, confirm Viewer and Timeline remain visible beside either the
   full-height Guide or Operators with Parameters, without page scrolling.
+- Confirm the 3×3 Operator matrix is geometrically square and its three rows
+  and columns divide that square evenly.
+- Confirm every Parameters disclosure label uses the same compact label size,
+  every state/summary value uses the same compact value size, and input text
+  does not jump in scale when a disclosure opens.
 - Switch between Guide and Operators; confirm only the selected rail mode is
   present and no state changes.
 - Collapse either rail mode (or Guide with `G`); confirm Viewer and Timeline

@@ -13,6 +13,7 @@ import {
   findPinAt,
   getPin,
   sectionsForPin,
+  canLinkPins,
   resolveSection,
   previousPin,
   nextPin,
@@ -60,7 +61,7 @@ import {
   moveGuidePin,
   moveGuideSection,
   unlinkGuideSectionEndpoint,
-  linkGuideSectionEndpoint,
+  linkGuidePins,
   undo as undoSession,
   redo as redoSession
 } from "./session.js";
@@ -113,6 +114,8 @@ const METADATA_RETRY_MS = 150;
 const PROGRAMMATIC_PLACEMENT_GRACE_MS = 2000;
 const NATIVE_POSITION_TOLERANCE_SECONDS = 0.25;
 const MAX_CONTEXT_SECONDS = 300;
+const PIN_SNAP_DISTANCE_PX = 16;
+const PIN_SNAP_ARM_MS = 450;
 
 function normalizeContextSeconds(value, fallback = 5) {
   if (value === null || value === undefined || String(value).trim() === "") return fallback;
@@ -1616,38 +1619,6 @@ function changeSectionWeight(sectionId, weight) {
   return true;
 }
 
-function changeSectionEndpointLink(sectionId, role, linked) {
-  const section = resolveSection(guide(), sectionId);
-  if (!section || !["start", "end"].includes(role)) return false;
-  settleBeforeAction();
-  const result = linked
-    ? linkGuideSectionEndpoint(state.session, sectionId, role)
-    : unlinkGuideSectionEndpoint(state.session, sectionId, role);
-  if (!result.changed) {
-    setStatus(
-      result.reason === "no-coincident-pin"
-        ? `There is no retained Pin available to relink this ${role} endpoint to.`
-        : result.reason === "unshared-pin"
-          ? `This ${role} endpoint is already independent.`
-          : result.reason === "invalid-link-geometry"
-            ? `Its original shared Pin is now beyond the opposite Section bound.`
-          : `The ${role} endpoint could not be ${linked ? "relinked" : "unlinked"}.`,
-      !["no-coincident-pin", "unshared-pin", "invalid-link-geometry"].includes(result.reason)
-    );
-    return false;
-  }
-  state.selectedRetained = { kind: "section", id: sectionId };
-  view.invalidateTimelinePins();
-  accept(result, {
-    effect: false,
-    renderGuide: true,
-    status: linked
-      ? `Relinked the ${role} endpoint; Sections sharing this Pin now move together.`
-      : `Unlinked the ${role} endpoint; this Section can now move independently at that bound.`
-  });
-  return true;
-}
-
 function selectedPinExtent() {
   const pins = state.selectedPinIds
     .map(id => getPin(guide(), id))
@@ -1864,6 +1835,20 @@ function deleteSectionById(sectionId) {
   });
 }
 
+function confirmSectionEndpointUnlink(sectionId, role) {
+  const section = resolveSection(guide(), sectionId);
+  if (!section || !["start", "end"].includes(role)) return;
+  openGuideDialog({
+    action: "unlink-section-endpoint",
+    id: sectionId,
+    role,
+    title: `Unlink ${role === "start" ? "Start" : "End"} Pin`,
+    message: `Give “${sectionName(section)}” an independent ${role} Pin at the same Address? Its Extent and weight stay unchanged. Drag the new Pin onto another Pin and pause to link it later.`,
+    showInput: false,
+    confirmLabel: "Unlink"
+  });
+}
+
 function findGuideAction(container, datasetKey, id) {
   const stack = [...(container?.children || [])];
   while (stack.length) {
@@ -1922,6 +1907,21 @@ function submitGuideDialog(event) {
   } else if (action.action === "delete-section") {
     result = deleteGuideSection(state.session, action.id);
     status = result.changed ? "Deleted Section." : "Section could not be deleted.";
+  } else if (action.action === "unlink-section-endpoint") {
+    result = unlinkGuideSectionEndpoint(
+      state.session,
+      action.id,
+      action.role
+    );
+    if (result.changed) {
+      state.selectedRetained = { kind: "section", id: action.id };
+      view.invalidateTimelinePins();
+    }
+    status = result.changed
+      ? `Unlinked the ${action.role} endpoint. Drag its Pin onto another Pin and pause to link them.`
+      : result.reason === "unshared-pin"
+        ? `This ${action.role} endpoint is already independent.`
+        : `The ${action.role} endpoint could not be unlinked.`;
   }
 
   if (result?.changed) accept(result, { renderGuide: true, status });
@@ -2363,6 +2363,68 @@ function sourceFromRelativeDragDelta(event, drag) {
   return drag.projection.timelineToSource(coordinate);
 }
 
+function pinSnapCandidate(drag, address) {
+  if (drag.kind !== "pin" || !Number.isFinite(address)) return null;
+  const sourceGuide = drag.originModel?.guide || model().guide;
+  if (!sectionsForPin(sourceGuide, drag.id).length) return null;
+  const width = Number(drag.surfaceWidth);
+  if (!Number.isFinite(width) || width <= 0) return null;
+  const coordinate = drag.projection.sourceToTimeline(address);
+  const maximumDistance = (
+    PIN_SNAP_DISTANCE_PX
+    / width
+    * drag.projection.timelineExtent
+  );
+  return sourceGuide.pins
+    .filter(pin =>
+      pin.id !== drag.id
+      && Math.abs(
+        drag.projection.sourceToTimeline(pin.t) - coordinate
+      ) <= maximumDistance
+      && canLinkPins(sourceGuide, drag.id, pin.id).allowed
+    )
+    .sort((first, second) =>
+      Math.abs(drag.projection.sourceToTimeline(first.t) - coordinate)
+      - Math.abs(drag.projection.sourceToTimeline(second.t) - coordinate)
+      || sectionsForPin(sourceGuide, second.id).length
+        - sectionsForPin(sourceGuide, first.id).length
+      || first.createdAt - second.createdAt
+    )[0] || null;
+}
+
+function clearPinSnapArm(drag) {
+  if (drag?.snapArmTimer !== null && drag?.snapArmTimer !== undefined) {
+    window.clearTimeout(drag.snapArmTimer);
+  }
+  if (drag) drag.snapArmTimer = null;
+}
+
+function updatePinSnapTarget(drag, target) {
+  const targetId = target?.id || null;
+  if (targetId === drag.snapTargetPinId) return;
+  clearPinSnapArm(drag);
+  drag.snapTargetPinId = targetId;
+  drag.snapArmed = false;
+  if (!targetId) return;
+  drag.snapArmTimer = window.setTimeout(() => {
+    if (
+      state.guideDrag !== drag
+      || drag.snapTargetPinId !== targetId
+    ) return;
+    drag.snapArmTimer = null;
+    drag.snapArmed = true;
+    const targetPin = getPin(guide(), targetId);
+    view.invalidateTimelinePins();
+    view.renderGuide();
+    view.render();
+    setStatus(
+      `Release to link with ${
+        targetPin?.label?.trim() || `Pin ${formatTime(targetPin?.t)}`
+      }.`
+    );
+  }, PIN_SNAP_ARM_MS);
+}
+
 function beginGuideDrag(kind, id, event, options = {}) {
   if (
     !state.videoLoaded
@@ -2407,7 +2469,10 @@ function beginGuideDrag(kind, id, event, options = {}) {
     moved: false,
     changed: false,
     blockedReason: null,
-    rangeChanged: false
+    rangeChanged: false,
+    snapTargetPinId: null,
+    snapArmed: false,
+    snapArmTimer: null
   };
 }
 
@@ -2491,6 +2556,8 @@ function updateGuideDrag(event) {
     history: drag.originHistory,
     future: drag.originFuture
   };
+  const snapTarget = pinSnapCandidate(drag, source);
+  updatePinSnapTarget(drag, snapTarget);
   const result = drag.kind === "pin"
     ? moveGuidePin(baseSession, drag.id, source, { amend: true })
     : moveGuideSection(
@@ -2512,7 +2579,6 @@ function updateGuideDrag(event) {
   } else {
     drag.blockedReason = result.reason || "unavailable";
   }
-  syncIntervalPinSelection();
   state.selectedRetained = drag.sectionId
     ? { kind: "section", id: drag.sectionId }
     : { kind: drag.kind, id: drag.id };
@@ -2528,6 +2594,10 @@ function finishGuideDrag(event, options = {}) {
   if (!drag || (event?.pointerId !== undefined && event.pointerId !== drag.pointerId)) {
     return false;
   }
+  const willLink = drag.kind === "pin"
+    && drag.snapArmed
+    && Boolean(drag.snapTargetPinId);
+  clearPinSnapArm(drag);
   state.guideDrag = null;
   try {
     if (
@@ -2559,7 +2629,7 @@ function finishGuideDrag(event, options = {}) {
   window.setTimeout(() => {
     state.guideClickSuppressed = false;
   }, 0);
-  if (!drag.changed) {
+  if (!drag.changed && !willLink) {
     clearGuideDragPreview();
     setStatus(
       drag.blockedReason === "invalid-guide-geometry"
@@ -2570,7 +2640,66 @@ function finishGuideDrag(event, options = {}) {
     return false;
   }
 
-  const label = drag.kind === "pin" ? "Move Pin" : "Move Section";
+  let linkedTargetPinId = null;
+  if (willLink) {
+    const targetPin = getPin(drag.originModel.guide, drag.snapTargetPinId);
+    const baseSession = {
+      model: drag.originModel,
+      history: drag.originHistory,
+      future: drag.originFuture
+    };
+    const snapped = targetPin
+      ? moveGuidePin(
+          baseSession,
+          drag.id,
+          targetPin.t,
+          { amend: true }
+        )
+      : { changed: false, reason: "missing-target-pin" };
+    if (!snapped.changed && snapped.reason !== "unchanged-pin") {
+      state.session = baseSession;
+      clearGuideDragPreview();
+      syncIntervalPinSelection();
+      view.invalidateTimelinePins();
+      view.renderGuide();
+      view.render();
+      setStatus("That Pin can no longer be linked at this Address.", true);
+      return false;
+    }
+    state.session = snapped.changed ? snapped.session : baseSession;
+    drag.rangeChanged = Boolean(snapped.rangeChanged);
+    const linked = linkGuidePins(
+      state.session,
+      drag.id,
+      drag.snapTargetPinId,
+      { amend: true }
+    );
+    if (!linked.changed) {
+      state.session = {
+        model: drag.originModel,
+        history: drag.originHistory,
+        future: drag.originFuture
+      };
+      clearGuideDragPreview();
+      syncIntervalPinSelection();
+      view.invalidateTimelinePins();
+      view.renderGuide();
+      view.render();
+      setStatus("Those Pins cannot be linked without invalidating a Section.", true);
+      return false;
+    }
+    state.session = linked.session;
+    linkedTargetPinId = drag.snapTargetPinId;
+    if (!drag.sectionId) {
+      state.selectedRetained = { kind: "pin", id: linkedTargetPinId };
+    }
+  }
+
+  const label = linkedTargetPinId
+    ? "Link Pins"
+    : drag.kind === "pin"
+      ? "Move Pin"
+      : "Move Section";
   const committed = checkpoint(state.session, label, drag.originModel);
   state.session = committed.session;
   syncIntervalPinSelection();
@@ -2586,11 +2715,13 @@ function finishGuideDrag(event, options = {}) {
   view.renderGuide();
   view.render();
   const value = drag.kind === "pin"
-    ? getPin(guide(), drag.id)
+    ? getPin(guide(), linkedTargetPinId || drag.id)
     : resolveSection(guide(), drag.id);
   if (guidePersisted) {
     setStatus(
-      drag.kind === "pin"
+      linkedTargetPinId
+        ? `Linked with ${value?.label?.trim() || `Pin ${formatTime(value?.t)}`}; shared Sections now move together.`
+        : drag.kind === "pin"
         ? `Moved Pin to ${formatTime(value?.t)}.`
         : `Moved “${sectionName(value)}” to ${formatRange(value)}.`
     );
@@ -3581,18 +3712,9 @@ function handleGuideClick(event) {
   if (deletePinButton) return deletePinById(deletePinButton.dataset.deletePin);
   const unlinkEndpoint = event.target.closest("[data-unlink-section-endpoint]");
   if (unlinkEndpoint) {
-    return changeSectionEndpointLink(
+    return confirmSectionEndpointUnlink(
       unlinkEndpoint.dataset.unlinkSectionEndpoint,
-      unlinkEndpoint.dataset.sectionEndpoint,
-      false
-    );
-  }
-  const linkEndpoint = event.target.closest("[data-link-section-endpoint]");
-  if (linkEndpoint) {
-    return changeSectionEndpointLink(
-      linkEndpoint.dataset.linkSectionEndpoint,
-      linkEndpoint.dataset.sectionEndpoint,
-      true
+      unlinkEndpoint.dataset.sectionEndpoint
     );
   }
   const renameSectionButton = event.target.closest("[data-rename-section]");

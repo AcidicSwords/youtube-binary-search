@@ -77,9 +77,10 @@ Sections reference shared Pin IDs and store one canonical `weight`.
 - `movePin()` clamps against every referencing partner and updates all edges through shared ownership.
 - `translateSection()` moves only the Section’s two endpoint Pins.
 - `unlinkSectionEndpoint()` clones one shared endpoint at the same source
-  Address, records the original Pin ID, and rewires only that Section;
-  `linkSectionEndpoint()` restores that ownership after independent movement,
-  with coincident-Pin linking retained for legacy data.
+  Address and rewires only that Section. It stores no hidden return target.
+- `canLinkPins()` validates graph and label consequences before presentation;
+  only an independent one-Section endpoint is a valid source. `linkPins()`
+  merges that dragged, coincident source Pin into the visible snap target.
 - `moveGuidePin()` also rebases any Working Interval bound aligned with the
   Pin's original Address and rebuilds its endpoint frames.
 - `deformSection()` creates or reuses an exact Working-Interval Section, then assigns the requested canonical factor.
@@ -172,12 +173,18 @@ Timeline input stays in `app.js`:
 - Timeline Pin marker: exact Go on stationary release or exact drag after the
   movement threshold;
 - Guide Pin map node or cluster Move handle: move one exact Pin;
+- independent endpoint Pin drag within the 16-pixel acquisition radius: show an
+  amber candidate, arm it green only after a 450 ms dwell, and link on release;
 - Range handles: update Range without rewriting Guide;
 - Range Start/End: distinct Go/set actions and synthetic Pin stops.
 
 Pointer capture begins only after movement crosses the drag threshold; a simple
 Pin press/release therefore remains selection, while motion keeps the same Pin
 as the drag owner.
+Changing or leaving a candidate cancels its dwell timer. Releasing before the
+candidate arms commits only the ordinary Pin move. Unlink uses the shared Guide
+confirmation dialog because it changes graph ownership even though source
+geometry is initially unchanged.
 Document fallback still gives each real drag exactly one terminal event.
 Grouped-Pin triggers open on pointer-down before Timeline Go can run. Each
 chooser row is a click-only exact selection beside a separate horizontal drag
@@ -191,6 +198,13 @@ Pointer-acquired button focus is released after activation, and `youtube.js`
 owns iframe focus release across Center play, buffer, pause, and end state
 changes. Application and Field code never reach through the adapter to raw
 YouTube objects.
+
+The Operator matrix is constrained to a square 3×3 grid because row and column
+placement carry semantic meaning. Its cells use a fixed three-level hierarchy:
+corner key, centered operator identity, then at most two lines of current
+consequence. Parameter labels use one compact sans-serif level while state
+values use one monospaced level; differences communicate role, not accidental
+inheritance.
 
 Compact Guide marks only the background viewer, map, Parameters, Operators, and
 source bar inert. Guide is nested inside `reader-column`, so the column itself
