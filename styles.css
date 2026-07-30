@@ -712,7 +712,7 @@ kbd {
 .timeline-section-span {
   position: absolute;
   top: calc(4px + var(--section-offset, 0px));
-  height: 26px;
+  height: 14px;
   overflow: hidden;
   border-radius: 999px;
   border-inline: 1px solid color-mix(in srgb, var(--section-color) 48%, transparent);
@@ -743,8 +743,8 @@ kbd {
 }
 
 .timeline-section-span.neutral {
-  height: 4px;
-  top: calc(15px + var(--section-offset, 0px));
+  height: 3px;
+  top: calc(9px + var(--section-offset, 0px));
   border: 0;
   background: color-mix(in srgb, var(--section-color) 64%, transparent);
   opacity: 0.72;
@@ -754,8 +754,8 @@ kbd {
   position: absolute;
   top: calc(4px + var(--section-offset, 0px));
   z-index: 3;
-  height: 26px;
-  min-height: 26px;
+  height: 20px;
+  min-height: 20px;
   padding: 0;
   border: 0;
   border-radius: 999px;
@@ -771,73 +771,6 @@ kbd {
   background: color-mix(in srgb, var(--section-color) 13%, transparent);
   outline: 1px solid color-mix(in srgb, var(--section-color) 55%, transparent);
   outline-offset: 1px;
-}
-
-.timeline-section-control {
-  position: absolute;
-  top: calc(2px + var(--section-offset, 0px));
-  z-index: 7;
-  display: grid;
-  width: var(--section-control-width);
-  height: 30px;
-  grid-template-columns: minmax(0, 1fr) 54px;
-  align-items: stretch;
-  overflow: hidden;
-  transform: translateX(-50%);
-  border: 1px solid color-mix(in srgb, var(--section-color) 75%, #fff);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--section-color) 14%, #0c1119);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  pointer-events: none;
-}
-
-.timeline-section-control-label {
-  display: grid;
-  min-width: 0;
-  align-content: center;
-  gap: 0;
-  padding: 2px 7px;
-}
-
-.timeline-section-control-label strong,
-.timeline-section-control-label small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.timeline-section-control-label strong {
-  color: var(--text);
-  font-size: 0.61rem;
-  font-weight: 680;
-}
-
-.timeline-section-control-label small {
-  color: color-mix(in srgb, var(--section-color) 65%, var(--muted));
-  font-size: 0.52rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.timeline-section-weight {
-  width: 54px;
-  min-width: 0;
-  height: 28px;
-  min-height: 28px;
-  padding: 1px 3px;
-  border: 0;
-  border-left: 1px solid color-mix(in srgb, var(--section-color) 55%, var(--line));
-  border-radius: 0;
-  background: rgba(9, 13, 19, 0.7);
-  color: var(--text);
-  font: 650 0.62rem ui-monospace, SFMono-Regular, Menlo, monospace;
-  pointer-events: auto;
-  touch-action: none;
-}
-
-.timeline-section-control.retained-selected {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 .timeline-section-span.retained-selected {
@@ -1546,10 +1479,46 @@ kbd {
 
 .section-item .guide-item-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr) auto;
 }
 
-.section-item .guide-section-weight { grid-column: span 2; }
+.guide-item-more {
+  position: relative;
+  align-self: stretch;
+}
+
+.guide-item-more > summary {
+  display: grid;
+  min-height: 30px;
+  place-items: center;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.69rem;
+  list-style: none;
+}
+
+.guide-item-more > summary::-webkit-details-marker { display: none; }
+
+.guide-secondary-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-column: 1 / -1;
+  gap: 5px;
+  padding-top: 5px;
+}
+
+.guide-item-more[open] {
+  grid-column: 1 / -1;
+}
+
+.guide-item-more[open] > summary {
+  justify-self: end;
+  width: max-content;
+}
 
 .guide-action-focus {
   border-color: rgba(121, 168, 255, 0.34);
@@ -1568,6 +1537,15 @@ kbd {
 
 .pin-item .guide-item-actions {
   justify-content: flex-end;
+}
+
+.pin-item .guide-item-more {
+  width: 100%;
+}
+
+.pin-item .guide-item-more > summary {
+  justify-self: end;
+  width: max-content;
 }
 
 .guide-section-weight {
@@ -1692,28 +1670,168 @@ kbd {
   gap: 8px;
 }
 
-/* The one wide-desktop layout owner. */
-@media (min-width: 1221px) {
+/* Wide screens are an instrument, not a vertically stacked document. */
+@media (min-width: 1240px) {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .app-shell {
+    display: grid;
+    height: 100dvh;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .load-bar {
+    min-height: 52px;
+    margin-bottom: var(--content-gap);
+    padding-block: 7px;
+  }
+
+  .brand-block p,
+  .compact-heading p,
+  .navigation-heading p {
+    display: none;
+  }
+
+  .workspace,
+  .reader-column {
+    min-height: 0;
+  }
+
+  .reader-column {
+    height: 100%;
+    grid-template-columns: minmax(0, 1fr) minmax(370px, 28vw);
+    grid-template-rows: auto minmax(0, auto);
+    grid-template-areas:
+      "viewer controls"
+      "timeline controls";
+    align-content: start;
+  }
+
+  .player-panel { grid-area: viewer; }
+
+  .timeline-panel {
+    grid-area: timeline;
+    min-height: 0;
+  }
+
   .command-workspace {
-    grid-template-columns:
-      minmax(260px, 0.78fr)
-      minmax(520px, 1.5fr)
-      minmax(300px, 0.92fr);
+    grid-area: controls;
+    display: flex;
+    min-height: 0;
+    align-self: stretch;
+    align-items: stretch;
+    flex-direction: column;
+    overflow: hidden;
   }
 
-  .parameter-panel,
-  .navigation-panel,
-  .guide-panel {
-    min-height: 520px;
+  .navigation-panel {
+    order: 1;
+    flex: 0 0 auto;
+    gap: 6px;
+    padding: 9px;
+  }
+
+  .navigation-panel .panel-heading {
+    margin-bottom: 3px;
+  }
+
+  .navigation-deck {
+    gap: 5px;
+    margin: 0;
+  }
+
+  .nav-action {
+    min-height: 54px;
+    gap: 2px;
+    padding: 6px;
+  }
+
+  .action-name { font-size: 0.74rem; }
+  .action-meta { font-size: 0.61rem; }
+
+  .history-actions {
+    width: 100%;
+    gap: 5px;
+  }
+
+  .history-action {
+    min-height: 34px;
+    padding-block: 4px;
+  }
+
+  .parameter-panel {
+    order: 2;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+    padding: 8px;
+  }
+
+  .parameter-panel > .panel-heading,
+  #resolution-state {
+    display: none;
+  }
+
+  #range-state,
+  #step-size-settings {
+    grid-column: 1 / -1;
+  }
+
+  .parameter-state {
+    min-height: 38px;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+  }
+
+  .parameter-state strong { text-align: right; }
+
+  .tool-disclosure > summary {
+    min-height: 34px;
+    padding: 5px 8px;
   }
 
   .guide-panel {
-    position: sticky;
-    top: 12px;
+    order: 3;
+    min-height: 190px;
+    max-height: none;
+    flex: 1 1 260px;
+  }
+
+  .guide-header {
+    padding: 8px 10px;
+  }
+
+  .guide-tabs {
+    padding: 5px;
+  }
+
+  .guide-list {
+    gap: 5px;
+    padding: 6px;
+  }
+
+  .guide-item-main {
+    gap: 2px;
+    padding: 7px 8px;
+  }
+
+  .guide-section-profile {
+    margin-top: 1px;
+  }
+
+  .section-endpoints {
+    padding: 0 7px 7px;
   }
 }
 
-@media (max-width: 1220px) {
+@media (max-width: 1239px) {
   .command-workspace {
     grid-template-columns: minmax(250px, 0.82fr) minmax(470px, 1.18fr);
   }
@@ -1880,6 +1998,28 @@ kbd {
   }
 }
 
+@media (min-width: 1240px) and (max-height: 759px) {
+  html,
+  body {
+    height: auto;
+    overflow: auto;
+  }
+
+  .app-shell {
+    height: auto;
+    overflow: visible;
+  }
+
+  .reader-column {
+    height: auto;
+  }
+
+  .command-workspace {
+    min-height: 695px;
+    overflow: visible;
+  }
+}
+
 @media (max-width: 480px) {
   .timeline-heading {
     grid-template-columns: minmax(0, 1fr);
@@ -1912,12 +2052,6 @@ kbd {
     min-height: var(--touch);
   }
 
-  .timeline-section-control { height: var(--touch); }
-
-  .timeline-section-weight {
-    height: var(--touch);
-    min-height: var(--touch);
-  }
 }
 
 
@@ -1928,6 +2062,25 @@ kbd {
   border-bottom: 1px solid var(--line);
   background: rgba(121, 168, 255, 0.035);
 }
+
+.guide-create-disclosure {
+  border-bottom: 1px solid var(--line);
+  background: rgba(121, 168, 255, 0.035);
+}
+
+.guide-create-disclosure > summary {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.72rem;
+  list-style: none;
+}
+
+.guide-create-disclosure > summary::-webkit-details-marker { display: none; }
 
 .guide-create-heading {
   display: grid;

@@ -95,21 +95,20 @@ for (const area of [
 
 assert.match(styles, /\.timeline-section-span\.compressed[\s\S]*linear-gradient/);
 assert.match(styles, /\.timeline-section-span\.expanded[\s\S]*linear-gradient/);
-assert.match(styles, /\.timeline-section-weight/);
-assert.match(styles, /\.timeline-section-control-label/);
+assert.doesNotMatch(styles, /\.timeline-section-control/);
 assert.match(styles, /\.guide-section-weight/);
 assert.match(styles, /\.guide-section-profile/);
 assert.match(
   styles,
-  /@media \(pointer: coarse\)[\s\S]*\.timeline-section-body[\s\S]*var\(--touch\)[\s\S]*\.timeline-section-control[\s\S]*var\(--touch\)/
+  /@media \(pointer: coarse\)[\s\S]*\.timeline-section-body[\s\S]*var\(--touch\)/
 );
 assert.match(styles, /\.timeline-pin[\s\S]*width:\s*var\(--pin-hit-size\)/);
 assert.doesNotMatch(styles, /\.timeline-fold-/);
 assert.match(styles, /--control-height:\s*40px/);
 assert.match(styles, /--touch:\s*48px/);
-assert.equal((styles.match(/@media \(min-width: 1221px\)/g) || []).length, 1);
-assert.doesNotMatch(fieldCss, /@media \(min-width: 1221px\)/);
-assert.match(fieldCss, /@container \(max-width: 1180px\)/);
+assert.equal((styles.match(/@media \(min-width: 1240px\)/g) || []).length, 2);
+assert.equal((fieldCss.match(/@media \(min-width: 1240px\)/g) || []).length, 1);
+assert.match(fieldCss, /@container \(max-width: 860px\)/);
 assert.doesNotMatch(grammarCss, /field-transport-bar|transport-actions|transport-readouts/);
 
 assert.match(session, /STEP_REACH_MODE[\s\S]*FIXED:\s*"fixed"[\s\S]*ADAPTIVE:\s*"adaptive"/);
@@ -168,7 +167,8 @@ assert.match(view, /timeline-ruler-tick/);
 assert.match(view, /packTimelineSectionLanes/);
 assert.match(view, /timelinePinClusterGap/);
 assert.match(view, /COARSE_TIMELINE_PIN_HIT_SIZE\s*=\s*48/);
-assert.match(view, /--section-control-width/);
+assert.match(view, /TIMELINE_SECTION_HIT_WIDTH\s*=\s*28/);
+assert.match(view, /TIMELINE_SECTION_MAX_LANES\s*=\s*5/);
 assert.match(view, /--pin-hit-size/);
 assert.doesNotMatch(view, /dataset\.(references|pinKind)/);
 assert.doesNotMatch(view, /--section-lane|--section-band-height/);
@@ -213,6 +213,7 @@ assert.match(docs["IMPLEMENTATION.md"], /timeline-projection\.js/);
 assert.match(docs["IMPLEMENTATION.md"], /positive spatial/);
 assert.match(docs["VALIDATION.md"], /each wrap rebases each available side at most once/);
 assert.match(docs["VALIDATION.md"], /1\/32[\s\S]*1\/16[\s\S]*1\/8/);
-assert.match(docs["INTERFACE.md"], /`Compresses`, `Neutral`, or `Expands`/);
+assert.match(docs["INTERFACE.md"], /bounded five-lane visual band/);
+assert.match(docs["INTERFACE.md"], /complete extent the Working Interval/);
 
 console.log("Project audit passed: v7 matrix, independent Step sizing, weighted Section graph, source-contiguous Range playback, timeline presentation, module boundaries, and canonical documents agree.");

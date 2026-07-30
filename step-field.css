@@ -296,7 +296,16 @@
   }
 }
 
-@container (max-width: 1180px) {
+@media (min-width: 1240px) {
+  .step-field:not(.field-off) {
+    grid-template-columns:
+      minmax(180px, 0.7fr)
+      minmax(390px, 1.6fr)
+      minmax(180px, 0.7fr);
+  }
+}
+
+@container (max-width: 860px) {
   .step-field:not(.field-off) {
     grid-template-areas:
       "center center"

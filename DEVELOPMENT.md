@@ -36,7 +36,7 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
 - Recompute adaptive Step from active weighted Range width, never from source duration or Field Offset.
 - Keep fixed Step Reach unchanged when Section geometry changes.
 - Hold and Stretch may update neither `fieldOffsets`, `stepReach`, nor Guide.
-- Timeline and Guide weight selectors must call the same Session transaction.
+- Guide and Deform weight selectors must call the same Session transaction.
 
 ## Testing map
 

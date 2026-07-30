@@ -933,7 +933,7 @@ function moveToAddress(destination, options = {}) {
     : goTo(state.session, destination, options);
   if (!result.changed) {
     locateAddress(departure);
-    setStatus(`Already at ${formatTime(departure)}.`);
+    setStatus(options.unchangedStatus || `Already at ${formatTime(departure)}.`);
     view.render();
     return false;
   }
@@ -1894,7 +1894,7 @@ function goToAdjacentPin(direction, options = {}) {
   return accepted;
 }
 
-function goToSectionMidpoint(sectionId, options = {}) {
+function selectSectionAsWorkingInterval(sectionId, options = {}) {
   const section = resolveSection(guide(), sectionId);
   if (!section) return;
   const carry = options.carryRetained === true || state.carryModifier;
@@ -1902,18 +1902,19 @@ function goToSectionMidpoint(sectionId, options = {}) {
   if (!carry) state.selectedRetained = { kind: "section", id: sectionId };
   moveToAddress(section.midpoint, {
     operator: "section",
-    label: `Go to Section “${sectionName(section)}”`,
+    label: `Select Section “${sectionName(section)}”`,
     transaction: sourceSession => goToSessionGuideSection(
       sourceSession,
       sectionId,
       {
         operator: "section",
-        label: `Go to Section “${sectionName(section)}”`
+        label: `Select Section “${sectionName(section)}”`
       }
     ),
     renderGuide: true,
     carryRetained: carry,
-    status: destination => `Current is at the midpoint of “${sectionName(section)}” (${formatTime(destination)}).`
+    unchangedStatus: `“${sectionName(section)}” is already the Working Interval.`,
+    status: destination => `“${sectionName(section)}” is the Working Interval; Current is centered at ${formatTime(destination)}.`
   });
   if (!hasCarrySelection && carry) {
     state.selectedRetained = { kind: "section", id: sectionId };
@@ -2957,32 +2958,16 @@ elements["section-lane"].addEventListener("click", event => {
     event.stopPropagation();
     return;
   }
-  const weight = event.target.closest("[data-section-weight]");
-  if (weight) {
-    event.stopPropagation();
-    return;
-  }
   const body = event.target.closest("[data-section-drag]");
   if (body) {
     event.stopPropagation();
-    state.selectedRetained = {
-      kind: "section",
-      id: body.dataset.sectionDrag
-    };
-    view.renderGuide();
-    view.render();
-    const section = resolveSection(guide(), body.dataset.sectionDrag);
-    setStatus(`Selected ${section?.label || formatRange(section)}.`);
+    selectSectionAsWorkingInterval(
+      body.dataset.sectionDrag,
+      { carryRetained: event.altKey === true }
+    );
   }
 });
-elements["section-lane"].addEventListener("change", event => {
-  const control = event.target.closest("[data-section-weight]");
-  if (!control) return;
-  event.stopPropagation();
-  changeSectionWeight(control.dataset.sectionWeight, control.value);
-});
 elements["section-lane"].addEventListener("pointerdown", event => {
-  if (event.target.closest("[data-section-weight]")) return;
   const body = event.target.closest("[data-section-drag]");
   if (body) {
     beginGuideDrag("section", body.dataset.sectionDrag, event);
@@ -3311,6 +3296,9 @@ function trapCompactGuideFocus(event) {
 function handleGuideClick(event) {
   const pinGo = event.target.closest("[data-pin-go]");
   if (pinGo) {
+    if (event.shiftKey) {
+      return togglePinPairSelection(pinGo.dataset.pinGo);
+    }
     return goToPin(
       getPin(guide(), pinGo.dataset.pinGo),
       "pin",
@@ -3321,7 +3309,7 @@ function handleGuideClick(event) {
   if (selectPin) return togglePinPairSelection(selectPin.dataset.selectPin);
   const sectionGo = event.target.closest("[data-section-go]");
   if (sectionGo) {
-    return goToSectionMidpoint(
+    return selectSectionAsWorkingInterval(
       sectionGo.dataset.sectionGo,
       { carryRetained: event.altKey === true }
     );

@@ -2,17 +2,11 @@
 
 ## Layout
 
-The wide interface is ordered vertically:
-
-1. panoramic Step Field;
-2. weighted temporal map;
-3. command workspace.
-
-The command workspace is `Parameters | Operators | Guide`. Narrow layouts stack without changing operator order or meaning.
+The wide interface is a fixed instrument: `Viewer + Timeline | Operators + Parameters + Guide`. The observation surface and map remain visible while Guide alone scrolls retained structure. Narrow layouts stack without changing operator order or meaning.
 
 ## Parameters
 
-Parameters show Active Range, Resolution, Context duration, and Step Reach.
+Parameters expose Active Range, Context duration, and Step Reach. Resolution remains visible on the Timeline, so the wide rail does not duplicate it.
 
 - **Manual** exposes editable spatial units.
 - **Range-relative** exposes `1/32`, `1/16`, and `1/8`.
@@ -41,29 +35,30 @@ readouts and needles: Current is committed Session state; Cursor is the moving
 physical observation.
 
 Sections are coloured horizontal spans packed into the lowest available lane.
-Their width shows the composed global projection, while their gradient and
-control describe that Section's own contribution:
+Their width shows the composed global projection, while their gradient
+describes that Section's own contribution:
 
 - compressed Sections converge toward their center;
 - expanded Sections open toward their edges;
 - neutral Sections render as an ordinary line.
 
-Every Section has one named tuning control attached to its span. The label names
-the Section and states `Compresses`, `Neutral`, or `Expands`; its selector
-contains the complete familiar ladder:
+Persistent names and selectors do not consume map lanes. Click a span to make
+its complete extent the Working Interval and return Current to its center; drag
+it to translate its endpoint Pins. Guide provides the Section's name, endpoint
+relations, Focus, and complete familiar weight ladder:
 
 ```text
 0.25×  0.5×  0.75×  1×  1.25×  1.5×  1.75×  2×
 ```
 
-The selector changes timeline geometry only. Every endpoint and interior Pin
+Weight changes timeline geometry only. Every endpoint and interior Pin
 remains laterally ordered and clickable. Pin clustering follows the complete
 interactive hit region, so nearby controls neither overlap nor compete for the
 same pointer. Shared endpoints gain visual weight without acquiring a different
 interaction rule. There is no perpendicular interaction axis, stacking, or
 hidden interior.
 
-The timeline grows with actual Section-lane demand. Major and minor source-time guides adapt to available width. Range, Resolution, Working Interval, exact previews, Current, and Cursor all use the same projection.
+The timeline packs actual overlap into a bounded five-lane visual band. Major and minor source-time guides adapt to available width. Range, Resolution, Working Interval, exact previews, Current, and Cursor all use the same projection.
 
 ## Operator matrix
 
@@ -96,9 +91,9 @@ Section creation accepts:
 - held Field span;
 - two selected Pins.
 
-Titles are optional. Each Section row exposes Go, Focus, Weight, Overwrite, Rename, and Delete. Each Pin row exposes Go, pair selection, Rename, and Delete.
+Titles are optional. Each Section row exposes selection, Focus, Weight, and both endpoint Pins; infrequent Overwrite, Rename, and Delete actions sit under More. Each Pin row exposes Go, while Shift-click performs pair selection and More contains explicit selection, Rename, and Delete.
 
-Timeline and Guide weight selectors are two views of the same transaction.
+Guide and Deform weight selectors are two views of the same transaction.
 Guide Section rows project the Section against the complete timeline and connect
 their Start and End Pin controls as one owned extent. Endpoint node weight and
 Pin metadata expose how many Sections share each Pin. Selection is lightweight
@@ -135,8 +130,8 @@ Hold and Stretch change live playback state only. Offset changes only through ex
   editing and modal Guide work; Enter activates a focused Step control.
 - Pointer release clears pointer-acquired control focus, and Center playback
   state changes release iframe focus back to the reader.
-- Timeline preserves vertical page scrolling.
-- Coarse pointers receive 48px Pin, Section-drag, and weight-control hit regions
+- Narrow Timeline preserves vertical page scrolling; wide desktop keeps the application frame fixed and scrolls only Guide content.
+- Coarse pointers receive 48px Pin and Section-drag hit regions
   without enlarging their visual marks.
 - Gradients are supplemented by numeric weight labels and compressed/expanded state text.
 - Compact visible markers retain coarse-pointer touch targets.

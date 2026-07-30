@@ -64,7 +64,7 @@ Plain `refine()` retains the existing Step departure while that Address remains 
 
 `step()` and `stepToPin()` share the same interval-anchor helper and prospective-midpoint guard. They keep the approached Resolution endpoint fixed until another Step would leave less than one Reach of midpoint headroom. Playback has separate union-only interval ownership. `switchEndpoint()` is a strict boundary selection with no projection mode.
 
-Direct Timeline/Guide Go first resolves Range or Focus scope, then calls `seedNeighborhoodFromMovement()` with the resulting projection. The complete movement becomes the Working Interval; its spatial width supplies two equal margins on each side, producing a five-times movement frame before Range clipping.
+Direct Timeline/Pin Go first resolves Range or Focus scope, then calls `seedNeighborhoodFromMovement()` with the resulting projection. The complete movement becomes the Working Interval; its spatial width supplies two equal margins on each side, producing a five-times movement frame before Range clipping. Selecting a retained Section is topology-specific: its endpoints become the Working Interval boundaries and Current returns to its midpoint in one transaction.
 
 ## Guide graph and weights
 
@@ -74,7 +74,7 @@ Sections reference shared Pin IDs and store one canonical `weight`.
 - `movePin()` clamps against every referencing partner and updates all edges through shared ownership.
 - `translateSection()` moves only the Section’s two endpoint Pins.
 - `deformSection()` creates or reuses an exact Working-Interval Section, then assigns the selected factor.
-- `setGuideSectionWeight()` gives timeline and Guide selectors the same history-aware Session transaction.
+- `setGuideSectionWeight()` gives Guide and Deform selectors the same history-aware Session transaction.
 
 Guide validation permits arbitrary overlap, nesting, touching siblings, and coincident extents. It rejects non-positive Section duration, out-of-bounds Pins, and non-canonical weights.
 
@@ -112,9 +112,9 @@ All semantic Step surfaces resolve through `step-gesture.js`. A repeated press p
 - a named layer key plus distinct Current and physical Cursor readouts;
 - Range ground, Resolution contour, directional Working-Interval ridge,
   Held Field overlay, and exact dry-run previews;
-- greedily lane-packed Section spans with no fixed lane cap;
+- greedily lane-packed Section spans rendered in a bounded five-lane band;
 - a converging compression gradient, diverging expansion gradient, or neutral `1×` line;
-- one Section-named tuning control and weight selector attached to each span;
+- direct Section hit regions whose names, weights, endpoints, and lifecycle remain in Guide;
 - Current, playback Cursor, and all free/shared Pins.
 
 Guide reprojects each Section across the complete timeline, connects its exact
@@ -122,8 +122,8 @@ Start/End Pin controls, and derives endpoint visual weight from the existing
 Section-reference count. Timeline Pins use the same relation count. These are
 pure projections of Guide ownership and persist no additional topology.
 
-There is one lateral coordinate and one Pin placement path. Vertical lanes only
-prevent retained Section controls from colliding; they do not add another
+There is one lateral coordinate and one Pin placement path. Vertical lanes pack
+projected extents and fold into a bounded visual band; they do not add another
 interaction axis or alter projection. Fine and coarse pointers use different
 lane and Pin hit geometry, and clustering uses the same hit width; visual marks
 remain unchanged while interactive regions cannot overlap ambiguously.
@@ -132,9 +132,10 @@ remain unchanged while interactive regions cannot overlap ambiguously.
 
 Timeline input stays in `app.js`:
 
-- Section body: select and translate its endpoint Pins;
-- Section weight selector: commit one factor;
-- timeline or Guide Go: invert or use an exact source target;
+- Section body click: make its full extent the Working Interval and center Current;
+- Section body drag: translate its endpoint Pins;
+- Guide or Deform weight selector: commit one factor;
+- timeline or Pin Go: invert or use an exact source target;
 - Pin marker: Go or drag;
 - Range handles: update Range without rewriting Guide;
 - Range Start/End: distinct Go/set actions and synthetic Pin stops.

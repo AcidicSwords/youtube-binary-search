@@ -196,8 +196,8 @@ assert.equal(resolveFieldPhase({
     "Reloading a video must release stale side-source errors, including same-video reloads.");
   assert.match(css, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);
   assert.match(css, /@container \(max-width: 680px\)/);
-  assert.doesNotMatch(css, /@media \(min-width: 1221px\)/);
-  assert.match(layoutCss, /@media \(min-width: 1221px\)/);
+  assert.match(css, /@media \(min-width: 1240px\)/);
+  assert.match(layoutCss, /@media \(min-width: 1240px\)/);
   assert.match(packageJson.scripts.check, /step-field\.js/);
   assert.match(packageJson.scripts.test, /step-field-tests\.mjs/);
 }

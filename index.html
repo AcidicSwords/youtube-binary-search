@@ -201,7 +201,7 @@
               <span>Resolution</span><strong id="resolution-label">—</strong>
             </div>
 
-            <details id="step-size-settings" class="tool-disclosure step-size-settings" open>
+            <details id="step-size-settings" class="tool-disclosure step-size-settings">
               <summary><span>Step size</span><span id="step-size-summary">10 s manual</span></summary>
               <div class="step-size-body">
                 <div class="segmented-control" role="group" aria-label="Step size mode">
@@ -388,7 +388,9 @@
             </section>
 
             <section id="guide-sections-panel" class="guide-tab-panel" role="tabpanel" aria-labelledby="guide-tab-sections">
-              <form id="section-capture" class="guide-create-form section-create-form">
+              <details class="guide-create-disclosure">
+                <summary><span>Save a Section</span><kbd>⇧P</kbd></summary>
+                <form id="section-capture" class="guide-create-form section-create-form">
                 <div class="guide-create-heading">
                   <span class="eyebrow">Create Section</span>
                   <strong id="section-window">No current extent</strong>
@@ -407,12 +409,15 @@
                   <button id="focus-working-section" type="button" disabled>Focus Working</button>
                   <button id="save-section" class="primary" type="submit" aria-keyshortcuts="Shift+P" disabled>Save Section</button>
                 </div>
-              </form>
+                </form>
+              </details>
               <div id="sections-list" class="guide-list"><p class="empty-state">No Sections for this video.</p></div>
             </section>
 
             <section id="guide-pins-panel" class="guide-tab-panel" role="tabpanel" aria-labelledby="guide-tab-pins" hidden>
-              <form id="pin-capture" class="guide-create-form pin-create-form">
+              <details class="guide-create-disclosure">
+                <summary><span>Save a Pin</span><kbd>P</kbd></summary>
+                <form id="pin-capture" class="guide-create-form pin-create-form">
                 <div class="guide-create-heading">
                   <span class="eyebrow">Create Pin</span>
                   <strong id="pin-current-position">Current —</strong>
@@ -421,7 +426,8 @@
                   <input id="pin-label" type="text" maxlength="100" placeholder="Optional Pin title" disabled>
                 </label>
                 <button id="pin-current" class="primary" type="submit" aria-keyshortcuts="P" disabled>Pin Current</button>
-              </form>
+                </form>
+              </details>
               <div id="pins-list" class="guide-list"><p class="empty-state">No Pins for this video.</p></div>
             </section>
 

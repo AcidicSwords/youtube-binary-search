@@ -88,7 +88,7 @@ Pins are shared source Addresses. Sections are edges between two Pins, so endpoi
 - Moving a Section translates only its endpoint Pins; unrelated interior Pins are not captured.
 - Deleting a referenced Pin previews the affected count and dissolves all referencing Sections in one transaction.
 
-The timeline lane-packs overlapping Sections, shows their gradients and weight selectors, and positions the Range, Resolution, Working Interval, previews, Pins, Current, and playback Cursor in the same strictly ordered coordinate space.
+The timeline lane-packs overlapping Sections as compact gradients and positions the Range, Resolution, Working Interval, previews, Pins, Current, and playback Cursor in the same strictly ordered coordinate space. Click a Section to make its complete extent the Working Interval and return Current to its center; edit its weight and lifecycle in the always-present Guide.
 
 ## Playback, Context, and Field
 

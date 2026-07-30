@@ -58,11 +58,12 @@
 
 ## Direct manipulation
 
-- Timeline/Guide Go across a spatial distance; confirm the movement is the Working Interval and its unclipped Resolution has two equal Interval-width margins on each side.
+- Timeline/Pin Go across a spatial distance; confirm the movement is the Working Interval and its unclipped Resolution has two equal Interval-width margins on each side.
+- Click a Section in Timeline and Guide; confirm its endpoints become the Working Interval and Current returns to its center in one Undoable transaction.
 - Repeat beside each Range boundary and confirm clipping removes only unavailable margin.
 - Drag a Section body; only its endpoint Pins should translate.
 - Drag a shared Pin; every referencing Section should update.
-- Change weight from the timeline and Guide; confirm both paths produce the same model and one Undo entry.
+- Change weight from Guide and Deform; confirm both paths produce the same model and one Undo entry.
 - Release each drag outside its marker; confirm one terminal action and one Undo.
 
 ## Guide lifecycle
@@ -88,26 +89,26 @@
 ## Timeline and responsive quality
 
 - Confirm major/minor source-time guides remain useful on wide and narrow viewports.
-- Confirm Sections occupy the lowest available lanes without a fixed cap.
+- Confirm Sections occupy the lowest available lanes and fold into the bounded five-lane visual band under extreme overlap.
 - Confirm compressed gradients converge, expanded gradients open, and `1×` is neutral.
 - Confirm gradients remain backed by a numeric selector and state text rather than colour alone.
 - In overlapping Sections, confirm `Compresses`/`Expands` describes the
   individual factor while each span and Guide profile show the composed global
   projection.
-- Confirm dense Section selectors, Pins, and Range handles have distinct hit regions.
-- Under a coarse pointer, confirm Pin, Section-drag, and Section-weight targets
+- Confirm dense Section spans, Pins, and Range handles have distinct hit regions.
+- Under a coarse pointer, confirm Pin and Section-drag targets
   are at least 48px and nearby Pins cluster before their hit regions overlap.
 - Confirm Current, Cursor, actual/preview Working Interval, Resolution, and selected state remain distinguishable.
-- Confirm desktop workspace order is Parameters, Operators, Guide.
+- At 1440px wide, confirm Viewer, Timeline, Operators, Parameters, and Guide are all present without page scrolling; only Guide content scrolls.
 - Confirm the timeline key, Current/Cursor readouts, Range ground, Resolution
-  contour, Working-Section ridge, Field overlay, Section controls, and Pins
+  contour, Working-Section ridge, Field overlay, Section spans, and Pins
   remain distinguishable at desktop and compact widths.
 - With a matrix or Step button focused, press Space and confirm it controls
   shared playback rather than reactivating that button.
 - Play and pause Center after interacting with its iframe, then immediately use
   a reader hotkey without clicking the timeline.
-- Confirm each timeline Section control visibly names its Section and Guide
-  exposes its global extent, weight state, endpoint sharing, and exact Pins.
+- Confirm each timeline Section span selects the corresponding named Guide row
+  and full Working Interval.
 - In compact Guide, switch between Sections and Pins and operate each control;
   confirm background surfaces are inert while the sheet never falls through to
   its scrim.

@@ -8,6 +8,7 @@ import {
   createSession,
   snapshotModel,
   goTo,
+  goToGuideSection,
   refine,
   localRefine,
   reopen,
@@ -35,6 +36,39 @@ import {
   rebasePlaybackTransport
 } from "./transport.js";
 import { packTimelineSectionLanes } from "./view.js";
+
+// Selecting retained topology makes its full extent the Working Interval and
+// returns Current to the center. This is one semantic transaction regardless
+// of whether the gesture originates in Timeline or Guide.
+{
+  const selectionGuide = createGuide("section-selection");
+  const selected = createSectionFromTimes(selectionGuide, 40, 80, {
+    label: "Selected extent"
+  }).section;
+  const selectionSession = createSession({
+    duration: 180,
+    current: 10,
+    guide: selectionGuide
+  });
+  const selectedResult = goToGuideSection(selectionSession, selected.id);
+  assert.equal(selectedResult.changed, true);
+  assert.deepEqual(selectedResult.session.model.resolution, {
+    L: 40,
+    C: 60,
+    R: 80,
+    level: 0
+  });
+  assert.equal(selectedResult.session.model.interval.start, 40);
+  assert.equal(selectedResult.session.model.interval.end, 80);
+  assert.equal(selectedResult.session.model.interval.arrival, 60);
+  assert.equal(selectedResult.session.model.interval.departure, 40);
+  assert.equal(selectedResult.session.model.interval.operator, "section");
+  assert.equal(
+    goToGuideSection(selectedResult.session, selected.id).changed,
+    false,
+    "Selecting the already active Section must not add redundant history."
+  );
+}
 
 // Direct placement gives the new Working Interval two equal margins on each
 // side in Timeline Space: the unclipped Resolution is exactly five Interval

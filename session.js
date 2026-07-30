@@ -712,11 +712,49 @@ export function goToGuidePin(session, pinId, options = {}) {
 export function goToGuideSection(session, sectionId, options = {}) {
   const section = resolveSection(session.model.guide, sectionId);
   if (!section) return unchanged(session, "missing-section");
-  return goTo(session, section.midpoint, {
-    ...options,
-    operator: options.operator || "section",
-    label: options.label || "Go to Section"
-  });
+  const label = options.label || "Select Section";
+  return commit(session, label, model => {
+    const current = model.resolution.C;
+    const operator = options.operator || "section";
+    const alreadySelected = (
+      Math.abs(model.resolution.L - section.start) <= EPSILON
+      && Math.abs(model.resolution.C - section.midpoint) <= EPSILON
+      && Math.abs(model.resolution.R - section.end) <= EPSILON
+      && Math.abs((model.interval?.start ?? NaN) - section.start) <= EPSILON
+      && Math.abs((model.interval?.end ?? NaN) - section.end) <= EPSILON
+      && model.interval?.operator === operator
+    );
+    if (alreadySelected) return { changed: false, reason: "selected-section" };
+
+    const startOpening = openAddress(model, section.start);
+    const endOpening = openAddress(model, section.end);
+    model.resolution = createRoot(section.start, section.midpoint, section.end);
+    model.resolutionBasis = isRangeNeighborhood(model.resolution, model.range)
+      ? RESOLUTION_BASIS.RANGE
+      : RESOLUTION_BASIS.MOVEMENT;
+    model.interval = createInterval(
+      section.start,
+      section.midpoint,
+      operator,
+      options.medium || "retained",
+      {
+        extent: section,
+        activeSide: "end"
+      }
+    );
+
+    return {
+      changed: true,
+      departure: current,
+      destination: section.midpoint,
+      current: section.midpoint,
+      place: section.midpoint,
+      interval: model.interval,
+      rangeChanged: startOpening.changed || endOpening.changed,
+      leftFocus: startOpening.leftFocus || endOpening.leftFocus,
+      openedFullVideo: startOpening.openedFullVideo || endOpening.openedFullVideo
+    };
+  }, options);
 }
 
 function refineIntervalRelation(model, target) {

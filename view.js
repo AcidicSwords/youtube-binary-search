@@ -36,9 +36,10 @@ import {
 } from "./session.js";
 import { YOUTUBE_STATE } from "./youtube.js";
 
-const TIMELINE_SECTION_CONTROL_WIDTH = 156;
-const TIMELINE_SECTION_LANE_HEIGHT = 32;
-const COARSE_TIMELINE_SECTION_LANE_HEIGHT = 52;
+const TIMELINE_SECTION_HIT_WIDTH = 28;
+const TIMELINE_SECTION_LANE_HEIGHT = 20;
+const COARSE_TIMELINE_SECTION_LANE_HEIGHT = 48;
+const TIMELINE_SECTION_MAX_LANES = 5;
 const TIMELINE_PIN_HIT_SIZE = 36;
 const COARSE_TIMELINE_PIN_HIT_SIZE = 48;
 
@@ -359,11 +360,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const sectionLane = elements["section-lane"];
     if (!sectionLane) return;
     sectionLane.replaceChildren();
-    setStyleProperty(
-      elements.timeline,
-      "--section-control-width",
-      `${TIMELINE_SECTION_CONTROL_WIDTH}px`
-    );
     renderTimelineRuler(projection);
     const timelineWidth = Math.max(1, elements.timeline.clientWidth || 1);
 
@@ -384,24 +380,29 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const packedSections = packTimelineSectionLanes(entries, {
       timelineExtent: projection.timelineExtent,
       controlExtent: projection.timelineExtent
-        * TIMELINE_SECTION_CONTROL_WIDTH
+        * TIMELINE_SECTION_HIT_WIDTH
         / timelineWidth
     });
-    const sectionBandHeight = Math.max(
-      38,
-      18 + packedSections.laneCount * sectionLaneHeight
+    const visibleLaneCount = Math.min(
+      packedSections.laneCount,
+      TIMELINE_SECTION_MAX_LANES
     );
-    const trackTop = sectionBandHeight + 12;
-    const rulerTop = trackTop + 42;
-    const pinTop = rulerTop + 40;
-    const timelineHeight = pinTop + 40;
+    const sectionBandHeight = Math.max(
+      30,
+      8 + visibleLaneCount * sectionLaneHeight
+    );
+    const trackTop = sectionBandHeight + 8;
+    const rulerTop = trackTop + 36;
+    const pinTop = rulerTop + 30;
+    const timelineHeight = pinTop + 31;
     setStyleProperty(elements.timeline, "--track-top", `${trackTop}px`);
     setStyleProperty(elements.timeline, "--ruler-top", `${rulerTop}px`);
     setStyleProperty(elements.timeline, "--pin-top", `${pinTop}px`);
     setStyleProperty(elements.timeline, "--timeline-height", `${timelineHeight}px`);
 
     for (const entry of packedSections.entries) {
-      const { section, projected, lane, controlCoordinate } = entry;
+      const { section, projected, lane } = entry;
+      const visibleLane = lane % TIMELINE_SECTION_MAX_LANES;
       const color = sectionColor(section.id);
       const selected = state().selectedRetained?.kind === "section"
         && state().selectedRetained.id === section.id;
@@ -410,8 +411,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         (projected.end - projected.start)
         / Math.max(projection.timelineExtent, EPSILON)
       ) * 100;
-      const controlPosition = controlCoordinate
-        / Math.max(projection.timelineExtent, EPSILON) * 100;
       const weight = section.weight;
       const strength = weight < 1
         ? Math.abs(Math.log2(weight)) / 2
@@ -429,7 +428,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       span.style.left = `${left}%`;
       span.style.width = `${width}%`;
       setStyleProperty(span, "--section-color", color);
-      setStyleProperty(span, "--section-offset", `${lane * sectionLaneHeight}px`);
+      setStyleProperty(span, "--section-offset", `${visibleLane * sectionLaneHeight}px`);
       setStyleProperty(span, "--weight-opacity", String(0.42 + strength * 0.45));
       span.setAttribute("aria-hidden", "true");
 
@@ -440,46 +439,14 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       body.style.left = `${left}%`;
       body.style.width = `${width}%`;
       setStyleProperty(body, "--section-color", color);
-      setStyleProperty(body, "--section-offset", `${lane * sectionLaneHeight}px`);
+      setStyleProperty(body, "--section-offset", `${visibleLane * sectionLaneHeight}px`);
       if (selected) body.classList.add("retained-selected");
       body.setAttribute(
         "aria-label",
-        `Select and move ${sectionLabel(section)}, ${formatRange(section)}`
+        `Select ${sectionLabel(section)} as the Working Interval; drag to move it, ${formatRange(section)}`
       );
-      body.title = `${sectionLabel(section)} · drag to translate its shared endpoint Pins`;
-
-      const weightState = sectionWeightState(weight);
-      const control = document.createElement("label");
-      control.className = "timeline-section-control";
-      control.style.left = `${controlPosition}%`;
-      setStyleProperty(control, "--section-color", color);
-      setStyleProperty(control, "--section-offset", `${lane * sectionLaneHeight}px`);
-      if (selected) control.classList.add("retained-selected");
-      control.title = `${sectionLabel(section)} · this Section's ${weight}× contribution ${weightState.toLowerCase()} Timeline Space`;
-      const controlText = document.createElement("span");
-      controlText.className = "timeline-section-control-label";
-      const controlName = document.createElement("strong");
-      controlName.textContent = sectionLabel(section);
-      const controlState = document.createElement("small");
-      controlState.textContent = weightState;
-      controlText.append(controlName, controlState);
-      const weightSelect = document.createElement("select");
-      weightSelect.className = "timeline-section-weight";
-      weightSelect.dataset.sectionWeight = section.id;
-      weightSelect.setAttribute(
-        "aria-label",
-        `${sectionLabel(section)} timeline weight`
-      );
-      weightSelect.title = `${sectionLabel(section)} · timeline weight`;
-      for (const optionWeight of SECTION_WEIGHT_VALUES) {
-        const option = document.createElement("option");
-        option.value = String(optionWeight);
-        option.textContent = `${optionWeight}×`;
-        weightSelect.appendChild(option);
-      }
-      weightSelect.value = String(weight);
-      control.append(controlText, weightSelect);
-      sectionLane.append(span, body, control);
+      body.title = `${sectionLabel(section)} · click to work from this extent; drag to translate its shared endpoint Pins`;
+      sectionLane.append(span, body);
     }
   }
 
@@ -615,16 +582,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       for (const section of sections) {
         const startReferences = sectionsForPin(guide(), section.startPin.id).length;
         const endReferences = sectionsForPin(guide(), section.endPin.id).length;
+        const selected = state().selectedRetained?.kind === "section"
+          && state().selectedRetained.id === section.id;
         const item = document.createElement("article");
         item.className = "guide-item section-item";
         item.dataset.sectionPreviewId = section.id;
         if (section.id === focusedId) item.classList.add("focused");
         if (section.weight < 1 - EPSILON) item.classList.add("compressed");
         else if (section.weight > 1 + EPSILON) item.classList.add("expanded");
-        if (
-          state().selectedRetained?.kind === "section"
-          && state().selectedRetained.id === section.id
-        ) item.classList.add("retained-selected");
+        if (selected) item.classList.add("retained-selected");
         setStyleProperty(item, "--section-color", sectionColor(section.id));
 
         const main = document.createElement("button");
@@ -704,7 +670,19 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         remove.dataset.deleteSection = section.id;
         remove.textContent = "Delete";
         remove.className = "guide-action guide-action-delete danger-text";
-        actions.append(focus, weightControl, overwrite, rename, remove);
+        const more = document.createElement("details");
+        more.className = "guide-item-more";
+        const moreSummary = document.createElement("summary");
+        moreSummary.textContent = "More";
+        moreSummary.setAttribute(
+          "aria-label",
+          `More actions for ${sectionLabel(section)}`
+        );
+        const secondaryActions = document.createElement("div");
+        secondaryActions.className = "guide-secondary-actions";
+        secondaryActions.append(rename, overwrite, remove);
+        more.append(moreSummary, secondaryActions);
+        actions.append(focus, weightControl, more);
 
         const endpoints = document.createElement("div");
         endpoints.className = "section-endpoints";
@@ -717,7 +695,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           endpointButton("End", section.endPin, endReferences)
         );
 
-        item.append(main, actions, endpoints);
+        item.append(main);
+        if (selected || section.id === focusedId) {
+          item.append(actions, endpoints);
+        }
         elements["sections-list"].appendChild(item);
       }
     }
@@ -733,16 +714,14 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     } else {
       for (const pin of pins) {
         const references = sectionsForPin(guide(), pin.id).length;
+        const selected = state().selectedRetained?.kind === "pin"
+          && state().selectedRetained.id === pin.id;
+        const pairSelected = state().selectedPinIds?.includes(pin.id);
         const item = document.createElement("article");
         item.className = "guide-item pin-item";
         setStyleProperty(item, "--reference-weight", String(Math.min(3, references)));
-        if (state().selectedPinIds?.includes(pin.id)) {
-          item.classList.add("pair-selected");
-        }
-        if (
-          state().selectedRetained?.kind === "pin"
-          && state().selectedRetained.id === pin.id
-        ) item.classList.add("retained-selected");
+        if (pairSelected) item.classList.add("pair-selected");
+        if (selected) item.classList.add("retained-selected");
         const main = document.createElement("button");
         main.type = "button";
         main.className = "guide-item-main";
@@ -783,8 +762,18 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           remove.textContent = "Delete…";
           remove.title = `Also dissolves ${references} referencing Section${references === 1 ? "" : "s"} after confirmation`;
         }
-        actions.append(select, rename, remove);
-        item.append(main, actions);
+        const more = document.createElement("details");
+        more.className = "guide-item-more";
+        const moreSummary = document.createElement("summary");
+        moreSummary.textContent = "More";
+        moreSummary.setAttribute("aria-label", `More actions for ${pinLabel(pin)}`);
+        const secondaryActions = document.createElement("div");
+        secondaryActions.className = "guide-secondary-actions";
+        secondaryActions.append(select, rename, remove);
+        more.append(moreSummary, secondaryActions);
+        actions.append(more);
+        item.append(main);
+        if (selected || pairSelected) item.append(actions);
         elements["pins-list"].appendChild(item);
       }
     }

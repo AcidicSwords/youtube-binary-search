@@ -49,6 +49,23 @@ let sectionNodes = descendants(byId.get("sections-list"));
 let weightControl = sectionNodes.find(node => node.dataset.sectionWeight);
 assert.ok(weightControl, "Every retained Section must expose its timeline weight.");
 const sectionId = weightControl.dataset.sectionWeight;
+const guideWeightControl = () => descendants(byId.get("sections-list")).find(node =>
+  node.dataset.sectionWeight === sectionId
+);
+const setSectionWeight = async value => {
+  let control = guideWeightControl();
+  if (!control) {
+    const sectionMain = descendants(byId.get("sections-list")).find(node =>
+      node.dataset.sectionGo === sectionId
+    );
+    byId.get("sections-list").dispatch("click", { target: sectionMain });
+    await flush();
+    control = guideWeightControl();
+  }
+  assert.ok(control, "The selected Section must expose its Guide weight.");
+  control.value = value;
+  byId.get("sections-list").dispatch("change", { target: control });
+};
 assert.equal(weightControl.value, "1");
 assert.deepEqual(
   weightControl.options.map(option => option.value),
@@ -57,11 +74,11 @@ assert.deepEqual(
 );
 
 let timelineNodes = descendants(byId.get("section-lane"));
-let timelineWeight = timelineNodes.find(node =>
-  node.dataset.sectionWeight === sectionId
+assert.equal(
+  timelineNodes.some(node => node.dataset.sectionWeight === sectionId),
+  false,
+  "Persistent tuning controls must not inflate Timeline Section lanes."
 );
-assert.ok(timelineWeight, "The same weight must be editable on the timeline.");
-assert.equal(timelineWeight.value, "1");
 
 // Compressing the Section changes only its positive lateral extent.
 let commandsBeforeWeight = playerCommandCounts();
@@ -145,6 +162,18 @@ assert.equal(currentText(), "Current 0:50.000");
 
 // Focus changes Range but does not suspend the Section's spatial weight.
 sectionNodes = descendants(byId.get("sections-list"));
+const sectionMain = sectionNodes.find(node =>
+  node.dataset.sectionGo === sectionId
+);
+byId.get("sections-list").dispatch("click", { target: sectionMain });
+await flush();
+assert.equal(currentText(), "Current 0:40.000");
+assert.equal(
+  byId.get("release-meta").textContent,
+  "0:30.000–0:50.000",
+  "Selecting a Section must make its full extent the Working Interval."
+);
+sectionNodes = descendants(byId.get("sections-list"));
 const focusAction = sectionNodes.find(node =>
   node.dataset.focusSection === sectionId
 );
@@ -162,12 +191,8 @@ assert.equal(byId.get("range-label").textContent, "0:00.000–1:40.000");
 
 // Expansion uses the same control and the opposite gradient while preserving
 // exact source duration and invertibility.
-timelineWeight = descendants(byId.get("section-lane")).find(node =>
-  node.dataset.sectionWeight === sectionId
-);
 commandsBeforeWeight = playerCommandCounts();
-timelineWeight.value = "2";
-byId.get("section-lane").dispatch("change", { target: timelineWeight });
+await setSectionWeight("2");
 await flush();
 assert.deepEqual(
   playerCommandCounts(),
@@ -185,12 +210,8 @@ assert.ok(
 );
 
 // Restoring 1× recovers the identity timeline exactly.
-timelineWeight = descendants(byId.get("section-lane")).find(node =>
-  node.dataset.sectionWeight === sectionId
-);
 commandsBeforeWeight = playerCommandCounts();
-timelineWeight.value = "1";
-byId.get("section-lane").dispatch("change", { target: timelineWeight });
+await setSectionWeight("1");
 await flush();
 assert.deepEqual(
   playerCommandCounts(),
@@ -227,21 +248,22 @@ assert.equal(
 
 // Existing Section weights remain editable during source playback without
 // pausing, seeking, changing rate, or realigning either Field side.
+sectionNodes = descendants(byId.get("sections-list"));
+byId.get("sections-list").dispatch("click", {
+  target: sectionNodes.find(node => node.dataset.sectionGo === sectionId)
+});
+await flush();
 byId.get("center-transport-surface").click();
 await flush(3);
 assert.equal(center().state, 1);
-timelineWeight = descendants(byId.get("section-lane")).find(node =>
-  node.dataset.sectionWeight === sectionId
-);
 commandsBeforeWeight = playerCommandCounts();
-timelineWeight.value = "0.5";
-byId.get("section-lane").dispatch("change", { target: timelineWeight });
+await setSectionWeight("0.5");
 await flush();
 assert.equal(center().state, 1);
 assert.deepEqual(
   playerCommandCounts(),
   commandsBeforeWeight,
-  "Editing timeline weight during playback must leave all media runtime untouched."
+  "Editing Guide weight during playback must leave all media runtime untouched."
 );
 
-console.log("Section weight smoke passed: shared familiar scale, timeline-only edits, positive compression, expansion, gradients, ordinary Pins, weighted Step, and identity recovery.");
+console.log("Section weight smoke passed: shared familiar scale, Guide-only tuning, positive compression, expansion, gradients, ordinary Pins, weighted Step, and identity recovery.");
