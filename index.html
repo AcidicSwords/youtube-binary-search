@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="theme-color" content="#0e1116">
-  <meta name="description" content="Read YouTube videos as ordered spatial ranges using refinement, linked Pins, and foldable Sections.">
+  <meta name="description" content="Read YouTube videos as ordered spatial ranges using refinement, linked Pins, and weighted Sections.">
   <title>Binary YouTube Reader</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
@@ -18,7 +18,7 @@
       <div class="brand-block">
         <div>
           <h1>Binary YouTube Reader</h1>
-          <p>Resolve a video spatially, link Addresses as Pins and Sections, and transpose settled spans out of lateral distance.</p>
+          <p>Resolve a video spatially, link Addresses as Pins and Sections, and weight how much timeline space each Section receives.</p>
         </div>
       </div>
       <div class="load-actions">
@@ -143,7 +143,7 @@
             </div>
           </div>
 
-          <div id="timeline" class="timeline" aria-label="Temporal map in traversal time. Click inside Range to go directly to a visible Address.">
+          <div id="timeline" class="timeline" aria-label="Temporal map in weighted timeline space. Click inside Range to go directly to an Address.">
             <div id="timeline-ruler" class="timeline-ruler" aria-hidden="true"></div>
             <div class="track">
               <div id="range-fill" class="range-fill"></div>
@@ -155,7 +155,6 @@
               <div id="field-span-fill" class="field-span-fill" hidden></div>
             </div>
             <div id="section-lane" class="section-lane" aria-label="Sections"></div>
-            <div id="fold-lane" class="fold-lane" aria-label="Transposed Sections"></div>
             <div id="pin-lane" class="pin-lane" aria-label="Pins"></div>
             <div id="pin-cluster-menu" class="pin-cluster-menu" role="menu" aria-label="Nearby Pins" hidden></div>
 
@@ -213,7 +212,7 @@
                   <button id="step-fraction-16" type="button" data-step-fraction="0.0625" aria-pressed="true">1/16</button>
                   <button id="step-fraction-8" type="button" data-step-fraction="0.125" aria-pressed="false">1/8</button>
                 </div>
-                <p class="setting-note">Adaptive size follows the active Range’s lateral width after transposed duration is removed.</p>
+                <p class="setting-note">Adaptive size follows the active Range’s weighted timeline width.</p>
               </div>
             </details>
 
@@ -243,7 +242,7 @@
                     <option value="10"></option>
                   </datalist>
                 </label>
-                <p class="setting-note">Plays up to half before and half after each traversal point, including the complete source material of any crossed Fold. Tail and Lead remain suspended until native Center playback resumes.</p>
+                <p class="setting-note">Plays up to half before and half after each traversal point. Tail and Lead remain suspended until native Center playback resumes.</p>
               </div>
             </details>
 
@@ -257,7 +256,7 @@
                 <span><kbd>⇧Q</kbd>/<kbd>⇧E</kbd> Local Refine</span>
                 <span><kbd>⇧A</kbd>/<kbd>⇧D</kbd> Pins</span>
                 <span><kbd>R</kbd> Release Interval</span>
-                <span><kbd>T</kbd> Transpose</span>
+                <span><kbd>T</kbd> Deform Section</span>
                 <span><kbd>F</kbd> Focus / Unfocus</span>
                 <span><kbd>Alt</kbd> Carry selected retained object</span>
                 <span><kbd>P</kbd> Pin Current in Guide</span>
@@ -279,7 +278,7 @@
                 <h2 id="navigation-heading">Navigate</h2>
               </div>
               <div class="navigation-heading-tools">
-                <p>Operators share one Working Interval; transposed Sections have zero lateral distance and ordered endpoint Pins.</p>
+                <p>Operators share one Working Interval and traverse the weighted timeline; every source Address remains ordered and reachable.</p>
                 <button id="shift-layer-toggle" class="shift-layer-toggle" type="button" aria-pressed="false">
                   <span>Shift layer</span><strong id="shift-layer-state">Off</strong>
                 </button>
@@ -317,10 +316,25 @@
                 <span class="action-name"><kbd>R</kbd> Release</span>
                 <span id="release-meta" class="action-meta">No Interval</span>
               </button>
-              <button id="transpose" class="nav-action lifecycle-action transpose-action" type="button" data-preview-action="transpose" aria-keyshortcuts="T" disabled>
-                <span class="action-name"><kbd>T</kbd> Transpose</span>
-                <span id="transpose-meta" class="action-meta">No target</span>
-              </button>
+              <div class="deform-control">
+                <button id="deform" class="nav-action lifecycle-action deform-action" type="button" data-preview-action="deform" aria-keyshortcuts="T" disabled>
+                  <span class="action-name"><kbd>T</kbd> Deform</span>
+                  <span id="deform-meta" class="action-meta">No target</span>
+                </button>
+                <label class="deform-weight-control" for="deform-weight-select">
+                  <span class="sr-only">Section timeline weight</span>
+                  <select id="deform-weight-select" aria-label="Section timeline weight">
+                    <option value="0.25">0.25×</option>
+                    <option value="0.5" selected>0.5×</option>
+                    <option value="0.75">0.75×</option>
+                    <option value="1">1×</option>
+                    <option value="1.25">1.25×</option>
+                    <option value="1.5">1.5×</option>
+                    <option value="1.75">1.75×</option>
+                    <option value="2">2×</option>
+                  </select>
+                </label>
+              </div>
               <button id="focus-toggle" class="nav-action lifecycle-action focus-action" type="button" data-preview-action="focus" aria-keyshortcuts="F" disabled>
                 <span class="action-name"><kbd>F</kbd> <span id="focus-toggle-label">Focus</span></span>
                 <span id="focus-toggle-meta" class="action-meta">No target</span>

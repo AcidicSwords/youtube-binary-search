@@ -62,9 +62,8 @@ export function deriveFieldBounds({ current, stepReach, range }) {
   validateFieldInputs(current, requested, range);
 
   const center = clamp(current, range.start, range.end);
-  // Field offsets are physical source-time relations. Folding is a navigation
-  // projection only and must never collapse, expand, or redirect Tail/Lead
-  // placement or Hold/Stretch measurement.
+  // Field offsets are physical source-time relations. Timeline weighting does
+  // not alter Tail/Lead placement or Hold/Stretch measurement.
   const backwardTarget = Math.max(range.start, center - requested.backward);
   const forwardTarget = Math.min(range.end, center + requested.forward);
   const backwardReach = Math.max(0, center - backwardTarget);

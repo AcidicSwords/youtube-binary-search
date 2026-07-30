@@ -129,8 +129,8 @@ byId.get("section-capture").dispatch("submit");
 await flush();
 assert.equal(byId.get("sections-list-count").textContent, "1");
 const sectionNodes = descendants(byId.get("sections-list"));
-assert.ok(sectionNodes.some(node => node.textContent === "Quarter to middle"));
-assert.ok(sectionNodes.some(node => node.dataset.collapseSection), "Saved Sections must expose Transpose.");
+assert.ok(sectionNodes.some(node => node.textContent.startsWith("Quarter to middle")));
+assert.ok(sectionNodes.some(node => node.dataset.sectionWeight), "Saved Sections must expose timeline weight.");
 assert.ok(sectionNodes.some(node => node.dataset.focusSection), "Saved Sections must expose Focus.");
 assert.ok(sectionNodes.some(node => node.dataset.overwriteSection), "Saved Sections must expose explicit Working Section overwrite.");
 
@@ -324,7 +324,7 @@ assert.equal(byId.has("context-action"), false);
 assert.equal(byId.has("skim"), false);
 assert.equal(byId.has("loop"), false);
 assert.equal(byId.get("release").classList.contains("lifecycle-action"), true);
-assert.equal(byId.get("transpose").classList.contains("lifecycle-action"), true);
+assert.equal(byId.get("deform").classList.contains("lifecycle-action"), true);
 assert.equal(byId.get("focus-toggle").classList.contains("lifecycle-action"), true);
 
 console.log("Interaction smoke passed: Shift Pin traversal, local Refine preview, unsaved Working Focus, explicit Section overwrite, Switch involution, Undo/Redo ownership, Guide retention, composable Step intervals, shared activation, deterministic refold/stretch, immutable configured offsets, whole-Field side Step, and Space playback.");

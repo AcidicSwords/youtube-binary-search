@@ -10,7 +10,7 @@ const fieldCss = read("step-field.css");
 const session = read("session.js");
 const transport = read("transport.js");
 const guide = read("guide.js");
-const projection = read("temporal-projection.js");
+const projection = read("timeline-projection.js");
 const youtube = read("youtube.js");
 
 const ids = [...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]);
@@ -71,7 +71,6 @@ for (const required of [
   "section-preview-fill",
   "timeline-ruler",
   "section-lane",
-  "fold-lane",
   "pin-lane",
   "pin-cluster-menu",
   "current-marker",
@@ -83,7 +82,8 @@ for (const required of [
   "switch-endpoint",
   "step-forward",
   "release",
-  "transpose",
+  "deform",
+  "deform-weight-select",
   "focus-toggle",
   "return-action",
   "step-size-settings",
@@ -107,11 +107,11 @@ for (const required of [
 
 assert.match(
   html,
-  /id="refine-backward"[\s\S]*id="reopen"[\s\S]*id="refine-forward"[\s\S]*id="step-backward"[\s\S]*id="switch-endpoint"[\s\S]*id="step-forward"[\s\S]*id="release"[\s\S]*id="transpose"[\s\S]*id="focus-toggle"[\s\S]*id="return-action"/
+  /id="refine-backward"[\s\S]*id="reopen"[\s\S]*id="refine-forward"[\s\S]*id="step-backward"[\s\S]*id="switch-endpoint"[\s\S]*id="step-forward"[\s\S]*id="release"[\s\S]*id="deform"[\s\S]*id="focus-toggle"[\s\S]*id="return-action"/
 );
 assert.match(
   styles,
-  /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward switch-endpoint step-forward"[\s\S]*"release transpose focus"/
+  /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward switch-endpoint step-forward"[\s\S]*"release deform focus"/
 );
 assert.match(html, /id="return-action"[^>]*aria-keyshortcuts="Z"/);
 assert.match(html, /id="redo-action"[^>]*aria-keyshortcuts="C"/);
@@ -128,16 +128,16 @@ assert.ok(app.includes('from "./transport.js"'));
 assert.ok(app.includes('from "./view.js"'));
 assert.ok(app.includes('from "./range-geometry.js"'));
 assert.ok(app.includes('from "./step-gesture.js"'));
-assert.ok(app.includes('from "./temporal-projection.js"'));
+assert.ok(app.includes('from "./timeline-projection.js"'));
 assert.doesNotMatch(app, /from "\.\/traversal\.js"|from "\.\/structure\.js"/);
 
 assert.match(view, /setAttribute\("role", "menuitem"\)/);
 assert.match(view, /setAttribute\("aria-haspopup", "menu"\)/);
 assert.match(view, /dataset\.overwriteSection/);
-assert.match(view, /dataset\.sectionCollapse/);
-assert.match(view, /dataset\.sectionExpand/);
-assert.match(view, /dataset\.foldContributors/);
-assert.match(view, /timeline-fold-pin/);
+assert.match(view, /dataset\.sectionWeight/);
+assert.match(view, /SECTION_WEIGHT_VALUES/);
+assert.match(view, /timeline-section-span/);
+assert.doesNotMatch(view, /timeline-fold|foldContributors|sectionCollapse|sectionExpand/);
 
 assert.match(session, /export function localRefine/);
 assert.match(
@@ -145,23 +145,26 @@ assert.match(
   /function retainedRefineIntervalRelation[\s\S]*classifyRetainedRefineRelation[\s\S]*export function refine[\s\S]*refineRelation:\s*intervalRelation\.relation/
 );
 assert.match(session, /export function releaseInterval/);
-assert.match(session, /export function transposeSection/);
+assert.match(session, /export function deformSection/);
+assert.match(session, /export function setGuideSectionWeight/);
 assert.match(session, /export function focusWorkingSection[\s\S]*FOCUS_KIND\.WORKING/);
 assert.match(session, /export function overwriteGuideSection[\s\S]*replaceSectionExtent/);
 assert.match(session, /syncIntervalEndpointFrames[\s\S]*containExtent/);
 assert.match(session, /projectPlayback[\s\S]*translateNeighborhood[\s\S]*sourceInterval\?\.start[\s\S]*sourceInterval\?\.end/);
 assert.match(session, /completePlayback[\s\S]*projectPlayback/);
 
-assert.match(guide, /collapsed:\s*options\.collapsed === true/);
+assert.match(guide, /SECTION_WEIGHT_VALUES[\s\S]*0\.25[\s\S]*2/);
+assert.match(guide, /export function setSectionWeight/);
 assert.match(guide, /export function translateSection/);
-assert.match(guide, /function traversalStops[\s\S]*projection\.orderedPinStops/);
-assert.match(guide, /export function previousPin[\s\S]*traversalStops/);
-assert.match(guide, /export function nextPin[\s\S]*traversalStops/);
+assert.match(guide, /function timelineStops[\s\S]*projection\.orderedPinStops/);
+assert.match(guide, /export function previousPin[\s\S]*timelineStops/);
+assert.match(guide, /export function nextPin[\s\S]*timelineStops/);
 
-assert.match(projection, /sourceToTraversal[\s\S]*traversalToSource/);
-assert.match(projection, /normalizeFoldUnion/);
-assert.match(projection, /boundaryPinIds/);
-assert.match(projection, /sourceStep[\s\S]*originFold/);
+assert.match(projection, /sourceToTimeline[\s\S]*timelineToSource/);
+assert.match(projection, /export function createTimelineProjection/);
+assert.match(projection, /contributors\.reduce[\s\S]*product \* activeWeight/);
+assert.match(projection, /stepSourceByTimeline[\s\S]*timelineToSource/);
+assert.doesNotMatch(projection, /affinity|materializ|collapse|fold/i);
 
 assert.match(transport, /PLAYBACK:\s*"playback"/);
 assert.match(transport, /CONTEXT:\s*"context"/);
@@ -175,7 +178,8 @@ assert.match(app, /function wrapPlaybackRange[\s\S]*rebasePlaybackTransport\(tra
 assert.match(app, /createStepGestureController[\s\S]*bindStepPress/);
 assert.match(app, /function goToAdjacentPin[\s\S]*stepToPinSession/);
 assert.match(app, /function releaseWorkingInterval[\s\S]*releaseSessionInterval/);
-assert.match(app, /function transposeWorkingOrSelected[\s\S]*transposeSessionSection/);
+assert.match(app, /function deformWorkingOrSelected[\s\S]*deformSessionSection/);
+assert.match(app, /function changeSectionWeight[\s\S]*setGuideSectionWeight/);
 assert.match(app, /function focusOrUnfocus[\s\S]*focusWorkingSection/);
 
 assert.match(youtube, /place\(address, allowSeekAhead = true\)/);
@@ -183,4 +187,4 @@ assert.match(youtube, /isYouTubeApiReady/);
 assert.match(app, /compactGuideLayout\(\) && state\.guideOpen/);
 assert.doesNotMatch(app, /plain && event\.key === "Backspace"/);
 
-console.log(`Integration check passed: ${references.size} DOM references, accessible v6 controls, matrix ownership, transposed timeline, independent Step configuration, Guide graph, and proper-Range playback are connected.`);
+console.log(`Integration check passed: ${references.size} DOM references, accessible v7 controls, matrix ownership, weighted timeline, independent Step configuration, Guide graph, and proper-Range playback are connected.`);

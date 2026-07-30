@@ -6,6 +6,7 @@ import {
   refineBlockReason
 } from "./range-geometry.js";
 import {
+  DEFAULT_DEFORM_WEIGHT,
   createGuide,
   getPin,
   sectionsForPin,
@@ -37,7 +38,7 @@ import {
   reopen as reopenSession,
   switchEndpoint as switchSessionEndpoint,
   releaseInterval as releaseSessionInterval,
-  transposeSection as transposeSessionSection,
+  deformSection as deformSessionSection,
   setRange as setSessionRange,
   previewRange,
   checkpoint,
@@ -53,13 +54,13 @@ import {
   deleteGuidePin,
   renameGuideSection,
   deleteGuideSection,
-  setGuideSectionCollapsed,
+  setGuideSectionWeight,
   moveGuidePin,
   moveGuideSection,
   undo as undoSession,
   redo as redoSession
 } from "./session.js";
-import { projectionForModel } from "./temporal-projection.js";
+import { projectionForModel } from "./timeline-projection.js";
 import {
   TRANSPORT_KIND,
   idleTransport,
@@ -88,6 +89,7 @@ import {
 } from "./step-gesture.js";
 import { createView } from "./view.js";
 
+const STORAGE_V7_PREFIX = "binary-youtube-reader:v7:";
 const STORAGE_V6_PREFIX = "binary-youtube-reader:v6:";
 const STORAGE_V5_PREFIX = "binary-youtube-reader:v5:";
 const STORAGE_V4_PREFIX = "binary-youtube-reader:v4:";
@@ -217,7 +219,7 @@ function currentStepReach() {
     model()?.stepReach ?? preferences.stepReach
   );
   if (!model()?.range) return configured;
-  return effectiveStepReach(configured, activeRange(), temporalProjection());
+  return effectiveStepReach(configured, activeRange(), timelineProjection());
 }
 
 function configuredStepReach() {
@@ -240,16 +242,16 @@ function currentInterval() {
   return model().interval;
 }
 
-function temporalProjection(options = {}) {
-  return projectionForModel(model(), options);
+function timelineProjection() {
+  return projectionForModel(model());
 }
 
-function projectionTopologyKey(sourceModel) {
+function timelineGeometryKey(sourceModel) {
   const projection = projectionForModel(sourceModel);
   return [
-    projection.effectiveDuration,
-    ...projection.folds.map(fold =>
-      `${fold.start}:${fold.end}`
+    projection.timelineExtent,
+    ...projection.segments.map(segment =>
+      `${segment.start}:${segment.end}:${segment.weight}`
     )
   ].join("|");
 }
@@ -281,7 +283,7 @@ function sectionName(section) {
   return section?.label?.trim() || `Section ${formatRange(section)}`;
 }
 
-function storageKey(prefix = STORAGE_V6_PREFIX) {
+function storageKey(prefix = STORAGE_V7_PREFIX) {
   return `${prefix}${state.videoId}`;
 }
 
@@ -332,6 +334,7 @@ function persistPreferences() {
 function readStoredGuide(duration) {
   if (!state.videoId) return createGuide();
   const candidates = [
+    [STORAGE_V7_PREFIX, raw => normalizeGuide(raw, state.videoId)],
     [STORAGE_V6_PREFIX, raw => normalizeGuide(raw, state.videoId)],
     [STORAGE_V5_PREFIX, raw => normalizeGuide(raw, state.videoId)],
     [STORAGE_V4_PREFIX, raw => normalizeGuide(raw, state.videoId)],
@@ -553,28 +556,24 @@ function accept(result, options = {}) {
     state.selectedRetained = null;
   }
   const guidePersisted = result.guideChanged ? persistGuide() : true;
-  const topologyChanged = projectionTopologyKey(previousModel)
-    !== projectionTopologyKey(model());
-  const projectionAligned = result.projectionChanged === true
-    && topologyChanged;
+  const timelineGeometryChanged = timelineGeometryKey(previousModel)
+    !== timelineGeometryKey(model());
   const rangeAligned = result.rangeChanged === true
     && options.effect !== false;
   if (rangeAligned) {
     stepField?.resetAtCurrent?.();
-  } else if (projectionAligned) {
-    stepField?.translateToCurrent(currentResolution().C, { preserve: true });
   }
   if (options.effect !== false) {
     applyPlayerEffect(result, {
       observe: options.observe,
-      fieldAligned: rangeAligned || projectionAligned
+      fieldAligned: rangeAligned
     });
   }
   if (
     options.renderGuide
     || result.guideChanged
     || result.rangeChanged
-    || topologyChanged
+    || timelineGeometryChanged
   ) view.renderGuide();
   if (options.status && guidePersisted) setStatus(options.status);
   view.render();
@@ -593,30 +592,23 @@ function carryRetainedThrough(result, originModel, enabled, selection = state.se
   const projection = projectionForModel(originModel);
   const originCurrent = originModel.resolution.C;
   const destination = result.session.model.resolution.C;
-  const originCoordinate = projection.sourceToTraversal(originCurrent);
-  const destinationCoordinate = projection.sourceToTraversal(destination);
+  const originCoordinate = projection.sourceToTimeline(originCurrent);
+  const destinationCoordinate = projection.sourceToTimeline(destination);
   const delta = destinationCoordinate - originCoordinate;
-  const direction = delta < 0 ? "backward" : "forward";
   let carried = null;
   let carryClamped = false;
 
   if (selection.kind === "pin") {
     const originPin = getPin(originModel.guide, selection.id);
     if (!originPin) return { ...result, carryFailed: "missing-pin" };
-    if (projection.foldAtSource(originPin.t)) {
-      return { ...result, carryFailed: "hidden-in-fold" };
-    }
     const requestedCoordinate =
-      projection.sourceToTraversal(originPin.t) + delta;
+      projection.sourceToTimeline(originPin.t) + delta;
     const boundedCoordinate = clamp(
       requestedCoordinate,
       0,
-      projection.effectiveDuration
+      projection.timelineExtent
     );
-    const target = projection.traversalToSource(
-      requestedCoordinate,
-      direction
-    );
+    const target = projection.timelineToSource(requestedCoordinate);
     carried = moveGuidePin(result.session, selection.id, target, {
       amend: true
     });
@@ -632,28 +624,14 @@ function carryRetainedThrough(result, originModel, enabled, selection = state.se
     if (!originSection || !currentSection) {
       return { ...result, carryFailed: "missing-section" };
     }
-    const coveringFold = projection.folds.find(fold =>
-      originSection.start >= fold.start - EPSILON
-      && originSection.end <= fold.end + EPSILON
-      && !fold.sectionIds.includes(selection.id)
-    );
-    if (coveringFold) {
-      return { ...result, carryFailed: "hidden-in-fold" };
-    }
-    const inverseProjection = projectionForModel(originModel, {
-      expandedSectionIds: [originSection.id]
-    });
     const requestedCoordinate =
-      projection.sourceToTraversal(originSection.start) + delta;
+      projection.sourceToTimeline(originSection.start) + delta;
     const boundedCoordinate = clamp(
       requestedCoordinate,
       0,
-      inverseProjection.effectiveDuration
+      projection.timelineExtent
     );
-    const targetStart = inverseProjection.traversalToSource(
-      requestedCoordinate,
-      direction
-    );
+    const targetStart = projection.timelineToSource(requestedCoordinate);
     const requestedDelta = targetStart - currentSection.start;
     carried = moveGuideSection(
       result.session,
@@ -685,7 +663,6 @@ function carryRetainedThrough(result, originModel, enabled, selection = state.se
     ...result,
     session: carried.session,
     guideChanged: true,
-    projectionChanged: true,
     rangeChanged: Boolean(result.rangeChanged || carried.rangeChanged),
     ...(Number.isFinite(carried.place) ? { place: carried.place } : {}),
     carriedRetained: { ...selection },
@@ -700,9 +677,7 @@ function retainedCarryStatus(result) {
       : " Carried the selected retained object with Current.";
   }
   return result?.carryFailed
-    ? result.carryFailed === "hidden-in-fold"
-      ? " Unfold or Focus its containing Section before carrying that hidden retained object."
-      : " The selected retained object could not follow Current beyond its structural boundary."
+    ? " The selected retained object could not follow Current beyond its structural boundary."
     : "";
 }
 
@@ -998,7 +973,7 @@ function refine(direction, options = {}) {
       currentResolution(),
       activeRange(),
       direction,
-      temporalProjection().metric
+      timelineProjection().metric
     );
     const label = direction === "backward" ? "Backward" : "Forward";
     setStatus(
@@ -1067,9 +1042,13 @@ function releaseWorkingInterval() {
   });
 }
 
-function transposeWorkingOrSelected() {
+function selectedDeformWeight() {
+  const value = Number(elements["deform-weight-select"]?.value);
+  return Number.isFinite(value) ? value : DEFAULT_DEFORM_WEIGHT;
+}
+
+function deformWorkingOrSelected() {
   if (!state.videoLoaded) return false;
-  settleBeforeAction();
   const working = currentInterval();
   const selected = state.selectedRetained?.kind === "section"
     ? resolveSection(guide(), state.selectedRetained.id)
@@ -1084,14 +1063,23 @@ function transposeWorkingOrSelected() {
     )
       ? selected.id
       : null;
-  const result = transposeSessionSection(state.session, selectedSectionId);
+  const weight = selectedDeformWeight();
+  const result = deformSessionSection(
+    state.session,
+    selectedSectionId,
+    weight
+  );
   if (!result.changed) {
-    if (result.reason === "ambiguous-transpose-target") {
+    if (result.reason === "ambiguous-deform-target") {
       openGuide("sections");
-      setStatus(`${result.sectionIds?.length || "Several"} Sections share this extent. Select the intended Section, then Transpose.`);
+      setStatus(`${result.sectionIds?.length || "Several"} Sections share this extent. Select the intended Section, then apply ${weight}×.`);
       return false;
     }
-    setStatus("Establish a Working Interval or select a Section to transpose.");
+    if (result.reason === "unchanged-section-weight") {
+      setStatus(`That Section already has ${weight}× timeline weight.`);
+      return false;
+    }
+    setStatus("Establish a Working Interval or select a Section to deform.");
     return false;
   }
   state.selectedRetained = {
@@ -1103,9 +1091,7 @@ function transposeWorkingOrSelected() {
   return accept(result, {
     effect: false,
     renderGuide: true,
-    status: result.collapsed
-      ? `Transposed “${name}”; its source endpoints remain sequential at one lateral Address.`
-      : `Unfolded “${name}” back into lateral source time.`
+    status: `Set “${name}” to ${result.weight}× timeline weight.`
   });
 }
 
@@ -1152,8 +1138,6 @@ function traverseHistory(transform, emptyMessage, completedVerb) {
   const currentMoved = Math.abs(destination - departure) > EPSILON;
   const rangeChanged = Math.abs(previousModel.range.start - activeRange().start) > EPSILON
     || Math.abs(previousModel.range.end - activeRange().end) > EPSILON;
-  const topologyChanged = projectionTopologyKey(previousModel)
-    !== projectionTopologyKey(model());
   if (currentMoved && state.contextSeconds > 0) {
     if (rangeChanged) stepField?.resetAtCurrent?.();
     else stepField?.translateToCurrent(destination, { preserve: true });
@@ -1163,8 +1147,6 @@ function traverseHistory(transform, emptyMessage, completedVerb) {
       preserveField: !rangeChanged,
       resetField: rangeChanged
     });
-  } else if (topologyChanged) {
-    stepField?.translateToCurrent(destination, { preserve: true });
   }
   view.renderGuide();
   if (guidePersisted) setStatus(`${completedVerb} ${result.label}.`);
@@ -1252,7 +1234,7 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
   state.pendingStep.started = true;
   state.session = carried.session;
   if (
-    projectionTopologyKey(previousModel) !== projectionTopologyKey(model())
+    timelineGeometryKey(previousModel) !== timelineGeometryKey(model())
   ) {
     view.renderGuide();
   }
@@ -1350,7 +1332,7 @@ function acceptContextCursor() {
   const parentNeighborhood = copy(currentResolution());
   const parentResolutionBasis = model().resolutionBasis;
   const returnModel = snapshotModel(model());
-  const returnProjectionKey = projectionTopologyKey(returnModel);
+  const returnTimelineKey = timelineGeometryKey(returnModel);
 
   // Context remains transient unless the user explicitly accepts its Cursor.
   // Stop the physical observation without restoring its anchor, then settle
@@ -1372,7 +1354,7 @@ function acceptContextCursor() {
   if (result.changed) {
     state.session = result.session;
     stepField?.translateToCurrent(currentResolution().C, { preserve: true });
-    if (returnProjectionKey !== projectionTopologyKey(model())) {
+    if (returnTimelineKey !== timelineGeometryKey(model())) {
       view.renderGuide();
     }
     setStatus(
@@ -1496,51 +1478,34 @@ function leaveSection() {
   });
 }
 
-function setSectionFolded(sectionId, collapsed) {
+function changeSectionWeight(sectionId, weight) {
   const section = resolveSection(guide(), sectionId);
   if (!section) return false;
   const name = sectionName(section);
-  settleBeforeAction();
-  const result = setGuideSectionCollapsed(
+  const result = setGuideSectionWeight(
     state.session,
     sectionId,
-    collapsed
+    Number(weight)
   );
   if (!result.changed) {
-    setStatus(
-      `“${name}” is already ${collapsed ? "transposed" : "unfolded"}.`
-    );
+    if (result.reason === "unchanged-section-weight") {
+      setStatus(`“${name}” already has ${section.weight}× timeline weight.`);
+    } else {
+      setStatus("Choose a valid Section weight.", true);
+    }
     return false;
   }
   state.selectedRetained = { kind: "section", id: sectionId };
   view.invalidateTimelinePins();
-  const nextProjection = projectionForModel(result.session.model);
-  const activeFold = nextProjection.folds.find(fold =>
-    fold.sectionIds.includes(sectionId)
-  );
-  const remainingCoverage = nextProjection.folds.filter(fold =>
-    fold.start < section.end - EPSILON
-    && fold.end > section.start + EPSILON
-    && !fold.sectionIds.includes(sectionId)
-  );
+  const next = result.value;
   accept(result, {
     effect: false,
     renderGuide: true,
-    status: collapsed
-      ? activeFold
-        ? `Transposed “${name}” into a zero-width Fold with ordered endpoint Pins. Playback remains source-contiguous.`
-        : `Stored “${name}” as transposed; the active Focus or a hard Range cut currently materializes it.`
-      : remainingCoverage.length
-        ? `Unfolded “${name}”; ${remainingCoverage.length} overlapping transposed Section${remainingCoverage.length === 1 ? "" : "s"} still cover part of its span.`
-        : `Unfolded “${name}” back into lateral source time.`
+    status: next.weight === 1
+      ? `Restored “${name}” to ordinary timeline density.`
+      : `Set “${name}” to ${next.weight}× timeline weight.`
   });
   return true;
-}
-
-function toggleSectionFold(sectionId) {
-  const section = resolveSection(guide(), sectionId);
-  if (!section) return false;
-  return setSectionFolded(sectionId, !section.collapsed);
 }
 
 function selectedPinExtent() {
@@ -1860,8 +1825,6 @@ function submitGuideDialog(event) {
 
 function goToPin(pin, operator = "pin", options = {}) {
   if (!pin) return;
-  const activeFold = temporalProjection().foldAtSource(pin.t);
-  const endpointVisible = activeFold?.boundaryPinIds?.includes(pin.id);
   const carry = options.carryRetained === true || state.carryModifier;
   const hasCarrySelection = carry && Boolean(state.selectedRetained);
   if (!carry) state.selectedRetained = { kind: "pin", id: pin.id };
@@ -1872,11 +1835,7 @@ function goToPin(pin, operator = "pin", options = {}) {
       operator,
       label: operator === "pin" ? "Go to Pin" : operator
     }),
-    status: (destination, result) => activeFold
-      ? endpointVisible
-        ? `Current is at stacked endpoint Pin ${formatTime(destination)}.`
-        : `Unfolded ${result.unfoldedSectionIds?.length || activeFold.sectionIds.length} covering Section${(result.unfoldedSectionIds?.length || activeFold.sectionIds.length) === 1 ? "" : "s"} and moved to Pin ${formatTime(destination)}.`
-      : `Current is at Pin ${formatTime(destination)}.`,
+    status: destination => `Current is at Pin ${formatTime(destination)}.`,
     renderGuide: true,
     carryRetained: carry
   });
@@ -1889,7 +1848,7 @@ function goToPin(pin, operator = "pin", options = {}) {
 }
 
 function goToAdjacentPin(direction, options = {}) {
-  const projection = temporalProjection();
+  const projection = timelineProjection();
   const pin = direction === "backward"
     ? previousPin(guide(), currentResolution().C, activeRange(), projection)
     : nextPin(guide(), currentResolution().C, activeRange(), projection);
@@ -1924,8 +1883,6 @@ function goToAdjacentPin(direction, options = {}) {
     renderGuide: true,
     status: pin.stopKind === "range-boundary"
       ? `Pin ${direction === "backward" ? "Backward" : "Forward"} to ${pin.label} at ${formatTime(pin.t)}.${retainedCarryStatus(result)}`
-      : pin.fold
-      ? `Pin ${direction === "backward" ? "Backward" : "Forward"} to stacked endpoint ${formatTime(pin.t)}; the Fold remains zero-width laterally.${retainedCarryStatus(result)}`
       : `Pin ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(pin.t)}.${retainedCarryStatus(result)}`
   });
   if (!hasCarrySelection && carry && destinationSelection) {
@@ -1939,7 +1896,6 @@ function goToAdjacentPin(direction, options = {}) {
 function goToSectionMidpoint(sectionId, options = {}) {
   const section = resolveSection(guide(), sectionId);
   if (!section) return;
-  const activeFold = temporalProjection().foldAtSource(section.midpoint);
   const carry = options.carryRetained === true || state.carryModifier;
   const hasCarrySelection = carry && Boolean(state.selectedRetained);
   if (!carry) state.selectedRetained = { kind: "section", id: sectionId };
@@ -1956,9 +1912,7 @@ function goToSectionMidpoint(sectionId, options = {}) {
     ),
     renderGuide: true,
     carryRetained: carry,
-    status: (destination, result) => activeFold
-      ? `Unfolded ${result.unfoldedSectionIds?.length || activeFold.sectionIds.length} covering Section${(result.unfoldedSectionIds?.length || activeFold.sectionIds.length) === 1 ? "" : "s"} and moved to the midpoint of “${sectionName(section)}” (${formatTime(destination)}).`
-      : `Current is at the midpoint of “${sectionName(section)}” (${formatTime(destination)}).`
+    status: destination => `Current is at the midpoint of “${sectionName(section)}” (${formatTime(destination)}).`
   });
   if (!hasCarrySelection && carry) {
     state.selectedRetained = { kind: "section", id: sectionId };
@@ -2237,56 +2191,46 @@ function pollPlayer() {
 
 function timeFromPointer(
   event,
-  projection = temporalProjection(),
+  projection = timelineProjection(),
   constrainToRange = false
 ) {
   const rect = elements.timeline.getBoundingClientRect();
   if (!Number.isFinite(rect.width) || rect.width <= 0) return currentResolution().C;
-  const traversal = clamp(
+  const coordinate = clamp(
     (event.clientX - rect.left) / rect.width,
     0,
     1
-  ) * projection.effectiveDuration;
-  const direction = traversal < projection.sourceToTraversal(currentResolution().C)
-    ? "backward"
-    : "forward";
-  const source = projection.traversalToSource(traversal, direction);
+  ) * projection.timelineExtent;
+  const source = projection.timelineToSource(coordinate);
   if (!constrainToRange) return source;
   const range = activeRange();
-  const projectedStart = projection.sourceToTraversal(range.start);
-  const projectedEnd = projection.sourceToTraversal(range.end);
+  const projectedStart = projection.sourceToTimeline(range.start);
+  const projectedEnd = projection.sourceToTimeline(range.end);
   if (
-    traversal < Math.min(projectedStart, projectedEnd) - EPSILON
-    || traversal > Math.max(projectedStart, projectedEnd) + EPSILON
+    coordinate < Math.min(projectedStart, projectedEnd) - EPSILON
+    || coordinate > Math.max(projectedStart, projectedEnd) + EPSILON
   ) {
     return source;
   }
-  // A collapsed point has two source faces. Once the visible coordinate is
-  // inside Range, clamp only that inverse ambiguity so direct traversal cannot
-  // escape through the Fold's excluded face.
   return clamp(source, range.start, range.end);
 }
 
 function sourceFromPointerInProjection(
   event,
-  coordinateProjection,
-  originSource,
-  inverseProjection = coordinateProjection
+  projection,
+  originSource
 ) {
   const rect = elements.timeline.getBoundingClientRect();
   if (!Number.isFinite(rect.width) || rect.width <= 0) return originSource;
-  const traversal = clamp(
+  const coordinate = clamp(
     (event.clientX - rect.left) / rect.width,
     0,
     1
-  ) * coordinateProjection.effectiveDuration;
-  const direction = traversal < coordinateProjection.sourceToTraversal(originSource)
-    ? "backward"
-    : "forward";
-  return inverseProjection.traversalToSource(traversal, direction);
+  ) * projection.timelineExtent;
+  return projection.timelineToSource(coordinate);
 }
 
-function beginGuideDrag(kind, id, event, options = {}) {
+function beginGuideDrag(kind, id, event) {
   if (
     !state.videoLoaded
     || state.dragHandle
@@ -2296,26 +2240,11 @@ function beginGuideDrag(kind, id, event, options = {}) {
   const pin = kind === "pin" ? getPin(guide(), id) : null;
   const section = kind === "section" ? resolveSection(guide(), id) : null;
   if (!pin && !section) return;
-  if (
-    pin
-    && projectionForModel(model()).foldAtSource(pin.t)
-    && options.axis !== "vertical"
-  ) {
-    // Pins inside a Fold are not lateral drag operands. Visible Fold endpoints
-    // opt into the perpendicular drag axis; hidden interior Pins require an
-    // explicit Guide Go, Focus, or Unfold first.
-    return;
-  }
   state.guideDrag = {
     kind,
     id,
     pointerId: event.pointerId,
     originClientX: event.clientX,
-    originClientY: event.clientY,
-    axis: options.axis || "horizontal",
-    foldStart: options.foldStart,
-    foldEnd: options.foldEnd,
-    foldRect: options.foldElement?.getBoundingClientRect?.() || null,
     originSource: pin?.t ?? section.start,
     originSection: section
       ? { start: section.start, end: section.end }
@@ -2324,7 +2253,6 @@ function beginGuideDrag(kind, id, event, options = {}) {
     originHistory: null,
     originFuture: null,
     projection: projectionForModel(model()),
-    inverseProjection: null,
     moved: false,
     changed: false,
     blockedReason: null,
@@ -2341,9 +2269,7 @@ function beginGuideDrag(kind, id, event, options = {}) {
 function updateGuideDrag(event) {
   const drag = state.guideDrag;
   if (!drag || event.pointerId !== drag.pointerId) return;
-  const distance = drag.axis === "vertical"
-    ? Math.abs(event.clientY - drag.originClientY)
-    : Math.abs(event.clientX - drag.originClientX);
+  const distance = Math.abs(event.clientX - drag.originClientX);
   if (!drag.moved && distance < 4) return;
   if (!drag.moved) {
     // Keep the pointer-down semantic projection authoritative while transport
@@ -2366,36 +2292,15 @@ function updateGuideDrag(event) {
     drag.originHistory = state.session.history;
     drag.originFuture = state.session.future || [];
     drag.projection = projectionForModel(drag.originModel);
-    drag.inverseProjection = section
-      ? projectionForModel(drag.originModel, {
-          expandedSectionIds: [section.id]
-        })
-      : drag.projection;
   }
   event.preventDefault?.();
   event.stopPropagation?.();
 
-  let source;
-  if (
-    drag.axis === "vertical"
-    && drag.foldRect
-    && Number.isFinite(drag.foldStart)
-    && Number.isFinite(drag.foldEnd)
-  ) {
-    const rect = drag.foldRect;
-    const secondsPerPixel = rect.height > 0
-      ? (drag.foldEnd - drag.foldStart) / rect.height
-      : 0;
-    source = drag.originSource
-      - (event.clientY - drag.originClientY) * secondsPerPixel;
-  } else {
-    source = sourceFromPointerInProjection(
-      event,
-      drag.projection,
-      drag.originSource,
-      drag.inverseProjection
-    );
-  }
+  const source = sourceFromPointerInProjection(
+    event,
+    drag.projection,
+    drag.originSource
+  );
   const baseSession = {
     model: drag.originModel,
     history: drag.originHistory,
@@ -2464,7 +2369,7 @@ function finishGuideDrag(event, options = {}) {
   }, 0);
   if (!drag.changed) {
     setStatus(
-      drag.blockedReason === "invalid-guide-topology"
+      drag.blockedReason === "invalid-guide-geometry"
         ? "That move would collapse or reverse one of the linked Sections."
         : "The retained object stayed at its original Address."
     );
@@ -2478,10 +2383,6 @@ function finishGuideDrag(event, options = {}) {
   const guidePersisted = persistGuide();
   if (drag.rangeChanged) {
     locateAddress(currentResolution().C, { resetField: true });
-  } else if (
-    projectionTopologyKey(drag.originModel) !== projectionTopologyKey(model())
-  ) {
-    stepField?.translateToCurrent(currentResolution().C, { preserve: true });
   }
   view.invalidateTimelinePins();
   view.renderGuide();
@@ -2507,7 +2408,7 @@ function handleTimelineClick(event) {
     || event.target.closest(".pin-cluster-menu")
   ) return;
   view.closePinClusterMenu();
-  const time = timeFromPointer(event, temporalProjection(), true);
+  const time = timeFromPointer(event, timelineProjection(), true);
   if (!contains(activeRange(), time)) {
     setStatus("That Address is outside Range.", true);
     return;
@@ -2627,7 +2528,7 @@ function adjustRangeHandle(kind, event) {
   if (event.key === "Home") value = kind === "start" ? 0 : range.start + MIN_RANGE_SECONDS;
   else if (event.key === "End") value = kind === "start" ? range.end - MIN_RANGE_SECONDS : model().duration;
   else {
-    value = temporalProjection().sourceStep(
+    value = timelineProjection().stepSourceByTimeline(
       value,
       amount,
       forward ? "forward" : "backward",
@@ -3028,16 +2929,9 @@ elements["section-lane"].addEventListener("click", event => {
     event.stopPropagation();
     return;
   }
-  const expand = event.target.closest("[data-section-expand]");
-  if (expand) {
+  const weight = event.target.closest("[data-section-weight]");
+  if (weight) {
     event.stopPropagation();
-    setSectionFolded(expand.dataset.sectionExpand, false);
-    return;
-  }
-  const collapse = event.target.closest("[data-section-collapse]");
-  if (collapse) {
-    event.stopPropagation();
-    setSectionFolded(collapse.dataset.sectionCollapse, true);
     return;
   }
   const body = event.target.closest("[data-section-drag]");
@@ -3053,76 +2947,18 @@ elements["section-lane"].addEventListener("click", event => {
     setStatus(`Selected ${section?.label || formatRange(section)}.`);
   }
 });
+elements["section-lane"].addEventListener("change", event => {
+  const control = event.target.closest("[data-section-weight]");
+  if (!control) return;
+  event.stopPropagation();
+  changeSectionWeight(control.dataset.sectionWeight, control.value);
+});
 elements["section-lane"].addEventListener("pointerdown", event => {
+  if (event.target.closest("[data-section-weight]")) return;
   const body = event.target.closest("[data-section-drag]");
   if (body) {
     beginGuideDrag("section", body.dataset.sectionDrag, event);
-    return;
   }
-  const sectionPin = event.target.closest("[data-section-expand]");
-  if (sectionPin) {
-    beginGuideDrag("section", sectionPin.dataset.sectionExpand, event);
-  }
-});
-elements["fold-lane"].addEventListener("click", event => {
-  if (state.guideClickSuppressed) {
-    event.stopPropagation();
-    return;
-  }
-  const axis = event.target.closest("[data-fold-axis]");
-  if (axis) {
-    event.stopPropagation();
-    setStatus("A Fold interior is source time, not a navigation axis. Use an endpoint Pin or the center hinge.");
-    return;
-  }
-  const pin = event.target.closest("[data-pin-go]");
-  if (pin) {
-    event.stopPropagation();
-    if (event.shiftKey) {
-      togglePinPairSelection(pin.dataset.pinGo);
-      return;
-    }
-    goToPin(
-      getPin(guide(), pin.dataset.pinGo),
-      "Fold Endpoint",
-      { carryRetained: event.altKey === true }
-    );
-    return;
-  }
-  const expand = event.target.closest("[data-section-expand]");
-  if (expand) {
-    event.stopPropagation();
-    setSectionFolded(expand.dataset.sectionExpand, false);
-    return;
-  }
-  const contributors = event.target.closest("[data-fold-contributors]");
-  if (contributors) {
-    event.stopPropagation();
-    const ids = contributors.dataset.foldContributors.split(",").filter(Boolean);
-    if (
-      state.selectedRetained?.kind !== "section"
-      || !ids.includes(state.selectedRetained.id)
-    ) state.selectedRetained = null;
-    openGuide("sections");
-    view.renderGuide();
-    view.render();
-    setStatus(`${ids.length} Sections share this Fold. Select the colored rail or Guide row to unfold one.`);
-  }
-});
-elements["fold-lane"].addEventListener("pointerdown", event => {
-  const pin = event.target.closest(".timeline-fold-pin[data-pin-go]");
-  if (pin) {
-    const foldElement = pin.closest(".timeline-fold");
-    beginGuideDrag("pin", pin.dataset.pinGo, event, {
-      axis: "vertical",
-      foldStart: Number(foldElement?.dataset.foldStart),
-      foldEnd: Number(foldElement?.dataset.foldEnd),
-      foldElement
-    });
-    return;
-  }
-  const section = event.target.closest(".timeline-fold-rail[data-section-expand]");
-  if (section) beginGuideDrag("section", section.dataset.sectionExpand, event);
 });
 elements["pin-cluster-menu"].addEventListener("click", event => {
   if (state.guideClickSuppressed) {
@@ -3209,7 +3045,7 @@ elements["go-range-start"].addEventListener("click", event => {
   });
 });
 elements["range-midpoint"].addEventListener("click", event => {
-  const middle = temporalProjection().sourceMidpoint(
+  const middle = timelineProjection().timelineMidpoint(
     activeRange().start,
     activeRange().end
   );
@@ -3263,7 +3099,8 @@ elements["switch-endpoint"].addEventListener("click", event => {
   });
 });
 elements.release.addEventListener("click", releaseWorkingInterval);
-elements.transpose.addEventListener("click", transposeWorkingOrSelected);
+elements.deform.addEventListener("click", deformWorkingOrSelected);
+elements["deform-weight-select"].addEventListener("change", view.render);
 elements["focus-toggle"].addEventListener("click", focusOrUnfocus);
 elements["shift-layer-toggle"].addEventListener("click", () => {
   state.shiftLayer = !state.shiftLayer;
@@ -3459,10 +3296,6 @@ function handleGuideClick(event) {
   }
   const focus = event.target.closest("[data-focus-section]");
   if (focus) return focusSection(focus.dataset.focusSection);
-  const collapse = event.target.closest("[data-collapse-section]");
-  if (collapse) return setSectionFolded(collapse.dataset.collapseSection, true);
-  const expand = event.target.closest("[data-expand-section]");
-  if (expand) return setSectionFolded(expand.dataset.expandSection, false);
   const leave = event.target.closest("[data-leave-section]");
   if (leave) return leaveSection();
   const renamePinButton = event.target.closest("[data-rename-pin]");
@@ -3480,6 +3313,11 @@ function handleGuideClick(event) {
 }
 
 elements["sections-list"].addEventListener("click", handleGuideClick);
+elements["sections-list"].addEventListener("change", event => {
+  const control = event.target.closest("[data-section-weight]");
+  if (!control) return;
+  changeSectionWeight(control.dataset.sectionWeight, control.value);
+});
 elements["pins-list"].addEventListener("click", handleGuideClick);
 elements["sections-list"].addEventListener("pointerover", event => {
   const item = event.target.closest("[data-section-preview-id]");
@@ -3654,7 +3492,7 @@ document.addEventListener("keydown", event => {
   }
   else if (plain && key === "t") {
     event.preventDefault();
-    transposeWorkingOrSelected();
+    deformWorkingOrSelected();
   }
   else if (plain && key === "f") {
     event.preventDefault();

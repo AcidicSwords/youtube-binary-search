@@ -1,18 +1,30 @@
 # Binary YouTube Reader
 
-Binary YouTube Reader is a spatial interface for resolving long videos. It keeps one exact source-time model while letting the reader refine a neighborhood, draw a Working Interval, retain Pins and Sections, and transpose settled Sections out of lateral navigation.
+Binary YouTube Reader turns a linear video into a spatial map. Source time remains exact while the reader refines neighborhoods, draws a Working Interval, retains Pins and Sections, and changes how much timeline space a Section receives.
 
-Transposition is non-destructive. A folded Section has zero lateral distance, but its earlier and later endpoint Pins remain sequential on a vertical rail. Operators cross the knot without spending the hidden duration; native playback and Context still play every source frame.
+A Section weight is a spatial scale, not a playback rate. It copies the familiar Tail/Lead rate ladder:
+
+```text
+0.25×  0.5×  0.75×  1×  1.25×  1.5×  1.75×  2×
+```
+
+The correspondence is perceptual:
+
+- Tail/Lead rate scales motion through time in a side viewer.
+- Section weight scales the same fixed source material across the timeline.
+- Every video player still follows its own existing runtime rules; Section weight never changes playback.
+
+Because every allowed weight is positive, every source Address remains ordered, visible, and directly reachable. There are no collapsed spans, stacked endpoints, hidden Pins, directional faces, or vertical navigation rules.
 
 ## The operator matrix
 
 ```text
 Refine Backward   Reopen             Refine Forward
 Step Backward     Switch Endpoint    Step Forward
-Release           Transpose          Focus / Unfocus
+Release           Deform             Focus / Unfocus
 ```
 
-The physical arrangement is also the keyboard arrangement:
+The keyboard has the same shape:
 
 ```text
 Q W E
@@ -20,83 +32,88 @@ A S D
 R T F
 ```
 
-Shift changes the two directional operator families:
+Shift changes only the two directional families:
 
-- Plain `Q/E` Refine retains the Working Interval’s departure anchor while increasing logarithmic resolution. If a reversal reaches or passes that anchor, the complete Current-to-target movement becomes the new Working Interval.
-- `Shift+Q/E` invokes Local Refine. It uses midpoint membership to shorten an existing Working Interval or replace it with the new local traversal.
-- `Shift+A/D` or `Shift+←/→` traverses Pins. Consecutive Pin hops use Step’s retained-anchor rule, so they compose into one Working Interval.
+- Plain `Q/E` Refine retains the Working Interval’s departure while increasing logarithmic resolution. If a reversal reaches or passes that departure, the complete Current-to-target movement becomes the new Working Interval.
+- `Shift+Q/E` invokes Local Refine. Midpoint membership decides whether it shortens the existing traversal or replaces it with the new local traversal.
+- `Shift+A/D` or `Shift+←/→` traverses Pins. Consecutive Pin hops use Step’s retained-anchor law.
 
-The remaining operators are deliberately small:
+The remaining operators each own one small intent:
 
-- Reopen restores the Resolution endpoints to the active Range.
-- Switch Endpoint swaps the Working Interval’s directed endpoints without changing its ordered extent.
-- Release clears the Working Interval and does nothing when there is none.
-- Transpose saves or reuses the Working Interval’s endpoint Pins and Section, then folds that Section. On a selected Section it toggles only that Section.
-- Focus clamps Range to a Working or saved Section. A transposed Section materializes while focused; Unfocus restores both the containing Range and its previous presentation.
-- Undo and Redo are outside the matrix on plain `Z` and `C`.
+- Reopen restores Resolution to the active Range without discarding coverage.
+- Switch Endpoint chooses the other boundary of the same Working Interval.
+- Release clears only the Working Interval.
+- Deform creates or reuses a Section for the Working Interval, then assigns the selected timeline weight. A selected Section can be edited directly.
+- Focus makes a Working Interval or saved Section the active Range; Unfocus restores its containing Range.
+- Plain `Z` is Undo and plain `C` is Redo.
+
+## Timeline weighting
+
+For a source interval of duration \(d\) with one Section weight \(w\):
+
+```text
+timeline extent = w × d
+```
+
+Thus ten source seconds receive 2.5 units of timeline space at `0.25×`, ten at `1×`, and twenty at `2×`. Source duration and playback duration remain ten seconds in every case.
+
+Overlapping Section weights compose by multiplication. This is the ordinary composition of independent scale transforms, is order-independent, and needs no Section priority or stored hierarchy. Setting a Section to `1×` makes that Section spatially neutral without deleting it.
+
+The gradient across a Section makes its lateral deformation legible:
+
+- below `1×`, colour converges inward to signal compression;
+- above `1×`, colour opens outward to signal expansion;
+- at `1×`, the Section is an ordinary neutral span.
 
 ## Step size
 
-Step size is independent from the three-player Field.
+Step Reach is independent from the three-player Field.
 
-- Manual mode accepts a lateral distance in seconds.
-- Range-relative mode derives the distance from the active Range’s current lateral width.
-- The `1/32`, `1/16`, and `1/8` presets make the adaptive interval easy to change. Bracket shortcuts cycle the same presets.
-- Hold and Stretch change only the live Tail/Lead relation. They never overwrite configured Offset or semantic Step size.
+- Manual mode accepts a distance in timeline units.
+- Range-relative mode derives Reach from the active Range’s weighted timeline width.
+- `1/32`, `1/16`, and `1/8` are the adaptive presets.
+- Hold and Stretch change only live Tail/Lead relations. They never overwrite configured Offset, Step Reach, or Section weight.
 
-Adaptive size is recomputed after Focus, Unfocus, or transposition because those operations change the active lateral Range. The stored fraction does not change.
+Changing Section weight recomputes adaptive Reach because the active spatial width changed. It does not change fixed Reach.
 
-## Pins, Sections, and Folds
+## Pins and Sections
 
-Pins are shared source Addresses. Sections are edges between two Pins; endpoint ownership is not duplicated.
+Pins are shared source Addresses. Sections are edges between two Pins, so endpoint ownership is never duplicated.
 
 - Sections may overlap, nest asymmetrically, share endpoints, or coincide.
-- Folding one Section never changes another Section’s persisted fold flag.
-- Overlapping folded Sections form one derived maximal Fold rail while retaining separate coloured contributor rails and identities.
-- A Pin strictly inside a Fold is hidden from lateral traversal. Direct Guide navigation to it unfolds the covering contributors and completes the exact Go in one Undo transaction.
+- Every Section owns one weight from the canonical ladder.
+- Every Pin remains a normal lateral traversal stop at every weight.
 - Range Start and Range End are synthetic Pin-traversal stops, deduplicated when a real Pin already exists there.
 - Moving a shared Pin updates every referencing Section.
-- Moving a Section translates only its two endpoint Pins; unrelated Pins inside its span are not captured.
-- Deleting a referenced Pin previews the affected count, dissolves all referencing Sections, and cleans up orphaned untitled endpoint Pins in one transaction.
+- Moving a Section translates only its endpoint Pins; unrelated interior Pins are not captured.
+- Deleting a referenced Pin previews the affected count and dissolves all referencing Sections in one transaction.
 
-The Fold rail is a source-time ruler rotated vertically at one lateral coordinate. Its bottom endpoint is earlier and its top endpoint is later. Plain Step and either Refine form treat that rail as zero lateral distance. Pin traversal visits the stacked endpoints sequentially. No operator moves through the rail’s interior.
+The timeline lane-packs overlapping Sections, shows their gradients and weight selectors, and positions the Range, Resolution, Working Interval, previews, Pins, Current, and playback Cursor in the same strictly ordered coordinate space.
 
-The timeline remains full width. It separates open Section lanes, the Fold stage, the semantic track, the source ruler, and free Pins into collision-aware bands. It shows adaptive major/minor source-time guides, active Range and Resolution, Working Interval, exact action previews, transposed contributor rails, shared Pins, Current, and the observed playback Cursor. Its height follows the actual lane and Fold density instead of overlapping excess structure.
-
-## Playback and Context
+## Playback, Context, and Field
 
 Current is committed semantic position. Cursor is observed physical position.
 
-Native playback and automatic Context are source-contiguous under every Fold configuration. A proper focused Range loops automatically; the full video Range stops at its end. A wrap:
+Playback and Context use source time only. A proper focused Range loops; the full-video Range stops at its source end. A wrap adds no history, changes no semantic Current, and rebases each available Field side at most once.
 
-- appends no history;
-- commits no Current or Working Interval;
-- rebases the existing Field relation once;
-- resumes at Range start.
+Playback settlement preserves or extends watched Working Interval coverage and never shortens it.
 
-Playback coverage is monotonic: settling playback preserves or extends the Working Interval with every watched source segment and never shortens it. Folding therefore changes navigation and presentation, never audio or media order.
+Center is the audible player. Tail and Lead are optional muted projections:
 
-## Step Field
-
-Center is the audible player. Tail and Lead are optional muted projections around it.
-
-- Offset is physical Field spacing, not Step size.
+- Offset is physical Field spacing, not timeline Step size.
 - Stretch forms a side relation during genuine Center playback.
-- Hold freezes the live measured relation at `1×` without saving it into the Offset controls.
-- Side surfaces and local Step buttons invoke semantic Step using the visible differential.
-- Context suspends the side projections and cannot be mistaken for a stored Field relation.
-
-All arrow, keyboard-matrix, local-button, and side-surface Step gestures share one cadence and one Undo boundary.
+- Hold freezes a live measured relation without saving it into Offset.
+- Timeline weighting only changes where source Addresses are drawn and navigated.
 
 ## Run locally
 
-Serve the directory over HTTP and open it in a modern browser:
+Serve the directory over HTTP:
 
 ```bash
 python3 -m http.server 8000
 ```
 
-Then visit `http://localhost:8000`.
+Then open `http://localhost:8000`.
 
 Run the release gate with:
 

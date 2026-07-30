@@ -5,6 +5,38 @@ export const PIN_KIND = Object.freeze({
   ENDPOINT: "section-endpoint"
 });
 
+export const SECTION_WEIGHT_VALUES = Object.freeze([
+  0.25,
+  0.5,
+  0.75,
+  1,
+  1.25,
+  1.5,
+  1.75,
+  2
+]);
+export const DEFAULT_SECTION_WEIGHT = 1;
+export const DEFAULT_DEFORM_WEIGHT = 0.5;
+
+export function isSectionWeight(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric)
+    && SECTION_WEIGHT_VALUES.some(weight => Math.abs(weight - numeric) <= EPSILON);
+}
+
+export function normalizeSectionWeight(value, fallback = DEFAULT_SECTION_WEIGHT) {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    const exact = SECTION_WEIGHT_VALUES.find(
+      weight => Math.abs(weight - numeric) <= EPSILON
+    );
+    if (exact !== undefined) return exact;
+  }
+  return isSectionWeight(fallback)
+    ? Number(fallback)
+    : DEFAULT_SECTION_WEIGHT;
+}
+
 function makeId(prefix) {
   const random = globalThis.crypto?.randomUUID?.()
     || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -17,7 +49,7 @@ function now() {
 
 export function createGuide(videoId = null) {
   return {
-    version: 6,
+    version: 7,
     videoId,
     pins: [],
     sections: [],
@@ -137,6 +169,10 @@ export function createSection(guide, startPinId, endPinId, options = {}) {
   const [start, end] = first.t < second.t ? [first, second] : [second, first];
   if (!(end.t > start.t + EPSILON)) throw new RangeError("A Section requires distinct Pins.");
 
+  const requestedWeight = options.weight ?? DEFAULT_SECTION_WEIGHT;
+  if (!isSectionWeight(requestedWeight)) {
+    throw new RangeError("A Section requires a canonical timeline weight.");
+  }
   const label = String(options.label || options.title || "").trim();
   const duplicate = findDuplicateSection(guide, start.id, end.id, label);
   if (duplicate) return { section: duplicate, created: false };
@@ -148,7 +184,7 @@ export function createSection(guide, startPinId, endPinId, options = {}) {
     startPinId: start.id,
     endPinId: end.id,
     label,
-    collapsed: options.collapsed === true,
+    weight: normalizeSectionWeight(requestedWeight),
     provenance: options.provenance || null,
     createdAt,
     updatedAt: Number(options.updatedAt) || createdAt
@@ -162,6 +198,9 @@ export function createSectionFromTimes(guide, start, end, options = {}) {
   const A = clamp(Math.min(start, end), 0, Number.POSITIVE_INFINITY);
   const B = clamp(Math.max(start, end), 0, Number.POSITIVE_INFINITY);
   if (!(B > A + EPSILON)) throw new RangeError("A Section requires positive duration.");
+  if (options.weight !== undefined && !isSectionWeight(options.weight)) {
+    throw new RangeError("A Section requires a canonical timeline weight.");
+  }
 
   const startPin = ensurePin(guide, A, {
     kind: PIN_KIND.ENDPOINT,
@@ -196,18 +235,21 @@ export function renameSection(guide, sectionId, label) {
   return section;
 }
 
-export function setSectionCollapsed(guide, sectionId, collapsed) {
+export function setSectionWeight(guide, sectionId, weight) {
   const section = guide.sections.find(item => item.id === sectionId);
   if (!section) return { changed: false, reason: "missing-section" };
-  const next = collapsed === true;
-  if (section.collapsed === next) {
+  if (!isSectionWeight(weight)) {
+    return { changed: false, reason: "invalid-section-weight" };
+  }
+  const next = normalizeSectionWeight(weight);
+  if (Math.abs(section.weight - next) <= EPSILON) {
     return {
       changed: false,
-      reason: next ? "already-collapsed" : "already-expanded",
+      reason: "unchanged-section-weight",
       section: resolveSection(guide, section)
     };
   }
-  section.collapsed = next;
+  section.weight = next;
   section.updatedAt = now();
   guide.updatedAt = section.updatedAt;
   return {
@@ -396,13 +438,13 @@ export function deleteSection(guide, sectionId) {
   return true;
 }
 
-function projectionCoordinate(projection, source) {
-  return projection?.sourceToTraversal
-    ? projection.sourceToTraversal(source)
+function timelineCoordinate(projection, source) {
+  return projection?.sourceToTimeline
+    ? projection.sourceToTimeline(source)
     : source;
 }
 
-function traversalStops(guide, range, projection = null) {
+function timelineStops(guide, range, projection = null) {
   const retained = projection?.orderedPinStops
     ? projection.orderedPinStops(range, guide)
     : visiblePins(guide)
@@ -411,8 +453,7 @@ function traversalStops(guide, range, projection = null) {
         ...pin,
         stopKind: "pin",
         sourcePin: pin,
-        traversal: pin.t,
-        fold: null
+        timeline: pin.t
       }));
   const boundaries = [
     {
@@ -422,8 +463,7 @@ function traversalStops(guide, range, projection = null) {
       stopKind: "range-boundary",
       boundary: "start",
       sourcePin: null,
-      traversal: projectionCoordinate(projection, range.start),
-      fold: null,
+      timeline: timelineCoordinate(projection, range.start),
       createdAt: Number.NEGATIVE_INFINITY
     },
     {
@@ -433,15 +473,14 @@ function traversalStops(guide, range, projection = null) {
       stopKind: "range-boundary",
       boundary: "end",
       sourcePin: null,
-      traversal: projectionCoordinate(projection, range.end),
-      fold: null,
+      timeline: timelineCoordinate(projection, range.end),
       createdAt: Number.POSITIVE_INFINITY
     }
   ].filter(boundary =>
     !retained.some(stop => Math.abs(stop.t - boundary.t) <= EPSILON)
   );
   return [...retained, ...boundaries].sort((first, second) =>
-    first.traversal - second.traversal
+    first.timeline - second.timeline
     || first.t - second.t
     || (first.createdAt ?? 0) - (second.createdAt ?? 0)
     || String(first.id || "").localeCompare(String(second.id || ""))
@@ -449,35 +488,17 @@ function traversalStops(guide, range, projection = null) {
 }
 
 export function previousPin(guide, current, range, projection = null) {
-  const coordinate = projectionCoordinate(projection, current);
-  const fold = projection?.foldAtSource?.(current) || null;
-  const stops = traversalStops(guide, range, projection);
-  if (fold) {
-    const withinFold = stops
-      .filter(item =>
-        item.fold === fold
-        && item.t < current - EPSILON
-      )
-      .at(-1);
-    if (withinFold) return withinFold;
-  }
+  const coordinate = timelineCoordinate(projection, current);
+  const stops = timelineStops(guide, range, projection);
   return stops
-    .filter(item => item.traversal < coordinate - EPSILON)
+    .filter(item => item.timeline < coordinate - EPSILON)
     .at(-1) || null;
 }
 
 export function nextPin(guide, current, range, projection = null) {
-  const coordinate = projectionCoordinate(projection, current);
-  const fold = projection?.foldAtSource?.(current) || null;
-  const stops = traversalStops(guide, range, projection);
-  if (fold) {
-    const withinFold = stops.find(item =>
-      item.fold === fold
-      && item.t > current + EPSILON
-    );
-    if (withinFold) return withinFold;
-  }
-  return stops.find(item => item.traversal > coordinate + EPSILON) || null;
+  const coordinate = timelineCoordinate(projection, current);
+  const stops = timelineStops(guide, range, projection);
+  return stops.find(item => item.timeline > coordinate + EPSILON) || null;
 }
 
 export function sortedSections(guide) {
@@ -525,7 +546,7 @@ function kindFromLegacy(pin) {
 
 export function normalizeGuide(parsed, videoId) {
   const guide = createGuide(videoId);
-  const retainsFoldState = Number(parsed?.version) >= 6;
+  const sourceVersion = Number(parsed?.version) || 0;
   const sourcePins = Array.isArray(parsed?.pins)
     ? parsed.pins
     : (Array.isArray(parsed?.marks) ? parsed.marks : []);
@@ -562,7 +583,11 @@ export function normalizeGuide(parsed, videoId) {
       startPinId,
       endPinId,
       label: String(source.label || "").trim(),
-      collapsed: retainsFoldState && source.collapsed === true,
+      weight: sourceVersion >= 7
+        ? normalizeSectionWeight(source.weight)
+        : source.collapsed === true
+          ? 0.25
+          : normalizeSectionWeight(source.weight),
       provenance: source.provenance || null,
       createdAt: Number(source.createdAt) || now(),
       updatedAt: Number(source.updatedAt) || Number(source.createdAt) || now()
@@ -627,7 +652,7 @@ export function validateGuide(guide, duration) {
       || ids.has(section.id)
       || !section.startPinId
       || !section.endPinId
-      || typeof section.collapsed !== "boolean"
+      || !isSectionWeight(section.weight)
       || !resolveSection(guide, section)
     ) return false;
     ids.add(section.id);
@@ -713,7 +738,10 @@ export function sanitizeGuide(input, videoId, duration) {
       startPinId,
       endPinId,
       label,
-      collapsed: sourceSection.collapsed === true,
+      weight: normalizeSectionWeight(
+        sourceSection.weight,
+        sourceSection.collapsed === true ? 0.25 : DEFAULT_SECTION_WEIGHT
+      ),
       provenance: sourceSection.provenance || null,
       createdAt: Number(sourceSection.createdAt) || now(),
       updatedAt: Number(sourceSection.updatedAt) || Number(sourceSection.createdAt) || now()
