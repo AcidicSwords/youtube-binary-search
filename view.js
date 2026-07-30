@@ -36,6 +36,12 @@ import {
 } from "./session.js";
 import { YOUTUBE_STATE } from "./youtube.js";
 
+const TIMELINE_SECTION_CONTROL_WIDTH = 156;
+const TIMELINE_SECTION_LANE_HEIGHT = 32;
+const COARSE_TIMELINE_SECTION_LANE_HEIGHT = 52;
+const TIMELINE_PIN_HIT_SIZE = 36;
+const COARSE_TIMELINE_PIN_HIT_SIZE = 48;
+
 export function formatTime(seconds) {
   if (!Number.isFinite(seconds)) return "—";
   const totalMilliseconds = Math.max(0, Math.round(seconds * 1000));
@@ -155,6 +161,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     return section?.label?.trim() || `Section ${formatRange(section)}`;
   }
 
+  function sectionWeightState(weight) {
+    if (weight < 1 - EPSILON) return "Compresses";
+    if (weight > 1 + EPSILON) return "Expands";
+    return "Neutral";
+  }
+
   function pinLabel(pin) {
     if (pin?.stopKind === "range-boundary") return pin.label;
     if (pin.label?.trim()) return pin.label.trim();
@@ -213,16 +225,34 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     }
   }
 
-  function endpointButton(role, pin) {
+  function timelineSectionLaneHeight() {
+    return document.defaultView?.matchMedia?.("(pointer: coarse)")?.matches
+      ? COARSE_TIMELINE_SECTION_LANE_HEIGHT
+      : TIMELINE_SECTION_LANE_HEIGHT;
+  }
+
+  function timelinePinClusterGap() {
+    return document.defaultView?.matchMedia?.("(pointer: coarse)")?.matches
+      ? COARSE_TIMELINE_PIN_HIT_SIZE
+      : TIMELINE_PIN_HIT_SIZE;
+  }
+
+  function endpointButton(role, pin, references) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "endpoint-button";
     button.dataset.pinGo = pin.id;
+    setStyleProperty(
+      button,
+      "--endpoint-weight",
+      String(Math.min(3, Math.max(1, references)))
+    );
     const roleLabel = document.createElement("small");
     roleLabel.textContent = role;
     const text = document.createElement("span");
     text.textContent = `${formatTime(pin.t)} ${pin.label || ""}`.trim();
     button.append(roleLabel, text);
+    button.title = `${role} Pin · ${references} Section${references === 1 ? "" : "s"}`;
     return button;
   }
 
@@ -325,10 +355,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     }
   }
 
-  function renderTimelineSections(projection) {
+  function renderTimelineSections(projection, sectionLaneHeight) {
     const sectionLane = elements["section-lane"];
     if (!sectionLane) return;
     sectionLane.replaceChildren();
+    setStyleProperty(
+      elements.timeline,
+      "--section-control-width",
+      `${TIMELINE_SECTION_CONTROL_WIDTH}px`
+    );
     renderTimelineRuler(projection);
     const timelineWidth = Math.max(1, elements.timeline.clientWidth || 1);
 
@@ -348,22 +383,22 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
     const packedSections = packTimelineSectionLanes(entries, {
       timelineExtent: projection.timelineExtent,
-      controlExtent: projection.timelineExtent * 64 / timelineWidth
+      controlExtent: projection.timelineExtent
+        * TIMELINE_SECTION_CONTROL_WIDTH
+        / timelineWidth
     });
     const sectionBandHeight = Math.max(
-      32,
-      16 + packedSections.laneCount * 24
+      38,
+      18 + packedSections.laneCount * sectionLaneHeight
     );
     const trackTop = sectionBandHeight + 12;
-    const rulerTop = trackTop + 24;
+    const rulerTop = trackTop + 42;
     const pinTop = rulerTop + 40;
     const timelineHeight = pinTop + 40;
-    setStyleProperty(elements.timeline, "--section-band-height", `${sectionBandHeight}px`);
     setStyleProperty(elements.timeline, "--track-top", `${trackTop}px`);
     setStyleProperty(elements.timeline, "--ruler-top", `${rulerTop}px`);
     setStyleProperty(elements.timeline, "--pin-top", `${pinTop}px`);
     setStyleProperty(elements.timeline, "--timeline-height", `${timelineHeight}px`);
-    elements.timeline.style.height = `${timelineHeight}px`;
 
     for (const entry of packedSections.entries) {
       const { section, projected, lane, controlCoordinate } = entry;
@@ -394,7 +429,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       span.style.left = `${left}%`;
       span.style.width = `${width}%`;
       setStyleProperty(span, "--section-color", color);
-      setStyleProperty(span, "--section-lane", String(lane));
+      setStyleProperty(span, "--section-offset", `${lane * sectionLaneHeight}px`);
       setStyleProperty(span, "--weight-opacity", String(0.42 + strength * 0.45));
       span.setAttribute("aria-hidden", "true");
 
@@ -405,7 +440,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       body.style.left = `${left}%`;
       body.style.width = `${width}%`;
       setStyleProperty(body, "--section-color", color);
-      setStyleProperty(body, "--section-lane", String(lane));
+      setStyleProperty(body, "--section-offset", `${lane * sectionLaneHeight}px`);
       if (selected) body.classList.add("retained-selected");
       body.setAttribute(
         "aria-label",
@@ -413,13 +448,24 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       );
       body.title = `${sectionLabel(section)} · drag to translate its shared endpoint Pins`;
 
+      const weightState = sectionWeightState(weight);
+      const control = document.createElement("label");
+      control.className = "timeline-section-control";
+      control.style.left = `${controlPosition}%`;
+      setStyleProperty(control, "--section-color", color);
+      setStyleProperty(control, "--section-offset", `${lane * sectionLaneHeight}px`);
+      if (selected) control.classList.add("retained-selected");
+      control.title = `${sectionLabel(section)} · this Section's ${weight}× contribution ${weightState.toLowerCase()} Timeline Space`;
+      const controlText = document.createElement("span");
+      controlText.className = "timeline-section-control-label";
+      const controlName = document.createElement("strong");
+      controlName.textContent = sectionLabel(section);
+      const controlState = document.createElement("small");
+      controlState.textContent = weightState;
+      controlText.append(controlName, controlState);
       const weightSelect = document.createElement("select");
       weightSelect.className = "timeline-section-weight";
       weightSelect.dataset.sectionWeight = section.id;
-      weightSelect.style.left = `${controlPosition}%`;
-      setStyleProperty(weightSelect, "--section-color", color);
-      setStyleProperty(weightSelect, "--section-lane", String(lane));
-      if (selected) weightSelect.classList.add("retained-selected");
       weightSelect.setAttribute(
         "aria-label",
         `${sectionLabel(section)} timeline weight`
@@ -432,12 +478,16 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         weightSelect.appendChild(option);
       }
       weightSelect.value = String(weight);
-      sectionLane.append(span, body, weightSelect);
+      control.append(controlText, weightSelect);
+      sectionLane.append(span, body, control);
     }
   }
 
   function renderTimelinePins() {
     const width = Math.max(1, elements.timeline.clientWidth || 1);
+    const sectionLaneHeight = timelineSectionLaneHeight();
+    const pinClusterGap = timelinePinClusterGap();
+    setStyleProperty(elements.timeline, "--pin-hit-size", `${pinClusterGap}px`);
     const activeRange = range();
     const projection = timelineProjection();
     const pins = visiblePins(guide())
@@ -458,22 +508,24 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ...(state().selectedPinIds || [])
     ].join(":");
     const pinKey = pins
-      .map(pin => `${pin.id}:${pin.t}:${pin.label}`)
+      .map(pin =>
+        `${pin.id}:${pin.t}:${pin.label}:${pin.kind}:${sectionsForPin(guide(), pin.id).length}`
+      )
       .join(",");
     const intervalKey = interval()
       ? `${interval().start}:${interval().end}`
       : "none";
-    const key = `${activeRange.start}|${activeRange.end}|${width}|${projection.timelineExtent}|${sectionKey}|${selectedKey}|${intervalKey}|${pinKey}`;
+    const key = `${activeRange.start}|${activeRange.end}|${width}|${sectionLaneHeight}|${pinClusterGap}|${projection.timelineExtent}|${sectionKey}|${selectedKey}|${intervalKey}|${pinKey}`;
     if (key === renderedPinKey) return;
     renderedPinKey = key;
     closePinClusterMenu();
     elements["pin-lane"].replaceChildren();
-    renderTimelineSections(projection);
+    renderTimelineSections(projection, sectionLaneHeight);
     renderedClusters = clusterPinsByPixels(
       pins,
       projection.timelineExtent,
       width,
-      18
+      pinClusterGap
     );
 
     renderedClusters.forEach((cluster, index) => {
@@ -487,6 +539,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         const endpointSections = sectionsForPin(guide(), pin.id)
           .map(section => resolveSection(guide(), section))
           .filter(Boolean);
+        const references = endpointSections.length;
+        setStyleProperty(button, "--pin-weight", String(Math.min(3, references)));
         if (endpointSections.length) {
           button.classList.add("section-endpoint-pin");
           setStyleProperty(
@@ -507,6 +561,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         button.title = description;
       } else {
         button.classList.add("cluster");
+        const references = cluster.pins.reduce(
+          (total, pin) => total + sectionsForPin(guide(), pin.id).length,
+          0
+        );
+        setStyleProperty(button, "--pin-weight", String(Math.min(3, references)));
         button.dataset.clusterIndex = String(index);
         button.setAttribute("aria-haspopup", "menu");
         button.setAttribute("aria-expanded", "false");
@@ -554,6 +613,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       elements["sections-list"].appendChild(empty);
     } else {
       for (const section of sections) {
+        const startReferences = sectionsForPin(guide(), section.startPin.id).length;
+        const endReferences = sectionsForPin(guide(), section.endPin.id).length;
         const item = document.createElement("article");
         item.className = "guide-item section-item";
         item.dataset.sectionPreviewId = section.id;
@@ -572,16 +633,36 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         main.dataset.sectionGo = section.id;
         const title = document.createElement("span");
         title.className = "guide-item-title";
-        title.textContent = `${sectionLabel(section)} · ${section.weight}× timeline`;
+        title.textContent = sectionLabel(section);
         const time = document.createElement("span");
         time.className = "guide-item-time";
-        time.textContent = `${formatRange(section)} · ${formatDuration(section.end - section.start)}`;
-        main.append(title, time);
+        time.textContent = [
+          ...(section.label?.trim() ? [formatRange(section)] : []),
+          formatDuration(section.end - section.start),
+          `${section.weight}×`,
+          sectionWeightState(section.weight).toLowerCase()
+        ].join(" · ");
+        const profile = document.createElement("span");
+        profile.className = "guide-section-profile";
+        profile.setAttribute("aria-hidden", "true");
+        setStyleProperty(profile, "--profile-start", `${percent(section.start)}%`);
+        setStyleProperty(
+          profile,
+          "--profile-width",
+          `${Math.max(0, percent(section.end) - percent(section.start))}%`
+        );
+        setStyleProperty(profile, "--start-weight", String(Math.min(3, startReferences)));
+        setStyleProperty(profile, "--end-weight", String(Math.min(3, endReferences)));
+        profile.appendChild(Object.assign(document.createElement("span"), {
+          className: "guide-section-profile-fill"
+        }));
+        main.append(title, time, profile);
 
         const actions = document.createElement("div");
         actions.className = "guide-item-actions";
         const focus = document.createElement("button");
         focus.type = "button";
+        focus.className = "guide-action guide-action-focus";
         if (section.id === focusedId) {
           focus.dataset.leaveSection = "true";
           focus.textContent = "Leave";
@@ -609,26 +690,31 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         weightControl.append(weightLabel, weightSelect);
         const overwrite = document.createElement("button");
         overwrite.type = "button";
+        overwrite.className = "guide-action guide-action-overwrite";
         overwrite.dataset.overwriteSection = section.id;
         overwrite.textContent = "Overwrite";
         overwrite.disabled = !interval();
         const rename = document.createElement("button");
         rename.type = "button";
+        rename.className = "guide-action guide-action-edit";
         rename.dataset.renameSection = section.id;
         rename.textContent = "Rename";
         const remove = document.createElement("button");
         remove.type = "button";
         remove.dataset.deleteSection = section.id;
         remove.textContent = "Delete";
-        remove.className = "danger-text";
+        remove.className = "guide-action guide-action-delete danger-text";
         actions.append(focus, weightControl, overwrite, rename, remove);
 
         const endpoints = document.createElement("div");
         endpoints.className = "section-endpoints";
+        const spanLink = document.createElement("span");
+        spanLink.className = "section-span-link";
+        spanLink.setAttribute("aria-hidden", "true");
         endpoints.append(
-          endpointButton("Start", section.startPin),
-          Object.assign(document.createElement("span"), { textContent: "→" }),
-          endpointButton("End", section.endPin)
+          endpointButton("Start", section.startPin, startReferences),
+          spanLink,
+          endpointButton("End", section.endPin, endReferences)
         );
 
         item.append(main, actions, endpoints);
@@ -646,8 +732,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       elements["pins-list"].appendChild(empty);
     } else {
       for (const pin of pins) {
+        const references = sectionsForPin(guide(), pin.id).length;
         const item = document.createElement("article");
         item.className = "guide-item pin-item";
+        setStyleProperty(item, "--reference-weight", String(Math.min(3, references)));
         if (state().selectedPinIds?.includes(pin.id)) {
           item.classList.add("pair-selected");
         }
@@ -664,13 +752,20 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         title.textContent = pinLabel(pin);
         const time = document.createElement("span");
         time.className = "guide-item-time";
-        time.textContent = formatTime(pin.t);
+        time.textContent = `${formatTime(pin.t)} · ${
+          pin.kind === PIN_KIND.ENDPOINT ? "Section endpoint" : "Pin"
+        } · ${
+          references
+            ? `anchors ${references} Section${references === 1 ? "" : "s"}`
+            : "unshared"
+        }`;
         main.append(title, time);
 
         const actions = document.createElement("div");
         actions.className = "guide-item-actions";
         const rename = document.createElement("button");
         rename.type = "button";
+        rename.className = "guide-action guide-action-edit";
         rename.dataset.renamePin = pin.id;
         rename.textContent = "Rename";
         const select = document.createElement("button");
@@ -683,8 +778,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         remove.type = "button";
         remove.dataset.deletePin = pin.id;
         remove.textContent = "Delete";
-        remove.className = "danger-text";
-        const references = sectionsForPin(guide(), pin.id).length;
+        remove.className = "guide-action guide-action-delete danger-text";
         if (references) {
           remove.textContent = "Delete…";
           remove.title = `Also dissolves ${references} referencing Section${references === 1 ? "" : "s"} after confirmation`;
@@ -801,6 +895,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : null;
     const livePlayback = Boolean(playbackProjection?.changed);
     const projectedModel = livePlayback ? playbackProjection.model : model();
+    elements["timeline-key-interval"].dataset.active = String(
+      Boolean(projectedModel?.interval)
+    );
     for (const id of [
       "resolution-fill",
       "interval-fill",
@@ -819,6 +916,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       setMarkerPosition(elements["resolution-end-marker"], projectedModel.resolution.R);
       elements["interval-fill"].hidden = !projectedModel.interval;
       if (projectedModel.interval) {
+        elements["interval-fill"].dataset.direction = projectedModel.interval.direction;
         setSegment(
           elements["interval-fill"],
           projectedModel.interval.start,
@@ -964,6 +1062,17 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : null;
     const focused = focusedProjection();
 
+    elements["timeline-current-time"].textContent = formatTime(semanticCurrent);
+    elements["timeline-key-sections"].dataset.active = String(
+      Boolean(sortedSections(guide()).length)
+    );
+    elements["timeline-key-range"].dataset.active = String(loaded);
+    elements["timeline-key-resolution"].dataset.active = String(Boolean(currentResolution));
+    elements["timeline-key-interval"].dataset.active = String(Boolean(currentInterval));
+    elements["timeline-key-field"].dataset.active = String(Boolean(fieldSpan));
+    elements["timeline-key-pins"].dataset.active = String(
+      Boolean(visiblePins(guide()).length)
+    );
     elements["duration-time"].textContent = Math.abs(
       projection.timelineExtent - model().duration
     ) > EPSILON

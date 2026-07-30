@@ -268,6 +268,7 @@ export function createStepFieldController({
     const side = sides[role];
     if (side.adapter || !isYouTubeApiReady() || !document?.getElementById?.(side.elementId)) return;
     side.adapter = createPlayer(side.elementId, {
+      accessible: false,
       playerVars: { controls: 0, disablekb: 1, fs: 0, playsinline: 1 },
       events: {
         onReady: adapter => {
@@ -275,9 +276,6 @@ export function createStepFieldController({
           side.error = false;
           side.blocked = false;
           adapter.mute?.();
-          const iframe = adapter.raw?.()?.getIframe?.();
-          iframe?.setAttribute?.("tabindex", "-1");
-          iframe?.setAttribute?.("aria-hidden", "true");
           refreshSideSnapshot(side);
           runtime.forceEstablish = true;
         },

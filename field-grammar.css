@@ -49,9 +49,20 @@
 }
 
 .field-span-fill {
+  position: absolute;
   z-index: 4;
-  border: 1px solid rgba(159, 217, 184, 0.72);
-  background: rgba(159, 217, 184, 0.16);
+  top: 3px;
+  bottom: 3px;
+  border: 1px solid rgba(159, 217, 184, 0.78);
+  border-radius: 5px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(159, 217, 184, 0.18) 0 4px,
+      rgba(159, 217, 184, 0.04) 4px 8px
+    );
+  box-shadow: 0 0 12px rgba(159, 217, 184, 0.12);
+  pointer-events: none;
 }
 
 .setting-note {

@@ -140,8 +140,9 @@ assert.equal(resolveFieldPhase({
     "Every play must refold and prime a side at 1× before directional-rate discovery.");
   assert.match(fieldSource, /mode:\s*"step"/);
   assert.doesNotMatch(fieldSource, /mode:\s*"go"/);
-  assert.match(fieldSource, /setAttribute\?\.\("tabindex", "-1"\)/);
-  assert.match(fieldSource, /setAttribute\?\.\("aria-hidden", "true"\)/);
+  assert.match(fieldSource, /accessible:\s*false/);
+  assert.doesNotMatch(fieldSource, /\.raw\?\.\(|\.raw\(\)/,
+    "Field code must request an inaccessible side player without reaching through its adapter.");
   assert.match(fieldSource, /function parkSide\(side, address, \{ force = false \} = \{\}\)/);
   assert.match(fieldSource, /if \(!side\.sourceReady\)[\s\S]*side\.adapter\?\.cue\?\.\(side\.videoId, target\)[\s\S]*return true;[\s\S]*side\.adapter\?\.place\?\.\(target\)[\s\S]*side\.adapter\?\.pause\?\.\(\)/,
     "A source may be cued only while preparing; source-ready paused sides must seek and pause on their represented frame.");
@@ -151,6 +152,8 @@ assert.equal(resolveFieldPhase({
     "Side panes must be rendered and measurable before player creation.");
   assert.match(youtubeSource, /DEFAULT_IFRAME_ALLOW[\s\S]*"autoplay"/);
   assert.match(youtubeSource, /setAttribute\?\.\("allow", options\.iframeAllow \|\| DEFAULT_IFRAME_ALLOW\)/);
+  assert.match(youtubeSource, /setAttribute\?\.\("tabindex", "-1"\)/);
+  assert.match(youtubeSource, /options\.accessible === false[\s\S]*setAttribute\?\.\("aria-hidden", "true"\)/);
   assert.doesNotMatch(html, /class="step-pane-action"/,
     "YouTube side iframes must not be covered by a transparent action element.");
   assert.match(html, /id="tail-player-surface"[\s\S]*role="button"[\s\S]*id="player-tail"/);
