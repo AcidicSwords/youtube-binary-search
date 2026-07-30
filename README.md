@@ -32,20 +32,23 @@ A S D
 R T F
 ```
 
-Shift changes only the two directional families:
+Shift changes the two directional families and raises Deform by one canonical weight step:
 
 - Plain `Q/E` Refine retains the Working Interval’s departure while increasing logarithmic resolution. If a reversal reaches or passes that departure, the complete Current-to-target movement becomes the new Working Interval.
 - `Shift+Q/E` invokes Local Refine. Midpoint membership decides whether it shortens the existing traversal or replaces it with the new local traversal.
 - `Shift+A/D` or `Shift+←/→` traverses Pins. Consecutive Pin hops use Step’s retained-anchor law.
+- `Shift+T` raises Section weight one step; `Alt+T` lowers it one step.
 
 The remaining operators each own one small intent:
 
 - Reopen restores Resolution to the active Range without discarding coverage.
 - Switch Endpoint chooses the other boundary of the same Working Interval.
 - Release clears only the Working Interval.
-- Deform creates or reuses a Section for the Working Interval, then assigns the selected timeline weight. A selected Section can be edited directly.
+- Deform creates or reuses a Section for the Working Interval. Plain `T` toggles `1×` against that Section’s remembered non-neutral weight; `Shift+T` and `Alt+T` tune the canonical ladder directly. `Alt+T` avoids the browser-reserved new-tab chord.
 - Focus makes a Working Interval or saved Section the active Range; Unfocus restores its containing Range.
 - Plain `Z` is Undo and plain `C` is Redo.
+- `P` immediately Pins Current; `Shift+P` immediately saves the Working
+  Interval as an untitled Section. Guide forms add optional titles explicitly.
 
 ## Timeline weighting
 
@@ -59,11 +62,19 @@ Thus ten source seconds receive 2.5 units of timeline space at `0.25×`, ten at 
 
 Overlapping Section weights compose by multiplication. This is the ordinary composition of independent scale transforms, is order-independent, and needs no Section priority or stored hierarchy. Setting a Section to `1×` makes that Section spatially neutral without deleting it.
 
-The gradient across a Section makes its lateral deformation legible:
+One composed field across the main timeline makes deformation legible:
 
-- below `1×`, colour converges inward to signal compression;
-- above `1×`, colour opens outward to signal expansion;
-- at `1×`, the Section is an ordinary neutral span.
+- below `1×`, violet influence marks compression;
+- above `1×`, teal influence marks expansion;
+- at `1×`, regular slate contours provide neutral scale.
+
+Each Section contributes a soft influence centered on its midpoint. Hue shows
+the sign of deformation, peak strength shows the magnitude of its log weight,
+and the influence fades beyond both endpoints so adjacent Sections read as one
+continuous terrain. Overlapping influences add in log space, exactly matching
+the multiplication of the underlying weights. Source-time contours are then
+projected through the exact map: compression packs them together and expansion
+spreads them apart. The atmosphere is perceptual; the contours remain metric.
 
 ## Step size
 
@@ -88,7 +99,17 @@ Pins are shared source Addresses. Sections are edges between two Pins, so endpoi
 - Moving a Section translates only its endpoint Pins; unrelated interior Pins are not captured.
 - Deleting a referenced Pin previews the affected count and dissolves all referencing Sections in one transaction.
 
-The timeline lane-packs overlapping Sections as compact gradients and positions the Range, Resolution, Working Interval, previews, Pins, Current, and playback Cursor in the same strictly ordered coordinate space. Click a Section to make its complete extent the Working Interval and return Current to its center; edit its weight and lifecycle in the always-present Guide.
+The timeline places Pins above the weighted track and its source ruler, then
+lane-packs overlapping Sections into a relationship tree below. Each thin
+Section wire has Start, midpoint, and End nodes with faint relations back to
+its Pin/track positions. Click a Section to make its complete extent the
+Working Interval and return Current to its center. Drag its Guide endpoints or
+complete profile while the three viewers preview the resulting extent. The
+collapsible right rail has two exclusive modes: full-height Guide, or Operators
+with Parameters. Guide and the operator controls never compete for vertical
+space. Collapse either mode to leave Viewer and Timeline as one panoramic
+surface; reopen Guide with its header control or `G` for exact weights and
+endpoint editing.
 
 ## Playback, Context, and Field
 

@@ -9,7 +9,9 @@
 - Confirm plain Refine `50 → 25 → 12.5` retains `50 → 12.5`, frame `{0,12.5,50}`, and reverses to `31.25`.
 - Refine, Reopen, then plain Refine past the retained departure in the opposite direction; confirm the complete movement becomes the Working Interval in both directions.
 - Confirm same-direction Refine still retains the old departure.
-- Confirm Local Refine uses midpoint membership.
+- Create a forward Working Interval, then Local Refine backward into it.
+  Confirm Local Refine draws Current-to-midpoint (the complementary half) while
+  plain Refine keeps the original departure.
 - Alternate Refine and Local Refine; committed Working Interval and hover preview must match.
 - Confirm Reopen restores Range endpoints.
 - Confirm Switch is an exact involution.
@@ -20,7 +22,10 @@
 
 ## Canonical weight scale
 
-- Confirm every Deform and Section selector contains, in order: `0.25×`, `0.5×`, `0.75×`, `1×`, `1.25×`, `1.5×`, `1.75×`, `2×`.
+- Confirm Guide’s Section selector contains, in order: `0.25×`, `0.5×`, `0.75×`, `1×`, `1.25×`, `1.5×`, `1.75×`, `2×`.
+- Confirm plain `T` toggles `1×` against the last non-neutral weight, `Shift+T`
+  moves one step up, and `Alt+T` moves one step down without issuing a player
+  or Field command.
 - For one isolated ten-second Section, confirm projected extent is `2.5`, `5`, `7.5`, `10`, `12.5`, `15`, `17.5`, and `20` respectively.
 - Confirm `1×` restores identity geometry without deleting the Section.
 - Confirm every allowed factor has a unique inverse at dense source samples.
@@ -61,17 +66,39 @@
 - Timeline/Pin Go across a spatial distance; confirm the movement is the Working Interval and its unclipped Resolution has two equal Interval-width margins on each side.
 - Click a Section in Timeline and Guide; confirm its endpoints become the Working Interval and Current returns to its center in one Undoable transaction.
 - Repeat beside each Range boundary and confirm clipping removes only unavailable margin.
-- Drag a Section body; only its endpoint Pins should translate.
+- Drag a Guide Section profile; only its endpoint Pins should translate.
 - Drag a shared Pin; every referencing Section should update.
-- Change weight from Guide and Deform; confirm both paths produce the same model and one Undo entry.
+- Unlink one shared Section endpoint; move it and confirm the other Section no
+  longer moves. Reload, confirm the independent Pins remain distinct, then
+  Relink and confirm the endpoint returns to its original shared Pin and shared
+  movement is restored.
+- Establish a Working Interval whose Start and End coincide with Pins; confirm
+  both endpoint Pins select automatically.
+- Click the visible center of a Timeline Pin; confirm Current moves to it
+  without the marker or its hitbox jumping. Drag beyond the threshold and confirm that
+  exact Pin moves while Center previews its new Address.
+- Change weight from Guide and Deform stepping; confirm both paths produce the same model and one Undo entry.
+- Confirm the main timeline shows one composed field: compressed, neutral, and
+  expanded influence uses distinct colours; magnitude controls peak strength;
+  influence is centered at the Section midpoint and fades smoothly beyond its
+  endpoints; equal-weight broad Sections are more diffuse than narrow Sections;
+  projected contour spacing follows effective weight; Section identity remains
+  a thin endpoint wire.
 - Release each drag outside its marker; confirm one terminal action and one Undo.
 
 ## Guide lifecycle
 
 - Create untitled and titled Pins and Sections.
 - Reuse exact endpoint Pins when deforming or saving.
-- Join two selected Pins.
-- Overwrite one retained Section from the Working Interval.
+- Align a Working Interval with two Pins, confirm both select, then save its Section.
+- Select one Section, then change Weight, drag an endpoint, rename, and Focus
+  without reselecting it between operations.
+- Confirm Rename and Delete remain visible beside every Guide title and no More
+  disclosure is present.
+- From Viewer, Timeline, Operators, and Guide lists, press `P` and confirm
+  Current is pinned immediately without moving focus into the title field.
+- Press `Shift+P` and confirm the Working Interval is saved immediately as an
+  untitled Section; stale Guide title/source fields must not alter the command.
 - Rename, select, Go, Focus, set Weight, and delete.
 - Delete a referenced Pin; warning count and dissolved Section count must agree.
 - Reload and confirm overlap, shared endpoints, titles, and per-Section weights persist.
@@ -89,8 +116,18 @@
 ## Timeline and responsive quality
 
 - Confirm major/minor source-time guides remain useful on wide and narrow viewports.
+- Confirm palette ownership: neutral slate Range; blue Resolution/Cursor; gold
+  Working Interval/Pins; green Field; violet operator candidates; warm Section
+  identity; violet/teal only for compression/expansion.
+- Confirm Range and metric contours recede behind Current, the Working Interval,
+  retained Pins, and the object under direct manipulation.
+- Confirm vertical order is Pins, weighted track, source ruler, then the
+  Section relationship tree.
 - Confirm Sections occupy the lowest available lanes and fold into the bounded five-lane visual band under extreme overlap.
-- Confirm compressed gradients converge, expanded gradients open, and `1×` is neutral.
+- Confirm every Section wire has Start, midpoint, and End nodes and faint dotted
+  relations align them with the corresponding Pin/track positions.
+- Confirm compression is violet, expansion is teal, magnitude strengthens the
+  midpoint, influence bleeds beyond each Section, and `1×` is neutral.
 - Confirm gradients remain backed by a numeric selector and state text rather than colour alone.
 - In overlapping Sections, confirm `Compresses`/`Expands` describes the
   individual factor while each span and Guide profile show the composed global
@@ -98,17 +135,42 @@
 - Confirm dense Section spans, Pins, and Range handles have distinct hit regions.
 - Under a coarse pointer, confirm Pin and Section-drag targets
   are at least 48px and nearby Pins cluster before their hit regions overlap.
+- Open a Pin cluster; confirm the compact inline chooser stays anchored to the
+  cluster, lists choices vertically, scrolls by wheel when dense, and selecting
+  one exact Pin moves Current to it.
+- Press a Pin cluster; confirm it opens before any Timeline action occurs. Choose
+  one Pin and confirm its row remains selected. Drag only its dedicated handle
+  and confirm that exact Pin moves, with no dead click or random neighboring
+  selection.
+- Select both endpoint Pins of an existing Section, then use Deform and Focus;
+  confirm the existing Section is selected and no duplicate Section is created.
 - Confirm Current, Cursor, actual/preview Working Interval, Resolution, and selected state remain distinguishable.
-- At 1440px wide, confirm Viewer, Timeline, Operators, Parameters, and Guide are all present without page scrolling; only Guide content scrolls.
+- At 1440px wide, confirm Viewer and Timeline remain visible beside either the
+  full-height Guide or Operators with Parameters, without page scrolling.
+- Switch between Guide and Operators; confirm only the selected rail mode is
+  present and no state changes.
+- Collapse either rail mode (or Guide with `G`); confirm Viewer and Timeline
+  expand into the released width and the corresponding header control reopens it.
 - Confirm the timeline key, Current/Cursor readouts, Range ground, Resolution
   contour, Working-Section ridge, Field overlay, Section spans, and Pins
   remain distinguishable at desktop and compact widths.
-- With a matrix or Step button focused, press Space and confirm it controls
+- With a matrix control or side viewer focused, press Space and confirm it controls
   shared playback rather than reactivating that button.
 - Play and pause Center after interacting with its iframe, then immediately use
   a reader hotkey without clicking the timeline.
 - Confirm each timeline Section span selects the corresponding named Guide row
   and full Working Interval.
+- Drag either Guide Section endpoint node; confirm the same shared Pin and every
+  referencing Section update in one Undo transaction.
+- Drag a selected Guide Pin node and a Section endpoint by the same pixel
+  distance on equal-width tracks; confirm both produce the same temporal
+  displacement and viewer preview.
+- Drag a Guide Section profile; confirm both endpoint Pins translate by the same
+  amount and cancellation restores the complete original extent.
+- During a Pin drag, confirm Center previews the Pin while Tail/Lead preserve the
+  configured Field. During either Section drag, confirm Tail, Center, and Lead
+  preview Start, midpoint, and End respectively, then restore ordinary Field
+  state on release or cancellation.
 - In compact Guide, switch between Sections and Pins and operate each control;
   confirm background surfaces are inert while the sheet never falls through to
   its scrim.

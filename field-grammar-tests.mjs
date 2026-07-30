@@ -81,9 +81,9 @@ for (const retired of ["continue", "context-action", "skim", "speed-select", "fi
 }
 for (const id of [
   "field-transport-state", "field-both-toggle", "field-span-fill",
-  "tail-field-toggle", "lead-field-toggle", "tail-step-button", "lead-step-button",
+  "tail-field-toggle", "lead-field-toggle",
   "section-capture", "section-source", "pin-capture", "pin-current",
-  "release", "deform", "deform-weight-select", "focus-toggle", "shift-layer-toggle",
+  "release", "deform", "deform-down", "deform-up", "focus-toggle", "shift-layer-toggle",
   "step-size-seconds", "step-mode-fixed", "step-mode-adaptive"
 ]) assert.match(html, new RegExp(`id=["']${id}["']`), `Missing v5.8 Field/Guide control: ${id}`);
 

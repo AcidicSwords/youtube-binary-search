@@ -23,8 +23,8 @@ for (const clientX of [250, 500]) {
   });
   await flush();
 }
-assert.equal(currentText(), "Current 0:50.000");
-assert.match(byId.get("section-window").textContent, /0:25\.000–0:50\.000/);
+assert.equal(currentText(), "Current 0:50");
+assert.match(byId.get("section-window").textContent, /0:25–0:50/);
 
 const center = env.center();
 const tail = env.tail();
@@ -42,7 +42,7 @@ assert.equal(byId.get("resolution-start-marker").dataset.live, "true");
 assert.equal(byId.get("resolution-end-marker").dataset.live, "true");
 assert.equal(
   currentText(),
-  "Current 0:50.000",
+  "Current 0:50",
   "Live playback projection must not commit semantic Current before pause."
 );
 
@@ -55,8 +55,8 @@ dispatchDocument("keydown", { key: " ", code: "Space" });
 await flush();
 await poll();
 
-assert.equal(currentText(), "Current 0:58.000");
-assert.match(byId.get("section-window").textContent, /0:25\.000–0:58\.000/);
+assert.equal(currentText(), "Current 0:58");
+assert.match(byId.get("section-window").textContent, /0:25–0:58/);
 assert.equal(byId.get("interval-fill").dataset.live, "false");
 assert.equal(
   center.commands.filter(command => command[0] === "pause").length,
@@ -74,12 +74,12 @@ assert.equal(
 // Focus turns the Working Interval into the sole playback loop operand.
 byId.get("focus-toggle").click();
 await flush();
-assert.equal(byId.get("range-label").textContent, "0:25.000–0:58.000");
+assert.equal(byId.get("range-label").textContent, "0:25–0:58");
 assert.equal(byId.get("focus-toggle-label").textContent, "Unfocus");
 
 byId.get("switch-endpoint").click();
 await flush();
-assert.equal(currentText(), "Current 0:25.000");
+assert.equal(currentText(), "Current 0:25");
 
 byId.get("center-transport-surface").click();
 await flush();
@@ -96,8 +96,8 @@ center.currentTime = 58;
 await poll();
 
 assert.equal(center.currentTime, 25, "Proper Range playback must wrap to Range start.");
-assert.equal(currentText(), "Current 0:25.000", "A Range wrap must not commit Current.");
-assert.match(byId.get("section-window").textContent, /0:25\.000–0:58\.000/);
+assert.equal(currentText(), "Current 0:25", "A Range wrap must not commit Current.");
+assert.match(byId.get("section-window").textContent, /0:25–0:58/);
 assert.equal(byId.get("return-meta").textContent, historyBeforeWrap, "A wrap must create no Undo entry.");
 assert.equal(
   tail.commands.filter(command => command[0] === "place").length,
@@ -132,10 +132,10 @@ assert.equal(
 center.currentTime = 30;
 dispatchDocument("keydown", { key: " ", code: "Space" });
 await flush();
-assert.equal(currentText(), "Current 0:30.000");
+assert.equal(currentText(), "Current 0:30");
 byId.get("focus-toggle").click();
 await flush();
-assert.equal(byId.get("range-label").textContent, "0:00.000–1:40.000");
+assert.equal(byId.get("range-label").textContent, "0:00–1:40");
 
 // Full-video playback has no internal Range wrap and settles at source end.
 dispatchDocument("keydown", { key: " ", code: "Space" });
@@ -144,6 +144,6 @@ center.currentTime = 100;
 center.emitState(0);
 await flush();
 assert.equal(center.currentTime, 100);
-assert.equal(currentText(), "Current 1:40.000");
+assert.equal(currentText(), "Current 1:40");
 
 console.log("Transport coherence smoke passed: live projection, exact settlement, Focus-owned proper-Range looping, one-pass Field rebasing, wrap history isolation, Unfocus restoration, and full-video completion.");

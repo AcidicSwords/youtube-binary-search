@@ -384,12 +384,10 @@ assert.match(
   "Every held Step gesture must settle its repeated movement as one transaction."
 );
 assert.match(sessionSource, /stepIntervalAnchor[\s\S]*intervalDeparture/, "Session must separate Step movement departure from the Interval anchor.");
-assert.match(sessionSource, /refineIntervalRelation[\s\S]*classifyRefineRelation[\s\S]*relation:\s*"shorten"/,
-  "Refine must distinguish outside-Interval replacement from inside-Interval shortening.");
+assert.match(sessionSource, /export function localRefine[\s\S]*intervalDeparture:\s*current[\s\S]*refineRelation:\s*"draw"/,
+  "Local Refine must draw the Current-to-midpoint traversal instead of retaining the previous anchor.");
 assert.match(sessionSource, /export function focusWorkingSection[\s\S]*FOCUS_KIND\.WORKING/,
   "The Working Section must be focusable without a Guide record.");
-assert.match(sessionSource, /export function overwriteGuideSection[\s\S]*replaceSectionExtent/,
-  "Guide overwrite must remain an explicit persistence transaction.");
 assert.match(appSource, /Left the focused Section and opened Full Video/, "Composite direct Go must disclose its Range escape.");
 assert.match(appSource, /createPlaybackTransport/, "Native playback must own continuous settlement.");
 assert.doesNotMatch(appSource, /startSkim|createSkimTransport|desiredSkimRate/, "Skim must be removed from the runtime.");

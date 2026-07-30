@@ -36,7 +36,7 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
 - Recompute adaptive Step from active weighted Range width, never from source duration or Field Offset.
 - Keep fixed Step Reach unchanged when Section geometry changes.
 - Hold and Stretch may update neither `fieldOffsets`, `stepReach`, nor Guide.
-- Guide and Deform weight selectors must call the same Session transaction.
+- Guide precision editing and Deform stepping must call the same Session transactions.
 
 ## Testing map
 
@@ -58,7 +58,11 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
 - `field-coherence-tests.mjs` — Step/Offset independence
 - `semantic-state-space-tests.mjs` — extended state-space proof
 
-Smoke tests cover startup, interaction, Context, gestures, transport wrapping, Section weighting, and metadata.
+Smoke tests cover startup, persistent Guide selection, Guide-relative
+endpoint/profile drag, operational Pin clusters, Context, gestures, transport
+wrapping, Section weighting, palette contracts, and metadata. Static palette,
+hit-region, and preview-layer ownership belongs to `project-audit.mjs`; live
+visual judgment belongs to `VALIDATION.md`.
 
 ## Release workflow
 

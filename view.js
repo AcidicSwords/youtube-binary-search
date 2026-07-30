@@ -4,7 +4,6 @@ import {
   clamp,
   contains,
   getTargets,
-  classifyRefineRelation,
   classifyRetainedRefineRelation,
   getActionRanges,
   refineBlockReason,
@@ -17,6 +16,7 @@ import {
   getPin,
   visiblePins,
   sectionsForPin,
+  coincidentPins,
   resolveSection,
   previousPin,
   nextPin,
@@ -40,18 +40,21 @@ const TIMELINE_SECTION_HIT_WIDTH = 28;
 const TIMELINE_SECTION_LANE_HEIGHT = 20;
 const COARSE_TIMELINE_SECTION_LANE_HEIGHT = 48;
 const TIMELINE_SECTION_MAX_LANES = 5;
-const TIMELINE_PIN_HIT_SIZE = 36;
-const COARSE_TIMELINE_PIN_HIT_SIZE = 48;
+const TIMELINE_PIN_HIT_SIZE = 52;
+const COARSE_TIMELINE_PIN_HIT_SIZE = 56;
 
 export function formatTime(seconds) {
   if (!Number.isFinite(seconds)) return "—";
-  const totalMilliseconds = Math.max(0, Math.round(seconds * 1000));
-  const hours = Math.floor(totalMilliseconds / 3_600_000);
-  const minutes = Math.floor((totalMilliseconds % 3_600_000) / 60_000);
-  const secs = Math.floor((totalMilliseconds % 60_000) / 1000);
-  const milliseconds = totalMilliseconds % 1000;
+  const totalCentiseconds = Math.max(0, Math.round(seconds * 100));
+  const hours = Math.floor(totalCentiseconds / 360_000);
+  const minutes = Math.floor((totalCentiseconds % 360_000) / 6_000);
+  const secs = Math.floor((totalCentiseconds % 6_000) / 100);
+  const centiseconds = totalCentiseconds % 100;
   const minuteText = hours ? String(minutes).padStart(2, "0") : String(minutes);
-  return `${hours ? `${hours}:` : ""}${minuteText}:${String(secs).padStart(2, "0")}.${String(milliseconds).padStart(3, "0")}`;
+  const fraction = centiseconds
+    ? `.${String(centiseconds).padStart(2, "0").replace(/0$/, "")}`
+    : "";
+  return `${hours ? `${hours}:` : ""}${minuteText}:${String(secs).padStart(2, "0")}${fraction}`;
 }
 
 export function formatDuration(seconds) {
@@ -183,6 +186,27 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     return pin.kind === PIN_KIND.ENDPOINT ? "Section endpoint" : "Unnamed Pin";
   }
 
+  function guideTitleActions(kind, id, label, options = {}) {
+    const actions = document.createElement("span");
+    actions.className = "guide-title-actions";
+    const rename = document.createElement("button");
+    rename.type = "button";
+    rename.className = "guide-title-action guide-title-rename";
+    rename.dataset[kind === "section" ? "renameSection" : "renamePin"] = id;
+    rename.textContent = "✎";
+    rename.setAttribute("aria-label", `Rename ${label}`);
+    rename.title = `Rename ${label}`;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "guide-title-action guide-title-delete danger-text";
+    remove.dataset[kind === "section" ? "deleteSection" : "deletePin"] = id;
+    remove.textContent = "×";
+    remove.setAttribute("aria-label", `Delete ${label}`);
+    remove.title = options.deleteTitle || `Delete ${label}`;
+    actions.append(rename, remove);
+    return actions;
+  }
+
   function timelineProjection() {
     if (state().rangeDragProjection) return state().rangeDragProjection;
     if (state().guideDrag?.moved && state().guideDrag.projection) {
@@ -238,22 +262,52 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : TIMELINE_PIN_HIT_SIZE;
   }
 
-  function endpointButton(role, pin, references) {
+  function endpointButton(role, pin, references, sectionId = null) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "endpoint-button";
     button.dataset.pinGo = pin.id;
+    button.dataset.pinDrag = pin.id;
+    if (sectionId) button.dataset.dragSection = sectionId;
+    setStyleProperty(button, "--endpoint-position", `${percent(pin.t)}%`);
     setStyleProperty(
       button,
       "--endpoint-weight",
       String(Math.min(3, Math.max(1, references)))
     );
     const roleLabel = document.createElement("small");
-    roleLabel.textContent = role;
+    roleLabel.textContent = role === "Start" ? "S" : "E";
     const text = document.createElement("span");
     text.textContent = `${formatTime(pin.t)} ${pin.label || ""}`.trim();
+    text.className = "sr-only";
     button.append(roleLabel, text);
-    button.title = `${role} Pin · ${references} Section${references === 1 ? "" : "s"}`;
+    const description = `${role} Pin at ${formatTime(pin.t)}; drag to adjust the Section bound, click to Go; ${references} Section${references === 1 ? "" : "s"}`;
+    button.setAttribute("aria-label", description);
+    button.title = description;
+    return button;
+  }
+
+  function pinPositionButton(pin, references) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "endpoint-button pin-position-node";
+    button.dataset.pinGo = pin.id;
+    button.dataset.pinDrag = pin.id;
+    setStyleProperty(button, "--endpoint-position", `${percent(pin.t)}%`);
+    setStyleProperty(
+      button,
+      "--endpoint-weight",
+      String(Math.min(3, Math.max(1, references)))
+    );
+    const roleLabel = document.createElement("small");
+    roleLabel.textContent = "P";
+    const text = document.createElement("span");
+    text.className = "sr-only";
+    text.textContent = `${formatTime(pin.t)} ${pin.label || ""}`.trim();
+    button.append(roleLabel, text);
+    const description = `${pinLabel(pin)} at ${formatTime(pin.t)}; drag to move on the full temporal map, click to Go`;
+    button.setAttribute("aria-label", description);
+    button.title = description;
     return button;
   }
 
@@ -268,27 +322,66 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     }
   }
 
-  function openPinClusterMenu(cluster, trigger = document.activeElement) {
+  function openPinClusterMenu(
+    cluster,
+    trigger = document.activeElement,
+    options = {}
+  ) {
     const menu = elements["pin-cluster-menu"];
     pinClusterTrigger = trigger || null;
     pinClusterTrigger?.setAttribute?.("aria-expanded", "true");
     menu.replaceChildren();
     for (const pin of cluster.pins) {
+      const row = document.createElement("div");
+      row.className = "pin-cluster-row";
       const button = document.createElement("button");
       button.type = "button";
       button.setAttribute("role", "menuitem");
       button.dataset.pinGo = pin.id;
+      if (pinClusterTrigger?.dataset?.clusterIndex !== undefined) {
+        button.dataset.clusterIndex = pinClusterTrigger.dataset.clusterIndex;
+      }
       const label = document.createElement("span");
       label.textContent = pinLabel(pin);
       const time = document.createElement("time");
       time.textContent = formatTime(pin.sourceT ?? pin.t);
+      const selected = state().selectedRetained?.kind === "pin"
+        && state().selectedRetained.id === pin.id;
+      if (selected) {
+        button.classList.add("retained-selected");
+        button.setAttribute("aria-current", "true");
+      }
+      button.title = `${pinLabel(pin)} at ${formatTime(pin.sourceT ?? pin.t)}; click to select`;
       button.append(label, time);
-      menu.appendChild(button);
+      const drag = document.createElement("button");
+      drag.type = "button";
+      drag.className = "pin-cluster-drag";
+      drag.dataset.pinDrag = pin.id;
+      if (pinClusterTrigger?.dataset?.clusterIndex !== undefined) {
+        drag.dataset.clusterIndex = pinClusterTrigger.dataset.clusterIndex;
+      }
+      drag.setAttribute(
+        "aria-label",
+        `Move ${pinLabel(pin)} from ${formatTime(pin.sourceT ?? pin.t)}`
+      );
+      drag.title = "Drag horizontally to move this exact Pin";
+      drag.textContent = "â†”";
+      row.append(button, drag);
+      menu.appendChild(row);
     }
     const width = elements.timeline.clientWidth || 1;
-    menu.style.left = `${clamp(cluster.x - 135, 6, Math.max(6, width - 276))}px`;
+    const estimatedWidth = 276;
+    menu.style.left = `${clamp(
+      cluster.x - estimatedWidth / 2,
+      6,
+      Math.max(6, width - estimatedWidth - 6)
+    )}px`;
     menu.hidden = false;
-    menu.querySelector?.("button")?.focus?.({ preventScroll: true });
+    const focusTarget = options.focusPinId
+      ? menu.querySelector?.(`[data-pin-go="${options.focusPinId}"]`)
+      : null;
+    (focusTarget || menu.querySelector?.("button"))
+      ?.focus?.({ preventScroll: true });
   }
 
   const clusterAt = index => renderedClusters[index] || null;
@@ -303,12 +396,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       hash = ((hash << 5) - hash + character.charCodeAt(0)) | 0;
     }
     const palette = [
-      "#52c7b8",
-      "#8ea8ff",
-      "#dc8cff",
-      "#f19a63",
-      "#d5bd55",
-      "#70bcf4"
+      "#ff8a70",
+      "#f7b267",
+      "#e76f51",
+      "#c9d77e",
+      "#ff6f91",
+      "#c7d0dd"
     ];
     return palette[Math.abs(hash) % palette.length];
   }
@@ -356,11 +449,106 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     }
   }
 
+  function deformationInfluence(section, coordinate, projection) {
+    const projected = projection.projectExtent(section);
+    if (!projected) return 0;
+    const midpoint = projection.sourceToTimeline(section.midpoint);
+    const halfSpan = Math.max(
+      (projected.end - projected.start) / 2,
+      projection.timelineExtent * 0.002
+    );
+    const bleed = Math.max(
+      projection.timelineExtent * 0.018,
+      halfSpan * 0.55
+    );
+    const spanRatio = clamp(
+      (projected.end - projected.start)
+      / Math.max(projection.timelineExtent, EPSILON),
+      0,
+      1
+    );
+    // Weight is distributed across the Section's projected footprint. A broad
+    // Section therefore reads as a diffuse field; a narrow one concentrates the
+    // same signed deformation around its midpoint.
+    const dilution = clamp(1 / Math.sqrt(1 + spanRatio * 5), 0.38, 1);
+    const distance = Math.abs(coordinate - midpoint);
+    if (distance <= halfSpan) {
+      const centerRelation = 1 - distance / halfSpan;
+      return dilution * (0.42 + 0.58 * centerRelation * centerRelation);
+    }
+    if (distance >= halfSpan + bleed) return 0;
+    const fade = 1 - (distance - halfSpan) / bleed;
+    return dilution * 0.42 * fade * fade * (3 - 2 * fade);
+  }
+
+  function renderTimelineDeformation(projection) {
+    const field = elements["deformation-field"];
+    if (!field) return;
+    field.replaceChildren();
+    const sections = sortedSections(guide())
+      .filter(section => Math.abs(section.weight - 1) > EPSILON);
+    const atmosphere = document.createElement("span");
+    atmosphere.className = "deformation-atmosphere";
+    const samples = 80;
+    const stops = [];
+    let compression = false;
+    let expansion = false;
+    for (let index = 0; index <= samples; index += 1) {
+      const ratio = index / samples;
+      const coordinate = projection.timelineExtent * ratio;
+      const signedDensity = sections.reduce(
+        (sum, section) =>
+          sum
+          + Math.log2(section.weight)
+          * deformationInfluence(section, coordinate, projection),
+        0
+      );
+      const compressed = signedDensity < -EPSILON;
+      const expanded = signedDensity > EPSILON;
+      compression ||= compressed;
+      expansion ||= expanded;
+      const strength = compressed
+        ? clamp(Math.abs(signedDensity) / 2, 0, 1)
+        : expanded
+          ? clamp(signedDensity, 0, 1)
+          : 0;
+      const color = compressed
+        ? `rgba(172, 112, 225, ${0.02 + strength * 0.28})`
+        : expanded
+          ? `rgba(65, 189, 174, ${0.018 + strength * 0.26})`
+          : "rgba(92, 111, 137, 0)";
+      stops.push(`${color} ${ratio * 100}%`);
+    }
+    if (compression) atmosphere.classList.add("has-compression");
+    if (expansion) atmosphere.classList.add("has-expansion");
+    atmosphere.style.background = `linear-gradient(90deg, ${stops.join(", ")})`;
+
+    const contours = document.createElement("span");
+    contours.className = "deformation-contours";
+    const contourCount = clamp(
+      Math.round(Math.max(1, elements.timeline.clientWidth || 1) / 13),
+      48,
+      112
+    );
+    for (let index = 1; index < contourCount; index += 1) {
+      const contour = document.createElement("i");
+      const source = projection.duration * index / contourCount;
+      contour.style.left = `${
+        projection.sourceToTimeline(source)
+        / Math.max(projection.timelineExtent, EPSILON)
+        * 100
+      }%`;
+      contours.appendChild(contour);
+    }
+    field.append(atmosphere, contours);
+  }
+
   function renderTimelineSections(projection, sectionLaneHeight) {
     const sectionLane = elements["section-lane"];
     if (!sectionLane) return;
     sectionLane.replaceChildren();
     renderTimelineRuler(projection);
+    renderTimelineDeformation(projection);
     const timelineWidth = Math.max(1, elements.timeline.clientWidth || 1);
 
     const entries = sortedSections(guide())
@@ -391,13 +579,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       30,
       8 + visibleLaneCount * sectionLaneHeight
     );
-    const trackTop = sectionBandHeight + 8;
+    const pinTop = 17;
+    const trackTop = 44;
     const rulerTop = trackTop + 36;
-    const pinTop = rulerTop + 30;
-    const timelineHeight = pinTop + 31;
+    const sectionTop = rulerTop + 38;
+    const timelineHeight = sectionTop + sectionBandHeight + 4;
     setStyleProperty(elements.timeline, "--track-top", `${trackTop}px`);
     setStyleProperty(elements.timeline, "--ruler-top", `${rulerTop}px`);
     setStyleProperty(elements.timeline, "--pin-top", `${pinTop}px`);
+    setStyleProperty(elements.timeline, "--section-top", `${sectionTop}px`);
     setStyleProperty(elements.timeline, "--timeline-height", `${timelineHeight}px`);
 
     for (const entry of packedSections.entries) {
@@ -411,31 +601,19 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         (projected.end - projected.start)
         / Math.max(projection.timelineExtent, EPSILON)
       ) * 100;
-      const weight = section.weight;
-      const strength = weight < 1
-        ? Math.abs(Math.log2(weight)) / 2
-        : Math.log2(weight);
       const span = document.createElement("span");
       span.className = "timeline-section-span";
-      span.classList.add(
-        weight < 1 - EPSILON
-          ? "compressed"
-          : weight > 1 + EPSILON
-            ? "expanded"
-            : "neutral"
-      );
       if (selected) span.classList.add("retained-selected");
-      span.style.left = `${left}%`;
-      span.style.width = `${width}%`;
       setStyleProperty(span, "--section-color", color);
-      setStyleProperty(span, "--section-offset", `${visibleLane * sectionLaneHeight}px`);
-      setStyleProperty(span, "--weight-opacity", String(0.42 + strength * 0.45));
       span.setAttribute("aria-hidden", "true");
+      const midpointNode = document.createElement("i");
+      midpointNode.className = "timeline-section-midpoint";
+      span.appendChild(midpointNode);
 
       const body = document.createElement("button");
       body.type = "button";
       body.className = "timeline-section-body";
-      body.dataset.sectionDrag = section.id;
+      body.dataset.sectionGo = section.id;
       body.style.left = `${left}%`;
       body.style.width = `${width}%`;
       setStyleProperty(body, "--section-color", color);
@@ -443,10 +621,33 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       if (selected) body.classList.add("retained-selected");
       body.setAttribute(
         "aria-label",
-        `Select ${sectionLabel(section)} as the Working Interval; drag to move it, ${formatRange(section)}`
+        `Select ${sectionLabel(section)} as the Working Interval, ${formatRange(section)}`
       );
-      body.title = `${sectionLabel(section)} · click to work from this extent; drag to translate its shared endpoint Pins`;
-      sectionLane.append(span, body);
+      body.title = `${sectionLabel(section)} · click to work from this extent`;
+      // The visible wire belongs to its control. Keeping one geometry owner
+      // prevents a click on what looks like a Section from falling through to Go.
+      body.appendChild(span);
+
+      const sectionY = sectionTop + visibleLane * sectionLaneHeight + 10;
+      const relationPoints = [
+        ["start", projected.start, pinTop + 7],
+        ["midpoint", projection.sourceToTimeline(section.midpoint), trackTop + 30],
+        ["end", projected.end, pinTop + 7]
+      ];
+      for (const [role, coordinate, relationTop] of relationPoints) {
+        const relation = document.createElement("span");
+        relation.className = `timeline-section-relation ${role}`;
+        if (selected) relation.classList.add("retained-selected");
+        relation.style.left = `${
+          coordinate / Math.max(projection.timelineExtent, EPSILON) * 100
+        }%`;
+        relation.style.top = `${relationTop}px`;
+        relation.style.height = `${Math.max(0, sectionY - relationTop)}px`;
+        setStyleProperty(relation, "--section-color", color);
+        relation.setAttribute("aria-hidden", "true");
+        sectionLane.appendChild(relation);
+      }
+      sectionLane.appendChild(body);
     }
   }
 
@@ -485,7 +686,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const key = `${activeRange.start}|${activeRange.end}|${width}|${sectionLaneHeight}|${pinClusterGap}|${projection.timelineExtent}|${sectionKey}|${selectedKey}|${intervalKey}|${pinKey}`;
     if (key === renderedPinKey) return;
     renderedPinKey = key;
-    closePinClusterMenu();
+    const clusterDrag = state().guideDrag?.origin === "cluster-menu";
+    if (!clusterDrag) closePinClusterMenu();
     elements["pin-lane"].replaceChildren();
     renderTimelineSections(projection, sectionLaneHeight);
     renderedClusters = clusterPinsByPixels(
@@ -517,17 +719,24 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           );
         }
         if (state().selectedPinIds?.includes(pin.id)) {
-          button.classList.add("pair-selected");
+          button.classList.add("extent-selected");
         }
         if (
           state().selectedRetained?.kind === "pin"
           && state().selectedRetained.id === pin.id
         ) button.classList.add("retained-selected");
-        const description = `${pinLabel(pin)} at ${formatTime(pin.sourceT)}`;
+        const description = `${pinLabel(pin)} at ${formatTime(pin.sourceT)}; click to move Current here, drag to move the Pin`;
         button.setAttribute("aria-label", description);
         button.title = description;
       } else {
         button.classList.add("cluster");
+        if (
+          state().selectedRetained?.kind === "pin"
+          && cluster.pins.some(pin => pin.id === state().selectedRetained.id)
+        ) button.classList.add("retained-selected");
+        if (
+          cluster.pins.some(pin => state().selectedPinIds?.includes(pin.id))
+        ) button.classList.add("extent-selected");
         const references = cluster.pins.reduce(
           (total, pin) => total + sectionsForPin(guide(), pin.id).length,
           0
@@ -540,7 +749,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         count.className = "timeline-pin-count";
         count.textContent = String(cluster.pins.length);
         button.appendChild(count);
-        const description = `${cluster.pins.length} nearby Pins`;
+        const description = `Choose among ${cluster.pins.length} nearby Pins`;
         button.setAttribute("aria-label", description);
         button.title = cluster.pins
           .map(pin => `${pinLabel(pin)} — ${formatTime(pin.sourceT ?? pin.t)}`)
@@ -548,6 +757,16 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       }
       elements["pin-lane"].appendChild(button);
     });
+    if (clusterDrag) {
+      const moved = getPin(guide(), state().guideDrag.id);
+      const menuButton = elements["pin-cluster-menu"].querySelector?.(
+        `[data-pin-go="${state().guideDrag.id}"]`
+      );
+      const time = menuButton
+        ? [...menuButton.children].find(node => node.tagName === "TIME")
+        : null;
+      if (moved && time) time.textContent = formatTime(moved.t);
+    }
   }
 
   function renderGuide() {
@@ -584,6 +803,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         const endReferences = sectionsForPin(guide(), section.endPin.id).length;
         const selected = state().selectedRetained?.kind === "section"
           && state().selectedRetained.id === section.id;
+        const endpointSelected = state().selectedPinIds?.some(id =>
+          id === section.startPin.id || id === section.endPin.id
+        );
         const item = document.createElement("article");
         item.className = "guide-item section-item";
         item.dataset.sectionPreviewId = section.id;
@@ -591,6 +813,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         if (section.weight < 1 - EPSILON) item.classList.add("compressed");
         else if (section.weight > 1 + EPSILON) item.classList.add("expanded");
         if (selected) item.classList.add("retained-selected");
+        if (endpointSelected && !selected) item.classList.add("extent-selected");
         setStyleProperty(item, "--section-color", sectionColor(section.id));
 
         const main = document.createElement("button");
@@ -610,6 +833,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         ].join(" · ");
         const profile = document.createElement("span");
         profile.className = "guide-section-profile";
+        profile.dataset.sectionDrag = section.id;
+        profile.title = `Drag to move ${sectionLabel(section)} with both endpoint Pins`;
         profile.setAttribute("aria-hidden", "true");
         setStyleProperty(profile, "--profile-start", `${percent(section.start)}%`);
         setStyleProperty(
@@ -623,6 +848,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           className: "guide-section-profile-fill"
         }));
         main.append(title, time, profile);
+        const header = document.createElement("div");
+        header.className = "guide-item-header";
+        header.append(
+          main,
+          guideTitleActions("section", section.id, sectionLabel(section))
+        );
 
         const actions = document.createElement("div");
         actions.className = "guide-item-actions";
@@ -654,48 +885,55 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         }
         weightSelect.value = String(section.weight);
         weightControl.append(weightLabel, weightSelect);
-        const overwrite = document.createElement("button");
-        overwrite.type = "button";
-        overwrite.className = "guide-action guide-action-overwrite";
-        overwrite.dataset.overwriteSection = section.id;
-        overwrite.textContent = "Overwrite";
-        overwrite.disabled = !interval();
-        const rename = document.createElement("button");
-        rename.type = "button";
-        rename.className = "guide-action guide-action-edit";
-        rename.dataset.renameSection = section.id;
-        rename.textContent = "Rename";
-        const remove = document.createElement("button");
-        remove.type = "button";
-        remove.dataset.deleteSection = section.id;
-        remove.textContent = "Delete";
-        remove.className = "guide-action guide-action-delete danger-text";
-        const more = document.createElement("details");
-        more.className = "guide-item-more";
-        const moreSummary = document.createElement("summary");
-        moreSummary.textContent = "More";
-        moreSummary.setAttribute(
-          "aria-label",
-          `More actions for ${sectionLabel(section)}`
-        );
-        const secondaryActions = document.createElement("div");
-        secondaryActions.className = "guide-secondary-actions";
-        secondaryActions.append(rename, overwrite, remove);
-        more.append(moreSummary, secondaryActions);
-        actions.append(focus, weightControl, more);
+        const endpointLinks = [];
+        for (const [role, pin, references] of [
+          ["start", section.startPin, startReferences],
+          ["end", section.endPin, endReferences]
+        ]) {
+          const candidates = coincidentPins(guide(), pin.id);
+          const provenance = String(pin.provenance || "").split(":");
+          const originalPinId = provenance[0] === "unlink"
+            && provenance[1] === section.id
+            && provenance[2] === role
+            ? provenance[3]
+            : null;
+          const originalPin = originalPinId
+            ? getPin(guide(), originalPinId)
+            : null;
+          if (references <= 1 && !candidates.length && !originalPin) continue;
+          const link = document.createElement("button");
+          link.type = "button";
+          link.className = "guide-action guide-action-link";
+          link.dataset.sectionEndpoint = role;
+          if (references > 1) {
+            link.dataset.unlinkSectionEndpoint = section.id;
+            link.textContent = `Unlink ${role === "start" ? "Start" : "End"}`;
+            link.title = `Give this Section an independent ${role} Pin at the same Address`;
+          } else {
+            link.dataset.linkSectionEndpoint = section.id;
+            link.textContent = `Relink ${role === "start" ? "Start" : "End"}`;
+            link.title = originalPin
+              ? `Reconnect this Section to its original shared ${role} Pin`
+              : `Reconnect this Section to the coincident shared ${role} Pin`;
+          }
+          endpointLinks.push(link);
+        }
+        actions.append(focus, weightControl, ...endpointLinks);
 
         const endpoints = document.createElement("div");
         endpoints.className = "section-endpoints";
+        setStyleProperty(endpoints, "--section-start", `${percent(section.start)}%`);
+        setStyleProperty(endpoints, "--section-end", `${percent(section.end)}%`);
         const spanLink = document.createElement("span");
         spanLink.className = "section-span-link";
         spanLink.setAttribute("aria-hidden", "true");
         endpoints.append(
-          endpointButton("Start", section.startPin, startReferences),
+          endpointButton("Start", section.startPin, startReferences, section.id),
           spanLink,
-          endpointButton("End", section.endPin, endReferences)
+          endpointButton("End", section.endPin, endReferences, section.id)
         );
 
-        item.append(main);
+        item.append(header);
         if (selected || section.id === focusedId) {
           item.append(actions, endpoints);
         }
@@ -716,11 +954,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         const references = sectionsForPin(guide(), pin.id).length;
         const selected = state().selectedRetained?.kind === "pin"
           && state().selectedRetained.id === pin.id;
-        const pairSelected = state().selectedPinIds?.includes(pin.id);
+        const extentSelected = state().selectedPinIds?.includes(pin.id);
         const item = document.createElement("article");
         item.className = "guide-item pin-item";
         setStyleProperty(item, "--reference-weight", String(Math.min(3, references)));
-        if (pairSelected) item.classList.add("pair-selected");
+        if (extentSelected) item.classList.add("extent-selected");
         if (selected) item.classList.add("retained-selected");
         const main = document.createElement("button");
         main.type = "button";
@@ -739,41 +977,30 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
             : "unshared"
         }`;
         main.append(title, time);
+        const header = document.createElement("div");
+        header.className = "guide-item-header";
+        header.append(
+          main,
+          guideTitleActions(
+            "pin",
+            pin.id,
+            pinLabel(pin),
+            references
+              ? {
+                  deleteTitle: `Delete ${pinLabel(pin)} and dissolve ${references} referencing Section${references === 1 ? "" : "s"} after confirmation`
+                }
+              : {}
+          )
+        );
 
-        const actions = document.createElement("div");
-        actions.className = "guide-item-actions";
-        const rename = document.createElement("button");
-        rename.type = "button";
-        rename.className = "guide-action guide-action-edit";
-        rename.dataset.renamePin = pin.id;
-        rename.textContent = "Rename";
-        const select = document.createElement("button");
-        select.type = "button";
-        select.dataset.selectPin = pin.id;
-        select.textContent = state().selectedPinIds?.includes(pin.id)
-          ? "Unselect"
-          : "Select";
-        const remove = document.createElement("button");
-        remove.type = "button";
-        remove.dataset.deletePin = pin.id;
-        remove.textContent = "Delete";
-        remove.className = "guide-action guide-action-delete danger-text";
-        if (references) {
-          remove.textContent = "Delete…";
-          remove.title = `Also dissolves ${references} referencing Section${references === 1 ? "" : "s"} after confirmation`;
-        }
-        const more = document.createElement("details");
-        more.className = "guide-item-more";
-        const moreSummary = document.createElement("summary");
-        moreSummary.textContent = "More";
-        moreSummary.setAttribute("aria-label", `More actions for ${pinLabel(pin)}`);
-        const secondaryActions = document.createElement("div");
-        secondaryActions.className = "guide-secondary-actions";
-        secondaryActions.append(select, rename, remove);
-        more.append(moreSummary, secondaryActions);
-        actions.append(more);
-        item.append(main);
-        if (selected || pairSelected) item.append(actions);
+        const positionTrack = document.createElement("div");
+        positionTrack.className = "pin-position-track";
+        const positionLine = document.createElement("span");
+        positionLine.className = "pin-position-line";
+        positionLine.setAttribute("aria-hidden", "true");
+        positionTrack.append(positionLine, pinPositionButton(pin, references));
+        item.append(header);
+        if (selected || extentSelected) item.append(positionTrack);
         elements["pins-list"].appendChild(item);
       }
     }
@@ -1212,9 +1439,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       || !currentInterval
       || workingAlreadyOwnsRange;
     elements["leave-section"].disabled = interactionLocked || !focused;
-    for (const control of elements["sections-list"].querySelectorAll?.("[data-overwrite-section]") || []) {
-      control.disabled = interactionLocked || !currentInterval;
-    }
     elements["refine-backward"].disabled = interactionLocked || targets.backward === null;
     elements["refine-forward"].disabled = interactionLocked || targets.forward === null;
     elements.reopen.disabled = interactionLocked || !actionModel?.reopen;
@@ -1233,7 +1457,14 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       currentInterval
       || selectedSection
     );
-    elements["deform-weight-select"].disabled = interactionLocked;
+    elements["deform-down"].disabled = interactionLocked || !(
+      currentInterval
+      || selectedSection
+    );
+    elements["deform-up"].disabled = interactionLocked || !(
+      currentInterval
+      || selectedSection
+    );
     elements["focus-toggle"].disabled = interactionLocked || !(
       focused
       || currentInterval
@@ -1301,7 +1532,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       targets.backward === null
         ? backwardBlock === "resolution-limit" ? "Resolution limit" : "Range start"
         : shiftLayer
-          ? `${classifyRefineRelation(currentInterval, semanticCurrent, targets.backward)} Interval · to ${formatTime(targets.backward)}`
+          ? `draw Current-to-midpoint Interval · to ${formatTime(targets.backward)}`
           : `${classifyRetainedRefineRelation(currentInterval, semanticCurrent, targets.backward) === "full" ? "full movement" : "retain anchor"} · to ${formatTime(targets.backward)}`
     );
     setActionMeta(
@@ -1311,7 +1542,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       targets.forward === null
         ? forwardBlock === "resolution-limit" ? "Resolution limit" : "Range end"
         : shiftLayer
-          ? `${classifyRefineRelation(currentInterval, semanticCurrent, targets.forward)} Interval · to ${formatTime(targets.forward)}`
+          ? `draw Current-to-midpoint Interval · to ${formatTime(targets.forward)}`
           : `${classifyRetainedRefineRelation(currentInterval, semanticCurrent, targets.forward) === "full" ? "full movement" : "retain anchor"} · to ${formatTime(targets.forward)}`
     );
     elements["reopen-meta"].textContent = actionModel?.reopen
@@ -1340,9 +1571,22 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["release-meta"].textContent = currentInterval
       ? formatRange(currentInterval)
       : "No Interval";
-    const deformTarget = currentInterval || selectedSection;
+    const selectedMatchesInterval = selectedSection && (
+      !currentInterval
+      || (
+        Math.abs(selectedSection.start - currentInterval.start) <= EPSILON
+        && Math.abs(selectedSection.end - currentInterval.end) <= EPSILON
+      )
+    );
+    const deformSection = selectedMatchesInterval ? selectedSection : null;
+    const deformTarget = currentInterval || deformSection;
+    const deformIsWeighted = deformSection
+      && Math.abs(deformSection.weight - 1) > EPSILON;
+    elements["deform-label"].textContent = deformIsWeighted
+      ? "Normalize"
+      : "Deform";
     elements["deform-meta"].textContent = deformTarget
-      ? `${elements["deform-weight-select"].value}× · ${formatRange(deformTarget)}`
+      ? `${deformIsWeighted ? "restore 1×" : "restore last"} · ${formatRange(deformTarget)}`
       : "No target";
     elements["focus-toggle-meta"].textContent = focused
       ? `restore ${formatRange(model().focus.returnRange)}`

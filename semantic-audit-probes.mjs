@@ -152,14 +152,12 @@ finding(
   "side-step-enabled-at-hard-range-boundary",
   environment.byId.get("step-backward").disabled === true
     && (
-      environment.byId.get("tail-step-button").disabled === false
-      || environment.byId.get("tail-field-toggle").disabled === false
+      environment.byId.get("tail-field-toggle").disabled === false
       || environment.byId.get("tail-player-surface")["aria-disabled"] !== "true"
       || environment.byId.get("tail-player-surface").tabIndex !== -1
     ),
   {
     matrixStepBackwardDisabled: environment.byId.get("step-backward").disabled,
-    tailStepBackwardDisabled: environment.byId.get("tail-step-button").disabled,
     tailFieldToggleDisabled: environment.byId.get("tail-field-toggle").disabled,
     tailSurfaceDisabled: environment.byId.get("tail-player-surface")["aria-disabled"],
     tailSurfaceTabIndex: environment.byId.get("tail-player-surface").tabIndex,

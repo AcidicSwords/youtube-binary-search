@@ -128,11 +128,28 @@ export class FakeElement {
   querySelectorAll(selector) {
     const nodes = descendants(this);
     if (selector === "[role=menuitem]") return nodes.filter(node => node.role === "menuitem");
+    const dataValue = selector.match(/^\[data-([a-z0-9-]+)="([^"]*)"\]$/i);
+    if (dataValue) {
+      const key = dataKey(`data-${dataValue[1]}`);
+      return nodes.filter(node => node.dataset[key] === dataValue[2]);
+    }
+    const dataPresence = selector.match(/^\[data-([a-z0-9-]+)\]$/i);
+    if (dataPresence) {
+      const key = dataKey(`data-${dataPresence[1]}`);
+      return nodes.filter(node => node.dataset[key] !== undefined);
+    }
+    if (selector.startsWith(".")) {
+      return nodes.filter(node => node.classList.contains(selector.slice(1)));
+    }
+    if (/^[a-z]+$/i.test(selector)) {
+      return nodes.filter(node => node.tagName === selector.toUpperCase());
+    }
     if (selector.includes("button:not([disabled])")) {
       return nodes.filter(node => ["BUTTON", "INPUT", "SELECT", "TEXTAREA", "A"].includes(node.tagName) && !node.disabled);
     }
     return [];
   }
+  querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
   getBoundingClientRect() { return { left: 0, width: this.clientWidth || 1000 }; }
 }
 
@@ -182,10 +199,6 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
   addOption(byId.get("section-source"), "field-span", "Held Field span");
   addOption(byId.get("tail-rate-select"), "1", "Loading");
   addOption(byId.get("lead-rate-select"), "1", "Loading");
-  for (const weight of [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]) {
-    addOption(byId.get("deform-weight-select"), weight, `${weight}×`);
-  }
-  byId.get("deform-weight-select").value = "0.5";
 
   const documentListeners = new Map();
   const body = new FakeElement("body", "BODY");

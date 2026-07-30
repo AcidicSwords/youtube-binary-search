@@ -12,7 +12,6 @@ import {
   saveIntervalAsSection,
   focusSection,
   focusWorkingSection,
-  overwriteGuideSection,
   leaveSection
 } from "./session.js";
 import { validateGuide, resolveSection } from "./guide.js";
@@ -86,7 +85,7 @@ const OPERATIONS_PER_RUN = 1000;
 for (let run = 0; run < RUNS; run += 1) {
   let session = createSession({ duration: 480, current: random() * 480 });
   for (let index = 0; index < OPERATIONS_PER_RUN; index += 1) {
-    const operation = Math.floor(random() * 15);
+    const operation = Math.floor(random() * 14);
     let result;
 
     if (operation === 0) result = refine(session, "backward");
@@ -114,13 +113,7 @@ for (let run = 0; run < RUNS; run += 1) {
         : { session, changed: false };
     } else if (operation === 11) result = leaveSection(session);
     else if (operation === 12) result = switchEndpoint(session);
-    else if (operation === 13) result = focusWorkingSection(session);
-    else {
-      const sections = session.model.guide.sections;
-      result = sections.length
-        ? overwriteGuideSection(session, sections[Math.floor(random() * sections.length)].id)
-        : { session, changed: false };
-    }
+    else result = focusWorkingSection(session);
 
     if (result?.session) session = result.session;
     assertSessionInvariant(session);

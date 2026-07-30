@@ -5,7 +5,7 @@
   grid-template-areas: "tail center lead";
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr);
   gap: var(--field-gap);
-  align-items: stretch;
+  align-items: center;
   padding: var(--field-gap);
   background: #080c11;
 }
@@ -15,7 +15,7 @@
   display: grid;
   min-width: 0;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(64px, auto);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 11px;
@@ -34,6 +34,16 @@
 
 .tail-pane { grid-area: tail; }
 .lead-pane { grid-area: lead; }
+
+.lead-pane .step-pane-bar,
+.lead-pane .pane-identity,
+.lead-pane .pane-bar-actions {
+  flex-direction: row-reverse;
+}
+
+.lead-pane .pane-identity {
+  text-align: right;
+}
 
 .step-pane-side .player-wrap {
   filter: saturate(0.88) brightness(0.88);
@@ -115,6 +125,18 @@
   font-size: 0.95rem;
 }
 
+.pane-bar-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+}
+
+.center-bar-actions {
+  flex: 1;
+  justify-content: flex-end;
+}
+
 .field-toggle {
   display: inline-flex;
   align-items: center;
@@ -132,36 +154,71 @@
 }
 
 .pane-field-controls {
-  --field-rate-track: minmax(76px, .7fr);
-  --field-offset-track: minmax(92px, .9fr);
-  --field-mode-track: minmax(108px, 1fr);
-  --field-step-track: minmax(118px, 1.15fr);
   position: relative;
   z-index: 7;
-  display: grid;
-  grid-template-columns:
-    var(--field-rate-track)
-    var(--field-offset-track)
-    var(--field-mode-track)
-    var(--field-step-track);
-  gap: 6px;
-  align-items: stretch;
-  padding: 7px;
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
   border-top: 1px solid var(--line);
   background: #0b1119;
 }
 
-.tail-field-controls {
-  grid-template-columns:
-    var(--field-step-track)
-    var(--field-mode-track)
-    var(--field-offset-track)
-    var(--field-rate-track);
+.field-settings {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
-.center-field-controls {
-  grid-template-columns: minmax(0, 1fr) minmax(150px, .75fr);
+.field-settings > summary {
+  display: grid;
+  min-height: var(--compact-control-height);
+  place-items: center;
+  padding: 5px;
+  border: 1px solid rgba(116, 134, 157, 0.46);
+  border-radius: 7px;
+  color: var(--muted);
+  background: #101722;
+  font-size: 0.62rem;
+  font-weight: 720;
+  cursor: pointer;
+  list-style: none;
 }
+
+.field-settings > summary::-webkit-details-marker { display: none; }
+.field-settings > summary::after {
+  color: var(--faint);
+  content: "⋯";
+  font-size: 0.72rem;
+  line-height: 0.6;
+}
+
+.field-settings[open] > summary,
+.field-settings > summary:hover,
+.field-settings > summary:focus-visible {
+  border-color: rgba(121, 168, 255, 0.62);
+  color: var(--text);
+}
+
+.field-settings-popover {
+  position: absolute;
+  top: calc(100% + 7px);
+  bottom: auto;
+  z-index: 12;
+  display: grid;
+  width: min(210px, calc(100vw - 24px));
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: #0b1119;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.42);
+}
+
+.tail-field-settings .field-settings-popover { right: 0; }
+.lead-field-settings .field-settings-popover { left: 0; }
 
 .field-control,
 .field-state-readout {
@@ -194,14 +251,15 @@
   align-items: center;
 }
 
-.field-mode-toggle,
-.field-step-button {
-  display: grid;
+.field-mode-toggle {
+  display: flex;
+  width: min(100%, 210px);
   min-width: 0;
-  align-content: center;
-  justify-items: center;
-  gap: 3px;
-  padding: 5px 8px;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 8px;
   text-align: center;
 }
 
@@ -216,7 +274,6 @@
 }
 
 .field-mode-toggle small,
-.field-step-button kbd,
 .field-state-readout small {
   overflow: hidden;
   color: var(--muted);
@@ -225,24 +282,28 @@
   white-space: nowrap;
 }
 
-.field-step-button {
-  border-color: rgba(121, 168, 255, 0.46);
-  background: rgba(121, 168, 255, 0.06);
-}
-
-.field-step-button.is-step-held,
 .side-player-surface.is-step-held {
   border-color: rgba(121, 168, 255, 0.92);
   background: rgba(121, 168, 255, 0.18);
   box-shadow: inset 0 0 0 1px rgba(121, 168, 255, 0.34);
 }
 
-.tail-pane .field-step-button { border-left-color: rgba(172, 184, 205, 0.7); }
-.lead-pane .field-step-button { border-right-color: rgba(121, 168, 255, 0.8); }
-
 .field-state-readout strong {
   color: var(--text);
   font-size: 0.82rem;
+}
+
+.center-field-summary {
+  display: flex;
+  min-width: 0;
+  min-height: var(--compact-control-height);
+  align-items: center;
+  gap: 6px;
+  padding: 3px 7px;
+}
+
+.center-field-summary small {
+  max-width: clamp(120px, 18vw, 260px);
 }
 
 .step-pane-restore {
@@ -290,18 +351,24 @@
   filter: grayscale(0.4) brightness(0.58);
 }
 
+.step-field.is-preview .step-pane-side .player-wrap {
+  filter: saturate(0.95) brightness(0.95);
+}
+
 @container (max-width: 1440px) {
-  .pane-field-controls {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  .center-field-summary small { max-width: 150px; }
 }
 
 @media (min-width: 1240px) {
   .step-field:not(.field-off) {
     grid-template-columns:
-      minmax(180px, 0.7fr)
-      minmax(390px, 1.6fr)
-      minmax(180px, 0.7fr);
+      minmax(220px, 0.96fr)
+      minmax(340px, 1.08fr)
+      minmax(220px, 0.96fr);
+  }
+
+  .step-pane-side .player-wrap {
+    min-height: 0;
   }
 }
 
@@ -354,8 +421,7 @@
   .step-pane-side .player-wrap { min-height: 200px; aspect-ratio: auto; }
   .step-pane-bar { min-height: 50px; }
   .step-pane-meta { font-size: 0.59rem; }
-  .pane-field-controls,
-  .center-field-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .center-field-summary small { display: none; }
 }
 
 @media (pointer: coarse) {
@@ -363,8 +429,7 @@
   .field-toggle,
   .field-control select,
   .field-control input,
-  .field-mode-toggle,
-  .field-step-button {
+  .field-mode-toggle {
     min-height: var(--touch);
   }
   .field-control select,

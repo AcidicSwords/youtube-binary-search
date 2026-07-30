@@ -7,7 +7,10 @@ import {
 } from "./range-geometry.js";
 import {
   DEFAULT_DEFORM_WEIGHT,
+  DEFAULT_SECTION_WEIGHT,
+  SECTION_WEIGHT_VALUES,
   createGuide,
+  findPinAt,
   getPin,
   sectionsForPin,
   resolveSection,
@@ -49,7 +52,6 @@ import {
   pinCurrent as pinSessionCurrent,
   saveIntervalAsSection,
   saveExtentAsSection,
-  overwriteGuideSection,
   renameGuidePin,
   deleteGuidePin,
   renameGuideSection,
@@ -57,6 +59,8 @@ import {
   setGuideSectionWeight,
   moveGuidePin,
   moveGuideSection,
+  unlinkGuideSectionEndpoint,
+  linkGuideSectionEndpoint,
   undo as undoSession,
   redo as redoSession
 } from "./session.js";
@@ -176,6 +180,7 @@ const state = {
   rangeDragProjection: null,
   guideTab: "sections",
   guideOpen: false,
+  railMode: "guide",
   compactGuide: null,
   guideReturnFocus: null,
   nativeGo: null,
@@ -183,6 +188,7 @@ const state = {
   guideDialog: null,
   selectedRetained: null,
   selectedPinIds: [],
+  deformWeightMemory: new Map(),
   guideDrag: null,
   guideClickSuppressed: false,
   carryModifier: false,
@@ -241,6 +247,29 @@ function guide() {
 
 function currentInterval() {
   return model().interval;
+}
+
+function syncIntervalPinSelection() {
+  const interval = currentInterval();
+  if (!interval) {
+    state.selectedPinIds = [];
+    return;
+  }
+  const retainedSection = state.selectedRetained?.kind === "section"
+    ? resolveSection(guide(), state.selectedRetained.id)
+    : null;
+  const retainedMatches = retainedSection
+    && Math.abs(retainedSection.start - interval.start) <= EPSILON
+    && Math.abs(retainedSection.end - interval.end) <= EPSILON;
+  const pins = retainedMatches
+    ? [retainedSection.startPin, retainedSection.endPin]
+    : [
+        findPinAt(guide(), interval.start),
+        findPinAt(guide(), interval.end)
+      ];
+  state.selectedPinIds = [...new Set(
+    pins.filter(Boolean).map(pin => pin.id)
+  )];
 }
 
 function timelineProjection() {
@@ -544,9 +573,6 @@ function accept(result, options = {}) {
   if (!result?.changed) return false;
   const previousModel = model();
   state.session = result.session;
-  state.selectedPinIds = state.selectedPinIds.filter(id =>
-    Boolean(getPin(guide(), id))
-  );
   if (
     state.selectedRetained?.kind === "pin"
       ? !getPin(guide(), state.selectedRetained.id)
@@ -556,6 +582,7 @@ function accept(result, options = {}) {
   ) {
     state.selectedRetained = null;
   }
+  syncIntervalPinSelection();
   const guidePersisted = result.guideChanged ? persistGuide() : true;
   const timelineGeometryChanged = timelineGeometryKey(previousModel)
     !== timelineGeometryKey(model());
@@ -733,6 +760,7 @@ function settleTransport(options = {}) {
     });
     if (result.changed) {
       state.session = result.session;
+      syncIntervalPinSelection();
       if (!handoffField) stepField?.translateToCurrent(current, { preserve: true });
       persistPreferences();
       view.renderGuide();
@@ -789,6 +817,7 @@ function flushPendingStep(options = {}) {
       history: pending.originHistory,
       future: pending.originFuture
     };
+    syncIntervalPinSelection();
     view.render();
     return { flushed: true, cancelled: true, direction: pending.lastDirection };
   }
@@ -856,10 +885,8 @@ function setStepGesturePresentation({ active, selection }) {
   const direction = active ? selection?.direction : null;
   for (const [id, controlDirection] of [
     ["step-backward", "backward"],
-    ["tail-step-button", "backward"],
     ["tail-player-surface", "backward"],
     ["step-forward", "forward"],
-    ["lead-step-button", "forward"],
     ["lead-player-surface", "forward"]
   ]) {
     elements[id]?.classList?.toggle?.(
@@ -990,9 +1017,7 @@ function refine(direction, options = {}) {
     : `cleared at ${formatTime(result.destination)}`;
   accept(result, {
     status: local
-      ? result.refineRelation === "shorten"
-        ? `Local Refine ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; the Working Section shortened to ${workingSection}.${retainedCarryStatus(result)}`
-        : `Local Refine ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; the previous Working Section was replaced by ${workingSection}.${retainedCarryStatus(result)}`
+      ? `Local Refine ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; drew a new Current-to-midpoint Working Interval ${workingSection}.${retainedCarryStatus(result)}`
       : result.refineRelation === "full"
         ? `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; recorded the full movement as ${workingSection}.${retainedCarryStatus(result)}`
         : `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; retained Working Interval ${workingSection}.${retainedCarryStatus(result)}`
@@ -1043,31 +1068,56 @@ function releaseWorkingInterval() {
   });
 }
 
-function selectedDeformWeight() {
-  const value = Number(elements["deform-weight-select"]?.value);
-  return Number.isFinite(value) ? value : DEFAULT_DEFORM_WEIGHT;
-}
-
-function deformWorkingOrSelected() {
-  if (!state.videoLoaded) return false;
+function deformTarget() {
   const working = currentInterval();
-  const selected = state.selectedRetained?.kind === "section"
+  const retainedSection = state.selectedRetained?.kind === "section"
     ? resolveSection(guide(), state.selectedRetained.id)
     : null;
-  const selectedSectionId = selected
-    && (
-      !working
-      || (
-        Math.abs(selected.start - working.start) <= EPSILON
-        && Math.abs(selected.end - working.end) <= EPSILON
-      )
+  const selected = retainedSection || sectionForSelectedPinExtent();
+  const selectedMatches = selected && (
+    !working
+    || (
+      Math.abs(selected.start - working.start) <= EPSILON
+      && Math.abs(selected.end - working.end) <= EPSILON
     )
-      ? selected.id
+  );
+  const exactMatches = working
+    ? guide().sections
+      .map(section => resolveSection(guide(), section))
+      .filter(section =>
+        section
+        && Math.abs(section.start - working.start) <= EPSILON
+        && Math.abs(section.end - working.end) <= EPSILON
+      )
+    : [];
+  const section = selectedMatches
+    ? selected
+    : exactMatches.length === 1
+      ? exactMatches[0]
       : null;
-  const weight = selectedDeformWeight();
+  return {
+    extent: working || section,
+    section,
+    sectionId: section?.id || null
+  };
+}
+
+function rememberDeformWeight(sectionId, weight) {
+  if (Math.abs(weight - DEFAULT_SECTION_WEIGHT) <= EPSILON) return;
+  state.deformWeightMemory.set(sectionId || "working", weight);
+}
+
+function applyDeformWeight(weight) {
+  if (!state.videoLoaded) return false;
+  const target = deformTarget();
+  if (!target.extent) {
+    setStatus("Establish a Working Interval or select a Section to deform.");
+    return false;
+  }
+  settleBeforeAction();
   const result = deformSessionSection(
     state.session,
-    selectedSectionId,
+    target.sectionId,
     weight
   );
   if (!result.changed) {
@@ -1087,6 +1137,8 @@ function deformWorkingOrSelected() {
     kind: "section",
     id: result.section.id
   };
+  rememberDeformWeight(result.section.id, result.weight);
+  state.deformWeightMemory.delete("working");
   view.invalidateTimelinePins();
   const name = sectionName(result.section);
   return accept(result, {
@@ -1096,15 +1148,62 @@ function deformWorkingOrSelected() {
   });
 }
 
+function deformWorkingOrSelected() {
+  const target = deformTarget();
+  if (!target.extent) {
+    setStatus("Establish a Working Interval or select a Section to deform.");
+    return false;
+  }
+  const currentWeight = target.section?.weight ?? DEFAULT_SECTION_WEIGHT;
+  const memoryKey = target.sectionId || "working";
+  if (Math.abs(currentWeight - DEFAULT_SECTION_WEIGHT) > EPSILON) {
+    rememberDeformWeight(memoryKey, currentWeight);
+    return applyDeformWeight(DEFAULT_SECTION_WEIGHT);
+  }
+  return applyDeformWeight(
+    state.deformWeightMemory.get(memoryKey)
+    ?? state.deformWeightMemory.get("working")
+    ?? DEFAULT_DEFORM_WEIGHT
+  );
+}
+
+function stepDeformWeight(direction) {
+  const target = deformTarget();
+  if (!target.extent) {
+    setStatus("Establish a Working Interval or select a Section to deform.");
+    return false;
+  }
+  const currentWeight = target.section?.weight ?? DEFAULT_SECTION_WEIGHT;
+  const currentIndex = SECTION_WEIGHT_VALUES.findIndex(
+    weight => Math.abs(weight - currentWeight) <= EPSILON
+  );
+  const neutralIndex = SECTION_WEIGHT_VALUES.indexOf(DEFAULT_SECTION_WEIGHT);
+  const nextIndex = clamp(
+    (currentIndex >= 0 ? currentIndex : neutralIndex) + direction,
+    0,
+    SECTION_WEIGHT_VALUES.length - 1
+  );
+  const nextWeight = SECTION_WEIGHT_VALUES[nextIndex];
+  if (Math.abs(nextWeight - currentWeight) <= EPSILON) {
+    setStatus(
+      direction < 0
+        ? "That Section is already at the lowest deformation weight."
+        : "That Section is already at the highest deformation weight."
+    );
+    return false;
+  }
+  rememberDeformWeight(target.sectionId, currentWeight);
+  return applyDeformWeight(nextWeight);
+}
+
 function focusOrUnfocus() {
   if (!state.videoLoaded) return false;
   if (model().focus) return leaveSection();
   const working = currentInterval();
-  if (state.selectedRetained?.kind === "section") {
-    const selected = resolveSection(
-      guide(),
-      state.selectedRetained.id
-    );
+  const selected = state.selectedRetained?.kind === "section"
+    ? resolveSection(guide(), state.selectedRetained.id)
+    : sectionForSelectedPinExtent();
+  if (selected) {
     if (
       selected
       && (
@@ -1133,6 +1232,7 @@ function traverseHistory(transform, emptyMessage, completedVerb) {
     return false;
   }
   state.session = result.session;
+  syncIntervalPinSelection();
   persistPreferences();
   const guidePersisted = result.guideChanged ? persistGuide() : true;
   const destination = currentResolution().C;
@@ -1234,6 +1334,7 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
   state.pendingStep.carryFailed = carried.carryFailed || null;
   state.pendingStep.started = true;
   state.session = carried.session;
+  syncIntervalPinSelection();
   if (
     timelineGeometryKey(previousModel) !== timelineGeometryKey(model())
   ) {
@@ -1266,7 +1367,10 @@ function startNativePlaybackSession() {
 
   if (Math.abs(current - currentResolution().C) > NATIVE_POSITION_TOLERANCE_SECONDS) {
     const direct = goTo(state.session, current, { operator: "nativeGo", label: "Native Go" });
-    if (direct.changed) state.session = direct.session;
+    if (direct.changed) {
+      state.session = direct.session;
+      syncIntervalPinSelection();
+    }
   }
 
   state.transport = createPlaybackTransport({
@@ -1354,6 +1458,7 @@ function acceptContextCursor() {
 
   if (result.changed) {
     state.session = result.session;
+    syncIntervalPinSelection();
     stepField?.translateToCurrent(currentResolution().C, { preserve: true });
     if (returnTimelineKey !== timelineGeometryKey(model())) {
       view.renderGuide();
@@ -1482,6 +1587,7 @@ function leaveSection() {
 function changeSectionWeight(sectionId, weight) {
   const section = resolveSection(guide(), sectionId);
   if (!section) return false;
+  rememberDeformWeight(sectionId, section.weight);
   const name = sectionName(section);
   const result = setGuideSectionWeight(
     state.session,
@@ -1499,12 +1605,45 @@ function changeSectionWeight(sectionId, weight) {
   state.selectedRetained = { kind: "section", id: sectionId };
   view.invalidateTimelinePins();
   const next = result.value;
+  rememberDeformWeight(sectionId, next.weight);
   accept(result, {
     effect: false,
     renderGuide: true,
     status: next.weight === 1
       ? `Restored “${name}” to ordinary timeline density.`
       : `Set “${name}” to ${next.weight}× timeline weight.`
+  });
+  return true;
+}
+
+function changeSectionEndpointLink(sectionId, role, linked) {
+  const section = resolveSection(guide(), sectionId);
+  if (!section || !["start", "end"].includes(role)) return false;
+  settleBeforeAction();
+  const result = linked
+    ? linkGuideSectionEndpoint(state.session, sectionId, role)
+    : unlinkGuideSectionEndpoint(state.session, sectionId, role);
+  if (!result.changed) {
+    setStatus(
+      result.reason === "no-coincident-pin"
+        ? `There is no retained Pin available to relink this ${role} endpoint to.`
+        : result.reason === "unshared-pin"
+          ? `This ${role} endpoint is already independent.`
+          : result.reason === "invalid-link-geometry"
+            ? `Its original shared Pin is now beyond the opposite Section bound.`
+          : `The ${role} endpoint could not be ${linked ? "relinked" : "unlinked"}.`,
+      !["no-coincident-pin", "unshared-pin", "invalid-link-geometry"].includes(result.reason)
+    );
+    return false;
+  }
+  state.selectedRetained = { kind: "section", id: sectionId };
+  view.invalidateTimelinePins();
+  accept(result, {
+    effect: false,
+    renderGuide: true,
+    status: linked
+      ? `Relinked the ${role} endpoint; Sections sharing this Pin now move together.`
+      : `Unlinked the ${role} endpoint; this Section can now move independently at that bound.`
   });
   return true;
 }
@@ -1525,52 +1664,34 @@ function selectedPinExtent() {
   };
 }
 
-function togglePinPairSelection(pinId) {
-  if (!getPin(guide(), pinId)) return false;
-  const selected = new Set(state.selectedPinIds);
-  const removing = selected.has(pinId);
-  if (removing) selected.delete(pinId);
-  else {
-    if (selected.size >= 2) selected.clear();
-    selected.add(pinId);
-  }
-  state.selectedPinIds = [...selected];
-  if (removing) {
-    const remaining = state.selectedPinIds.at(-1);
-    if (remaining) {
-      state.selectedRetained = { kind: "pin", id: remaining };
-    } else if (
-      state.selectedRetained?.kind === "pin"
-      && state.selectedRetained.id === pinId
-    ) {
-      state.selectedRetained = null;
-    }
-  } else {
-    state.selectedRetained = { kind: "pin", id: pinId };
-  }
-  if (state.selectedPinIds.length === 2 && elements["section-source"]) {
-    elements["section-source"].value = "selected-pins";
-  }
-  view.renderGuide();
-  view.render();
+function sectionForSelectedPinExtent() {
   const extent = selectedPinExtent();
-  setStatus(
-    extent
-      ? `Selected two Pins ${formatRange(extent)}. Name and save them as a Section.`
-      : state.selectedPinIds.length
-        ? "Selected one Pin. Shift-click another Pin to form a Section."
-        : "Cleared Pin selection."
-  );
-  return true;
+  if (!extent) return null;
+  const matches = guide().sections
+    .map(section => resolveSection(guide(), section))
+    .filter(section =>
+      section
+      && section.startPinId === extent.startPinId
+      && section.endPinId === extent.endPinId
+    );
+  return matches.length === 1 ? matches[0] : null;
 }
 
-function pinCurrent(event = null) {
+function pinCurrent(event = null, options = {}) {
   event?.preventDefault?.();
-  const label = elements["pin-label"]?.value?.trim?.() || "";
+  const label = options.useFormLabel === false
+    ? ""
+    : elements["pin-label"]?.value?.trim?.() || "";
   settleBeforeAction();
   const result = pinSessionCurrent(state.session, label);
   if (!result.changed) {
     const pin = result.value?.pin;
+    if (pin) {
+      state.selectedRetained = { kind: "pin", id: pin.id };
+      selectGuideTab("pins");
+      view.renderGuide();
+      view.render();
+    }
     setStatus(pin ? `Current is already pinned at ${formatTime(pin.t)}.` : "Current is already pinned.");
     return;
   }
@@ -1580,12 +1701,14 @@ function pinCurrent(event = null) {
     renderGuide: true,
     status: `Pinned Current at ${formatTime(pin.t)}.`
   });
-  if (elements["pin-label"]) elements["pin-label"].value = "";
+  if (options.useFormLabel !== false && elements["pin-label"]) {
+    elements["pin-label"].value = "";
+  }
   selectGuideTab("pins");
 }
 
-function selectedSectionExtent() {
-  const kind = elements["section-source"]?.value || "interval";
+function selectedSectionExtent(source = null) {
+  const kind = source || elements["section-source"]?.value || "interval";
   return {
     kind,
     extent: kind === "field-span"
@@ -1596,10 +1719,12 @@ function selectedSectionExtent() {
   };
 }
 
-function saveCurrentIntervalAsSection(event = null) {
+function saveCurrentIntervalAsSection(event = null, options = {}) {
   event?.preventDefault?.();
-  const label = elements["section-label"].value.trim();
-  const { kind, extent } = selectedSectionExtent();
+  const label = options.useFormLabel === false
+    ? ""
+    : elements["section-label"].value.trim();
+  const { kind, extent } = selectedSectionExtent(options.source);
   if (!extent) return setStatus("Establish the selected Extent before saving a Section.", true);
   settleBeforeAction();
   const result = kind === "interval"
@@ -1611,9 +1736,17 @@ function saveCurrentIntervalAsSection(event = null) {
       kind === "selected-pins" ? "selected-pins" : "field-span"
     );
   if (!result.changed) {
+    const existing = result.value?.section;
+    if (result.reason === "duplicate-section" && existing) {
+      state.selectedRetained = { kind: "section", id: existing.id };
+      syncIntervalPinSelection();
+      selectGuideTab("sections");
+      view.renderGuide();
+      view.render();
+    }
     setStatus(
       result.reason === "duplicate-section"
-        ? `${label ? `Section “${label}”` : "An untitled Section"} already exists for this Extent.`
+        ? `${label ? `Section “${label}”` : "An untitled Section"} already exists for this Extent and is selected.`
         : "The Section could not be saved.",
       result.reason !== "duplicate-section"
     );
@@ -1630,7 +1763,7 @@ function saveCurrentIntervalAsSection(event = null) {
       ? `Saved Section “${label}”.`
       : `Saved untitled Section ${formatRange(extent)}.`
   });
-  elements["section-label"].value = "";
+  if (options.useFormLabel !== false) elements["section-label"].value = "";
   selectGuideTab("sections");
 }
 
@@ -1717,24 +1850,6 @@ function renameSectionById(sectionId) {
   });
 }
 
-function overwriteSectionById(sectionId) {
-  const section = resolveSection(guide(), sectionId);
-  const working = currentInterval();
-  if (!section) return;
-  if (!working) {
-    setStatus("Establish a Working Section before overwriting a retained Section.", true);
-    return;
-  }
-  openGuideDialog({
-    action: "overwrite-section",
-    id: sectionId,
-    title: "Overwrite Section",
-    message: `Replace “${sectionName(section)}” ${formatRange(section)} with Working Section ${formatRange(working)}?`,
-    showInput: false,
-    confirmLabel: "Overwrite"
-  });
-}
-
 function deleteSectionById(sectionId) {
   const section = resolveSection(guide(), sectionId);
   if (!section) return;
@@ -1804,15 +1919,6 @@ function submitGuideDialog(event) {
       : result.reason === "duplicate-section"
         ? "A Section with this title and Extent already exists."
         : "Section title is unchanged.";
-  } else if (action.action === "overwrite-section") {
-    result = overwriteGuideSection(state.session, action.id);
-    status = result.changed
-      ? `Overwrote “${sectionName(result.value)}” with Working Section ${formatRange(result.value)}.`
-      : result.reason === "duplicate-section"
-        ? "That overwrite would duplicate an existing Section."
-        : result.reason === "unchanged-section"
-          ? "The retained Section already matches the Working Section."
-          : "Section could not be overwritten.";
   } else if (action.action === "delete-section") {
     result = deleteGuideSection(state.session, action.id);
     status = result.changed ? "Deleted Section." : "Section could not be deleted.";
@@ -1828,7 +1934,9 @@ function goToPin(pin, operator = "pin", options = {}) {
   if (!pin) return;
   const carry = options.carryRetained === true || state.carryModifier;
   const hasCarrySelection = carry && Boolean(state.selectedRetained);
-  if (!carry) state.selectedRetained = { kind: "pin", id: pin.id };
+  const destinationSelection = options.selectionAfter
+    || { kind: "pin", id: pin.id };
+  if (!carry) state.selectedRetained = destinationSelection;
   moveToAddress(pin.t, {
     operator,
     label: operator === "pin" ? "Go to Pin" : operator,
@@ -1841,7 +1949,7 @@ function goToPin(pin, operator = "pin", options = {}) {
     carryRetained: carry
   });
   if (!hasCarrySelection && carry) {
-    state.selectedRetained = { kind: "pin", id: pin.id };
+    state.selectedRetained = destinationSelection;
     view.renderGuide();
     view.render();
   }
@@ -2240,7 +2348,22 @@ function sourceFromPointerInProjection(
   return projection.timelineToSource(coordinate);
 }
 
-function beginGuideDrag(kind, id, event) {
+function sourceFromRelativeDragDelta(event, drag) {
+  const width = drag.surfaceWidth;
+  if (!Number.isFinite(width) || width <= 0) return drag.originSource;
+  const originCoordinate = drag.projection.sourceToTimeline(drag.originSource);
+  const coordinate = clamp(
+    originCoordinate
+      + (event.clientX - drag.originClientX)
+      / width
+      * drag.projection.timelineExtent,
+    0,
+    drag.projection.timelineExtent
+  );
+  return drag.projection.timelineToSource(coordinate);
+}
+
+function beginGuideDrag(kind, id, event, options = {}) {
   if (
     !state.videoLoaded
     || state.dragHandle
@@ -2250,11 +2373,28 @@ function beginGuideDrag(kind, id, event) {
   const pin = kind === "pin" ? getPin(guide(), id) : null;
   const section = kind === "section" ? resolveSection(guide(), id) : null;
   if (!pin && !section) return;
+  const timelineSurface = elements.timeline.contains?.(event.target);
+  const surface = options.surface || (timelineSurface ? "timeline" : "relative");
+  const guideMapSurface = event.target?.closest?.(".section-endpoints")
+    || event.target?.closest?.(".pin-position-track");
+  const guideItemWidth = guideMapSurface
+    ? guideMapSurface.getBoundingClientRect().width
+    : event.target
+      ?.closest?.(".guide-item")
+      ?.getBoundingClientRect?.()
+      ?.width;
+  const timelineWidth = elements.timeline.getBoundingClientRect().width;
   state.guideDrag = {
     kind,
     id,
     pointerId: event.pointerId,
     originClientX: event.clientX,
+    surface,
+    surfaceWidth: Number(options.surfaceWidth)
+      || (surface === "relative" ? guideItemWidth : timelineWidth)
+      || timelineWidth,
+    origin: options.origin || (timelineSurface ? "timeline" : "guide"),
+    sectionId: options.sectionId || null,
     originSource: pin?.t ?? section.start,
     originSection: section
       ? { start: section.start, end: section.end }
@@ -2263,25 +2403,58 @@ function beginGuideDrag(kind, id, event) {
     originHistory: null,
     originFuture: null,
     projection: projectionForModel(model()),
+    threshold: Number(options.threshold) || 6,
     moved: false,
     changed: false,
     blockedReason: null,
     rangeChanged: false
   };
-  try {
-    elements.timeline.setPointerCapture?.(event.pointerId);
-  } catch {
-    // Document-level release listeners retain the drag lifecycle when pointer
-    // capture is unavailable for this pointer.
+}
+
+function previewGuideDrag(drag) {
+  const sectionId = drag.kind === "section" ? drag.id : drag.sectionId;
+  const section = sectionId ? resolveSection(guide(), sectionId) : null;
+  const pin = drag.kind === "pin" ? getPin(guide(), drag.id) : null;
+  const center = section?.midpoint ?? pin?.t;
+  if (!Number.isFinite(center)) return;
+  if (
+    !Number.isFinite(drag.previewCenter)
+    || Math.abs(drag.previewCenter - center) > 0.04
+  ) {
+    drag.previewCenter = center;
+    placePlayer(center);
   }
+  stepField?.previewExtent?.(
+    section
+      ? {
+          kind: "section",
+          start: section.start,
+          center: section.midpoint,
+          end: section.end
+        }
+      : { kind: "pin", center }
+  );
+}
+
+function clearGuideDragPreview({ restore = true } = {}) {
+  stepField?.clearPreview?.({ restore: false });
+  if (!restore || !state.videoLoaded || !currentResolution()) return;
+  const current = currentResolution().C;
+  placePlayer(current);
+  stepField?.translateToCurrent?.(current, { preserve: true });
 }
 
 function updateGuideDrag(event) {
   const drag = state.guideDrag;
   if (!drag || event.pointerId !== drag.pointerId) return;
   const distance = Math.abs(event.clientX - drag.originClientX);
-  if (!drag.moved && distance < 4) return;
+  if (!drag.moved && distance < drag.threshold) return;
   if (!drag.moved) {
+    try {
+      elements.timeline.setPointerCapture?.(event.pointerId);
+    } catch {
+      // Document-level listeners retain the drag if pointer capture is absent.
+    }
     // Keep the pointer-down semantic projection authoritative while transport
     // settles so drag geometry cannot shift beneath the pointer.
     drag.moved = true;
@@ -2306,11 +2479,13 @@ function updateGuideDrag(event) {
   event.preventDefault?.();
   event.stopPropagation?.();
 
-  const source = sourceFromPointerInProjection(
-    event,
-    drag.projection,
-    drag.originSource
-  );
+  const source = drag.surface === "relative"
+    ? sourceFromRelativeDragDelta(event, drag)
+    : sourceFromPointerInProjection(
+        event,
+        drag.projection,
+        drag.originSource
+      );
   const baseSession = {
     model: drag.originModel,
     history: drag.originHistory,
@@ -2337,7 +2512,12 @@ function updateGuideDrag(event) {
   } else {
     drag.blockedReason = result.reason || "unavailable";
   }
-  state.selectedRetained = { kind: drag.kind, id: drag.id };
+  syncIntervalPinSelection();
+  state.selectedRetained = drag.sectionId
+    ? { kind: "section", id: drag.sectionId }
+    : { kind: drag.kind, id: drag.id };
+  syncIntervalPinSelection();
+  previewGuideDrag(drag);
   view.invalidateTimelinePins();
   view.renderGuide();
   view.render();
@@ -2366,9 +2546,11 @@ function finishGuideDrag(event, options = {}) {
         history: drag.originHistory,
         future: drag.originFuture
       };
+      syncIntervalPinSelection();
       view.invalidateTimelinePins();
       view.renderGuide();
       view.render();
+      clearGuideDragPreview();
     }
     return false;
   }
@@ -2378,6 +2560,7 @@ function finishGuideDrag(event, options = {}) {
     state.guideClickSuppressed = false;
   }, 0);
   if (!drag.changed) {
+    clearGuideDragPreview();
     setStatus(
       drag.blockedReason === "invalid-guide-geometry"
         ? "That move would collapse or reverse one of the linked Sections."
@@ -2390,10 +2573,15 @@ function finishGuideDrag(event, options = {}) {
   const label = drag.kind === "pin" ? "Move Pin" : "Move Section";
   const committed = checkpoint(state.session, label, drag.originModel);
   state.session = committed.session;
+  syncIntervalPinSelection();
   const guidePersisted = persistGuide();
   if (drag.rangeChanged) {
+    clearGuideDragPreview({ restore: false });
     locateAddress(currentResolution().C, { resetField: true });
+  } else {
+    clearGuideDragPreview();
   }
+  if (drag.origin === "cluster-menu") view.closePinClusterMenu();
   view.invalidateTimelinePins();
   view.renderGuide();
   view.render();
@@ -2416,6 +2604,7 @@ function handleTimelineClick(event) {
     event.target.closest(".range-handle")
     || event.target.closest(".timeline-pin")
     || event.target.closest(".pin-cluster-menu")
+    || event.target.closest("[data-section-go]")
   ) return;
   view.closePinClusterMenu();
   const time = timeFromPointer(event, timelineProjection(), true);
@@ -2476,6 +2665,7 @@ function updateRangeDrag(event) {
     const result = previewRange(baseSession, start, end, current);
     if (result.changed) state.session = result.session;
   }
+  syncIntervalPinSelection();
   view.render();
 }
 
@@ -2500,6 +2690,7 @@ function finishRangeDrag() {
       history: state.session.history,
       future: state.session.future || []
     };
+    syncIntervalPinSelection();
   }
   view.render();
 }
@@ -2516,6 +2707,7 @@ function cancelRangeDrag() {
       history: state.session.history,
       future: state.session.future || []
     };
+    syncIntervalPinSelection();
     locateAddress(currentResolution().C);
     view.renderGuide();
   }
@@ -2692,16 +2884,33 @@ function compactGuideLayout() {
 
 function applyGuideState({ focus = false } = {}) {
   const compact = compactGuideLayout();
-  const open = compact ? state.guideOpen : true;
+  const open = state.guideOpen;
   const panel = elements["guide-panel"];
-  panel.classList.toggle("is-open", compact && open);
-  panel.setAttribute("aria-hidden", String(!open));
-  elements["guide-toggle"].setAttribute("aria-expanded", String(open));
-  elements["guide-scrim"].hidden = !(compact && open);
+  const rail = elements["command-workspace"];
+  const guideVisible = compact ? open : open && state.railMode === "guide";
+  const controlsVisible = compact || (open && state.railMode === "controls");
+  panel.classList.toggle("is-open", compact && guideVisible);
+  panel.hidden = !compact && !guideVisible;
+  panel.inert = !guideVisible;
+  panel.setAttribute("aria-hidden", String(!guideVisible));
+  for (const id of ["parameter-panel", "navigation-panel"]) {
+    elements[id].hidden = !controlsVisible;
+  }
+  rail.classList.toggle("mode-guide", !compact && state.railMode === "guide");
+  rail.classList.toggle("mode-controls", !compact && state.railMode === "controls");
+  rail.classList.toggle("is-collapsed", !compact && !open);
+  rail.inert = !compact && !open;
+  elements["reader-column"].classList.toggle("rail-collapsed", !compact && !open);
+  elements["guide-toggle"].setAttribute("aria-expanded", String(guideVisible));
+  elements["operator-toggle"].setAttribute(
+    "aria-expanded",
+    String(!compact && controlsVisible)
+  );
+  elements["guide-scrim"].hidden = !(compact && guideVisible);
   panel.setAttribute("role", compact ? "dialog" : "complementary");
-  if (compact && open) panel.setAttribute("aria-modal", "true");
+  if (compact && guideVisible) panel.setAttribute("aria-modal", "true");
   else panel.removeAttribute("aria-modal");
-  document.body?.classList?.toggle("guide-open", compact && open);
+  document.body?.classList?.toggle("guide-open", compact && guideVisible);
   // The compact Guide is a true modal surface: pointer, keyboard, and assistive
   // technology must not continue into the obscured reader or loading controls.
   for (const id of [
@@ -2710,11 +2919,15 @@ function applyGuideState({ focus = false } = {}) {
     "parameter-panel",
     "navigation-panel"
   ]) {
-    elements[id].inert = compact && open;
+    elements[id].inert = compact && guideVisible;
   }
-  elements["load-bar"].inert = compact && open;
-  if (focus && open) {
+  elements["load-bar"].inert = compact && guideVisible;
+  if (focus && guideVisible) {
     (compact ? elements["guide-close"] : elements[`guide-tab-${state.guideTab}`])
+      ?.focus?.({ preventScroll: true });
+  } else if (focus && controlsVisible) {
+    elements["navigation-panel"]
+      ?.querySelector?.("button:not(:disabled)")
       ?.focus?.({ preventScroll: true });
   }
 }
@@ -2731,21 +2944,28 @@ function openGuide(tab = state.guideTab) {
   if (state.compactGuide !== compactGuideLayout()) syncGuideLayout();
   state.guideReturnFocus = document.activeElement;
   selectGuideTab(tab);
+  state.railMode = "guide";
   state.guideOpen = true;
   applyGuideState({ focus: true });
 }
 
 function closeGuide({ restoreFocus = true } = {}) {
-  if (!compactGuideLayout()) {
-    state.guideOpen = true;
-    applyGuideState();
-    return;
-  }
   const returnFocus = state.guideReturnFocus;
   state.guideOpen = false;
   applyGuideState();
-  if (restoreFocus) returnFocus?.focus?.({ preventScroll: true });
+  if (restoreFocus) {
+    (returnFocus || elements["guide-toggle"])?.focus?.({ preventScroll: true });
+  }
   state.guideReturnFocus = null;
+}
+
+function openControls() {
+  if (state.compactGuide !== compactGuideLayout()) syncGuideLayout();
+  if (compactGuideLayout()) return;
+  state.guideReturnFocus = document.activeElement;
+  state.railMode = "controls";
+  state.guideOpen = true;
+  applyGuideState({ focus: true });
 }
 
 function closeCompactGuideAfterSelection() {
@@ -2755,11 +2975,19 @@ function closeCompactGuideAfterSelection() {
 function toggleGuide(tab = state.guideTab) {
   if (state.compactGuide !== compactGuideLayout()) syncGuideLayout();
   if (!compactGuideLayout()) {
-    openGuide(tab);
+    if (state.guideOpen && state.railMode === "guide") closeGuide();
+    else openGuide(tab);
     return;
   }
   if (state.guideOpen && tab === state.guideTab) closeGuide();
   else openGuide(tab);
+}
+
+function toggleControls() {
+  if (state.compactGuide !== compactGuideLayout()) syncGuideLayout();
+  if (compactGuideLayout()) return;
+  if (state.guideOpen && state.railMode === "controls") closeGuide();
+  else openControls();
 }
 
 function toggleRangeTools() {
@@ -2931,10 +3159,6 @@ elements["pin-lane"].addEventListener("click", event => {
   const pinButton = event.target.closest("[data-pin-go]");
   if (pinButton) {
     event.stopPropagation();
-    if (event.shiftKey) {
-      togglePinPairSelection(pinButton.dataset.pinGo);
-      return;
-    }
     goToPin(
       getPin(guide(), pinButton.dataset.pinGo),
       "pin",
@@ -2950,60 +3174,91 @@ elements["pin-lane"].addEventListener("click", event => {
   }
 });
 elements["pin-lane"].addEventListener("pointerdown", event => {
+  const clusterButton = event.target.closest("[data-cluster-index]");
+  if (clusterButton && !clusterButton.dataset.pinGo) {
+    event.preventDefault();
+    event.stopPropagation();
+    const cluster = view.clusterAt(Number(clusterButton.dataset.clusterIndex));
+    if (cluster) view.openPinClusterMenu(cluster, clusterButton);
+    return;
+  }
   const pinButton = event.target.closest("[data-pin-go]");
-  if (pinButton) beginGuideDrag("pin", pinButton.dataset.pinGo, event);
+  if (!pinButton) return;
+  event.stopPropagation();
+  beginGuideDrag("pin", pinButton.dataset.pinGo, event, {
+    origin: "timeline",
+    threshold: 8
+  });
 });
 elements["section-lane"].addEventListener("click", event => {
   if (state.guideClickSuppressed) {
     event.stopPropagation();
     return;
   }
-  const body = event.target.closest("[data-section-drag]");
+  const body = event.target.closest("[data-section-go]");
   if (body) {
     event.stopPropagation();
     selectSectionAsWorkingInterval(
-      body.dataset.sectionDrag,
+      body.dataset.sectionGo,
       { carryRetained: event.altKey === true }
     );
   }
 });
-elements["section-lane"].addEventListener("pointerdown", event => {
-  const body = event.target.closest("[data-section-drag]");
-  if (body) {
-    beginGuideDrag("section", body.dataset.sectionDrag, event);
-  }
-});
-elements["pin-cluster-menu"].addEventListener("click", event => {
+function activatePinClusterChoice(button, event) {
   if (state.guideClickSuppressed) {
     event.stopPropagation();
-    return;
+    return false;
   }
-  const button = event.target.closest("[data-pin-go]");
-  if (!button) return;
+  if (!button) return false;
   event.stopPropagation();
-  if (event.shiftKey) {
-    togglePinPairSelection(button.dataset.pinGo);
-    return;
-  }
+  const pinId = button.dataset.pinGo;
+  const clusterIndex = Number(button.dataset.clusterIndex);
   view.closePinClusterMenu();
   goToPin(
-    getPin(guide(), button.dataset.pinGo),
+    getPin(guide(), pinId),
     "pin",
     { carryRetained: event.altKey === true }
   );
-});
+  if (Number.isInteger(clusterIndex)) {
+    const cluster = view.clusterAt(clusterIndex);
+    const trigger = elements["pin-lane"].querySelector?.(
+      `[data-cluster-index="${clusterIndex}"]`
+    );
+    if (cluster && trigger) view.openPinClusterMenu(cluster, trigger, {
+      focusPinId: pinId
+    });
+  }
+  return true;
+}
+
 elements["pin-cluster-menu"].addEventListener("pointerdown", event => {
-  const button = event.target.closest("[data-pin-go]");
-  if (button) beginGuideDrag("pin", button.dataset.pinGo, event);
+  const button = event.target.closest("[data-pin-drag]");
+  if (!button) return;
+  event.preventDefault();
+  event.stopPropagation();
+  beginGuideDrag("pin", button.dataset.pinDrag, event, {
+    surface: "relative",
+    surfaceWidth: elements.timeline.getBoundingClientRect().width,
+    origin: "cluster-menu",
+    threshold: 8
+  });
 });
 
+elements["pin-cluster-menu"].addEventListener("click", event => {
+  const button = event.target.closest("[data-pin-go]");
+  if (!button) return;
+  activatePinClusterChoice(button, event);
+});
 elements["pin-cluster-menu"].addEventListener("keydown", event => {
   const buttons = [...elements["pin-cluster-menu"].querySelectorAll("[role=menuitem]")];
   if (!buttons.length) return;
   const index = Math.max(0, buttons.indexOf(document.activeElement));
   let next = null;
-  if (event.key === "ArrowDown") next = (index + 1) % buttons.length;
-  else if (event.key === "ArrowUp") next = (index + buttons.length - 1) % buttons.length;
+  if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+    next = (index + 1) % buttons.length;
+  } else if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+    next = (index + buttons.length - 1) % buttons.length;
+  }
   else if (event.key === "Home") next = 0;
   else if (event.key === "End") next = buttons.length - 1;
   else if (event.key === "Escape") {
@@ -3018,10 +3273,6 @@ elements["pin-cluster-menu"].addEventListener("keydown", event => {
   buttons[next].focus();
 });
 
-elements["pin-cluster-menu"].addEventListener("focusout", event => {
-  if (elements["pin-cluster-menu"].contains?.(event.relatedTarget)) return;
-  view.closePinClusterMenu();
-});
 document.addEventListener("pointerdown", event => {
   if (elements["pin-cluster-menu"].hidden) return;
   if (
@@ -3113,7 +3364,8 @@ elements["switch-endpoint"].addEventListener("click", event => {
 });
 elements.release.addEventListener("click", releaseWorkingInterval);
 elements.deform.addEventListener("click", deformWorkingOrSelected);
-elements["deform-weight-select"].addEventListener("change", view.render);
+elements["deform-down"].addEventListener("click", () => stepDeformWeight(-1));
+elements["deform-up"].addEventListener("click", () => stepDeformWeight(1));
 elements["focus-toggle"].addEventListener("click", focusOrUnfocus);
 elements["shift-layer-toggle"].addEventListener("click", () => {
   state.shiftLayer = !state.shiftLayer;
@@ -3161,8 +3413,6 @@ const sideStep = role => event => {
 for (const binding of [
   [elements["step-backward"], "matrix:backward", directionalStep("backward"), true],
   [elements["step-forward"], "matrix:forward", directionalStep("forward"), true],
-  [elements["tail-step-button"], "field-button:tail", sideStep("tail"), true],
-  [elements["lead-step-button"], "field-button:lead", sideStep("lead"), true],
   [elements["tail-player-surface"], "field-surface:tail", sideStep("tail"), true],
   [elements["lead-player-surface"], "field-surface:lead", sideStep("lead"), true]
 ]) {
@@ -3242,6 +3492,7 @@ elements["leave-section"].addEventListener("click", leaveSection);
 
 // Guide
 elements["guide-toggle"].addEventListener("click", () => toggleGuide());
+elements["operator-toggle"].addEventListener("click", toggleControls);
 elements["guide-close"].addEventListener("click", closeGuide);
 elements["guide-scrim"].addEventListener("click", closeGuide);
 elements["guide-tab-sections"].addEventListener("click", () => selectGuideTab("sections"));
@@ -3294,19 +3545,25 @@ function trapCompactGuideFocus(event) {
 }
 
 function handleGuideClick(event) {
+  if (state.guideClickSuppressed) {
+    event.preventDefault?.();
+    event.stopPropagation?.();
+    return;
+  }
   const pinGo = event.target.closest("[data-pin-go]");
   if (pinGo) {
-    if (event.shiftKey) {
-      return togglePinPairSelection(pinGo.dataset.pinGo);
-    }
+    const sectionId = pinGo.dataset.dragSection || null;
     return goToPin(
       getPin(guide(), pinGo.dataset.pinGo),
       "pin",
-      { carryRetained: event.altKey === true }
+      {
+        carryRetained: event.altKey === true,
+        selectionAfter: sectionId
+          ? { kind: "section", id: sectionId }
+          : undefined
+      }
     );
   }
-  const selectPin = event.target.closest("[data-select-pin]");
-  if (selectPin) return togglePinPairSelection(selectPin.dataset.selectPin);
   const sectionGo = event.target.closest("[data-section-go]");
   if (sectionGo) {
     return selectSectionAsWorkingInterval(
@@ -3322,23 +3579,53 @@ function handleGuideClick(event) {
   if (renamePinButton) return renamePinById(renamePinButton.dataset.renamePin);
   const deletePinButton = event.target.closest("[data-delete-pin]");
   if (deletePinButton) return deletePinById(deletePinButton.dataset.deletePin);
+  const unlinkEndpoint = event.target.closest("[data-unlink-section-endpoint]");
+  if (unlinkEndpoint) {
+    return changeSectionEndpointLink(
+      unlinkEndpoint.dataset.unlinkSectionEndpoint,
+      unlinkEndpoint.dataset.sectionEndpoint,
+      false
+    );
+  }
+  const linkEndpoint = event.target.closest("[data-link-section-endpoint]");
+  if (linkEndpoint) {
+    return changeSectionEndpointLink(
+      linkEndpoint.dataset.linkSectionEndpoint,
+      linkEndpoint.dataset.sectionEndpoint,
+      true
+    );
+  }
   const renameSectionButton = event.target.closest("[data-rename-section]");
   if (renameSectionButton) return renameSectionById(renameSectionButton.dataset.renameSection);
-  const overwriteSectionButton = event.target.closest("[data-overwrite-section]");
-  if (overwriteSectionButton) {
-    return overwriteSectionById(overwriteSectionButton.dataset.overwriteSection);
-  }
   const deleteSectionButton = event.target.closest("[data-delete-section]");
   if (deleteSectionButton) return deleteSectionById(deleteSectionButton.dataset.deleteSection);
 }
 
 elements["sections-list"].addEventListener("click", handleGuideClick);
+elements["sections-list"].addEventListener("pointerdown", event => {
+  const node = event.target.closest("[data-pin-drag]");
+  if (node) {
+    beginGuideDrag(
+      "pin",
+      node.dataset.pinDrag,
+      event,
+      { sectionId: node.dataset.dragSection || null }
+    );
+    return;
+  }
+  const section = event.target.closest("[data-section-drag]");
+  if (section) beginGuideDrag("section", section.dataset.sectionDrag, event);
+});
 elements["sections-list"].addEventListener("change", event => {
   const control = event.target.closest("[data-section-weight]");
   if (!control) return;
   changeSectionWeight(control.dataset.sectionWeight, control.value);
 });
 elements["pins-list"].addEventListener("click", handleGuideClick);
+elements["pins-list"].addEventListener("pointerdown", event => {
+  const pin = event.target.closest("[data-pin-drag]");
+  if (pin) beginGuideDrag("pin", pin.dataset.pinDrag, event);
+});
 elements["sections-list"].addEventListener("pointerover", event => {
   const item = event.target.closest("[data-section-preview-id]");
   if (!item || item.contains(event.relatedTarget)) return;
@@ -3510,9 +3797,18 @@ document.addEventListener("keydown", event => {
     event.preventDefault();
     releaseWorkingInterval();
   }
-  else if (plain && key === "t") {
+  else if (
+    key === "t"
+    && (
+      plain
+      || (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey)
+      || (!event.shiftKey && !event.metaKey && event.altKey !== event.ctrlKey)
+    )
+  ) {
     event.preventDefault();
-    deformWorkingOrSelected();
+    if (event.shiftKey) stepDeformWeight(1);
+    else if (event.ctrlKey || event.altKey) stepDeformWeight(-1);
+    else deformWorkingOrSelected();
   }
   else if (plain && key === "f") {
     event.preventDefault();
@@ -3520,13 +3816,14 @@ document.addEventListener("keydown", event => {
   }
   else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && key === "p") {
     event.preventDefault();
-    openGuide("sections");
-    elements["section-label"]?.focus?.({ preventScroll: true });
+    saveCurrentIntervalAsSection(event, {
+      source: "interval",
+      useFormLabel: false
+    });
   }
   else if (plain && key === "p") {
     event.preventDefault();
-    openGuide("pins");
-    elements["pin-label"]?.focus?.({ preventScroll: true });
+    pinCurrent(event, { useFormLabel: false });
   }
   else if (shiftedSpatialKey("a") || (
     event.shiftKey

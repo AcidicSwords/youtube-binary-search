@@ -158,18 +158,23 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   }
   assert.equal((html.match(/id=["']tail-rate-select["']/g) || []).length, 1);
   assert.equal((html.match(/id=["']lead-rate-select["']/g) || []).length, 1);
-  assert.match(html, /id=["']tail-pane["'][\s\S]*id=["']player-tail["'][\s\S]*id=["']tail-rate-select["']/);
-  assert.match(html, /id=["']lead-pane["'][\s\S]*id=["']player-lead["'][\s\S]*id=["']lead-rate-select["']/);
+  assert.match(html, /id=["']tail-pane["'][\s\S]*id=["']tail-rate-select["'][\s\S]*id=["']player-tail["']/);
+  assert.match(html, /id=["']lead-pane["'][\s\S]*id=["']lead-rate-select["'][\s\S]*id=["']player-lead["']/);
   assert.doesNotMatch(fieldCss, /\.step-pane-action/, "Side players must not use a transparent overlay element.");
   assert.match(fieldCss, /\.side-player-surface iframe[\s\S]*pointer-events:\s*none/);
   assert.match(
     fieldCss,
-    /\.pane-field-controls\s*\{[\s\S]*--field-step-track:[\s\S]*grid-template-columns:\s*var\(--field-rate-track\)\s*var\(--field-offset-track\)\s*var\(--field-mode-track\)\s*var\(--field-step-track\)/
+    /\.pane-field-controls\s*\{[\s\S]*display:\s*flex[\s\S]*justify-content:\s*center/
   );
   assert.match(
-    fieldCss,
-    /\.tail-field-controls\s*\{[\s\S]*grid-template-columns:\s*var\(--field-step-track\)\s*var\(--field-mode-track\)\s*var\(--field-offset-track\)\s*var\(--field-rate-track\)/,
-    "Mirrored Tail/Lead controls must map equal functions to equal track sizes."
+    html,
+    /tail-field-settings[\s\S]*field-settings-popover[\s\S]*step-backward-seconds[\s\S]*tail-rate-select/,
+    "Intermittent Tail rate and offset controls must share one compact Tune disclosure."
+  );
+  assert.match(
+    html,
+    /lead-field-settings[\s\S]*field-settings-popover[\s\S]*lead-rate-select[\s\S]*step-forward-seconds/,
+    "Intermittent Lead rate and offset controls must share one compact Tune disclosure."
   );
   assert.doesNotMatch(field, /bindSideStepSurface/,
     "Step Field must expose geometry while the application owns the shared Step gesture.");

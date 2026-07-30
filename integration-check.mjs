@@ -69,10 +69,13 @@ for (const required of [
   "interval-fill",
   "field-span-fill",
   "section-preview-fill",
+  "deformation-field",
   "timeline-ruler",
   "section-lane",
   "pin-lane",
   "pin-cluster-menu",
+  "guide-toggle",
+  "operator-toggle",
   "current-marker",
   "cursor-marker",
   "refine-backward",
@@ -83,7 +86,8 @@ for (const required of [
   "step-forward",
   "release",
   "deform",
-  "deform-weight-select",
+  "deform-down",
+  "deform-up",
   "focus-toggle",
   "return-action",
   "step-size-settings",
@@ -133,10 +137,11 @@ assert.doesNotMatch(app, /from "\.\/traversal\.js"|from "\.\/structure\.js"/);
 
 assert.match(view, /setAttribute\("role", "menuitem"\)/);
 assert.match(view, /setAttribute\("aria-haspopup", "menu"\)/);
-assert.match(view, /dataset\.overwriteSection/);
+assert.doesNotMatch(view, /dataset\.overwriteSection|Overwrite/);
 assert.match(view, /dataset\.sectionWeight/);
 assert.match(view, /SECTION_WEIGHT_VALUES/);
 assert.match(view, /timeline-section-span/);
+assert.match(view, /function deformationInfluence[\s\S]*Math\.log2\(section\.weight\)[\s\S]*deformation-contours/);
 assert.doesNotMatch(view, /timeline-fold|foldContributors|sectionCollapse|sectionExpand/);
 
 assert.match(session, /export function localRefine/);
@@ -148,7 +153,7 @@ assert.match(session, /export function releaseInterval/);
 assert.match(session, /export function deformSection/);
 assert.match(session, /export function setGuideSectionWeight/);
 assert.match(session, /export function focusWorkingSection[\s\S]*FOCUS_KIND\.WORKING/);
-assert.match(session, /export function overwriteGuideSection[\s\S]*replaceSectionExtent/);
+assert.doesNotMatch(session, /overwriteGuideSection|replaceSectionExtent/);
 assert.match(session, /syncIntervalEndpointFrames[\s\S]*containExtent/);
 assert.match(session, /projectPlayback[\s\S]*translateNeighborhood[\s\S]*sourceInterval\?\.start[\s\S]*sourceInterval\?\.end/);
 assert.match(session, /completePlayback[\s\S]*projectPlayback/);
@@ -178,9 +183,25 @@ assert.match(app, /function wrapPlaybackRange[\s\S]*rebasePlaybackTransport\(tra
 assert.match(app, /createStepGestureController[\s\S]*bindStepPress/);
 assert.match(app, /function goToAdjacentPin[\s\S]*stepToPinSession/);
 assert.match(app, /function releaseWorkingInterval[\s\S]*releaseSessionInterval/);
-assert.match(app, /function deformWorkingOrSelected[\s\S]*deformSessionSection/);
+assert.match(app, /function applyDeformWeight[\s\S]*deformSessionSection/);
 assert.match(app, /function changeSectionWeight[\s\S]*setGuideSectionWeight/);
 assert.match(app, /function focusOrUnfocus[\s\S]*focusWorkingSection/);
+assert.match(
+  app,
+  /"section-lane"\]\.addEventListener\("click"[\s\S]*?selectSectionAsWorkingInterval/
+);
+assert.match(
+  app,
+  /function handleGuideClick[\s\S]*?const sectionGo[\s\S]*?selectSectionAsWorkingInterval\([\s\S]*?dataset\.sectionGo/
+);
+assert.match(
+  app,
+  /function applyGuideState[\s\S]*?command-workspace[\s\S]*?rail-collapsed/
+);
+assert.match(
+  app,
+  /key === "t"[\s\S]*?event\.altKey !== event\.ctrlKey[\s\S]*?stepDeformWeight\(-1\)/
+);
 
 assert.match(youtube, /place\(address, allowSeekAhead = true\)/);
 assert.match(youtube, /isYouTubeApiReady/);

@@ -112,11 +112,16 @@ Changing a Section weight:
 - preserves ordinary source order and direct reachability;
 - becomes spatially neutral at `1×`.
 
-The gradient is the visible expression of the same weight, not a second value:
+The deformation display is a projection of the same weight, not a second value:
 
-- compression converges inward below `1×`;
-- expansion opens outward above `1×`;
-- `1×` renders as a neutral span.
+- each non-neutral Section contributes a soft influence centered at its
+  projected midpoint and fading beyond its endpoints;
+- hue records sign: compression below `1×` and expansion above `1×`;
+- peak strength records the magnitude of the Section’s signed log weight;
+- overlapping influences add in log space, the visual counterpart of
+  multiplicative weight composition;
+- projected source-time contours retain the exact metric and make local density
+  visible independently of the softened atmosphere.
 
 ## 5. Operator laws
 
@@ -135,11 +140,12 @@ Positive Timeline Space guarantees a valid spatial midpoint for every positive s
 
 ### Local Refine (`Shift+Refine`)
 
-Local Refine uses the same directional midpoint and child-frame calculation, then applies midpoint membership:
-
-- a target inside the Working Interval shortens toward the opposite endpoint;
-- exact coincidence with that endpoint collapses the Working Interval;
-- a target outside replaces it with the complete Current-to-target movement.
+Local Refine uses the same directional midpoint and child-frame calculation,
+then records exactly the new pre-movement Current-to-target traversal. It never
+inherits the previous Working Interval departure. Therefore, when the midpoint
+lies inside an existing Working Interval, Local Refine preserves the
+complementary half from Current to that midpoint; plain Refine preserves the
+established anchor instead.
 
 Example on an unweighted normalized Range:
 
@@ -168,6 +174,19 @@ Hold, Stretch, and Section weight editing cannot write Step Reach.
 
 Pin traversal applies Step’s interval-anchor law to the next source-ordered retained Pin. All Pins remain visible operands. Range Start and Range End are synthetic stops and are deduplicated by real Pins at the same Address.
 
+### Pin selection and Section ownership
+
+Pin selection is derived from the Working Interval. A Pin coincident with its
+Start or End is selected automatically; when both bounds coincide with Pins,
+both endpoints are selected. Clicking a Pin moves Current to its Address and
+does not create or alter the Working Interval. Selection changes no Pin identity.
+
+Sections move together at a bound only when they reference the same Pin ID.
+Unlinking one Section endpoint creates an independent coincident Pin and rewires
+only that edge; Relink restores its original shared Pin, including after the
+independent endpoint has moved. Unlink preserves the source Address and Section
+weight; Relink adopts the shared Pin's current Address.
+
 ### Reopen
 
 Reopen restores Resolution endpoints to Range around unchanged Current and preserves the Working Interval.
@@ -190,7 +209,24 @@ Deform requires a positive-duration Working Interval or a selected Section and a
 - preserves the Working Interval;
 - makes `1×` neutral without deleting the Section.
 
-Changing weight on the timeline or in Guide is the same Session transaction.
+Changing weight from the operator matrix or Guide uses the same Session transaction.
+
+The input grammar separates normalization from tuning:
+
+- plain `T` toggles a weighted Section to `1×` and restores its remembered
+  non-neutral factor when pressed again;
+- `Shift+T` moves one step up the canonical ladder;
+- `Alt+T` moves one step down the canonical ladder. The browser-reserved
+  `Ctrl+T` chord is not part of the web interface grammar.
+
+Timeline presentation renders all active Section factors as one continuous
+field. The atmosphere expresses sign, log magnitude, midpoint, and softly
+diluted span without claiming an extra boundary; the same weight is visually
+more concentrated over a narrow Section and more diffuse over a broad Section.
+Contour placement expresses the exact composed density. Presentation orders
+Pins above the weighted track and source ruler, with the Section relationship
+tree below. Individual Sections remain thin selectable Start/midpoint/End wires
+rather than weight bars; dotted relations are presentation only.
 
 ### Focus / Unfocus
 
@@ -244,7 +280,7 @@ RESOLVE THE WORKING INTERVAL
 Release · Deform · Focus
 
 RETAIN AND EDIT TOPOLOGY
-Pin · Save Section · Join · Move · Overwrite · Rename · Delete
+Pin · Save Section · Join · Move · Rename · Delete
 
 RESTORE HISTORY
 Undo · Redo
@@ -382,7 +418,6 @@ Move Pin          update every referencing Section
 Move Section      translate only its two endpoint Pins
 Delete Section    remove Section and unshared untitled endpoint Pins
 Delete Pin        dissolve all references and clean up orphan endpoints
-Overwrite         replace one Section extent from the Working Interval
 ```
 
 Arbitrary overlap, nesting, shared endpoints, and coincident extents are valid. The effective density is derived from independent Section factors; no stored hierarchy or priority is introduced.
@@ -468,7 +503,7 @@ The registry must include:
 - Playback;
 - Context and Context acceptance;
 - Stretch and Hold;
-- Pin, Save Section, Join, Weight, Move Pin, Move Section, Overwrite, Rename, Delete;
+- Pin, Save Section, Join, Weight, Move Pin, Move Section, Rename, Delete;
 - Alt Carry;
 - Undo and Redo.
 

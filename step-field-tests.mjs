@@ -102,7 +102,7 @@ assert.equal(resolveFieldPhase({
 
   for (const id of [
     "step-field", "player-tail", "player", "player-lead", "center-transport-surface",
-    "tail-player-surface", "lead-player-surface", "tail-step-button", "lead-step-button",
+    "tail-player-surface", "lead-player-surface",
     "tail-field-toggle", "lead-field-toggle", "field-both-toggle",
     "tail-rate-select", "lead-rate-select",
     "step-backward-seconds", "step-forward-seconds",
@@ -158,10 +158,12 @@ assert.equal(resolveFieldPhase({
     "YouTube side iframes must not be covered by a transparent action element.");
   assert.match(html, /id="tail-player-surface"[\s\S]*role="button"[\s\S]*id="player-tail"/);
   assert.match(html, /id="lead-player-surface"[\s\S]*role="button"[\s\S]*id="player-lead"/);
-  assert.match(html, /id="player-tail"[\s\S]*id="tail-step-button"[\s\S]*id="tail-field-toggle"[\s\S]*id="step-backward-seconds"[\s\S]*id="tail-rate-select"/,
-    "Tail controls must mirror Lead from the outside edge toward Center.");
-  assert.match(html, /id="player-lead"[\s\S]*id="lead-rate-select"[\s\S]*id="step-forward-seconds"[\s\S]*id="lead-field-toggle"[\s\S]*id="lead-step-button"/,
-    "Lead controls must mirror Tail from Center toward the outside edge.");
+  assert.match(html, /id="step-backward-seconds"[\s\S]*id="tail-rate-select"[\s\S]*id="player-tail"[\s\S]*id="tail-field-toggle"/,
+    "Tail keeps intermittent Tune in its identity bar and only Hold/Stretch beneath its Step surface.");
+  assert.match(html, /id="lead-rate-select"[\s\S]*id="step-forward-seconds"[\s\S]*id="player-lead"[\s\S]*id="lead-field-toggle"/,
+    "Lead keeps intermittent Tune in its identity bar and only Hold/Stretch beneath its Step surface.");
+  assert.doesNotMatch(html, /id="(?:tail|lead)-step-button"/,
+    "The side video surfaces already own Step; duplicate footer buttons must not return.");
   assert.match(css, /\.side-player-surface iframe[\s\S]*pointer-events:\s*none/,
     "Side video surfaces must route clicks to semantic Step instead of independently toggling muted iframes.");
   assert.match(html, /id="center-transport-surface"/,

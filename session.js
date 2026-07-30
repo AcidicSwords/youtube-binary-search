@@ -7,7 +7,6 @@ import {
   containExtent,
   createRoot,
   getTargets,
-  classifyRefineRelation,
   classifyRetainedRefineRelation,
   refineNeighborhood,
   seedNeighborhoodFromMovement,
@@ -32,12 +31,14 @@ import {
   setSectionWeight,
   movePin,
   translateSection,
+  createSection,
   createSectionFromTimes,
   findDuplicateSection,
   renameSection,
-  replaceSectionExtent,
   deleteSection,
   resolveSection,
+  unlinkSectionEndpoint,
+  linkSectionEndpoint,
   validateGuide
 } from "./guide.js";
 import { projectionForModel } from "./timeline-projection.js";
@@ -709,36 +710,42 @@ export function goToGuidePin(session, pinId, options = {}) {
   });
 }
 
-export function goToGuideSection(session, sectionId, options = {}) {
-  const section = resolveSection(session.model.guide, sectionId);
-  if (!section) return unchanged(session, "missing-section");
+export function workFromExtent(session, extent, options = {}) {
+  const start = Number(extent?.start);
+  const end = Number(extent?.end);
+  if (
+    !Number.isFinite(start)
+    || !Number.isFinite(end)
+    || end <= start + EPSILON
+  ) return unchanged(session, "invalid-extent");
+  const midpoint = (start + end) / 2;
   const label = options.label || "Select Section";
   return commit(session, label, model => {
     const current = model.resolution.C;
     const operator = options.operator || "section";
     const alreadySelected = (
-      Math.abs(model.resolution.L - section.start) <= EPSILON
-      && Math.abs(model.resolution.C - section.midpoint) <= EPSILON
-      && Math.abs(model.resolution.R - section.end) <= EPSILON
-      && Math.abs((model.interval?.start ?? NaN) - section.start) <= EPSILON
-      && Math.abs((model.interval?.end ?? NaN) - section.end) <= EPSILON
+      Math.abs(model.resolution.L - start) <= EPSILON
+      && Math.abs(model.resolution.C - midpoint) <= EPSILON
+      && Math.abs(model.resolution.R - end) <= EPSILON
+      && Math.abs((model.interval?.start ?? NaN) - start) <= EPSILON
+      && Math.abs((model.interval?.end ?? NaN) - end) <= EPSILON
       && model.interval?.operator === operator
     );
     if (alreadySelected) return { changed: false, reason: "selected-section" };
 
-    const startOpening = openAddress(model, section.start);
-    const endOpening = openAddress(model, section.end);
-    model.resolution = createRoot(section.start, section.midpoint, section.end);
+    const startOpening = openAddress(model, start);
+    const endOpening = openAddress(model, end);
+    model.resolution = createRoot(start, midpoint, end);
     model.resolutionBasis = isRangeNeighborhood(model.resolution, model.range)
       ? RESOLUTION_BASIS.RANGE
       : RESOLUTION_BASIS.MOVEMENT;
     model.interval = createInterval(
-      section.start,
-      section.midpoint,
+      start,
+      midpoint,
       operator,
       options.medium || "retained",
       {
-        extent: section,
+        extent: { start, end },
         activeSide: "end"
       }
     );
@@ -746,9 +753,9 @@ export function goToGuideSection(session, sectionId, options = {}) {
     return {
       changed: true,
       departure: current,
-      destination: section.midpoint,
-      current: section.midpoint,
-      place: section.midpoint,
+      destination: midpoint,
+      current: midpoint,
+      place: midpoint,
       interval: model.interval,
       rangeChanged: startOpening.changed || endOpening.changed,
       leftFocus: startOpening.leftFocus || endOpening.leftFocus,
@@ -757,13 +764,14 @@ export function goToGuideSection(session, sectionId, options = {}) {
   }, options);
 }
 
-function refineIntervalRelation(model, target) {
-  const current = model.resolution.C;
-  const interval = model.interval;
-  const relation = classifyRefineRelation(interval, current, target);
-  return relation === "shorten"
-    ? { departure: interval.departure, relation: "shorten" }
-    : { departure: current, relation: "replace" };
+export function goToGuideSection(session, sectionId, options = {}) {
+  const section = resolveSection(session.model.guide, sectionId);
+  if (!section) return unchanged(session, "missing-section");
+  return workFromExtent(session, section, {
+    ...options,
+    label: options.label || "Select Section",
+    operator: options.operator || "section"
+  });
 }
 
 function retainedRefineIntervalRelation(model, target) {
@@ -779,13 +787,13 @@ export function localRefine(session, direction) {
   const target = getTargets(session.model.resolution, metric)[direction];
   if (target === null) return unchanged(session, "no-destination");
   const backward = direction === "backward";
-  const intervalRelation = refineIntervalRelation(session.model, target);
+  const current = session.model.resolution.C;
   return goTo(session, target, {
     mode: "refine",
     operator: backward ? "localRefineBackward" : "localRefineForward",
     label: backward ? "Local Refine Backward" : "Local Refine Forward",
-    intervalDeparture: intervalRelation.departure,
-    refineRelation: intervalRelation.relation
+    intervalDeparture: current,
+    refineRelation: "draw"
   });
 }
 
@@ -1309,8 +1317,10 @@ export function saveExtentAsSection(session, extent, label, provenance = "extent
   ) return unchanged(session, "no-extent");
   const text = String(label || "").trim();
 
-  const startPin = findPinAt(session.model.guide, extent.start);
-  const endPin = findPinAt(session.model.guide, extent.end);
+  const selectedStartPin = getPin(session.model.guide, extent.startPinId);
+  const selectedEndPin = getPin(session.model.guide, extent.endPinId);
+  const startPin = selectedStartPin || findPinAt(session.model.guide, extent.start);
+  const endPin = selectedEndPin || findPinAt(session.model.guide, extent.end);
   const duplicate = startPin && endPin
     ? findDuplicateSection(
       session.model.guide,
@@ -1326,12 +1336,19 @@ export function saveExtentAsSection(session, extent, label, provenance = "extent
   }
 
   return commit(session, "Save Section", draft => {
-    const value = createSectionFromTimes(
-      draft.guide,
-      extent.start,
-      extent.end,
-      { label: text, provenance }
-    );
+    const value = selectedStartPin && selectedEndPin
+      ? createSection(
+          draft.guide,
+          selectedStartPin.id,
+          selectedEndPin.id,
+          { label: text, provenance }
+        )
+      : createSectionFromTimes(
+          draft.guide,
+          extent.start,
+          extent.end,
+          { label: text, provenance }
+        );
     return { changed: true, guideChanged: true, value };
   }, { guideEdit: true });
 }
@@ -1344,68 +1361,6 @@ export function saveIntervalAsSection(session, label) {
     label,
     `interval:${session.model.interval.operator}`
   );
-}
-
-export function overwriteGuideSection(session, sectionId) {
-  const section = resolveSection(session.model.guide, sectionId);
-  const interval = session.model.interval;
-  if (!section) return unchanged(session, "missing-section");
-  if (!interval) return unchanged(session, "no-interval");
-
-  const sameExtent = Math.abs(section.start - interval.start) <= EPSILON
-    && Math.abs(section.end - interval.end) <= EPSILON;
-  if (sameExtent) return unchanged(session, "unchanged-section", { value: section });
-
-  const startPin = findPinAt(session.model.guide, interval.start);
-  const endPin = findPinAt(session.model.guide, interval.end);
-  if (
-    startPin
-    && endPin
-    && findDuplicateSection(
-      session.model.guide,
-      startPin.id,
-      endPin.id,
-      section.label,
-      section.id
-    )
-  ) {
-    return unchanged(session, "duplicate-section", { value: section });
-  }
-
-  return commit(session, `Overwrite “${sectionDisplayName(section)}”`, draft => {
-    const value = replaceSectionExtent(
-      draft.guide,
-      sectionId,
-      draft.interval.start,
-      draft.interval.end,
-      { provenance: `working:${draft.interval.operator}` }
-    );
-    if (!validateGuide(draft.guide, draft.duration)) {
-      return { changed: false, reason: "invalid-guide-geometry" };
-    }
-    const focusedTarget = focusKind(draft.focus) === FOCUS_KIND.SAVED
-      && draft.focus.sectionId === sectionId;
-    let moved = false;
-    let intervalCleared = false;
-
-    if (focusedTarget) {
-      const departure = draft.resolution.C;
-      draft.range = { start: value.start, end: value.end };
-      const current = clamp(departure, value.start, value.end);
-      draft.resolution = createRoot(value.start, current, value.end);
-      draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
-      moved = Math.abs(current - departure) > EPSILON;
-      intervalCleared = clearIntervalOutsideRange(draft);
-    }
-
-    return {
-      changed: true,
-      guideChanged: true,
-      value,
-      ...(focusedTarget ? { rangeChanged: true, intervalCleared } : {}),
-      ...(moved ? { place: draft.resolution.C } : {})
-    };
-  }, { guideEdit: true });
 }
 
 export function renameGuidePin(session, pinId, label) {
@@ -1489,6 +1444,37 @@ function rebaseFocusedGuideSection(model) {
   };
 }
 
+function rebaseWorkingIntervalBounds(model, movements) {
+  const interval = model.interval;
+  if (!interval) return { changed: false, cleared: false };
+  const destinationFor = bound => movements.find(
+    movement => Math.abs(bound - movement.source) <= EPSILON
+  )?.destination;
+  const movedStart = destinationFor(interval.start);
+  const movedEnd = destinationFor(interval.end);
+  if (!Number.isFinite(movedStart) && !Number.isFinite(movedEnd)) {
+    return { changed: false, cleared: false };
+  }
+
+  let start = Number.isFinite(movedStart) ? movedStart : interval.start;
+  let end = Number.isFinite(movedEnd) ? movedEnd : interval.end;
+  if (Math.abs(end - start) <= EPSILON) {
+    model.interval = null;
+    return { changed: true, cleared: true };
+  }
+  if (start > end) {
+    [start, end] = [end, start];
+    [interval.startFrame, interval.endFrame] = [
+      interval.endFrame,
+      interval.startFrame
+    ];
+    interval.activeSide = interval.activeSide === "start" ? "end" : "start";
+  }
+  interval.start = start;
+  interval.end = end;
+  return { changed: true, cleared: false };
+}
+
 export function setGuideSectionWeight(session, sectionId, weight) {
   const section = resolveSection(session.model.guide, sectionId);
   if (!section) return unchanged(session, "missing-section");
@@ -1509,20 +1495,30 @@ export function setGuideSectionWeight(session, sectionId, weight) {
 }
 
 export function moveGuidePin(session, pinId, address, options = {}) {
-  if (!getPin(session.model.guide, pinId)) return unchanged(session, "missing-pin");
+  const sourcePin = getPin(session.model.guide, pinId);
+  if (!sourcePin) return unchanged(session, "missing-pin");
   const perform = draft => {
+    const source = getPin(draft.guide, pinId)?.t;
     const value = movePin(draft.guide, pinId, address, draft.duration);
     if (!value.changed) return value;
     if (!validateGuide(draft.guide, draft.duration)) {
       return { changed: false, reason: "invalid-guide-geometry" };
     }
+    const interval = rebaseWorkingIntervalBounds(
+      draft,
+      [{ source, destination: value.destination }]
+    );
     const focus = rebaseFocusedGuideSection(draft);
+    if (draft.interval && interval.changed && !focus.intervalCleared) {
+      syncIntervalEndpointFrames(draft);
+    }
     return {
       changed: true,
       guideChanged: true,
       value,
       rangeChanged: focus.rangeChanged,
-      intervalCleared: focus.intervalCleared,
+      intervalChanged: interval.changed,
+      intervalCleared: interval.cleared || focus.intervalCleared,
       ...(focus.moved ? { place: draft.resolution.C } : {})
     };
   };
@@ -1535,6 +1531,7 @@ export function moveGuideSection(session, sectionId, requestedDelta, options = {
   const section = resolveSection(session.model.guide, sectionId);
   if (!section) return unchanged(session, "missing-section");
   const perform = draft => {
+    const source = resolveSection(draft.guide, sectionId);
     const value = translateSection(
       draft.guide,
       sectionId,
@@ -1545,13 +1542,21 @@ export function moveGuideSection(session, sectionId, requestedDelta, options = {
     if (!validateGuide(draft.guide, draft.duration)) {
       return { changed: false, reason: "invalid-guide-geometry" };
     }
+    const interval = rebaseWorkingIntervalBounds(draft, [
+      { source: source.start, destination: value.section.start },
+      { source: source.end, destination: value.section.end }
+    ]);
     const focus = rebaseFocusedGuideSection(draft);
+    if (draft.interval && interval.changed && !focus.intervalCleared) {
+      syncIntervalEndpointFrames(draft);
+    }
     return {
       changed: true,
       guideChanged: true,
       value,
       rangeChanged: focus.rangeChanged,
-      intervalCleared: focus.intervalCleared,
+      intervalChanged: interval.changed,
+      intervalCleared: interval.cleared || focus.intervalCleared,
       ...(focus.moved ? { place: draft.resolution.C } : {})
     };
   };
@@ -1563,6 +1568,35 @@ export function moveGuideSection(session, sectionId, requestedDelta, options = {
       perform,
       { guideEdit: true }
     );
+}
+
+function changeSectionEndpointLink(session, sectionId, role, linked) {
+  const section = resolveSection(session.model.guide, sectionId);
+  if (!section) return unchanged(session, "missing-section");
+  const label = `${linked ? "Relink" : "Unlink"} ${role === "start" ? "Start" : "End"} Pin`;
+  return commit(session, label, draft => {
+    const value = linked
+      ? linkSectionEndpoint(draft.guide, sectionId, role)
+      : unlinkSectionEndpoint(draft.guide, sectionId, role);
+    if (!value.changed) return value;
+    const focus = rebaseFocusedGuideSection(draft);
+    return {
+      changed: true,
+      guideChanged: true,
+      value,
+      rangeChanged: focus.rangeChanged,
+      intervalCleared: focus.intervalCleared,
+      ...(focus.moved ? { place: draft.resolution.C } : {})
+    };
+  }, { guideEdit: true });
+}
+
+export function unlinkGuideSectionEndpoint(session, sectionId, role) {
+  return changeSectionEndpointLink(session, sectionId, role, false);
+}
+
+export function linkGuideSectionEndpoint(session, sectionId, role) {
+  return changeSectionEndpointLink(session, sectionId, role, true);
 }
 
 export function deleteGuideSection(session, sectionId) {

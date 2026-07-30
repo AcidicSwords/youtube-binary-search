@@ -20,18 +20,18 @@ byId.get("timeline").dispatch("click", {
   clientX: 500
 });
 await flush();
-assert.equal(currentText(), "Current 0:50.000");
+assert.equal(currentText(), "Current 0:50");
 
 const forward = byId.get("step-forward");
 forward.dispatch("pointerdown", { button: 0, pointerId: 7 });
-assert.equal(currentText(), "Current 1:00.000", "Pointer press must Step immediately.");
+assert.equal(currentText(), "Current 1:00", "Pointer press must Step immediately.");
 assert.equal(forward.classList.contains("is-step-held"), true);
 
 await env.delay(375);
 await flush();
 assert.equal(
   currentText(),
-  "Current 1:20.000",
+  "Current 1:20",
   "A held button must repeat on the application cadence rather than browser click timing."
 );
 assert.equal(
@@ -69,7 +69,7 @@ byId.get("return-action").click();
 await flush();
 assert.equal(
   currentText(),
-  "Current 0:50.000",
+  "Current 0:50",
   "Undo must revert the entire held-button Step gesture in one operation."
 );
 assert.equal(env.center().currentTime, 50);
@@ -77,14 +77,14 @@ assert.equal(env.center().currentTime, 50);
 forward.dispatch("keydown", { key: "Enter", code: "Enter" });
 assert.equal(
   currentText(),
-  "Current 1:00.000",
+  "Current 1:00",
   "Enter on a focused Step control must Step immediately on keyboard press."
 );
 await env.delay(375);
 await flush();
 assert.equal(
   currentText(),
-  "Current 1:20.000",
+  "Current 1:20",
   "Holding Enter on a focused Step control must use the same application cadence."
 );
 forward.dispatch("keyup", { key: "Enter", code: "Enter" });
@@ -93,7 +93,7 @@ byId.get("return-action").click();
 await flush();
 assert.equal(
   currentText(),
-  "Current 0:50.000",
+  "Current 0:50",
   "A held keyboard control press must remain one Undo transaction."
 );
 
@@ -102,14 +102,14 @@ for (const pointerId of [8, 9]) {
   forward.dispatch("pointerup", { button: 0, pointerId });
   if (pointerId === 8) await env.delay(180);
 }
-assert.equal(currentText(), "Current 1:10.000");
+assert.equal(currentText(), "Current 1:10");
 await env.delay(300);
 await flush();
 byId.get("return-action").click();
 await flush();
 assert.equal(
   currentText(),
-  "Current 0:50.000",
+  "Current 0:50",
   "Undo must also revert a rapid sequence of repeated Step taps."
 );
 

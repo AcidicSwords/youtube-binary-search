@@ -115,6 +115,112 @@ export function sectionsForPin(guide, pinId) {
   );
 }
 
+function sectionEndpointKey(role) {
+  return role === "start" ? "startPinId" : role === "end" ? "endPinId" : null;
+}
+
+export function coincidentPins(guide, pinId, epsilon = EPSILON) {
+  const pin = getPin(guide, pinId);
+  if (!pin) return [];
+  return sortPins(guide.pins).filter(candidate =>
+    candidate.id !== pin.id
+    && Math.abs(candidate.t - pin.t) <= epsilon
+  );
+}
+
+export function unlinkSectionEndpoint(guide, sectionId, role) {
+  const section = guide.sections.find(item => item.id === sectionId);
+  const key = sectionEndpointKey(role);
+  if (!section || !key) {
+    return {
+      changed: false,
+      reason: section ? "invalid-endpoint-role" : "missing-section"
+    };
+  }
+  const source = getPin(guide, section[key]);
+  if (!source) return { changed: false, reason: "missing-pin" };
+  if (sectionsForPin(guide, source.id).length <= 1) {
+    return { changed: false, reason: "unshared-pin" };
+  }
+
+  const changedAt = now();
+  const pin = {
+    id: makeId("pin"),
+    videoId: guide.videoId,
+    t: source.t,
+    label: "",
+    kind: PIN_KIND.ENDPOINT,
+    provenance: `unlink:${sectionId}:${role}:${source.id}`,
+    createdAt: changedAt,
+    updatedAt: changedAt
+  };
+  guide.pins.push(pin);
+  guide.pins = sortPins(guide.pins);
+  section[key] = pin.id;
+  section.updatedAt = changedAt;
+  guide.updatedAt = changedAt;
+  return {
+    changed: true,
+    pin,
+    section: resolveSection(guide, section),
+    previousPinId: source.id
+  };
+}
+
+export function linkSectionEndpoint(guide, sectionId, role) {
+  const section = guide.sections.find(item => item.id === sectionId);
+  const key = sectionEndpointKey(role);
+  if (!section || !key) {
+    return {
+      changed: false,
+      reason: section ? "invalid-endpoint-role" : "missing-section"
+    };
+  }
+  const source = getPin(guide, section[key]);
+  if (!source) return { changed: false, reason: "missing-pin" };
+  const provenance = String(source.provenance || "").split(":");
+  const originalPinId = provenance[0] === "unlink"
+    && provenance[1] === sectionId
+    && provenance[2] === role
+    ? provenance[3]
+    : null;
+  const original = originalPinId ? getPin(guide, originalPinId) : null;
+  const target = original || coincidentPins(guide, source.id)
+    .sort((first, second) =>
+      sectionsForPin(guide, second.id).length
+      - sectionsForPin(guide, first.id).length
+      || first.createdAt - second.createdAt
+    )[0];
+  if (!target) return { changed: false, reason: "no-coincident-pin" };
+
+  const nextStartPinId = role === "start" ? target.id : section.startPinId;
+  const nextEndPinId = role === "end" ? target.id : section.endPinId;
+  const nextStart = getPin(guide, nextStartPinId);
+  const nextEnd = getPin(guide, nextEndPinId);
+  if (!nextStart || !nextEnd || nextEnd.t <= nextStart.t + EPSILON) {
+    return { changed: false, reason: "invalid-link-geometry" };
+  }
+  if (findDuplicateSection(
+    guide,
+    nextStartPinId,
+    nextEndPinId,
+    section.label,
+    section.id
+  )) return { changed: false, reason: "duplicate-section" };
+
+  const changedAt = now();
+  section[key] = target.id;
+  section.updatedAt = changedAt;
+  guide.updatedAt = changedAt;
+  removeOrphanEndpoint(guide, source.id);
+  return {
+    changed: true,
+    pin: target,
+    section: resolveSection(guide, section),
+    previousPinId: source.id
+  };
+}
+
 export function visiblePins(guide) {
   return sortPins(guide.pins);
 }
@@ -670,6 +776,7 @@ export function sanitizeGuide(input, videoId, duration) {
   const source = input && Array.isArray(input.pins) && Array.isArray(input.sections)
     ? input
     : normalizeGuide(input, videoId);
+  const preserveIndependentCoincidentPins = Number(source?.version) >= 7;
   const guide = createGuide(videoId);
   const idMap = new Map();
   const usedIds = new Set();
@@ -685,7 +792,9 @@ export function sanitizeGuide(input, videoId, duration) {
       || !Object.values(PIN_KIND).includes(sourcePin.kind)
     ) continue;
 
-    const coincident = findPinAt(guide, address);
+    const coincident = preserveIndependentCoincidentPins
+      ? null
+      : findPinAt(guide, address);
     if (coincident) {
       idMap.set(sourcePin.id, coincident.id);
       if (sourcePin.kind === PIN_KIND.EXPLICIT) coincident.kind = PIN_KIND.EXPLICIT;

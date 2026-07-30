@@ -27,7 +27,7 @@ center.deferNextPlacement = true;
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 500 });
 await flush();
 
-assert.equal(currentText(), "Current 0:50.000", "Traversal must commit semantic Current before observation begins.");
+assert.equal(currentText(), "Current 0:50", "Traversal must commit semantic Current before observation begins.");
 assert.equal(center.pendingPlacement, 47.5, "Five-second Context must begin half its duration before Current.");
 assert.equal(center.currentTime, 0, "A delayed iframe may temporarily leave physical Cursor behind semantic Current.");
 assert.equal(center.state, 1, "Automatic Context must play Center.");
@@ -50,7 +50,7 @@ await poll();
 await flush();
 assert.equal(center.currentTime, 50);
 assert.equal(center.state, 2);
-assert.equal(currentText(), "Current 0:50.000");
+assert.equal(currentText(), "Current 0:50");
 assert.equal(byId.get("cursor-marker").hidden, true);
 
 // Held Step owns its repeat cadence instead of trusting browser key-repeat.
@@ -61,12 +61,12 @@ dispatchDocument("keydown", { key: "ArrowRight", code: "ArrowRight" });
 for (let index = 0; index < 5; index += 1) {
   dispatchDocument("keydown", { key: "ArrowRight", code: "ArrowRight", repeat: true });
 }
-assert.equal(currentText(), "Current 1:00.000");
-assert.match(byId.get("section-window").textContent, /0:00\.000–1:00\.000/);
+assert.equal(currentText(), "Current 1:00");
+assert.match(byId.get("section-window").textContent, /0:00–1:00/);
 await env.delay(375);
 await flush();
-assert.equal(currentText(), "Current 1:20.000");
-assert.match(byId.get("section-window").textContent, /0:00\.000–1:20\.000/);
+assert.equal(currentText(), "Current 1:20");
+assert.match(byId.get("section-window").textContent, /0:00–1:20/);
 assert.equal(
   center.commands.filter(command => command[0] === "play").length,
   playsBeforeHeldStep,
@@ -99,7 +99,7 @@ byId.get("return-action").click();
 await flush();
 assert.equal(
   currentText(),
-  "Current 0:50.000",
+  "Current 0:50",
   "Undo must batch the complete held-arrow gesture."
 );
 assert.equal(center.currentTime, 47.5);
@@ -108,11 +108,11 @@ assert.equal(center.state, 1);
 // A new traversal supersedes active Context without restoring the old anchor.
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 250 });
 await flush();
-assert.equal(currentText(), "Current 0:25.000");
+assert.equal(currentText(), "Current 0:25");
 assert.equal(center.currentTime, 22.5);
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 750 });
 await flush();
-assert.equal(currentText(), "Current 1:15.000");
+assert.equal(currentText(), "Current 1:15");
 assert.equal(center.currentTime, 72.5, "Replacement Context must begin half a window before the new destination.");
 assert.equal(center.state, 1);
 
@@ -120,12 +120,12 @@ assert.equal(center.state, 1);
 // commits the Step immediately, then starts a replacement Context after Step
 // coalescing completes.
 byId.get("step-forward").click();
-assert.equal(currentText(), "Current 1:25.000");
+assert.equal(currentText(), "Current 1:25");
 await env.delay(300);
 await flush();
 assert.equal(center.currentTime, 82.5);
 assert.equal(center.state, 1);
-assert.equal(currentText(), "Current 1:25.000");
+assert.equal(currentText(), "Current 1:25");
 
 // Context accepts custom numeric durations; presets are suggestions rather than
 // the complete domain. Turning it off during observation restores Center once.
@@ -146,7 +146,7 @@ assert.equal(byId.get("context-setting-value").textContent, "Off");
 const playsBeforeOffTraversal = center.commands.filter(command => command[0] === "play").length;
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 500 });
 await flush();
-assert.equal(currentText(), "Current 0:50.000");
+assert.equal(currentText(), "Current 0:50");
 assert.equal(center.currentTime, 50);
 assert.equal(center.state, 2);
 assert.equal(
@@ -159,7 +159,7 @@ assert.equal(
 // semantic state rather than any transient Context boundary.
 byId.get("return-action").click();
 await flush();
-assert.equal(currentText(), "Current 1:25.000");
+assert.equal(currentText(), "Current 1:25");
 assert.equal(center.currentTime, 85);
 
 console.log("Context smoke passed: automatic post-traversal observation, held-key Step deferral, delayed placement, Field suspension, replacement traversal, Step during Context, Off, and Undo isolation.");

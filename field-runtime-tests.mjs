@@ -235,6 +235,62 @@ function makeHarness({
   const h = makeHarness();
   try {
     h.controller.tick();
+    assert.equal(
+      h.controller.previewExtent({
+        kind: "section",
+        start: 20,
+        center: 50,
+        end: 90
+      }),
+      true
+    );
+    assert.equal(h.tail().time, 20, "Section preview must put Tail on the Start Pin.");
+    assert.equal(h.lead().time, 90, "Section preview must put Lead on the End Pin.");
+    assert.equal(h.elements.get("center-meta").textContent, "50");
+    assert.equal(h.elements.get("tail-meta").textContent, "20");
+    assert.equal(h.elements.get("lead-meta").textContent, "90");
+    assert.equal(h.elements.get("field-transport-state").textContent, "Section preview");
+    assert.equal(h.elements.get("field-span-label").textContent, "20–90");
+
+    assert.doesNotThrow(() => {
+      h.controller.previewExtent({
+        kind: "section",
+        start: 50,
+        center: 50,
+        end: 90
+      });
+    }, "A Section preview may collapse onto one endpoint during direct manipulation.");
+    assert.equal(h.tail().time, 50, "A collapsed Start preview must keep Tail at Center.");
+    assert.equal(h.lead().time, 90, "A collapsed Start preview must preserve Lead.");
+
+    assert.doesNotThrow(() => {
+      h.controller.previewExtent({
+        kind: "section",
+        start: 50,
+        center: 50,
+        end: 50
+      });
+    }, "A momentarily zero-width Section preview must remain renderable.");
+    assert.equal(h.tail().time, 50);
+    assert.equal(h.lead().time, 50);
+
+    h.controller.clearPreview();
+    assert.equal(h.tail().time, 40, "Ending preview must restore the held Tail relation.");
+    assert.equal(h.lead().time, 60, "Ending preview must restore the held Lead relation.");
+
+    h.controller.previewExtent({ kind: "pin", center: 5 });
+    assert.equal(h.tail().time, 0, "Pin preview Field must clamp Tail at Range Start.");
+    assert.equal(h.lead().time, 15, "Pin preview Field must preserve configured Lead spacing.");
+    assert.equal(h.elements.get("field-transport-state").textContent, "Pin preview");
+  } finally {
+    h.restore();
+  }
+}
+
+{
+  const h = makeHarness();
+  try {
+    h.controller.tick();
     h.snapshot = {
       ...h.snapshot,
       current: 0,
@@ -302,4 +358,4 @@ function makeHarness({
   }
 }
 
-console.log("Field runtime tests passed: decoded paused frames, fresh refold/stretch, rate confirmation, Hold isolation, exact pause, whole-Field Step geometry, unsupported-rate fallback, and boundary recovery.");
+console.log("Field runtime tests passed: decoded paused frames, fresh refold/stretch, rate confirmation, Hold isolation, exact pause, whole-Field Step geometry, retained-object drag previews, unsupported-rate fallback, and boundary recovery.");
