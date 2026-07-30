@@ -99,7 +99,7 @@ assert.match(
   /function rangeLoops\(\)[\s\S]*isProperRange\(activeRange\(\), model\(\)\.duration\)/,
   "Every proper Range must be the stable playback loop operand."
 );
-assert.match(app, /function wrapPlaybackRange\([\s\S]*rebasePlaybackTransport\(transport\)[\s\S]*placePlayer\(range\.start\)[\s\S]*resumeAt[\s\S]*player\.play\(\)/,
+assert.match(app, /function wrapPlaybackRange\([\s\S]*rebasePlaybackTransport\(transport,\s*range\.start\)[\s\S]*placePlayer\(range\.start\)[\s\S]*resumeAt[\s\S]*player\.play\(\)/,
   "Range wrap must rebase the Field without a Session transaction.");
 assert.doesNotMatch(app, /createLoopTransport|TRANSPORT_KIND\.LOOP|data-loop-section/);
 assert.doesNotMatch(
@@ -117,15 +117,12 @@ assert.match(
 );
 assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*side\.offset = 0[\s\S]*requestRate\(side, 1, true\)[\s\S]*(?:adapter\?\.place|adapter\?\.cue)[\s\S]*side\.adapter\?\.play/,
   "Every running Stretch must refold to Center at 1× before future divergence.");
-assert.match(fieldSource, /function hold\(role, \{ record = true \} = \{\}\)[\s\S]*onHoldOffsets/,
-  "Holding mid-stretch may retain the measured physical Field relation.");
-assert.match(app, /onHoldOffsets: patch => \{[\s\S]*state\.fieldOffsets = normalizeStepReach/,
-  "Hold must update only physical Field offsets.");
-assert.doesNotMatch(
-  app.match(/onHoldOffsets: patch => \{[\s\S]*?\n    \},\n    onChange:/)?.[0] || "",
-  /commitStepReach|setSessionStepReach/,
-  "Hold must never overwrite semantic Step size."
-);
+assert.doesNotMatch(fieldSource, /onHoldOffsets/,
+  "Hold and Stretch must never persist a measured runtime offset.");
+assert.doesNotMatch(app, /onHoldOffsets:/,
+  "The application must not expose a Hold-to-configuration write path.");
+assert.match(app, /function changeFieldOffset[\s\S]*state\.fieldOffsets = normalizeStepReach/,
+  "Only explicit Offset input changes may update configured Field offsets.");
 assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*side\.adapter\?\.play/,
   "Side playback must prime at 1× inside the same Stretch transition.");
 assert.match(fieldSource, /function driveSide\(role, center, centerDelta, snapshot, centerRunning\)[\s\S]*requestStretchRate\(side\)/,

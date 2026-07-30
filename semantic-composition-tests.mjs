@@ -8,7 +8,7 @@ import {
   completePlayback,
   createSession,
   goTo,
-  refine,
+  localRefine,
   snapshotModel,
   step,
   switchEndpoint
@@ -33,12 +33,12 @@ function assertLoopContained(session) {
   }
 }
 
-// Refine owns binary subdivision and transforms the Working Section by target
-// membership. An inside midpoint shortens toward the preserved opposite
-// endpoint; an outside midpoint replaces the Interval with the new traversal.
+// Shift+Refine owns local binary subdivision by target membership. An inside
+// midpoint shortens toward the preserved opposite endpoint; an outside midpoint
+// replaces the Interval with the new traversal.
 let composed = createSession({ duration: 100, current: 50 });
 composed = goTo(composed, 70, { operator: "directA" }).session;
-const replaced = refine(composed, "forward");
+const replaced = localRefine(composed, "forward");
 assert.equal(replaced.refineRelation, "replace");
 assert.deepEqual(
   {
@@ -50,7 +50,7 @@ assert.deepEqual(
   { start: 70, end: 80, departure: 70, arrival: 80 }
 );
 
-const shortened = refine(composed, "backward");
+const shortened = localRefine(composed, "backward");
 assert.equal(shortened.refineRelation, "shorten");
 assert.deepEqual(
   {
@@ -62,7 +62,7 @@ assert.deepEqual(
   { start: 50, end: 60, departure: 50, arrival: 60 }
 );
 
-const replacedPast = refine(switchEndpoint(composed).session, "forward");
+const replacedPast = localRefine(switchEndpoint(composed).session, "forward");
 assert.equal(replacedPast.refineRelation, "replace");
 assert.deepEqual(
   {
@@ -111,13 +111,13 @@ assert.deepEqual(
 );
 assertLoopContained(pinComposition);
 
-// Step, playback, and Pin traversal are the linear class. They leave the
-// receding Resolution endpoint fixed and push only the endpoint approached by
-// Current, while their Interval ownership remains distinct.
+// Step, playback, and Pin traversal are the linear class. Step guards the
+// approached Resolution midpoint; playback translates the approached endpoint;
+// their Interval ownership remains distinct.
 let linear = createSession({ duration: 200, current: 50 });
 linear = goTo(linear, 70, { operator: "timeline" }).session; // 50—70—90
 linear = step(linear, "forward", 5).session;
-assert.deepEqual(linear.model.resolution, { L: 50, C: 75, R: 95, level: 0 });
+assert.deepEqual(linear.model.resolution, { L: 50, C: 75, R: 90, level: 0 });
 assert.deepEqual(
   { start: linear.model.interval.start, end: linear.model.interval.end },
   { start: 50, end: 75 }
@@ -132,7 +132,7 @@ linear = completePlayback(linear, {
   parentResolutionBasis: playbackOrigin.resolutionBasis,
   returnModel: playbackOrigin
 }).session;
-assert.deepEqual(linear.model.resolution, { L: 50, C: 85, R: 105, level: 0 });
+assert.deepEqual(linear.model.resolution, { L: 50, C: 85, R: 100, level: 0 });
 assert.deepEqual(
   { start: linear.model.interval.start, end: linear.model.interval.end },
   { start: 50, end: 85 }
@@ -143,7 +143,7 @@ linear = goTo(linear, 100, {
   operator: "nextPin",
   mode: "linear"
 }).session;
-assert.deepEqual(linear.model.resolution, { L: 50, C: 100, R: 120, level: 0 });
+assert.deepEqual(linear.model.resolution, { L: 50, C: 100, R: 115, level: 0 });
 assert.deepEqual(
   {
     start: linear.model.interval.start,

@@ -184,11 +184,9 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   assert.match(fieldCss, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);
   assert.match(app, /setStepReach as setSessionStepReach/);
   assert.match(app, /stepReach: currentFieldOffsets\(\)/);
-  assert.match(app, /onHoldOffsets:[\s\S]*state\.fieldOffsets = normalizeStepReach/);
-  assert.doesNotMatch(
-    app.match(/onHoldOffsets: patch => \{[\s\S]*?\n    \},\n    onChange:/)?.[0] || "",
-    /commitStepReach|setSessionStepReach/
-  );
+  assert.doesNotMatch(app, /onHoldOffsets:/);
+  assert.doesNotMatch(field, /onHoldOffsets/);
+  assert.match(app, /function changeFieldOffset[\s\S]*state\.fieldOffsets = normalizeStepReach/);
   assert.match(
     app,
     /performStep\(selection\.direction, selection\.distance,\s*\{[\s\S]*carryRetained: selection\.carryRetained === true/,

@@ -57,8 +57,6 @@ function makeHarness({
     center: { time: 50, rate: 1, state: YOUTUBE_STATE.PAUSED, availableRates: rates }
   };
   const adapters = new Map();
-  const holds = [];
-
   function createPlayer(id, config) {
     let time = 0;
     let rate = 1;
@@ -122,7 +120,6 @@ function makeHarness({
     getSnapshot: () => snapshot,
     getPreferences: () => preferences,
     setPreferences: patch => { preferences = { ...preferences, ...patch }; },
-    onHoldOffsets: patch => holds.push(patch),
     createPlayer,
     formatTime: value => String(value)
   });
@@ -131,7 +128,6 @@ function makeHarness({
     controller,
     elements,
     adapters,
-    holds,
     get snapshot() { return snapshot; },
     set snapshot(value) { snapshot = value; },
     get preferences() { return preferences; },
@@ -191,8 +187,8 @@ function makeHarness({
 
     h.controller.hold("tail");
     assert.equal(h.controller.snapshot().tailMode, FIELD_SIDE_MODE.HELD);
-    assert.equal(h.holds.at(-1).backward, 1);
-    assert.deepEqual(h.snapshot.interval, semanticInterval, "Hold records Step geometry only; it must not redefine Interval.");
+    assert.equal(h.controller.getStepSelection("tail").distance, 1);
+    assert.deepEqual(h.snapshot.interval, semanticInterval, "Hold changes runtime Field state only; it must not redefine Interval.");
 
     h.snapshot = {
       ...h.snapshot,

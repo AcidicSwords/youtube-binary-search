@@ -114,7 +114,8 @@ assert.deepEqual(
       projection
     ).lead.target
   },
-  { tail: 29, lead: 46 }
+  { tail: 44, lead: 31 },
+  "Field targets remain source-contiguous even when Step uses the quotient metric."
 );
 
 assert.deepEqual(
@@ -130,7 +131,8 @@ assert.deepEqual(
     1,
     projection.metric
   ),
-  { L: 20, C: 45, R: 48, level: 0 }
+  { L: 20, C: 45, R: 47, level: 1 },
+  "A zero-width Fold crossing must not push an endpoint that already has one-Step midpoint headroom."
 );
 
 // Shift+Step sees ordered endpoint Pins at one coordinate. Ordinary interior

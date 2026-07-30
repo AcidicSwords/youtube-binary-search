@@ -403,18 +403,49 @@ function projectionCoordinate(projection, source) {
 }
 
 function traversalStops(guide, range, projection = null) {
-  if (projection?.orderedPinStops) {
-    return projection.orderedPinStops(range, guide);
-  }
-  return visiblePins(guide)
-    .filter(pin => pin.t >= range.start - EPSILON && pin.t <= range.end + EPSILON)
-    .map(pin => ({
-      ...pin,
-      stopKind: "pin",
-      sourcePin: pin,
-      traversal: pin.t,
-      fold: null
-    }));
+  const retained = projection?.orderedPinStops
+    ? projection.orderedPinStops(range, guide)
+    : visiblePins(guide)
+      .filter(pin => pin.t >= range.start - EPSILON && pin.t <= range.end + EPSILON)
+      .map(pin => ({
+        ...pin,
+        stopKind: "pin",
+        sourcePin: pin,
+        traversal: pin.t,
+        fold: null
+      }));
+  const boundaries = [
+    {
+      id: null,
+      t: range.start,
+      label: "Range Start",
+      stopKind: "range-boundary",
+      boundary: "start",
+      sourcePin: null,
+      traversal: projectionCoordinate(projection, range.start),
+      fold: null,
+      createdAt: Number.NEGATIVE_INFINITY
+    },
+    {
+      id: null,
+      t: range.end,
+      label: "Range End",
+      stopKind: "range-boundary",
+      boundary: "end",
+      sourcePin: null,
+      traversal: projectionCoordinate(projection, range.end),
+      fold: null,
+      createdAt: Number.POSITIVE_INFINITY
+    }
+  ].filter(boundary =>
+    !retained.some(stop => Math.abs(stop.t - boundary.t) <= EPSILON)
+  );
+  return [...retained, ...boundaries].sort((first, second) =>
+    first.traversal - second.traversal
+    || first.t - second.t
+    || (first.createdAt ?? 0) - (second.createdAt ?? 0)
+    || String(first.id || "").localeCompare(String(second.id || ""))
+  );
 }
 
 export function previousPin(guide, current, range, projection = null) {

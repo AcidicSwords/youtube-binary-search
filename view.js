@@ -29,7 +29,8 @@ import {
 import {
   STEP_REACH_MODE,
   effectiveStepReach,
-  projectPlayback
+  projectPlayback,
+  previewTransition
 } from "./session.js";
 import { YOUTUBE_STATE } from "./youtube.js";
 
@@ -70,6 +71,93 @@ export function formatRange(extent) {
   return extent ? `${formatTime(extent.start)}–${formatTime(extent.end)}` : "—";
 }
 
+export function packTimelineSectionLanes(entries) {
+  const laneEnds = [];
+  for (const entry of entries) {
+    let lane = laneEnds.findIndex(end =>
+      entry.projected.start > end + EPSILON
+    );
+    if (lane < 0) lane = laneEnds.length;
+    laneEnds[lane] = Math.max(
+      laneEnds[lane] ?? Number.NEGATIVE_INFINITY,
+      entry.projected.end
+    );
+    entry.lane = lane;
+  }
+  return { entries, laneCount: laneEnds.length };
+}
+
+export function computeTimelineFoldLayout(
+  folds,
+  width,
+  effectiveDuration,
+  minimumGap = 6
+) {
+  const surfaceWidth = Math.max(1, Number(width) || 1);
+  const duration = Math.max(EPSILON, Number(effectiveDuration) || 0);
+  const maximumSourceDuration = Math.max(
+    EPSILON,
+    ...(folds || []).map(fold => fold.sourceDuration)
+  );
+  const layout = (folds || [])
+    .map((fold, index) => {
+      const contributorCount = Math.max(1, fold.sections?.length || 1);
+      const rootWidth = clamp(38 + Math.min(contributorCount, 8) * 7, 48, 94);
+      const anchorX = clamp(fold.traversal / duration, 0, 1) * surfaceWidth;
+      const height = 70 + 82 * Math.sqrt(
+        fold.sourceDuration / maximumSourceDuration
+      );
+      return {
+        fold,
+        index,
+        anchorX,
+        x: clamp(anchorX, rootWidth / 2, surfaceWidth - rootWidth / 2),
+        width: rootWidth,
+        height
+      };
+    })
+    .sort((first, second) =>
+      first.anchorX - second.anchorX || first.index - second.index
+    );
+  let gap = minimumGap;
+  const requiredWidth = layout.reduce((sum, entry) => sum + entry.width, 0)
+    + Math.max(0, layout.length - 1) * gap;
+  if (requiredWidth > surfaceWidth && layout.length) {
+    gap = 2;
+    const availablePerFold = Math.max(
+      28,
+      (surfaceWidth - Math.max(0, layout.length - 1) * gap) / layout.length
+    );
+    for (const entry of layout) entry.width = Math.min(entry.width, availablePerFold);
+  }
+
+  for (let index = 1; index < layout.length; index += 1) {
+    const previous = layout[index - 1];
+    const current = layout[index];
+    const minimum = previous.x + previous.width / 2
+      + gap + current.width / 2;
+    current.x = Math.max(current.x, minimum);
+  }
+  for (let index = layout.length - 1; index >= 0; index -= 1) {
+    const current = layout[index];
+    const maximum = index === layout.length - 1
+      ? surfaceWidth - current.width / 2
+      : layout[index + 1].x - layout[index + 1].width / 2
+        - gap - current.width / 2;
+    current.x = Math.min(current.x, maximum);
+  }
+  for (let index = 0; index < layout.length; index += 1) {
+    const current = layout[index];
+    const minimum = index === 0
+      ? current.width / 2
+      : layout[index - 1].x + layout[index - 1].width / 2
+        + gap + current.width / 2;
+    current.x = Math.max(current.x, minimum);
+  }
+
+  return layout.sort((first, second) => first.index - second.index);
+}
+
 export function createView({ document, getState, getPlayerTime, minRangeSeconds }) {
   const elements = Object.fromEntries(
     [...document.querySelectorAll("[id]")].map(node => [node.id, node])
@@ -77,6 +165,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
   let previewAction = null;
   let previewSectionId = null;
+  let activePreviewModel = null;
   let renderedPinKey = "";
   let renderedClusters = [];
   let pinClusterTrigger = null;
@@ -111,6 +200,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
   }
 
   function pinLabel(pin) {
+    if (pin?.stopKind === "range-boundary") return pin.label;
     if (pin.label?.trim()) return pin.label.trim();
     const references = sectionsForPin(guide(), pin.id)
       .map(section => resolveSection(guide(), section))
@@ -244,33 +334,42 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const ruler = elements["timeline-ruler"];
     if (!ruler) return;
     ruler.replaceChildren();
-    for (let index = 0; index <= 4; index += 1) {
-      const traversal = projection.effectiveDuration * index / 4;
+    const width = Math.max(320, elements.timeline.clientWidth || 1);
+    const divisions = clamp(Math.floor(width / 112), 4, 10);
+    for (let index = 0; index <= divisions; index += 1) {
+      const traversal = projection.effectiveDuration * index / divisions;
       const source = projection.traversalToSource(
         traversal,
         index === 0 ? "backward" : "forward"
       );
       const tick = document.createElement("span");
       tick.className = "timeline-ruler-tick";
-      if (index === 0 || index === 4) tick.classList.add("edge");
-      tick.style.left = `${index * 25}%`;
+      if (index === 0 || index === divisions) tick.classList.add("edge");
+      tick.style.left = `${index / divisions * 100}%`;
       const label = document.createElement("time");
       label.textContent = formatRulerTime(source);
       tick.appendChild(label);
       ruler.appendChild(tick);
+      if (index < divisions) {
+        const minor = document.createElement("span");
+        minor.className = "timeline-ruler-tick minor";
+        minor.style.left = `${(index + 0.5) / divisions * 100}%`;
+        ruler.appendChild(minor);
+      }
     }
-  }
 
-  function packSectionLanes(entries, limit = 5) {
-    const laneEnds = [];
-    for (const entry of entries) {
-      let lane = laneEnds.findIndex(end => entry.projected.start > end + EPSILON);
-      if (lane < 0) lane = laneEnds.length;
-      lane = Math.min(lane, limit - 1);
-      laneEnds[lane] = Math.max(laneEnds[lane] ?? 0, entry.projected.end);
-      entry.lane = lane;
+    for (const [role, source] of [
+      ["start", range().start],
+      ["end", range().end]
+    ]) {
+      const boundary = document.createElement("span");
+      boundary.className = `timeline-range-guide ${role}`;
+      boundary.style.left = `${percent(source)}%`;
+      const label = document.createElement("time");
+      label.textContent = `${role === "start" ? "Start" : "End"} ${formatRulerTime(source)}`;
+      boundary.appendChild(label);
+      ruler.appendChild(boundary);
     }
-    return entries;
   }
 
   function intervalContainsSection(section) {
@@ -318,7 +417,36 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         || first.projected.end - second.projected.end
       );
 
-    for (const entry of packSectionLanes(openEntries)) {
+    const packedSections = packTimelineSectionLanes(openEntries);
+    const timelineWidth = Math.max(1, elements.timeline.clientWidth || 1);
+    const foldLayout = computeTimelineFoldLayout(
+      projection.folds,
+      timelineWidth,
+      projection.effectiveDuration
+    );
+    const maximumFoldHeight = foldLayout.length
+      ? Math.max(...foldLayout.map(entry => entry.height))
+      : 0;
+    const sectionBandHeight = Math.max(
+      32,
+      18 + packedSections.laneCount * 18
+    );
+    const foldBandHeight = maximumFoldHeight > 0
+      ? maximumFoldHeight + 36
+      : 30;
+    const trackTop = sectionBandHeight + foldBandHeight / 2;
+    const rulerTop = sectionBandHeight + foldBandHeight + 10;
+    const pinTop = rulerTop + 42;
+    const timelineHeight = pinTop + 44;
+    setStyleProperty(elements.timeline, "--section-band-height", `${sectionBandHeight}px`);
+    setStyleProperty(elements.timeline, "--fold-band-height", `${foldBandHeight}px`);
+    setStyleProperty(elements.timeline, "--track-top", `${trackTop}px`);
+    setStyleProperty(elements.timeline, "--ruler-top", `${rulerTop}px`);
+    setStyleProperty(elements.timeline, "--pin-top", `${pinTop}px`);
+    setStyleProperty(elements.timeline, "--timeline-height", `${timelineHeight}px`);
+    elements.timeline.style.height = `${timelineHeight}px`;
+
+    for (const entry of packedSections.entries) {
       const { section, projected, lane } = entry;
       const color = sectionColor(section.id);
       const selected = state().selectedRetained?.kind === "section"
@@ -379,24 +507,36 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       sectionLane.append(span, body, hinge);
     }
 
-    const timelineWidth = Math.max(1, elements.timeline.clientWidth || 1);
-    for (const fold of projection.folds) {
+    for (const layout of foldLayout) {
+      const { fold } = layout;
       const root = document.createElement("div");
       root.className = "timeline-fold";
-      root.style.left = `${
-        fold.traversal / Math.max(projection.effectiveDuration, EPSILON) * 100
-      }%`;
-      const height = clamp(
-        timelineWidth * fold.sourceDuration / Math.max(model().duration, EPSILON),
-        48,
-        148
-      );
+      root.style.left = `${layout.x}px`;
+      const height = layout.height;
       setStyleProperty(root, "--fold-height", `${height}px`);
+      setStyleProperty(root, "--fold-width", `${layout.width}px`);
+      setStyleProperty(
+        root,
+        "--fold-anchor-offset",
+        `${layout.anchorX - layout.x}px`
+      );
+      setStyleProperty(
+        root,
+        "--fold-anchor-width",
+        `${Math.abs(layout.anchorX - layout.x)}px`
+      );
       root.dataset.foldStart = String(fold.start);
       root.dataset.foldEnd = String(fold.end);
 
+      const anchor = document.createElement("span");
+      anchor.className = "timeline-fold-anchor";
+      if (layout.anchorX < layout.x) anchor.classList.add("left");
+      anchor.setAttribute("aria-hidden", "true");
+      root.appendChild(anchor);
+
       const axis = document.createElement("span");
       axis.className = "timeline-fold-axis";
+      axis.dataset.foldAxis = "true";
       axis.setAttribute("aria-hidden", "true");
       root.appendChild(axis);
 
@@ -405,6 +545,45 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       duration.textContent = formatDuration(fold.sourceDuration);
       duration.setAttribute("aria-hidden", "true");
       root.appendChild(duration);
+
+      for (const [role, value] of [
+        ["top", fold.end],
+        ["bottom", fold.start]
+      ]) {
+        const face = document.createElement("time");
+        face.className = `timeline-fold-face ${role}`;
+        face.textContent = formatRulerTime(value);
+        face.setAttribute("aria-hidden", "true");
+        root.appendChild(face);
+      }
+
+      for (const kind of [
+        "range",
+        "resolution",
+        "interval",
+        "preview-resolution",
+        "preview-interval"
+      ]) {
+        const coverage = document.createElement("span");
+        coverage.className = `timeline-fold-coverage ${kind}`;
+        coverage.dataset.coverageKind = kind;
+        coverage.hidden = true;
+        coverage.setAttribute("aria-hidden", "true");
+        root.appendChild(coverage);
+      }
+      for (const kind of [
+        "backward",
+        "forward",
+        "preview-backward",
+        "preview-forward"
+      ]) {
+        const target = document.createElement("span");
+        target.className = `timeline-fold-refine-target ${kind}`;
+        target.dataset.foldTarget = kind;
+        target.hidden = true;
+        target.setAttribute("aria-hidden", "true");
+        root.appendChild(target);
+      }
 
       const cursor = document.createElement("span");
       cursor.className = "timeline-fold-cursor";
@@ -419,8 +598,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       root.appendChild(current);
 
       const railSpacing = Math.min(
-        7,
-        32 / Math.max(1, fold.sections.length - 1)
+        10,
+        (layout.width - 24) / Math.max(1, fold.sections.length - 1)
       );
       const railCenter = (fold.sections.length - 1) / 2;
       for (const [railIndex, section] of fold.sections.entries()) {
@@ -428,6 +607,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         rail.type = "button";
         rail.className = "timeline-fold-rail";
         rail.dataset.sectionExpand = section.id;
+        rail.dataset.sectionStart = String(section.start);
+        rail.dataset.sectionEnd = String(section.end);
         const startRatio = (section.start - fold.start) / Math.max(fold.sourceDuration, EPSILON);
         const endRatio = (section.end - fold.start) / Math.max(fold.sourceDuration, EPSILON);
         setStyleProperty(rail, "--rail-top", `${(1 - endRatio) * 100}%`);
@@ -472,7 +653,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         ) end += 1;
         const group = endpointLayout.slice(start, end);
         const spacing = group.length > 1
-          ? Math.min(14, 36 / (group.length - 1))
+          ? Math.min(16, (layout.width - 20) / (group.length - 1))
           : 0;
         group.forEach((entry, index) => {
           entry.offset = (index - (group.length - 1) / 2) * spacing;
@@ -830,22 +1011,67 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     renderTimelinePins();
   }
 
-  function renderActionPreview(actionModel, structural) {
-    const shiftedDirectional = (state().shiftLayer || state().shiftKeyHeld)
-      && ["stepBackward", "stepForward"].includes(previewAction);
-    let actionRange = shiftedDirectional
-      ? structural?.[previewAction] || null
-      : previewAction && actionModel
-        ? actionModel[previewAction]
-        : null;
-    if (!actionRange && structural) actionRange = structural[previewAction] || null;
-    elements["action-preview-fill"].hidden = !actionRange;
-    if (!actionRange) {
-      elements["action-preview-fill"].removeAttribute("data-kind");
-      return;
+  function renderActionPreview(previewResult, structural) {
+    const predicted = previewResult?.changed
+      ? previewResult.session.model
+      : null;
+    activePreviewModel = predicted;
+    const previewResolution = predicted?.resolution || null;
+    const removedInterval = previewAction === "release" ? interval() : null;
+    const structuralExtent = structural?.[previewAction] || null;
+    const previewInterval = predicted?.interval || removedInterval || structuralExtent;
+
+    elements["preview-resolution-fill"].hidden = !previewResolution;
+    elements["action-preview-fill"].hidden = !previewInterval;
+    if (previewResolution) {
+      setSegment(
+        elements["preview-resolution-fill"],
+        previewResolution.L,
+        previewResolution.R
+      );
     }
-    elements["action-preview-fill"].dataset.kind = previewAction;
-    setSegment(elements["action-preview-fill"], actionRange.start, actionRange.end);
+    if (previewInterval) {
+      elements["action-preview-fill"].dataset.kind = previewAction;
+      if (removedInterval) elements["action-preview-fill"].dataset.effect = "remove";
+      else elements["action-preview-fill"].removeAttribute("data-effect");
+      setSegment(
+        elements["action-preview-fill"],
+        previewInterval.start,
+        previewInterval.end
+      );
+    } else {
+      elements["action-preview-fill"].removeAttribute("data-kind");
+      elements["action-preview-fill"].removeAttribute("data-effect");
+    }
+
+    const markerIds = [
+      "preview-resolution-start-marker",
+      "preview-resolution-end-marker",
+      "preview-backward-target-marker",
+      "preview-forward-target-marker",
+      "preview-current-marker"
+    ];
+    for (const id of markerIds) elements[id].hidden = !previewResolution;
+    if (!previewResolution) return;
+
+    setMarkerPosition(
+      elements["preview-resolution-start-marker"],
+      previewResolution.L
+    );
+    setMarkerPosition(
+      elements["preview-resolution-end-marker"],
+      previewResolution.R
+    );
+    setMarkerPosition(elements["preview-current-marker"], previewResolution.C);
+    const targets = getTargets(previewResolution, timelineProjection().metric);
+    elements["preview-backward-target-marker"].hidden = targets.backward === null;
+    elements["preview-forward-target-marker"].hidden = targets.forward === null;
+    if (targets.backward !== null) {
+      setMarkerPosition(elements["preview-backward-target-marker"], targets.backward);
+    }
+    if (targets.forward !== null) {
+      setMarkerPosition(elements["preview-forward-target-marker"], targets.forward);
+    }
   }
 
   function renderSectionPreview() {
@@ -857,6 +1083,115 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
   function setActionMeta(buttonId, metaId, label, meta) {
     elements[metaId].textContent = meta;
     elements[buttonId].setAttribute("aria-label", `${label}: ${meta}`);
+  }
+
+  function setFoldCoverage(element, fold, extent) {
+    if (!element) return;
+    const start = Math.max(fold.start, extent?.start ?? Number.POSITIVE_INFINITY);
+    const end = Math.min(fold.end, extent?.end ?? Number.NEGATIVE_INFINITY);
+    const visible = end - start > EPSILON;
+    element.hidden = !visible;
+    if (!visible) return;
+    const duration = Math.max(EPSILON, fold.end - fold.start);
+    setStyleProperty(
+      element,
+      "--coverage-top",
+      `${(1 - (end - fold.start) / duration) * 100}%`
+    );
+    setStyleProperty(
+      element,
+      "--coverage-height",
+      `${(end - start) / duration * 100}%`
+    );
+  }
+
+  function setFoldTarget(element, fold, address) {
+    if (!element) return;
+    const visible = Number.isFinite(address)
+      && address >= fold.start - EPSILON
+      && address <= fold.end + EPSILON;
+    element.hidden = !visible;
+    if (!visible) return;
+    const duration = Math.max(EPSILON, fold.end - fold.start);
+    setStyleProperty(
+      element,
+      "--fold-target-position",
+      `${(1 - (address - fold.start) / duration) * 100}%`
+    );
+  }
+
+  function renderFoldSemantics(baseModel, previewModel = null) {
+    const projection = timelineProjection();
+    const baseTargets = baseModel?.resolution
+      ? getTargets(baseModel.resolution, projection.metric)
+      : { backward: null, forward: null };
+    const previewTargets = previewModel?.resolution
+      ? getTargets(previewModel.resolution, projection.metric)
+      : { backward: null, forward: null };
+    for (const foldElement of elements["fold-lane"]?.querySelectorAll?.(".timeline-fold") || []) {
+      const start = Number(foldElement.dataset.foldStart);
+      const end = Number(foldElement.dataset.foldEnd);
+      const fold = { start, end };
+      setFoldCoverage(
+        foldElement.querySelector?.('[data-coverage-kind="range"]'),
+        fold,
+        baseModel?.range
+      );
+      setFoldCoverage(
+        foldElement.querySelector?.('[data-coverage-kind="resolution"]'),
+        fold,
+        baseModel?.resolution
+          ? { start: baseModel.resolution.L, end: baseModel.resolution.R }
+          : null
+      );
+      setFoldCoverage(
+        foldElement.querySelector?.('[data-coverage-kind="interval"]'),
+        fold,
+        baseModel?.interval
+      );
+      setFoldCoverage(
+        foldElement.querySelector?.('[data-coverage-kind="preview-resolution"]'),
+        fold,
+        previewModel?.resolution
+          ? { start: previewModel.resolution.L, end: previewModel.resolution.R }
+          : null
+      );
+      setFoldCoverage(
+        foldElement.querySelector?.('[data-coverage-kind="preview-interval"]'),
+        fold,
+        previewModel?.interval
+      );
+      for (const [kind, address] of [
+        ["backward", baseTargets.backward],
+        ["forward", baseTargets.forward],
+        ["preview-backward", previewTargets.backward],
+        ["preview-forward", previewTargets.forward]
+      ]) {
+        setFoldTarget(
+          foldElement.querySelector?.(`[data-fold-target="${kind}"]`),
+          fold,
+          address
+        );
+      }
+      for (const rail of foldElement.querySelectorAll?.(".timeline-fold-rail") || []) {
+        const section = {
+          start: Number(rail.dataset.sectionStart),
+          end: Number(rail.dataset.sectionEnd)
+        };
+        const contained = Boolean(
+          baseModel?.interval
+          && baseModel.interval.start <= section.start + EPSILON
+          && baseModel.interval.end >= section.end - EPSILON
+        );
+        const previewContained = Boolean(
+          previewModel?.interval
+          && previewModel.interval.start <= section.start + EPSILON
+          && previewModel.interval.end >= section.end - EPSILON
+        );
+        rail.classList.toggle("interval-included", contained);
+        rail.classList.toggle("preview-included", previewContained);
+      }
+    }
   }
 
   function renderTransport() {
@@ -915,6 +1250,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           parentNeighborhood: transport.parentNeighborhood,
           parentResolutionBasis: transport.parentResolutionBasis,
           returnModel: transport.returnModel,
+          cycles: transport.cycles || 0,
           operator: transport.operator
         })
       : null;
@@ -962,6 +1298,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         }
       }
     }
+    renderFoldSemantics(
+      projectedModel,
+      livePlayback ? null : activePreviewModel
+    );
 
     const surface = elements["center-transport-surface"];
     if (surface) {
@@ -1062,6 +1402,26 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       transpose: currentInterval || selectedForPreview,
       focus: currentInterval || selectedForPreview
     } : null;
+    let resolvedPreviewAction = previewAction;
+    if (shiftLayer && previewAction === "refineBackward") {
+      resolvedPreviewAction = "localRefineBackward";
+    } else if (shiftLayer && previewAction === "refineForward") {
+      resolvedPreviewAction = "localRefineForward";
+    } else if (shiftLayer && previewAction === "stepBackward") {
+      resolvedPreviewAction = "pinBackward";
+    } else if (shiftLayer && previewAction === "stepForward") {
+      resolvedPreviewAction = "pinForward";
+    }
+    const previewDirection = resolvedPreviewAction?.endsWith("Backward")
+      ? "backward"
+      : "forward";
+    const previewPin = previewDirection === "backward" ? previous : next;
+    const previewResult = resolvedPreviewAction
+      ? previewTransition(currentState.session, resolvedPreviewAction, {
+          seconds: effectiveReach[previewDirection],
+          destination: previewPin?.t
+        })
+      : null;
     const focused = focusedProjection();
 
     elements["duration-time"].textContent = projection.effectiveDuration < model().duration - EPSILON
@@ -1117,10 +1477,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["shift-layer-toggle"].setAttribute("aria-pressed", String(shiftLayer));
     elements["shift-layer-state"].textContent = shiftLayer ? "On" : "Off";
     elements["refine-backward-label"].textContent = shiftLayer
-      ? "Additive Refine Backward"
+      ? "Local Refine Backward"
       : "Refine Backward";
     elements["refine-forward-label"].textContent = shiftLayer
-      ? "Additive Refine Forward"
+      ? "Local Refine Forward"
       : "Refine Forward";
     elements["step-backward-label"].textContent = shiftLayer
       ? "Pin Backward"
@@ -1189,7 +1549,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
     const interactionLocked = !loaded;
     for (const id of [
-      "range-start-here", "range-midpoint", "range-end-here", "full-video-range",
+      "go-range-start", "range-start-here", "range-midpoint",
+      "go-range-end", "range-end-here", "full-video-range",
       "step-backward-seconds", "step-forward-seconds",
       "context-seconds",
       "section-source", "section-label", "pin-label"
@@ -1218,6 +1579,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["refine-forward"].disabled = interactionLocked || targets.forward === null;
     elements.reopen.disabled = interactionLocked || !actionModel?.reopen;
     elements["return-action"].disabled = !loaded || !currentState.session.history.length;
+    elements["redo-action"].disabled = !loaded || !(currentState.session.future || []).length;
     elements["switch-endpoint"].disabled = interactionLocked || !currentInterval;
     elements["step-backward"].disabled = interactionLocked
       || (shiftLayer ? !previous : !actionModel?.stepBackward);
@@ -1264,10 +1626,17 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         semanticCurrent,
         projection.sourceMidpoint(activeRange.start, activeRange.end)
       ) <= EPSILON;
+    elements["go-range-start"].disabled = interactionLocked
+      || Math.abs(semanticCurrent - activeRange.start) <= EPSILON;
+    elements["go-range-end"].disabled = interactionLocked
+      || Math.abs(semanticCurrent - activeRange.end) <= EPSILON;
 
     elements["return-meta"].textContent = currentState.session.history.length
       ? currentState.session.history.at(-1).label
       : "Nothing to undo";
+    elements["redo-meta"].textContent = (currentState.session.future || []).length
+      ? currentState.session.future.at(-1).label
+      : "Nothing to redo";
     const activeFold = projection.foldAtSource(semanticCurrent);
     const destinationFrame = currentInterval?.departureFrame;
     const destinationScale = destinationFrame?.resolution
@@ -1294,8 +1663,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       targets.backward === null
         ? backwardBlock === "resolution-limit" ? "Resolution limit" : "Range start"
         : shiftLayer
-          ? `retain anchor · to ${formatTime(targets.backward)}`
-          : `${classifyRefineRelation(currentInterval, semanticCurrent, targets.backward)} Interval · to ${formatTime(targets.backward)}`
+          ? `${classifyRefineRelation(currentInterval, semanticCurrent, targets.backward)} Interval · to ${formatTime(targets.backward)}`
+          : `retain anchor · to ${formatTime(targets.backward)}`
     );
     setActionMeta(
       "refine-forward",
@@ -1304,8 +1673,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       targets.forward === null
         ? forwardBlock === "resolution-limit" ? "Resolution limit" : "Range end"
         : shiftLayer
-          ? `retain anchor · to ${formatTime(targets.forward)}`
-          : `${classifyRefineRelation(currentInterval, semanticCurrent, targets.forward)} Interval · to ${formatTime(targets.forward)}`
+          ? `${classifyRefineRelation(currentInterval, semanticCurrent, targets.forward)} Interval · to ${formatTime(targets.forward)}`
+          : `retain anchor · to ${formatTime(targets.forward)}`
     );
     elements["reopen-meta"].textContent = actionModel?.reopen
       ? `${formatDuration(
@@ -1358,7 +1727,16 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       elements["interval-fill"].hidden = true;
       elements["field-span-fill"].hidden = true;
       elements["section-preview-fill"].hidden = true;
+      elements["preview-resolution-fill"].hidden = true;
       elements["action-preview-fill"].hidden = true;
+      for (const id of [
+        "preview-resolution-start-marker",
+        "preview-resolution-end-marker",
+        "preview-backward-target-marker",
+        "preview-forward-target-marker",
+        "preview-current-marker"
+      ]) elements[id].hidden = true;
+      activePreviewModel = null;
       renderTimelinePins();
       renderTransport();
       return;
@@ -1385,7 +1763,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["field-span-fill"].hidden = !fieldSpan;
     if (fieldSpan) setSegment(elements["field-span-fill"], fieldSpan.start, fieldSpan.end);
     renderSectionPreview();
-    renderActionPreview(actionModel, structuralPresentation);
+    renderActionPreview(previewResult, structuralPresentation);
     renderTimelinePins();
     renderTransport();
   }

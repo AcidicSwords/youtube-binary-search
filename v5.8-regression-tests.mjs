@@ -101,8 +101,8 @@ oldEquivalent = reopen(oldEquivalent).session;
 oldEquivalent = refine(oldEquivalent, "forward").session;
 assert.equal(oldEquivalent.model.resolution.C, 330);
 
-// Step preserves the origin Neighborhood, pushes only its approached endpoint,
-// and retains a half-Step Refine target after crossing that endpoint.
+// Step preserves the origin Neighborhood and keeps its approached endpoint fixed
+// while the prospective midpoint still has a full Step of headroom.
 let stepped = createSession({ duration: 480, current: 120 });
 stepped = goTo(stepped, 180, { operator: "timeline" }).session; // 120—180—240
 const stepOrigin = snapshotModel(stepped.model);
@@ -111,7 +111,7 @@ stepped = step(stepped, "forward", 20, {
   originResolution: stepOrigin.resolution,
   originResolutionBasis: stepOrigin.resolutionBasis
 }).session;
-assert.deepEqual(stepped.model.resolution, { L: 120, C: 200, R: 260, level: 0 });
+assert.deepEqual(stepped.model.resolution, { L: 120, C: 200, R: 240, level: 0 });
 assert.equal(stepped.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
 stepped = step(stepped, "forward", 100, {
   departure: 180,
@@ -119,9 +119,9 @@ stepped = step(stepped, "forward", 100, {
   originResolutionBasis: stepOrigin.resolutionBasis,
   amend: true
 }).session;
-assert.deepEqual(stepped.model.resolution, { L: 120, C: 300, R: 400, level: 0 });
+assert.deepEqual(stepped.model.resolution, { L: 120, C: 300, R: 480, level: 0 });
 assert.equal(stepped.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
-assert.deepEqual(getTargets(stepped.model.resolution), { backward: 210, forward: 350 });
+assert.deepEqual(getTargets(stepped.model.resolution), { backward: 210, forward: 390 });
 assert.deepEqual(
   { start: stepped.model.interval.start, end: stepped.model.interval.end },
   { start: 120, end: 300 },
@@ -131,8 +131,8 @@ assert.deepEqual(
 let boundaryPush = createSession({ duration: 100, current: 50 });
 boundaryPush = refine(boundaryPush, "backward").session;
 boundaryPush = step(boundaryPush, "forward", 25).session;
-assert.deepEqual(boundaryPush.model.resolution, { L: 0, C: 50, R: 75, level: 0 });
-assert.equal(getTargets(boundaryPush.model.resolution).forward, 62.5);
+assert.deepEqual(boundaryPush.model.resolution, { L: 0, C: 50, R: 100, level: 0 });
+assert.equal(getTargets(boundaryPush.model.resolution).forward, 75);
 
 // Step edits the active Interval around its original departure anchor.
 let drawnInterval = createSession({ duration: 100, current: 20 });
@@ -198,13 +198,13 @@ pathA = step(pathA, "forward", 15, {
   originResolution: pathOrigin.resolution,
   originResolutionBasis: pathOrigin.resolutionBasis
 }).session;
-pathA = step(pathA, "forward", 20, {
+pathA = step(pathA, "forward", 15, {
   departure: 40,
   originResolution: pathOrigin.resolution,
   originResolutionBasis: pathOrigin.resolutionBasis,
   amend: true
 }).session;
-pathA = step(pathA, "backward", 20, {
+pathA = step(pathA, "backward", 15, {
   departure: 40,
   originResolution: pathOrigin.resolution,
   originResolutionBasis: pathOrigin.resolutionBasis,

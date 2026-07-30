@@ -28,7 +28,7 @@ import {
   goToGuidePin as goToSessionGuidePin,
   goToGuideSection as goToSessionGuideSection,
   refine as refineSession,
-  additiveRefine as additiveRefineSession,
+  localRefine as localRefineSession,
   step as stepSession,
   stepToPin as stepToPinSession,
   setStepReach as setSessionStepReach,
@@ -56,7 +56,8 @@ import {
   setGuideSectionCollapsed,
   moveGuidePin,
   moveGuideSection,
-  undo as undoSession
+  undo as undoSession,
+  redo as redoSession
 } from "./session.js";
 import { projectionForModel } from "./temporal-projection.js";
 import {
@@ -241,10 +242,6 @@ function currentInterval() {
 
 function temporalProjection(options = {}) {
   return projectionForModel(model(), options);
-}
-
-function fieldProjection() {
-  return temporalProjection();
 }
 
 function projectionTopologyKey(sourceModel) {
@@ -754,6 +751,7 @@ function settleTransport(options = {}) {
       parentNeighborhood: active.parentNeighborhood,
       parentResolutionBasis: active.parentResolutionBasis,
       returnModel: active.returnModel,
+      cycles: active.cycles || 0,
       label: active.label,
       operator: active.operator || "playback"
     });
@@ -812,7 +810,8 @@ function flushPendingStep(options = {}) {
   if (pending.started && sameSpatialModel(model(), pending.originModel)) {
     state.session = {
       model: pending.originModel,
-      history: pending.originHistory
+      history: pending.originHistory,
+      future: pending.originFuture
     };
     view.render();
     return { flushed: true, cancelled: true, direction: pending.lastDirection };
@@ -990,9 +989,9 @@ function refine(direction, options = {}) {
   settleBeforeAction({ replacingContext: true });
   const carry = options.carryRetained === true || state.carryModifier;
   const originModel = snapshotModel(model(), { cloneGuide: carry });
-  const additive = options.additive === true;
-  let result = additive
-    ? additiveRefineSession(state.session, direction)
+  const local = options.local === true;
+  let result = local
+    ? localRefineSession(state.session, direction)
     : refineSession(state.session, direction);
   if (!result.changed) {
     const reason = refineBlockReason(
@@ -1014,11 +1013,11 @@ function refine(direction, options = {}) {
     ? formatRange(result.interval)
     : `cleared at ${formatTime(result.destination)}`;
   accept(result, {
-    status: additive
-      ? `Additive Refine ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; retained Working Interval ${workingSection}.${retainedCarryStatus(result)}`
-      : result.refineRelation === "shorten"
-      ? `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; the Working Section shortened to ${workingSection}.${retainedCarryStatus(result)}`
-      : `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; the previous Working Section was replaced by ${workingSection}.${retainedCarryStatus(result)}`
+    status: local
+      ? result.refineRelation === "shorten"
+        ? `Local Refine ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; the Working Section shortened to ${workingSection}.${retainedCarryStatus(result)}`
+        : `Local Refine ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; the previous Working Section was replaced by ${workingSection}.${retainedCarryStatus(result)}`
+      : `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; retained Working Interval ${workingSection}.${retainedCarryStatus(result)}`
   });
 }
 
@@ -1135,14 +1134,14 @@ function focusOrUnfocus() {
   return false;
 }
 
-function undoLastAction() {
+function traverseHistory(transform, emptyMessage, completedVerb) {
   settleBeforeAction({ replacingContext: true });
   const previousModel = model();
   const departure = currentResolution().C;
-  const result = undoSession(state.session);
+  const result = transform(state.session);
   if (!result.changed) {
-    setStatus("There is no preceding state to Undo.");
-    return;
+    setStatus(emptyMessage);
+    return false;
   }
   state.session = result.session;
   persistPreferences();
@@ -1166,8 +1165,25 @@ function undoLastAction() {
     stepField?.translateToCurrent(destination, { preserve: true });
   }
   view.renderGuide();
-  if (guidePersisted) setStatus(`Undid ${result.label}.`);
+  if (guidePersisted) setStatus(`${completedVerb} ${result.label}.`);
   view.render();
+  return true;
+}
+
+function undoLastAction() {
+  return traverseHistory(
+    undoSession,
+    "There is no preceding state to Undo.",
+    "Undid"
+  );
+}
+
+function redoLastAction() {
+  return traverseHistory(
+    redoSession,
+    "There is no subsequent state to Redo.",
+    "Redid"
+  );
 }
 
 function performStep(direction, distance = reachFor(direction), options = {}) {
@@ -1188,6 +1204,7 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
       intervalDeparture,
       originModel,
       originHistory: state.session.history,
+      originFuture: state.session.future || [],
       timer: null,
       started: false,
       lastDirection: direction,
@@ -1399,7 +1416,7 @@ function wrapPlaybackRange(transport = state.transport) {
     || !rangeLoops()
   ) return false;
   const range = activeRange();
-  state.transport = rebasePlaybackTransport(transport);
+  state.transport = rebasePlaybackTransport(transport, range.start);
   placePlayer(range.start);
   player.setRate(1);
   stepField?.resumeAt?.({ center: range.start, reason: "range-wrap" });
@@ -1878,15 +1895,19 @@ function goToAdjacentPin(direction, options = {}) {
     setStatus(`There is no Pin ${direction} within the active Range.`);
     return false;
   }
-  const destinationSelection = pin.stopKind === "section"
-    ? { kind: "section", id: pin.sectionId }
-    : { kind: "pin", id: pin.id };
+  const destinationSelection = pin.stopKind === "range-boundary"
+    ? null
+    : pin.stopKind === "section"
+      ? { kind: "section", id: pin.sectionId }
+      : { kind: "pin", id: pin.id };
   const carry = options.carryRetained === true || state.carryModifier;
   const hasCarrySelection = carry && Boolean(state.selectedRetained);
-  if (!carry) state.selectedRetained = destinationSelection;
+  if (!carry && destinationSelection) state.selectedRetained = destinationSelection;
   settleBeforeAction({ replacingContext: true });
   const originModel = snapshotModel(model(), { cloneGuide: carry });
-  let result = stepToPinSession(state.session, pin.t, direction);
+  let result = stepToPinSession(state.session, pin.t, direction, {
+    stepSeconds: reachFor(direction)
+  });
   if (!result.changed) {
     setStatus(`Current is already at that Pin.`);
     return false;
@@ -1899,11 +1920,13 @@ function goToAdjacentPin(direction, options = {}) {
   );
   const accepted = accept(result, {
     renderGuide: true,
-    status: pin.fold
+    status: pin.stopKind === "range-boundary"
+      ? `Pin ${direction === "backward" ? "Backward" : "Forward"} to ${pin.label} at ${formatTime(pin.t)}.${retainedCarryStatus(result)}`
+      : pin.fold
       ? `Pin ${direction === "backward" ? "Backward" : "Forward"} to stacked endpoint ${formatTime(pin.t)}; the Fold remains zero-width laterally.${retainedCarryStatus(result)}`
       : `Pin ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(pin.t)}.${retainedCarryStatus(result)}`
   });
-  if (!hasCarrySelection && carry) {
+  if (!hasCarrySelection && carry && destinationSelection) {
     state.selectedRetained = destinationSelection;
     view.renderGuide();
     view.render();
@@ -2168,12 +2191,15 @@ function pollPlayer() {
     }
   } else if (transport.kind === TRANSPORT_KIND.PLAYBACK && state.playerState === YOUTUBE_STATE.PLAYING) {
     if (!transport.enteredPath) {
-      const entered = now >= transport.departure - NATIVE_POSITION_TOLERANCE_SECONDS
-        && now <= transport.departure + 1.5;
+      const entry = Number.isFinite(transport.entry)
+        ? transport.entry
+        : transport.departure;
+      const entered = now >= entry - NATIVE_POSITION_TOLERANCE_SECONDS
+        && now <= entry + 1.5;
       if (entered) transport.enteredPath = true;
       else if (Date.now() - transport.startedAt > TRANSPORT_START_GRACE_MS) {
         transport.startedAt = Date.now();
-        placePlayer(transport.departure);
+        placePlayer(entry);
         player.setRate(1);
         player.play();
       }
@@ -2294,6 +2320,7 @@ function beginGuideDrag(kind, id, event, options = {}) {
       : null,
     originModel: null,
     originHistory: null,
+    originFuture: null,
     projection: projectionForModel(model()),
     inverseProjection: null,
     moved: false,
@@ -2335,6 +2362,7 @@ function updateGuideDrag(event) {
       : null;
     drag.originModel = snapshotModel(model(), { cloneGuide: true });
     drag.originHistory = state.session.history;
+    drag.originFuture = state.session.future || [];
     drag.projection = projectionForModel(drag.originModel);
     drag.inverseProjection = section
       ? projectionForModel(drag.originModel, {
@@ -2368,7 +2396,8 @@ function updateGuideDrag(event) {
   }
   const baseSession = {
     model: drag.originModel,
-    history: drag.originHistory
+    history: drag.originHistory,
+    future: drag.originFuture
   };
   const result = drag.kind === "pin"
     ? moveGuidePin(baseSession, drag.id, source, { amend: true })
@@ -2417,7 +2446,8 @@ function finishGuideDrag(event, options = {}) {
     if (options.cancel === true && drag.moved) {
       state.session = {
         model: drag.originModel,
-        history: drag.originHistory
+        history: drag.originHistory,
+        future: drag.originFuture
       };
       view.invalidateTimelinePins();
       view.renderGuide();
@@ -2519,9 +2549,17 @@ function updateRangeDrag(event) {
     && Math.abs(end - origin.range.end) <= EPSILON;
 
   if (sameBoundaries) {
-    state.session = { model: origin, history: state.session.history };
+    state.session = {
+      model: origin,
+      history: state.session.history,
+      future: state.session.future || []
+    };
   } else {
-    const baseSession = { model: origin, history: state.session.history };
+    const baseSession = {
+      model: origin,
+      history: state.session.history,
+      future: state.session.future || []
+    };
     const result = previewRange(baseSession, start, end, current);
     if (result.changed) state.session = result.session;
   }
@@ -2544,7 +2582,11 @@ function finishRangeDrag() {
     view.renderGuide();
     setStatus(`Range set to ${formatRange(activeRange())}.`);
   } else if (origin) {
-    state.session = { model: origin, history: state.session.history };
+    state.session = {
+      model: origin,
+      history: state.session.history,
+      future: state.session.future || []
+    };
   }
   view.render();
 }
@@ -2558,7 +2600,8 @@ function cancelRangeDrag() {
   if (origin) {
     state.session = {
       model: origin,
-      history: state.session.history
+      history: state.session.history,
+      future: state.session.future || []
     };
     locateAddress(currentResolution().C);
     view.renderGuide();
@@ -2855,7 +2898,6 @@ function initializePlayerApi() {
       videoId: state.videoId,
       current: currentResolution()?.C || 0,
       range: activeFieldRange(),
-      projection: fieldProjection(),
       // Step Field offsets are physical observation settings. They are
       // intentionally independent from the semantic Step Reach.
       stepReach: currentFieldOffsets(),
@@ -2880,19 +2922,6 @@ function initializePlayerApi() {
         state.fieldResponse = normalizeFieldResponse({ ...state.fieldResponse, ...patch });
       }
       persistPreferences();
-    },
-    onHoldOffsets: patch => {
-      const current = currentFieldOffsets();
-      state.fieldOffsets = normalizeStepReach({
-        backward: Number.isFinite(Number(patch.backward)) ? Number(patch.backward) : current.backward,
-        forward: Number.isFinite(Number(patch.forward)) ? Number(patch.forward) : current.forward,
-        linked: false,
-        mode: STEP_REACH_MODE.FIXED
-      }, current);
-      // Hold records only the Field relation it measured. Semantic Step Reach
-      // remains untouched, so changing observation never changes navigation.
-      persistPreferences();
-      view.render();
     },
     onChange: fieldState => {
       state.field = fieldState;
@@ -3038,6 +3067,12 @@ elements["fold-lane"].addEventListener("click", event => {
     event.stopPropagation();
     return;
   }
+  const axis = event.target.closest("[data-fold-axis]");
+  if (axis) {
+    event.stopPropagation();
+    setStatus("A Fold interior is source time, not a navigation axis. Use an endpoint Pin or the center hinge.");
+    return;
+  }
   const pin = event.target.closest("[data-pin-go]");
   if (pin) {
     event.stopPropagation();
@@ -3163,6 +3198,14 @@ elements["range-end-here"].addEventListener("click", () => {
     `Set Range End to ${formatTime(currentResolution().C)}.`
   );
 });
+elements["go-range-start"].addEventListener("click", event => {
+  moveToAddress(activeRange().start, {
+    operator: "rangeStart",
+    label: "Go to Range Start",
+    carryRetained: event.altKey === true,
+    status: destination => `Moved to Range Start at ${formatTime(destination)}.`
+  });
+});
 elements["range-midpoint"].addEventListener("click", event => {
   const middle = temporalProjection().sourceMidpoint(
     activeRange().start,
@@ -3175,6 +3218,14 @@ elements["range-midpoint"].addEventListener("click", event => {
     status: destination => `Moved to Range midpoint at ${formatTime(destination)}.`
   });
 });
+elements["go-range-end"].addEventListener("click", event => {
+  moveToAddress(activeRange().end, {
+    operator: "rangeEnd",
+    label: "Go to Range End",
+    carryRetained: event.altKey === true,
+    status: destination => `Moved to Range End at ${formatTime(destination)}.`
+  });
+});
 elements["full-video-range"].addEventListener("click", () => {
   setRange(0, model().duration, currentResolution().C, "Full Video Range", "Restored Full Video Range.");
 });
@@ -3182,9 +3233,9 @@ elements["full-video-range"].addEventListener("click", () => {
 // Navigation and observation
 
 elements["refine-backward"].addEventListener("click", event => {
-  const additive = event.shiftKey === true || state.shiftLayer;
+  const local = event.shiftKey === true || state.shiftLayer;
   refine("backward", {
-    additive,
+    local,
     carryRetained: event.altKey === true
   });
   if (state.shiftLayer) {
@@ -3193,9 +3244,9 @@ elements["refine-backward"].addEventListener("click", event => {
   }
 });
 elements["refine-forward"].addEventListener("click", event => {
-  const additive = event.shiftKey === true || state.shiftLayer;
+  const local = event.shiftKey === true || state.shiftLayer;
   refine("forward", {
-    additive,
+    local,
     carryRetained: event.altKey === true
   });
   if (state.shiftLayer) {
@@ -3217,6 +3268,7 @@ elements["shift-layer-toggle"].addEventListener("click", () => {
   view.render();
 });
 elements["return-action"].addEventListener("click", undoLastAction);
+elements["redo-action"].addEventListener("click", redoLastAction);
 elements["center-transport-surface"].addEventListener("click", toggleNativePlayback);
 
 const tapStep = selection => {
@@ -3522,10 +3574,8 @@ document.addEventListener("keydown", event => {
   const spatialKey = expected => plain && (code === `Key${expected.toUpperCase()}` || key === expected);
   const carrySpatialKey = expected => carryChord
     && (code === `Key${expected.toUpperCase()}` || key === expected);
-  const commandUndo = (event.ctrlKey || event.metaKey)
-    && !event.altKey
-    && !event.shiftKey
-    && key === "z";
+  const commandUndo = plain && key === "z";
+  const commandRedo = plain && key === "c";
 
   if (plain && key === "g") {
     event.preventDefault();
@@ -3585,14 +3635,14 @@ document.addEventListener("keydown", event => {
   else if (shiftedSpatialKey("q")) {
     event.preventDefault();
     refine("backward", {
-      additive: true,
+      local: true,
       carryRetained: event.altKey === true
     });
   }
   else if (shiftedSpatialKey("e")) {
     event.preventDefault();
     refine("forward", {
-      additive: true,
+      local: true,
       carryRetained: event.altKey === true
     });
   }
@@ -3653,6 +3703,7 @@ document.addEventListener("keydown", event => {
   else if (plain && event.key === "[") { event.preventDefault(); adjustStepPreset(-1); }
   else if (plain && event.key === "]") { event.preventDefault(); adjustStepPreset(1); }
   else if (commandUndo) { event.preventDefault(); undoLastAction(); }
+  else if (commandRedo) { event.preventDefault(); redoLastAction(); }
   else if (plain && event.key === " ") { event.preventDefault(); toggleNativePlayback(); }
 });
 

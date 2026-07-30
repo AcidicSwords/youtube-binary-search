@@ -79,6 +79,7 @@ export function createPlaybackTransport({
     kind: TRANSPORT_KIND.PLAYBACK,
     phase: "starting",
     departure,
+    entry: departure,
     parentNeighborhood,
     parentResolutionBasis,
     returnModel,
@@ -90,11 +91,16 @@ export function createPlaybackTransport({
   };
 }
 
-export function rebasePlaybackTransport(transport, startedAt = Date.now()) {
+export function rebasePlaybackTransport(
+  transport,
+  entry = transport?.entry ?? transport?.departure,
+  startedAt = Date.now()
+) {
   if (transport?.kind !== TRANSPORT_KIND.PLAYBACK) return transport;
   return {
     ...transport,
     phase: "starting",
+    entry,
     enteredPath: false,
     cycles: (transport.cycles || 0) + 1,
     startedAt

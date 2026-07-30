@@ -10,7 +10,7 @@ This document is normative for v6. Source time is the only persisted temporal tr
 - **Current** — committed semantic source Address.
 - **Cursor** — transient observed player Address.
 - **Resolution** — `{ backward, current, forward, level }`, stored in source Addresses and interpreted through the active traversal metric.
-- **Working Interval** — a directed source-contiguous extent `{ departure, arrival }`; arrival is Current. It may have positive source duration and zero Traversal Time duration.
+- **Working Interval** — source-contiguous coverage `{ start, end }` plus an active side, endpoint frames, and directed `{ departure, arrival }`; arrival is Current. During playback Current may be inside retained coverage, while departure remains the opposite stored boundary.
 - **Pin** — a shared source Address with optional title.
 - **Section** — an edge between two Pins with positive source duration, optional title, and independent `collapsed` flag.
 - **Focus context** — the exact containing Range and presentation context restored by Unfocus.
@@ -52,17 +52,7 @@ Fold and unfold never move source Addresses, Current, or the Working Interval.
 
 ### Refine
 
-Refine chooses the directional midpoint of the active Resolution in Traversal Time and increases `level`. Its existing membership law remains:
-
-- a target inside the Working Interval shortens toward the opposite endpoint;
-- exact coincidence with that opposite endpoint collapses the Interval;
-- a target outside replaces the Interval with the complete Current-to-target movement.
-
-A Fold has no interior midpoint in Traversal Time, so Refine cannot descend inside it.
-
-### Additive Refine
-
-Additive Refine uses the exact ordinary Refine target and child frame, then applies Step’s retained-anchor rule:
+Refine chooses the directional midpoint of the active Resolution in Traversal Time, increases `level`, and retains the usable Working Interval departure:
 
 1. use `Interval.departure` when `Interval.arrival === Current`;
 2. otherwise use pre-movement Current;
@@ -70,28 +60,40 @@ Additive Refine uses the exact ordinary Refine target and child frame, then appl
 4. expand only the receding Resolution bound enough to contain that extent;
 5. preserve the refinement increment.
 
+A Fold has no interior midpoint in Traversal Time, so Refine cannot descend inside it.
+
+### Local Refine (`Shift+Refine`)
+
+Local Refine uses the same directional midpoint and child-frame calculation, then applies midpoint membership:
+
+- a target inside the Working Interval shortens toward the opposite endpoint;
+- exact coincidence with that opposite endpoint collapses the Interval;
+- a target outside replaces the Interval with the complete Current-to-target movement.
+
 Example on a normalized Range:
 
 ```text
-plain:     50 → 25 → 12.5    Interval 25 → 12.5, frame {0,12.5,25}
-additive:  50 → 25 → 12.5    Interval 50 → 12.5, frame {0,12.5,50}
-reverse additive target       31.25
+Refine:        50 → 25 → 12.5    Interval 50 → 12.5, frame {0,12.5,50}
+Local Refine:  50 → 25 → 12.5    Interval 25 → 12.5, frame {0,12.5,25}
+reverse Refine target             31.25
 ```
 
 ### Step
 
 Step translates Current by the effective Reach in Traversal Time, clamped to Range. It preserves a usable departure anchor, so repeated movements extend, shrink, collapse, and redraw one Working Interval predictably.
 
+The approached Resolution endpoint remains fixed while its prospective midpoint has at least one complete Step of headroom. Once a further Step would consume that guard, only the approached endpoint advances far enough to put the next midpoint one Step ahead. The result depends on the gesture origin, final destination, and configured Reach—not tap cadence.
+
 Step Reach is:
 
 - fixed: independently entered directional seconds;
 - adaptive: `projectedRangeWidth × fraction`, with supported presets `1/32`, `1/16`, and `1/8`, bounded by the canonical minimum and maximum.
 
-Hold and Stretch cannot write Step Reach.
+Hold and Stretch cannot write Step Reach or configured Field Offset.
 
 ### Pin traversal
 
-Pin traversal uses Step’s anchor rule but chooses the next visible Pin operand. A Fold contributes its ordered boundary Pins at one lateral coordinate; a forward sequence therefore visits lower then upper Pins, and backward reverses that sequence.
+Pin traversal uses Step’s anchor rule but chooses the next visible Pin operand. A Fold contributes its ordered boundary Pins at one lateral coordinate; a forward sequence therefore visits lower then upper Pins, and backward reverses that sequence. Range Start and Range End participate as synthetic stops and are deduplicated by real Pins at the same address.
 
 ### Reopen
 
@@ -117,9 +119,11 @@ Focus installs a Section or Working Interval as Range. Focusing a transposed sav
 
 Timeline Go targets visible Traversal Time. Guide Go targets an exact source object. Navigating to a hidden interior Pin or Section unfolds every covering contributor and commits that exact Go as one Undo transaction.
 
-### Undo
+### Undo / Redo
 
 Every semantic gesture creates at most one history entry. Fold/unfold, drag, cascade deletion, hidden-object Go, Focus, and Unfocus are each atomic.
+
+Plain `Z` restores the preceding checkpoint. Plain `C` reapplies the next checkpoint. Any new semantic commit clears the Redo future.
 
 ## 6. Range playback
 
@@ -129,7 +133,8 @@ Playback and Context are source-contiguous and projection-independent.
 - A proper Range loops.
 - Each wrap seeks to Range start, increments transport cycles, and resumes.
 - A wrap commits no Current, Working Interval, Resolution, Context, or history.
-- Playback settlement commits the same endpoint deformation that was rendered live.
+- The wrap watchdog follows the current cycle entry at Range start rather than the original playback departure.
+- Playback settlement commits the same coverage rendered live: the union of prior Working coverage and every watched source segment. It may preserve or extend coverage, never shorten it.
 
 ## 7. Guide lifecycle
 

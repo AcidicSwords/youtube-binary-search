@@ -22,7 +22,8 @@ R T F
 
 Shift changes the two directional operator families:
 
-- `Shift+Q/E` invokes Additive Refine. It uses the same logarithmic midpoint descent as Refine while preserving the departure anchor and expanding only the receding Resolution bound enough to contain the retained Working Interval.
+- Plain `Q/E` Refine retains the Working Interval’s departure anchor while increasing logarithmic resolution.
+- `Shift+Q/E` invokes Local Refine. It uses midpoint membership to shorten an existing Working Interval or replace it with the new local traversal.
 - `Shift+A/D` or `Shift+←/→` traverses Pins. Consecutive Pin hops use Step’s retained-anchor rule, so they compose into one Working Interval.
 
 The remaining operators are deliberately small:
@@ -32,7 +33,7 @@ The remaining operators are deliberately small:
 - Release clears the Working Interval and does nothing when there is none.
 - Transpose saves or reuses the Working Interval’s endpoint Pins and Section, then folds that Section. On a selected Section it toggles only that Section.
 - Focus clamps Range to a Working or saved Section. A transposed Section materializes while focused; Unfocus restores both the containing Range and its previous presentation.
-- Undo is outside the matrix on `Ctrl/⌘ Z`.
+- Undo and Redo are outside the matrix on plain `Z` and `C`.
 
 ## Step size
 
@@ -41,7 +42,7 @@ Step size is independent from the three-player Field.
 - Manual mode accepts a lateral distance in seconds.
 - Range-relative mode derives the distance from the active Range’s current lateral width.
 - The `1/32`, `1/16`, and `1/8` presets make the adaptive interval easy to change. Bracket shortcuts cycle the same presets.
-- Hold and Stretch change only physical Tail/Lead offsets. They never overwrite semantic Step size.
+- Hold and Stretch change only the live Tail/Lead relation. They never overwrite configured Offset or semantic Step size.
 
 Adaptive size is recomputed after Focus, Unfocus, or transposition because those operations change the active lateral Range. The stored fraction does not change.
 
@@ -53,13 +54,14 @@ Pins are shared source Addresses. Sections are edges between two Pins; endpoint 
 - Folding one Section never changes another Section’s persisted fold flag.
 - Overlapping folded Sections form one derived maximal Fold rail while retaining separate coloured contributor rails and identities.
 - A Pin strictly inside a Fold is hidden from lateral traversal. Direct Guide navigation to it unfolds the covering contributors and completes the exact Go in one Undo transaction.
+- Range Start and Range End are synthetic Pin-traversal stops, deduplicated when a real Pin already exists there.
 - Moving a shared Pin updates every referencing Section.
 - Moving a Section translates only its two endpoint Pins; unrelated Pins inside its span are not captured.
 - Deleting a referenced Pin previews the affected count, dissolves all referencing Sections, and cleans up orphaned untitled endpoint Pins in one transaction.
 
 The Fold rail is a source-time ruler rotated vertically at one lateral coordinate. Its bottom endpoint is earlier and its top endpoint is later. Plain Step and either Refine form treat that rail as zero lateral distance. Pin traversal visits the stacked endpoints sequentially. No operator moves through the rail’s interior.
 
-The timeline remains full width. It shows source-time ruler labels, the active Range and Resolution, Working Interval, open Section lanes, transposed contributor rails, shared Pins, Current, and the observed playback Cursor. Dense Fold endpoints are staggered for legibility without changing their exact source positions.
+The timeline remains full width. It separates open Section lanes, the Fold stage, the semantic track, the source ruler, and free Pins into collision-aware bands. It shows adaptive major/minor source-time guides, active Range and Resolution, Working Interval, exact action previews, transposed contributor rails, shared Pins, Current, and the observed playback Cursor. Its height follows the actual lane and Fold density instead of overlapping excess structure.
 
 ## Playback and Context
 
@@ -72,7 +74,7 @@ Native playback and automatic Context are source-contiguous under every Fold con
 - rebases the existing Field relation once;
 - resumes at Range start.
 
-Folding therefore changes navigation and presentation, never audio or media order.
+Playback coverage is monotonic: settling playback preserves or extends the Working Interval with every watched source segment and never shortens it. Folding therefore changes navigation and presentation, never audio or media order.
 
 ## Step Field
 
@@ -80,7 +82,7 @@ Center is the audible player. Tail and Lead are optional muted projections aroun
 
 - Offset is physical Field spacing, not Step size.
 - Stretch forms a side relation during genuine Center playback.
-- Hold freezes its measured relation at `1×`.
+- Hold freezes the live measured relation at `1×` without saving it into the Offset controls.
 - Side surfaces and local Step buttons invoke semantic Step using the visible differential.
 - Context suspends the side projections and cannot be mistaken for a stored Field relation.
 

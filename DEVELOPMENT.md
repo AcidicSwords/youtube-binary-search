@@ -35,13 +35,14 @@ Do not add Fold-specific arithmetic to an operator. Extend the shared projection
 - Materialize a transposed Section for Focus without mutating its stored flag.
 - Unfold covering contributors for an exact hidden Guide target in the same transaction.
 - Recompute adaptive Step from active projected Range; never from source duration or Field Offset.
-- Hold/Stretch may update only `fieldOffsets`.
+- Hold/Stretch are runtime-only and may update neither `fieldOffsets` nor `stepReach`.
 
 ## Testing map
 
 - `tests.mjs` — Range geometry and Session transactions
 - `temporal-projection-tests.mjs` — Fold union, maps, layout, materialization
 - `v6-transposition-tests.mjs` — matrix additions, Pin graph, adaptive Step, cascade behavior
+- `v6-coherence-tests.mjs` — guarded Step, swapped Refine, Fold Fields/stops, monotonic playback, Redo, exact previews, dense layout
 - `transport-tests.mjs` — source Context and proper-Range looping helpers
 - `source-field-tests.mjs` — source player relationships
 - `fuzz-tests.mjs` — 25,000 deterministic semantic operations

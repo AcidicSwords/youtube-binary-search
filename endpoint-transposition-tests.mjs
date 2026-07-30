@@ -6,6 +6,7 @@ import {
   snapshotModel,
   goTo,
   refine,
+  localRefine,
   reopen,
   step,
   completePlayback,
@@ -68,7 +69,7 @@ assert.deepEqual(switched.session.model.interval, originalInterval);
 let overrun = createSession({ duration: 100, current: 50 });
 overrun = goTo(overrun, 70, { operator: "timeline" }).session;
 overrun = switchEndpoint(overrun).session;
-const overrunResult = refine(overrun, "forward");
+const overrunResult = localRefine(overrun, "forward");
 assert.equal(overrunResult.refineRelation, "replace");
 assert.deepEqual(
   {
@@ -86,9 +87,9 @@ assert.deepEqual(overrunResult.session.model.resolution, {
   level: 1
 });
 
-// Playback edits the selected endpoint instead of replacing the Interval that
-// Switch Endpoint is transposing. The opposite endpoint and its search frame
-// survive shrink, extension, and a subsequent switch.
+// Playback accumulates watched coverage without replacing or shortening the
+// Interval that Switch Endpoint is transposing. Boundary search frames survive
+// an interior Current and a subsequent switch.
 let played = createSession({ duration: 120, current: 10 });
 played = goTo(played, 50, { operator: "timeline" }).session;
 const frameAtFifty = frameOf(played.model);
@@ -108,8 +109,8 @@ assert.deepEqual(
     departure: played.model.interval.departure,
     arrival: played.model.interval.arrival
   },
-  { start: 20, end: 50, departure: 50, arrival: 20 },
-  "Playback from a switched endpoint must resize the active Interval around the preserved opposite endpoint."
+  { start: 10, end: 50, departure: 50, arrival: 20 },
+  "Playback from a switched endpoint must preserve the prior extent while Current moves inside it."
 );
 assert.equal(played.model.resolution.L, playbackOrigin.resolution.L);
 assert.equal(played.model.resolution.C, 20);
@@ -118,8 +119,8 @@ assert.equal(played.model.resolution.C, 50);
 assert.deepEqual(frameOf(played.model), frameAtFifty);
 assert.deepEqual(
   { start: played.model.interval.start, end: played.model.interval.end },
-  { start: 20, end: 50 },
-  "Switch Endpoint must not change the playback-deformed extent."
+  { start: 10, end: 50 },
+  "Switch Endpoint must not change accumulated playback coverage."
 );
 
 // Reopen changes the active endpoint frame without changing Interval extent.
@@ -238,6 +239,8 @@ let legacy = createSession({ duration: 100, current: 20 });
 legacy = goTo(legacy, 40, { operator: "timeline" }).session;
 delete legacy.model.interval.departureFrame;
 delete legacy.model.interval.arrivalFrame;
+delete legacy.model.interval.startFrame;
+delete legacy.model.interval.endFrame;
 legacy = switchEndpoint(legacy).session;
 assert.equal(legacy.model.resolution.C, 20);
 assert.ok(legacy.model.interval.departureFrame);
@@ -251,7 +254,8 @@ assert.match(
   html,
   /id="refine-backward"[\s\S]*id="reopen"[\s\S]*id="refine-forward"[\s\S]*id="step-backward"[\s\S]*id="switch-endpoint"[\s\S]*id="step-forward"[\s\S]*id="release"[\s\S]*id="transpose"[\s\S]*id="focus-toggle"/
 );
-assert.match(html, /id="return-action"[\s\S]*Control\+Z Meta\+Z/);
+assert.match(html, /id="return-action"[^>]*aria-keyshortcuts="Z"/);
+assert.match(html, /id="redo-action"[^>]*aria-keyshortcuts="C"/);
 assert.match(
   app,
   /spatialKey\("s"\)[\s\S]*switchCurrentEndpoint\(\{ carryRetained: carryChord \}\)/

@@ -11,7 +11,7 @@ import {
   leaveSection,
   overwriteGuideSection,
   pinCurrent,
-  refine,
+  localRefine,
   reopen,
   saveIntervalAsSection,
   setRange,
@@ -59,8 +59,12 @@ function assertInvariant(session) {
       `Active Interval must remain inside Resolution: ${JSON.stringify({ interval, resolution })}`
     );
     assert.ok(Math.abs(interval.arrival - resolution.C) <= EPSILON);
-    assert.ok(Math.abs(interval.start - Math.min(interval.departure, interval.arrival)) <= EPSILON);
-    assert.ok(Math.abs(interval.end - Math.max(interval.departure, interval.arrival)) <= EPSILON);
+    assert.ok(interval.arrival >= interval.start - EPSILON);
+    assert.ok(interval.arrival <= interval.end + EPSILON);
+    assert.ok(
+      Math.abs(interval.departure - interval.start) <= EPSILON
+      || Math.abs(interval.departure - interval.end) <= EPSILON
+    );
     for (const [key, address] of [
       ["departureFrame", interval.departure],
       ["arrivalFrame", interval.arrival]
@@ -123,8 +127,8 @@ for (let run = 0; run < RUNS; run += 1) {
         ? refineExpectation(session, "forward")
         : null;
     let result;
-    if (operation === 0) result = refine(session, "backward");
-    else if (operation === 1) result = refine(session, "forward");
+    if (operation === 0) result = localRefine(session, "backward");
+    else if (operation === 1) result = localRefine(session, "forward");
     else if (operation === 2) result = reopen(session);
     else if (operation === 3) result = step(session, "backward", 0.25 + random() * 120);
     else if (operation === 4) result = step(session, "forward", 0.25 + random() * 120);
@@ -202,8 +206,9 @@ for (let run = 0; run < RUNS; run += 1) {
   }
 }
 
-// Refine is a complete approximate locator inside a fixed Range. Direction is
-// chosen by the target's relation to Current; the target remains bracketed.
+// Local (Shift+) Refine is a complete approximate locator inside a fixed Range.
+// Direction is chosen by the target's relation to Current; the target remains
+// bracketed.
 const TARGET_TRIALS = 10_000;
 let maximumRefinements = 0;
 for (let trial = 0; trial < TARGET_TRIALS; trial += 1) {
@@ -212,7 +217,7 @@ for (let trial = 0; trial < TARGET_TRIALS; trial += 1) {
   let count = 0;
   while (Math.abs(locator.model.resolution.C - target) > EPSILON) {
     const direction = target < locator.model.resolution.C ? "backward" : "forward";
-    const result = refine(locator, direction);
+    const result = localRefine(locator, direction);
     assert.equal(result.changed, true);
     locator = result.session;
     assert.ok(target >= locator.model.resolution.L - EPSILON);

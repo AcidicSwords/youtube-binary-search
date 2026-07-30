@@ -61,8 +61,15 @@ assert.match(
   /0:25\.000–0:50\.000/,
   "Pin traversal must establish the same retained anchor as Step."
 );
+assert.match(byId.get("backward-meta").textContent, /^retain anchor · to /,
+  "Plain Refine meta must disclose retained-anchor behavior before invocation.");
+byId.get("shift-layer-toggle").click();
+await flush();
+assert.equal(byId.get("refine-backward-label").textContent, "Local Refine Backward");
 assert.match(byId.get("backward-meta").textContent, /^shorten Interval · to /,
-  "Refine meta must disclose Interval shortening before invocation.");
+  "Shift+Refine meta must disclose local membership behavior before invocation.");
+byId.get("shift-layer-toggle").click();
+await flush();
 byId.get("switch-endpoint").click();
 await flush();
 assert.equal(currentText(), "Current 0:25.000");
@@ -85,7 +92,7 @@ assert.match(byId.get("section-window").textContent, /0:25\.000–0:50\.000/);
 
 // Switch Endpoint preserves the ordered Interval while transposing its active
 // endpoint and retained search frame. S owns the same operator; Undo remains a
-// separate Ctrl/Cmd+Z history action outside the matrix.
+// separate plain-Z history action outside the matrix.
 byId.get("switch-endpoint").click();
 await flush();
 assert.equal(currentText(), "Current 0:25.000");
@@ -94,10 +101,10 @@ assert.match(byId.get("switch-endpoint-meta").textContent, /0:50\.000/);
 dispatchDocument("keydown", { key: "s", code: "KeyS" });
 await flush();
 assert.equal(currentText(), "Current 0:50.000");
-dispatchDocument("keydown", { key: "z", code: "KeyZ", ctrlKey: true });
+dispatchDocument("keydown", { key: "z", code: "KeyZ" });
 await flush();
 assert.equal(currentText(), "Current 0:25.000");
-dispatchDocument("keydown", { key: "z", code: "KeyZ", ctrlKey: true });
+dispatchDocument("keydown", { key: "z", code: "KeyZ" });
 await flush();
 assert.equal(currentText(), "Current 0:50.000");
 
@@ -142,13 +149,13 @@ assert.ok(
   descendants(byId.get("sections-list")).some(node => /0:25\.000–1:00\.000/.test(node.textContent)),
   "Overwrite must update the retained Section Extent."
 );
-dispatchDocument("keydown", { key: "z", code: "KeyZ", ctrlKey: true });
+dispatchDocument("keydown", { key: "z", code: "KeyZ" });
 await flush();
 assert.ok(
   descendants(byId.get("sections-list")).some(node => /0:25\.000–0:50\.000/.test(node.textContent)),
   "Undo must restore the retained Section Extent."
 );
-dispatchDocument("keydown", { key: "z", code: "KeyZ", ctrlKey: true });
+dispatchDocument("keydown", { key: "z", code: "KeyZ" });
 await flush();
 assert.match(byId.get("section-window").textContent, /0:25\.000–0:50\.000/);
 byId.get("guide-tab-sections").blur();
@@ -229,7 +236,7 @@ byId.get("tail-field-toggle").click(); // Stretch -> Hold at 4 s
 await flush();
 assert.equal(center.state, 1, "Holding a side must not interrupt Center playback.");
 assert.equal(tail.rate, 1, "Held Tail must match Center at 1x.");
-assert.equal(byId.get("step-backward-seconds").value, "4", "Explicit Hold adopts its visible physical Tail offset.");
+assert.equal(byId.get("step-backward-seconds").value, "10", "Explicit Hold must not overwrite configured Tail Offset.");
 assert.equal(byId.get("step-size-seconds").value, "10", "Hold must not overwrite semantic Step size.");
 assert.equal(byId.get("section-window").textContent, intervalBeforeStretch,
   "Hold must update neither semantic Step Reach nor Interval.");
@@ -237,12 +244,12 @@ assert.equal(byId.get("section-window").textContent, intervalBeforeStretch,
 byId.get("field-both-toggle").click(); // Hold remaining Lead at 8 s
 await flush();
 assert.equal(lead.rate, 1);
-assert.equal(byId.get("step-forward-seconds").value, "8");
+assert.equal(byId.get("step-forward-seconds").value, "10");
 assert.equal(byId.get("field-both-toggle-label").textContent, "Stretch both");
 assert.equal(byId.get("section-window").textContent, intervalBeforeStretch);
 
-// Native pause freezes and parks exact side frames. Playback moves only the
-// selected Interval endpoint; the Field remains a separate physical object.
+// Native pause freezes and parks exact side frames. Playback accumulates watched
+// coverage without shortening it; the Field remains a separate physical object.
 center.currentTime = 58;
 tail.currentTime = 54;
 lead.currentTime = 66;
@@ -320,4 +327,4 @@ assert.equal(byId.get("release").classList.contains("lifecycle-action"), true);
 assert.equal(byId.get("transpose").classList.contains("lifecycle-action"), true);
 assert.equal(byId.get("focus-toggle").classList.contains("lifecycle-action"), true);
 
-console.log("Interaction smoke passed: Shift Pin traversal, membership-based Refine preview, unsaved Working Focus, explicit Section overwrite, Switch involution, separate Undo, Guide retention, composable Step intervals, shared activation, deterministic refold/stretch, confirmed rates, independent Hold offsets, whole-Field side Step, and Space playback.");
+console.log("Interaction smoke passed: Shift Pin traversal, local Refine preview, unsaved Working Focus, explicit Section overwrite, Switch involution, Undo/Redo ownership, Guide retention, composable Step intervals, shared activation, deterministic refold/stretch, immutable configured offsets, whole-Field side Step, and Space playback.");
