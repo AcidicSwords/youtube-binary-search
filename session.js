@@ -8,6 +8,7 @@ import {
   createRoot,
   getTargets,
   classifyRefineRelation,
+  classifyRetainedRefineRelation,
   refineNeighborhood,
   seedNeighborhoodFromMovement,
   isRangeNeighborhood,
@@ -810,6 +811,14 @@ function refineIntervalRelation(model, target) {
     : { departure: current, relation: "replace" };
 }
 
+function retainedRefineIntervalRelation(model, target) {
+  const current = model.resolution.C;
+  const relation = classifyRetainedRefineRelation(model.interval, current, target);
+  return relation === "retain"
+    ? { departure: model.interval.departure, relation }
+    : { departure: current, relation };
+}
+
 export function localRefine(session, direction) {
   const metric = projectionForModel(session.model).metric;
   const target = getTargets(session.model.resolution, metric)[direction];
@@ -830,13 +839,13 @@ export function refine(session, direction) {
   const target = getTargets(session.model.resolution, projection.metric)[direction];
   if (target === null) return unchanged(session, "no-destination");
   const backward = direction === "backward";
-  const anchor = stepIntervalAnchor(session.model);
+  const intervalRelation = retainedRefineIntervalRelation(session.model, target);
   return goTo(session, target, {
     mode: "refine",
     operator: backward ? "refineBackward" : "refineForward",
     label: backward ? "Refine Backward" : "Refine Forward",
-    intervalDeparture: anchor,
-    refineRelation: "retain"
+    intervalDeparture: intervalRelation.departure,
+    refineRelation: intervalRelation.relation
   });
 }
 

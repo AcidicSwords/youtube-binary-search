@@ -22,7 +22,7 @@ R T F
 
 Shift changes the two directional operator families:
 
-- Plain `Q/E` Refine retains the Working Interval’s departure anchor while increasing logarithmic resolution.
+- Plain `Q/E` Refine retains the Working Interval’s departure anchor while increasing logarithmic resolution. If a reversal reaches or passes that anchor, the complete Current-to-target movement becomes the new Working Interval.
 - `Shift+Q/E` invokes Local Refine. It uses midpoint membership to shorten an existing Working Interval or replace it with the new local traversal.
 - `Shift+A/D` or `Shift+←/→` traverses Pins. Consecutive Pin hops use Step’s retained-anchor rule, so they compose into one Working Interval.
 

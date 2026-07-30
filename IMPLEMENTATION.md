@@ -58,7 +58,7 @@ The inverse mapping uses direction at a Fold coordinate. Plain Step translates c
 
 Both Refine variants delegate target and child-frame calculation to the established Range kernel.
 
-Plain `refine()` retains the existing Step departure when usable, otherwise the pre-movement Current. It contains the resulting extent by expanding only the receding frame bound and preserves the refinement level.
+Plain `refine()` retains the existing Step departure while that Address remains outside the new Current-to-target path. If the target reaches or passes the retained departure, Refine rebases at Current and records the complete movement; treating the crossed Address as a departure would incorrectly discard part of the traversal. It contains the resulting extent by expanding only the receding frame bound and preserves the refinement level.
 
 `localRefine()` is the Shift variant. It applies the established midpoint-membership law: an inside target shortens toward the opposite endpoint, and an outside target replaces the Working Interval.
 

@@ -140,7 +140,10 @@ assert.match(view, /dataset\.foldContributors/);
 assert.match(view, /timeline-fold-pin/);
 
 assert.match(session, /export function localRefine/);
-assert.match(session, /export function refine[\s\S]*refineRelation:\s*"retain"/);
+assert.match(
+  session,
+  /function retainedRefineIntervalRelation[\s\S]*classifyRetainedRefineRelation[\s\S]*export function refine[\s\S]*refineRelation:\s*intervalRelation\.relation/
+);
 assert.match(session, /export function releaseInterval/);
 assert.match(session, /export function transposeSection/);
 assert.match(session, /export function focusWorkingSection[\s\S]*FOCUS_KIND\.WORKING/);

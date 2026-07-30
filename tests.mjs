@@ -8,6 +8,7 @@ import {
   createRoot,
   getTargets,
   classifyRefineRelation,
+  classifyRetainedRefineRelation,
   descend,
   refineNeighborhood,
   seedNeighborhoodFromMovement,
@@ -104,6 +105,33 @@ assert.equal(
   ),
   "shorten",
   "The Interval-membership rule includes an endpoint landing, which collapses the Interval."
+);
+
+const retainedRefineInterval = {
+  start: 25,
+  end: 50,
+  departure: 50,
+  arrival: 25
+};
+assert.equal(
+  classifyRetainedRefineRelation(retainedRefineInterval, 25, 37.5),
+  "retain",
+  "Plain Refine retains its anchor while a reversal remains on the Current side of it."
+);
+assert.equal(
+  classifyRetainedRefineRelation(retainedRefineInterval, 25, 12.5),
+  "retain",
+  "Plain Refine retains its anchor while continuing away from it."
+);
+assert.equal(
+  classifyRetainedRefineRelation(retainedRefineInterval, 25, 50),
+  "full",
+  "Reaching the retained anchor must record the non-zero Current-to-anchor movement."
+);
+assert.equal(
+  classifyRetainedRefineRelation(retainedRefineInterval, 25, 62.5),
+  "full",
+  "Passing the retained anchor must record the complete traversal instead of subtracting it."
 );
 assert.deepEqual(
   getTargets({ L: 0, C: 0.077, R: 1, level: 3 }),
