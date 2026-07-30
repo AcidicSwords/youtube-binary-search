@@ -74,20 +74,20 @@ assert.equal(
 );
 assert.equal(env.center().currentTime, 50);
 
-forward.dispatch("keydown", { key: " ", code: "Space" });
+forward.dispatch("keydown", { key: "Enter", code: "Enter" });
 assert.equal(
   currentText(),
   "Current 1:00.000",
-  "A focused Step control must Step immediately on keyboard press."
+  "Enter on a focused Step control must Step immediately on keyboard press."
 );
 await env.delay(375);
 await flush();
 assert.equal(
   currentText(),
   "Current 1:20.000",
-  "Holding Space on a focused Step control must use the same application cadence."
+  "Holding Enter on a focused Step control must use the same application cadence."
 );
-forward.dispatch("keyup", { key: " ", code: "Space" });
+forward.dispatch("keyup", { key: "Enter", code: "Enter" });
 await flush();
 byId.get("return-action").click();
 await flush();

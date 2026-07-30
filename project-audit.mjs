@@ -27,6 +27,8 @@ for (const retiredArtifact of [
   "PATCHSET.md",
   "SHA256SUMS",
   "TEST_REPORT.md",
+  "source-field.js",
+  "source-field-tests.mjs",
   "structure.js",
   "traversal.js",
   "v5.2-regression-tests.mjs"
@@ -44,9 +46,9 @@ const docs = Object.fromEntries([
 ].map(path => [path, read(path)]));
 
 assert.equal(pkg.version, "7.0.0");
-assert.ok(docs["SPEC.md"].startsWith("# Binary YouTube Reader — Canonical Specification\n"));
-assert.ok(docs["IMPLEMENTATION.md"].startsWith("# Binary YouTube Reader — Canonical Implementation\n"));
-assert.ok(docs["INTERFACE.md"].startsWith("# Binary YouTube Reader — Interface Grammar\n"));
+assert.match(docs["SPEC.md"], /^# Binary YouTube Reader — Canonical Specification\r?\n/);
+assert.match(docs["IMPLEMENTATION.md"], /^# Binary YouTube Reader — Canonical Implementation\r?\n/);
+assert.match(docs["INTERFACE.md"], /^# Binary YouTube Reader — Interface Grammar\r?\n/);
 for (const name of ["SPEC.md", "IMPLEMENTATION.md", "INTERFACE.md", "DEVELOPMENT.md", "VALIDATION.md"]) {
   assert.ok(docs["README.md"].includes(`\`${name}\``), `README must link ${name}`);
 }
@@ -57,8 +59,13 @@ assert.doesNotMatch(canonicalText, /Pin Forward\/Backward replaces Interval/i);
 assert.doesNotMatch(html, /id="loop"|id="pin-backward"|id="pin-forward"/);
 
 assert.match(html, /player-panel[\s\S]*timeline-panel[\s\S]*command-workspace/);
+assert.match(app, /"player-panel",[\s\S]*"timeline-panel",[\s\S]*"parameter-panel",[\s\S]*"navigation-panel"[\s\S]*\.inert = compact && open/);
+assert.doesNotMatch(app, /elements\["reader-column"\]\.inert/,
+  "Compact Guide must not inert the Guide nested inside reader-column.");
 assert.match(html, /command-workspace[\s\S]*parameter-panel[\s\S]*navigation-panel[\s\S]*guide-panel/);
 assert.match(html, /id="timeline-ruler"[\s\S]*id="section-lane"[\s\S]*id="pin-lane"/);
+assert.match(html, /timeline-legend[\s\S]*timeline-key-sections[\s\S]*timeline-key-interval[\s\S]*timeline-key-pins/);
+assert.match(html, /id="timeline-current-time"[\s\S]*id="cursor-time"/);
 assert.doesNotMatch(html, /id="fold-lane"/);
 assert.match(html, /id="step-size-settings"[\s\S]*id="step-mode-fixed"[\s\S]*id="step-mode-adaptive"/);
 assert.match(html, /data-step-fraction="0\.03125"[\s\S]*data-step-fraction="0\.0625"[\s\S]*data-step-fraction="0\.125"/);
@@ -89,7 +96,14 @@ for (const area of [
 assert.match(styles, /\.timeline-section-span\.compressed[\s\S]*linear-gradient/);
 assert.match(styles, /\.timeline-section-span\.expanded[\s\S]*linear-gradient/);
 assert.match(styles, /\.timeline-section-weight/);
+assert.match(styles, /\.timeline-section-control-label/);
 assert.match(styles, /\.guide-section-weight/);
+assert.match(styles, /\.guide-section-profile/);
+assert.match(
+  styles,
+  /@media \(pointer: coarse\)[\s\S]*\.timeline-section-body[\s\S]*var\(--touch\)[\s\S]*\.timeline-section-control[\s\S]*var\(--touch\)/
+);
+assert.match(styles, /\.timeline-pin[\s\S]*width:\s*var\(--pin-hit-size\)/);
 assert.doesNotMatch(styles, /\.timeline-fold-/);
 assert.match(styles, /--control-height:\s*40px/);
 assert.match(styles, /--touch:\s*48px/);
@@ -152,6 +166,13 @@ assert.match(view, /SECTION_WEIGHT_VALUES/);
 assert.doesNotMatch(view, /timeline-fold|foldContributors|sectionCollapse|sectionExpand/);
 assert.match(view, /timeline-ruler-tick/);
 assert.match(view, /packTimelineSectionLanes/);
+assert.match(view, /timelinePinClusterGap/);
+assert.match(view, /COARSE_TIMELINE_PIN_HIT_SIZE\s*=\s*48/);
+assert.match(view, /--section-control-width/);
+assert.match(view, /--pin-hit-size/);
+assert.doesNotMatch(view, /dataset\.(references|pinKind)/);
+assert.doesNotMatch(view, /--section-lane|--section-band-height/);
+assert.doesNotMatch(app, /else if \(plain && event\.key === " "\)/);
 
 assert.match(stepGesture, /createStepGestureController/);
 assert.match(stepGesture, /bindStepPress/);
@@ -159,7 +180,11 @@ assert.doesNotMatch(field, /bindSideStepSurface/);
 assert.match(fieldGeometry, /DEFAULT_FIELD_RESPONSE/);
 assert.doesNotMatch(fieldGeometry, /stepSeconds|sideActivationMode/);
 assert.doesNotMatch(field, /globalThis\.YT/);
+assert.doesNotMatch(app, /globalThis\.YT/);
+assert.doesNotMatch(`${app}\n${field}`, /\.raw\?\.\(|\.raw\(\)/,
+  "Composition and Field code must not reach through the YouTube adapter.");
 assert.match(youtube, /export function isYouTubeApiReady/);
+assert.match(youtube, /releaseKeyboardFocus\(activeElement\)/);
 assert.equal((youtube.match(/new\s+globalThis\.YT\.Player/g) || []).length, 1);
 assert.doesNotMatch(rangeGeometry, /\bskim\b|logSpeed|chooseSupportedRate/i);
 
@@ -176,6 +201,7 @@ for (const required of [
   "field-coherence-tests.mjs"
 ]) assert.ok(pkg.scripts.test.includes(required), `Missing test gate: ${required}`);
 assert.match(pkg.scripts["test:semantic"], /semantic-state-space-tests\.mjs/);
+assert.match(pkg.scripts.check, /npm run test:semantic/);
 assert.match(pkg.scripts.audit, /integration-check\.mjs/);
 assert.match(pkg.scripts.audit, /project-audit\.mjs/);
 
@@ -187,5 +213,6 @@ assert.match(docs["IMPLEMENTATION.md"], /timeline-projection\.js/);
 assert.match(docs["IMPLEMENTATION.md"], /positive spatial/);
 assert.match(docs["VALIDATION.md"], /each wrap rebases each available side at most once/);
 assert.match(docs["VALIDATION.md"], /1\/32[\s\S]*1\/16[\s\S]*1\/8/);
+assert.match(docs["INTERFACE.md"], /`Compresses`, `Neutral`, or `Expands`/);
 
 console.log("Project audit passed: v7 matrix, independent Step sizing, weighted Section graph, source-contiguous Range playback, timeline presentation, module boundaries, and canonical documents agree.");

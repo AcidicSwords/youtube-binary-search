@@ -91,9 +91,26 @@
 - Confirm Sections occupy the lowest available lanes without a fixed cap.
 - Confirm compressed gradients converge, expanded gradients open, and `1×` is neutral.
 - Confirm gradients remain backed by a numeric selector and state text rather than colour alone.
+- In overlapping Sections, confirm `Compresses`/`Expands` describes the
+  individual factor while each span and Guide profile show the composed global
+  projection.
 - Confirm dense Section selectors, Pins, and Range handles have distinct hit regions.
+- Under a coarse pointer, confirm Pin, Section-drag, and Section-weight targets
+  are at least 48px and nearby Pins cluster before their hit regions overlap.
 - Confirm Current, Cursor, actual/preview Working Interval, Resolution, and selected state remain distinguishable.
 - Confirm desktop workspace order is Parameters, Operators, Guide.
+- Confirm the timeline key, Current/Cursor readouts, Range ground, Resolution
+  contour, Working-Section ridge, Field overlay, Section controls, and Pins
+  remain distinguishable at desktop and compact widths.
+- With a matrix or Step button focused, press Space and confirm it controls
+  shared playback rather than reactivating that button.
+- Play and pause Center after interacting with its iframe, then immediately use
+  a reader hotkey without clicking the timeline.
+- Confirm each timeline Section control visibly names its Section and Guide
+  exposes its global extent, weight state, endpoint sharing, and exact Pins.
+- In compact Guide, switch between Sections and Pins and operate each control;
+  confirm background surfaces are inert while the sheet never falls through to
+  its scrim.
 - Confirm keyboard, mouse, touch Shift latch, coarse pointer, and screen-reader names expose the same actions.
 
 ## Invariant checks

@@ -45,7 +45,6 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
 - `v7-deformation-tests.mjs` — Deform ownership, adaptive Step, Guide graph, nested weights
 - `v7-coherence-tests.mjs` — guarded Step, Refine roles, source Field behavior, monotonic playback, Redo, exact previews, lane packing
 - `transport-tests.mjs` — source Context and proper-Range looping
-- `source-field-tests.mjs` — source player relationships
 - `fuzz-tests.mjs` — deterministic semantic operations
 - `v5.8-regression-tests.mjs` — preserved interaction-kernel guarantees
 - `endpoint-transposition-tests.mjs` — endpoint frames and matrix ownership
@@ -65,7 +64,6 @@ Smoke tests cover startup, interaction, Context, gestures, transport wrapping, S
 
 ```bash
 npm run check
-npm run test:semantic
 ```
 
 Also inspect wide, narrow, and coarse-pointer layouts with:

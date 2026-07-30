@@ -75,6 +75,7 @@ import {
 import {
   YOUTUBE_STATE,
   createYouTubePlayer,
+  isYouTubeApiReady,
   parseYouTubeUrl
 } from "./youtube.js";
 import {
@@ -2018,6 +2019,14 @@ function cuePendingVideo() {
 
 function handlePlayerStateChange(name, _rawState, metadata = {}) {
   state.playerState = name;
+  if ([
+    YOUTUBE_STATE.PLAYING,
+    YOUTUBE_STATE.BUFFERING,
+    YOUTUBE_STATE.PAUSED,
+    YOUTUBE_STATE.ENDED
+  ].includes(name)) {
+    reclaimCenterKeyboardFocus();
+  }
   if (name === YOUTUBE_STATE.CUED && pendingLoad && !state.videoLoaded) {
     initializeVideo();
     return;
@@ -2694,7 +2703,14 @@ function applyGuideState({ focus = false } = {}) {
   document.body?.classList?.toggle("guide-open", compact && open);
   // The compact Guide is a true modal surface: pointer, keyboard, and assistive
   // technology must not continue into the obscured reader or loading controls.
-  elements["reader-column"].inert = compact && open;
+  for (const id of [
+    "player-panel",
+    "timeline-panel",
+    "parameter-panel",
+    "navigation-panel"
+  ]) {
+    elements[id].inert = compact && open;
+  }
   elements["load-bar"].inert = compact && open;
   if (focus && open) {
     (compact ? elements["guide-close"] : elements[`guide-tab-${state.guideTab}`])
@@ -2777,14 +2793,26 @@ function stopOrClose() {
   return false;
 }
 
+function reclaimCenterKeyboardFocus() {
+  if (!player?.releaseKeyboardFocus?.(document.activeElement)) return false;
+  window.focus?.();
+  return true;
+}
+
+function releasePointerControlFocus(event) {
+  for (let control = event.target; control && control !== document.body; control = control.parentElement) {
+    if (!["BUTTON", "SUMMARY"].includes(control.tagName)) continue;
+    if (document.activeElement === control) control.blur?.();
+    return;
+  }
+}
+
 function initializePlayerApi() {
-  if (player || !globalThis.YT?.Player) return;
+  if (player || !isYouTubeApiReady()) return;
   player = createYouTubePlayer("player", {
     events: {
-      onReady: adapter => {
+      onReady: () => {
         state.playerReady = true;
-        const iframe = adapter.raw?.()?.getIframe?.();
-        iframe?.setAttribute?.("tabindex", "-1");
         setStatus("YouTube ready. Paste a link.");
         cuePendingVideo();
       },
@@ -2837,7 +2865,7 @@ function initializePlayerApi() {
 
 window.onYouTubeIframeAPIReady = initializePlayerApi;
 
-if (globalThis.YT?.Player) {
+if (isYouTubeApiReady()) {
   initializePlayerApi();
 } else {
   const apiScript = document.createElement("script");
@@ -3163,6 +3191,10 @@ for (const binding of [
   });
 }
 
+// Pointer focus is no longer needed at release, and blurring does not cancel
+// the ensuing click. Keyboard focus remains intact for Tab and Enter.
+document.addEventListener("pointerup", releasePointerControlFocus);
+
 elements["context-seconds"].addEventListener("change", event => {
   const previous = state.contextSeconds;
   state.contextSeconds = normalizeContextSeconds(event.target.value, previous);
@@ -3344,9 +3376,10 @@ elements["sections-list"].addEventListener("focusout", event => {
   view.render();
 });
 
-// Context is an active listening surface, so its Space command owns the key
-// before a previously focused traversal button can consume it as native button
-// activation. Text editing and modal Guide work retain ordinary keyboard rules.
+// Space is the reader's universal observation command. Capture it before a
+// previously focused control can consume it as native activation. Text editing
+// and modal Guide work retain ordinary keyboard rules; Enter activates a
+// focused control.
 document.addEventListener("keydown", event => {
   if (event.key === "Alt") {
     state.carryModifier = true;
@@ -3368,12 +3401,14 @@ document.addEventListener("keydown", event => {
     || event.repeat
     || editing
     || guideDialogOpen()
-    || !transportIs(TRANSPORT_KIND.CONTEXT)
+    || (compactGuideLayout() && state.guideOpen)
+    || !state.videoLoaded
   ) return;
   event.preventDefault();
   event.stopPropagation();
   event.stopImmediatePropagation?.();
-  acceptContextCursor();
+  if (transportIs(TRANSPORT_KIND.CONTEXT)) acceptContextCursor();
+  else toggleNativePlayback();
 }, true);
 
 // Keyboard: spatial cluster W/A/S/D, directional arrows, and observation keys.
@@ -3449,9 +3484,6 @@ document.addEventListener("keydown", event => {
       || code === "KeyD"
     );
   if (event.repeat && !repeatableStep) return;
-
-  // Space already activates a focused button or summary natively. Avoid toggling playback twice.
-  if (event.key === " " && ["BUTTON", "SUMMARY"].includes(tag)) return;
 
   const shiftedSpatialKey = expected =>
     event.shiftKey
@@ -3544,7 +3576,6 @@ document.addEventListener("keydown", event => {
   else if (plain && event.key === "]") { event.preventDefault(); adjustStepPreset(1); }
   else if (commandUndo) { event.preventDefault(); undoLastAction(); }
   else if (commandRedo) { event.preventDefault(); redoLastAction(); }
-  else if (plain && event.key === " ") { event.preventDefault(); toggleNativePlayback(); }
 });
 
 document.addEventListener("keyup", event => {

@@ -29,7 +29,7 @@ const DEFAULT_IFRAME_ALLOW = [
   "web-share"
 ].join("; ");
 
-export function playerStateName(value) {
+function playerStateName(value) {
   return RAW_STATE[value] || YOUTUBE_STATE.UNKNOWN;
 }
 
@@ -125,6 +125,8 @@ export function createYouTubePlayer(elementId, options = {}) {
     const iframe = rawPlayer?.getIframe?.();
     if (!iframe) return null;
     iframe.setAttribute?.("allow", options.iframeAllow || DEFAULT_IFRAME_ALLOW);
+    iframe.setAttribute?.("tabindex", "-1");
+    if (options.accessible === false) iframe.setAttribute?.("aria-hidden", "true");
     return iframe;
   }
 
@@ -156,6 +158,12 @@ export function createYouTubePlayer(elementId, options = {}) {
     unmute() {
       rawPlayer?.unMute?.();
     },
+    releaseKeyboardFocus(activeElement) {
+      const iframe = rawPlayer?.getIframe?.();
+      if (!iframe || activeElement !== iframe) return false;
+      iframe.blur?.();
+      return true;
+    },
     destroy() {
       rawPlayer?.destroy?.();
       rawPlayer = null;
@@ -174,9 +182,6 @@ export function createYouTubePlayer(elementId, options = {}) {
         rawState: Number.isFinite(rawState) ? rawState : -1,
         availableRates: Array.isArray(rates) && rates.length ? rates : [1]
       };
-    },
-    raw() {
-      return rawPlayer;
     }
   };
 

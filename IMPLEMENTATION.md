@@ -109,13 +109,24 @@ All semantic Step surfaces resolve through `step-gesture.js`. A repeated press p
 `view.js` renders:
 
 - adaptive source timestamp guides positioned in Timeline Space;
-- Range, Resolution, exact dry-run previews, and Working Interval;
+- a named layer key plus distinct Current and physical Cursor readouts;
+- Range ground, Resolution contour, directional Working-Interval ridge,
+  Held Field overlay, and exact dry-run previews;
 - greedily lane-packed Section spans with no fixed lane cap;
 - a converging compression gradient, diverging expansion gradient, or neutral `1×` line;
-- a weight selector on each Section;
+- one Section-named tuning control and weight selector attached to each span;
 - Current, playback Cursor, and all free/shared Pins.
 
-There is one lateral coordinate and one Pin placement path. No vertical topology, stacked controls, or hidden hit targets exist.
+Guide reprojects each Section across the complete timeline, connects its exact
+Start/End Pin controls, and derives endpoint visual weight from the existing
+Section-reference count. Timeline Pins use the same relation count. These are
+pure projections of Guide ownership and persist no additional topology.
+
+There is one lateral coordinate and one Pin placement path. Vertical lanes only
+prevent retained Section controls from colliding; they do not add another
+interaction axis or alter projection. Fine and coarse pointers use different
+lane and Pin hit geometry, and clustering uses the same hit width; visual marks
+remain unchanged while interactive regions cannot overlap ambiguously.
 
 `previewTransition()` uses the exact Session operator used for commit, so presentation does not maintain parallel operator arithmetic.
 
@@ -129,6 +140,19 @@ Timeline input stays in `app.js`:
 - Range Start/End: distinct Go/set actions and synthetic Pin stops.
 
 Pointer capture plus document fallback gives each drag exactly one terminal event.
+
+Space is captured as the reader-wide observation command before native button
+activation. Text inputs, selects, modal Guide work, and compact Guide focus keep
+their ordinary ownership; Enter remains the focused Step-control gesture.
+Pointer-acquired button focus is released after activation, and `youtube.js`
+owns iframe focus release across Center play, buffer, pause, and end state
+changes. Application and Field code never reach through the adapter to raw
+YouTube objects.
+
+Compact Guide marks only the background viewer, map, Parameters, Operators, and
+source bar inert. Guide is nested inside `reader-column`, so the column itself
+must remain interactive; otherwise visible tab controls fall through to the
+scrim.
 
 ## Persistence and migration
 

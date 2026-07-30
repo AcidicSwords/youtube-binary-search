@@ -230,7 +230,7 @@ export function bindStepPress(element, {
     if (selection) tap?.(selection);
   };
   const onKeyDown = event => {
-    if (!keyboardActivation || !["Enter", " "].includes(event.key) || unavailable()) return;
+    if (!keyboardActivation || event.key !== "Enter" || unavailable()) return;
     event.preventDefault?.();
     event.stopPropagation?.();
     if (keyboardKey !== null && !controller.isActive(id)) keyboardKey = null;

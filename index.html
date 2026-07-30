@@ -37,7 +37,7 @@
 
     <div class="workspace">
       <section id="reader-column" class="reader-column" aria-label="Video reader">
-        <section class="player-panel" aria-label="Panoramic video field">
+        <section id="player-panel" class="player-panel" aria-label="Panoramic video field">
           <div id="step-field" class="step-field field-off" data-phase="off" aria-label="Step Field">
             <section id="tail-pane" class="step-pane step-pane-side tail-pane" aria-label="Tail Step projection">
               <div class="step-pane-bar">
@@ -131,13 +131,22 @@
           <div id="status" class="status" role="status" aria-live="polite">Load a YouTube video to begin.</div>
         </section>
 
-        <section class="panel timeline-panel" aria-label="Range and temporal map">
+        <section id="timeline-panel" class="panel timeline-panel" aria-label="Range and temporal map">
           <div class="panel-heading timeline-heading">
             <div>
               <span class="eyebrow">Range</span>
               <h2>Temporal map</h2>
             </div>
+            <div class="timeline-legend" aria-label="Temporal map layers">
+              <span id="timeline-key-sections" class="timeline-key key-sections" title="Sections: retained weighted extents"><i aria-hidden="true"></i>Sections</span>
+              <span id="timeline-key-range" class="timeline-key key-range" title="Range: navigable boundary"><i aria-hidden="true"></i>Range</span>
+              <span id="timeline-key-resolution" class="timeline-key key-resolution" title="Resolution: current neighborhood"><i aria-hidden="true"></i>Resolution</span>
+              <span id="timeline-key-interval" class="timeline-key key-interval" title="Working Interval: ordered movement extent"><i aria-hidden="true"></i>Working Interval</span>
+              <span id="timeline-key-field" class="timeline-key key-field" title="Field span: held physical spread"><i aria-hidden="true"></i>Field span</span>
+              <span id="timeline-key-pins" class="timeline-key key-pins" title="Pins: retained source Addresses"><i aria-hidden="true"></i>Pins</span>
+            </div>
             <div class="timeline-header">
+              <span><small>Current</small><strong id="timeline-current-time" aria-label="Committed Current">0:00.000</strong></span>
               <span><small>Cursor</small><strong id="cursor-time" aria-label="Observed position">0:00.000</strong></span>
               <span><small>Duration</small><strong id="duration-time">0:00.000</strong></span>
             </div>
@@ -175,7 +184,7 @@
         </section>
 
         <div class="command-workspace">
-          <aside class="panel parameter-panel" aria-labelledby="parameters-heading">
+          <aside id="parameter-panel" class="panel parameter-panel" aria-labelledby="parameters-heading">
             <div class="panel-heading compact-heading">
               <div>
                 <span class="eyebrow">Inputs and state</span>
@@ -271,7 +280,7 @@
             </details>
           </aside>
 
-          <section class="panel navigation-panel" aria-labelledby="navigation-heading">
+          <section id="navigation-panel" class="panel navigation-panel" aria-labelledby="navigation-heading">
             <div class="panel-heading navigation-heading">
               <div>
                 <span class="eyebrow">Operator matrix</span>
