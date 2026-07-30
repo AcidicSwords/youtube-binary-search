@@ -9,6 +9,7 @@
 - Confirm plain Refine `50 → 25 → 12.5` retains `50 → 12.5`, frame `{0,12.5,50}`, and reverses to `31.25`.
 - Confirm Local Refine uses midpoint membership and the same sequence yields `25 → 12.5`, frame `{0,12.5,25}`.
 - Alternate Refine and Local Refine in both directions; confirm the committed Working Interval matches the hover preview exactly.
+- Refine once, Reopen, then Local Refine in the opposite direction; confirm an outside midpoint replaces the Interval with the complete Current-to-target movement rather than subtracting from the old extent.
 - Confirm Reopen restores Range endpoints.
 - Confirm Switch is an exact involution.
 - Confirm Release clears only a non-null Working Interval and creates no history on null.
@@ -49,6 +50,9 @@
 
 ## Direct manipulation
 
+- Timeline/Guide Go across a visible lateral distance; confirm the movement is the Working Interval and its unclipped Resolution has two equal Interval-width margins on each side (five Interval widths total).
+- Repeat beside each Range boundary and confirm clipping removes only unavailable margin.
+- Move between stacked Fold faces and confirm the zero-lateral hop preserves the prior Resolution.
 - Drag an open Section body; only its endpoint Pins should translate.
 - Drag a shared Pin; every referencing Section should update.
 - Drag a Fold endpoint vertically beyond the original rail; confirm the Section can extend and shrink while all shared constraints hold.

@@ -544,7 +544,6 @@ function openAddress(model, address) {
 function moveDraft(model, destination, options = {}) {
   if (!Number.isFinite(destination)) return { changed: false, reason: "invalid-destination" };
 
-  const metric = projectionForModel(model).metric;
   const sourceInterval = clone(
     options.originInterval === undefined ? model.interval : options.originInterval
   );
@@ -554,6 +553,11 @@ function moveDraft(model, destination, options = {}) {
     : model.resolution.C;
   const boundedDestination = clamp(destination, 0, model.duration);
   const opening = openAddress(model, boundedDestination);
+  // Leaving Focus or opening Full Video can change both Range and which
+  // transposed Sections are materialized. Every movement target and frame must
+  // therefore use the resulting topography, not the projection that existed
+  // before the composite Go resolved its scope.
+  const metric = projectionForModel(model).metric;
   const rangeChanged = opening.changed;
   const resolvedDestination = clamp(boundedDestination, model.range.start, model.range.end);
   let finalDestination = resolvedDestination;

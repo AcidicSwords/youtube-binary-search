@@ -64,6 +64,8 @@ Plain `refine()` retains the existing Step departure when usable, otherwise the 
 
 `step()` and `stepToPin()` share the same interval-anchor helper and one prospective-midpoint guard. They keep the approached endpoint fixed until another Step would leave less than one Reach of midpoint headroom. Settled playback has separate union-only interval ownership. `switchEndpoint()` is a strict boundary selection; folded endpoint choice is represented by which exact Pin is Current, never a hidden side mode.
 
+Direct Timeline/Guide Go first resolves any Focus/Full-Video scope change, then routes through `seedNeighborhoodFromMovement()` using the resulting projection. The complete movement becomes the Working Interval; its projected width supplies two equal margins on each side, producing a five-times movement frame before Range clipping. The shared constructor is the only owner of this scale law. A zero-lateral Fold-face hop bypasses reseeding and retains the prior frame.
+
 ## Guide graph
 
 Sections reference shared Pin IDs. `movePin()` clamps against every referencing partner and updates all edges implicitly. `translateSection()` moves only the Section’s two endpoint Pins, respecting constraints imposed by any other shared edges. It never captures unrelated interior Pins.

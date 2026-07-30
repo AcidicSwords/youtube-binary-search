@@ -209,7 +209,6 @@ assert.deepEqual(frameOf(stepped.model), {
   ...frameAtSixty,
   resolution: {
     ...frameAtSixty.resolution,
-    L: 15,
     level: 0
   }
 });
@@ -245,7 +244,7 @@ legacy = switchEndpoint(legacy).session;
 assert.equal(legacy.model.resolution.C, 20);
 assert.ok(legacy.model.interval.departureFrame);
 assert.ok(legacy.model.interval.arrivalFrame);
-assert.deepEqual(legacy.model.interval.arrivalFrame.resolution, createRoot(0, 20, 40));
+assert.deepEqual(legacy.model.interval.arrivalFrame.resolution, createRoot(0, 20, 80));
 
 const html = readFileSync(new URL("./index.html", import.meta.url), "utf8");
 const app = readFileSync(new URL("./app.js", import.meta.url), "utf8");

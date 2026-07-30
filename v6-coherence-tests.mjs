@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   getTargets,
+  seedNeighborhoodFromMovement,
   stepNeighborhood
 } from "./range-geometry.js";
 import {
@@ -9,6 +10,7 @@ import {
   goTo,
   refine,
   localRefine,
+  reopen,
   step,
   stepToPin,
   switchEndpoint,
@@ -36,6 +38,49 @@ import {
   packTimelineSectionLanes,
   computeTimelineFoldLayout
 } from "./view.js";
+
+// Direct placement gives the new Working Interval two equal margins on each
+// side in Traversal Time: the unclipped Resolution is exactly five Interval
+// widths. Range clipping removes only unavailable margin.
+assert.deepEqual(
+  seedNeighborhoodFromMovement(40, 50, { start: 0, end: 100 }),
+  { L: 20, C: 50, R: 70, level: 0 }
+);
+assert.deepEqual(
+  seedNeighborhoodFromMovement(50, 40, { start: 0, end: 100 }),
+  { L: 20, C: 40, R: 70, level: 0 }
+);
+assert.deepEqual(
+  seedNeighborhoodFromMovement(5, 15, { start: 0, end: 100 }),
+  { L: 0, C: 15, R: 35, level: 0 }
+);
+{
+  const metricGuide = createGuide("movement-frame-fold");
+  createSectionFromTimes(metricGuide, 430, 445, {
+    label: "Metric Fold",
+    collapsed: true
+  });
+  const metricSession = createSession({
+    duration: 1000,
+    current: 400,
+    guide: metricGuide
+  });
+  const metric = projectionForModel(metricSession.model).metric;
+  const frame = seedNeighborhoodFromMovement(
+    400,
+    500,
+    { start: 0, end: 1000 },
+    metric
+  );
+  assert.deepEqual(frame, { L: 230, C: 500, R: 670, level: 0 });
+  assert.equal(
+    metric.toCoordinate(frame.R) - metric.toCoordinate(frame.L),
+    5 * (
+      metric.toCoordinate(500) - metric.toCoordinate(400)
+    ),
+    "The five-times law is measured in Traversal Time across a Fold."
+  );
+}
 
 // Step keeps the approached endpoint fixed through the one-Step midpoint guard.
 // It moves the endpoint only when the next Step would consume that headroom.
@@ -80,6 +125,25 @@ assert.deepEqual(mixed.model.resolution, { L: 12.5, C: 31.25, R: 50, level: 3 })
 assert.deepEqual(
   { start: mixed.model.interval.start, end: mixed.model.interval.end },
   { start: 31.25, end: 50 }
+);
+
+// Reopen abandons the local frame without changing the Working Interval. A
+// shifted/local Refine back across Current is subtractive only when its new
+// midpoint belongs to that Interval; an outside midpoint records the complete
+// new traversal exactly like a fresh Refine movement.
+let reopenedReverse = createSession({ duration: 100, current: 50 });
+reopenedReverse = refine(reopenedReverse, "backward").session;
+reopenedReverse = reopen(reopenedReverse).session;
+const oppositeLocal = localRefine(reopenedReverse, "forward");
+assert.equal(oppositeLocal.refineRelation, "replace");
+assert.deepEqual(
+  {
+    start: oppositeLocal.session.model.interval.start,
+    end: oppositeLocal.session.model.interval.end,
+    departure: oppositeLocal.session.model.interval.departure,
+    arrival: oppositeLocal.session.model.interval.arrival
+  },
+  { start: 25, end: 62.5, departure: 25, arrival: 62.5 }
 );
 
 function transitionGeometry(result) {
