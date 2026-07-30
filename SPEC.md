@@ -52,13 +52,14 @@ Fold and unfold never move source Addresses, Current, or the Working Interval.
 
 ### Refine
 
-Refine chooses the directional midpoint of the active Resolution in Traversal Time, increases `level`, and retains the usable Working Interval departure:
+Refine chooses the directional midpoint of the active Resolution in Traversal Time, increases `level`, and retains the usable Working Interval departure until the new movement reaches it:
 
 1. use `Interval.departure` when `Interval.arrival === Current`;
-2. otherwise use pre-movement Current;
-3. retain the bounded anchor-to-arrival extent;
-4. expand only the receding Resolution bound enough to contain that extent;
-5. preserve the refinement increment.
+2. if the Current-to-target path reaches or passes that departure, use pre-movement Current instead;
+3. otherwise, if no usable departure exists, use pre-movement Current;
+4. retain the bounded departure-to-arrival extent, or the complete Current-to-target movement after a crossing;
+5. expand only the receding Resolution bound enough to contain that extent;
+6. preserve the refinement increment.
 
 A Fold has no interior midpoint in Traversal Time, so Refine cannot descend inside it.
 

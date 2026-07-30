@@ -1017,7 +1017,9 @@ function refine(direction, options = {}) {
       ? result.refineRelation === "shorten"
         ? `Local Refine ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; the Working Section shortened to ${workingSection}.${retainedCarryStatus(result)}`
         : `Local Refine ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; the previous Working Section was replaced by ${workingSection}.${retainedCarryStatus(result)}`
-      : `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; retained Working Interval ${workingSection}.${retainedCarryStatus(result)}`
+      : result.refineRelation === "full"
+        ? `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; recorded the full movement as ${workingSection}.${retainedCarryStatus(result)}`
+        : `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; retained Working Interval ${workingSection}.${retainedCarryStatus(result)}`
   });
 }
 

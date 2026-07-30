@@ -5,6 +5,7 @@ import {
   contains,
   getTargets,
   classifyRefineRelation,
+  classifyRetainedRefineRelation,
   getActionRanges,
   refineBlockReason,
   RESOLUTION_BASIS
@@ -1664,7 +1665,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         ? backwardBlock === "resolution-limit" ? "Resolution limit" : "Range start"
         : shiftLayer
           ? `${classifyRefineRelation(currentInterval, semanticCurrent, targets.backward)} Interval · to ${formatTime(targets.backward)}`
-          : `retain anchor · to ${formatTime(targets.backward)}`
+          : `${classifyRetainedRefineRelation(currentInterval, semanticCurrent, targets.backward) === "full" ? "full movement" : "retain anchor"} · to ${formatTime(targets.backward)}`
     );
     setActionMeta(
       "refine-forward",
@@ -1674,7 +1675,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         ? forwardBlock === "resolution-limit" ? "Resolution limit" : "Range end"
         : shiftLayer
           ? `${classifyRefineRelation(currentInterval, semanticCurrent, targets.forward)} Interval · to ${formatTime(targets.forward)}`
-          : `retain anchor · to ${formatTime(targets.forward)}`
+          : `${classifyRetainedRefineRelation(currentInterval, semanticCurrent, targets.forward) === "full" ? "full movement" : "retain anchor"} · to ${formatTime(targets.forward)}`
     );
     elements["reopen-meta"].textContent = actionModel?.reopen
       ? `${formatDuration(

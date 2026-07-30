@@ -127,13 +127,36 @@ assert.deepEqual(
   { start: 31.25, end: 50 }
 );
 
-// Reopen abandons the local frame without changing the Working Interval. A
-// shifted/local Refine back across Current is subtractive only when its new
-// midpoint belongs to that Interval; an outside midpoint records the complete
-// new traversal exactly like a fresh Refine movement.
+// Reopen abandons the local frame without changing the Working Interval.
+// Crossing the old departure makes it part of the new path: plain Refine must
+// then record the complete Current-to-target movement rather than discard the
+// Current-to-departure portion. Continuing away from the departure still
+// retains it. Local Refine independently applies its membership law.
 let reopenedReverse = createSession({ duration: 100, current: 50 });
 reopenedReverse = refine(reopenedReverse, "backward").session;
 reopenedReverse = reopen(reopenedReverse).session;
+const oppositePlain = refine(reopenedReverse, "forward");
+assert.equal(oppositePlain.refineRelation, "full");
+assert.deepEqual(
+  {
+    start: oppositePlain.session.model.interval.start,
+    end: oppositePlain.session.model.interval.end,
+    departure: oppositePlain.session.model.interval.departure,
+    arrival: oppositePlain.session.model.interval.arrival
+  },
+  { start: 25, end: 62.5, departure: 25, arrival: 62.5 }
+);
+const continuingPlain = refine(reopenedReverse, "backward");
+assert.equal(continuingPlain.refineRelation, "retain");
+assert.deepEqual(
+  {
+    start: continuingPlain.session.model.interval.start,
+    end: continuingPlain.session.model.interval.end,
+    departure: continuingPlain.session.model.interval.departure,
+    arrival: continuingPlain.session.model.interval.arrival
+  },
+  { start: 12.5, end: 50, departure: 50, arrival: 12.5 }
+);
 const oppositeLocal = localRefine(reopenedReverse, "forward");
 assert.equal(oppositeLocal.refineRelation, "replace");
 assert.deepEqual(
@@ -144,6 +167,21 @@ assert.deepEqual(
     arrival: oppositeLocal.session.model.interval.arrival
   },
   { start: 25, end: 62.5, departure: 25, arrival: 62.5 }
+);
+
+let mirroredReopenedReverse = createSession({ duration: 100, current: 50 });
+mirroredReopenedReverse = refine(mirroredReopenedReverse, "forward").session;
+mirroredReopenedReverse = reopen(mirroredReopenedReverse).session;
+const mirroredOppositePlain = refine(mirroredReopenedReverse, "backward");
+assert.equal(mirroredOppositePlain.refineRelation, "full");
+assert.deepEqual(
+  {
+    start: mirroredOppositePlain.session.model.interval.start,
+    end: mirroredOppositePlain.session.model.interval.end,
+    departure: mirroredOppositePlain.session.model.interval.departure,
+    arrival: mirroredOppositePlain.session.model.interval.arrival
+  },
+  { start: 37.5, end: 75, departure: 75, arrival: 37.5 }
 );
 
 function transitionGeometry(result) {

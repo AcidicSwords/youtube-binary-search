@@ -7,6 +7,7 @@
 - Confirm DOM and visual order is `QWE / ASD / RTF`.
 - Confirm Shift changes only Refine to Local Refine and Step to Pin traversal.
 - Confirm plain Refine `50 → 25 → 12.5` retains `50 → 12.5`, frame `{0,12.5,50}`, and reverses to `31.25`.
+- Refine once, Reopen, then plain Refine past the retained departure in the opposite direction; confirm the complete Current-to-target path becomes the Working Interval. Repeat in both directions, and confirm same-direction Refine still retains the old departure.
 - Confirm Local Refine uses midpoint membership and the same sequence yields `25 → 12.5`, frame `{0,12.5,25}`.
 - Alternate Refine and Local Refine in both directions; confirm the committed Working Interval matches the hover preview exactly.
 - Refine once, Reopen, then Local Refine in the opposite direction; confirm an outside midpoint replaces the Interval with the complete Current-to-target movement rather than subtracting from the old extent.

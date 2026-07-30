@@ -145,6 +145,33 @@ export function classifyRefineRelation(interval, current, target) {
     : "replace";
 }
 
+/**
+ * Plain Refine composes around the retained departure only while that
+ * departure remains outside the newly traversed Current-to-target path.
+ *
+ * Once the target reaches or passes the retained departure, that Address is
+ * part of the movement rather than its origin. Reusing it as the departure
+ * would discard the Current-to-departure portion and make a reversal appear
+ * subtractive. In that case the complete movement must start at Current.
+ */
+export function classifyRetainedRefineRelation(interval, current, target) {
+  if (
+    !interval
+    || !Number.isFinite(current)
+    || !Number.isFinite(target)
+    || !Number.isFinite(interval.departure)
+    || !Number.isFinite(interval.arrival)
+    || Math.abs(interval.arrival - current) > EPSILON
+    || Math.abs(interval.departure - current) <= EPSILON
+  ) return "full";
+
+  const pathStart = Math.min(current, target);
+  const pathEnd = Math.max(current, target);
+  const departureIsTraversed = interval.departure >= pathStart - EPSILON
+    && interval.departure <= pathEnd + EPSILON;
+  return departureIsTraversed ? "full" : "retain";
+}
+
 export function refineBlockReason(neighborhood, range, direction, metric = null) {
   assertNeighborhood(neighborhood);
   if (!range || !Number.isFinite(range.start) || !Number.isFinite(range.end)) {

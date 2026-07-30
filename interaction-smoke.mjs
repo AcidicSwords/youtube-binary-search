@@ -61,8 +61,8 @@ assert.match(
   /0:25\.000–0:50\.000/,
   "Pin traversal must establish the same retained anchor as Step."
 );
-assert.match(byId.get("backward-meta").textContent, /^retain anchor · to /,
-  "Plain Refine meta must disclose retained-anchor behavior before invocation.");
+assert.match(byId.get("backward-meta").textContent, /^full movement · to /,
+  "Plain Refine meta must disclose that reaching the retained anchor records the complete movement.");
 byId.get("shift-layer-toggle").click();
 await flush();
 assert.equal(byId.get("refine-backward-label").textContent, "Local Refine Backward");
