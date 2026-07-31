@@ -1931,73 +1931,6 @@ kbd {
 .danger-text { color: var(--danger); }
 
 
-.pin-position-track {
-  --section-color: var(--pin);
-  position: relative;
-  height: 43px;
-  margin: 0 10px 9px;
-  color: var(--muted);
-}
-
-.pin-position-line {
-  position: absolute;
-  top: 20px;
-  right: 17px;
-  left: 17px;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgb(var(--range-rgb) / 0.36) 12% 88%,
-    transparent
-  );
-}
-
-.endpoint-button {
-  --endpoint-weight: 1;
-  display: grid;
-  width: 34px;
-  min-width: 34px;
-  height: 34px;
-  min-height: 34px;
-  place-items: center;
-  padding: 0;
-  border: calc(1px + var(--endpoint-weight) * 0.65px) solid var(--section-color);
-  border-radius: 50%;
-  color: var(--text);
-  background: #0c121a;
-  box-shadow: 0 0 calc(2px + var(--endpoint-weight) * 2px)
-    color-mix(in srgb, var(--section-color) 24%, transparent);
-  /* This node reports where a Pin sits and Goes to it. Spatial dragging
-     belongs to the Temporal Topography, so it must not offer a resize cursor
-     it cannot honour, and it must not claim the touch stream for a gesture it
-     never handles — that left it unable to scroll or be tapped on touch. */
-  cursor: pointer;
-  position: absolute;
-  top: 4px;
-  left: clamp(
-    17px,
-    var(--endpoint-position),
-    calc(100% - 17px)
-  );
-  z-index: 2;
-  transform: translateX(-50%);
-}
-
-.endpoint-button small {
-  color: var(--text);
-  font-size: 0.61rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.endpoint-button:hover,
-.endpoint-button:focus-visible {
-  color: #fff;
-  background: color-mix(in srgb, var(--section-color) 22%, #0c121a);
-  transform: translateX(-50%) scale(1.06);
-}
-
 
 .section-span-link::before,
 
@@ -2562,7 +2495,7 @@ kbd {
 }
 
 .guide-address-input {
-  width: 7ch;
+  width: calc(9ch + 14px);
   min-width: 0;
   height: var(--guide-control);
   padding: 0 4px;
@@ -2603,5 +2536,5 @@ kbd {
 
 @media (pointer: coarse) {
   .guide-item { --guide-control: 40px; }
-  .guide-address-input { width: 8ch; }
+  .guide-address-input { width: calc(10ch + 14px); }
 }

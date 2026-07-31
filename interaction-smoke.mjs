@@ -1100,4 +1100,36 @@ assert.equal(env.document.activeElement, null, "Pointer activation must not leav
   assert.equal(byId.get("release-meta").textContent, "Working Interval");
 }
 
+// A Guide entry is a name, an Address, and only facts that are not derivable
+// from the other two. A Pin exists so you need not remember a time, so the time
+// is a field rather than something baked into a fabricated title that then
+// truncates.
+{
+  const rowsOf = list => descendants(byId.get(list))
+    .filter(node => node.classList?.contains?.("guide-item"));
+  const partOf = (row, className) => descendants(row)
+    .find(node => node.classList?.contains?.(className))?.textContent ?? "";
+  for (const list of ["pins-list", "sections-list"]) {
+    for (const row of rowsOf(list)) {
+      const title = partOf(row, "guide-item-title");
+      const meta = partOf(row, "guide-item-time");
+      assert.doesNotMatch(title, /\d+:\d\d/,
+        `A ${list} title must name the entry, not carry its Address: "${title}"`);
+      assert.match(meta, /\d+:\d\d/,
+        `A ${list} row must still show its Address: "${meta}"`);
+      // The title already says what kind of entry this is.
+      assert.ok(!meta.includes("Section endpoint"),
+        `A row must not repeat its own title in its meta: "${meta}"`);
+    }
+  }
+  // A Pin has one Address and no extent; a track for one point is the map
+  // redrawn at useless scale, and moving a Pin happens on the map.
+  assert.equal(
+    descendants(byId.get("pins-list"))
+      .filter(node => node.classList?.contains?.("pin-position-track")).length,
+    0,
+    "A Pin row must not redraw the map to place one point."
+  );
+}
+
 console.log("Interaction smoke passed: direct P/Shift+P creation, retained Section editing, spatial Pin unlink/link, Timeline Section node dragging, Guide exact Address editing, operational clustered Pins, Shift Pin traversal, local Refine preview, unsaved Working Focus, Switch involution, Undo/Redo ownership, composable Step intervals, shared activation, bounded Field breathing, immutable configured offsets, whole-Field side Step, universal Space playback, and coherent focus release.");

@@ -193,6 +193,10 @@ Section creation accepts:
 - held Field span;
 - two selected Pins.
 
+A Guide entry is a **name**, an **Address**, and only facts not derivable from those two. A Pin exists so the viewer need not remember a time, so the time is a field of the entry and never baked into its title: an unnamed Pin is called `Section Start` or `Pin`, never `Start of Section 2:12.3–2:42.04`, which repeats the Address and then truncates. An unnamed Section is called `Section`; its extent, duration and Weight are its line. Nothing states the same fact twice inside one entry — the Weight factor already says whether it compresses or expands, and the duration is stated once.
+
+A Pin has one Address and no extent, so its row draws no positional track: one point plotted across the whole map is the Temporal Topography redrawn at useless scale. Position is read and moved on the map; the Guide holds the exact Address.
+
 A Guide row is expanded exactly when it is the selected retained object, and nothing else opens one. Participating in the Working Interval, being focused, and being a snap target are all worth showing and are shown as highlights on the collapsed row, because rows that open themselves make the selection unreadable. Focusing a Section selects it, so its row carries Unfocus.
 
 Titles are optional. Each Section row exposes selection, Focus, Weight, and
