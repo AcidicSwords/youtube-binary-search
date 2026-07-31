@@ -1106,14 +1106,29 @@ function setStepGesturePresentation({ active, selection }) {
 }
 
 stepGesture = createStepGestureController({
-  perform: selection => performStep(
-    selection.direction,
-    selection.distance,
-    {
-      waitForGestureEnd: true,
-      carryRetained: selection.carryRetained === true
+  // The Shift layer turns Step into Pin traversal, and a pressed control must
+  // mean exactly what the same operator means from the keyboard. Traversal is a
+  // discrete jump between retained landmarks: one press, one Pin, one
+  // checkpoint. Reporting no ongoing gesture publishes no repeat cadence, so a
+  // held button never walks the Guide at Step speed, and the synthesized click
+  // is suppressed so one press cannot traverse twice.
+  perform: selection => {
+    if (selection.pinTraversal) {
+      traverseToAdjacentPin(
+        selection.direction,
+        selection.carryRetained === true
+      );
+      return false;
     }
-  ),
+    return performStep(
+      selection.direction,
+      selection.distance,
+      {
+        waitForGestureEnd: true,
+        carryRetained: selection.carryRetained === true
+      }
+    );
+  },
   finish: detail => {
     if (detail.defer && detail.effect && detail.repeats === 0) {
       deferPendingStepCompletion({ observe: detail.observe });
@@ -2206,6 +2221,19 @@ function goToAdjacentPin(direction, options = {}) {
     view.render();
   }
   return accepted;
+}
+
+// Pin traversal is reachable from a keyboard chord, a pressed matrix control,
+// and a click. The Shift layer is a one-shot modifier that every operator
+// honouring it consumes, so all three arrive here rather than each remembering
+// to consume it themselves.
+function traverseToAdjacentPin(direction, carryRetained = false) {
+  const changed = goToAdjacentPin(direction, { carryRetained });
+  if (state.shiftLayer) {
+    state.shiftLayer = false;
+    view.render();
+  }
+  return changed;
 }
 
 function selectSectionAsWorkingInterval(sectionId, options = {}) {
@@ -4219,14 +4247,10 @@ elements["center-transport-surface"].addEventListener("click", toggleNativePlayb
 const tapStep = selection => {
   if (!selection) return false;
   if (selection.pinTraversal) {
-    const changed = goToAdjacentPin(selection.direction, {
-      carryRetained: selection.carryRetained === true
-    });
-    if (state.shiftLayer) {
-      state.shiftLayer = false;
-      view.render();
-    }
-    return changed;
+    return traverseToAdjacentPin(
+      selection.direction,
+      selection.carryRetained === true
+    );
   }
   return performStep(selection.direction, selection.distance, {
     carryRetained: selection.carryRetained === true
@@ -4865,7 +4889,7 @@ document.addEventListener("keydown", event => {
     && event.key === "ArrowLeft"
   )) {
     event.preventDefault();
-    goToAdjacentPin("backward", { carryRetained: event.altKey === true });
+    traverseToAdjacentPin("backward", event.altKey === true);
   }
   else if (shiftedSpatialKey("d") || (
     event.shiftKey
@@ -4874,7 +4898,7 @@ document.addEventListener("keydown", event => {
     && event.key === "ArrowRight"
   )) {
     event.preventDefault();
-    goToAdjacentPin("forward", { carryRetained: event.altKey === true });
+    traverseToAdjacentPin("forward", event.altKey === true);
   }
   else if (
     (plain || carryChord)

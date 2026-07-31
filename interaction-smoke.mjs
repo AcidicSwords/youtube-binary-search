@@ -151,6 +151,49 @@ assert.match(
 );
 assert.match(byId.get("backward-meta").textContent, /^full movement · to /,
   "Plain Refine meta must disclose that reaching the retained anchor records the complete movement.");
+
+// A pressed control must mean what the same operator means from the keyboard.
+// A real press arrives as pointerdown/pointerup and suppresses the synthesized
+// click, so the press path — not the click path — is what a mouse or finger
+// actually reaches. Shift+press must traverse Pins, never fall back to a Step.
+byId.get("step-backward").dispatch("pointerdown", { shiftKey: true, pointerId: 41, button: 0 });
+await flush();
+byId.get("step-backward").dispatch("pointerup", { shiftKey: true, pointerId: 41, button: 0 });
+byId.get("step-backward").dispatch("click", { shiftKey: true, detail: 1 });
+await flush();
+assert.equal(currentText(), "Current 0:25",
+  "Shift+press must traverse to the previous Pin, not Step by the Reach.");
+byId.get("step-forward").dispatch("pointerdown", { shiftKey: true, pointerId: 42, button: 0 });
+await flush();
+byId.get("step-forward").dispatch("pointerup", { shiftKey: true, pointerId: 42, button: 0 });
+byId.get("step-forward").dispatch("click", { shiftKey: true, detail: 1 });
+await flush();
+assert.equal(currentText(), "Current 0:50",
+  "One press is one traversal: the suppressed click must not traverse again.");
+
+// The Shift layer is a one-shot modifier, and a pressed control consumes it
+// exactly as a clicked one does — otherwise the next plain press would still
+// be traversing Pins.
+byId.get("shift-layer-toggle").click();
+await flush();
+byId.get("step-backward").dispatch("pointerdown", { pointerId: 43, button: 0 });
+await flush();
+byId.get("step-backward").dispatch("pointerup", { pointerId: 43, button: 0 });
+byId.get("step-backward").dispatch("click", { detail: 1 });
+await flush();
+assert.equal(currentText(), "Current 0:25",
+  "The Shift layer must apply to a pressed control.");
+byId.get("step-forward").dispatch("pointerdown", { pointerId: 44, button: 0 });
+await flush();
+byId.get("step-forward").dispatch("pointerup", { pointerId: 44, button: 0 });
+byId.get("step-forward").dispatch("click", { detail: 1 });
+await flush();
+assert.equal(currentText(), "Current 0:35",
+  "A consumed Shift layer must leave the next press an ordinary Step.");
+dispatchDocument("keydown", { key: "D", code: "KeyD", shiftKey: true });
+await flush();
+assert.equal(currentText(), "Current 0:50");
+
 byId.get("shift-layer-toggle").click();
 await flush();
 assert.equal(byId.get("refine-backward-label").textContent, "Local Refine Backward");

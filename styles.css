@@ -1961,8 +1961,11 @@ kbd {
   background: #0c121a;
   box-shadow: 0 0 calc(2px + var(--endpoint-weight) * 2px)
     color-mix(in srgb, var(--section-color) 24%, transparent);
-  cursor: ew-resize;
-  touch-action: none;
+  /* This node reports where a Pin sits and Goes to it. Spatial dragging
+     belongs to the Temporal Topography, so it must not offer a resize cursor
+     it cannot honour, and it must not claim the touch stream for a gesture it
+     never handles — that left it unable to scroll or be tapped on touch. */
+  cursor: pointer;
   position: absolute;
   top: 4px;
   left: clamp(
