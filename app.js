@@ -3087,17 +3087,26 @@ function finishCurrentDrag(event, options = {}) {
     return false;
   }
   stepField?.clearPreview?.({ restore: false });
-  const committed = moveToAddress(drag.candidate, {
-    operator: "timeline",
-    label: "Go",
-    status: destination => `Moved Current to ${formatTime(destination)}.`
-  });
-  if (!committed) {
+  // Releasing commits one Step, not one Go: dragging Current extends or shortens
+  // the retained traversal exactly as a Step of that distance would.
+  const projection = drag.projection;
+  const origin = drag.originSource;
+  const distance = Math.abs(
+    projection.sourceToTimeline(drag.candidate) - projection.sourceToTimeline(origin)
+  );
+  const committed = distance > 0
+    && performStep(
+      drag.candidate < origin ? "backward" : "forward",
+      distance,
+      { waitForGestureEnd: false }
+    );
+  if (committed) completePendingStep();
+  else {
     locateAddress(currentResolution().C);
     stepField?.translateToCurrent?.(currentResolution().C, { preserve: true });
     view.render();
   }
-  return committed;
+  return Boolean(committed);
 }
 
 function handleTimelineClick(event) {
@@ -3396,9 +3405,18 @@ function beginNudgeGesture(target) {
     window.clearTimeout(state.nudgeGesture.timer);
   } else {
     settleNudgeGesture();
+    const origin = snapshotModel(model(), { cloneGuide: true });
+    const departure = origin.resolution.C;
     state.nudgeGesture = {
       key,
-      origin: snapshotModel(model(), { cloneGuide: true }),
+      origin,
+      // Nudging Current is Step, not Go: it extends or shortens the retained
+      // traversal from the same anchor instead of drawing a new one.
+      departure,
+      intervalDeparture: origin.interval
+        && Math.abs(origin.interval.arrival - departure) <= EPSILON
+        ? origin.interval.departure
+        : departure,
       history: state.session.history,
       future: state.session.future || [],
       accumulator: 0,
@@ -3431,6 +3449,27 @@ function settleNudgeGesture() {
   return true;
 }
 
+// Current is displaced by Step rather than by Go, so a drag or a Nudge extends
+// or shortens the retained traversal instead of replacing it with a new Working
+// Interval and a new Resolution. If a fresh neighbourhood is wanted, that is
+// what clicking the Timeline is for.
+function stepCurrentBySourceDelta(session, sourceDelta, options = {}) {
+  const projection = timelineProjection();
+  const range = activeRange();
+  const current = session.model.resolution.C;
+  const destination = clamp(current + sourceDelta, range.start, range.end);
+  const distance = Math.abs(
+    projection.sourceToTimeline(destination) - projection.sourceToTimeline(current)
+  );
+  if (!(distance > 0)) return { changed: false, reason: "range-edge", session };
+  return stepSession(
+    session,
+    sourceDelta < 0 ? "backward" : "forward",
+    distance,
+    options
+  );
+}
+
 function nudgeTargetKey(target) {
   return `${target.kind}:${target.id || "current"}`;
 }
@@ -3453,13 +3492,17 @@ function nudgeTarget(target, direction, options = {}) {
   let result = null;
   if (target.kind === "current") {
     gesture.label = "Nudge Current";
-    // Dragging or nudging Current is an exact Go, not a separate operator.
-    const destination = clamp(
-      currentResolution().C + delta,
-      activeRange().start,
-      activeRange().end
-    );
-    result = goTo(amendable, destination, { operator: "timeline", amend: true });
+    // Current moves by Step law. The quantum is source time, so it is converted
+    // to the equivalent Timeline distance at Current before it is stepped —
+    // Section Weight therefore cannot change the temporal size of one Nudge.
+    result = stepCurrentBySourceDelta(amendable, delta, {
+      departure: gesture.departure,
+      intervalDeparture: gesture.intervalDeparture,
+      originInterval: gesture.origin.interval,
+      originResolution: gesture.origin.resolution,
+      originResolutionBasis: gesture.origin.resolutionBasis,
+      amend: true
+    });
     if (result.changed) state.session = result.session;
   } else if (target.kind === "pin") {
     gesture.label = "Nudge Pin";
@@ -3494,21 +3537,65 @@ function nudgeTarget(target, direction, options = {}) {
   return true;
 }
 
+// Increment controls repeat while held. The action itself already batches into
+// one Undo checkpoint per gesture, so a held press is one transaction however
+// many repetitions it produces.
+const HOLD_REPEAT_DELAY_MS = 380;
+const HOLD_REPEAT_INTERVAL_MS = 80;
+
+// Delegated so it survives Guide re-rendering: the container is bound once and
+// resolves the pressed control at pointer-down.
+function bindHoldRepeat(container, selector, act) {
+  if (!container?.addEventListener) return;
+  let delayTimer = null;
+  let repeatTimer = null;
+  let active = null;
+
+  const stop = () => {
+    active = null;
+    window.clearTimeout(delayTimer);
+    window.clearInterval(repeatTimer);
+    delayTimer = null;
+    repeatTimer = null;
+  };
+  const start = control => {
+    if (active || !control || control.disabled) return;
+    active = control;
+    act(control);
+    delayTimer = window.setTimeout(() => {
+      repeatTimer = window.setInterval(() => {
+        if (!active || active.disabled) stop();
+        else act(active);
+      }, HOLD_REPEAT_INTERVAL_MS);
+    }, HOLD_REPEAT_DELAY_MS);
+  };
+
+  container.addEventListener("pointerdown", event => {
+    if (Number.isFinite(event.button) && event.button !== 0) return;
+    const control = event.target.closest?.(selector);
+    if (!control) return;
+    event.preventDefault();
+    start(control);
+  });
+  container.addEventListener("keydown", event => {
+    const control = event.target.closest?.(selector);
+    if (!control || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    if (!event.repeat) start(control);
+  });
+  for (const type of ["pointerup", "pointercancel", "pointerleave", "keyup", "focusout"]) {
+    container.addEventListener(type, stop);
+  }
+  document.addEventListener("pointerup", stop);
+  document.addEventListener("pointercancel", stop);
+}
+
 // The exact manipulable object under the pointer owns the Nudge. An empty
 // Timeline nudges Current.
 function nudgeTargetFromElement(node) {
   const pin = node?.closest?.("[data-pin-go]") || node?.closest?.("[data-pin-drag]");
   if (pin) {
     return { kind: "pin", id: pin.dataset.pinGo || pin.dataset.pinDrag };
-  }
-  const sectionNode = node?.closest?.("[data-section-node]");
-  if (sectionNode) {
-    const role = sectionNode.dataset.sectionNode;
-    const section = resolveSection(guide(), sectionNode.dataset.sectionId);
-    if (!section) return { kind: "current" };
-    if (role === "start") return { kind: "pin", id: section.startPin.id };
-    if (role === "end") return { kind: "pin", id: section.endPin.id };
-    return { kind: "section", id: section.id };
   }
   const section = node?.closest?.("[data-section-go]");
   if (section) return { kind: "section", id: section.dataset.sectionGo };
@@ -3902,15 +3989,6 @@ elements["section-lane"].addEventListener("click", event => {
     event.stopPropagation();
     return;
   }
-  const node = event.target.closest("[data-section-node]");
-  if (node) {
-    event.stopPropagation();
-    selectSectionAsWorkingInterval(
-      node.dataset.sectionId,
-      { carryRetained: event.altKey === true }
-    );
-    return;
-  }
   const body = event.target.closest("[data-section-go]");
   if (body) {
     event.stopPropagation();
@@ -3920,29 +3998,43 @@ elements["section-lane"].addEventListener("click", event => {
     );
   }
 });
-// The Temporal Topography owns spatial direct manipulation. Each Section node
-// has one visually centered acquisition region and one unambiguous owner:
-// Start/End move that endpoint Pin, and the midpoint translates the Section.
+// The Temporal Topography owns spatial direct manipulation, but the Section wire
+// is already its own control: pressing within a quarter-width of either end
+// acquires that endpoint Pin, and pressing the middle translates the complete
+// Section. The roles come from where the wire was pressed rather than from extra
+// nodes drawn over the map.
+const SECTION_END_GRIP = 0.25;
+
+function sectionWireRole(body, event) {
+  const rect = body.getBoundingClientRect?.();
+  const width = Number(rect?.width);
+  if (!Number.isFinite(width) || width <= 0) return "midpoint";
+  const position = (event.clientX - rect.left) / width;
+  if (position <= SECTION_END_GRIP) return "start";
+  if (position >= 1 - SECTION_END_GRIP) return "end";
+  return "midpoint";
+}
+
 elements["section-lane"].addEventListener("pointerdown", event => {
-  const node = event.target.closest("[data-section-node]");
-  if (!node) return;
-  const section = resolveSection(guide(), node.dataset.sectionId);
+  const body = event.target.closest("[data-section-go]");
+  if (!body) return;
+  const section = resolveSection(guide(), body.dataset.sectionGo);
   if (!section) return;
   event.stopPropagation();
-  const role = node.dataset.sectionNode;
-  if (role === "start" || role === "end") {
-    beginGuideDrag(
-      "pin",
-      role === "start" ? section.startPin.id : section.endPin.id,
-      event,
-      { origin: "timeline", sectionId: section.id, threshold: 6 }
-    );
+  const role = sectionWireRole(body, event);
+  if (role === "midpoint") {
+    beginGuideDrag("section", section.id, event, {
+      origin: "timeline",
+      threshold: 6
+    });
     return;
   }
-  beginGuideDrag("section", section.id, event, {
-    origin: "timeline",
-    threshold: 6
-  });
+  beginGuideDrag(
+    "pin",
+    role === "start" ? section.startPin.id : section.endPin.id,
+    event,
+    { origin: "timeline", sectionId: section.id, threshold: 6 }
+  );
 });
 function activatePinClusterChoice(button, event) {
   if (state.guideClickSuppressed) {
@@ -4104,8 +4196,9 @@ elements["switch-endpoint"].addEventListener("click", event => {
 });
 elements.release.addEventListener("click", releaseWorkingInterval);
 elements.deform.addEventListener("click", deformWorkingOrSelected);
-elements["deform-down"].addEventListener("click", () => stepDeformWeight(-1));
-elements["deform-up"].addEventListener("click", () => stepDeformWeight(1));
+// Weight steppers repeat while held, like every other increment control.
+bindHoldRepeat(elements["deform-down"], "#deform-down", () => stepDeformWeight(-1));
+bindHoldRepeat(elements["deform-up"], "#deform-up", () => stepDeformWeight(1));
 elements["focus-toggle"].addEventListener("click", focusOrUnfocus);
 elements["shift-layer-toggle"].addEventListener("click", () => {
   state.shiftLayer = !state.shiftLayer;
@@ -4423,6 +4516,26 @@ function clearGuideAddressPreview() {
   return true;
 }
 
+function guideNudgeTarget(control) {
+  const kind = control?.dataset?.nudgeTarget;
+  const id = control?.dataset?.nudgeId;
+  if (!kind || !id) return null;
+  if (kind === "pin") return { kind: "pin", id };
+  const section = resolveSection(guide(), id);
+  if (!section) return null;
+  if (kind === "section-start") return { kind: "pin", id: section.startPin.id };
+  if (kind === "section-end") return { kind: "pin", id: section.endPin.id };
+  return { kind: "section", id };
+}
+
+function bindGuideNudgeControls(container) {
+  bindHoldRepeat(container, "[data-nudge-target]", control => {
+    const target = guideNudgeTarget(control);
+    if (!target) return;
+    nudgeTarget(target, Number(control.dataset.nudgeDirection) < 0 ? -1 : 1);
+  });
+}
+
 function handleGuideAddressKeydown(event) {
   const input = event.target.closest?.("[data-address-input]");
   if (!input) return;
@@ -4465,26 +4578,9 @@ function handleGuideClick(event) {
       { carryRetained: event.altKey === true }
     );
   }
-  const nudge = event.target.closest("[data-nudge-target]");
-  if (nudge) {
-    // Increment buttons use the same Nudge operation as Timeline Shift-wheel
-    // and keyboard nudging.
-    const kind = nudge.dataset.nudgeTarget;
-    const id = nudge.dataset.nudgeId;
-    const direction = Number(nudge.dataset.nudgeDirection) < 0 ? -1 : 1;
-    const section = kind.startsWith("section-")
-      ? resolveSection(guide(), id)
-      : null;
-    const target = kind === "pin"
-      ? { kind: "pin", id }
-      : kind === "section-start" && section
-        ? { kind: "pin", id: section.startPin.id }
-        : kind === "section-end" && section
-          ? { kind: "pin", id: section.endPin.id }
-          : { kind: "section", id };
-    nudgeTarget(target, direction);
-    return;
-  }
+  // Increment controls run through the shared hold-repeat binding, so a click
+  // here would double-fire the first repetition.
+  if (event.target.closest("[data-nudge-target]")) return;
   const addressGo = event.target.closest("[data-address-go]");
   if (addressGo) {
     return goToPin(
@@ -4524,6 +4620,7 @@ elements["sections-list"].addEventListener("change", event => {
   applyGuideAddressInput(event.target.closest("[data-address-input]"));
 });
 elements["sections-list"].addEventListener("keydown", handleGuideAddressKeydown);
+bindGuideNudgeControls(elements["sections-list"]);
 elements["sections-list"].addEventListener("input", event => {
   previewGuideAddressInput(event.target.closest("[data-address-input]"));
 });
@@ -4535,6 +4632,7 @@ elements["pins-list"].addEventListener("change", event => {
   applyGuideAddressInput(event.target.closest("[data-address-input]"));
 });
 elements["pins-list"].addEventListener("keydown", handleGuideAddressKeydown);
+bindGuideNudgeControls(elements["pins-list"]);
 elements["pins-list"].addEventListener("input", event => {
   previewGuideAddressInput(event.target.closest("[data-address-input]"));
 });

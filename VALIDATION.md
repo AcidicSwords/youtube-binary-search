@@ -133,13 +133,26 @@
 
 - Press the Current marker and release without moving. Confirm nothing moves and
   no history entry appears.
+- Drag Current forward, then back past its own departure. Confirm the Working
+  Interval extends and then shortens from the same anchor, and that neither drag
+  draws a new interval around the landing point.
+- Open the Field Tune popover while Center is paused and edit each value.
+  Confirm no click reaches the play/pause surface underneath.
+- Press and hold every increment control in Guide and on Deform. Confirm it
+  repeats and that the whole hold is one Undo entry.
+- Confirm no Section node chrome is drawn over the map, and that pressing a
+  Section wire near an end moves that endpoint Pin while its middle translates
+  the Section.
+- Confirm a Section row shows one Address line with Start and End, and no second
+  positional endpoint track.
 - Drag Current across a spatial distance. Confirm the marker follows the
   candidate, the original Current remains as a faint departure marker, Center
   shows the candidate frame, the Field shows the candidate Context Frame when
   Context is enabled and the candidate Go Frame otherwise, and Session Current is
   unchanged until release.
-- Release and confirm one exact Go: one Working Interval, one Undo checkpoint,
-  and one Field transition in the traversal direction.
+- Release and confirm one Step: the retained departure is preserved, one Undo
+  checkpoint is created, and one Field transition runs in the traversal
+  direction.
 - Repeat and cancel with Escape or a lost pointer. Confirm the original Current
   presentation returns with no semantic change and no history.
 - Shift-drag Current. Confirm reduced gain, quantized source Addresses, the same

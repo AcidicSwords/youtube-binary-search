@@ -16,6 +16,7 @@
 11. The Temporal Topography owns spatial direct manipulation; Guide owns exact editing.
 12. The minimum Field offset is a law; Range clipping may remove a side, never shrink `x`.
 13. Any fine-adjustment quantum must exceed the kernel's semantic equality tolerance.
+14. Current is displaced by Step law; only an exact Go draws a new neighbourhood.
 
 ## Change routing
 
@@ -66,6 +67,11 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
   destination as the Address it started from, so the control becomes inert.
 - Resume breathing with the rate of the phase actually preserved, never with a
   fixed outward pair.
+- Dragging or nudging Current must go through Step, never Go, so the retained
+  traversal extends or shortens instead of being redrawn.
+- Every increment control must repeat while held and settle as one transaction.
+- A pane bar that creates a stacking context must out-rank the transport surface,
+  or its popovers become unclickable.
 - Rapid visual transitions cannot block semantic commits. A transition is
   attached to a commit that has already happened; discard superseded player
   callbacks with the transition generation token rather than serializing them.

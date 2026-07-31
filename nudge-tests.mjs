@@ -77,6 +77,7 @@ assert.equal(byId.get("return-action").disabled, historyBeforePress);
 
 // Crossing the drag threshold previews a candidate Address. Session Current
 // remains unchanged and the original Current stays as a departure marker.
+const intervalStartBeforeDrag = byId.get("section-window").textContent.split("–")[0];
 byId.get("current-marker").dispatch("pointerdown", {
   target: byId.get("current-marker"),
   clientX: 500,
@@ -111,7 +112,15 @@ await flush();
 await poll();
 assert.equal(currentText(), "Current 1:05");
 assert.equal(byId.get("current-departure-marker").hidden, true);
-assert.match(byId.get("status").textContent, /Moved Current to 1:05/);
+// Dragging Current is Step, not Go: it extends the retained traversal from the
+// same departure instead of drawing a new Working Interval around the landing.
+assert.match(byId.get("status").textContent, /Stepped Forward to 1:05/);
+assert.ok(
+  byId.get("section-window").textContent.startsWith(intervalStartBeforeDrag),
+  "Dragging Current extends the retained traversal from its existing anchor."
+);
+assert.match(byId.get("section-window").textContent, /–1:05$/,
+  "It extends to the new Current rather than drawing a new interval around it.");
 dispatchDocument("keydown", { key: "z", code: "KeyZ" });
 await flush();
 assert.equal(currentText(), "Current 0:50", "One drag creates at most one Undo checkpoint.");
@@ -253,10 +262,39 @@ await flush();
 const guideNudgeForward = descendants(byId.get("pins-list"))
   .find(node => node.dataset.nudgeTarget === "pin" && node.dataset.nudgeDirection === "1");
 assert.ok(guideNudgeForward, "Guide must expose the shared Nudge increments.");
-byId.get("pins-list").dispatch("click", { target: guideNudgeForward });
+// Increment controls fire on press and repeat while held, so they are driven by
+// pointer events rather than by click.
+byId.get("pins-list").dispatch("pointerdown", {
+  target: guideNudgeForward, button: 0, pointerId: 81
+});
+byId.get("pins-list").dispatch("pointerup", {
+  target: guideNudgeForward, pointerId: 81
+});
 await flush();
 assert.equal(pinAddress(), "1:07.5",
   "Guide increments and Timeline Shift-wheel are one operation.");
+// Let that gesture settle so the hold below is a separate transaction.
+await env.delay(600);
+await flush();
+
+// Holding one repeats it, and the whole hold is still one Undo transaction.
+byId.get("pins-list").dispatch("pointerdown", {
+  target: guideNudgeForward, button: 0, pointerId: 82
+});
+await env.delay(700);
+await flush();
+byId.get("pins-list").dispatch("pointerup", {
+  target: guideNudgeForward, pointerId: 82
+});
+await flush();
+const heldAddress = pinAddress();
+assert.notEqual(heldAddress, "1:07.5", "Holding an increment must repeat it.");
+await env.delay(600);
+await flush();
+dispatchDocument("keydown", { key: "z", code: "KeyZ" });
+await flush();
+assert.equal(pinAddress(), "1:07.5",
+  "A held increment settles as one Undo checkpoint.");
 await env.delay(600);
 await flush();
 dispatchDocument("keydown", { key: "z", code: "KeyZ" });

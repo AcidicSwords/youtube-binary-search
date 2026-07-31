@@ -264,30 +264,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
   // Guide's full-map profile is a read-only positional representation and an
   // acquisition link back to the Timeline. It owns no drag geometry: spatial
   // direct manipulation belongs to the Temporal Topography.
-  function endpointButton(role, pin, references, sectionId = null) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "endpoint-button";
-    button.dataset.pinGo = pin.id;
-    if (sectionId) button.dataset.dragSection = sectionId;
-    setStyleProperty(button, "--endpoint-position", `${percent(pin.t)}%`);
-    setStyleProperty(
-      button,
-      "--endpoint-weight",
-      String(Math.min(3, Math.max(1, references)))
-    );
-    const roleLabel = document.createElement("small");
-    roleLabel.textContent = role === "Start" ? "S" : "E";
-    const text = document.createElement("span");
-    text.textContent = `${formatTime(pin.t)} ${pin.label || ""}`.trim();
-    text.className = "sr-only";
-    button.append(roleLabel, text);
-    const description = `${role} Pin at ${formatTime(pin.t)}; click to Go, edit its Address below or drag it on the Timeline; ${references} Section${references === 1 ? "" : "s"}`;
-    button.setAttribute("aria-label", description);
-    button.title = description;
-    return button;
-  }
-
   function pinPositionButton(pin, references) {
     const button = document.createElement("button");
     button.type = "button";
@@ -311,55 +287,43 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     return button;
   }
 
-  // One exact Address editor: a numeric field plus the shared Nudge increments.
-  function addressField(kind, id, label, address, options = {}) {
-    const row = document.createElement("div");
-    row.className = "guide-address-row";
-    const field = document.createElement("label");
-    field.className = "guide-address-field";
-    const name = document.createElement("span");
+  // One exact Address control: a compact field flanked by the shared Nudge
+  // increments. Rows compose these; they do not each carry their own chrome.
+  function nudgeButton(kind, id, direction, label) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "guide-nudge";
+    button.dataset.nudgeTarget = kind;
+    button.dataset.nudgeId = id;
+    button.dataset.nudgeDirection = String(direction);
+    button.textContent = direction < 0 ? "\u2212" : "+";
+    const description = `Nudge ${label} ${direction < 0 ? "backward" : "forward"}; hold to repeat`;
+    button.setAttribute("aria-label", description);
+    button.title = description;
+    return button;
+  }
+
+  function addressControl(kind, id, label, address) {
+    const field = document.createElement("span");
+    field.className = "guide-address";
+    const name = document.createElement("small");
     name.textContent = label;
     const input = document.createElement("input");
     input.type = "text";
     input.className = "guide-address-input";
     input.inputMode = "decimal";
+    input.size = 7;
     input.dataset.addressInput = kind;
     input.dataset.addressId = id;
     input.value = formatTime(address);
     input.setAttribute("aria-label", `${label} Address; timecode or seconds`);
-    field.append(name, input);
-    const controls = document.createElement("div");
-    controls.className = "guide-address-controls";
-    for (const direction of [-1, 1]) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "guide-nudge";
-      button.dataset.nudgeTarget = kind;
-      button.dataset.nudgeId = id;
-      button.dataset.nudgeDirection = String(direction);
-      button.textContent = direction < 0 ? "−" : "+";
-      const description = `Nudge ${label} ${direction < 0 ? "backward" : "forward"} one quantum`;
-      button.setAttribute("aria-label", description);
-      button.title = description;
-      controls.appendChild(button);
-    }
-    if (options.goPinId) {
-      const go = document.createElement("button");
-      go.type = "button";
-      go.className = "guide-action guide-address-go";
-      go.dataset.addressGo = options.goPinId;
-      go.textContent = "Go";
-      go.setAttribute("aria-label", `Move Current to ${label} at ${formatTime(address)}`);
-      controls.appendChild(go);
-    }
-    row.append(field, controls);
-    if (options.readout) {
-      const readout = document.createElement("span");
-      readout.className = "guide-address-readout";
-      readout.textContent = options.readout;
-      row.appendChild(readout);
-    }
-    return row;
+    field.append(
+      name,
+      nudgeButton(kind, id, -1, label),
+      input,
+      nudgeButton(kind, id, 1, label)
+    );
+    return field;
   }
 
   function closePinClusterMenu(options = {}) {
@@ -676,11 +640,14 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       setStyleProperty(body, "--section-color", color);
       setStyleProperty(body, "--section-offset", `${visibleLane * sectionLaneHeight}px`);
       if (selected) body.classList.add("retained-selected");
+      // The wire itself is the acquisition surface. Pressing near its Start or
+      // End drags that endpoint Pin; pressing its middle translates the whole
+      // Section. No extra node chrome is drawn over the map.
       body.setAttribute(
         "aria-label",
-        `Select ${sectionLabel(section)} as the Working Interval, ${formatRange(section)}`
+        `${sectionLabel(section)}, ${formatRange(section)}; click to work from this extent, drag its ends to move an endpoint Pin or its middle to translate it`
       );
-      body.title = `${sectionLabel(section)} · click to work from this extent`;
+      body.title = `${sectionLabel(section)} · click to work from this extent · drag the ends or the middle`;
       // The visible wire belongs to its control. Keeping one geometry owner
       // prevents a click on what looks like a Section from falling through to Go.
       body.appendChild(span);
@@ -707,33 +674,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       }
       sectionLane.appendChild(body);
 
-      // Each Section node is one visually centered acquisition region with one
-      // unambiguous gesture owner: Start and End move that endpoint Pin, the
-      // midpoint translates the complete Section.
-      const nodePoints = [
-        ["start", projected.start, "Start", section.start],
-        ["midpoint", midpointCoordinate, "profile", section.midpoint],
-        ["end", projected.end, "End", section.end]
-      ];
-      for (const [role, coordinate, roleLabel, address] of nodePoints) {
-        const node = document.createElement("button");
-        node.type = "button";
-        node.className = `timeline-section-node ${role}`;
-        node.dataset.sectionNode = role;
-        node.dataset.sectionId = section.id;
-        if (selected) node.classList.add("retained-selected");
-        node.style.left = `${
-          coordinate / Math.max(projection.timelineExtent, EPSILON) * 100
-        }%`;
-        setStyleProperty(node, "--section-offset", `${visibleLane * sectionLaneHeight}px`);
-        setStyleProperty(node, "--section-color", color);
-        const description = role === "midpoint"
-          ? `${sectionLabel(section)} ${roleLabel} at ${formatTime(address)}; drag to translate the complete Section, Shift-drag or Shift-wheel to nudge`
-          : `${sectionLabel(section)} ${roleLabel} Pin at ${formatTime(address)}; drag to move that endpoint Pin, Shift-drag or Shift-wheel to nudge`;
-        node.setAttribute("aria-label", description);
-        node.title = description;
-        sectionLane.appendChild(node);
-      }
     }
   }
 
@@ -1000,38 +940,23 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         }
         actions.append(focus, weightControl, ...endpointLinks);
 
-        const endpoints = document.createElement("div");
-        endpoints.className = "section-endpoints";
-        setStyleProperty(endpoints, "--section-start", `${percent(section.start)}%`);
-        setStyleProperty(endpoints, "--section-end", `${percent(section.end)}%`);
-        const spanLink = document.createElement("span");
-        spanLink.className = "section-span-link";
-        spanLink.setAttribute("aria-hidden", "true");
-        endpoints.append(
-          endpointButton("Start", section.startPin, startReferences, section.id),
-          spanLink,
-          endpointButton("End", section.endPin, endReferences, section.id)
-        );
-
-        // Exact topology and numeric editing. Guide no longer duplicates the
-        // Timeline's spatial drag system.
+        // Exact topology and numeric editing on one line. Guide no longer
+        // duplicates the Timeline's spatial drag system, and it no longer
+        // repeats the same extent as three separate stacked editors.
         const addresses = document.createElement("div");
         addresses.className = "guide-addresses";
+        const duration = document.createElement("span");
+        duration.className = "guide-address-readout";
+        duration.textContent = formatDuration(section.end - section.start);
         addresses.append(
-          addressField("section-start", section.id, "Start", section.start, {
-            goPinId: section.startPin.id
-          }),
-          addressField("section-end", section.id, "End", section.end, {
-            goPinId: section.endPin.id
-          }),
-          addressField("section", section.id, "Section", section.start, {
-            readout: `Duration ${formatDuration(section.end - section.start)}`
-          })
+          addressControl("section-start", section.id, "Start", section.start),
+          addressControl("section-end", section.id, "End", section.end),
+          duration
         );
 
         item.append(header);
         if (selected || section.id === focusedId) {
-          item.append(actions, endpoints, addresses);
+          item.append(actions, addresses);
         }
         elements["sections-list"].appendChild(item);
       }
@@ -1104,14 +1029,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         positionTrack.append(positionLine, pinPositionButton(pin, references));
         const addresses = document.createElement("div");
         addresses.className = "guide-addresses";
-        addresses.append(
-          addressField("pin", pin.id, "Address", pin.t, {
-            goPinId: pin.id,
-            readout: references
-              ? `${references} reference${references === 1 ? "" : "s"}`
-              : "unshared"
-          })
-        );
+        addresses.append(addressControl("pin", pin.id, "Address", pin.t));
         item.append(header);
         if (selected || extentSelected) item.append(positionTrack, addresses);
         elements["pins-list"].appendChild(item);

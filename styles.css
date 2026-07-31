@@ -878,48 +878,6 @@ kbd {
   opacity: 0.48;
 }
 
-/* Section Start, midpoint and End acquisition regions. Each is one centered
-   control with one unambiguous gesture owner. */
-.timeline-section-node {
-  position: absolute;
-  z-index: 4;
-  top: calc(var(--section-top, 190px) + var(--section-offset, 0px) + 3px);
-  width: 13px;
-  height: 15px;
-  padding: 0;
-  border: 1px solid color-mix(in srgb, var(--section-color) 74%, transparent);
-  border-radius: 3px;
-  background: #0b1017;
-  transform: translateX(-50%);
-  touch-action: none;
-  cursor: ew-resize;
-  opacity: 0.72;
-}
-
-.timeline-section-node::after {
-  position: absolute;
-  inset: -8px -9px;
-  content: "";
-}
-
-.timeline-section-node.midpoint {
-  border-radius: 50%;
-  cursor: grab;
-}
-
-.timeline-section-node.retained-selected,
-.timeline-section-node:hover,
-.timeline-section-node:focus-visible {
-  opacity: 1;
-  background: color-mix(in srgb, var(--section-color) 34%, #0b1017);
-}
-
-@media (pointer: coarse) {
-  .timeline-section-node::after {
-    inset: -17px -18px;
-  }
-}
-
 .timeline-section-body {
   position: absolute;
   top: calc(var(--section-top, 112px) + var(--section-offset, 0px));
@@ -2603,76 +2561,73 @@ kbd {
 }
 
 
-/* Guide is the exact editor: numeric Address fields and the shared Nudge
-   increments. It owns no drag geometry. */
+/* Guide is the exact editor: one compact Address line per object, with the
+   shared Nudge increments flanking each field. It owns no drag geometry, and it
+   does not repeat the same extent as several stacked editors. */
 .guide-addresses {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-top: 8px;
 }
 
-.guide-address-row {
-  display: flex;
+.guide-address {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 3px;
 }
 
-.guide-address-field {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.guide-address-field > span {
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.guide-address > small {
+  margin-right: 2px;
   color: var(--text-dim);
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .guide-address-input {
-  flex: 1 1 6ch;
-  min-width: 6ch;
-  padding: 3px 6px;
+  width: 7ch;
+  min-width: 0;
+  padding: 3px 4px;
   font-family: var(--mono, ui-monospace, monospace);
-  font-size: 0.76rem;
-}
-
-.guide-address-controls {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  font-size: 0.74rem;
+  text-align: center;
 }
 
 .guide-nudge {
-  min-width: 26px;
-  min-height: 26px;
+  min-width: 22px;
+  min-height: 22px;
   padding: 0;
-  border: 1px solid rgba(148, 163, 184, 0.32);
+  border: 1px solid rgba(148, 163, 184, 0.3);
   border-radius: 4px;
   background: rgba(148, 163, 184, 0.08);
   color: var(--text);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   line-height: 1;
+  touch-action: none;
 }
 
 .guide-nudge:hover,
 .guide-nudge:focus-visible {
-  background: rgba(148, 163, 184, 0.2);
+  background: rgba(148, 163, 184, 0.22);
+}
+
+.guide-nudge:active {
+  background: rgba(148, 163, 184, 0.34);
 }
 
 .guide-address-readout {
-  font-size: 0.7rem;
+  margin-left: auto;
   color: var(--text-dim);
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.7rem;
 }
 
 @media (pointer: coarse) {
   .guide-nudge {
-    min-width: 44px;
-    min-height: 44px;
+    min-width: 40px;
+    min-height: 40px;
   }
+  .guide-address-input { width: 8ch; }
 }
