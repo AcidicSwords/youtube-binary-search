@@ -436,3 +436,28 @@
   .field-control input { font-size: 16px; }
   .pane-collapse { width: var(--touch); }
 }
+
+/* Stable Field-frame traversal. Semantic movement commits immediately; this
+   brief directional motion preserves the slideshow illusion across rapid seeks. */
+.step-field.frame-moving-forward .step-pane {
+  animation: field-frame-forward 220ms cubic-bezier(.2,.72,.2,1);
+}
+.step-field.frame-moving-backward .step-pane {
+  animation: field-frame-backward 220ms cubic-bezier(.2,.72,.2,1);
+}
+.step-field.frame-moving-forward .tail-pane,
+.step-field.frame-moving-backward .lead-pane { opacity: .72; }
+
+@keyframes field-frame-forward {
+  from { transform: translateX(8%); filter: saturate(.82); }
+  to { transform: translateX(0); filter: saturate(1); }
+}
+@keyframes field-frame-backward {
+  from { transform: translateX(-8%); filter: saturate(.82); }
+  to { transform: translateX(0); filter: saturate(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step-field.frame-moving-forward .step-pane,
+  .step-field.frame-moving-backward .step-pane { animation: none; }
+}

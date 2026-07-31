@@ -113,18 +113,23 @@ assert.match(fieldSource, /FIELD_SIDE_MODE/);
 assert.match(
   fieldSource,
   /function stretch\(role\)[\s\S]*suspendedNow = suspensionRequired\(snapshot\)[\s\S]*beginStretch\(side, center, snapshot, \{ play: centerRunning && !suspendedNow \}\)/,
-  "Stretch must use live suspension state before delegating to the deterministic refold-then-diverge transition."
+  "Stretch must use live suspension state before entering the bounded breathing cycle."
 );
-assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*side\.offset = 0[\s\S]*requestRate\(side, 1, true\)[\s\S]*(?:adapter\?\.place|adapter\?\.cue)[\s\S]*side\.adapter\?\.play/,
-  "Every running Stretch must refold to Center at 1× before future divergence.");
+assert.match(
+  fieldSource,
+  /function beginStretch\(side, center, snapshot,[\s\S]*breathingBounds[\s\S]*bounds\.inner[\s\S]*FIELD_SWEEP_PHASE\.EXPANDING[\s\S]*requestStretchRate/,
+  "Every running Stretch must begin from a non-zero bounded relation and retain sweep direction."
+);
 assert.doesNotMatch(fieldSource, /onHoldOffsets/,
   "Hold and Stretch must never persist a measured runtime offset.");
 assert.doesNotMatch(app, /onHoldOffsets:/,
   "The application must not expose a Hold-to-configuration write path.");
 assert.match(app, /function changeFieldOffset[\s\S]*state\.fieldOffsets = normalizeStepReach/,
   "Only explicit Offset input changes may update configured Field offsets.");
-assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*side\.adapter\?\.play/,
-  "Side playback must prime at 1× inside the same Stretch transition.");
+assert.match(fieldSource, /nextBreathingPhase\(runtime\.sweepPhase[\s\S]*side\.boundary = null[\s\S]*requestStretchRate\(side, true\)/,
+  "The Field must reverse only after every operational side reaches the active breathing boundary.");
+assert.match(fieldSource, /side\.boundary[\s\S]*requestRate\(side, 1, true\)/,
+  "A side that arrives first must follow Center at 1× while waiting at the synchronization barrier.");
 assert.match(fieldSource, /function driveSide\(role, center, centerDelta, snapshot, centerRunning\)[\s\S]*requestStretchRate\(side\)/,
   "Directional rate must be requested only after a side is running and its capabilities are observable.");
 assert.match(css, /data-phase="unfolding"/);
@@ -133,4 +138,4 @@ assert.match(css, /field-span-fill/);
 assert.match(packageJson.scripts.test, /field-grammar-tests\.mjs/);
 assert.match(packageJson.scripts.check, /step-field-geometry\.js/);
 
-console.log("Field grammar tests passed: automatic Context, independent Hold/Stretch offsets, Range looping, side Step, and Guide retention.");
+console.log("Field grammar tests passed: stable Context framing, bounded breathing, Range looping, side Step, and Guide retention.");

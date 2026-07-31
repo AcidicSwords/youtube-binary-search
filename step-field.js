@@ -7,12 +7,18 @@ import {
   STEP_FIELD_PHASE,
   FIELD_REACH_TOLERANCE,
   DEFAULT_FIELD_RESPONSE,
+  FIELD_SWEEP_PHASE,
+  FIELD_BOUNDARY,
   normalizeFieldResponse,
   deriveFieldBounds,
   deriveStepField,
   normalizeFieldReach,
   chooseNearestRate,
   chooseDirectionalRate,
+  breathingRateFor,
+  deriveBreathingBounds,
+  advanceBreathingOffset,
+  nextBreathingPhase,
   hasCenterDiscontinuity,
   resolveFieldPhase,
   deriveObservedField
@@ -21,12 +27,18 @@ import {
 export {
   STEP_FIELD_PHASE,
   DEFAULT_FIELD_RESPONSE,
+  FIELD_SWEEP_PHASE,
+  FIELD_BOUNDARY,
   normalizeFieldResponse,
   deriveFieldBounds,
   deriveStepField,
   normalizeFieldReach,
   chooseNearestRate,
   chooseDirectionalRate,
+  breathingRateFor,
+  deriveBreathingBounds,
+  advanceBreathingOffset,
+  nextBreathingPhase,
   resolveFieldPhase,
   deriveObservedField
 } from "./step-field-geometry.js";
@@ -117,7 +129,10 @@ export function createStepFieldController({
     forceEstablish: true,
     restoreRoles: new Set(),
     suspended: false,
+    sweepPhase: FIELD_SWEEP_PHASE.EXPANDING,
     preview: null,
+    previewRevision: null,
+    transitionTimer: null,
     field: null,
     fieldKey: ""
   };
@@ -144,6 +159,7 @@ export function createStepFieldController({
       progressOffset: 0,
       configuredOffset: 0,
       beforeStretchOffset: 0,
+      boundary: null,
       desiredAddress: null,
       lastPlacedAddress: null,
       lastPlaceAt: 0,
@@ -196,6 +212,22 @@ export function createStepFieldController({
     return snapshotReach(snapshot)[directionFor(role)];
   }
 
+  function configuredInnerOffset(snapshot = getSnapshot?.()) {
+    const value = Number(snapshot?.fieldInnerOffset ?? preferences().innerOffset);
+    return Number.isFinite(value) && value > 0
+      ? value
+      : DEFAULT_FIELD_RESPONSE.innerOffset;
+  }
+
+  function breathingBounds(center, snapshot = getSnapshot?.()) {
+    return deriveBreathingBounds({
+      current: center,
+      innerOffset: configuredInnerOffset(snapshot),
+      outerReach: snapshotReach(snapshot),
+      range: snapshot.range
+    });
+  }
+
   function effectiveOffset(role, center, snapshot = getSnapshot?.()) {
     const configured = configuredOffset(role, snapshot);
     if (!snapshot?.range) return configured;
@@ -239,7 +271,10 @@ export function createStepFieldController({
         "reopen",
         "resolution",
         "context",
-        "section"
+        "section",
+        "current",
+        "pin",
+        "go"
       ].includes(value.kind)
       || !snapshot?.range
     ) {
@@ -263,7 +298,11 @@ export function createStepFieldController({
       center,
       end,
       backwardDistance: Number(value.backwardDistance),
-      forwardDistance: Number(value.forwardDistance)
+      forwardDistance: Number(value.forwardDistance),
+      revision: Number.isInteger(value.revision) ? value.revision : 0,
+      direction: ["backward", "forward", "none"].includes(value.direction)
+        ? value.direction
+        : "none"
     };
   }
 
@@ -298,7 +337,7 @@ export function createStepFieldController({
       && !sideIsTransitioning(role)
       && sideCanRun(side)
       && side.sourceReady
-      && effectiveOffset(role, center, snapshot) > EPSILON
+      && breathingBounds(center, snapshot)[role].operational
     );
   }
 
@@ -347,13 +386,15 @@ export function createStepFieldController({
       changePreferences({ leadVisible: true, stepFieldEnabled: true });
     });
     elements["tail-rate-select"]?.addEventListener?.("change", event => {
-      changePreferences({ tailRate: Number(event.target.value) });
+      const tailRate = Number(event.target.value);
+      changePreferences({ tailRate, leadRate: 2 - tailRate });
       if (!suspensionRequired() && sides.tail.mode === FIELD_SIDE_MODE.STRETCHING) {
         requestStretchRate(sides.tail, true);
       }
     });
     elements["lead-rate-select"]?.addEventListener?.("change", event => {
-      changePreferences({ leadRate: Number(event.target.value) });
+      const leadRate = Number(event.target.value);
+      changePreferences({ leadRate, tailRate: 2 - leadRate });
       if (!suspensionRequired() && sides.lead.mode === FIELD_SIDE_MODE.STRETCHING) {
         requestStretchRate(sides.lead, true);
       }
@@ -624,18 +665,25 @@ export function createStepFieldController({
   }
 
   function requestStretchRate(side, force = false) {
-    side.requestedRate = Number(preferences()[`${side.role}Rate`]);
+    const prefs = preferences();
+    const requested = breathingRateFor(
+      side.role,
+      runtime.sweepPhase,
+      prefs,
+      { waiting: Boolean(side.boundary) }
+    );
+    side.requestedRate = requested;
     refreshSideSnapshot(side);
-    const rate = chooseDirectionalRate(side.availableRates, side.requestedRate, side.role);
-    if (rate === null && !side.ratesKnown) {
-      // getAvailablePlaybackRates commonly reports only 1× until the iframe has
-      // actually entered playback. Unknown is not the same as unsupported.
+    const rate = chooseNearestRate(side.availableRates, requested);
+    const usable = Math.abs(rate - requested) <= 0.26
+      && (side.boundary || Math.abs(rate - 1) > 0.001);
+    if (!usable && !side.ratesKnown) {
       side.rateAvailable = true;
       requestRate(side, 1, force);
       return undefined;
     }
-    side.rateAvailable = rate !== null;
-    if (rate === null) {
+    side.rateAvailable = usable;
+    if (!usable) {
       requestRate(side, 1, force);
       return null;
     }
@@ -644,12 +692,14 @@ export function createStepFieldController({
   }
 
   function establishSide(side, center, snapshot) {
-    const offset = effectiveOffset(side.role, center, snapshot);
+    const bounds = breathingBounds(center, snapshot)[side.role];
+    const offset = bounds.operational ? bounds.outer : 0;
     side.mode = FIELD_SIDE_MODE.HELD;
     side.offset = offset;
     side.progressOffset = offset;
     side.configuredOffset = configuredOffset(side.role, snapshot);
     side.beforeStretchOffset = offset;
+    side.boundary = bounds.operational ? FIELD_BOUNDARY.OUTER : null;
     if (sideIsVisible(side.role)) {
       pauseSide(side);
       parkAtRelation(side, center, snapshot, { force: true });
@@ -665,6 +715,7 @@ export function createStepFieldController({
     runtime.semanticCurrent = center;
     runtime.lastCenterTime = center;
     runtime.centerWasRunning = false;
+    runtime.sweepPhase = FIELD_SWEEP_PHASE.EXPANDING;
     runtime.forceEstablish = false;
     runtime.restoreRoles.clear();
     runtime.phase = STEP_FIELD_PHASE.HELD;
@@ -810,6 +861,26 @@ export function createStepFieldController({
       render(snapshot, runtime.field);
     }
     ensurePlayers(prefs);
+    const revision = Number.isInteger(preview.revision) ? preview.revision : null;
+    if (revision !== null && revision !== runtime.previewRevision) {
+      runtime.previewRevision = revision;
+      const root = elements["step-field"];
+      const direction = ["backward", "forward"].includes(preview.direction)
+        ? preview.direction
+        : "none";
+      root?.classList?.toggle?.("frame-moving-forward", direction === "forward");
+      root?.classList?.toggle?.("frame-moving-backward", direction === "backward");
+      if (root?.dataset) root.dataset.frameDirection = direction;
+      if (runtime.transitionTimer) clearTimeout(runtime.transitionTimer);
+      if (direction !== "none") {
+        runtime.transitionTimer = setTimeout(() => {
+          root?.classList?.toggle?.("frame-moving-forward", false);
+          root?.classList?.toggle?.("frame-moving-backward", false);
+          if (root?.dataset) root.dataset.frameDirection = "none";
+          runtime.transitionTimer = null;
+        }, 220);
+      }
+    }
     const addresses = {
       tail: preview.start,
       lead: preview.end
@@ -874,27 +945,40 @@ export function createStepFieldController({
 
   function beginStretch(side, center, snapshot, { play = false } = {}) {
     if (!sideCanRun(side)) return false;
+    const bounds = breathingBounds(center, snapshot)[side.role];
+    if (!bounds.operational) return false;
     side.beforeStretchOffset = side.offset;
     side.mode = FIELD_SIDE_MODE.STRETCHING;
-    side.offset = 0;
-    side.progressOffset = 0;
+    side.offset = clamp(
+      side.offset > REACH_TOLERANCE ? side.offset : bounds.inner,
+      bounds.inner,
+      bounds.outer
+    );
+    side.progressOffset = side.offset;
     side.configuredOffset = configuredOffset(side.role, snapshot);
+    if (
+      runtime.sweepPhase === FIELD_SWEEP_PHASE.EXPANDING
+      && side.offset >= bounds.outer - REACH_TOLERANCE
+    ) runtime.sweepPhase = FIELD_SWEEP_PHASE.CONTRACTING;
+    else if (
+      runtime.sweepPhase === FIELD_SWEEP_PHASE.CONTRACTING
+      && side.offset <= bounds.inner + REACH_TOLERANCE
+    ) runtime.sweepPhase = FIELD_SWEEP_PHASE.EXPANDING;
+    side.boundary = null;
     side.blocked = false;
     side.adapter?.mute?.();
-    requestRate(side, 1, true);
-
-    // Stretch is one operation: refold to physical Center, then diverge toward
-    // the configured maximum. The source must already be cued before the trusted
-    // play gesture; a cue and play issued together race in the YouTube iframe.
-    side.desiredAddress = center;
-    side.lastPlacedAddress = center;
+    side.desiredAddress = exactAddress(
+      side.role, center, side.offset, snapshot.range
+    );
+    side.lastPlacedAddress = side.desiredAddress;
     side.lastPlaceAt = Date.now();
     side.pendingPlay = Boolean(play);
     if (side.sourceReady) {
-      side.adapter?.place?.(center);
+      side.adapter?.place?.(side.desiredAddress);
+      requestStretchRate(side, true);
     } else if (side.playback !== "loading") {
       side.playback = "loading";
-      side.adapter?.cue?.(side.videoId, center);
+      side.adapter?.cue?.(side.videoId, side.desiredAddress);
     }
     if (play && side.sourceReady) {
       side.adapter?.play?.();
@@ -924,13 +1008,18 @@ export function createStepFieldController({
     );
     const started = { tail: false, lead: false };
     runtime.centerWasRunning = true;
+    runtime.sweepPhase = FIELD_SWEEP_PHASE.EXPANDING;
     for (const role of ["tail", "lead"]) {
       const side = sides[role];
+      const bounds = breathingBounds(center, snapshot)[role];
       if (
         !sideIsVisible(role, prefs)
         || !sideCanRun(side)
-        || effectiveOffset(role, center, snapshot) <= EPSILON
+        || !bounds.operational
       ) continue;
+      side.offset = bounds.inner;
+      side.progressOffset = bounds.inner;
+      side.boundary = FIELD_BOUNDARY.INNER;
       started[role] = beginStretch(side, center, snapshot, { play: true });
     }
     runtime.semanticCurrent = semanticAddress(snapshot, center);
@@ -1074,9 +1163,13 @@ export function createStepFieldController({
     } else {
       offset = clamp(side.offset, 0, effectiveOffset(role, center, snapshot));
     }
+    const bounds = breathingBounds(center, snapshot)[role];
     side.mode = FIELD_SIDE_MODE.HELD;
-    side.offset = offset;
-    side.progressOffset = offset;
+    side.offset = bounds.operational
+      ? clamp(offset, bounds.inner, bounds.outer)
+      : 0;
+    side.progressOffset = side.offset;
+    side.boundary = null;
     side.configuredOffset = configuredOffset(role, snapshot);
     requestRate(side, 1, true);
     side.desiredAddress = exactAddress(
@@ -1177,89 +1270,78 @@ export function createStepFieldController({
     const side = sides[role];
     const prefs = preferences();
     const visible = prefs[`${role}Visible`];
-    const maximum = effectiveOffset(role, center, snapshot);
+    const bounds = breathingBounds(center, snapshot)[role];
     if (!visible || !sideCanRun(side)) {
       pauseSide(side);
-      return { available: false, held: false, offset: 0 };
+      return { available: false, operational: false, held: false, offset: 0, boundary: null };
     }
-    if (maximum <= EPSILON) {
+    if (!bounds.operational) {
       side.mode = FIELD_SIDE_MODE.HELD;
       side.offset = 0;
       side.progressOffset = 0;
+      side.boundary = null;
       side.configuredOffset = configuredOffset(role, snapshot);
       pauseSide(side);
       parkSide(side, center);
-      return { available: false, held: true, offset: 0 };
+      return { available: false, operational: false, held: true, offset: 0, boundary: null };
     }
 
     side.configuredOffset = configuredOffset(role, snapshot);
+    side.offset = clamp(side.offset || bounds.inner, bounds.inner, bounds.outer);
+    side.progressOffset = clamp(side.progressOffset || side.offset, bounds.inner, bounds.outer);
     if (!centerRunning) {
       stabilizeParkedSide(side, center, snapshot);
-      return { available: true, held: side.mode === FIELD_SIDE_MODE.HELD, offset: side.offset };
+      side.offset = clamp(side.offset, bounds.inner, bounds.outer);
+      side.progressOffset = side.offset;
+      return {
+        available: true, operational: true, held: side.mode === FIELD_SIDE_MODE.HELD,
+        offset: side.offset, boundary: side.boundary
+      };
     }
 
     if (side.mode === FIELD_SIDE_MODE.HELD) {
-      side.offset = clamp(side.offset, 0, maximum);
-      side.progressOffset = side.offset;
+      side.boundary = null;
       requestRate(side, 1);
       ensureSidePlaying(side);
-      const desired = exactAddress(
-        role,
-        center,
-        side.offset,
-        snapshot.range
-      );
+      const desired = exactAddress(role, center, side.offset, snapshot.range);
       side.desiredAddress = desired;
       correctRunningSide(side, desired);
-      return { available: true, held: true, offset: side.offset };
+      return { available: true, operational: true, held: true, offset: side.offset, boundary: null };
     }
 
     ensureSidePlaying(side);
     const rate = requestStretchRate(side);
     if (rate === undefined) {
-      const actual = measuredOffset(side, center, snapshot);
-      side.offset = clamp(actual, 0, maximum);
-      return { available: true, held: false, offset: side.offset };
+      return { available: true, operational: true, held: false, offset: side.offset, boundary: side.boundary };
     }
-    const confirmed = Number.isFinite(side.actualRate) ? side.actualRate : 1;
-    const differential = role === "tail" ? Math.max(0, 1 - confirmed) : Math.max(0, confirmed - 1);
-    if (centerDelta > 0 && rate !== null) {
-      side.progressOffset = Math.min(maximum, side.progressOffset + differential * centerDelta);
+    if (rate === null) {
+      // A source without the paired rates cannot breathe truthfully. Preserve
+      // the attained relation at Center rate and require a deliberate retry.
+      side.mode = FIELD_SIDE_MODE.HELD;
+      side.boundary = null;
+      requestRate(side, 1, true);
+    } else if (!side.boundary && centerDelta > 0) {
+      const advanced = advanceBreathingOffset({
+        offset: side.progressOffset,
+        phase: runtime.sweepPhase,
+        centerDelta,
+        rate,
+        inner: bounds.inner,
+        outer: bounds.outer
+      });
+      side.progressOffset = advanced.offset;
+      side.boundary = advanced.boundary;
     }
 
-    const actual = measuredOffset(side, center, snapshot);
-    side.offset = clamp(actual, 0, maximum);
-    const desiredOffset = Math.min(maximum, Math.max(side.progressOffset, side.offset));
-    side.progressOffset = desiredOffset;
-    const desired = exactAddress(
-      role,
-      center,
-      desiredOffset,
-      snapshot.range
-    );
+    side.offset = side.progressOffset;
+    if (side.boundary) requestRate(side, 1, true);
+    const desired = exactAddress(role, center, side.offset, snapshot.range);
     side.desiredAddress = desired;
     correctRunningSide(side, desired);
-
-    const reached = desiredOffset >= maximum - REACH_TOLERANCE
-      || side.offset >= maximum - REACH_TOLERANCE;
-    if (reached || rate === null) {
-      // A source without a directional rate still remains usable: place the side
-      // at the requested frame and hold it instead of leaving the control stuck.
-      side.mode = FIELD_SIDE_MODE.HELD;
-      side.offset = maximum;
-      side.progressOffset = maximum;
-      side.desiredAddress = exactAddress(
-        role,
-        center,
-        maximum,
-        snapshot.range
-      );
-      if (Math.abs(readSide(side).time - side.desiredAddress) > DRIFT_TOLERANCE) side.adapter?.place?.(side.desiredAddress);
-      requestRate(side, 1, true);
-      ensureSidePlaying(side);
-      return { available: true, held: true, offset: maximum };
-    }
-    return { available: true, held: false, offset: side.offset };
+    return {
+      available: true, operational: true, held: false,
+      offset: side.offset, boundary: side.boundary
+    };
   }
 
   function stepSelection(role) {
@@ -1382,6 +1464,7 @@ export function createStepFieldController({
     for (const role of ["tail", "lead"]) {
       const side = sides[role];
       observed[role].mode = side.mode;
+      observed[role].boundary = side.boundary;
       observed[role].requestedRate = Number(prefs[`${role}Rate`]);
       observed[role].actualRate = side.actualRate;
       observed[role].playback = side.playback;
@@ -1403,6 +1486,7 @@ export function createStepFieldController({
     };
     const key = JSON.stringify({
       phase: observed.phase,
+      sweepPhase: runtime.sweepPhase,
       center: Number(center.toFixed(2)),
       tail: Number(observed.tail.offset.toFixed(2)),
       lead: Number(observed.lead.offset.toFixed(2)),
@@ -1423,7 +1507,9 @@ export function createStepFieldController({
       span: [observed.span.available, observed.span.held],
       activation: observed.activation,
       suspended: runtime.suspended,
-      preview: preview?.kind || null
+      preview: preview?.kind || null,
+      previewRevision: preview?.revision ?? null,
+      previewDirection: preview?.direction ?? "none"
     });
     runtime.field = observed;
     if (key !== runtime.fieldKey) {
@@ -1541,11 +1627,13 @@ export function createStepFieldController({
       section: "Section"
     }[preview?.kind] || "Field";
     setText(elements["field-transport-state"], preview
-      ? `${previewLabel} preview`
+      ? `${previewLabel} frame`
       : runtime.suspended
       ? "Field suspended"
       : runtime.phase === STEP_FIELD_PHASE.PARTIAL
         ? "Partially Held"
+        : runtime.phase === STEP_FIELD_PHASE.UNFOLDING
+        ? runtime.sweepPhase === FIELD_SWEEP_PHASE.CONTRACTING ? "Breathing inward" : "Breathing outward"
         : runtime.phase.charAt(0).toUpperCase() + runtime.phase.slice(1));
     setText(elements["field-rate-state"], `Tail ${sides.tail.actualRate}× · Center 1× · Lead ${sides.lead.actualRate}×`);
     setText(elements["field-span-label"], preview
@@ -1657,6 +1745,19 @@ export function createStepFieldController({
       tail: driveSide("tail", relationalCenter, centerDelta, snapshot, centerRunning && !runtime.suspended),
       lead: driveSide("lead", relationalCenter, centerDelta, snapshot, centerRunning && !runtime.suspended)
     };
+    if (!runtime.suspended && centerRunning) {
+      const nextSweep = nextBreathingPhase(runtime.sweepPhase, [
+        sideStates.tail, sideStates.lead
+      ]);
+      if (nextSweep !== runtime.sweepPhase) {
+        runtime.sweepPhase = nextSweep;
+        for (const side of Object.values(sides)) {
+          if (side.mode !== FIELD_SIDE_MODE.STRETCHING) continue;
+          side.boundary = null;
+          requestStretchRate(side, true);
+        }
+      }
+    }
     runtime.phase = runtime.suspended
       ? STEP_FIELD_PHASE.SUSPENDED
       : resolveFieldPhase({
@@ -1723,6 +1824,9 @@ export function createStepFieldController({
     runtime.semanticCurrent = null;
     runtime.lastCenterTime = null;
     runtime.centerWasRunning = false;
+    runtime.sweepPhase = FIELD_SWEEP_PHASE.EXPANDING;
+    if (runtime.transitionTimer) clearTimeout(runtime.transitionTimer);
+    runtime.transitionTimer = null;
     runtime.forceEstablish = true;
     runtime.restoreRoles.clear();
     runtime.suspended = false;
@@ -1803,6 +1907,7 @@ export function createStepFieldController({
       return {
         ...(runtime.field || {}),
         phase: runtime.phase,
+        sweepPhase: runtime.sweepPhase,
         tailMode: sides.tail.mode,
         leadMode: sides.lead.mode,
         tailRuntime: { ...sides.tail, adapter: undefined },

@@ -209,3 +209,34 @@ assert.equal(resolveFieldPhase({
 }
 
 console.log("All Step Field tests passed: geometry, suspension, Hold/Stretch, side Step, visible bootstrap, shared user activation, autoplay delegation, cue-based parking, rate priming, and panoramic layout.");
+
+// Breathing Field geometry remains bounded and synchronized.
+{
+  const geometry = await import("./step-field-geometry.js");
+  const response = geometry.normalizeFieldResponse({ tailRate: 0.5, leadRate: 2, innerOffset: 2.5 });
+  assert.deepEqual(response, { tailRate: 0.5, leadRate: 1.5, innerOffset: 2.5 });
+  const bounds = geometry.deriveBreathingBounds({
+    current: 50,
+    innerOffset: response.innerOffset,
+    outerReach: { backward: 10, forward: 10, linked: true },
+    range: { start: 0, end: 100 }
+  });
+  assert.deepEqual(bounds.tail, { inner: 2.5, outer: 10, operational: true });
+  assert.equal(geometry.breathingRateFor("tail", geometry.FIELD_SWEEP_PHASE.EXPANDING, response), 0.5);
+  assert.equal(geometry.breathingRateFor("lead", geometry.FIELD_SWEEP_PHASE.EXPANDING, response), 1.5);
+  assert.equal(geometry.breathingRateFor("tail", geometry.FIELD_SWEEP_PHASE.CONTRACTING, response), 1.5);
+  assert.equal(geometry.breathingRateFor("lead", geometry.FIELD_SWEEP_PHASE.CONTRACTING, response), 0.5);
+  const outward = geometry.advanceBreathingOffset({
+    offset: 2.5,
+    phase: geometry.FIELD_SWEEP_PHASE.EXPANDING,
+    centerDelta: 15,
+    rate: 0.5,
+    inner: 2.5,
+    outer: 10
+  });
+  assert.deepEqual(outward, { offset: 10, boundary: geometry.FIELD_BOUNDARY.OUTER });
+  assert.equal(geometry.nextBreathingPhase(geometry.FIELD_SWEEP_PHASE.EXPANDING, [
+    { operational: true, boundary: geometry.FIELD_BOUNDARY.OUTER },
+    { operational: true, boundary: geometry.FIELD_BOUNDARY.OUTER }
+  ]), geometry.FIELD_SWEEP_PHASE.CONTRACTING);
+}

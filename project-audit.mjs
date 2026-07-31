@@ -14,6 +14,7 @@ const guide = read("guide.js");
 const projection = read("timeline-projection.js");
 const transport = read("transport.js");
 const field = read("step-field.js");
+const fieldFrame = read("field-frame.js");
 const fieldGeometry = read("step-field-geometry.js");
 const rangeGeometry = read("range-geometry.js");
 const stepGesture = read("step-gesture.js");
@@ -38,6 +39,8 @@ for (const retiredArtifact of [
 
 const docs = Object.fromEntries([
   "README.md",
+  "PROJECT.md",
+  "GLOSSARY.md",
   "SPEC.md",
   "IMPLEMENTATION.md",
   "INTERFACE.md",
@@ -65,11 +68,15 @@ function contrastRatio(first, second) {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
-assert.equal(pkg.version, "7.0.0");
-assert.match(docs["SPEC.md"], /^# Binary YouTube Reader — Canonical Specification\r?\n/);
-assert.match(docs["IMPLEMENTATION.md"], /^# Binary YouTube Reader — Canonical Implementation\r?\n/);
-assert.match(docs["INTERFACE.md"], /^# Binary YouTube Reader — Interface Grammar\r?\n/);
-for (const name of ["SPEC.md", "IMPLEMENTATION.md", "INTERFACE.md", "DEVELOPMENT.md", "VALIDATION.md"]) {
+assert.equal(pkg.name, "video-cartography");
+assert.equal(pkg.version, "8.0.0");
+assert.match(pkg.description, /Panoramic Phase Field[\s\S]*Temporal Topography/);
+assert.match(docs["PROJECT.md"], /^# Video Cartography\r?\n/);
+assert.match(docs["GLOSSARY.md"], /^# Video Cartography — Canonical Glossary\r?\n/);
+assert.match(docs["SPEC.md"], /^# Video Cartography — Canonical Specification\r?\n/);
+assert.match(docs["IMPLEMENTATION.md"], /^# Video Cartography — Canonical Implementation\r?\n/);
+assert.match(docs["INTERFACE.md"], /^# Video Cartography — Interface Grammar\r?\n/);
+for (const name of ["PROJECT.md", "GLOSSARY.md", "SPEC.md", "IMPLEMENTATION.md", "INTERFACE.md", "DEVELOPMENT.md", "VALIDATION.md"]) {
   assert.ok(docs["README.md"].includes(`\`${name}\``), `README must link ${name}`);
 }
 
@@ -77,6 +84,11 @@ const canonicalText = [html, ...Object.values(docs)].join("\n");
 assert.doesNotMatch(canonicalText, /\bApplication Continue\b|\bSkim\b|Fold Point proxy/i);
 assert.doesNotMatch(canonicalText, /Pin Forward\/Backward replaces Interval/i);
 assert.doesNotMatch(html, /id="loop"|id="pin-backward"|id="pin-forward"/);
+assert.match(html, /<title>Video Cartography<\/title>/);
+assert.match(html, /<h1>Video Cartography<\/h1>/);
+assert.match(html, /Panoramic Phase Field/);
+assert.match(html, /Temporal Topography/);
+assert.match(html, /name="application-name" content="Video Cartography"/);
 
 assert.match(html, /player-panel[\s\S]*timeline-panel[\s\S]*command-workspace/);
 assert.match(app, /"player-panel",[\s\S]*"timeline-panel",[\s\S]*"parameter-panel",[\s\S]*"navigation-panel"[\s\S]*\.inert = compact && guideVisible/);
@@ -140,21 +152,28 @@ assert.match(view, /Unlink \$\{role === "start" \? "Start" : "End"\}/);
 assert.doesNotMatch(view, /Relink|data\.linkSectionEndpoint/);
 assert.doesNotMatch(view, /guide-item-more|guide-secondary-actions|More actions for/);
 assert.doesNotMatch(styles, /\.guide-item-more|\.guide-secondary-actions/);
-assert.match(view, /dataset\.pinDrag\s*=\s*pin\.id/);
-assert.match(app, /"sections-list"\]\.addEventListener\("pointerdown"[\s\S]*?beginGuideDrag\("pin"/);
-assert.match(app, /"sections-list"\]\.addEventListener\("pointerdown"[\s\S]*?beginGuideDrag\("section"/);
-assert.match(app, /function sourceFromRelativeDragDelta[\s\S]*surfaceWidth[\s\S]*originClientX[\s\S]*timelineExtent/);
-assert.match(app, /closest\?\.\("\.section-endpoints"\)[\s\S]*closest\?\.\("\.pin-position-track"\)[\s\S]*getBoundingClientRect/);
-assert.match(view, /function pinPositionButton[\s\S]*className\s*=\s*"endpoint-button pin-position-node"[\s\S]*dataset\.pinDrag/);
-assert.match(styles, /\.pin-position-track[\s\S]*height:\s*43px[\s\S]*margin:\s*0 10px 9px/);
+const pinPositionSource = view.match(/function pinPositionButton[\s\S]*?(?=\n  function addressEditor)/)?.[0] || "";
+assert.doesNotMatch(pinPositionSource, /dataset\.pinDrag/,
+  "Guide position projections must not own a second drag system.");
+assert.doesNotMatch(app, /"sections-list"\]\.addEventListener\("pointerdown"/);
+assert.doesNotMatch(app, /"pins-list"\]\.addEventListener\("pointerdown"/);
+assert.match(view, /function addressEditor[\s\S]*dataset\.guideAddressKind[\s\S]*dataset\.guideNudgeKind/);
+assert.match(app, /function applyGuideAddress[\s\S]*moveGuidePin[\s\S]*moveGuideSection/);
+assert.match(app, /function nudgeGuideAddress[\s\S]*nudgeGuideTarget/);
+assert.match(app, /"section-lane"\]\.addEventListener\("pointerdown"[\s\S]*beginGuideDrag\("pin"[\s\S]*beginGuideDrag\("section"/);
+assert.match(view, /timeline-section-drag-node[\s\S]*dataset\.pinDrag[\s\S]*dataset\.sectionDrag/);
+assert.match(styles, /\.timeline-section-drag-node[\s\S]*cursor:\s*ew-resize/);
+assert.match(app, /function beginCurrentDrag[\s\S]*function finishCurrentDrag[\s\S]*operator:\s*"timelineCurrentDrag"/);
+assert.match(app, /function handleTimelineNudge[\s\S]*event\.shiftKey[\s\S]*nudgeCurrent[\s\S]*nudgeGuideTarget/);
+assert.match(app, /function finishNudgeGesture[\s\S]*checkpoint\([\s\S]*gesture\.originModel/);
 assert.doesNotMatch(view, /guide-action-move/);
 assert.match(app, /function previewGuideDrag[\s\S]*kind:\s*"section"[\s\S]*start:[\s\S]*center:[\s\S]*end:/);
 assert.match(field, /function previewExtent[\s\S]*renderPreview/);
 assert.match(field, /function clearPreview[\s\S]*restore/);
 assert.match(app, /function sectionForSelectedPinExtent[\s\S]*startPinId[\s\S]*endPinId/);
 assert.match(app, /function handleTimelineClick[\s\S]*closest\("\[data-section-go\]"\)/);
-assert.doesNotMatch(app, /"section-lane"\]\.addEventListener\("pointerdown"/);
-assert.doesNotMatch(styles, /\.timeline-section-control/);
+assert.match(app, /"section-lane"\]\.addEventListener\("pointerdown"/);
+assert.match(styles, /\.timeline-section-drag-node/);
 assert.match(styles, /\.guide-section-weight/);
 assert.match(styles, /\.guide-section-profile/);
 assert.match(styles, /\.timeline-section-midpoint\s*\{/);
@@ -217,6 +236,19 @@ assert.match(projection, /weightAtSource/);
 assert.doesNotMatch(projection, /affinity|materializ|collapse|fold/i);
 assert.doesNotMatch(projection, /player|document|window/);
 
+assert.match(fieldFrame, /FIELD_FRAME_OWNER[\s\S]*CONTEXT[\s\S]*OPERATOR[\s\S]*DIRECT/);
+assert.match(fieldFrame, /deriveContextFrame/);
+assert.match(fieldFrame, /transitionFieldFrame[\s\S]*fieldFrameDirection/);
+assert.match(fieldGeometry, /FIELD_SWEEP_PHASE[\s\S]*EXPANDING[\s\S]*CONTRACTING/);
+assert.match(fieldGeometry, /deriveBreathingBounds/);
+assert.match(fieldGeometry, /nextBreathingPhase/);
+assert.match(field, /runtime\.sweepPhase/);
+assert.match(field, /FIELD_BOUNDARY\.OUTER[\s\S]*FIELD_BOUNDARY\.INNER/);
+assert.match(field, /nextBreathingPhase\([\s\S]*runtime\.sweepPhase/);
+assert.doesNotMatch(field, /reached[\s\S]{0,240}side\.mode\s*=\s*FIELD_SIDE_MODE\.HELD/,
+  "Reaching a breathing boundary must not choose Hold.");
+assert.match(app, /deriveAmbientFieldFrame[\s\S]*state\.contextSeconds > EPSILON[\s\S]*deriveContextFrame/);
+assert.match(app, /establishFieldFrame[\s\S]*retainContextFrame/);
 assert.match(transport, /PLAYBACK:\s*"playback"/);
 assert.match(transport, /CONTEXT:\s*"context"/);
 assert.match(transport, /export function isProperRange/);
@@ -308,7 +340,7 @@ assert.match(docs["VALIDATION.md"], /1\/32[\s\S]*1\/16[\s\S]*1\/8/);
 assert.match(docs["INTERFACE.md"], /bounded five-lane visual band/);
 assert.match(docs["INTERFACE.md"], /complete extent the Working Interval/);
 assert.match(docs["INTERFACE.md"], /free and shared Pins[\s\S]*main Range \/ Resolution track[\s\S]*source ruler[\s\S]*Section relationship tree/);
-assert.match(docs["INTERFACE.md"], /Pin drag parks Center[\s\S]*Tail at Start, Center at midpoint, and Lead at End/);
+assert.match(docs["INTERFACE.md"], /Current drag centers the candidate[\s\S]*Section drag shows Start, midpoint, and End/);
 assert.match(docs["VALIDATION.md"], /lists choices vertically, scrolls by wheel/);
 
 console.log("Project audit passed: v7 matrix, independent Step sizing, weighted Section graph, source-contiguous Range playback, timeline presentation, module boundaries, and canonical documents agree.");

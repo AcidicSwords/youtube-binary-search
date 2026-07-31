@@ -2522,3 +2522,102 @@ kbd {
     grid-column: 1;
   }
 }
+
+.current-marker {
+  cursor: grab;
+  touch-action: none;
+}
+.current-marker:active,
+.current-marker.is-dragging { cursor: grabbing; }
+.current-marker:focus-visible {
+  outline: 2px solid rgba(255, 211, 112, .95);
+  outline-offset: 4px;
+}
+
+.guide-exact-geometry {
+  display: grid;
+  gap: .45rem;
+  margin-top: .45rem;
+}
+.guide-address-editor {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 1fr) auto minmax(6.5rem, .8fr) auto;
+  align-items: center;
+  gap: .35rem;
+}
+.guide-address-label {
+  color: var(--muted);
+  font-size: .72rem;
+}
+.guide-address-editor input {
+  min-width: 0;
+  font: 0.76rem/1.2 var(--mono);
+  text-align: right;
+}
+.guide-address-nudge {
+  min-width: 2rem;
+  padding: .3rem .45rem;
+}
+.guide-section-profile,
+.section-endpoints,
+.pin-position-track { cursor: default; }
+
+
+.timeline-section-drag-node {
+  position: absolute;
+  top: calc(var(--section-top, 112px) + var(--section-offset, 0px) + 10px);
+  z-index: 5;
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: ew-resize;
+  transform: translate(-50%, -50%);
+}
+
+.timeline-section-drag-node::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border: 1px solid color-mix(in srgb, var(--section-color) 84%, transparent);
+  border-radius: 50%;
+  background: #0b1017;
+  box-shadow: 0 0 5px color-mix(in srgb, var(--section-color) 28%, transparent);
+  content: "";
+  transform: translate(-50%, -50%);
+}
+
+.timeline-section-drag-node.midpoint::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+}
+
+.timeline-section-drag-node:hover::before,
+.timeline-section-drag-node:focus-visible::before {
+  background: color-mix(in srgb, var(--section-color) 34%, #0b1017);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--section-color) 18%, transparent);
+}
+
+.timeline-section-drag-node:focus-visible {
+  outline: 1px dotted color-mix(in srgb, var(--section-color) 72%, transparent);
+  outline-offset: 1px;
+}
+
+.timeline-section-body { cursor: pointer; }
+
+@media (pointer: coarse) {
+  .timeline-section-drag-node {
+    width: 48px;
+    height: 48px;
+    min-height: 48px;
+  }
+}

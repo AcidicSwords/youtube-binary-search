@@ -49,8 +49,8 @@ assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: false }), false);
 assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: true }), true);
 assert.equal(fieldPreferenceRequiresEstablish({ stepFieldEnabled: false }), false);
 assert.equal(fieldPreferenceRequiresEstablish({ stepFieldEnabled: true }), true);
-assert.deepEqual(normalizeFieldResponse({ tailRate: 0.75, leadRate: 1.5 }), { tailRate: 0.75, leadRate: 1.5 });
-assert.deepEqual(normalizeFieldResponse({ tailRate: 2, leadRate: 0.5 }), { tailRate: 0.5, leadRate: 2 });
+assert.deepEqual(normalizeFieldResponse({ tailRate: 0.75, leadRate: 1.5 }), { tailRate: 0.75, leadRate: 1.25, innerOffset: 2.5 });
+assert.deepEqual(normalizeFieldResponse({ tailRate: 2, leadRate: 0.5 }), { tailRate: 0.5, leadRate: 1.5, innerOffset: 2.5 });
 
 {
   let session = createSession({ duration: 200, current: 100, stepReach: { backward: 5, forward: 15, linked: false } });
@@ -238,7 +238,13 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   assert.match(app, /fieldPreview:\s*fieldOperatorPreview\(\)/);
   assert.match(
     app,
-    /function fieldOperatorPreview[\s\S]*kind:\s*"context"[\s\S]*transport\.start[\s\S]*transport\.anchor[\s\S]*transport\.end/
+    /function deriveAmbientFieldFrame[\s\S]*contextSeconds > EPSILON[\s\S]*deriveContextFrame\(\{[\s\S]*anchor:\s*center[\s\S]*range:\s*activeRange\(\)[\s\S]*seconds:\s*state\.contextSeconds/,
+    "Context-enabled idle Field framing must derive one stable bounded Context frame."
+  );
+  assert.match(
+    app,
+    /function fieldOperatorPreview[\s\S]*return state\.fieldFrame \|\| establishFieldFrame\(currentResolution\(\)\.C\)/,
+    "The Field controller must receive the retained settled frame rather than rebuild transient operator ownership."
   );
   assert.match(
     app,
@@ -283,9 +289,9 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
     "Running Stretch must reconcile to a supported confirmed directional rate.");
   assert.match(view, /effectiveStepReach/);
   assert.match(app, /preferences\.stepReach = normalizeStepReach/);
-  assert.match(implementation, /^# Binary YouTube Reader — Canonical Implementation/m);
+  assert.match(implementation, /^# Video Cartography — Canonical Implementation/m);
   assert.doesNotMatch(readme, /Application Continue/);
-  assert.match(readme, /Step size|Step Size/);
+  assert.match(readme, /Step Reach/);
 }
 
 console.log("Field coherence tests passed: semantic Step size and physical Field offsets remain independent.");

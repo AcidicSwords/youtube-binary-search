@@ -232,3 +232,21 @@ source/timeline mapping is strictly increasing and invertible
 source playback is contiguous
 history contains no transport-only wrap
 ```
+
+
+## Field Frame, Breath, Current, and Nudge
+
+- With Context enabled, confirm Tail and Lead show the same bounded Context edges before, during, and after Context transport.
+- Confirm accepting Cursor changes Center/Current without assigning new side frames.
+- Disable Context and confirm Step, Refine, Reopen, and Section fallback Frames use their exact semantic targets.
+- Traverse rapidly forward and backward; confirm stale slideshow revisions are discarded, Center settles on the latest Current, and direction reverses cleanly.
+- Confirm reduced-motion mode removes motion but not Frame addresses.
+- Begin Breath at Inner Offset; confirm Tail remains behind and Lead remains ahead while both expand.
+- Force one side to reach a boundary early; confirm it follows Center at Center rate until the other arrives.
+- Confirm the outer barrier exchanges rates, the inner barrier restores them, and Breath repeats without automatic Hold.
+- Hold during expansion and contraction; confirm attained offsets and resume direction are preserved.
+- Drag Current and cancel; confirm no Session or history change. Drag and release; confirm one Go and one Undo checkpoint.
+- Drag Timeline Section Start/End and midpoint nodes; confirm the same Pin/Section operations used by Guide exact fields.
+- Shift-drag Current, a Pin, and a Section node; confirm source-time quantization.
+- Shift-wheel and comma/period repeatedly; confirm one uninterrupted sequence produces one Undo checkpoint.
+- Edit Guide Address fields and use −/+ controls; confirm exact parity with Timeline manipulation.

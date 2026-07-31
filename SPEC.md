@@ -1,14 +1,14 @@
-# Binary YouTube Reader — Canonical Specification
+# Video Cartography — Canonical Specification
 
 ## 1. Authority
 
-This document is normative for v7. Source time is the only persisted temporal truth. Timeline Space is a pure derived spatial coordinate for navigation and layout.
+This document is normative for v8. Source time is the only persisted temporal truth. Timeline Space is a pure derived spatial coordinate for navigation and layout.
 
 ### 1.1 Project objective
 
 A video is globally present as a source but locally actualized in playback. At any instant, its frames are linearly ordered and mutually exclusive: only one source moment can occupy the ordinary audiovisual present.
 
-Binary YouTube Reader transforms that condition into bounded spatiotemporal availability without changing source order:
+Video Cartography transforms that condition into bounded spatiotemporal availability without changing source order:
 
 ```text
 linear temporal exclusivity
@@ -20,7 +20,7 @@ The application maintains the usable illusion that the complete video is availab
 
 That availability has three complementary forms:
 
-- **Field availability** — Tail, Center, and Lead make a bounded temporal neighbourhood perceptually co-present.
+- **Field availability** — the Panoramic Phase Field makes a bounded neighbourhood of Tail, Center, and Lead perceptually co-present as a stable Frame or live Breath.
 - **Map availability** — Timeline Space makes the complete ordered source spatially present as one deformable terrain.
 - **Guide availability** — Pins and Sections make prior distinctions persist as landmarks and regions.
 
@@ -59,17 +59,15 @@ Operator contracts use the following canonical dimensions:
 | topology | Pins, Sections, shared references | persistent landmarks and regions |
 | metric | Section weights and derived Timeline Space | how much map distance content receives |
 | movement magnitude | stored Step Reach and derived effective Reach | how far Step moves |
-| traversal provenance | `lastOperator` | which committed spatial grammar owns the next three-frame interpretation |
-| perceptual horizon | Field pane addresses, rates, offsets, Hold/Stretch state | what nearby moments are perceptually co-present |
+| traversal provenance | `lastOperator` | which committed spatial grammar supplies the Context-disabled fallback Frame |
+| perceptual horizon | stable Field Frame, Breath phase, pane addresses, rates, offsets, Hold/Stretch state | what nearby moments are perceptually co-present |
 | reversibility | history and future | which semantic transformations can be restored |
 
 Derived values are not stored dimensions. In particular:
 
 - changing Section weight may change projected positions, spatial midpoints, and adaptive effective Reach without changing any source Address or stored Step Reach;
 - moving Current may translate Field panes physically without allowing Field state to write Session state;
-- presentation selection, hover, preview, and viewport state are not semantic
-  dimensions; `lastOperator` is traversal provenance, while the preview
-  geometry derived from it remains presentation.
+- presentation selection, hover, Field Frame transition, and viewport state are not semantic dimensions; `lastOperator` is traversal provenance, while Frame geometry derived from Context, the operator, or direct manipulation remains presentation.
 
 ## 3. Source time and Timeline Space
 
@@ -255,46 +253,39 @@ Playback actualizes source continuity. Cursor moves physically while Current rem
 
 Context is bounded observation around Current. It remains transient unless the user accepts Cursor. Context acceptance uses the same continuous settlement law rather than direct-Go framing.
 
-### Stretch and Hold
+### Field Frame
 
-Stretch changes the live Tail/Lead relation through playback-rate difference while Center remains the temporal anchor. Hold preserves an attained side relation. Both are runtime-only and cannot write Current, Working Interval, Resolution, Range, Guide, Weight, or Step Reach.
-
-Configured Offset and attained relation are distinct. Editing one Offset can
-reconcile only that side. A side at its configured target follows the new
-target; a partial Hold preserves its attained relation unless the new bound
-clamps it. Field Off or pane collapse makes that projection dormant: it is not a
-Step, Hold, Stretch, span, activation, video-sync, or delayed-play operand.
-Operational Field controls require a visible ready source and positive
-Range-contained reach. A held Field span requires both operational sides.
-
-Context duration and Field Offset are independent physical observation
-parameters. Their numeric relation may be intentionally useful but is not an
-ownership relation: neither operation reads, derives, persists, or rewrites the
-other. Configured Field Offset belongs only to live Stretch/Hold. Outside
-playback, Field preview ownership is:
+Outside ordinary playback, the Panoramic Phase Field presents one stable Frame:
 
 ```text
-Step/default = exact weighted Backward target | Current | exact Forward target
-Refine       = next weighted backward midpoint | Current | next forward midpoint
-Reopen       = reopened backward midpoint | Current | reopened forward midpoint
-Context      = first source frame | playing Cursor | last source frame
-Pin drag     = weighted Step Backward | Pin | weighted Step Forward
-Section      = Start | midpoint Current | End
+Context enabled = bounded Context Start | Current or Cursor | bounded Context End
+Context disabled = operator backward frame | Current | operator forward frame
 ```
 
-`lastOperator` is part of the immutable Session snapshot solely to restore this
-interpretation through Context, Guide edits, Undo, and Redo. Direct
-manipulation overrides the ambient operator preview only for the gesture's
-lifetime. Preview never mutates configured Offset, attained Hold, Stretch
-mode, Step Reach, or Session state, and is never a Held Field span. Playback
-synchronously removes preview ownership before the trusted play gesture and
-retains the existing refold/Stretch/Hold implementation. Hover/focus dry-runs
-semantic operations on the timeline without media effects.
+Context edges persist before, during, and after Context transport. Settlement or acceptance may move Center from Cursor to Current but cannot reassign Tail and Lead. A new semantic movement establishes one new Frame. Its direction is rendered as a brief slideshow transition: forward movement enters through Lead and exits through Tail; backward movement reverses that relation. The transition is presentation-only and never delays or replays the semantic commit.
 
-A Section owns the ambient three-frame Viewer only while Current equals that
-Section's midpoint. Direct endpoint/whole-Section manipulation may temporarily
-preview a different midpoint; once it ends, Step resumes if committed Current
-does not equal the resulting midpoint.
+Direct Current, Pin, or Section manipulation temporarily supplies exact source Addresses. It overrides the ambient Frame only for the gesture lifetime and restores the Context Frame or operator fallback afterward. Hover and focus dry-runs remain on the Temporal Topography and do not seek players.
+
+### Stretch, Breath, and Hold
+
+Stretch begins or resumes a bounded Field Breath during genuine Center playback. Let `x` be the configured Inner Offset and `y` the effective Outer Offset, with `0 < x < y` for each operational side:
+
+```text
+x <= Center - Tail <= y
+x <= Lead - Center <= y
+```
+
+Tail always remains behind Center and Lead always remains ahead. Outward rates `z < c < w` are symmetric about Center rate `c` where supported, so `c - z = w - c`. Expansion moves both offsets from `x` toward `y`. A side that reaches its outer boundary first follows Center at rate `c` while preserving `y`. When every operational side reaches its outer boundary, the rates exchange and contraction begins. At the inner boundary, an early side again follows Center at rate `c`; once all operational sides reach `x`, the outward assignment returns.
+
+Hidden, collapsed, unavailable, or Range-clipped sides are excluded from synchronization. Hold alone stops the Breath, returns participating sides to Center rate, and preserves their attained offsets and sweep direction. Reaching a boundary never chooses Hold automatically.
+
+Field Frame, Breath, Stretch, and Hold are runtime/presentation systems. They cannot write Current, Working Interval, Resolution, Range, Guide, Weight, Step Reach, configured offsets, or history.
+
+### Current drag and Nudge
+
+Dragging Current on the Temporal Topography is exact Go. Pointer movement previews a candidate Address through the captured Timeline projection without mutating Session; release commits one Go and one Undo checkpoint, while cancellation restores the original state.
+
+Nudge is source-time precision movement. Shift-drag reduces gain and quantizes the candidate Address. Shift-wheel and comma/period move Current, a Pin, a Section endpoint, or a whole Section by the active source-time quantum. One continuous wheel or key sequence amends one candidate model and settles as one Undo transaction. The interface may call the quantum a frame only when the media adapter supplies a verified frame duration.
 
 ### Alt Carry
 
@@ -483,12 +474,17 @@ Working Interval ⊆ Range in source time
 Working Interval ⊆ Resolution ⊆ Range in Timeline Space
 Working Interval is one continuous source extent
 every source Address has one timeline position and one inverse
-playback, Context, and Field geometry are source-time operations
+playback, Context, and live Field Breath geometry are source-time operations
 adaptive Step changes with weighted Range width, not Field Offset
 Release is the only operator whose sole effect is clearing the Working Interval
 Timeline Space is derived and never persisted
 each operator changes only dimensions permitted by its effect contract
-presentation preview and semantic commit invoke the same operator implementation
+Tail remains behind Center throughout Field Breath
+Lead remains ahead of Center throughout Field Breath
+Context settlement preserves the established Field Frame edges
+one Current drag, retained-object drag, wheel series, or held-key Nudge creates at most one history checkpoint
+Guide exact editing and Temporal Topography manipulation invoke the same Session operations
+semantic dry-run and commit invoke the same operator implementation; Field Frame presentation receives only resulting source Addresses
 ```
 
 Source-contiguous media behavior and strict spatial invertibility are the highest-priority invariants.

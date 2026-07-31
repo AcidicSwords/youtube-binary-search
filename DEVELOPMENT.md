@@ -12,6 +12,10 @@
 7. Step Reach, Field Offset, and Section weight have separate ownership.
 8. Shared Pins form a graph; do not invent a stored Section hierarchy.
 9. Pin linking is visible spatial acquisition; do not persist a hidden return target.
+10. Context establishes a stable Field Frame; transport settlement cannot reassign its edges.
+11. Stretch is a bounded synchronized Breath; only Hold may stop it.
+12. Temporal Topography owns spatial drag; Guide owns exact Address editing.
+13. Nudge acts in source time and one continuous gesture creates one Undo checkpoint.
 
 ## Change routing
 
@@ -22,7 +26,8 @@
 - Timeline and Guide projection: `view.js`
 - Timeline input, shortcuts, persistence, adapters: `app.js`
 - Held Step ownership: `step-gesture.js`
-- Field geometry/runtime: `step-field-geometry.js`, `step-field.js`
+- stable Field Frame geometry: `field-frame.js`
+- Field Breath geometry/runtime: `step-field-geometry.js`, `step-field.js`
 - YouTube construction and placement: `youtube.js`
 
 Do not add Section-coverage branches to an operator. Extend the shared positive projection and prove its mapping first.
@@ -47,6 +52,9 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
   One-side Tune may command only that side; hidden/off panes must remain
   dormant and reject stale player events.
 - Guide precision editing and Deform stepping must call the same Session transactions.
+- Guide may not implement a second drag geometry; spatial movement belongs to the Temporal Topography.
+- Context ending must preserve the current Field Frame.
+- A boundary may reverse Breath but may never imply Hold.
 
 ## Testing map
 
@@ -61,7 +69,8 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
 - `semantic-composition-tests.mjs` — cross-operator sequences
 - `semantic-audit-probes.mjs` — adversarial regressions
 - `step-gesture-tests.mjs` — cadence, batching, one-Undo settlement
-- `step-field-tests.mjs` — pure Field geometry
+- `field-frame-tests.mjs` — stable Context/operator/direct Frames and slideshow direction
+- `step-field-tests.mjs` — pure Field and breathing geometry
 - `field-runtime-tests.mjs` — controller lifecycle
 - `field-grammar-tests.mjs` — UI ownership
 - `field-bounds-tests.mjs` — hard Range boundaries

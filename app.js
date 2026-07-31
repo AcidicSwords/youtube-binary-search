@@ -90,12 +90,20 @@ import {
   normalizeFieldResponse
 } from "./step-field.js";
 import {
+  FIELD_FRAME_OWNER,
+  deriveContextFrame,
+  normalizeFieldFrame,
+  retainContextFrame,
+  transitionFieldFrame
+} from "./field-frame.js";
+import {
   DEFAULT_STEP_GESTURE_TIMING,
   bindStepPress,
   createStepGestureController
 } from "./step-gesture.js";
 import { createView } from "./view.js";
 
+const STORAGE_V8_PREFIX = "video-cartography:v8:";
 const STORAGE_V7_PREFIX = "binary-youtube-reader:v7:";
 const STORAGE_V6_PREFIX = "binary-youtube-reader:v6:";
 const STORAGE_V5_PREFIX = "binary-youtube-reader:v5:";
@@ -103,7 +111,8 @@ const STORAGE_V4_PREFIX = "binary-youtube-reader:v4:";
 const STORAGE_V3_PREFIX = "binary-youtube-reader:v3:";
 const STORAGE_V2_PREFIX = "binary-youtube-reader:v2:";
 const STORAGE_V1_PREFIX = "binary-youtube-reader:v1:";
-const PREFERENCES_KEY = "binary-youtube-reader:preferences:v1";
+const PREFERENCES_KEY = "video-cartography:preferences:v2";
+const LEGACY_PREFERENCES_KEY = "binary-youtube-reader:preferences:v1";
 const POLL_MS = 100;
 const STEP_TAP_SETTLE_MS = DEFAULT_STEP_GESTURE_TIMING.tapSettleMs;
 const STEP_PRESETS = [0.25, 0.5, 1, 2, 3, 5, 10, 15, 30, 60, 120, 300];
@@ -117,6 +126,9 @@ const NATIVE_POSITION_TOLERANCE_SECONDS = 0.25;
 const MAX_CONTEXT_SECONDS = 300;
 const PIN_SNAP_DISTANCE_PX = 16;
 const PIN_SNAP_ARM_MS = 450;
+const CURRENT_DRAG_THRESHOLD_PX = 5;
+const DEFAULT_NUDGE_SECONDS = 0.05;
+const NUDGE_GESTURE_SETTLE_MS = 180;
 
 function normalizeContextSeconds(value, fallback = 5) {
   if (value === null || value === undefined || String(value).trim() === "") return fallback;
@@ -127,7 +139,11 @@ function normalizeContextSeconds(value, fallback = 5) {
 
 function readPreferences() {
   try {
-    const value = JSON.parse(localStorage.getItem(PREFERENCES_KEY) || "null");
+    const value = JSON.parse(
+      localStorage.getItem(PREFERENCES_KEY)
+      || localStorage.getItem(LEGACY_PREFERENCES_KEY)
+      || "null"
+    );
     const legacyStep = Number.isFinite(Number(value?.stepSeconds))
       ? Number(value.stepSeconds)
       : 10;
@@ -137,7 +153,10 @@ function readPreferences() {
       fieldOffsets: normalizeStepReach(
         value?.fieldOffsets ?? value?.stepReach ?? legacyStep
       ),
-      fieldResponse: normalizeFieldResponse(value?.fieldResponse),
+      fieldResponse: normalizeFieldResponse({
+        ...value?.fieldResponse,
+        innerOffset: value?.fieldInnerOffset ?? value?.fieldResponse?.innerOffset
+      }),
       stepFieldEnabled: value?.stepFieldEnabled !== false,
       tailVisible: value?.tailVisible !== false,
       leadVisible: value?.leadVisible !== false
@@ -187,11 +206,16 @@ const state = {
   selectedPinIds: [],
   deformWeightMemory: new Map(),
   guideDrag: null,
+  currentDrag: null,
+  nudgeGesture: null,
+  currentClickSuppressed: false,
   guideClickSuppressed: false,
   carryModifier: false,
   shiftLayer: false,
   shiftKeyHeld: false,
-  field: null
+  field: null,
+  fieldFrame: null,
+  fieldFrameRevision: 0
 };
 
 let player = null;
@@ -237,7 +261,8 @@ function currentFieldOffsets() {
 function fieldStepPreview(center, kind = "step") {
   const reach = currentStepReach();
   const projection = timelineProjection();
-  return {
+  return normalizeFieldFrame({
+    owner: FIELD_FRAME_OWNER.OPERATOR,
     kind,
     start: projection.stepTarget(
       center,
@@ -254,71 +279,115 @@ function fieldStepPreview(center, kind = "step") {
     ),
     backwardDistance: reach.backward,
     forwardDistance: reach.forward
-  };
+  }, activeRange());
 }
 
-function fieldOperatorPreview() {
+function rawOperatorFieldFrame(center = currentResolution()?.C) {
   if (!state.videoLoaded || !currentResolution() || !activeRange()) return null;
-  const transport = state.transport;
-  if (transport.kind === TRANSPORT_KIND.CONTEXT) {
-    return {
-      kind: "context",
-      start: transport.start,
-      center: transport.anchor,
-      end: transport.end
-    };
-  }
-  if (
-    transport.kind !== TRANSPORT_KIND.IDLE
-    || state.dragHandle
-    || state.guideDrag?.moved
-    || [YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(
-      playerSnapshot().state
-    )
-  ) return null;
-
-  const center = currentResolution().C;
   const projection = timelineProjection();
   const operator = model().lastOperator;
   if ([
     "refineBackward",
     "refineForward",
     "localRefineBackward",
-    "localRefineForward"
+    "localRefineForward",
+    "reopen"
   ].includes(operator)) {
     const targets = getTargets(currentResolution(), projection.metric);
-    return {
-      kind: "refine",
+    return normalizeFieldFrame({
+      owner: FIELD_FRAME_OWNER.OPERATOR,
+      kind: operator === "reopen" ? "reopen" : "refine",
       start: targets.backward ?? center,
       center,
       end: targets.forward ?? center
-    };
+    }, activeRange());
   }
   if (operator === "section") {
     const interval = currentInterval();
     const midpoint = interval ? (interval.start + interval.end) / 2 : NaN;
-    if (
-      Number.isFinite(midpoint)
-      && Math.abs(center - midpoint) <= EPSILON
-    ) {
-      return {
+    if (Number.isFinite(midpoint) && Math.abs(center - midpoint) <= EPSILON) {
+      return normalizeFieldFrame({
+        owner: FIELD_FRAME_OWNER.OPERATOR,
         kind: "section",
         start: interval.start,
         center,
         end: interval.end
-      };
+      }, activeRange());
     }
   }
-  if (operator === "reopen") {
-    const targets = getTargets(currentResolution(), projection.metric);
-    return {
-      kind: "reopen",
-      start: targets.backward ?? center,
-      center,
-      end: targets.forward ?? center
-    };
-  }
   return fieldStepPreview(center);
+}
+
+function deriveAmbientFieldFrame(center = currentResolution()?.C) {
+  if (!Number.isFinite(center) || !activeRange()) return null;
+  if (state.contextSeconds > EPSILON) {
+    return deriveContextFrame({
+      anchor: center,
+      range: activeRange(),
+      seconds: state.contextSeconds
+    });
+  }
+  return rawOperatorFieldFrame(center);
+}
+
+function establishFieldFrame(center = currentResolution()?.C, { retainContext = false } = {}) {
+  if (!state.videoLoaded || !Number.isFinite(center) || !activeRange()) {
+    state.fieldFrame = null;
+    return null;
+  }
+  const previous = state.fieldFrame;
+  const next = retainContext
+    ? retainContextFrame(previous, center, activeRange())
+      || deriveAmbientFieldFrame(center)
+    : deriveAmbientFieldFrame(center);
+  if (!next) {
+    state.fieldFrame = null;
+    return null;
+  }
+  state.fieldFrameRevision += 1;
+  state.fieldFrame = transitionFieldFrame(
+    previous,
+    next,
+    state.fieldFrameRevision
+  );
+  return state.fieldFrame;
+}
+
+function directCurrentFieldFrame(candidate) {
+  if (!Number.isFinite(candidate)) return null;
+  const base = state.contextSeconds > EPSILON
+    ? deriveContextFrame({
+        anchor: candidate,
+        range: activeRange(),
+        seconds: state.contextSeconds
+      })
+    : fieldStepPreview(candidate, "go");
+  return base
+    ? normalizeFieldFrame({
+        ...base,
+        owner: FIELD_FRAME_OWNER.DIRECT,
+        kind: "current",
+        revision: state.fieldFrameRevision + 1,
+        direction: candidate > currentResolution().C + EPSILON
+          ? "forward"
+          : candidate < currentResolution().C - EPSILON
+            ? "backward"
+            : "none"
+      }, activeRange())
+    : null;
+}
+
+function fieldOperatorPreview() {
+  if (!state.videoLoaded || !currentResolution() || !activeRange()) return null;
+  if (state.currentDrag?.moved && Number.isFinite(state.currentDrag.candidate)) {
+    return directCurrentFieldFrame(state.currentDrag.candidate);
+  }
+  if (
+    state.transport.kind === TRANSPORT_KIND.PLAYBACK
+    || [YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(playerSnapshot().state)
+      && state.transport.kind !== TRANSPORT_KIND.CONTEXT
+  ) return null;
+  return state.fieldFrame || establishFieldFrame(currentResolution().C);
 }
 
 function reachFor(direction) {
@@ -397,7 +466,7 @@ function sectionName(section) {
   return section?.label?.trim() || `Section ${formatRange(section)}`;
 }
 
-function storageKey(prefix = STORAGE_V7_PREFIX) {
+function storageKey(prefix = STORAGE_V8_PREFIX) {
   return `${prefix}${state.videoId}`;
 }
 
@@ -434,6 +503,7 @@ function persistPreferences() {
       stepReach: preferences.stepReach,
       fieldOffsets: preferences.fieldOffsets,
       fieldResponse: preferences.fieldResponse,
+      fieldInnerOffset: preferences.fieldResponse.innerOffset,
       stepFieldEnabled: preferences.stepFieldEnabled,
       tailVisible: preferences.tailVisible,
       leadVisible: preferences.leadVisible
@@ -446,6 +516,7 @@ function persistPreferences() {
 function readStoredGuide(duration) {
   if (!state.videoId) return createGuide();
   const candidates = [
+    [STORAGE_V8_PREFIX, raw => normalizeGuide(raw, state.videoId)],
     [STORAGE_V7_PREFIX, raw => normalizeGuide(raw, state.videoId)],
     [STORAGE_V6_PREFIX, raw => normalizeGuide(raw, state.videoId)],
     [STORAGE_V5_PREFIX, raw => normalizeGuide(raw, state.videoId)],
@@ -599,6 +670,11 @@ function locateAddress(address, {
 }
 
 function startContext(anchor, options = {}) {
+  if (state.contextSeconds > EPSILON && (
+    !state.fieldFrame
+    || state.fieldFrame.owner !== FIELD_FRAME_OWNER.CONTEXT
+    || Math.abs(state.fieldFrame.center - anchor) > EPSILON
+  )) establishFieldFrame(anchor);
   const transport = createContextTransport({
     anchor,
     range: activeRange(),
@@ -665,6 +741,11 @@ function accept(result, options = {}) {
     state.selectedRetained = null;
   }
   syncIntervalPinSelection();
+  if (
+    Math.abs(previousModel.resolution.C - model().resolution.C) > EPSILON
+    || previousModel.lastOperator !== model().lastOperator
+    || result.rangeChanged
+  ) establishFieldFrame(model().resolution.C);
   const guidePersisted = result.guideChanged ? persistGuide() : true;
   const timelineGeometryChanged = timelineGeometryKey(previousModel)
     !== timelineGeometryKey(model());
@@ -843,6 +924,7 @@ function settleTransport(options = {}) {
     if (result.changed) {
       state.session = result.session;
       syncIntervalPinSelection();
+      establishFieldFrame(current);
       if (!handoffField) stepField?.translateToCurrent(current, { preserve: true });
       persistPreferences();
       view.renderGuide();
@@ -1001,6 +1083,9 @@ stepGesture = createStepGestureController({
 });
 
 function settleBeforeAction(options = {}) {
+  if (!options.skipNudge && state.nudgeGesture) {
+    finishNudgeGesture({ observe: false });
+  }
   clearNativeGo();
   stepGesture?.cancel({ finalize: false });
   view.closePinClusterMenu();
@@ -1315,6 +1400,7 @@ function traverseHistory(transform, emptyMessage, completedVerb) {
   }
   state.session = result.session;
   syncIntervalPinSelection();
+  establishFieldFrame(currentResolution().C);
   persistPreferences();
   const guidePersisted = result.guideChanged ? persistGuide() : true;
   const destination = currentResolution().C;
@@ -1417,6 +1503,7 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
   state.pendingStep.started = true;
   state.session = carried.session;
   syncIntervalPinSelection();
+  establishFieldFrame(currentResolution().C);
   if (
     timelineGeometryKey(previousModel) !== timelineGeometryKey(model())
   ) {
@@ -1541,6 +1628,7 @@ function acceptContextCursor() {
   if (result.changed) {
     state.session = result.session;
     syncIntervalPinSelection();
+    establishFieldFrame(currentResolution().C, { retainContext: true });
     stepField?.translateToCurrent(currentResolution().C, { preserve: true });
     if (returnTimelineKey !== timelineGeometryKey(model())) {
       view.renderGuide();
@@ -2159,11 +2247,14 @@ function initializeVideo() {
   state.selectedPinIds = [];
   state.guideDrag = null;
   state.field = null;
+  state.fieldFrame = null;
+  state.fieldFrameRevision = 0;
   state.availableRates = snapshot.availableRates;
   state.playerState = snapshot.state;
   view.invalidateTimelinePins();
   pendingLoad = null;
 
+  establishFieldFrame(requestedStart);
   locateAddress(requestedStart);
   // Build and cue Tail/Lead before the Center transport surface becomes active.
   // This keeps the first parent-owned playback gesture synchronous across all
@@ -2194,6 +2285,9 @@ function cuePendingVideo() {
   state.selectedRetained = null;
   state.selectedPinIds = [];
   state.guideDrag = null;
+  state.currentDrag = null;
+  state.fieldFrame = null;
+  state.fieldFrameRevision = 0;
   stepField?.resetSources?.();
   state.session = createSession({ stepReach: preferences.stepReach });
   view.setPreviewAction(null);
@@ -2442,6 +2536,284 @@ function sourceFromRelativeDragDelta(event, drag) {
   return drag.projection.timelineToSource(coordinate);
 }
 
+function nudgeQuantum() {
+  return DEFAULT_NUDGE_SECONDS;
+}
+
+function quantizeAddress(address, quantum = nudgeQuantum()) {
+  if (!(Number.isFinite(address) && Number.isFinite(quantum) && quantum > 0)) {
+    return address;
+  }
+  return Math.round(address / quantum) * quantum;
+}
+
+function beginCurrentDrag(event) {
+  if (!state.videoLoaded || state.dragHandle || state.guideDrag || state.currentDrag) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const projection = timelineProjection();
+  const originSource = currentResolution().C;
+  state.currentDrag = {
+    pointerId: event.pointerId,
+    originClientX: event.clientX,
+    originSource,
+    candidate: originSource,
+    projection,
+    moved: false,
+    target: event.currentTarget
+  };
+  event.currentTarget?.setPointerCapture?.(event.pointerId);
+}
+
+function updateCurrentDrag(event) {
+  const drag = state.currentDrag;
+  if (!drag || (event.pointerId !== undefined && drag.pointerId !== event.pointerId)) return;
+  if (!drag.moved) {
+    if (Math.abs(event.clientX - drag.originClientX) < CURRENT_DRAG_THRESHOLD_PX) return;
+    settleBeforeAction({ replacingContext: true });
+    drag.moved = true;
+    drag.target?.classList?.add?.("is-dragging");
+  }
+  let candidate = sourceFromPointerInProjection(
+    event,
+    drag.projection,
+    drag.originSource
+  );
+  candidate = clamp(candidate, activeRange().start, activeRange().end);
+  if (event.shiftKey) candidate = clamp(
+    quantizeAddress(candidate),
+    activeRange().start,
+    activeRange().end
+  );
+  if (Math.abs(candidate - drag.candidate) <= EPSILON) return;
+  drag.candidate = candidate;
+  placePlayer(candidate);
+  stepField?.tick?.();
+  view.render();
+  setStatus(`Current preview ${formatTime(candidate)}${event.shiftKey ? " · fine Nudge" : ""}.`);
+}
+
+function finishCurrentDrag(event, { cancel = false } = {}) {
+  const drag = state.currentDrag;
+  if (!drag || (event?.pointerId !== undefined && drag.pointerId !== event.pointerId)) return false;
+  state.currentDrag = null;
+  drag.target?.classList?.remove?.("is-dragging");
+  if (!drag.moved || cancel) {
+    if (drag.moved) {
+      locateAddress(drag.originSource);
+      stepField?.tick?.();
+      view.render();
+      setStatus(cancel ? "Current drag cancelled." : `Current remains ${formatTime(drag.originSource)}.`);
+    }
+    return false;
+  }
+  state.currentClickSuppressed = true;
+  setTimeout(() => { state.currentClickSuppressed = false; }, 0);
+  return moveToAddress(drag.candidate, {
+    operator: "timelineCurrentDrag",
+    label: "Drag Current",
+    status: destination => `Dragged Current to ${formatTime(destination)}.`
+  });
+}
+
+function nudgeTargetKey(target) {
+  return `${target.kind}:${target.id || "current"}`;
+}
+
+function finishNudgeGesture({ cancel = false, observe = true } = {}) {
+  const gesture = state.nudgeGesture;
+  if (!gesture) return false;
+  if (gesture.timer) window.clearTimeout(gesture.timer);
+  state.nudgeGesture = null;
+  if (cancel || !gesture.changed) {
+    state.session = {
+      model: gesture.originModel,
+      history: gesture.originHistory,
+      future: gesture.originFuture
+    };
+    syncIntervalPinSelection();
+    establishFieldFrame(currentResolution()?.C);
+    locateAddress(currentResolution()?.C, { preserveField: true });
+    view.invalidateTimelinePins();
+    view.renderGuide();
+    view.render();
+    if (cancel) setStatus("Fine adjustment cancelled.");
+    return false;
+  }
+
+  state.session = checkpoint(
+    state.session,
+    gesture.target.kind === "current"
+      ? "Nudge Current"
+      : gesture.target.kind === "pin"
+        ? "Nudge Pin"
+        : "Nudge Section",
+    gesture.originModel
+  ).session;
+  syncIntervalPinSelection();
+  if (gesture.guideChanged) {
+    persistGuide();
+    view.invalidateTimelinePins();
+    view.renderGuide();
+  }
+  establishFieldFrame(currentResolution()?.C, {
+    retainContext: gesture.target.kind !== "current"
+  });
+  if (gesture.target.kind === "current") {
+    applyPlayerEffect({
+      place: currentResolution().C,
+      interval: currentInterval()
+    }, { observe });
+  } else if (gesture.rangeChanged || gesture.placeChanged) {
+    locateAddress(currentResolution().C, {
+      preserveField: !gesture.rangeChanged,
+      resetField: gesture.rangeChanged
+    });
+  } else {
+    stepField?.clearPreview?.({ restore: false });
+    stepField?.translateToCurrent?.(currentResolution().C, { preserve: true });
+  }
+  const objectLabel = gesture.target.kind === "current"
+    ? "Current"
+    : gesture.target.kind === "pin"
+      ? "Pin"
+      : "Section";
+  const finalValue = gesture.target.kind === "current"
+    ? formatTime(currentResolution().C)
+    : gesture.target.kind === "pin"
+      ? formatTime(getPin(guide(), gesture.target.id)?.t)
+      : formatRange(resolveSection(guide(), gesture.target.id));
+  setStatus(`Nudged ${objectLabel} to ${finalValue}.`);
+  view.render();
+  return true;
+}
+
+function beginNudgeGesture(target) {
+  const key = nudgeTargetKey(target);
+  if (state.nudgeGesture?.key === key) return state.nudgeGesture;
+  if (state.nudgeGesture) finishNudgeGesture({ observe: false });
+  settleBeforeAction({ replacingContext: true, skipNudge: true });
+  const cloneGuide = target.kind !== "current";
+  const originModel = snapshotModel(model(), { cloneGuide });
+  state.nudgeGesture = {
+    key,
+    target: { ...target },
+    originModel,
+    originHistory: state.session.history,
+    originFuture: state.session.future || [],
+    changed: false,
+    guideChanged: false,
+    rangeChanged: false,
+    placeChanged: false,
+    timer: null
+  };
+  return state.nudgeGesture;
+}
+
+function scheduleNudgeSettlement(gesture) {
+  if (gesture.timer) window.clearTimeout(gesture.timer);
+  gesture.timer = window.setTimeout(() => {
+    if (state.nudgeGesture === gesture) finishNudgeGesture({ observe: true });
+  }, NUDGE_GESTURE_SETTLE_MS);
+}
+
+function nudgeCurrent(direction) {
+  if (!state.videoLoaded) return false;
+  const gesture = beginNudgeGesture({ kind: "current" });
+  const destination = clamp(
+    currentResolution().C + direction * nudgeQuantum(),
+    activeRange().start,
+    activeRange().end
+  );
+  const result = goTo(state.session, destination, {
+    operator: "nudgeCurrent",
+    label: "Nudge Current",
+    amend: true
+  });
+  if (!result.changed) {
+    setStatus("Current is at the Range boundary.");
+    scheduleNudgeSettlement(gesture);
+    return false;
+  }
+  state.session = result.session;
+  gesture.changed = true;
+  syncIntervalPinSelection();
+  establishFieldFrame(currentResolution().C);
+  placePlayer(currentResolution().C);
+  stepField?.tick?.();
+  setStatus(`Fine Current ${formatTime(currentResolution().C)}.`);
+  scheduleNudgeSettlement(gesture);
+  view.render();
+  return true;
+}
+
+function nudgeGuideTarget(target, direction) {
+  if (!state.videoLoaded) return false;
+  const gesture = beginNudgeGesture(target);
+  const delta = direction * nudgeQuantum();
+  let result = null;
+  if (target.kind === "pin") {
+    const pin = getPin(guide(), target.id);
+    if (!pin) return false;
+    result = moveGuidePin(state.session, target.id, pin.t + delta, {
+      amend: true
+    });
+  } else if (target.kind === "section") {
+    result = moveGuideSection(state.session, target.id, delta, {
+      amend: true
+    });
+  }
+  if (!result?.changed) {
+    setStatus("That retained object cannot move farther.");
+    scheduleNudgeSettlement(gesture);
+    return false;
+  }
+  state.session = result.session;
+  gesture.changed = true;
+  gesture.guideChanged = true;
+  gesture.rangeChanged ||= result.rangeChanged === true;
+  gesture.placeChanged ||= Number.isFinite(result.place);
+  state.selectedRetained = { kind: target.kind, id: target.id };
+  syncIntervalPinSelection();
+  const section = target.kind === "section"
+    ? resolveSection(guide(), target.id)
+    : null;
+  const pin = target.kind === "pin" ? getPin(guide(), target.id) : null;
+  if (section) {
+    stepField?.previewExtent?.({
+      kind: "section",
+      start: section.start,
+      center: section.midpoint,
+      end: section.end
+    });
+  } else if (pin) {
+    stepField?.previewExtent?.(fieldStepPreview(pin.t, "pin"));
+  }
+  view.invalidateTimelinePins();
+  view.renderGuide();
+  view.render();
+  setStatus(`Fine ${target.kind === "pin" ? "Pin" : "Section"} adjustment.`);
+  scheduleNudgeSettlement(gesture);
+  return true;
+}
+
+function timelineNudgeTarget(event) {
+  const pin = event.target.closest?.("[data-pin-go]");
+  if (pin) return { kind: "pin", id: pin.dataset.pinGo };
+  const section = event.target.closest?.("[data-section-go]");
+  if (section) return { kind: "section", id: section.dataset.sectionGo };
+  return { kind: "current" };
+}
+
+function handleTimelineNudge(event) {
+  if (!state.videoLoaded || !event.shiftKey || Math.abs(event.deltaY || event.deltaX) < 0.01) return;
+  event.preventDefault();
+  const direction = (event.deltaY || event.deltaX) < 0 ? 1 : -1;
+  const target = timelineNudgeTarget(event);
+  if (target.kind === "current") nudgeCurrent(direction);
+  else nudgeGuideTarget(target, direction);
+}
+
 function pinSnapCandidate(drag, address) {
   if (drag.kind !== "pin" || !Number.isFinite(address)) return null;
   const sourceGuide = drag.originModel?.guide || model().guide;
@@ -2545,6 +2917,7 @@ function beginGuideDrag(kind, id, event, options = {}) {
     originFuture: null,
     projection: projectionForModel(model()),
     threshold: Number(options.threshold) || 6,
+    precision: options.precision === true,
     moved: false,
     changed: false,
     blockedReason: null,
@@ -2623,13 +2996,20 @@ function updateGuideDrag(event) {
   event.preventDefault?.();
   event.stopPropagation?.();
 
-  const source = drag.surface === "relative"
+  let source = drag.surface === "relative"
     ? sourceFromRelativeDragDelta(event, drag)
     : sourceFromPointerInProjection(
         event,
         drag.projection,
         drag.originSource
       );
+  if (drag.precision || event.shiftKey) {
+    const rawDelta = source - drag.originSource;
+    source = quantizeAddress(
+      drag.originSource + rawDelta * 0.15,
+      DEFAULT_NUDGE_SECONDS
+    );
+  }
   const baseSession = {
     model: drag.originModel,
     history: drag.originHistory,
@@ -2809,9 +3189,10 @@ function finishGuideDrag(event, options = {}) {
 }
 
 function handleTimelineClick(event) {
-  if (!state.videoLoaded || state.dragHandle) return;
+  if (!state.videoLoaded || state.dragHandle || state.currentClickSuppressed) return;
   if (
     event.target.closest(".range-handle")
+    || event.target.closest(".current-marker")
     || event.target.closest(".timeline-pin")
     || event.target.closest(".pin-cluster-menu")
     || event.target.closest("[data-section-go]")
@@ -3074,6 +3455,26 @@ function changeFieldOffset(direction, value) {
   return true;
 }
 
+function changeFieldInnerOffset(value) {
+  const outer = Math.min(
+    currentFieldOffsets().backward,
+    currentFieldOffsets().forward
+  );
+  const parsed = Number(value);
+  const innerOffset = Number.isFinite(parsed)
+    ? clamp(parsed, 0.05, Math.max(0.05, outer - 0.05))
+    : state.fieldResponse.innerOffset;
+  state.fieldResponse = normalizeFieldResponse({
+    ...state.fieldResponse,
+    innerOffset
+  });
+  persistPreferences();
+  establishFieldFrame(currentResolution()?.C);
+  stepField?.resetAtCurrent?.();
+  view.render();
+  setStatus(`Field Inner offset set to ${innerOffset}s.`);
+}
+
 function syncContextControl() {
   elements["context-seconds"].value = String(state.contextSeconds);
 }
@@ -3214,7 +3615,9 @@ function stopOrClose() {
   // Escape resolves only the topmost active layer. Repeated presses move outward
   // predictably instead of collapsing unrelated state in one action.
   if (state.dragHandle) return cancelRangeDrag();
+  if (state.currentDrag) return finishCurrentDrag(null, { cancel: true });
   if (state.guideDrag) return finishGuideDrag(null, { cancel: true });
+  if (state.nudgeGesture) return finishNudgeGesture({ cancel: true });
   if (guideDialogOpen()) return closeGuideDialog();
   if (!elements["pin-cluster-menu"].hidden) {
     view.closePinClusterMenu({ restoreFocus: true });
@@ -3276,12 +3679,13 @@ function initializePlayerApi() {
       // Step Field offsets are physical observation settings. They are
       // intentionally independent from the semantic Step Reach.
       stepReach: currentFieldOffsets(),
+      fieldInnerOffset: state.fieldResponse.innerOffset,
       // The semantic owner supplies exact, temporary preview geometry. The
       // Field controller never imports timeline projection or Context math.
       fieldPreview: fieldOperatorPreview(),
       transportKind: state.transport.kind,
       pendingStep: Boolean(state.pendingStep),
-      dragging: Boolean(state.dragHandle || state.guideDrag?.moved),
+      dragging: Boolean(state.dragHandle || state.guideDrag?.moved || state.currentDrag?.moved),
       center: playerSnapshot(),
       playerState: state.playerState
     }),
@@ -3290,13 +3694,18 @@ function initializePlayerApi() {
       tailVisible: state.tailVisible,
       leadVisible: state.leadVisible,
       tailRate: state.fieldResponse.tailRate,
-      leadRate: state.fieldResponse.leadRate
+      leadRate: state.fieldResponse.leadRate,
+      innerOffset: state.fieldResponse.innerOffset
     }),
     setPreferences: patch => {
       if (Object.hasOwn(patch, "stepFieldEnabled")) state.stepFieldEnabled = Boolean(patch.stepFieldEnabled);
       if (Object.hasOwn(patch, "tailVisible")) state.tailVisible = Boolean(patch.tailVisible);
       if (Object.hasOwn(patch, "leadVisible")) state.leadVisible = Boolean(patch.leadVisible);
-      if (Object.hasOwn(patch, "tailRate") || Object.hasOwn(patch, "leadRate")) {
+      if (
+        Object.hasOwn(patch, "tailRate")
+        || Object.hasOwn(patch, "leadRate")
+        || Object.hasOwn(patch, "innerOffset")
+      ) {
         state.fieldResponse = normalizeFieldResponse({ ...state.fieldResponse, ...patch });
       }
       persistPreferences();
@@ -3343,24 +3752,37 @@ elements["youtube-url"].addEventListener("keydown", event => {
 
 // Timeline and Range
 elements.timeline.addEventListener("click", handleTimelineClick);
+elements.timeline.addEventListener("wheel", handleTimelineNudge, { passive: false });
+elements.timeline.addEventListener("pointermove", updateCurrentDrag);
 elements.timeline.addEventListener("pointermove", updateRangeDrag);
 elements.timeline.addEventListener("pointermove", updateGuideDrag);
+elements.timeline.addEventListener("pointerup", finishCurrentDrag);
 elements.timeline.addEventListener("pointerup", finishRangeDrag);
 elements.timeline.addEventListener("pointerup", finishGuideDrag);
+elements.timeline.addEventListener("pointercancel", event => finishCurrentDrag(event, { cancel: true }));
 elements.timeline.addEventListener("pointercancel", cancelRangeDrag);
 elements.timeline.addEventListener("pointercancel", event => {
   finishGuideDrag(event, { cancel: true });
 });
+document.addEventListener("pointerup", finishCurrentDrag);
 document.addEventListener("pointerup", finishGuideDrag);
 document.addEventListener("pointercancel", event => {
+  finishCurrentDrag(event, { cancel: true });
   finishGuideDrag(event, { cancel: true });
 });
 document.addEventListener("pointermove", event => {
   if (elements.timeline.contains?.(event.target)) return;
+  updateCurrentDrag(event);
   updateGuideDrag(event);
 });
+elements["current-marker"].addEventListener("pointerdown", beginCurrentDrag);
 elements["range-start-handle"].addEventListener("pointerdown", event => beginRangeDrag("start", event));
 elements["range-end-handle"].addEventListener("pointerdown", event => beginRangeDrag("end", event));
+elements["current-marker"].addEventListener("keydown", event => {
+  if (!["ArrowLeft", "ArrowRight", ",", "."].includes(event.key)) return;
+  event.preventDefault();
+  nudgeCurrent(event.key === "ArrowLeft" || event.key === "," ? -1 : 1);
+});
 elements["range-start-handle"].addEventListener("keydown", event => adjustRangeHandle("start", event));
 elements["range-end-handle"].addEventListener("keydown", event => adjustRangeHandle("end", event));
 elements["range-start-handle"].addEventListener("lostpointercapture", event => {
@@ -3406,6 +3828,29 @@ elements["pin-lane"].addEventListener("pointerdown", event => {
   beginGuideDrag("pin", pinButton.dataset.pinGo, event, {
     origin: "timeline",
     threshold: 8
+  });
+});
+elements["section-lane"].addEventListener("pointerdown", event => {
+  const pinNode = event.target.closest("[data-pin-drag]");
+  if (pinNode) {
+    event.preventDefault();
+    event.stopPropagation();
+    beginGuideDrag("pin", pinNode.dataset.pinDrag, event, {
+      origin: "timeline",
+      sectionId: pinNode.dataset.dragSection || null,
+      threshold: event.shiftKey ? 2 : 6,
+      precision: event.shiftKey === true
+    });
+    return;
+  }
+  const sectionNode = event.target.closest("[data-section-drag]");
+  if (!sectionNode) return;
+  event.preventDefault();
+  event.stopPropagation();
+  beginGuideDrag("section", sectionNode.dataset.sectionDrag, event, {
+    origin: "timeline",
+    threshold: event.shiftKey ? 2 : 6,
+    precision: event.shiftKey === true
   });
 });
 elements["section-lane"].addEventListener("click", event => {
@@ -3653,6 +4098,8 @@ elements["context-seconds"].addEventListener("change", event => {
   state.contextSeconds = normalizeContextSeconds(event.target.value, previous);
   event.target.value = String(state.contextSeconds);
   persistPreferences();
+  establishFieldFrame(currentResolution()?.C);
+  stepField?.translateToCurrent?.(currentResolution()?.C, { preserve: true });
   if (transportIs(TRANSPORT_KIND.CONTEXT)) {
     if (state.contextSeconds === 0) {
       settleTransport();
@@ -3679,6 +4126,9 @@ elements["step-backward-seconds"].addEventListener("change", event => {
 });
 elements["step-forward-seconds"].addEventListener("change", event => {
   changeFieldOffset("forward", event.target.value);
+});
+elements["field-inner-seconds"].addEventListener("change", event => {
+  changeFieldInnerOffset(event.target.value);
 });
 elements["step-size-seconds"].addEventListener("change", event => {
   changeStepSeconds(event.target.value);
@@ -3762,15 +4212,76 @@ function trapCompactGuideFocus(event) {
   return false;
 }
 
+function applyGuideAddress(kind, id, role, rawValue) {
+  if (!state.videoLoaded) return false;
+  const value = Number(rawValue);
+  if (!Number.isFinite(value)) {
+    setStatus("Enter a valid source Address in seconds.", true);
+    view.renderGuide();
+    return false;
+  }
+  settleBeforeAction();
+  let result = null;
+  if (kind === "pin") {
+    result = moveGuidePin(state.session, id, value, { label: "Set Pin Address" });
+  } else if (kind === "section-endpoint") {
+    const section = resolveSection(guide(), id);
+    const pinId = role === "start" ? section?.startPin?.id : section?.endPin?.id;
+    if (pinId) result = moveGuidePin(state.session, pinId, value, {
+      label: `Set Section ${role === "start" ? "Start" : "End"}`
+    });
+  } else if (kind === "section") {
+    const section = resolveSection(guide(), id);
+    if (section) result = moveGuideSection(
+      state.session,
+      id,
+      value - section.midpoint,
+      { label: "Set Section position" }
+    );
+  }
+  if (!result?.changed) {
+    setStatus("That Address would leave the valid source or collapse the retained relation.", true);
+    view.renderGuide();
+    return false;
+  }
+  return accept(result, {
+    effect: false,
+    renderGuide: true,
+    status: kind === "pin"
+      ? `Set Pin Address to ${formatTime(result.value?.destination ?? value)}.`
+      : kind === "section-endpoint"
+        ? `Set Section ${role} to ${formatTime(value)}.`
+        : `Moved Section midpoint to ${formatTime(value)}.`
+  });
+}
+
+function nudgeGuideAddress(kind, id, role, direction) {
+  if (kind === "pin") return nudgeGuideTarget({ kind: "pin", id }, direction);
+  const section = resolveSection(guide(), id);
+  if (!section) return false;
+  if (kind === "section") return nudgeGuideTarget({ kind: "section", id }, direction);
+  const pinId = role === "start" ? section.startPin.id : section.endPin.id;
+  return nudgeGuideTarget({ kind: "pin", id: pinId }, direction);
+}
+
 function handleGuideClick(event) {
   if (state.guideClickSuppressed) {
     event.preventDefault?.();
     event.stopPropagation?.();
     return;
   }
+  const nudge = event.target.closest("[data-guide-nudge-kind]");
+  if (nudge) {
+    return nudgeGuideAddress(
+      nudge.dataset.guideNudgeKind,
+      nudge.dataset.guideNudgeId,
+      nudge.dataset.guideNudgeRole || "",
+      Number(nudge.dataset.guideNudgeDirection) < 0 ? -1 : 1
+    );
+  }
   const pinGo = event.target.closest("[data-pin-go]");
   if (pinGo) {
-    const sectionId = pinGo.dataset.dragSection || null;
+    const sectionId = pinGo.dataset.sectionEndpointOwner || null;
     return goToPin(
       getPin(guide(), pinGo.dataset.pinGo),
       "pin",
@@ -3811,29 +4322,31 @@ function handleGuideClick(event) {
 }
 
 elements["sections-list"].addEventListener("click", handleGuideClick);
-elements["sections-list"].addEventListener("pointerdown", event => {
-  const node = event.target.closest("[data-pin-drag]");
-  if (node) {
-    beginGuideDrag(
-      "pin",
-      node.dataset.pinDrag,
-      event,
-      { sectionId: node.dataset.dragSection || null }
+elements["sections-list"].addEventListener("change", event => {
+  const address = event.target.closest("[data-guide-address-kind]");
+  if (address) {
+    applyGuideAddress(
+      address.dataset.guideAddressKind,
+      address.dataset.guideAddressId,
+      address.dataset.guideAddressRole || "",
+      address.value
     );
     return;
   }
-  const section = event.target.closest("[data-section-drag]");
-  if (section) beginGuideDrag("section", section.dataset.sectionDrag, event);
-});
-elements["sections-list"].addEventListener("change", event => {
   const control = event.target.closest("[data-section-weight]");
   if (!control) return;
   changeSectionWeight(control.dataset.sectionWeight, control.value);
 });
 elements["pins-list"].addEventListener("click", handleGuideClick);
-elements["pins-list"].addEventListener("pointerdown", event => {
-  const pin = event.target.closest("[data-pin-drag]");
-  if (pin) beginGuideDrag("pin", pin.dataset.pinDrag, event);
+elements["pins-list"].addEventListener("change", event => {
+  const address = event.target.closest("[data-guide-address-kind]");
+  if (!address) return;
+  applyGuideAddress(
+    address.dataset.guideAddressKind,
+    address.dataset.guideAddressId,
+    address.dataset.guideAddressRole || "",
+    address.value
+  );
 });
 elements["sections-list"].addEventListener("pointerover", event => {
   const item = event.target.closest("[data-section-preview-id]");
@@ -4066,6 +4579,14 @@ document.addEventListener("keydown", event => {
     event.preventDefault();
     stepGesture.begin(`keyboard:${event.key}`, directionalStep("forward"));
   }
+  else if (plain && (event.key === "," || event.key === ".")) {
+    event.preventDefault();
+    const retained = state.selectedRetained;
+    const direction = event.key === "," ? -1 : 1;
+    if (retained?.kind === "pin" || retained?.kind === "section") {
+      nudgeGuideTarget(retained, direction);
+    } else nudgeCurrent(direction);
+  }
   else if (plain && event.key === "[") { event.preventDefault(); adjustStepPreset(-1); }
   else if (plain && event.key === "]") { event.preventDefault(); adjustStepPreset(1); }
   else if (commandUndo) { event.preventDefault(); undoLastAction(); }
@@ -4107,7 +4628,9 @@ window.addEventListener("blur", () => {
   state.carryModifier = false;
   stepGesture.cancel({ observe: false });
   if (state.dragHandle) cancelRangeDrag();
+  if (state.currentDrag) finishCurrentDrag(null, { cancel: true });
   if (state.guideDrag) finishGuideDrag(null, { cancel: true });
+  if (state.nudgeGesture) finishNudgeGesture({ observe: false });
 });
 
 window.addEventListener("resize", () => {

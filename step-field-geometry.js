@@ -11,19 +11,101 @@ export const STEP_FIELD_PHASE = Object.freeze({
 });
 
 export const FIELD_REACH_TOLERANCE = 0.16;
-export const DEFAULT_FIELD_RESPONSE = Object.freeze({ tailRate: 0.5, leadRate: 2 });
+export const DEFAULT_FIELD_RESPONSE = Object.freeze({
+  tailRate: 0.5,
+  leadRate: 1.5,
+  innerOffset: 2.5
+});
+
+export const FIELD_SWEEP_PHASE = Object.freeze({
+  EXPANDING: "expanding",
+  CONTRACTING: "contracting"
+});
+
+export const FIELD_BOUNDARY = Object.freeze({
+  INNER: "inner",
+  OUTER: "outer"
+});
 
 export function normalizeFieldResponse(value = DEFAULT_FIELD_RESPONSE) {
   const tailRate = Number(value?.tailRate);
   const leadRate = Number(value?.leadRate);
+  const tailDifferential = Number.isFinite(tailRate) && tailRate > 0 && tailRate < 1
+    ? 1 - tailRate
+    : 1 - DEFAULT_FIELD_RESPONSE.tailRate;
+  const leadDifferential = Number.isFinite(leadRate) && leadRate > 1
+    ? leadRate - 1
+    : DEFAULT_FIELD_RESPONSE.leadRate - 1;
+  const differential = clamp(
+    Math.min(tailDifferential, leadDifferential),
+    0.05,
+    0.75
+  );
+  const innerOffset = Number(value?.innerOffset);
   return {
-    tailRate: Number.isFinite(tailRate) && tailRate > 0 && tailRate < 1
-      ? tailRate
-      : DEFAULT_FIELD_RESPONSE.tailRate,
-    leadRate: Number.isFinite(leadRate) && leadRate > 1
-      ? leadRate
-      : DEFAULT_FIELD_RESPONSE.leadRate
+    tailRate: 1 - differential,
+    leadRate: 1 + differential,
+    innerOffset: Number.isFinite(innerOffset) && innerOffset > 0
+      ? innerOffset
+      : DEFAULT_FIELD_RESPONSE.innerOffset
   };
+}
+
+export function breathingRateFor(role, phase, response, { waiting = false, centerRate = 1 } = {}) {
+  if (waiting) return centerRate;
+  const normalized = normalizeFieldResponse(response);
+  if (phase === FIELD_SWEEP_PHASE.CONTRACTING) {
+    return role === "tail" ? normalized.leadRate : normalized.tailRate;
+  }
+  return role === "tail" ? normalized.tailRate : normalized.leadRate;
+}
+
+export function deriveBreathingBounds({ current, innerOffset, outerReach, range }) {
+  const center = clamp(current, range.start, range.end);
+  const outer = normalizeFieldReach(outerReach);
+  const requestedInner = Math.max(EPSILON, Number(innerOffset));
+  const side = role => {
+    const available = role === "tail"
+      ? Math.max(0, center - range.start)
+      : Math.max(0, range.end - center);
+    const maximum = Math.min(
+      role === "tail" ? outer.backward : outer.forward,
+      available
+    );
+    return {
+      inner: Math.min(requestedInner, maximum),
+      outer: maximum,
+      operational: maximum >= requestedInner - EPSILON
+    };
+  };
+  return { center, innerOffset: requestedInner, tail: side("tail"), lead: side("lead") };
+}
+
+export function advanceBreathingOffset({
+  offset, phase, centerDelta, rate, centerRate = 1, inner, outer
+}) {
+  const differential = Math.abs(Number(rate) - centerRate);
+  const distance = Math.max(0, Number(centerDelta)) * differential;
+  const next = phase === FIELD_SWEEP_PHASE.CONTRACTING
+    ? Math.max(inner, offset - distance)
+    : Math.min(outer, offset + distance);
+  const boundary = phase === FIELD_SWEEP_PHASE.CONTRACTING
+    ? next <= inner + FIELD_REACH_TOLERANCE ? FIELD_BOUNDARY.INNER : null
+    : next >= outer - FIELD_REACH_TOLERANCE ? FIELD_BOUNDARY.OUTER : null;
+  return { offset: next, boundary };
+}
+
+export function nextBreathingPhase(phase, sideStates) {
+  const operational = (sideStates || []).filter(side => side.operational);
+  if (!operational.length) return phase;
+  const expected = phase === FIELD_SWEEP_PHASE.CONTRACTING
+    ? FIELD_BOUNDARY.INNER
+    : FIELD_BOUNDARY.OUTER;
+  return operational.every(side => side.boundary === expected)
+    ? phase === FIELD_SWEEP_PHASE.CONTRACTING
+      ? FIELD_SWEEP_PHASE.EXPANDING
+      : FIELD_SWEEP_PHASE.CONTRACTING
+    : phase;
 }
 
 export function normalizeFieldReach(value) {

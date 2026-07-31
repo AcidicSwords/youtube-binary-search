@@ -94,7 +94,7 @@ function makeControllerHarness() {
     transportKind: "idle",
     pendingStep: false,
     dragging: false,
-    center: { time: 50, rate: 1, state: YOUTUBE_STATE.PAUSED, availableRates: [0.5, 1, 2] }
+    center: { time: 50, rate: 1, state: YOUTUBE_STATE.PAUSED, availableRates: [0.5, 1, 1.5, 2] }
   };
 
   function createPlayer(id, config) {
@@ -115,7 +115,7 @@ function makeControllerHarness() {
       play() { commands.push(["play"]); state = YOUTUBE_STATE.PLAYING; config.events.onStateChange?.(state); },
       pause() { commands.push(["pause"]); state = YOUTUBE_STATE.PAUSED; },
       setRate(value) { commands.push(["rate", value]); rate = value; config.events.onPlaybackRateChange?.(value); },
-      read() { return { time, rate, state, availableRates: [0.5, 1, 2] }; },
+      read() { return { time, rate, state, availableRates: [0.5, 1, 1.5, 2] }; },
       raw() { return { getIframe: () => ({ setAttribute() {} }) }; }
     };
     adapters.set(id, adapter);
@@ -151,7 +151,7 @@ function makeControllerHarness() {
 
     harness.controller.stretch("tail");
     assert.equal(harness.controller.snapshot().tailMode, FIELD_SIDE_MODE.STRETCHING);
-    assert.equal(harness.adapters.get("player-tail").read().time, 50, "Stretch snaps Tail to Current.");
+    assert.equal(harness.adapters.get("player-tail").read().time, 40, "Stretch resumes from the attained relation instead of crossing Center.");
 
     harness.snapshot = {
       ...harness.snapshot,
@@ -161,7 +161,7 @@ function makeControllerHarness() {
     harness.controller.tick();
     const tailCommands = harness.adapters.get("player-tail").commands;
     assert.ok(tailCommands.some(command => command[0] === "play"), "Native Center playback starts the muted Tail.");
-    assert.ok(tailCommands.some(command => command[0] === "rate" && command[1] === 0.5), "Tail requests a supported slow rate after priming.");
+    assert.ok(tailCommands.some(command => command[0] === "rate" && command[1] === 1.5), "Tail requests the swapped fast rate when resuming inward from the outer boundary.");
 
     harness.adapters.get("player-tail").place(47);
     harness.controller.hold("tail");

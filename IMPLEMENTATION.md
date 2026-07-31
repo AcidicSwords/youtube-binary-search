@@ -1,4 +1,4 @@
-# Binary YouTube Reader — Canonical Implementation
+# Video Cartography — Canonical Implementation
 
 ## Ownership
 
@@ -10,13 +10,14 @@
 | `timeline-projection.js` | positive spatial density, source/timeline mapping, Pin ordering |
 | `transport.js` | Context and native-playback runtime values |
 | `step-gesture.js` | press/repeat/settlement and one-Undo gesture boundary |
-| `step-field-geometry.js` | pure Tail/Lead source target and phase geometry |
-| `step-field.js` | physical Tail/Lead players and Hold/Stretch runtime |
+| `field-frame.js` | pure stable Field Frame geometry, ownership, and traversal direction |
+| `step-field-geometry.js` | pure Tail/Lead source target and breathing geometry |
+| `step-field.js` | physical Tail/Lead players, stable Frame placement, Breath, and Hold runtime |
 | `view.js` | DOM projection, weighted timeline, Guide and operator presentation |
 | `app.js` | composition, adapters, persistence, direct manipulation |
 | `youtube.js` | the only owner of YouTube player construction |
 
-`session.js`, `guide.js`, `range-geometry.js`, `timeline-projection.js`, and `transport.js` remain DOM- and I/O-free.
+`session.js`, `guide.js`, `range-geometry.js`, `timeline-projection.js`, `transport.js`, `field-frame.js`, and `step-field-geometry.js` remain DOM- and I/O-free.
 
 ## Canonical model and transactions
 
@@ -109,40 +110,23 @@ Playback presentation and settlement both use `projectPlayback()`. It unions pri
 
 Section-weight edits neither settle nor rebase an active transport. The timeline can deform around a moving Cursor without issuing a pause, seek, or rate command.
 
-## Field
+## Panoramic Phase Field
 
-Field Offset is configured physical state. Only explicit Offset input updates `fieldOffsets`. Hold and Stretch maintain runtime side state without reporting or persisting their measured relation, and neither can call `setStepReach()` or a Section-weight transaction.
+`field-frame.js` derives and validates stable source-address Frames. Context-enabled Frames retain bounded Context edges across idle, running, settled, and accepted transport. Context-disabled Frames use exact operator geometry supplied by `app.js`. `transitionFieldFrame()` classifies semantic direction and assigns a monotonically increasing presentation revision; it mutates no Session state.
 
-Each side keeps `configuredOffset` separate from its live `offset`.
-`reconfigureOffset(role)` reconciles only the edited side: a relation following
-its old configured maximum follows the new one, while a partial Hold is
-preserved and only clamped when necessary. The sibling receives no player
-command.
+`step-field-geometry.js` owns pure breathing arithmetic: Inner/Outer bounds, outward and inward rate assignment, offset advancement, boundary classification, and synchronization phase changes.
 
-`sideIsOperational()` is the common availability boundary for the side Step
-surface, its Hold/Stretch control, and the combined Field control. It requires
-Field On, a visible ready source, completed establishment, and non-zero
-Range-contained reach. Published Field identity includes enabled/visible state,
-target geometry, span availability, and activation so application state cannot
-retain a stale held span after collapse or Field Off.
+`step-field.js` owns physical side players. It receives source Addresses, never operator or Timeline arithmetic. In idle Frame mode it parks Tail and Lead at the supplied Addresses and uses the Frame revision only to render a short directional slideshow transition. During ordinary playback it clears Frame ownership and runs the bounded Breath:
 
-Pause clears pending play intent. CUED and PLAYING callbacks re-check current
-visibility, Field ownership, suspension, and Center playback intent before
-acting. Hidden/off panes are omitted from polling placement and video-sync
-paths, so a delayed iframe callback cannot resurrect them and repeated ticks
-issue no dormant player commands.
+```text
+inner -> expanding -> outer barrier -> contracting -> inner barrier -> repeat
+```
 
-Field target placement and measurement are source-time arithmetic. The projection is used only by the timeline view when drawing those source Addresses.
+An early side follows Center at Center rate while waiting at a barrier. Hold preserves attained offsets and sweep direction. Field Off or pane collapse makes a side dormant and removes it from synchronization. Delayed iframe events cannot reactivate a dormant side.
 
-`app.js` alone derives ambient `fieldPreview` geometry. Idle Step uses the same
-`projection.stepTarget()` calls and effective Reach as the committed Step;
-Context uses the active transport's exact `start`, `anchor`, and `end`.
-`step-field.js` only validates and displays those source Addresses, so it does
-not import timeline projection or Context arithmetic.
+Configured Outer Offset, Inner Offset, attained relation, requested rate pair, actual adapter rates, and sweep phase are separate runtime/preferences values. None can write Session, Guide, Step Reach, or Section Weight.
 
-All semantic Step surfaces resolve through `step-gesture.js`. A repeated press
-commits Center at each Current, retargets the adjacent Step preview, keeps one
-history origin, and starts automatic Context at most once after settlement.
+`app.js` owns Frame selection and Context lifecycle. Direct manipulation temporarily supplies an exact Frame. Context transport changes Center from Current to Cursor without changing the established edges. Playback synchronously removes idle Frame ownership before Breath begins.
 
 ## Timeline and direct manipulation
 
@@ -163,19 +147,9 @@ history origin, and starts automatic Context at most once after settlement.
 - direct Section hit regions whose names, weights, endpoints, and lifecycle remain in Guide;
 - Current, playback Cursor, and all free/shared Pins.
 
-Guide reprojects each Section across the complete timeline, connects its exact
-Start/End Pin controls, and derives endpoint visual weight from the existing
-Section-reference count. Shared-Pin mutation is available through positioned
-Guide endpoint nodes, full-map Guide Pin nodes, and direct Timeline Pin
-drag. A stationary Timeline Pin release performs exact Pin Go. Working-Interval
-bounds derive the selected endpoint Pins and follow their direct movement. The
-Guide profile routes through the same whole-Section
-translation used by its Timeline wire. Guide-local pointer deltas use the full
-visible endpoint track or Guide row as their interaction width and convert
-through the captured Timeline projection, so equal relative movement feels
-equal and the Start/End controls retain travel on both sides. Timeline Pins use
-the same relation count. These are pure projections of Guide ownership and
-persist no additional topology.
+The Temporal Topography is the single spatial editing surface. Current, Pins, Section Start/End nodes, whole-Section midpoint nodes, and Range handles all capture one Timeline projection at pointer-down. Current release invokes exact Go; Pin and Section nodes invoke the existing Guide graph transactions. Working-Interval bounds follow shared endpoint movement through Session reconciliation.
+
+Guide rows project location for orientation but use exact source Address inputs and Nudge controls rather than a second drag geometry. Timeline gestures, Guide numeric edits, Shift-wheel, Shift-drag, and keyboard Nudge all call the same Session operations and persist no additional topology.
 
 Session snapshots retain `lastOperator`, so Undo and Redo restore the same
 three-frame interpretation as the spatial state. `app.js` owns preview
@@ -209,8 +183,9 @@ remain unchanged while interactive regions cannot overlap ambiguously.
 Timeline input stays in `app.js`:
 
 - Section body click: make its full extent the Working Interval and center Current;
-- Guide endpoint drag: move that shared Pin using relative Timeline distance;
-- Guide profile drag: translate the complete Section;
+- Timeline Section endpoint drag: move that shared Pin through captured Timeline Space;
+- Timeline Section midpoint drag: translate the complete Section;
+- Guide Address input: invoke the same exact Pin or Section transaction;
 - Guide selector or Deform step: commit one canonical factor;
 - timeline or Guide Pin Go: invert or use an exact source target;
 - Timeline Pin marker: exact Go on stationary release or exact drag after the
@@ -258,6 +233,6 @@ scrim.
 
 Guide data is video-specific. Preferences store Context duration, semantic Step Reach, independent Field offsets and rates, Field visibility, and pane visibility.
 
-Guide schema v7 persists Section `weight`; it never persists Timeline Space, segment density, lanes, gradients, or projected positions. Legacy v6 `collapsed: true` migrates once to `0.25×`, the closest positive replacement, while open Sections migrate to `1×`. The legacy flag is discarded.
+Guide schema v8 persists Section `weight` and remains compatible with v7 data; it never persists Timeline Space, segment density, lanes, gradients, or projected positions. Legacy v6 `collapsed: true` migrates once to `0.25×`, the closest positive replacement, while open Sections migrate to `1×`. The legacy flag is discarded.
 
 Legacy scalar Step values migrate to fixed mode. Legacy coupled Field values seed separate preferences once and remain independent afterward.

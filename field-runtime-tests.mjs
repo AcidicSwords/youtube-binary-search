@@ -24,7 +24,7 @@ function element(tagName = "DIV") {
 }
 
 function makeHarness({
-  rates = [0.5, 1, 2],
+  rates = [0.5, 1, 1.5, 2],
   deferredCue = false,
   delayedPlay = false,
   ratesAfterPlay = null
@@ -171,12 +171,18 @@ function makeHarness({
     const started = h.controller.playFromGesture({ center: 50 });
     assert.deepEqual(started, { tail: true, lead: true }, "A Context settled in the same gesture stack must not leave stale suspension behind.");
     assert.deepEqual(h.snapshot.interval, semanticInterval, "Physical Field activation must not mutate semantic Interval.");
-    assert.ok(["cue", "place"].includes(h.tail().commands.at(-2)?.[0]));
-    assert.equal(h.tail().commands.at(-2)?.[1], 50);
-    assert.deepEqual(h.tail().commands.at(-1), ["play"]);
-    assert.ok(["cue", "place"].includes(h.lead().commands.at(-2)?.[0]));
-    assert.equal(h.lead().commands.at(-2)?.[1], 50);
-    assert.deepEqual(h.lead().commands.at(-1), ["play"]);
+    assert.equal(
+      h.tail().commands.filter(command => ["cue", "place"].includes(command[0])).at(-1)?.[1],
+      47.5,
+      "Breathing begins at the non-zero inner Tail offset."
+    );
+    assert.equal(
+      h.lead().commands.filter(command => ["cue", "place"].includes(command[0])).at(-1)?.[1],
+      52.5,
+      "Breathing begins at the non-zero inner Lead offset."
+    );
+    assert.ok(h.tail().commands.some(command => command[0] === "play"));
+    assert.ok(h.lead().commands.some(command => command[0] === "play"));
 
     h.snapshot = {
       ...h.snapshot,
@@ -187,11 +193,11 @@ function makeHarness({
     h.lead().setTime(54);
     h.controller.tick();
     assert.equal(h.tail().rate, 0.5);
-    assert.equal(h.lead().rate, 2);
+    assert.equal(h.lead().rate, 1.5);
 
     h.controller.hold("tail");
     assert.equal(h.controller.snapshot().tailMode, FIELD_SIDE_MODE.HELD);
-    assert.equal(h.controller.getStepSelection("tail").distance, 1);
+    assert.ok(h.controller.getStepSelection("tail").distance >= 2.5);
     assert.deepEqual(h.snapshot.interval, semanticInterval, "Hold changes runtime Field state only; it must not redefine Interval.");
 
     h.snapshot = {
@@ -200,15 +206,15 @@ function makeHarness({
       center: { ...h.snapshot.center, time: 52, state: YOUTUBE_STATE.PAUSED }
     };
     h.controller.pause({ center: 52, freeze: true });
-    assert.equal(h.tail().time, 51);
-    assert.equal(h.lead().time, 54);
+    assert.equal(h.tail().time, 48.5);
+    assert.equal(h.lead().time, 55.5);
     assert.equal(h.tail().state, YOUTUBE_STATE.PAUSED);
     assert.equal(h.lead().state, YOUTUBE_STATE.PAUSED);
 
     h.controller.translateToCurrent(60, { preserve: true });
-    assert.equal(h.tail().time, 59, "Whole-Field translation must preserve Tail's held 1 s offset.");
-    assert.equal(h.lead().time, 62, "Whole-Field translation must preserve Lead's held 2 s offset.");
-    assert.equal(h.controller.getStepSelection("tail").distance, 1);
+    assert.equal(h.tail().time, 56.5, "Whole-Field translation must preserve Tail's held breathing offset.");
+    assert.equal(h.lead().time, 63.5, "Whole-Field translation must preserve Lead's breathing offset.");
+    assert.equal(h.controller.getStepSelection("tail").distance, 3.5);
   } finally {
     h.restore();
   }
@@ -255,7 +261,7 @@ function makeHarness({
     h.tail().setTime(51);
     h.controller.tick();
     h.controller.hold("tail");
-    assert.equal(h.controller.getStepSelection("tail").distance, 1);
+    assert.equal(h.controller.getStepSelection("tail").distance, 3.5);
     h.snapshot = {
       ...h.snapshot,
       stepReach: {
@@ -266,7 +272,7 @@ function makeHarness({
     h.controller.reconfigureOffset("tail");
     assert.equal(
       h.controller.getStepSelection("tail").distance,
-      1,
+      3.5,
       "A partial held relation must remain held when only its configured maximum changes."
     );
   } finally {
@@ -357,7 +363,7 @@ function makeHarness({
     h.controller.tick();
     assert.equal(h.tail().time, 35, "Step preview must use the semantic Backward destination, not Field Offset.");
     assert.equal(h.lead().time, 72, "Step preview must use the semantic Forward destination, not Field Offset.");
-    assert.equal(h.elements.get("field-transport-state").textContent, "Step preview");
+    assert.equal(h.elements.get("field-transport-state").textContent, "Step frame");
     assert.equal(h.controller.snapshot().span.held, false, "A temporary preview must not become a Held Field span.");
     assert.equal(h.controller.getStepSelection("tail").distance, 15);
     assert.equal(h.controller.getStepSelection("tail").address, 35);
@@ -380,7 +386,7 @@ function makeHarness({
     h.controller.tick();
     assert.equal(h.tail().time, 42);
     assert.equal(h.lead().time, 63);
-    assert.equal(h.elements.get("field-transport-state").textContent, "Refine preview");
+    assert.equal(h.elements.get("field-transport-state").textContent, "Refine frame");
     assert.equal(h.controller.getStepSelection("tail"), null);
     assert.equal(h.controller.getStepSelection("lead"), null);
 
@@ -396,7 +402,7 @@ function makeHarness({
     h.controller.tick();
     assert.equal(h.tail().time, 25);
     assert.equal(h.lead().time, 75);
-    assert.equal(h.elements.get("field-transport-state").textContent, "Reopen preview");
+    assert.equal(h.elements.get("field-transport-state").textContent, "Reopen frame");
     assert.equal(h.controller.getStepSelection("tail"), null);
     assert.equal(h.controller.getStepSelection("lead"), null);
 
@@ -419,7 +425,7 @@ function makeHarness({
     assert.equal(h.tail().time, 47.5, "Context preview must park Tail on the first observed frame.");
     assert.equal(h.lead().time, 52.5, "Context preview must park Lead on the last observed frame.");
     assert.equal(h.elements.get("center-meta").textContent, "48.25", "Context Center meta must follow the playing Cursor.");
-    assert.equal(h.elements.get("field-transport-state").textContent, "Context preview");
+    assert.equal(h.elements.get("field-transport-state").textContent, "Context frame");
     assert.equal(h.controller.getStepSelection("tail"), null);
     assert.equal(h.controller.getStepSelection("lead"), null);
     assert.equal(h.elements.get("tail-player-surface").getAttribute("aria-disabled"), "true");
@@ -456,7 +462,7 @@ function makeHarness({
       }
     };
     h.controller.tick();
-    assert.equal(h.elements.get("field-transport-state").textContent, "Step preview");
+    assert.equal(h.elements.get("field-transport-state").textContent, "Step frame");
 
     const started = h.controller.playFromGesture({ center: 50 });
     assert.deepEqual(
@@ -483,7 +489,7 @@ function makeHarness({
       "Stretch/Hold playback must not retain the preceding operator-preview presentation."
     );
     assert.equal(h.tail().rate, 0.5);
-    assert.equal(h.lead().rate, 2);
+    assert.equal(h.lead().rate, 1.5);
     assert.equal(h.elements.get("tail-field-toggle").disabled, false);
     assert.equal(h.elements.get("lead-field-toggle").disabled, false);
   } finally {
@@ -527,8 +533,8 @@ function makeHarness({
     const field = h.controller.snapshot();
     assert.equal(field.tailMode, FIELD_SIDE_MODE.HELD);
     assert.equal(field.leadMode, FIELD_SIDE_MODE.HELD);
-    assert.equal(h.tail().time, 41, "A source without a slow rate must park Tail at its current target instead of getting stuck.");
-    assert.equal(h.lead().time, 61, "A source without a fast rate must park Lead at its current target instead of getting stuck.");
+    assert.equal(field.tailRuntime.offset, 2.5, "A source without a slow rate must preserve Tail at the inner relation.");
+    assert.equal(field.leadRuntime.offset, 2.5, "A source without a fast rate must preserve Lead at the inner relation.");
   } finally {
     h.restore();
   }
@@ -572,7 +578,7 @@ function makeHarness({
     assert.equal(h.elements.get("center-meta").textContent, "50");
     assert.equal(h.elements.get("tail-meta").textContent, "20");
     assert.equal(h.elements.get("lead-meta").textContent, "90");
-    assert.equal(h.elements.get("field-transport-state").textContent, "Section preview");
+    assert.equal(h.elements.get("field-transport-state").textContent, "Section frame");
     h.controller.tick();
     assert.equal(h.tail().time, 20, "Polling must not dislodge an active Section preview.");
     assert.equal(h.lead().time, 90, "Polling must preserve the exact preview End.");
@@ -612,7 +618,7 @@ function makeHarness({
     });
     assert.equal(h.tail().time, 0, "Pin preview Field must clamp Tail at Range Start.");
     assert.equal(h.lead().time, 3.5, "Pin preview Field must use its supplied spatial Step target.");
-    assert.equal(h.elements.get("field-transport-state").textContent, "Pin preview");
+    assert.equal(h.elements.get("field-transport-state").textContent, "Pin frame");
   } finally {
     h.restore();
   }
@@ -648,7 +654,7 @@ function makeHarness({
     rates: [1],
     deferredCue: true,
     delayedPlay: true,
-    ratesAfterPlay: [0.5, 1, 2]
+    ratesAfterPlay: [0.5, 1, 1.5, 2]
   });
   try {
     h.controller.tick();
@@ -663,8 +669,10 @@ function makeHarness({
     assert.deepEqual(started, { tail: true, lead: true });
     assert.equal(h.tail().commands.filter(command => command[0] === "cue").length, tailCueCount, "Trusted Play must not re-cue Tail.");
     assert.equal(h.lead().commands.filter(command => command[0] === "cue").length, leadCueCount, "Trusted Play must not re-cue Lead.");
-    assert.deepEqual(h.tail().commands.slice(-2), [["place", 50], ["play"]]);
-    assert.deepEqual(h.lead().commands.slice(-2), [["place", 50], ["play"]]);
+    assert.equal(h.tail().commands.filter(command => command[0] === "place").at(-1)?.[1], 47.5);
+    assert.equal(h.lead().commands.filter(command => command[0] === "place").at(-1)?.[1], 52.5);
+    assert.ok(h.tail().commands.some(command => command[0] === "play"));
+    assert.ok(h.lead().commands.some(command => command[0] === "play"));
 
     h.snapshot = {
       ...h.snapshot,
@@ -683,7 +691,7 @@ function makeHarness({
     };
     h.controller.tick();
     assert.equal(h.tail().rate, 0.5);
-    assert.equal(h.lead().rate, 2);
+    assert.equal(h.lead().rate, 1.5);
   } finally {
     h.restore();
   }
