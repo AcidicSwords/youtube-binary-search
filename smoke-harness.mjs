@@ -150,7 +150,11 @@ export class FakeElement {
     return [];
   }
   querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
-  getBoundingClientRect() { return { left: 0, width: this.clientWidth || 1000 }; }
+  // Tests that depend on where an element sits, not merely how wide it is, may
+  // set `rect` directly.
+  getBoundingClientRect() {
+    return this.rect || { left: 0, width: this.clientWidth || 1000 };
+  }
 }
 
 export function descendants(root) {

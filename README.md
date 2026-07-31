@@ -109,9 +109,9 @@ The timeline places Pins above the weighted track and its source ruler, then
 lane-packs overlapping Sections into a relationship tree below. Each thin
 Section wire has Start, midpoint, and End nodes with faint relations back to
 its Pin/track positions. Click a Section to make its complete extent the
-Working Interval and return Current to its center. Drag its Start or End node to
-move that endpoint Pin, or its midpoint node to translate the whole Section,
-while the three viewers show the resulting extent. The
+Working Interval and return Current to its center. Drag near either end of a
+Section wire to move that endpoint Pin, or its middle to translate the whole
+Section, while the three viewers show the resulting extent. The
 collapsible right rail has two exclusive modes: full-height Guide, or Operators
 with Parameters. Guide and the operator controls never compete for vertical
 space. Collapse either mode to leave Viewer and Timeline as one panoramic
@@ -187,17 +187,19 @@ The Temporal Topography owns spatial direct manipulation. Current, Pins, Section
 Start/End/midpoint nodes, and Range boundaries are all dragged there:
 
 ```text
-Current marker          → Go
+Current marker          → Step
 Pin marker              → Move Pin
-Section Start or End    → Move endpoint Pin
-Section midpoint        → Translate Section
+Section wire ends       → Move endpoint Pin
+Section wire middle     → Translate Section
 Range boundary          → Change Range
 ```
 
-Dragging Current is an exact Go gesture: the marker follows a candidate Address,
-the original Current remains as a faint departure marker, Session Current is
-unchanged until release, and the release commits one Go with one Undo
-checkpoint. A stationary press moves nothing.
+Dragging Current is a Step gesture, not a Go: the marker follows a candidate
+Address, the original Current remains as a faint departure marker, Session
+Current is unchanged until release, and the release commits one Step that
+extends or shortens the retained traversal. It does not draw a new Working
+Interval around the landing point — clicking the Timeline is what does that. A
+stationary press moves nothing.
 
 Fine adjustment is called Nudge, because a verified source frame duration is not
 available from every media adapter. It acts in source time:
@@ -207,6 +209,7 @@ available from every media adapter. It acts in source time:
 - `Shift`-drag enters precision mode: reduced gain, quantized to the same Nudge
   quantum, same gesture owner;
 - `,` and `.` nudge the selected map object, or Current when unambiguous;
+- every increment control repeats while held;
 - Guide's `−`/`+` controls invoke the same operation.
 
 One drag, wheel series, or held-key repetition creates at most one Undo

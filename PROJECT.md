@@ -49,7 +49,7 @@ When Context is enabled, Tail and Lead remain the bounded Context edges before, 
 
 When Context is disabled, the Field falls back to the active operator geometry: Step destinations, Refine midpoints, Reopen alternatives, or an exact retained extent.
 
-Committed movement creates a brief directional slideshow transition from the preceding Frame to the resulting Frame. Forward traversal makes frames enter through Lead and leave through Tail; backward traversal reverses the direction. Semantic state commits immediately. The slideshow is presentation, not a second transition model.
+Committed movement creates one brief directional transition from the preceding Frame to the resulting Frame. Semantic state commits immediately; the transition is presentation, not a second transition model. It is an opacity cue rather than motion, because three media surfaces cannot be reparented and translating them reads as a shake rather than as travel.
 
 Direct Current, Pin, or Section manipulation temporarily supplies exact source frames for perceptual verification and then restores the ambient Frame.
 
@@ -80,7 +80,9 @@ The Timeline is the Temporal Topography: the complete source projected into late
 
 Section factors compose multiplicatively. Their signed logarithms compose visually as one continuous compression/expansion atmosphere, while projected source-time contours retain exact metric meaning.
 
-Current, Pins, Section endpoints, whole Sections, and Range boundaries are manipulated spatially on the Temporal Topography. Current drag is exact Go. Guide objects remain source topology rather than generic interface selections.
+Current, Pins, Section endpoints, whole Sections, and Range boundaries are manipulated spatially on the Temporal Topography. Section wires carry their own roles: pressing near an end acquires that endpoint Pin, pressing the middle translates the Section. Guide objects remain source topology rather than generic interface selections.
+
+Dragging or nudging Current is a Step, not a Go. It extends or shortens the traversal already established rather than drawing a new Working Interval around wherever it lands. Drawing a new neighbourhood is what an exact Go is for.
 
 Fine adjustment is **Nudge**. Shift-drag enters quantized precision mode. Shift-wheel and comma/period move the acquired object by one source-time quantum and batch a continuous sequence into one Undo checkpoint. The interface calls this a frame only when a media adapter can prove an exact frame duration.
 

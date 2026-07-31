@@ -152,15 +152,23 @@ assert.doesNotMatch(app, /"sections-list"\]\.addEventListener\("pointerdown"/,
   "Guide Section rows must not own a drag gesture.");
 assert.doesNotMatch(app, /"pins-list"\]\.addEventListener\("pointerdown"/,
   "Guide Pin rows must not own a drag gesture.");
-assert.match(app, /"section-lane"\]\.addEventListener\("pointerdown"[\s\S]*?data-section-node[\s\S]*?beginGuideDrag\(\s*"pin"[\s\S]*?beginGuideDrag\("section"/,
-  "Section Start, End and midpoint nodes are the Timeline's acquisition regions.");
+assert.match(app, /function sectionWireRole[\s\S]*SECTION_END_GRIP[\s\S]*return "midpoint"/,
+  "The Section wire resolves its own roles from where it was pressed.");
+assert.match(app, /"section-lane"\]\.addEventListener\("pointerdown"[\s\S]*?sectionWireRole\(body, event\)[\s\S]*?beginGuideDrag\("section"[\s\S]*?beginGuideDrag\(\s*"pin"/,
+  "Pressing the wire acquires an endpoint Pin or the whole Section.");
+assert.doesNotMatch(view, /timeline-section-node/,
+  "No separate Section node chrome may be drawn over the map.");
+assert.doesNotMatch(styles, /\.timeline-section-node/);
 assert.match(app, /function sourceFromRelativeDragDelta[\s\S]*surfaceWidth[\s\S]*originClientX[\s\S]*timelineExtent/);
 assert.match(view, /function pinPositionButton[\s\S]*className\s*=\s*"endpoint-button pin-position-node"[\s\S]*dataset\.pinGo/);
 assert.doesNotMatch(view, /dataset\.sectionDrag/,
   "Guide's full-map profile is a read-only positional representation.");
 assert.match(styles, /\.pin-position-track[\s\S]*height:\s*43px[\s\S]*margin:\s*0 10px 9px/);
 // Guide is the exact editor: Address inputs plus the shared Nudge increments.
-assert.match(view, /function addressField\([\s\S]*dataset\.addressInput[\s\S]*dataset\.nudgeTarget/);
+assert.match(view, /function addressControl\([\s\S]*dataset\.addressInput/);
+assert.match(view, /function nudgeButton\([\s\S]*dataset\.nudgeTarget/);
+assert.doesNotMatch(view, /className = "section-endpoints"/,
+  "Guide shows one compact Address line, not a second positional track.");
 assert.match(app, /function applyGuideAddressInput[\s\S]*moveGuidePin[\s\S]*moveGuideSection[\s\S]*checkpoint\(/,
   "Guide numeric editing and Timeline manipulation must call the same operation.");
 assert.match(app, /function nudgeTarget\(target, direction, options = \{\}\)/);
@@ -170,8 +178,8 @@ assert.match(app, /function settleNudgeGesture[\s\S]*checkpoint\(state\.session,
   "One wheel series or held-key repetition settles as one Undo transaction.");
 assert.match(app, /function beginCurrentDrag[\s\S]*state\.currentDrag = \{/,
   "Current is its own gesture owner on the Temporal Topography.");
-assert.match(app, /function finishCurrentDrag[\s\S]*moveToAddress\(drag\.candidate/,
-  "Dragging Current commits one exact Go.");
+assert.match(app, /function finishCurrentDrag[\s\S]*completePendingStep\(\)/,
+  "Dragging Current settles as one Step transaction.");
 assert.doesNotMatch(view, /guide-action-move/);
 assert.match(app, /function previewGuideDrag[\s\S]*kind:\s*"section"[\s\S]*start:[\s\S]*center:[\s\S]*end:/);
 assert.match(field, /function previewExtent[\s\S]*renderPreview/);
@@ -185,9 +193,17 @@ assert.match(styles, /\.timeline-section-midpoint\s*\{/);
 assert.match(styles, /\.timeline-section-relation\s*\{[^}]*repeating-linear-gradient\(/);
 assert.match(view, /const pinTop\s*=\s*17[\s\S]*const trackTop\s*=\s*44[\s\S]*const sectionTop\s*=\s*rulerTop\s*\+\s*38/);
 assert.match(view, /\["start",\s*projected\.start[\s\S]*\["midpoint",\s*midpointCoordinate[\s\S]*\["end",\s*projected\.end/);
-assert.match(view, /const nodePoints = \[[\s\S]*"start"[\s\S]*"midpoint"[\s\S]*"end"[\s\S]*dataset\.sectionNode/,
-  "Every Section exposes one centered Start, midpoint and End acquisition region.");
-assert.match(styles, /\.timeline-section-node\s*\{/);
+// Increment controls repeat while held; a click-only binding cannot.
+assert.match(app, /function bindHoldRepeat\(container, selector, act\)[\s\S]*HOLD_REPEAT_INTERVAL_MS/);
+assert.match(app, /bindGuideNudgeControls\(elements\["sections-list"\]\)/);
+assert.match(app, /bindGuideNudgeControls\(elements\["pins-list"\]\)/);
+assert.match(app, /bindHoldRepeat\(elements\["deform-up"\]/);
+// Current moves by Step law, never by Go, so a drag or Nudge extends or
+// shortens the retained traversal instead of redrawing it.
+assert.match(app, /function stepCurrentBySourceDelta[\s\S]*stepSession\(/);
+assert.doesNotMatch(app, /function finishCurrentDrag[\s\S]*moveToAddress\(drag\.candidate/,
+  "Dragging Current must not commit a Go.");
+assert.match(app, /function finishCurrentDrag[\s\S]*performStep\(/);
 assert.match(
   styles,
   /@media \(pointer: coarse\)[\s\S]*\.timeline-section-body[\s\S]*var\(--touch\)/
@@ -266,21 +282,24 @@ assert.match(fieldGeometry, /export function advanceBreath/);
 assert.match(fieldGeometry, /export function holdBreath/);
 assert.match(fieldGeometry, /export function effectiveBreathBounds/);
 assert.match(field, /runtime\.frameGeneration/);
-// The three Field roles must be animated distinctly. One shared keyframe for all
-// three panes cannot express which side received the outgoing frame.
-for (const role of ["tail-pane", "step-pane-center", "lead-pane"]) {
-  assert.match(
-    fieldCss,
-    new RegExp(`is-traversing-forward \\.${role.replace(/[.*+?^$()|[\]\\]/g, "\\$&")}\\s*\\{\\s*animation-name`),
-    `Forward transition must give ${role} its own animation.`
-  );
-}
-assert.equal(
-  new Set(
-    (fieldCss.match(/is-traversing-forward [^{]*\{ animation-name: ([a-z-]+); \}/g) || [])
-  ).size,
-  3,
-  "Forward traversal must animate trailing, center, and leading roles differently."
+// The Field transition is an opacity cue only. Translating the panes reads as a
+// shake: nothing can actually travel between roles, because three iframes cannot
+// be reparented.
+assert.doesNotMatch(
+  fieldCss,
+  /@keyframes field-[a-z-]+\s*\{[^}]*translateX/,
+  "Field transitions must not translate the panes."
+);
+assert.match(fieldCss, /@keyframes field-role-settled/);
+assert.match(fieldCss, /@keyframes field-role-arriving/);
+// The pane bar creates a stacking context, so it must out-rank the full-bleed
+// transport surface or its Tune popover cannot be clicked.
+const barZ = Number(fieldCss.match(/\.step-pane-bar\s*\{[\s\S]*?z-index:\s*(\d+)/)?.[1]);
+const surfaceZ = Number(styles.match(/\.center-transport-surface\s*\{[\s\S]*?z-index:\s*(\d+)/)?.[1]);
+assert.ok(Number.isFinite(barZ) && Number.isFinite(surfaceZ));
+assert.ok(
+  barZ > surfaceZ,
+  "The pane bar must paint above the play/pause surface so Tune inputs stay clickable."
 );
 assert.match(field, /side\.placementGeneration !== runtime\.frameGeneration/,
   "A callback belonging to a superseded Field Frame must be discarded.");
@@ -391,7 +410,8 @@ assert.match(docs["PROJECT.md"], /Field Breath/);
 assert.match(docs["SPEC.md"], /### Field Frame/);
 assert.match(docs["SPEC.md"], /#### Slideshow transitions/);
 assert.match(docs["SPEC.md"], /#### Persistent Context framing/);
-assert.match(docs["SPEC.md"], /### Current drag as Go/);
+assert.match(docs["SPEC.md"], /### Current drag and Nudge as Step/);
+assert.doesNotMatch(docs["SPEC.md"], /Current drag as Go/);
 assert.match(docs["SPEC.md"], /### Nudge/);
 assert.match(docs["SPEC.md"], /### Exact Guide editing/);
 assert.doesNotMatch(docs["SPEC.md"], /maximum Stretch[\s\S]{0,80}becomes Hold/i,

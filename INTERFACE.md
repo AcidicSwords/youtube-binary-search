@@ -81,7 +81,7 @@ object lives here with one visually centered acquisition region and one
 unambiguous gesture owner:
 
 ```text
-Current marker          → Go
+Current marker          → Step
 Pin marker              → Move Pin
 Section Start or End    → Move endpoint Pin
 Section midpoint        → Translate Section
@@ -91,11 +91,14 @@ Range boundary          → Change Range
 The Current marker is itself a control. Pressing it acquires Current before the
 Timeline can read the press as generic Go; crossing the movement threshold shows
 a candidate Address while the original Current stays as a faint departure marker,
-and release commits one exact Go. A stationary press moves nothing, and Escape or
-a cancelled pointer restores the original presentation without history.
+and release commits one Step of that distance — extending or shortening the
+retained traversal rather than drawing a new one. A stationary press moves
+nothing, and a cancelled pointer restores the original presentation without
+history.
 
-Each Section wire carries Start, midpoint and End nodes as its acquisition
-regions. Coarse pointers receive enlarged hit areas without enlarging the marks.
+Each Section wire is its own acquisition surface: pressing within a quarter-width
+of either end drags that endpoint Pin, and pressing the middle translates the
+complete Section. No extra node chrome is drawn over the map.
 `Shift`-drag on any of these enters precision mode: reduced gain, quantized to
 the Nudge quantum, same gesture owner, one transaction on release. `Shift` +
 wheel nudges the exact object under the pointer — Current, a Pin, a Section
@@ -271,12 +274,13 @@ Every committed movement produces one directional transition between the
 displayed Frame and the next. Forward traversal moves the visible strip leftward
 and backward traversal moves it rightward, so frames enter through Tail or Lead,
 pass through Center as they become Current, and leave through the opposite side.
-Rapid same-direction movements compose as one continuing slideshow; a reversal
-turns cleanly. The three panes are animated distinctly so the direction and the
-handoff are readable: the trailing pane enters already bright because it now
-carries the address Center just left, and the leading pane fades up because its
-material was not previously visible. The transition never delays the semantic
-commit, and it never creates history.
+Rapid same-direction movements compose as one continuing sequence; a reversal
+turns cleanly. The cue is opacity only: the trailing pane is already settled
+because it now carries the address Center just left, and the leading pane rises
+into place because its material was not previously visible. The panes are not
+translated — nothing can actually slide between roles, and moving them read as a
+shake. The transition never delays the semantic commit, and it never creates
+history.
 
 Context beginning, moving, pausing, or settling reassigns neither side. Its Tail
 and Lead are the frozen observation edges, so materially different side frames
@@ -365,4 +369,5 @@ travelling transition.
 - Compact visible markers retain coarse-pointer touch targets.
 - Plain `Z` is Undo and plain `C` is Redo.
 - `,` and `.` nudge the selected map object, or Current when unambiguous.
+- Every increment control repeats while held and settles as one transaction.
 - Reduced-motion users receive settled Field Frames without directional travel.

@@ -76,7 +76,11 @@
 
 .step-pane-bar {
   position: relative;
-  z-index: 7;
+  /* This bar creates a stacking context, so its Tune popover is capped by this
+     value rather than by its own z-index. It must therefore out-rank
+     .center-transport-surface (z-index 8) or that full-bleed play/pause surface
+     paints over the popover and swallows every click meant for its inputs. */
+  z-index: 9;
   display: flex;
   min-height: var(--control-height);
   align-items: center;
@@ -441,74 +445,49 @@
 /* Directional Field transitions.
 
    Every committed movement produces one transition from the currently displayed
-   Frame to the next. The strip travels leftward on forward traversal and
-   rightward on backward traversal, and the semantic commit never waits for it:
-   Session has already changed when these classes appear.
+   Frame to the next, and the semantic commit never waits for it: Session has
+   already changed when these classes appear.
 
-   The three roles are animated distinctly rather than identically, because they
-   are doing different things. On forward traversal the trailing pane has just
-   received the address Center was showing, so it enters already bright — it is
-   carrying the outgoing frame. The leading pane is receiving material that was
-   not previously visible anywhere, so it fades up. Center sits between them.
-   That asymmetry is what makes the direction readable.
-
-   The panes cannot duplicate one another's video: three YouTube iframes cannot
-   be reparented without reloading, so the outgoing frame is handed to the
-   trailing side by seeking it there, not by moving a pixel surface. When Step
-   Reach matches the Field offset the trailing pane's new address is exactly the
-   address Center just left, and the handoff is literal. Otherwise it is
-   directional but not a frame-for-frame carousel. */
-.step-field {
-  --field-transition-ms: 300ms;
-  --field-travel: clamp(24px, 12%, 96px);
-}
-
-.step-field.is-traversing-forward,
-.step-field.is-traversing-backward {
-  overflow: hidden;
-}
-
+   The cue is opacity only. Translating the panes read as a shake rather than as
+   travel — three iframes cannot be reparented, so nothing can actually slide
+   between roles, and the movement bought nothing for the jitter it cost. What
+   remains is the one thing the roles genuinely differ in: on forward traversal
+   the trailing pane has just received the address Center was showing, so it is
+   already settled, while the leading pane is receiving material that was not
+   previously visible and rises into place. */
 .step-field.is-traversing-forward .step-pane,
 .step-field.is-traversing-backward .step-pane {
-  animation-duration: var(--field-transition-ms);
-  animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation-duration: var(--field-transition-ms, 260ms);
+  animation-timing-function: ease-out;
   animation-fill-mode: both;
 }
 
-.step-field.is-traversing-forward .tail-pane { animation-name: field-forward-trailing; }
-.step-field.is-traversing-forward .step-pane-center { animation-name: field-forward-center; }
-.step-field.is-traversing-forward .lead-pane { animation-name: field-forward-leading; }
-
-.step-field.is-traversing-backward .lead-pane { animation-name: field-backward-trailing; }
-.step-field.is-traversing-backward .step-pane-center { animation-name: field-backward-center; }
-.step-field.is-traversing-backward .tail-pane { animation-name: field-backward-leading; }
-
-/* Forward: the strip moves leftward, so every pane arrives from the right. */
-@keyframes field-forward-trailing {
-  from { transform: translateX(var(--field-travel)); opacity: 1; }
-  to { transform: translateX(0); opacity: 0.96; }
-}
-@keyframes field-forward-center {
-  from { transform: translateX(var(--field-travel)); opacity: 0.72; }
-  to { transform: translateX(0); opacity: 1; }
-}
-@keyframes field-forward-leading {
-  from { transform: translateX(var(--field-travel)); opacity: 0.28; }
-  to { transform: translateX(0); opacity: 1; }
+.step-field.is-traversing-forward .tail-pane,
+.step-field.is-traversing-backward .lead-pane {
+  animation-name: field-role-settled;
 }
 
-/* Backward: the strip moves rightward, so every pane arrives from the left. */
-@keyframes field-backward-trailing {
-  from { transform: translateX(calc(-1 * var(--field-travel))); opacity: 1; }
-  to { transform: translateX(0); opacity: 0.96; }
+.step-field.is-traversing-forward .step-pane-center,
+.step-field.is-traversing-backward .step-pane-center {
+  animation-name: field-role-center;
 }
-@keyframes field-backward-center {
-  from { transform: translateX(calc(-1 * var(--field-travel))); opacity: 0.72; }
-  to { transform: translateX(0); opacity: 1; }
+
+.step-field.is-traversing-forward .lead-pane,
+.step-field.is-traversing-backward .tail-pane {
+  animation-name: field-role-arriving;
 }
-@keyframes field-backward-leading {
-  from { transform: translateX(calc(-1 * var(--field-travel))); opacity: 0.28; }
-  to { transform: translateX(0); opacity: 1; }
+
+@keyframes field-role-settled {
+  from { opacity: 1; }
+  to { opacity: 0.96; }
+}
+@keyframes field-role-center {
+  from { opacity: 0.82; }
+  to { opacity: 1; }
+}
+@keyframes field-role-arriving {
+  from { opacity: 0.55; }
+  to { opacity: 1; }
 }
 
 /* The Field breathes between its inner and outer offsets during ordinary
@@ -549,6 +528,4 @@
   .step-field.is-traversing-backward .step-pane {
     animation: none;
   }
-  .step-field.is-traversing-forward,
-  .step-field.is-traversing-backward { overflow: visible; }
 }

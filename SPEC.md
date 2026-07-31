@@ -475,28 +475,34 @@ other.
 Preview, breathing, Context, and semantic state cannot overwrite one another's
 configuration.
 
-### Current drag as Go
+### Current drag and Nudge as Step
 
-Dragging Current is an exact Go gesture. It is not Pin movement and it does not
-require a new operator:
+Dragging or nudging Current is a Step gesture, not a Go. It moves Current by the
+gestured distance under Step's retained-anchor law, so the Working Interval
+extends or shortens from the traversal already established:
 
 ```text
-Current drag → candidate exact Address → release → one Go transaction
+Current drag → candidate Address → release → one Step transaction
 ```
+
+It is not Pin movement, and it does not draw a new Working Interval or a new
+Resolution around the landing point. A fresh neighbourhood is what an exact Go
+is for: clicking the Timeline, or choosing an exact Guide object.
 
 Pressing Current acquires the Current marker before the Timeline can interpret
 the gesture as generic Go. Crossing the drag threshold begins the candidate
 presentation. During the drag the Current marker follows the candidate Timeline
 position, the candidate is converted through the canonical Timeline Space
 inverse, Center displays the candidate frame, the Field displays the candidate
-Context Frame when Context is enabled and the candidate Go Frame otherwise, the
-original Current may remain as a faint departure marker, and Session Current
-remains unchanged.
+Context Frame when Context is enabled and the candidate operator Frame
+otherwise, the original Current may remain as a faint departure marker, and
+Session Current remains unchanged.
 
-On release, one exact Go is committed from the original Current to the candidate
-Current: one Working Interval, at most one Undo checkpoint, and one Field
-transition in the corresponding traversal direction. On cancellation the original
-Current presentation is restored and no semantic change or history is created. A
+On release, one Step of the gestured distance is committed: the retained
+departure is preserved when the interval's arrival is the departing Current, at
+most one Undo checkpoint is created, and the Field performs one transition in
+the corresponding traversal direction. On cancellation the original Current
+presentation is restored and no semantic change or history is created. A
 stationary press performs no movement.
 
 ### Nudge
@@ -516,14 +522,17 @@ movement happened; otherwise one Nudge resolves to the Address it started from
 and the operation is silently inert.
 
 Nudge acts in source time and is then reprojected. Section Weight must not change
-the temporal size of one Nudge.
+the temporal size of one Nudge. Nudging Current uses the same Step law as
+dragging it: the source-time quantum is converted to the equivalent Timeline
+distance at Current, so the traversal extends or shortens rather than being
+redrawn.
 
 Within the Timeline, `Shift` + wheel upward or rightward nudges forward and
 downward or leftward nudges backward. The target is the exact manipulable object
 under the pointer:
 
 ```text
-Current           → nudge Current through Go
+Current           → nudge Current through Step
 Pin               → nudge that Pin
 Section endpoint  → nudge that endpoint Pin
 Section midpoint  → translate the complete Section
@@ -788,7 +797,7 @@ Lead remains ahead of Center during breathing
 breathing offsets remain within effective [x, y] bounds
 a side waiting at a breathing boundary runs at Center rate
 Hold alone changes Stretching into Held
-dragging Current invokes Go
+dragging or nudging Current invokes Step, never Go
 Timeline direct manipulation and Guide exact editing call the same operation
 one drag, wheel series, or held-key nudge creates at most one Undo checkpoint
 fine Nudge acts in source time, not Timeline Space

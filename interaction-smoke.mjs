@@ -240,7 +240,8 @@ byId.get("sections-list").dispatch("change", { target: weightControl });
 await flush();
 const controlsAfterWeight = descendants(byId.get("sections-list"));
 assert.ok(controlsAfterWeight.some(node => node.dataset.sectionWeight));
-assert.ok(controlsAfterWeight.some(node => node.dataset.dragSection));
+assert.ok(controlsAfterWeight.some(node => node.dataset.addressInput === "section-start"),
+  "A selected Section keeps its exact Address controls across consecutive edits.");
 assert.match(
   controlsAfterWeight.find(node => node.dataset.sectionWeight).value,
   /0\.75/
@@ -306,13 +307,21 @@ assert.ok(
   descendants(byId.get("sections-list")).every(node => !node.dataset.pinDrag),
   "Guide must no longer own an independent drag geometry."
 );
-const timelineSectionNode = role => descendants(byId.get("section-lane"))
-  .find(node =>
-    node.dataset.sectionNode === role
-    && node.dataset.sectionId === quarterSectionId
-  );
-const independentEnd = timelineSectionNode("end");
-assert.ok(independentEnd, "The Timeline must expose one End acquisition region per Section.");
+// The Section wire is its own control: pressing near an end acquires that
+// endpoint Pin, pressing the middle translates the Section. No node chrome.
+const sectionWire = id => {
+  const wire = descendants(byId.get("section-lane"))
+    .find(node => node.dataset.sectionGo === id);
+  if (wire) wire.rect = { left: 250, width: 250 };
+  return wire;
+};
+assert.equal(
+  descendants(byId.get("section-lane")).some(node => node.dataset.sectionNode),
+  false,
+  "No separate Section node chrome may be drawn over the map."
+);
+const independentEnd = sectionWire(quarterSectionId);
+assert.ok(independentEnd, "The Section wire must be the acquisition surface.");
 byId.get("section-lane").dispatch("pointerdown", {
   target: independentEnd,
   clientX: 500,
@@ -440,8 +449,8 @@ assert.ok(
   selectedSectionNodes.some(node => node.dataset.addressInput === "section-start"),
   "A selected Guide Section must expose exact Start and End Address fields."
 );
-const startEndpoint = timelineSectionNode("start");
-assert.ok(startEndpoint, "The Timeline must expose one Start acquisition region per Section.");
+const startEndpoint = sectionWire(quarterSectionId);
+assert.ok(startEndpoint, "Pressing near the wire's Start acquires that endpoint Pin.");
 byId.get("section-lane").dispatch("pointerdown", {
   target: startEndpoint,
   clientX: 250,
@@ -488,15 +497,41 @@ assert.ok(
   descendants(byId.get("sections-list")).some(node => /0:25–0:50/.test(node.textContent)),
   "Undo must restore a committed Guide endpoint drag as one transaction."
 );
-const restoredEndpoint = descendants(byId.get("sections-list")).find(node =>
-  node.dataset.pinGo && node.dataset.dragSection
+// Guide exposes one compact Address line per object rather than a second
+// positional track and a stack of per-endpoint editors.
+const sectionAddressInputs = descendants(byId.get("sections-list"))
+  .filter(node => node.dataset.addressInput);
+assert.deepEqual(
+  sectionAddressInputs.map(node => node.dataset.addressInput),
+  ["section-start", "section-end"],
+  "A Section row exposes exactly its Start and End Addresses."
 );
-byId.get("sections-list").dispatch("click", { target: restoredEndpoint });
+assert.equal(
+  descendants(byId.get("sections-list")).some(node => node.className === "section-endpoints"),
+  false,
+  "The duplicate endpoint track is gone; the profile already shows position."
+);
+const startAddressInput = sectionAddressInputs[0];
+startAddressInput.value = "0:20";
+byId.get("sections-list").dispatch("change", { target: startAddressInput });
 await flush();
 assert.ok(
-  descendants(byId.get("sections-list")).some(node => node.dataset.sectionWeight),
-  "Going to a Section endpoint must retain the Section as the operational object."
+  descendants(byId.get("sections-list")).some(node => /0:20–0:50/.test(node.textContent)),
+  "An exact Address edit commits the same extent the Timeline drag would."
 );
+assert.ok(
+  descendants(byId.get("sections-list")).some(node => node.dataset.sectionWeight),
+  "Exact editing must retain the Section as the operational object."
+);
+dispatchDocument("keydown", { key: "z", code: "KeyZ" });
+await flush();
+// Return Current to the Start Pin so the following Timeline Pin Go spans the
+// Section's full extent, exactly as clicking a Guide endpoint used to.
+const startPinMarker = descendants(byId.get("pin-lane"))
+  .find(node => node.dataset.pinGo && /0:25/.test(node["aria-label"] || ""));
+byId.get("pin-lane").dispatch("click", { target: startPinMarker });
+await flush();
+assert.equal(currentText(), "Current 0:25");
 
 // A stationary Timeline Pin gesture is exact Go; it does not become a manual
 // selection mode. Its centered drag acquisition remains dormant below threshold.
@@ -539,8 +574,8 @@ assert.ok(
   selectedSectionNodes.every(node => !node.dataset.sectionDrag),
   "Guide's full-map profile is a read-only positional representation."
 );
-const sectionProfile = timelineSectionNode("midpoint");
-assert.ok(sectionProfile, "The Timeline midpoint node translates the complete Section.");
+const sectionProfile = sectionWire(quarterSectionId);
+assert.ok(sectionProfile, "Pressing the wire's middle translates the complete Section.");
 byId.get("section-lane").dispatch("pointerdown", {
   target: sectionProfile,
   clientX: 375,
