@@ -1077,13 +1077,13 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     renderTimelinePins();
   }
 
-  function renderActionPreview(previewResult, structural) {
+  function renderActionPreview(previewResult, structural, kind = previewAction) {
     const predicted = previewResult?.changed
       ? previewResult.session.model
       : null;
     const previewResolution = predicted?.resolution || null;
-    const removedInterval = previewAction === "release" ? interval() : null;
-    const structuralExtent = structural?.[previewAction] || null;
+    const removedInterval = kind === "release" ? interval() : null;
+    const structuralExtent = structural?.[kind] || null;
     const previewInterval = predicted?.interval || removedInterval || structuralExtent;
 
     elements["preview-resolution-fill"].hidden = !previewResolution;
@@ -1096,7 +1096,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       );
     }
     if (previewInterval) {
-      elements["action-preview-fill"].dataset.kind = previewAction;
+      elements["action-preview-fill"].dataset.kind = kind;
       if (removedInterval) elements["action-preview-fill"].dataset.effect = "remove";
       else elements["action-preview-fill"].removeAttribute("data-effect");
       setSegment(
@@ -1207,7 +1207,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           projectedModel.interval.end
         );
       }
-      if (livePlayback) {
+      // A Step target answers "where would a Step land". While a Step is
+      // actually being performed — held on a control or key, or dragged out on
+      // Current — that question is being answered by the movement itself
+      // several times a second, and two recomputed markers streaking across the
+      // map read as artifacts rather than as information. They stand down for
+      // the gesture exactly as they already do during live playback.
+      const performingStep = state().stepGestureActive === true
+        || state().currentDrag?.moved === true;
+      if (livePlayback || performingStep) {
         elements["backward-target-marker"].hidden = true;
         elements["forward-target-marker"].hidden = true;
       } else {
@@ -1258,7 +1266,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     }
 
     if (state().videoLoaded && currentResolution) {
-      const showCursor = moving || physicallyDisplaced;
+      // A Current drag seeks the player to the candidate, so the Cursor would
+      // track the Current marker exactly and draw a second marker underneath
+      // it. Cursor reports observation that has left Current; during the drag
+      // it has not, so there is nothing for it to report.
+      const showCursor = (moving || physicallyDisplaced)
+        && !state().currentDrag?.moved;
       elements["cursor-marker"].hidden = !showCursor;
       if (showCursor) setMarkerPosition(elements["cursor-marker"], cursor);
     } else {
@@ -1338,12 +1351,48 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? "backward"
       : "forward";
     const previewPin = previewDirection === "backward" ? previous : next;
-    const previewResult = resolvedPreviewAction
-      ? previewTransition(currentState.session, resolvedPreviewAction, {
-          seconds: effectiveReach[previewDirection],
-          destination: previewPin?.t
-        })
+    // Dragging Current commits a Step, so the drag must show the Step it will
+    // commit. Without this the Working Interval and the neighbourhood stand
+    // still under a moving marker and then jump on release, which reads as the
+    // gesture doing something other than what it does.
+    const activeCurrentDrag = currentState.currentDrag?.moved
+      ? currentState.currentDrag
       : null;
+    const dragProjection = activeCurrentDrag?.projection || projection;
+    const dragDistance = activeCurrentDrag
+      ? Math.abs(
+          dragProjection.sourceToTimeline(activeCurrentDrag.candidate)
+          - dragProjection.sourceToTimeline(activeCurrentDrag.originSource)
+        )
+      : 0;
+    const dragAction = activeCurrentDrag && dragDistance > EPSILON
+      ? (
+          activeCurrentDrag.candidate < activeCurrentDrag.originSource
+            ? "stepBackward"
+            : "stepForward"
+        )
+      : null;
+    // Pressing a Step control focuses it, and focus legitimately arms the
+    // operator preview — so a held Step would otherwise draw the whole
+    // predictive apparatus, five markers and two extents, and recompute all of
+    // it on every repeat. An operator preview answers "what would this do";
+    // while the operator is running, the movement is answering that several
+    // times a second. It stands down for the gesture, exactly as the Step
+    // targets and Cursor do.
+    const performingStepGesture = currentState.stepGestureActive === true;
+    const armedPreviewAction = performingStepGesture ? null : resolvedPreviewAction;
+    const previewResult = dragAction
+      ? previewTransition(currentState.session, dragAction, {
+          seconds: dragDistance
+        })
+      : armedPreviewAction
+        ? previewTransition(currentState.session, armedPreviewAction, {
+            seconds: effectiveReach[previewDirection],
+            destination: previewPin?.t
+          })
+        : null;
+    const previewKind = dragAction
+      || (performingStepGesture ? null : previewAction);
     const focused = focusedProjection();
 
     elements["timeline-current-time"].textContent = formatTime(semanticCurrent);
@@ -1708,9 +1757,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     setMarkerPosition(elements["range-start-handle"], activeRange.start);
     setMarkerPosition(elements["range-end-handle"], activeRange.end);
 
-    // Dragging Current is an exact Go gesture: the marker follows the candidate
-    // Address while the original Current stays as a faint departure marker and
-    // Session Current remains unchanged until release.
+    // Dragging Current commits a Step: the marker follows the candidate
+    // Address, the departure it extends or shortens from stays as a faint
+    // marker, the previewed Interval and neighbourhood show the Step that
+    // will land, and Session Current remains unchanged until release.
     const currentDrag = state().currentDrag;
     const dragging = Boolean(currentDrag?.moved);
     const candidate = dragging ? currentDrag.candidate : semanticCurrent;
@@ -1748,7 +1798,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["field-span-fill"].hidden = !fieldSpan;
     if (fieldSpan) setSegment(elements["field-span-fill"], fieldSpan.start, fieldSpan.end);
     renderSectionPreview();
-    renderActionPreview(previewResult, structuralPresentation);
+    renderActionPreview(previewResult, structuralPresentation, previewKind);
     renderTimelinePins();
     renderTransport();
   }

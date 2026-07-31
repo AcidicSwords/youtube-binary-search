@@ -236,9 +236,14 @@ const state = {
   shiftLayer: false,
   shiftKeyHeld: false,
   field: null,
-  // Direct manipulation of Current on the Temporal Topography. It is an exact
-  // Go gesture, not a Pin move, and it owns the Field Frame while it runs.
+  // Direct manipulation of Current on the Temporal Topography. It commits a
+  // Step, not a Go and not a Pin move, and it owns the Field Frame while it runs.
   currentDrag: null,
+  // True while a Step gesture is being held. Predictive chrome stands down for
+  // the duration: a destination marker is an answer to "where would this go",
+  // and while the gesture runs that question is being answered by the movement
+  // itself, several times a second.
+  stepGestureActive: false,
   // The exact Frame supplied by whichever direct manipulation is active.
   directFrame: null,
   // One wheel series or held-key repetition settles as one Undo transaction.
@@ -1092,6 +1097,7 @@ function deferPendingStepCompletion(options = {}) {
 
 function setStepGesturePresentation({ active, selection }) {
   const direction = active ? selection?.direction : null;
+  state.stepGestureActive = Boolean(active);
   for (const [id, controlDirection] of [
     ["step-backward", "backward"],
     ["tail-player-surface", "backward"],
@@ -1106,14 +1112,29 @@ function setStepGesturePresentation({ active, selection }) {
 }
 
 stepGesture = createStepGestureController({
-  perform: selection => performStep(
-    selection.direction,
-    selection.distance,
-    {
-      waitForGestureEnd: true,
-      carryRetained: selection.carryRetained === true
+  // The Shift layer turns Step into Pin traversal, and a pressed control must
+  // mean exactly what the same operator means from the keyboard. Traversal is a
+  // discrete jump between retained landmarks: one press, one Pin, one
+  // checkpoint. Reporting no ongoing gesture publishes no repeat cadence, so a
+  // held button never walks the Guide at Step speed, and the synthesized click
+  // is suppressed so one press cannot traverse twice.
+  perform: selection => {
+    if (selection.pinTraversal) {
+      traverseToAdjacentPin(
+        selection.direction,
+        selection.carryRetained === true
+      );
+      return false;
     }
-  ),
+    return performStep(
+      selection.direction,
+      selection.distance,
+      {
+        waitForGestureEnd: true,
+        carryRetained: selection.carryRetained === true
+      }
+    );
+  },
   finish: detail => {
     if (detail.defer && detail.effect && detail.repeats === 0) {
       deferPendingStepCompletion({ observe: detail.observe });
@@ -2208,6 +2229,19 @@ function goToAdjacentPin(direction, options = {}) {
   return accepted;
 }
 
+// Pin traversal is reachable from a keyboard chord, a pressed matrix control,
+// and a click. The Shift layer is a one-shot modifier that every operator
+// honouring it consumes, so all three arrive here rather than each remembering
+// to consume it themselves.
+function traverseToAdjacentPin(direction, carryRetained = false) {
+  const changed = goToAdjacentPin(direction, { carryRetained });
+  if (state.shiftLayer) {
+    state.shiftLayer = false;
+    view.render();
+  }
+  return changed;
+}
+
 function selectSectionAsWorkingInterval(sectionId, options = {}) {
   const section = resolveSection(guide(), sectionId);
   if (!section) return;
@@ -2638,6 +2672,25 @@ function updatePinSnapTarget(drag, target) {
   }, PIN_SNAP_ARM_MS);
 }
 
+// A focused extent is the world, and its own boundary cannot be moved from
+// inside it. Dragging such a Pin could only ever pull the boundary inward,
+// because the Range it defines is simultaneously the limit the drag clamps to,
+// and every move re-normalizes the drawn map underneath the finger. Refusing
+// the gesture is the honest answer: Unfocus first, or edit the Address in the
+// Guide, where the same change is an exact edit rather than a spatial one.
+function composesFocusedRange(pin, section) {
+  if (!model().focus) return false;
+  const range = activeRange();
+  const onBoundary = address => Number.isFinite(address)
+    && (
+      Math.abs(address - range.start) <= EPSILON
+      || Math.abs(address - range.end) <= EPSILON
+    );
+  if (pin) return onBoundary(pin.t);
+  if (section) return onBoundary(section.start) || onBoundary(section.end);
+  return false;
+}
+
 function beginGuideDrag(kind, id, event, options = {}) {
   if (
     !state.videoLoaded
@@ -2648,6 +2701,12 @@ function beginGuideDrag(kind, id, event, options = {}) {
   const pin = kind === "pin" ? getPin(guide(), id) : null;
   const section = kind === "section" ? resolveSection(guide(), id) : null;
   if (!pin && !section) return;
+  if (composesFocusedRange(pin, section)) {
+    setStatus(
+      "Focus made this the world; Unfocus to move the boundary that defines it."
+    );
+    return;
+  }
   const timelineSurface = elements.timeline.contains?.(event.target);
   const surface = options.surface || (timelineSurface ? "timeline" : "relative");
   const timelineWidth = elements.timeline.getBoundingClientRect().width;
@@ -4219,14 +4278,10 @@ elements["center-transport-surface"].addEventListener("click", toggleNativePlayb
 const tapStep = selection => {
   if (!selection) return false;
   if (selection.pinTraversal) {
-    const changed = goToAdjacentPin(selection.direction, {
-      carryRetained: selection.carryRetained === true
-    });
-    if (state.shiftLayer) {
-      state.shiftLayer = false;
-      view.render();
-    }
-    return changed;
+    return traverseToAdjacentPin(
+      selection.direction,
+      selection.carryRetained === true
+    );
   }
   return performStep(selection.direction, selection.distance, {
     carryRetained: selection.carryRetained === true
@@ -4865,7 +4920,7 @@ document.addEventListener("keydown", event => {
     && event.key === "ArrowLeft"
   )) {
     event.preventDefault();
-    goToAdjacentPin("backward", { carryRetained: event.altKey === true });
+    traverseToAdjacentPin("backward", event.altKey === true);
   }
   else if (shiftedSpatialKey("d") || (
     event.shiftKey
@@ -4874,7 +4929,7 @@ document.addEventListener("keydown", event => {
     && event.key === "ArrowRight"
   )) {
     event.preventDefault();
-    goToAdjacentPin("forward", { carryRetained: event.altKey === true });
+    traverseToAdjacentPin("forward", event.altKey === true);
   }
   else if (
     (plain || carryChord)

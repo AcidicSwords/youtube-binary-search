@@ -39,6 +39,27 @@ assert.equal(
   80,
   "Held Step must move the visible Center on each repeat, not only its semantic marker."
 );
+// Predictive chrome answers "what would this do" and "where would it land".
+// While the operator is being performed several times a second, the movement
+// itself is answering, and every one of these elements recomputes on every
+// repeat -- which is what drew streaks across the map. Pressing the control
+// also focuses it, and focus arms the operator preview, so the whole
+// predictive apparatus must be checked, not only the Step targets.
+assert.deepEqual(
+  [
+    "backward-target-marker",
+    "forward-target-marker",
+    "preview-resolution-fill",
+    "action-preview-fill",
+    "preview-resolution-start-marker",
+    "preview-resolution-end-marker",
+    "preview-backward-target-marker",
+    "preview-forward-target-marker",
+    "preview-current-marker"
+  ].filter(id => byId.get(id).hidden !== true),
+  [],
+  "No predictive chrome may be drawn while a Step gesture is running."
+);
 
 const sidePlacesBeforeRelease = {
   center: env.center().commands.filter(command => command[0] === "place").length,
@@ -48,6 +69,8 @@ const sidePlacesBeforeRelease = {
 dispatchDocument("pointerup", { button: 0, pointerId: 7 });
 await flush();
 assert.equal(forward.classList.contains("is-step-held"), false);
+assert.equal(byId.get("forward-target-marker").hidden, false,
+  "Releasing the gesture restores the Step targets.");
 assert.equal(env.center().currentTime, 80);
 assert.equal(
   env.center().commands.filter(command => command[0] === "place").length,

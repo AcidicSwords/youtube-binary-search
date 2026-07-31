@@ -239,6 +239,8 @@ Previous/Next Pin stops.
 
 ## Focus and playback
 
+While an extent is focused, the Pins that compose its boundary cannot be dragged on the Timeline. Such a drag could only ever pull the boundary inward — the Range it defines is simultaneously the limit the drag clamps to — and every move would re-normalize the drawn map under the finger, destroying the sense of scale Focus exists to give. Unfocus to move it spatially, or edit the Address in the Guide, where the same change is exact rather than spatial.
+
 Focus clamps Range without changing any Section weight, and draws the map across the focused extent alone: a focused Section or Working Interval spans the whole timeline whatever its Weight, and its interior still warps according to the Weights inside it. Everything outside the focused extent is not drawn, so nothing piles against the edges. Pressing and dragging use the same drawn map, so a pressed position always addresses what is under it. Unfocus restores the containing Range and the whole map.
 
 Native playback loops when Range is a proper subset of the video. There is no separate Loop operator. Playback remains source-contiguous and always uses media runtime rate, never Section weight.

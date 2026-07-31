@@ -104,8 +104,22 @@ export class FakeElement {
     else this[name] = String(value);
   }
   removeAttribute(name) { delete this[name]; }
-  focus() { globalThis.document.activeElement = this; }
-  blur() { globalThis.document.activeElement = null; }
+  // Focus and blur must actually notify. A pressed control focuses itself, and
+  // interface state is legitimately armed from focus, so a harness that moved
+  // activeElement silently could not observe anything a real press causes
+  // through that path.
+  focus() {
+    const previous = globalThis.document.activeElement;
+    if (previous === this) return;
+    globalThis.document.activeElement = this;
+    previous?.dispatch?.("blur", { target: previous });
+    this.dispatch("focus", { target: this });
+  }
+  blur() {
+    if (globalThis.document.activeElement !== this) return;
+    globalThis.document.activeElement = null;
+    this.dispatch("blur", { target: this });
+  }
   scrollIntoView() {}
   setPointerCapture() {}
   showModal() { this.open = true; this.hidden = false; }

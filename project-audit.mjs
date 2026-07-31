@@ -166,6 +166,18 @@ assert.match(view, /function pinPositionButton[\s\S]*className\s*=\s*"endpoint-b
 assert.doesNotMatch(view, /dataset\.sectionDrag/,
   "Guide's full-map profile is a read-only positional representation.");
 assert.match(styles, /\.pin-position-track[\s\S]*height:\s*43px[\s\S]*margin:\s*0 10px 9px/);
+// Guide's position node reports where a Pin sits and Goes to it. It owns no
+// drag geometry, so it must not offer a drag affordance it cannot honour, and
+// must not claim the touch stream for a gesture it never handles — doing so
+// left it unable to scroll or be tapped on touch devices.
+{
+  const endpointRule = styles.match(/\.endpoint-button\s*\{([\s\S]*?)\}/)?.[1];
+  assert.ok(endpointRule, "The Guide position node must keep a style rule.");
+  assert.doesNotMatch(endpointRule, /touch-action/,
+    "A control with no pointer gesture must not claim the touch stream.");
+  assert.doesNotMatch(endpointRule, /cursor:\s*(ew-resize|col-resize|grab|move)/,
+    "A read-only position node must not present a drag cursor.");
+}
 // Guide is the exact editor: Address inputs plus the shared Nudge increments.
 assert.match(view, /function addressControl\([\s\S]*dataset\.addressInput/);
 assert.match(view, /function nudgeButton\([\s\S]*dataset\.nudgeTarget/);
