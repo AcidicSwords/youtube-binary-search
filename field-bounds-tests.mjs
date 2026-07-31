@@ -91,10 +91,11 @@ function makeControllerHarness() {
     current: 50,
     range: { start: 0, end: 100 },
     stepReach: { backward: 10, forward: 10, linked: true },
+    fieldBreath: { inner: 2, outer: 10, rate: 0.5 },
     transportKind: "idle",
     pendingStep: false,
     dragging: false,
-    center: { time: 50, rate: 1, state: YOUTUBE_STATE.PAUSED, availableRates: [0.5, 1, 2] }
+    center: { time: 50, rate: 1, state: YOUTUBE_STATE.PAUSED, availableRates: [0.5, 1, 1.5, 2] }
   };
 
   function createPlayer(id, config) {
@@ -115,7 +116,7 @@ function makeControllerHarness() {
       play() { commands.push(["play"]); state = YOUTUBE_STATE.PLAYING; config.events.onStateChange?.(state); },
       pause() { commands.push(["pause"]); state = YOUTUBE_STATE.PAUSED; },
       setRate(value) { commands.push(["rate", value]); rate = value; config.events.onPlaybackRateChange?.(value); },
-      read() { return { time, rate, state, availableRates: [0.5, 1, 2] }; },
+      read() { return { time, rate, state, availableRates: [0.5, 1, 1.5, 2] }; },
       raw() { return { getIframe: () => ({ setAttribute() {} }) }; }
     };
     adapters.set(id, adapter);
@@ -149,9 +150,10 @@ function makeControllerHarness() {
     assert.equal(harness.adapters.get("player-lead").read().time, 60, "Paused Lead must display its represented forward Step frame.");
     assert.equal(harness.controller.snapshot().phase, STEP_FIELD_PHASE.HELD);
 
-    harness.controller.stretch("tail");
+    harness.controller.stretch("both");
     assert.equal(harness.controller.snapshot().tailMode, FIELD_SIDE_MODE.STRETCHING);
-    assert.equal(harness.adapters.get("player-tail").read().time, 50, "Stretch snaps Tail to Current.");
+    assert.equal(harness.adapters.get("player-tail").read().time, 40,
+      "Stretch resumes the breath from its attained relation, never crossing Center.");
 
     harness.snapshot = {
       ...harness.snapshot,
@@ -161,10 +163,20 @@ function makeControllerHarness() {
     harness.controller.tick();
     const tailCommands = harness.adapters.get("player-tail").commands;
     assert.ok(tailCommands.some(command => command[0] === "play"), "Native Center playback starts the muted Tail.");
-    assert.ok(tailCommands.some(command => command[0] === "rate" && command[1] === 0.5), "Tail requests a supported slow rate after priming.");
+    // Stretch resumed at the attained outer bound, so both sides arrive at the
+    // outer synchronization barrier at once and the Field contracts.
+    assert.equal(harness.controller.breath().phase, "contracting");
+    assert.ok(
+      tailCommands.some(command => command[0] === "rate" && command[1] > 1),
+      "Contraction gives Tail the faster rate so it catches Center while remaining behind it."
+    );
+    assert.ok(
+      harness.adapters.get("player-tail").read().time < 50,
+      "Tail remains behind Center throughout the breath."
+    );
 
     harness.adapters.get("player-tail").place(47);
-    harness.controller.hold("tail");
+    harness.controller.hold("both");
     assert.equal(harness.controller.snapshot().tailMode, FIELD_SIDE_MODE.HELD);
 
     const tailStep = harness.controller.getStepSelection("tail");
@@ -180,7 +192,6 @@ function makeControllerHarness() {
       tail: harness.controller.snapshot().tailMode,
       lead: harness.controller.snapshot().leadMode
     };
-    harness.elements.get("tail-field-toggle").click();
     harness.elements.get("field-both-toggle").click();
     assert.deepEqual(
       {
@@ -190,7 +201,6 @@ function makeControllerHarness() {
       suspendedModes,
       "Hold/Stretch controls must not reinterpret a transient Context cursor."
     );
-    assert.equal(harness.elements.get("tail-field-toggle").disabled, true);
     assert.equal(harness.elements.get("field-both-toggle").disabled, true);
 
     harness.snapshot = {

@@ -16,11 +16,21 @@ assert.equal(byId.get("duration-time").textContent, "1:40");
 
 // Tune rejects an empty/invalid Offset without silently converting it to the
 // minimum or leaving the field showing a value the model did not accept.
-byId.get("step-backward-seconds").value = "";
-byId.get("step-backward-seconds").dispatch("change");
+byId.get("field-outer-offset").value = "";
+byId.get("field-outer-offset").dispatch("change");
 await flush();
-assert.equal(byId.get("step-backward-seconds").value, "10");
+assert.equal(byId.get("field-outer-offset").value, "10");
 assert.match(byId.get("status").textContent, /positive number/);
+
+// 0 < inner < outer holds against the sibling bound.
+byId.get("field-inner-offset").value = "40";
+byId.get("field-inner-offset").dispatch("change");
+await flush();
+assert.equal(byId.get("field-inner-offset").value, "10",
+  "The inner offset can never exceed the outer offset.");
+byId.get("field-inner-offset").value = "2.5";
+byId.get("field-inner-offset").dispatch("change");
+await flush();
 
 // Keep this smoke focused on direct interaction; automatic Context has its own
 // dedicated smoke test.
@@ -45,21 +55,21 @@ await poll();
 await flush(3);
 const previewTail = env.tail();
 const previewLead = env.lead();
-assert.equal(byId.get("field-transport-state").textContent, "Step preview");
+assert.equal(byId.get("field-transport-state").textContent, "Step Frame");
 assert.equal(previewTail.currentTime, 0);
 assert.equal(previewLead.currentTime, 10);
 byId.get("refine-forward").click();
 await flush();
 await poll();
 assert.equal(currentText(), "Current 0:50");
-assert.equal(byId.get("field-transport-state").textContent, "Refine preview");
+assert.equal(byId.get("field-transport-state").textContent, "Refine Frame");
 assert.equal(previewTail.currentTime, 25);
 assert.equal(previewLead.currentTime, 75);
 byId.get("refine-forward").click();
 await flush();
 await poll();
 assert.equal(currentText(), "Current 1:15");
-assert.equal(byId.get("field-transport-state").textContent, "Refine preview");
+assert.equal(byId.get("field-transport-state").textContent, "Refine Frame");
 assert.equal(previewTail.currentTime, 37.5);
 assert.equal(previewLead.currentTime, 87.5);
 byId.get("return-action").click();
@@ -77,7 +87,7 @@ assert.equal(currentText(), "Current 0:10");
 byId.get("reopen").click();
 await flush();
 await poll();
-assert.equal(byId.get("field-transport-state").textContent, "Reopen preview");
+assert.equal(byId.get("field-transport-state").textContent, "Reopen Frame");
 assert.equal(previewTail.currentTime, 5);
 assert.equal(previewLead.currentTime, 55);
 byId.get("return-action").click();
@@ -85,7 +95,7 @@ byId.get("return-action").click();
 await flush();
 await poll();
 assert.equal(currentText(), "Current 0:00");
-assert.equal(byId.get("field-transport-state").textContent, "Step preview");
+assert.equal(byId.get("field-transport-state").textContent, "Step Frame");
 assert.equal(previewTail.currentTime, 0);
 assert.equal(previewLead.currentTime, 10);
 
@@ -268,15 +278,22 @@ assert.equal(byId.get("guide-dialog-title").textContent, "Unlink End Pin");
 byId.get("guide-dialog-form").dispatch("submit");
 await flush();
 assert.equal(byId.get("pins-list-count").textContent, "4");
-const independentEnd = descendants(byId.get("sections-list"))
+// Spatial direct manipulation belongs to the Temporal Topography. Guide exposes
+// the same endpoint as an exact address, never as a second drag geometry.
+const quarterSectionId = descendants(guideItemNamed("Quarter to middle"))
+  .find(node => node.dataset.sectionGo).dataset.sectionGo;
+assert.ok(
+  descendants(byId.get("sections-list")).every(node => !node.dataset.pinDrag),
+  "Guide must no longer own an independent drag geometry."
+);
+const timelineSectionNode = role => descendants(byId.get("section-lane"))
   .find(node =>
-    node.dataset.pinDrag
-    && node.dataset.dragSection
-    && /^End Pin/.test(node["aria-label"] || "")
+    node.dataset.sectionNode === role
+    && node.dataset.sectionId === quarterSectionId
   );
-assert.ok(independentEnd, "Unlink must leave the independent endpoint directly draggable.");
-independentEnd.closest(".section-endpoints").clientWidth = 500;
-byId.get("sections-list").dispatch("pointerdown", {
+const independentEnd = timelineSectionNode("end");
+assert.ok(independentEnd, "The Timeline must expose one End acquisition region per Section.");
+byId.get("section-lane").dispatch("pointerdown", {
   target: independentEnd,
   clientX: 500,
   pointerId: 62,
@@ -369,7 +386,7 @@ await flush(4);
 assert.ok(players.has("player-tail") && players.has("player-lead"));
 const tail = env.tail();
 const lead = env.lead();
-assert.equal(byId.get("field-transport-state").textContent, "Section preview");
+assert.equal(byId.get("field-transport-state").textContent, "Section Frame");
 assert.equal(tail.currentTime, 25, "Tail must preview the selected Section start.");
 assert.equal(lead.currentTime, 50, "Lead must preview the selected Section end.");
 assert.equal(byId.get("center-transport-surface").disabled, false);
@@ -399,27 +416,28 @@ assert.equal(
   "Working Interval bounds aligned with Pins must select both endpoint Pins."
 );
 let selectedSectionNodes = descendants(byId.get("sections-list"));
-const startEndpoint = selectedSectionNodes.find(node =>
-  node.dataset.pinDrag && node.dataset.dragSection
+assert.ok(
+  selectedSectionNodes.some(node => node.dataset.addressInput === "section-start"),
+  "A selected Guide Section must expose exact Start and End Address fields."
 );
-assert.ok(startEndpoint, "A selected Guide Section must expose draggable endpoint nodes.");
-startEndpoint.closest(".section-endpoints").clientWidth = 500;
-byId.get("sections-list").dispatch("pointerdown", {
+const startEndpoint = timelineSectionNode("start");
+assert.ok(startEndpoint, "The Timeline must expose one Start acquisition region per Section.");
+byId.get("section-lane").dispatch("pointerdown", {
   target: startEndpoint,
-  clientX: 500,
+  clientX: 250,
   pointerId: 41,
   button: 0,
   buttons: 1
 });
 dispatchDocument("pointermove", {
   target: startEndpoint,
-  clientX: 450,
+  clientX: 150,
   pointerId: 41,
   button: 0,
   buttons: 1
 });
 await flush();
-assert.equal(byId.get("field-transport-state").textContent, "Section preview");
+assert.equal(byId.get("field-transport-state").textContent, "Section Frame");
 assert.equal(byId.get("field-span-label").textContent, "0:15–0:50");
 assert.match(
   byId.get("section-window").textContent,
@@ -431,13 +449,13 @@ assert.equal(center.currentTime, 32.5);
 assert.equal(lead.currentTime, 50);
 assert.ok(
   descendants(byId.get("sections-list")).some(node => /0:15–0:50/.test(node.textContent)),
-  "Guide endpoint drag distance must be proportional to the Guide row."
+  "Guide must reproject the extent that the Timeline gesture produced."
 );
 dispatchDocument("pointerup", { target: startEndpoint, pointerId: 41 });
 await flush();
 assert.equal(
   byId.get("field-transport-state").textContent,
-  "Step preview",
+  "Step Frame",
   "After an endpoint edit displaces the retained midpoint from Current, the Viewer must return to Current-centered Step."
 );
 assert.ok(
@@ -451,7 +469,7 @@ assert.ok(
   "Undo must restore a committed Guide endpoint drag as one transaction."
 );
 const restoredEndpoint = descendants(byId.get("sections-list")).find(node =>
-  node.dataset.pinDrag && node.dataset.dragSection
+  node.dataset.pinGo && node.dataset.dragSection
 );
 byId.get("sections-list").dispatch("click", { target: restoredEndpoint });
 await flush();
@@ -497,25 +515,28 @@ selectedSectionMain = descendants(byId.get("sections-list"))
 byId.get("sections-list").dispatch("click", { target: selectedSectionMain });
 await flush();
 selectedSectionNodes = descendants(byId.get("sections-list"));
-const sectionProfile = selectedSectionNodes.find(node => node.dataset.sectionDrag);
-assert.ok(sectionProfile, "Guide must expose a whole-Section drag surface.");
-sectionProfile.closest(".guide-item").clientWidth = 500;
-byId.get("sections-list").dispatch("pointerdown", {
+assert.ok(
+  selectedSectionNodes.every(node => !node.dataset.sectionDrag),
+  "Guide's full-map profile is a read-only positional representation."
+);
+const sectionProfile = timelineSectionNode("midpoint");
+assert.ok(sectionProfile, "The Timeline midpoint node translates the complete Section.");
+byId.get("section-lane").dispatch("pointerdown", {
   target: sectionProfile,
-  clientX: 500,
+  clientX: 375,
   pointerId: 42,
   button: 0,
   buttons: 1
 });
 dispatchDocument("pointermove", {
   target: sectionProfile,
-  clientX: 550,
+  clientX: 475,
   pointerId: 42,
   button: 0,
   buttons: 1
 });
 await flush();
-assert.equal(byId.get("field-transport-state").textContent, "Section preview");
+assert.equal(byId.get("field-transport-state").textContent, "Section Frame");
 assert.equal(byId.get("field-span-label").textContent, "0:35–1:00");
 assert.match(
   byId.get("section-window").textContent,
@@ -527,7 +548,7 @@ assert.equal(center.currentTime, 47.5);
 assert.equal(lead.currentTime, 60);
 dispatchDocument("pointercancel", { target: sectionProfile, pointerId: 42 });
 await flush();
-assert.equal(byId.get("field-transport-state").textContent, "Section preview");
+assert.equal(byId.get("field-transport-state").textContent, "Section Frame");
 assert.equal(tail.currentTime, 25);
 assert.equal(lead.currentTime, 50);
 assert.ok(
@@ -567,8 +588,8 @@ byId.get("center-transport-surface").click();
 assert.equal(center.commands.filter(command => command[0] === "play").length, playCounts.center + 1);
 assert.equal(tail.commands.filter(command => command[0] === "play").length, playCounts.tail + 1);
 assert.equal(lead.commands.filter(command => command[0] === "play").length, playCounts.lead + 1);
-assert.deepEqual(tail.commands.slice(-2).map(command => command[0]), ["place", "play"], "Activated Tail must refold to Center before it plays.");
-assert.deepEqual(lead.commands.slice(-2).map(command => command[0]), ["place", "play"], "Activated Lead must refold to Center before it plays.");
+assert.deepEqual(tail.commands.slice(-2).map(command => command[0]), ["place", "play"], "Activated Tail must start its breath behind Center.");
+assert.deepEqual(lead.commands.slice(-2).map(command => command[0]), ["place", "play"], "Activated Lead must start its breath ahead of Center.");
 await flush();
 assert.equal(byId.get("center-transport-surface").hidden, true, "Native Center controls must be exposed while ordinary playback is running.");
 
@@ -580,28 +601,30 @@ for (let elapsed = 1; elapsed <= 8; elapsed += 1) {
   lead.currentTime = 50 + elapsed * 2;
   await poll();
 }
-assert.equal(tail.rate, 0.5, "Tail must use its confirmed sub-1x rate while stretching.");
-assert.equal(lead.rate, 2, "Lead must use its confirmed supra-1x rate while stretching.");
-assert.equal(byId.get("tail-offset-state").textContent, "4s / 10s");
-assert.equal(byId.get("lead-offset-state").textContent, "8s / 10s");
+// The Field breathes outward from its inner offset: Tail falls behind Center at
+// z < c while Lead advances at w > c, and both stay inside [x, y].
+assert.equal(tail.rate, 0.5, "Expansion applies the outward Tail rate z < c.");
+assert.equal(lead.rate, 1.5, "Expansion applies the outward Lead rate w > c.");
+assert.equal(byId.get("tail-offset-state").textContent, "6s in 2.5s–10s");
+assert.equal(byId.get("lead-offset-state").textContent, "6s in 2.5s–10s");
+assert.equal(byId.get("field-transport-state").textContent, "Breathing out");
 assert.equal(byId.get("section-window").textContent, intervalBeforeStretch,
-  "Stretch progression must never rewrite the semantic Interval.");
+  "Breathing must never rewrite the semantic Interval.");
 
-byId.get("tail-field-toggle").click(); // Stretch -> Hold at 4 s
+// Hold alone stops the cycle. It preserves the attained relation, sets every
+// held side to Center rate, and writes no configuration and no Session state.
+byId.get("field-both-toggle").click();
 await flush();
-assert.equal(center.state, 1, "Holding a side must not interrupt Center playback.");
-assert.equal(tail.rate, 1, "Held Tail must match Center at 1x.");
-assert.equal(byId.get("step-backward-seconds").value, "10", "Explicit Hold must not overwrite configured Tail Offset.");
+assert.equal(center.state, 1, "Holding the Field must not interrupt Center playback.");
+assert.equal(tail.rate, 1, "Every held side matches Center at 1x.");
+assert.equal(lead.rate, 1);
+assert.equal(byId.get("field-both-toggle-label").textContent, "Stretch both");
+assert.equal(byId.get("field-transport-state").textContent, "Held");
+assert.equal(byId.get("field-outer-offset").value, "10", "Hold must not overwrite the configured Outer Offset.");
+assert.equal(byId.get("field-inner-offset").value, "2.5", "Hold must not overwrite the configured Inner Offset.");
 assert.equal(byId.get("step-size-seconds").value, "10", "Hold must not overwrite semantic Step size.");
 assert.equal(byId.get("section-window").textContent, intervalBeforeStretch,
   "Hold must update neither semantic Step Reach nor Interval.");
-
-byId.get("field-both-toggle").click(); // Hold remaining Lead at 8 s
-await flush();
-assert.equal(lead.rate, 1);
-assert.equal(byId.get("step-forward-seconds").value, "10");
-assert.equal(byId.get("field-both-toggle-label").textContent, "Stretch both");
-assert.equal(byId.get("section-window").textContent, intervalBeforeStretch);
 
 // Native pause settles playback, preserves its attained relation internally,
 // then returns the panes to the exact semantic Step preview.
@@ -614,7 +637,7 @@ await poll();
 assert.equal(byId.get("center-transport-surface").hidden, false, "Paused Center must restore the shared activation surface.");
 assert.equal(currentText(), "Current 0:58");
 assert.match(byId.get("section-window").textContent, /0:25–0:58/);
-assert.equal(byId.get("field-transport-state").textContent, "Step preview");
+assert.equal(byId.get("field-transport-state").textContent, "Step Frame");
 assert.equal(tail.currentTime, 48, "Paused Tail must preview the exact Step Backward destination.");
 assert.equal(lead.currentTime, 68, "Paused Lead must preview the exact Step Forward destination.");
 assert.equal(tail.state, 2);
@@ -661,8 +684,9 @@ const focusedSpace = dispatchDocument("keydown", { key: " ", code: "Space" });
 assert.equal(focusedSpace.defaultPrevented, true, "Space must remain playback while a button has focus.");
 assert.equal(tail.commands.filter(command => command[0] === "play").length, tailPlayBeforeSpace + 1);
 assert.equal(lead.commands.filter(command => command[0] === "play").length, leadPlayBeforeSpace + 1);
-assert.deepEqual(tail.commands.slice(-2), [["place", 58], ["play"]]);
-assert.deepEqual(lead.commands.slice(-2), [["place", 58], ["play"]]);
+// A fresh play gesture begins the breath at the inner offset on each side.
+assert.deepEqual(tail.commands.slice(-2), [["place", 55.5], ["play"]]);
+assert.deepEqual(lead.commands.slice(-2), [["place", 60.5], ["play"]]);
 await flush();
 assert.equal(center.state, 1);
 center.iframe.focus();
@@ -736,7 +760,7 @@ dispatchDocument("pointermove", {
   buttons: 1
 });
 await flush();
-assert.equal(byId.get("field-transport-state").textContent, "Pin preview");
+assert.equal(byId.get("field-transport-state").textContent, "Pin Frame");
 dispatchDocument("pointerup", {
   target: selectedClusterDrag,
   clientX: 690,
@@ -778,42 +802,77 @@ await flush();
 assert.equal(Number(byId.get("pins-list-count").textContent), pinsBeforeHotkey + 1);
 assert.match(byId.get("status").textContent, /already pinned/);
 
+// Guide is the exact editor: it exposes the Pin's Address and the shared Nudge
+// increments, while spatial movement stays on the Timeline.
 const selectedGuidePin = descendants(byId.get("pins-list")).find(node =>
   node.classList.contains("pin-item")
     && node.classList.contains("retained-selected")
 );
-const guidePinNode = descendants(selectedGuidePin).find(node => node.dataset.pinDrag);
 assert.ok(
-  guidePinNode,
-  "A selected Guide Pin must expose a draggable node on its temporal map."
+  descendants(selectedGuidePin).every(node => !node.dataset.pinDrag),
+  "Guide must not own a second drag implementation for Pins."
 );
-guidePinNode.closest(".pin-position-track").clientWidth = 500;
-byId.get("pins-list").dispatch("pointerdown", {
-  target: guidePinNode,
-  clientX: 500,
+const guidePinAddress = descendants(selectedGuidePin)
+  .find(node => node.dataset.addressInput === "pin");
+assert.ok(guidePinAddress, "A selected Guide Pin must expose an exact Address field.");
+assert.equal(guidePinAddress.value, "1:18");
+const guidePinNudge = descendants(selectedGuidePin)
+  .find(node => node.dataset.nudgeTarget === "pin" && node.dataset.nudgeDirection === "1");
+assert.ok(guidePinNudge, "Every Guide Address must expose the shared Nudge increments.");
+
+// Timeline direct manipulation and Guide exact editing call the same operation.
+const timelinePinMarker = descendants(byId.get("pin-lane"))
+  .find(node => node.dataset.pinGo && /1:18/.test(node["aria-label"] || ""));
+assert.ok(timelinePinMarker, "The Timeline owns spatial Pin manipulation.");
+byId.get("pin-lane").dispatch("pointerdown", {
+  target: timelinePinMarker,
+  clientX: 780,
   pointerId: 61,
   button: 0,
   buttons: 1
 });
 dispatchDocument("pointermove", {
-  target: guidePinNode,
-  clientX: 450,
+  target: timelinePinMarker,
+  clientX: 680,
   pointerId: 61,
   button: 0,
   buttons: 1
 });
 await flush();
-assert.equal(byId.get("field-transport-state").textContent, "Pin preview");
+assert.equal(byId.get("field-transport-state").textContent, "Pin Frame");
 assert.equal(center.currentTime, 68);
 dispatchDocument("pointerup", {
-  target: guidePinNode,
-  clientX: 450,
+  target: timelinePinMarker,
+  clientX: 680,
   pointerId: 61,
   button: 0,
   buttons: 0
 });
 await flush();
-assert.notEqual(byId.get("field-transport-state").textContent, "Pin preview");
+assert.notEqual(byId.get("field-transport-state").textContent, "Pin Frame");
+
+// The Guide Address field commits the same Session transaction.
+const movedPinAddress = descendants(byId.get("pins-list"))
+  .find(node => node.dataset.addressInput === "pin" && node.dataset.addressId);
+assert.equal(movedPinAddress.value, "1:08");
+movedPinAddress.value = "1:12";
+byId.get("pins-list").dispatch("change", { target: movedPinAddress });
+await flush();
+assert.match(byId.get("status").textContent, /Set Address to 1:12/);
+assert.equal(
+  descendants(byId.get("pins-list"))
+    .find(node => node.dataset.addressInput === "pin").value,
+  "1:12",
+  "Guide numeric editing must produce the same model as Timeline manipulation."
+);
+dispatchDocument("keydown", { key: "z", code: "KeyZ" });
+await flush();
+assert.equal(
+  descendants(byId.get("pins-list"))
+    .find(node => node.dataset.addressInput === "pin").value,
+  "1:08",
+  "One exact Address edit is one Undo transaction."
+);
 
 byId.get("timeline").dispatch("click", {
   target: byId.get("timeline"),
@@ -866,4 +925,4 @@ byId.get("focus-toggle").focus();
 dispatchDocument("pointerup", { target: byId.get("focus-toggle"), pointerId: 8 });
 assert.equal(env.document.activeElement, null, "Pointer activation must not leave a control visually selected.");
 
-console.log("Interaction smoke passed: direct P/Shift+P creation, retained Section editing, spatial Pin unlink/link, Guide-scaled endpoint/whole-Section drag previews, operational clustered Pins, Shift Pin traversal, local Refine preview, unsaved Working Focus, Switch involution, Undo/Redo ownership, composable Step intervals, shared activation, deterministic refold/stretch, immutable configured offsets, whole-Field side Step, universal Space playback, and coherent focus release.");
+console.log("Interaction smoke passed: direct P/Shift+P creation, retained Section editing, spatial Pin unlink/link, Timeline Section node dragging, Guide exact Address editing, operational clustered Pins, Shift Pin traversal, local Refine preview, unsaved Working Focus, Switch involution, Undo/Redo ownership, composable Step intervals, shared activation, bounded Field breathing, immutable configured offsets, whole-Field side Step, universal Space playback, and coherent focus release.");

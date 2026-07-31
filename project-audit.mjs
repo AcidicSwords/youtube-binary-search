@@ -15,6 +15,7 @@ const projection = read("timeline-projection.js");
 const transport = read("transport.js");
 const field = read("step-field.js");
 const fieldGeometry = read("step-field-geometry.js");
+const fieldFrame = read("field-frame.js");
 const rangeGeometry = read("range-geometry.js");
 const stepGesture = read("step-gesture.js");
 const youtube = read("youtube.js");
@@ -141,26 +142,48 @@ assert.doesNotMatch(view, /Relink|data\.linkSectionEndpoint/);
 assert.doesNotMatch(view, /guide-item-more|guide-secondary-actions|More actions for/);
 assert.doesNotMatch(styles, /\.guide-item-more|\.guide-secondary-actions/);
 assert.match(view, /dataset\.pinDrag\s*=\s*pin\.id/);
-assert.match(app, /"sections-list"\]\.addEventListener\("pointerdown"[\s\S]*?beginGuideDrag\("pin"/);
-assert.match(app, /"sections-list"\]\.addEventListener\("pointerdown"[\s\S]*?beginGuideDrag\("section"/);
+// The Temporal Topography owns spatial direct manipulation. Guide must not
+// contain a second drag implementation.
+assert.doesNotMatch(app, /"sections-list"\]\.addEventListener\("pointerdown"/,
+  "Guide Section rows must not own a drag gesture.");
+assert.doesNotMatch(app, /"pins-list"\]\.addEventListener\("pointerdown"/,
+  "Guide Pin rows must not own a drag gesture.");
+assert.match(app, /"section-lane"\]\.addEventListener\("pointerdown"[\s\S]*?data-section-node[\s\S]*?beginGuideDrag\(\s*"pin"[\s\S]*?beginGuideDrag\("section"/,
+  "Section Start, End and midpoint nodes are the Timeline's acquisition regions.");
 assert.match(app, /function sourceFromRelativeDragDelta[\s\S]*surfaceWidth[\s\S]*originClientX[\s\S]*timelineExtent/);
-assert.match(app, /closest\?\.\("\.section-endpoints"\)[\s\S]*closest\?\.\("\.pin-position-track"\)[\s\S]*getBoundingClientRect/);
-assert.match(view, /function pinPositionButton[\s\S]*className\s*=\s*"endpoint-button pin-position-node"[\s\S]*dataset\.pinDrag/);
+assert.match(view, /function pinPositionButton[\s\S]*className\s*=\s*"endpoint-button pin-position-node"[\s\S]*dataset\.pinGo/);
+assert.doesNotMatch(view, /dataset\.sectionDrag/,
+  "Guide's full-map profile is a read-only positional representation.");
 assert.match(styles, /\.pin-position-track[\s\S]*height:\s*43px[\s\S]*margin:\s*0 10px 9px/);
+// Guide is the exact editor: Address inputs plus the shared Nudge increments.
+assert.match(view, /function addressField\([\s\S]*dataset\.addressInput[\s\S]*dataset\.nudgeTarget/);
+assert.match(app, /function applyGuideAddressInput[\s\S]*moveGuidePin[\s\S]*moveGuideSection[\s\S]*checkpoint\(/,
+  "Guide numeric editing and Timeline manipulation must call the same operation.");
+assert.match(app, /function nudgeTarget\(target, direction, options = \{\}\)/);
+assert.match(app, /function handleTimelineWheel[\s\S]*event\.shiftKey[\s\S]*event\.preventDefault\(\)[\s\S]*NUDGE_WHEEL_THRESHOLD/,
+  "Shift-wheel nudging prevents the browser default only for an acquired target.");
+assert.match(app, /function settleNudgeGesture[\s\S]*checkpoint\(state\.session, gesture\.label/,
+  "One wheel series or held-key repetition settles as one Undo transaction.");
+assert.match(app, /function beginCurrentDrag[\s\S]*state\.currentDrag = \{/,
+  "Current is its own gesture owner on the Temporal Topography.");
+assert.match(app, /function finishCurrentDrag[\s\S]*moveToAddress\(drag\.candidate/,
+  "Dragging Current commits one exact Go.");
 assert.doesNotMatch(view, /guide-action-move/);
 assert.match(app, /function previewGuideDrag[\s\S]*kind:\s*"section"[\s\S]*start:[\s\S]*center:[\s\S]*end:/);
 assert.match(field, /function previewExtent[\s\S]*renderPreview/);
 assert.match(field, /function clearPreview[\s\S]*restore/);
 assert.match(app, /function sectionForSelectedPinExtent[\s\S]*startPinId[\s\S]*endPinId/);
 assert.match(app, /function handleTimelineClick[\s\S]*closest\("\[data-section-go\]"\)/);
-assert.doesNotMatch(app, /"section-lane"\]\.addEventListener\("pointerdown"/);
 assert.doesNotMatch(styles, /\.timeline-section-control/);
 assert.match(styles, /\.guide-section-weight/);
 assert.match(styles, /\.guide-section-profile/);
 assert.match(styles, /\.timeline-section-midpoint\s*\{/);
 assert.match(styles, /\.timeline-section-relation\s*\{[^}]*repeating-linear-gradient\(/);
 assert.match(view, /const pinTop\s*=\s*17[\s\S]*const trackTop\s*=\s*44[\s\S]*const sectionTop\s*=\s*rulerTop\s*\+\s*38/);
-assert.match(view, /\["start",\s*projected\.start[\s\S]*\["midpoint",\s*projection\.sourceToTimeline\(section\.midpoint\)[\s\S]*\["end",\s*projected\.end/);
+assert.match(view, /\["start",\s*projected\.start[\s\S]*\["midpoint",\s*midpointCoordinate[\s\S]*\["end",\s*projected\.end/);
+assert.match(view, /const nodePoints = \[[\s\S]*"start"[\s\S]*"midpoint"[\s\S]*"end"[\s\S]*dataset\.sectionNode/,
+  "Every Section exposes one centered Start, midpoint and End acquisition region.");
+assert.match(styles, /\.timeline-section-node\s*\{/);
 assert.match(
   styles,
   /@media \(pointer: coarse\)[\s\S]*\.timeline-section-body[\s\S]*var\(--touch\)/
@@ -223,10 +246,24 @@ assert.match(transport, /export function isProperRange/);
 assert.match(transport, /export function rebasePlaybackTransport/);
 assert.doesNotMatch(transport, /\bLOOP\s*:|CONTINUE|SKIM/);
 
-assert.match(app, /preferences\.fieldOffsets/);
+assert.match(app, /preferences\.fieldBreath/);
 assert.doesNotMatch(app, /onHoldOffsets:/);
 assert.doesNotMatch(field, /onHoldOffsets/);
-assert.match(app, /function changeFieldOffset[\s\S]*state\.fieldOffsets\s*=/);
+assert.match(app, /function changeFieldBoundary[\s\S]*state\.fieldBreath\s*=/);
+// Field Frame resolution is pure and owns no transport, breathing, or Session.
+assert.match(fieldFrame, /export function createFieldFrameSequencer/);
+assert.match(fieldFrame, /export function contextFrame/);
+assert.match(fieldFrame, /export function operatorFrame/);
+assert.match(fieldFrame, /export function directFrame/);
+assert.doesNotMatch(fieldFrame, /document\.(?:getElementById|createElement|querySelector)|window\.(?:set|add|match)|createYouTubePlayer|addEventListener/);
+assert.doesNotMatch(fieldFrame, /import .*session\.js|import .*guide\.js|import .*transport\.js|import .*timeline-projection\.js/);
+// The breathing state machine is pure geometry; the controller owns its runtime.
+assert.match(fieldGeometry, /export function advanceBreath/);
+assert.match(fieldGeometry, /export function holdBreath/);
+assert.match(fieldGeometry, /export function effectiveBreathBounds/);
+assert.match(field, /runtime\.frameGeneration/);
+assert.match(field, /side\.placementGeneration !== runtime\.frameGeneration/,
+  "A callback belonging to a superseded Field Frame must be discarded.");
 assert.match(app, /function setStepMode/);
 assert.match(app, /function setStepFraction/);
 assert.match(app, /function wrapPlaybackRange/);

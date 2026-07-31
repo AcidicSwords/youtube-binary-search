@@ -103,9 +103,9 @@ assert.equal(resolveFieldPhase({
   for (const id of [
     "step-field", "player-tail", "player", "player-lead", "center-transport-surface",
     "tail-player-surface", "lead-player-surface",
-    "tail-field-toggle", "lead-field-toggle", "field-both-toggle",
-    "tail-rate-select", "lead-rate-select",
-    "step-backward-seconds", "step-forward-seconds",
+    "field-both-toggle", "field-breath-rate",
+    "field-inner-offset", "field-outer-offset", "nudge-seconds",
+    "current-marker", "current-departure-marker",
     "tail-collapse", "lead-collapse", "tail-restore", "lead-restore", "step-field-toggle"
   ]) {
     assert.match(html, new RegExp(`id=["']${id}["']`), `Missing Step Field DOM id: ${id}`);
@@ -128,9 +128,15 @@ assert.equal(resolveFieldPhase({
   assert.doesNotMatch(app, /onHoldOffsets:/);
   assert.doesNotMatch(fieldSource, /onHoldOffsets/);
   assert.match(fieldSource, /const FIELD_SIDE_MODE/);
-  assert.match(fieldSource, /function stretch\(role\)/);
-  assert.match(fieldSource, /function hold\(role\)/);
+  assert.match(fieldSource, /function stretch\(role = "both"\)/);
+  assert.match(fieldSource, /function hold\(role = "both"\)/);
   assert.match(fieldSource, /function toggleBoth\(\)/);
+  assert.doesNotMatch(fieldSource, /function toggleSide\(/,
+    "Breathing is one coordinated relation; independent side Stretch/Hold controls are removed.");
+  assert.doesNotMatch(html, /id="(?:tail|lead)-field-toggle"/,
+    "There is one combined Stretch/Hold control.");
+  assert.doesNotMatch(html, /id="(?:tail|lead)-rate-select"/,
+    "The interface exposes one breathing-rate pair, not two independent side rates.");
   assert.match(fieldSource, /function freezeSideForPause\(side, center, snapshot\)/);
   assert.match(fieldSource, /function translateToCurrent\(current, \{ preserve = true \} = \{\}\)/);
   assert.match(fieldSource, /const retained = side\.offset > REACH_TOLERANCE[\s\S]*side\.offset[\s\S]*side\.configuredOffset/,
@@ -158,10 +164,8 @@ assert.equal(resolveFieldPhase({
     "YouTube side iframes must not be covered by a transparent action element.");
   assert.match(html, /id="tail-player-surface"[\s\S]*role="button"[\s\S]*id="player-tail"/);
   assert.match(html, /id="lead-player-surface"[\s\S]*role="button"[\s\S]*id="player-lead"/);
-  assert.match(html, /id="step-backward-seconds"[\s\S]*id="tail-rate-select"[\s\S]*id="player-tail"[\s\S]*id="tail-field-toggle"/,
-    "Tail keeps intermittent Tune in its identity bar and only Hold/Stretch beneath its Step surface.");
-  assert.match(html, /id="lead-rate-select"[\s\S]*id="step-forward-seconds"[\s\S]*id="player-lead"[\s\S]*id="lead-field-toggle"/,
-    "Lead keeps intermittent Tune in its identity bar and only Hold/Stretch beneath its Step surface.");
+  assert.match(html, /id="field-inner-offset"[\s\S]*id="field-outer-offset"[\s\S]*id="field-breath-rate"[\s\S]*id="field-both-toggle"/,
+    "Inner Offset, Outer Offset and the breathing rate pair sit with the one combined Stretch/Hold control.");
   assert.doesNotMatch(html, /id="(?:tail|lead)-step-button"/,
     "The side video surfaces already own Step; duplicate footer buttons must not return.");
   assert.match(css, /\.side-player-surface iframe[\s\S]*pointer-events:\s*none/,
@@ -188,8 +192,8 @@ assert.equal(resolveFieldPhase({
     /@container \(max-width: 680px\)[\s\S]*\.step-field\.tail-collapsed\.lead-collapsed:not\(\.field-off\)[\s\S]*grid-template-areas:\s*"center"\s*"tail"\s*"lead"/,
     "Phone stacking must override the more-specific collapsed medium layout."
   );
-  assert.match(fieldSource, /const availableRoles = controllableRoles\(snapshot, prefs\)[\s\S]*availableRoles\.every/,
-    "Combined Field state must derive from currently operational projections only.");
+  assert.match(fieldSource, /const availableRoles = controllableRoles\(snapshot, prefs\)[\s\S]*const held = runtime\.breath\.held/,
+    "Combined Field state must derive from one breathing relation over currently operational projections.");
   assert.match(fieldSource, /function sideIsOperational\([\s\S]*sideIsVisible[\s\S]*side\.sourceReady[\s\S]*effectiveOffset/,
     "One operational predicate must govern side controls, side Step, and combined Field actions.");
   assert.match(fieldSource, /function sidePlaybackAllowed\([\s\S]*runtime\.centerWasRunning[\s\S]*!runtime\.suspended/,

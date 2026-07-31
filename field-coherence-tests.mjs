@@ -187,20 +187,20 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   const readme = readFileSync("README.md", "utf8");
 
   for (const id of [
-    "step-backward-seconds", "step-forward-seconds",
-    "tail-rate-select", "lead-rate-select",
+    "field-inner-offset", "field-outer-offset", "field-breath-rate",
     "tail-player-surface", "lead-player-surface",
-    "tail-field-toggle", "lead-field-toggle", "field-both-toggle",
+    "field-both-toggle", "nudge-seconds",
     "field-transport-state", "field-rate-state"
   ]) assert.match(html, new RegExp(`id=["']${id}["']`));
 
   for (const retired of ["step-link", "continue", "context-action", "skim", "speed-select"]) {
     assert.doesNotMatch(html, new RegExp(`id=["']${retired}["']`));
   }
-  assert.equal((html.match(/id=["']tail-rate-select["']/g) || []).length, 1);
-  assert.equal((html.match(/id=["']lead-rate-select["']/g) || []).length, 1);
-  assert.match(html, /id=["']tail-pane["'][\s\S]*id=["']tail-rate-select["'][\s\S]*id=["']player-tail["']/);
-  assert.match(html, /id=["']lead-pane["'][\s\S]*id=["']lead-rate-select["'][\s\S]*id=["']player-lead["']/);
+  assert.equal((html.match(/id=["']field-breath-rate["']/g) || []).length, 1,
+    "One breathing-rate pair replaces the two independent side rate controls.");
+  assert.equal((html.match(/id=["']field-both-toggle["']/g) || []).length, 1);
+  assert.match(html, /id=["']tail-pane["'][\s\S]*id=["']player-tail["']/);
+  assert.match(html, /id=["']lead-pane["'][\s\S]*id=["']player-lead["']/);
   assert.doesNotMatch(fieldCss, /\.step-pane-action/, "Side players must not use a transparent overlay element.");
   assert.match(fieldCss, /\.side-player-surface iframe[\s\S]*pointer-events:\s*none/);
   assert.match(
@@ -209,13 +209,8 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   );
   assert.match(
     html,
-    /tail-field-settings[\s\S]*field-settings-popover[\s\S]*step-backward-seconds[\s\S]*tail-rate-select/,
-    "Intermittent Tail rate and offset controls must share one compact Tune disclosure."
-  );
-  assert.match(
-    html,
-    /lead-field-settings[\s\S]*field-settings-popover[\s\S]*lead-rate-select[\s\S]*step-forward-seconds/,
-    "Intermittent Lead rate and offset controls must share one compact Tune disclosure."
+    /center-field-settings[\s\S]*field-settings-popover[\s\S]*field-inner-offset[\s\S]*field-outer-offset[\s\S]*field-breath-rate[\s\S]*nudge-seconds/,
+    "Inner Offset, Outer Offset, breathing rate, and the Nudge quantum share one compact Tune disclosure."
   );
   assert.doesNotMatch(field, /bindSideStepSurface/,
     "Step Field must expose geometry while the application owns the shared Step gesture.");
@@ -235,11 +230,14 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   );
   assert.match(app, /setStepReach as setSessionStepReach/);
   assert.match(app, /stepReach: currentFieldOffsets\(\)/);
-  assert.match(app, /fieldPreview:\s*fieldOperatorPreview\(\)/);
+  assert.match(app, /fieldFrame:\s*fieldOperatorPreview\(\)/);
   assert.match(
     app,
-    /function fieldOperatorPreview[\s\S]*kind:\s*"context"[\s\S]*transport\.start[\s\S]*transport\.anchor[\s\S]*transport\.end/
+    /function fieldFrameRequest[\s\S]*FIELD_FRAME_OWNER\.CONTEXT[\s\S]*transport\.start[\s\S]*transport\.end/,
+    "Context supplies the frozen observation window as the Frame's fixed edges."
   );
+  assert.match(app, /const fieldFrames = createFieldFrameSequencer\(\)/,
+    "One sequencer owns stable Field Frame identity and its revision.");
   assert.match(
     app,
     /function fieldStepPreview[\s\S]*kind,[\s\S]*projection\.stepTarget\([\s\S]*"backward"[\s\S]*projection\.stepTarget\([\s\S]*"forward"/,
@@ -248,21 +246,21 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   assert.match(
     app,
     /fieldStepPreview\(center,\s*"pin"\)/,
-    "Pin dragging must preview spatial Step targets rather than physical Field offsets."
+    "Pin dragging must supply spatial Step targets rather than physical Field offsets."
   );
   assert.doesNotMatch(app, /onHoldOffsets:/);
   assert.doesNotMatch(field, /onHoldOffsets/);
-  assert.match(app, /function changeFieldOffset[\s\S]*state\.fieldOffsets = normalizeStepReach/);
+  assert.match(app, /function changeFieldBoundary[\s\S]*state\.fieldBreath = normalizeFieldBreath/);
   assert.match(app, /seconds:\s*state\.contextSeconds/);
   assert.doesNotMatch(
     app,
-    /fieldOffsets\s*=\s*[^;\n]*contextSeconds|contextSeconds\s*=\s*[^;\n]*fieldOffsets/,
-    "Context duration and physical Field offsets must remain independently owned."
+    /fieldBreath\s*=\s*[^;\n]*contextSeconds|contextSeconds\s*=\s*[^;\n]*fieldBreath/,
+    "Context duration and the physical Field relation must remain independently owned."
   );
   assert.match(
     app,
-    /function changeFieldOffset[\s\S]*stepField\?\.reconfigureOffset\?\.\([\s\S]*direction === "backward" \? "tail" : "lead"/,
-    "Changing one configured Field Offset must reconcile only its owning side."
+    /function changeFieldBoundary[\s\S]*boundary === "inner"[\s\S]*Math\.min\(amount, breath\.outer\)[\s\S]*Math\.max\(amount, breath\.inner\)[\s\S]*stepField\?\.reconfigureOffset\?\.\(\)/,
+    "0 < inner < outer is enforced against the sibling bound and reconciled once."
   );
   assert.doesNotMatch(
     app,
@@ -279,8 +277,8 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   assert.match(field, /onAutoplayBlocked:[\s\S]*playback = "blocked"/);
   assert.match(field, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*side\.adapter\?\.play/,
     "Playback must refold and prime each side at 1× before directional divergence.");
-  assert.match(field, /function driveSide\(role, center, centerDelta, snapshot, centerRunning\)[\s\S]*requestStretchRate\(side\)/,
-    "Running Stretch must reconcile to a supported confirmed directional rate.");
+  assert.match(field, /function driveSide\(role, center, snapshot, centerRunning, breathSide, participation\)[\s\S]*requestBreathRate\(side, breathSide\.rate\)/,
+    "A breathing side must reconcile to the nearest supported rate for its current phase.");
   assert.match(view, /effectiveStepReach/);
   assert.match(app, /preferences\.stepReach = normalizeStepReach/);
   assert.match(implementation, /^# Binary YouTube Reader — Canonical Implementation/m);

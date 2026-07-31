@@ -13,6 +13,229 @@ export const STEP_FIELD_PHASE = Object.freeze({
 export const FIELD_REACH_TOLERANCE = 0.16;
 export const DEFAULT_FIELD_RESPONSE = Object.freeze({ tailRate: 0.5, leadRate: 2 });
 
+// Field Breath: bounded expansion and contraction during ordinary Center
+// playback. The relation is symmetric, so one breathing-rate pair is configured
+// rather than two conceptually independent side rates.
+export const BREATH_PHASE = Object.freeze({
+  EXPANDING: "expanding",
+  CONTRACTING: "contracting"
+});
+
+export const BREATH_RATE_STEPS = Object.freeze([0.25, 0.5, 0.75]);
+export const DEFAULT_FIELD_BREATH = Object.freeze({
+  inner: 2.5,
+  outer: 10,
+  rate: 0.5
+});
+export const BREATH_BOUND_TOLERANCE = 0.02;
+
+export function normalizeFieldBreath(value = DEFAULT_FIELD_BREATH) {
+  const rawOuter = Number(value?.outer);
+  const outer = Number.isFinite(rawOuter) && rawOuter > 0
+    ? rawOuter
+    : DEFAULT_FIELD_BREATH.outer;
+  const rawInner = Number(value?.inner);
+  const inner = Number.isFinite(rawInner) && rawInner > 0
+    ? Math.min(rawInner, outer)
+    : Math.min(DEFAULT_FIELD_BREATH.inner, outer);
+  const rawRate = Number(value?.rate);
+  const rate = Number.isFinite(rawRate) && rawRate > 0 && rawRate < 1
+    ? rawRate
+    : DEFAULT_FIELD_BREATH.rate;
+  // 0 < x < y is the configured relation. A collapsed pair is still usable: it
+  // simply describes a Field that breathes nowhere.
+  return { inner, outer, rate };
+}
+
+// The configured values are the outward rates. The inward phase temporarily
+// exchanges them without rewriting the saved pair.
+export function breathRatePair(rate, centerRate = 1) {
+  const normalized = normalizeFieldBreath({ rate }).rate;
+  const center = Number.isFinite(centerRate) && centerRate > 0 ? centerRate : 1;
+  return {
+    center,
+    tailRate: Math.max(0.05, center - normalized),
+    leadRate: center + normalized
+  };
+}
+
+export function breathRateFromResponse(response = DEFAULT_FIELD_RESPONSE) {
+  const { tailRate, leadRate } = normalizeFieldResponse(response);
+  const symmetric = ((1 - tailRate) + (leadRate - 1)) / 2;
+  return BREATH_RATE_STEPS.reduce(
+    (best, step) => (
+      Math.abs(step - symmetric) < Math.abs(best - symmetric) ? step : best
+    ),
+    BREATH_RATE_STEPS[0]
+  );
+}
+
+// Effective bounds are Range-clipped. A side with less room than `inner`
+// breathes inside whatever remains and never crosses Center.
+export function effectiveBreathBounds(breath, available) {
+  const { inner, outer } = normalizeFieldBreath(breath);
+  const room = Number.isFinite(available) ? Math.max(0, available) : 0;
+  const effectiveOuter = Math.min(outer, room);
+  return {
+    inner: Math.min(inner, effectiveOuter),
+    outer: effectiveOuter,
+    operational: effectiveOuter > FIELD_REACH_TOLERANCE
+  };
+}
+
+export function createBreathRuntime(breath = DEFAULT_FIELD_BREATH) {
+  const { inner } = normalizeFieldBreath(breath);
+  return {
+    phase: BREATH_PHASE.EXPANDING,
+    held: true,
+    sides: {
+      tail: { offset: inner, waiting: false },
+      lead: { offset: inner, waiting: false }
+    }
+  };
+}
+
+// A held or boundary-waiting side runs at Center rate so it follows Center
+// while preserving its attained offset.
+export function breathSideRate({
+  role,
+  phase,
+  rate,
+  waiting = false,
+  held = false,
+  centerRate = 1
+}) {
+  const pair = breathRatePair(rate, centerRate);
+  if (held || waiting) return pair.center;
+  const outward = phase !== BREATH_PHASE.CONTRACTING;
+  if (role === "tail") return outward ? pair.tailRate : pair.leadRate;
+  return outward ? pair.leadRate : pair.tailRate;
+}
+
+function advanceSide(side, { phase, bounds, delta, operational }) {
+  if (!operational) {
+    // Unavailable, collapsed, hidden or Range-clipped sides are excluded from
+    // the synchronization barrier entirely.
+    return { offset: clamp(side.offset, 0, bounds.outer), waiting: false, excluded: true };
+  }
+  if (side.waiting) {
+    return {
+      offset: clamp(side.offset, bounds.inner, bounds.outer),
+      waiting: true,
+      excluded: false
+    };
+  }
+  if (phase === BREATH_PHASE.EXPANDING) {
+    const offset = Math.min(bounds.outer, side.offset + delta);
+    const reached = offset >= bounds.outer - BREATH_BOUND_TOLERANCE;
+    return {
+      offset: reached ? bounds.outer : offset,
+      waiting: reached,
+      excluded: false
+    };
+  }
+  const offset = Math.max(bounds.inner, side.offset - delta);
+  const reached = offset <= bounds.inner + BREATH_BOUND_TOLERANCE;
+  return {
+    offset: reached ? bounds.inner : offset,
+    waiting: reached,
+    excluded: false
+  };
+}
+
+// One breathing step. `centerDelta` is elapsed Center source time; the offset
+// changes by the configured rate difference over that interval.
+export function advanceBreath(runtime, {
+  breath,
+  centerDelta = 0,
+  centerRate = 1,
+  sides = {}
+} = {}) {
+  const configured = normalizeFieldBreath(breath);
+  const state = runtime || createBreathRuntime(configured);
+  const bounds = {
+    tail: effectiveBreathBounds(configured, sides.tail?.available),
+    lead: effectiveBreathBounds(configured, sides.lead?.available)
+  };
+  const operational = {
+    tail: Boolean(sides.tail?.operational) && bounds.tail.operational,
+    lead: Boolean(sides.lead?.operational) && bounds.lead.operational
+  };
+  const delta = state.held
+    ? 0
+    : Math.max(0, Number(centerDelta) || 0) * configured.rate;
+
+  const next = {
+    phase: state.phase,
+    held: Boolean(state.held),
+    sides: {}
+  };
+  for (const role of ["tail", "lead"]) {
+    const advanced = state.held
+      ? {
+        offset: clamp(
+          state.sides[role].offset,
+          0,
+          bounds[role].outer
+        ),
+        waiting: state.sides[role].waiting,
+        excluded: !operational[role]
+      }
+      : advanceSide(state.sides[role], {
+        phase: state.phase,
+        bounds: bounds[role],
+        delta,
+        operational: operational[role]
+      });
+    next.sides[role] = { offset: advanced.offset, waiting: advanced.waiting };
+    next.sides[role].excluded = advanced.excluded;
+  }
+
+  const participating = ["tail", "lead"].filter(role => operational[role]);
+  const barrier = participating.length > 0
+    && participating.every(role => next.sides[role].waiting);
+  if (!state.held && barrier) {
+    next.phase = state.phase === BREATH_PHASE.EXPANDING
+      ? BREATH_PHASE.CONTRACTING
+      : BREATH_PHASE.EXPANDING;
+    for (const role of ["tail", "lead"]) next.sides[role].waiting = false;
+  }
+
+  for (const role of ["tail", "lead"]) {
+    next.sides[role].bounds = bounds[role];
+    next.sides[role].rate = breathSideRate({
+      role,
+      phase: next.phase,
+      rate: configured.rate,
+      waiting: next.sides[role].waiting || !operational[role],
+      held: next.held,
+      centerRate
+    });
+  }
+  next.barrier = barrier;
+  return next;
+}
+
+// Hold alone stops the cycle. It preserves each attained offset, sets every
+// held side to Center rate, and preserves the breathing direction so Stretch
+// resumes from the attained relation.
+export function holdBreath(runtime, breath = DEFAULT_FIELD_BREATH) {
+  const state = runtime || createBreathRuntime(breath);
+  return {
+    ...state,
+    held: true,
+    sides: {
+      tail: { ...state.sides.tail, waiting: false },
+      lead: { ...state.sides.lead, waiting: false }
+    }
+  };
+}
+
+export function resumeBreath(runtime, breath = DEFAULT_FIELD_BREATH) {
+  const state = runtime || createBreathRuntime(breath);
+  return { ...state, held: false };
+}
+
 export function normalizeFieldResponse(value = DEFAULT_FIELD_RESPONSE) {
   const tailRate = Number(value?.tailRate);
   const leadRate = Number(value?.leadRate);

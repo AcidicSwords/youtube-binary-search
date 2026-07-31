@@ -436,3 +436,82 @@
   .field-control input { font-size: 16px; }
   .pane-collapse { width: var(--touch); }
 }
+
+
+/* Directional slideshow transitions.
+
+   Every committed movement produces one transition from the currently displayed
+   Field Frame to the next. Forward traversal moves the visible strip leftward;
+   backward traversal moves it rightward. The transition never delays or
+   intermediates the semantic commit: Session has already changed when these
+   classes appear. Repeated same-direction movements simply retrigger the same
+   animation, so rapid traversal reads as one continuing slideshow. */
+.step-field {
+  --field-transition-ms: 260ms;
+  --field-travel: clamp(10px, 3.2vw, 34px);
+}
+
+.step-field.is-traversing-forward .step-pane,
+.step-field.is-traversing-backward .step-pane {
+  animation-duration: var(--field-transition-ms);
+  animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation-fill-mode: both;
+}
+
+.step-field.is-traversing-forward .step-pane {
+  animation-name: field-slide-forward;
+}
+
+.step-field.is-traversing-backward .step-pane {
+  animation-name: field-slide-backward;
+}
+
+@keyframes field-slide-forward {
+  from { transform: translateX(var(--field-travel)); opacity: 0.62; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes field-slide-backward {
+  from { transform: translateX(calc(-1 * var(--field-travel))); opacity: 0.62; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* The Field breathes between its inner and outer offsets during ordinary
+   playback. The marker is informational; the relation itself is physical. */
+.step-field.is-breathing .center-field-summary strong {
+  color: var(--accent, #79a8ff);
+}
+
+.field-side-state {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 3px 7px;
+  color: var(--muted);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.field-side-state small {
+  overflow: hidden;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.62rem;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.center-field-settings .field-settings-popover { right: 0; }
+
+/* Reduced motion settles directly on the resulting Frame. The controller also
+   stops emitting the directional classes, so this is a second guarantee. */
+@media (prefers-reduced-motion: reduce) {
+  .step-field.is-traversing-forward .step-pane,
+  .step-field.is-traversing-backward .step-pane {
+    animation: none;
+  }
+}

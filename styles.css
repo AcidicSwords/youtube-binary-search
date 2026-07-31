@@ -645,6 +645,7 @@ kbd {
 .resolution-marker,
 .target-marker,
 .current-marker,
+.current-departure-marker,
 .cursor-marker {
   width: 2px;
   height: 48px;
@@ -658,13 +659,49 @@ kbd {
   background: #a58dd0;
 }
 
+/* Current is itself the direct manipulation surface: one visually centered
+   acquisition region whose gesture owner is Go. */
 .current-marker {
   z-index: 8;
   width: 3px;
   height: 50px;
+  padding: 0;
+  border: 0;
   top: calc(var(--track-top, 104px) - 10px);
   background: #fff;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.11);
+  pointer-events: auto;
+  touch-action: none;
+  cursor: ew-resize;
+}
+
+.current-marker::after {
+  position: absolute;
+  inset: -6px -10px;
+  content: "";
+}
+
+.current-marker.is-dragging {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgb(var(--resolution-rgb) / 0.22);
+}
+
+.current-marker.is-precision {
+  box-shadow: 0 0 0 3px rgba(233, 196, 106, 0.34);
+}
+
+/* The original Current remains as a faint departure marker while a candidate
+   Address is being chosen. Session Current is unchanged until release. */
+.current-departure-marker {
+  z-index: 6;
+  width: 2px;
+  height: 44px;
+  top: calc(var(--track-top, 104px) - 7px);
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.5) 0 3px,
+    transparent 3px 6px
+  );
 }
 
 .cursor-marker {
@@ -839,6 +876,48 @@ kbd {
 
 .timeline-section-relation.retained-selected {
   opacity: 0.48;
+}
+
+/* Section Start, midpoint and End acquisition regions. Each is one centered
+   control with one unambiguous gesture owner. */
+.timeline-section-node {
+  position: absolute;
+  z-index: 4;
+  top: calc(var(--section-top, 190px) + var(--section-offset, 0px) + 3px);
+  width: 13px;
+  height: 15px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--section-color) 74%, transparent);
+  border-radius: 3px;
+  background: #0b1017;
+  transform: translateX(-50%);
+  touch-action: none;
+  cursor: ew-resize;
+  opacity: 0.72;
+}
+
+.timeline-section-node::after {
+  position: absolute;
+  inset: -8px -9px;
+  content: "";
+}
+
+.timeline-section-node.midpoint {
+  border-radius: 50%;
+  cursor: grab;
+}
+
+.timeline-section-node.retained-selected,
+.timeline-section-node:hover,
+.timeline-section-node:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, var(--section-color) 34%, #0b1017);
+}
+
+@media (pointer: coarse) {
+  .timeline-section-node::after {
+    inset: -17px -18px;
+  }
 }
 
 .timeline-section-body {
@@ -2520,5 +2599,80 @@ kbd {
   .section-create-form .guide-create-heading,
   .section-create-actions {
     grid-column: 1;
+  }
+}
+
+
+/* Guide is the exact editor: numeric Address fields and the shared Nudge
+   increments. It owns no drag geometry. */
+.guide-addresses {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.guide-address-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.guide-address-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.guide-address-field > span {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.guide-address-input {
+  flex: 1 1 6ch;
+  min-width: 6ch;
+  padding: 3px 6px;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.76rem;
+}
+
+.guide-address-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.guide-nudge {
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--text);
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.guide-nudge:hover,
+.guide-nudge:focus-visible {
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.guide-address-readout {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+@media (pointer: coarse) {
+  .guide-nudge {
+    min-width: 44px;
+    min-height: 44px;
   }
 }

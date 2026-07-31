@@ -152,13 +152,13 @@ finding(
   "side-step-enabled-at-hard-range-boundary",
   environment.byId.get("step-backward").disabled === true
     && (
-      environment.byId.get("tail-field-toggle").disabled === false
+      environment.byId.get("field-both-toggle").disabled === false
       || environment.byId.get("tail-player-surface")["aria-disabled"] !== "true"
       || environment.byId.get("tail-player-surface").tabIndex !== -1
     ),
   {
     matrixStepBackwardDisabled: environment.byId.get("step-backward").disabled,
-    tailFieldToggleDisabled: environment.byId.get("tail-field-toggle").disabled,
+    combinedFieldToggleDisabled: environment.byId.get("field-both-toggle").disabled,
     tailSurfaceDisabled: environment.byId.get("tail-player-surface")["aria-disabled"],
     tailSurfaceTabIndex: environment.byId.get("tail-player-surface").tabIndex,
     tailMeta: environment.byId.get("tail-meta").textContent
@@ -192,20 +192,25 @@ environment.byId.get("timeline").dispatch("click", { clientX: 600 });
 await environment.flush(8);
 environment.center().currentTime = 59;
 await environment.poll();
-const firstSuspendedTail = environment.byId.get("tail-offset-state").textContent;
+const firstSuspendedTail = environment.byId.get("tail-meta").textContent;
+const firstSuspendedLead = environment.byId.get("lead-meta").textContent;
 environment.center().currentTime = 59.5;
 await environment.poll();
-const secondSuspendedTail = environment.byId.get("tail-offset-state").textContent;
+const secondSuspendedTail = environment.byId.get("tail-meta").textContent;
+const secondSuspendedLead = environment.byId.get("lead-meta").textContent;
 finding(
   "context-mutates-configured-field-offset",
-  firstSuspendedTail !== "2.5s / 10s"
-    || secondSuspendedTail !== "2.5s / 10s"
-    || environment.byId.get("step-backward-seconds").value !== "10",
+  firstSuspendedTail !== secondSuspendedTail
+    || firstSuspendedLead !== secondSuspendedLead
+    || environment.byId.get("field-outer-offset").value !== "10"
+    || environment.byId.get("field-inner-offset").value !== "2.5",
   {
     afterFirstContextTick: firstSuspendedTail,
     afterSecondContextTick: secondSuspendedTail,
-    configuredTailOffset: environment.byId.get("step-backward-seconds").value,
-    tailMeta: environment.byId.get("tail-meta").textContent
+    firstLead: firstSuspendedLead,
+    secondLead: secondSuspendedLead,
+    configuredInnerOffset: environment.byId.get("field-inner-offset").value,
+    configuredOuterOffset: environment.byId.get("field-outer-offset").value
   }
 );
 

@@ -81,7 +81,7 @@ for (const retired of ["continue", "context-action", "skim", "speed-select", "fi
 }
 for (const id of [
   "field-transport-state", "field-both-toggle", "field-span-fill",
-  "tail-field-toggle", "lead-field-toggle",
+  "field-inner-offset", "field-outer-offset", "field-breath-rate",
   "section-capture", "section-source", "pin-capture", "pin-current",
   "release", "deform", "deform-down", "deform-up", "focus-toggle", "shift-layer-toggle",
   "step-size-seconds", "step-mode-fixed", "step-mode-adaptive"
@@ -112,21 +112,27 @@ assert.doesNotMatch(app, /createSkimTransport|completeSkim|reachSkimDestination/
 assert.match(fieldSource, /FIELD_SIDE_MODE/);
 assert.match(
   fieldSource,
-  /function stretch\(role\)[\s\S]*suspendedNow = suspensionRequired\(snapshot\)[\s\S]*beginStretch\(side, center, snapshot, \{ play: centerRunning && !suspendedNow \}\)/,
-  "Stretch must use live suspension state before delegating to the deterministic refold-then-diverge transition."
+  /function stretch\(role = "both"\)[\s\S]*suspendedNow = suspensionRequired\(snapshot\)[\s\S]*resumeBreath\(runtime\.breath[\s\S]*beginStretch\(sides\[name\], center, snapshot, \{ play: centerRunning && !suspendedNow \}\)/,
+  "Stretch must use live suspension state and resume the breathing cycle from its attained relation."
 );
-assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*side\.offset = 0[\s\S]*requestRate\(side, 1, true\)[\s\S]*(?:adapter\?\.place|adapter\?\.cue)[\s\S]*side\.adapter\?\.play/,
-  "Every running Stretch must refold to Center at 1× before future divergence.");
+assert.match(fieldSource, /function startBreathCycle\(center, snapshot[\s\S]*BREATH_PHASE\.EXPANDING[\s\S]*Math\.min\(bounds\.inner, bounds\.outer\)/,
+  "A fresh playback gesture must begin the breath at the inner boundary and expand outward.");
+assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*(?:adapter\?\.place|adapter\?\.cue)[\s\S]*side\.adapter\?\.play/,
+  "Every running breath must prime its side at 1× before directional-rate discovery.");
 assert.doesNotMatch(fieldSource, /onHoldOffsets/,
   "Hold and Stretch must never persist a measured runtime offset.");
 assert.doesNotMatch(app, /onHoldOffsets:/,
   "The application must not expose a Hold-to-configuration write path.");
-assert.match(app, /function changeFieldOffset[\s\S]*state\.fieldOffsets = normalizeStepReach/,
-  "Only explicit Offset input changes may update configured Field offsets.");
+assert.match(app, /function changeFieldBoundary[\s\S]*state\.fieldBreath = normalizeFieldBreath/,
+  "Only explicit Inner/Outer Offset input may update the configured Field relation.");
+assert.doesNotMatch(app, /state\.fieldOffsets\s*=/,
+  "Two independent side Offsets are replaced by one bounded breathing relation.");
 assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*side\.adapter\?\.play/,
   "Side playback must prime at 1× inside the same Stretch transition.");
-assert.match(fieldSource, /function driveSide\(role, center, centerDelta, snapshot, centerRunning\)[\s\S]*requestStretchRate\(side\)/,
-  "Directional rate must be requested only after a side is running and its capabilities are observable.");
+assert.match(fieldSource, /function driveField\(center, centerDelta, snapshot, centerRunning\)[\s\S]*advanceBreath\(runtime\.breath/,
+  "The whole Field breathes as one relation, so the state machine advances once per tick.");
+assert.match(fieldSource, /function driveSide\(role, center, snapshot, centerRunning, breathSide, participation\)[\s\S]*ensureSidePlaying\(side\);\s*requestBreathRate\(side, breathSide\.rate\)/,
+  "Breathing rate must be requested only after a side is running and its capabilities are observable.");
 assert.match(css, /data-phase="unfolding"/);
 assert.match(css, /data-phase="held"/);
 assert.match(css, /field-span-fill/);
