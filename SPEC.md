@@ -827,6 +827,7 @@ dragging or nudging Current invokes Step, never Go
 a Current drag previews the Interval and neighbourhood its Step will commit
 what a direct gesture previews is what its release commits
 Cursor is drawn only where observation has left Current
+predictive chrome stands down while the movement it predicts is being performed
 a focused extent's own boundary cannot be dragged from inside it
 Timeline direct manipulation and Guide exact editing call the same operation
 one drag, wheel series, or held-key nudge creates at most one Undo checkpoint

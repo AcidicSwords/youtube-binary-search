@@ -236,9 +236,14 @@ const state = {
   shiftLayer: false,
   shiftKeyHeld: false,
   field: null,
-  // Direct manipulation of Current on the Temporal Topography. It is an exact
-  // Go gesture, not a Pin move, and it owns the Field Frame while it runs.
+  // Direct manipulation of Current on the Temporal Topography. It commits a
+  // Step, not a Go and not a Pin move, and it owns the Field Frame while it runs.
   currentDrag: null,
+  // True while a Step gesture is being held. Predictive chrome stands down for
+  // the duration: a destination marker is an answer to "where would this go",
+  // and while the gesture runs that question is being answered by the movement
+  // itself, several times a second.
+  stepGestureActive: false,
   // The exact Frame supplied by whichever direct manipulation is active.
   directFrame: null,
   // One wheel series or held-key repetition settles as one Undo transaction.
@@ -1092,6 +1097,7 @@ function deferPendingStepCompletion(options = {}) {
 
 function setStepGesturePresentation({ active, selection }) {
   const direction = active ? selection?.direction : null;
+  state.stepGestureActive = Boolean(active);
   for (const [id, controlDirection] of [
     ["step-backward", "backward"],
     ["tail-player-surface", "backward"],

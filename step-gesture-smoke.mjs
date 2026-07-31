@@ -39,6 +39,17 @@ assert.equal(
   80,
   "Held Step must move the visible Center on each repeat, not only its semantic marker."
 );
+// A Step target answers "where would a Step land". While the Step is being
+// performed several times a second that question is answered by the movement,
+// and two markers recomputed per repeat streak across the map as artifacts.
+assert.deepEqual(
+  {
+    backward: byId.get("backward-target-marker").hidden,
+    forward: byId.get("forward-target-marker").hidden
+  },
+  { backward: true, forward: true },
+  "Step targets must stand down while a Step gesture is running."
+);
 
 const sidePlacesBeforeRelease = {
   center: env.center().commands.filter(command => command[0] === "place").length,
@@ -48,6 +59,8 @@ const sidePlacesBeforeRelease = {
 dispatchDocument("pointerup", { button: 0, pointerId: 7 });
 await flush();
 assert.equal(forward.classList.contains("is-step-held"), false);
+assert.equal(byId.get("forward-target-marker").hidden, false,
+  "Releasing the gesture restores the Step targets.");
 assert.equal(env.center().currentTime, 80);
 assert.equal(
   env.center().commands.filter(command => command[0] === "place").length,

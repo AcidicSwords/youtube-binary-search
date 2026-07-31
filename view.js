@@ -1207,7 +1207,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           projectedModel.interval.end
         );
       }
-      if (livePlayback) {
+      // A Step target answers "where would a Step land". While a Step is
+      // actually being performed — held on a control or key, or dragged out on
+      // Current — that question is being answered by the movement itself
+      // several times a second, and two recomputed markers streaking across the
+      // map read as artifacts rather than as information. They stand down for
+      // the gesture exactly as they already do during live playback.
+      const performingStep = state().stepGestureActive === true
+        || state().currentDrag?.moved === true;
+      if (livePlayback || performingStep) {
         elements["backward-target-marker"].hidden = true;
         elements["forward-target-marker"].hidden = true;
       } else {
