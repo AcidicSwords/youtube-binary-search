@@ -39,6 +39,7 @@ for (const retiredArtifact of [
 
 const docs = Object.fromEntries([
   "README.md",
+  "PROJECT.md",
   "SPEC.md",
   "IMPLEMENTATION.md",
   "INTERFACE.md",
@@ -70,7 +71,7 @@ assert.equal(pkg.version, "7.0.0");
 assert.match(docs["SPEC.md"], /^# Binary YouTube Reader — Canonical Specification\r?\n/);
 assert.match(docs["IMPLEMENTATION.md"], /^# Binary YouTube Reader — Canonical Implementation\r?\n/);
 assert.match(docs["INTERFACE.md"], /^# Binary YouTube Reader — Interface Grammar\r?\n/);
-for (const name of ["SPEC.md", "IMPLEMENTATION.md", "INTERFACE.md", "DEVELOPMENT.md", "VALIDATION.md"]) {
+for (const name of ["PROJECT.md", "SPEC.md", "IMPLEMENTATION.md", "INTERFACE.md", "DEVELOPMENT.md", "VALIDATION.md"]) {
   assert.ok(docs["README.md"].includes(`\`${name}\``), `README must link ${name}`);
 }
 
@@ -345,7 +346,29 @@ assert.match(docs["VALIDATION.md"], /1\/32[\s\S]*1\/16[\s\S]*1\/8/);
 assert.match(docs["INTERFACE.md"], /bounded five-lane visual band/);
 assert.match(docs["INTERFACE.md"], /complete extent the Working Interval/);
 assert.match(docs["INTERFACE.md"], /free and shared Pins[\s\S]*main Range \/ Resolution track[\s\S]*source ruler[\s\S]*Section relationship tree/);
-assert.match(docs["INTERFACE.md"], /Pin drag parks Center[\s\S]*Tail at Start, Center at midpoint, and Lead at End/);
+assert.match(docs["INTERFACE.md"], /A Pin drag centers that Pin[\s\S]*Tail at Start,\s*\n?Center at midpoint, and Lead at End/);
+assert.match(docs["INTERFACE.md"], /Field Frame/);
+assert.match(docs["INTERFACE.md"], /Field Breath/);
+assert.match(docs["INTERFACE.md"], /Inner offset\s+x/);
+assert.match(docs["INTERFACE.md"], /Outer offset\s+y/);
+assert.match(docs["INTERFACE.md"], /Stretch \/ Hold/);
+assert.match(docs["README.md"], /stable directional slideshow\s*\n?around Current/);
+assert.match(docs["README.md"], /breathes continuously between inner\s*\n?and outer offsets until Hold preserves the attained relation/);
+assert.match(docs["PROJECT.md"], /Field Frame/);
+assert.match(docs["PROJECT.md"], /Field Breath/);
+assert.match(docs["SPEC.md"], /### Field Frame/);
+assert.match(docs["SPEC.md"], /#### Slideshow transitions/);
+assert.match(docs["SPEC.md"], /#### Persistent Context framing/);
+assert.match(docs["SPEC.md"], /### Current drag as Go/);
+assert.match(docs["SPEC.md"], /### Nudge/);
+assert.match(docs["SPEC.md"], /### Exact Guide editing/);
+assert.doesNotMatch(docs["SPEC.md"], /maximum Stretch[\s\S]{0,80}becomes Hold/i,
+  "Reaching the outer offset begins contraction; it is not an automatic Hold.");
+assert.match(docs["IMPLEMENTATION.md"], /field-frame\.js/);
+assert.match(docs["IMPLEMENTATION.md"], /Transition revision ownership/);
+assert.match(docs["IMPLEMENTATION.md"], /Breathing state machine/);
+assert.match(docs["IMPLEMENTATION.md"], /Nudge transaction batching/);
+assert.match(docs["IMPLEMENTATION.md"], /Exact Guide input routing/);
 assert.match(docs["VALIDATION.md"], /lists choices vertically, scrolls by wheel/);
 
 console.log("Project audit passed: v7 matrix, independent Step sizing, weighted Section graph, source-contiguous Range playback, timeline presentation, module boundaries, and canonical documents agree.");

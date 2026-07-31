@@ -10,13 +10,16 @@
 | `timeline-projection.js` | positive spatial density, source/timeline mapping, Pin ordering |
 | `transport.js` | Context and native-playback runtime values |
 | `step-gesture.js` | press/repeat/settlement and one-Undo gesture boundary |
-| `step-field-geometry.js` | pure Tail/Lead source target and phase geometry |
-| `step-field.js` | physical Tail/Lead players and Hold/Stretch runtime |
+| `field-frame.js` | pure Field Frame derivation, direction, and transition descriptors |
+| `step-field-geometry.js` | pure Tail/Lead source geometry and the breathing state machine |
+| `step-field.js` | physical Tail/Lead players, Frame placement, breathing runtime, Hold |
 | `view.js` | DOM projection, weighted timeline, Guide and operator presentation |
 | `app.js` | composition, adapters, persistence, direct manipulation |
 | `youtube.js` | the only owner of YouTube player construction |
 
-`session.js`, `guide.js`, `range-geometry.js`, `timeline-projection.js`, and `transport.js` remain DOM- and I/O-free.
+`session.js`, `guide.js`, `range-geometry.js`, `timeline-projection.js`,
+`transport.js`, `field-frame.js`, and `step-field-geometry.js` remain DOM- and
+I/O-free.
 
 ## Canonical model and transactions
 
@@ -111,13 +114,77 @@ Section-weight edits neither settle nor rebase an active transport. The timeline
 
 ## Field
 
-Field Offset is configured physical state. Only explicit Offset input updates `fieldOffsets`. Hold and Stretch maintain runtime side state without reporting or persisting their measured relation, and neither can call `setStepReach()` or a Section-weight transaction.
+### Field Frame resolution
+
+`field-frame.js` is the only owner of Frame derivation. `createFieldFrameSequencer()`
+resolves one request per publish and returns a descriptor:
+
+```text
+{ owner, kind, tail, center, lead, direction, revision, reframed, outgoing }
+```
+
+Frame identity is `(owner, kind, tail, lead)` and deliberately excludes Center,
+so a Context Cursor crossing its own window keeps one Frame and one revision.
+`revision` therefore advances once per semantic movement, never once per publish.
+
+`app.js` composes the request. Direct manipulation has the highest priority for
+the gesture's lifetime, Context outranks operator framing while it is enabled,
+and ordinary Center playback returns `null` so the Breath owns presentation.
+Semantic Step Reach travels with the descriptor as `backwardDistance` and
+`forwardDistance` because a Range-clipped Frame edge is not the semantic Reach.
+
+### Transition revision ownership
+
+`step-field.js` owns the transition lifecycle. `beginFrameTransition()` compares
+the incoming Frame identity with the settled one; an unchanged identity updates
+Center only. A changed identity advances `runtime.frameGeneration`, classifies
+the direction from the transient outgoing Current, and marks the presentation for
+one `FIELD_TRANSITION_MS` window. Repeated same-direction movements simply
+retrigger the same animation, so rapid traversal reads as one continuing
+slideshow.
+
+The generation is also the stale-event token. Every placement records
+`side.placementGeneration`; a CUED callback whose generation no longer matches
+the current one is discarded, so obsolete intermediate Frames are never replayed
+and the Field settles on the latest committed state. The transition never blocks
+a semantic commit: Session has already changed by the time a Frame arrives.
+
+### Breathing state machine
+
+`step-field-geometry.js` owns the pure cycle. `advanceBreath()` receives the
+configured `{ inner, outer, rate }`, the elapsed Center source time, and each
+side's operational state and Range-clipped room. It returns the next phase, the
+per-side offset, the boundary-waiting flag, and the rate that side should run at.
+
+```text
+expanding    tail → c − r, lead → c + r
+contracting  tail → c + r, lead → c − r
+waiting/held → c
+```
+
+A side that reaches its effective bound clamps exactly to it and waits at Center
+rate. The phase reverses only when every operational side is waiting;
+non-operational sides are excluded from that barrier entirely.
+`effectiveBreathBounds()` clips both bounds against the room Range leaves the
+side, so a Range-constrained Field still breathes and still never crosses Center.
+
+`step-field.js` owns the runtime. `driveField()` advances the machine once per
+tick and then places both sides from its authoritative offsets, so the two sides
+can never disagree about the phase. `holdBreath()` and `resumeBreath()` preserve
+the direction across a Hold. A fresh playback gesture calls `startBreathCycle()`
+to begin at the inner boundary; the deliberate Stretch control instead resumes
+from the attained relation.
+
+Field Offset is configured physical state. Only explicit Inner/Outer Offset input
+updates `fieldBreath`. Hold and Stretch maintain runtime side state without
+reporting or persisting their measured relation, and neither can call
+`setStepReach()` or a Section-weight transaction.
 
 Each side keeps `configuredOffset` separate from its live `offset`.
-`reconfigureOffset(role)` reconciles only the edited side: a relation following
-its old configured maximum follows the new one, while a partial Hold is
-preserved and only clamped when necessary. The sibling receives no player
-command.
+`reconfigureOffset()` reconciles the live relation with a newly configured bound:
+a side already following its configured bound follows the new one, while a
+partial relation is preserved and only clamped when necessary. Configuration
+edits are neither a Hold nor a Stretch.
 
 `sideIsOperational()` is the common availability boundary for the side Step
 surface, its Hold/Stretch control, and the combined Field control. It requires
@@ -134,11 +201,11 @@ issue no dormant player commands.
 
 Field target placement and measurement are source-time arithmetic. The projection is used only by the timeline view when drawing those source Addresses.
 
-`app.js` alone derives ambient `fieldPreview` geometry. Idle Step uses the same
+`app.js` alone derives the ambient Frame request. Idle Step uses the same
 `projection.stepTarget()` calls and effective Reach as the committed Step;
-Context uses the active transport's exact `start`, `anchor`, and `end`.
-`step-field.js` only validates and displays those source Addresses, so it does
-not import timeline projection or Context arithmetic.
+Context uses the active transport's exact `start` and `end` with the observed
+Cursor as Center. `step-field.js` only validates and displays those source
+Addresses, so it does not import timeline projection or Context arithmetic.
 
 All semantic Step surfaces resolve through `step-gesture.js`. A repeated press
 commits Center at each Current, retargets the adjacent Step preview, keeps one
@@ -165,38 +232,60 @@ history origin, and starts automatic Context at most once after settlement.
 
 Guide reprojects each Section across the complete timeline, connects its exact
 Start/End Pin controls, and derives endpoint visual weight from the existing
-Section-reference count. Shared-Pin mutation is available through positioned
-Guide endpoint nodes, full-map Guide Pin nodes, and direct Timeline Pin
-drag. A stationary Timeline Pin release performs exact Pin Go. Working-Interval
-bounds derive the selected endpoint Pins and follow their direct movement. The
-Guide profile routes through the same whole-Section
-translation used by its Timeline wire. Guide-local pointer deltas use the full
-visible endpoint track or Guide row as their interaction width and convert
-through the captured Timeline projection, so equal relative movement feels
-equal and the Start/End controls retain travel on both sides. Timeline Pins use
-the same relation count. These are pure projections of Guide ownership and
+Section-reference count. That full-map profile is a read-only positional
+representation and an acquisition link back to the Timeline; it carries no drag
+geometry. Shared-Pin mutation happens on the Temporal Topography — Timeline Pin
+markers and Section Start/End nodes — or through Guide's exact Address inputs.
+A stationary Timeline Pin release performs exact Pin Go. Working-Interval bounds
+derive the selected endpoint Pins and follow their direct movement. Timeline Pins
+use the same relation count. These are pure projections of Guide ownership and
 persist no additional topology.
 
-Session snapshots retain `lastOperator`, so Undo and Redo restore the same
-three-frame interpretation as the spatial state. `app.js` owns preview
-selection: Context temporarily takes precedence; otherwise Refine and Reopen
-derive exact weighted midpoint targets, a selected Section uses its exact
-extent only while Current is its midpoint, and Step is the default. An edited
-Section whose midpoint no longer equals Current therefore returns to Step
-after its direct preview ends. The Field controller receives only source
-addresses and imports neither projection nor operator arithmetic.
+### Exact Guide input routing
 
-During a retained-object drag, `app.js` supplies one temporary extent to
-`step-field.js`. Pin preview uses exact spatial Step targets around the Pin;
-Section preview uses exact Start/midpoint/End addresses. Configured Field
-offsets remain exclusive to live Stretch/Hold. `previewExtent()` accepts only
-those two complete request forms. Polling re-publishes the active preview
-instead of running ordinary side motion. Direct preview has precedence over
-the ambient operator or Context preview and restores that ambient owner when
-cleared. Preview spans are never published as Held Field spans, and malformed
-or unknown requests cannot acquire Field ownership. Presentation hover/focus
-remains a non-invasive Session dry run in `view.js`; only a drag that has
-crossed its movement threshold seeks the three players.
+`addressField()` renders one row per editable Address: a text input accepting
+canonical timecode or seconds, the shared `−`/`+` Nudge increments, and Go.
+`applyGuideAddressInput()` parses and clamps the value, calls the same
+`moveGuidePin()` or `moveGuideSection()` transaction the Timeline drag uses, and
+commits one `checkpoint()`. Enter applies, Escape re-renders the committed value,
+and the increment buttons route to `nudgeTarget()` rather than a private path, so
+Timeline, Guide, keyboard, and pointer share one operation implementation.
+
+### Nudge transaction batching
+
+`nudgeQuantum()` returns an adapter-verified frame duration when one exists and
+the configured source-time quantum otherwise; `nudgeUnitLabel()` never claims a
+frame step without that verification. `beginNudgeGesture()` keys a gesture by its
+target, snapshots the origin model once, and restarts a settle timer on every
+repetition. `nudgeTarget()` amends that origin with `{ amend: true }` so no
+intermediate step touches history, and `settleNudgeGesture()` appends exactly one
+`checkpoint()` when the gesture ends. High-resolution wheel deltas accumulate on
+the gesture until one discrete quantum threshold is crossed, and the browser
+default is prevented only once a valid Timeline target has been acquired.
+Precision drag reduces pointer gain, quantizes in source time, and reprojects, so
+Section Weight cannot change the temporal size of one Nudge.
+
+Session snapshots retain `lastOperator`, so Undo and Redo restore the same
+three-frame interpretation as the spatial state. `app.js` owns Frame-owner
+selection: direct manipulation first, then Context while it is enabled, then the
+operator fallback — Refine and Reopen derive exact weighted midpoint targets, a
+selected Section uses its exact extent only while Current is its midpoint, and
+Step is the default. An edited Section whose midpoint no longer equals Current
+therefore returns to Step when its gesture ends. The Field controller receives
+only source addresses and imports neither projection nor operator arithmetic.
+
+During a direct manipulation, `app.js` supplies one exact Frame to
+`step-field.js` through `previewExtent()`, which validates it with
+`directFrame()`; malformed or unknown kinds cannot acquire Field ownership.
+Current drag supplies the candidate Context Frame when Context is enabled and the
+candidate Go Frame otherwise; Pin drag uses exact spatial Step targets around the
+Pin; Section drag uses exact Start/midpoint/End addresses. Configured breathing
+bounds remain exclusive to live Stretch/Hold. Polling re-publishes the active
+Frame instead of running ordinary side motion. A direct Frame has precedence over
+the ambient Context or operator Frame and one transition restores that ambient
+owner when cleared. Frames are never published as Held Field spans. Presentation
+hover/focus remains a non-invasive Session dry run in `view.js`; only a drag that
+has crossed its movement threshold seeks the three players.
 
 There is one lateral coordinate and one Pin placement path. Vertical lanes pack
 projected extents and fold into a bounded visual band; they do not add another
@@ -209,13 +298,18 @@ remain unchanged while interactive regions cannot overlap ambiguously.
 Timeline input stays in `app.js`:
 
 - Section body click: make its full extent the Working Interval and center Current;
-- Guide endpoint drag: move that shared Pin using relative Timeline distance;
-- Guide profile drag: translate the complete Section;
+- Current marker: acquired on pointer-down, then exact Go on release after the
+  movement threshold; a stationary press moves nothing;
+- Section Start/End node: move that endpoint Pin;
+- Section midpoint node: translate the complete Section;
 - Guide selector or Deform step: commit one canonical factor;
+- Guide Address input or increment: the same Pin/Section transaction;
 - timeline or Guide Pin Go: invert or use an exact source target;
 - Timeline Pin marker: exact Go on stationary release or exact drag after the
   movement threshold;
-- Guide Pin map node or cluster Move handle: move one exact Pin;
+- cluster Move handle: move one exact Pin;
+- `Shift` + wheel: nudge the exact object under the pointer;
+- `Shift` + drag: precision mode for the same gesture owner;
 - independent endpoint Pin drag within the 16-pixel acquisition radius: show an
   amber candidate, arm it green only after a 450 ms dwell, and link on release;
 - Range handles: update Range without rewriting Guide;
@@ -256,8 +350,13 @@ scrim.
 
 ## Persistence and migration
 
-Guide data is video-specific. Preferences store Context duration, semantic Step Reach, independent Field offsets and rates, Field visibility, and pane visibility.
+Guide data is video-specific. Preferences store Context duration, semantic Step
+Reach, the configured Field Breath `{ inner, outer, rate }`, the Nudge quantum,
+Field visibility, and pane visibility.
 
 Guide schema v7 persists Section `weight`; it never persists Timeline Space, segment density, lanes, gradients, or projected positions. Legacy v6 `collapsed: true` migrates once to `0.25×`, the closest positive replacement, while open Sections migrate to `1×`. The legacy flag is discarded.
 
-Legacy scalar Step values migrate to fixed mode. Legacy coupled Field values seed separate preferences once and remain independent afterward.
+Legacy scalar Step values migrate to fixed mode. Legacy independent side Offsets
+migrate once into one bounded breathing relation: the widest side becomes the
+outer offset, a proportional fraction becomes the inner offset, and the saved
+side rates become the nearest symmetric breathing pair.

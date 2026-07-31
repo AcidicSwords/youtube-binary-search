@@ -32,6 +32,53 @@
 - Confirm no weight changes source duration, player rate, Context, Field Offset, or playback order.
 - Confirm a v6 collapsed Section migrates to `0.25×`, an open Section migrates to `1×`, and the old flag is discarded.
 
+## Field Frame and slideshow transitions
+
+- Traverse forward four or five times in quick succession. Confirm each
+  committed movement produces exactly one leftward transition, that the sequence
+  reads as one continuing slideshow, and that the Field settles on the latest
+  resulting Frame rather than replaying obsolete intermediates.
+- Repeat backward and confirm the strip travels rightward.
+- Reverse direction immediately mid-transition. Confirm the Field turns cleanly
+  without accumulating or snapping back.
+- Hold a directional key or click a Step surface rapidly. Confirm no semantic
+  movement is delayed or dropped while a transition is animating, and that
+  Current always matches Center once the sequence stops.
+- With Context enabled, traverse once. Confirm Tail shows Context Start, Lead
+  shows Context End, and Center follows the Cursor across the window without
+  either edge moving.
+- Let that Context stop, and accept its Cursor. Confirm neither Tail nor Lead is
+  reassigned by the ending or the settlement.
+- Confirm Context edges materially different from one another let you locate the
+  crossing by playing or stopping inside the window.
+- With Context disabled, confirm the Frame follows the current operator: Step
+  destinations, Refine or Reopen midpoints, a retained Section's Start and End
+  while Current owns its midpoint, and the Go neighbourhood after a direct Go.
+- Enable reduced motion. Confirm the same resulting Frames appear without the
+  directional travel and without any intermediate frame.
+
+## Field breathing
+
+- Start playback and watch a full cycle. Confirm Tail falls behind Center and
+  Lead advances ahead from the inner offset, both approach the outer offset, and
+  the Field then contracts back to the inner offset and repeats.
+- Confirm Tail never reaches or crosses Center, Lead never reaches or crosses
+  Center, and neither offset leaves the effective `[x, y]` bounds.
+- Switch between the three breathing rate pairs. Confirm both sides always
+  change together and that the saved pair is unchanged by the inward phase.
+- Place Current near a Range boundary so one side is clipped. Confirm the
+  clipped side clamps exactly to its effective bound, waits there at Center
+  rate, and that contraction begins only once the unclipped side also arrives.
+- Collapse one side or turn the Field off mid-cycle. Confirm the remaining side
+  keeps breathing and is not stalled at a boundary by the dormant one.
+- Press Hold part-way through expansion. Confirm both sides freeze at their
+  attained offsets at Center rate, playback continues, and no Offset, Step
+  Reach, Section weight, or Undo entry changes.
+- Press Stretch again. Confirm it resumes from the attained relation and in the
+  same direction it was travelling.
+- Repeat the Hold and resume during contraction.
+- Confirm reaching the outer offset begins contraction rather than becoming Hold.
+
 ## Step size and Field independence
 
 - Enter different manual backward and forward distances; reload and confirm persistence.
@@ -39,12 +86,13 @@
 - Edit Section weight and confirm adaptive Reach follows weighted Range width while its fraction remains fixed.
 - Confirm fixed Reach does not change.
 - Focus and Unfocus; confirm adaptive distance updates.
-- Hold and Stretch Tail, Lead, and both sides. Neither configured Offset, Step Reach, nor Section weight may change.
-- Confirm side Step uses visible differential without rewriting semantic Reach.
-- Hold one side at a partial relation, edit its configured Offset, and confirm
-  the partial Hold remains while the sibling receives no seek, pause, rate, or
-  mode change. Repeat with the side fully at its target and confirm it follows
-  the new target.
+- Hold and Stretch the Field. Neither configured Offset, Step Reach, nor Section
+  weight may change, and no Undo entry may appear.
+- Confirm side Step uses the visible differential without rewriting semantic Reach.
+- Hold at a partial relation, edit the configured Outer Offset, and confirm the
+  partial relation remains and the edit is neither a Hold nor a Stretch. Repeat
+  with the Field fully at its bound and confirm it follows the new bound.
+- Confirm no independent per-side Stretch/Hold or rate control is present.
 - Clear or invalidate an Offset input; confirm the canonical value returns and
   no preference changes.
 - Collapse a side while its source is preparing or playback is starting, then
@@ -76,10 +124,41 @@
 
 ## Direct manipulation
 
+- Press the Current marker and release without moving. Confirm nothing moves and
+  no history entry appears.
+- Drag Current across a spatial distance. Confirm the marker follows the
+  candidate, the original Current remains as a faint departure marker, Center
+  shows the candidate frame, the Field shows the candidate Context Frame when
+  Context is enabled and the candidate Go Frame otherwise, and Session Current is
+  unchanged until release.
+- Release and confirm one exact Go: one Working Interval, one Undo checkpoint,
+  and one Field transition in the traversal direction.
+- Repeat and cancel with Escape or a lost pointer. Confirm the original Current
+  presentation returns with no semantic change and no history.
+- Shift-drag Current. Confirm reduced gain, quantized source Addresses, the same
+  gesture owner, and one transaction on release.
+- Shift-wheel over Current, a Pin, a Section endpoint, a Section midpoint, and
+  empty Timeline. Confirm each nudges its own object, that trackpad deltas
+  accumulate until one quantum is crossed, and that the browser only scrolls when
+  no Timeline target was acquired.
+- Confirm one continuous wheel series is one Undo entry, and that holding `,` or
+  `.` is likewise one entry.
+- Change Section Weight and repeat one Nudge. Confirm the temporal size of the
+  nudge is unchanged.
+- Confirm no control claims a frame step while the adapter reports no frame
+  duration; the quantum must be shown in seconds.
+- Edit a Pin Address in Guide and drag the same Pin on the Timeline. Confirm both
+  produce the same model and the same single Undo entry per gesture.
+- Enter an invalid Address, one outside Range, and one that would collapse or
+  reverse a Section. Confirm each is rejected with the committed value restored.
+- Confirm Guide contains no draggable Pin, endpoint, or profile node.
+- Drag a Timeline Section Start node, End node, and midpoint node. Confirm they
+  move that endpoint Pin, that endpoint Pin, and the complete Section
+  respectively.
 - Timeline/Pin Go across a spatial distance; confirm the movement is the Working Interval and its unclipped Resolution has two equal Interval-width margins on each side.
 - Click a Section in Timeline and Guide; confirm its endpoints become the Working Interval and Current returns to its center in one Undoable transaction.
 - Repeat beside each Range boundary and confirm clipping removes only unavailable margin.
-- Drag a Guide Section profile; only its endpoint Pins should translate.
+- Drag a Timeline Section midpoint node; only its endpoint Pins should translate.
 - Drag a shared Pin; every referencing Section should update.
 - Choose Unlink on one shared Section endpoint and confirm graph ownership does
   not change until the dialog is confirmed. Move the independent endpoint and
@@ -182,33 +261,32 @@
   a reader hotkey without clicking the timeline.
 - Confirm each timeline Section span selects the corresponding named Guide row
   and full Working Interval.
-- Drag either Guide Section endpoint node; confirm the same shared Pin and every
-  referencing Section update in one Undo transaction.
-- Drag a selected Guide Pin node and a Section endpoint by the same pixel
-  distance on equal-width tracks; confirm both produce the same temporal
-  displacement and viewer preview.
-- Drag a Guide Section profile; confirm both endpoint Pins translate by the same
-  amount and cancellation restores the complete original extent.
-- During a Pin drag, confirm Center previews the Pin while Tail/Lead show the
-  exact weighted Step destinations around it. During either Section drag,
-  confirm Tail, Center, and Lead
-  preview Start, midpoint, and End respectively, then restore ordinary Field
-  state on release or cancellation.
-- Set Step Reach to 10 seconds, Context to 5 seconds, and both Field Offsets to
-  2.5 seconds. Confirm idle Field shows exact weighted Step targets; Context
-  shows its first/last source frames; Pin drag still uses weighted Step; and the
-  2.5-second Offsets appear only during Stretch/Hold. Confirm no setting
-  rewrites either of the others.
+- Drag either Timeline Section endpoint node; confirm the same shared Pin and
+  every referencing Section update in one Undo transaction.
+- Confirm the Guide row reprojects that result without offering its own drag.
+- Drag a Timeline Section midpoint node; confirm both endpoint Pins translate by
+  the same amount and cancellation restores the complete original extent.
+- During a Pin drag, confirm Center shows the Pin while Tail/Lead show the exact
+  weighted Step destinations around it. During either Section drag, confirm Tail,
+  Center, and Lead show Start, midpoint, and End respectively, then restore the
+  ambient Frame in one transition on release or cancellation.
+- Set Step Reach to 10 seconds, Context to 5 seconds, the Inner Offset to 2.5
+  seconds, and the Outer Offset to 10 seconds. Confirm the idle Field shows exact
+  weighted Step targets; Context shows its first/last source frames; Pin drag
+  still uses weighted Step; and the breathing bounds appear only during
+  Stretch/Hold. Confirm no setting rewrites any other.
+- Enter an Inner Offset larger than the Outer Offset and confirm it is clamped
+  against the sibling bound rather than accepted.
 - Refine once and confirm Tail/Lead show the next backward/forward weighted
   midpoints. Reopen and confirm they show the newly available Refine midpoints.
   Let Context complete after each traversal and confirm it returns to that last
   semantic preview.
-- Pause after attaining asymmetric Stretch/Hold relations. Confirm Step preview
+- Pause after attaining an asymmetric breathing relation. Confirm the Step Frame
   replaces the visible side frames without rewriting those stored runtime
-  relations, and the next Play still performs the ordinary refold/Stretch.
-- Start playback from every idle preview kind. Confirm preview labeling and
-  non-Held spans disappear synchronously, both sides refold to Center, configured
-  physical Offsets/rates govern Stretch/Hold, and pausing returns to Step.
+  relations, and the next Play still starts a fresh breath.
+- Start playback from every idle Frame kind. Confirm Frame labeling and non-Held
+  spans disappear synchronously, both sides begin at the inner offset, the
+  configured bounds and rate pair govern the breath, and pausing returns to Step.
 - Hover and keyboard-focus operator controls without pressing them. Confirm the
   timeline previews their exact dry-run result while Center, Tail, and Lead do
   not seek, pause, or change rate.
@@ -223,6 +301,9 @@ After every operator and drag:
 
 ```text
 Range.start <= Current <= Range.end
+Center equals Current unless Context or a direct Frame owns Center
+Tail remains behind Center and Lead remains ahead of Center
+breathing offsets remain within effective [x, y] bounds
 Working Interval ⊆ Range in source time
 Working Interval ⊆ Resolution ⊆ Range in Timeline Space
 every Section has positive source duration

@@ -4307,6 +4307,7 @@ function guideAddressTarget(input) {
 
 function applyGuideAddressInput(input) {
   if (!input) return false;
+  clearGuideAddressPreview();
   const target = guideAddressTarget(input);
   if (!target) return false;
   const parsed = parseAddress(input.value);
@@ -4351,6 +4352,55 @@ function applyGuideAddressInput(input) {
   return true;
 }
 
+// An Address input previews the candidate Field Frame before commit. Typing is
+// presentation only: it seeks the players but writes no Session state.
+function previewGuideAddressInput(input) {
+  const target = guideAddressTarget(input);
+  const parsed = parseAddress(input?.value);
+  if (!target || parsed === null || !Number.isFinite(parsed) || !state.videoLoaded) {
+    return false;
+  }
+  const address = clamp(parsed, activeRange().start, activeRange().end);
+  const section = target.sectionId
+    ? resolveSection(guide(), target.sectionId)
+    : input.dataset.addressInput === "section"
+      ? resolveSection(guide(), target.id)
+      : null;
+  let frame;
+  if (section && input.dataset.addressInput === "section") {
+    const shift = address - section.start;
+    frame = {
+      kind: "section",
+      start: section.start + shift,
+      center: section.midpoint + shift,
+      end: section.end + shift
+    };
+  } else if (section) {
+    const start = input.dataset.addressInput === "section-start" ? address : section.start;
+    const end = input.dataset.addressInput === "section-end" ? address : section.end;
+    frame = { kind: "section", start, center: (start + end) / 2, end };
+  } else {
+    const step = fieldStepPreview(address, "pin");
+    frame = { kind: "pin", start: step.start, center: address, end: step.end };
+  }
+  state.directFrame = frame;
+  placePlayer(address);
+  stepField?.previewExtent?.(frame);
+  return true;
+}
+
+function clearGuideAddressPreview() {
+  if (!state.directFrame) return false;
+  state.directFrame = null;
+  stepField?.clearPreview?.({ restore: false });
+  if (state.videoLoaded && currentResolution()) {
+    locateAddress(currentResolution().C);
+    stepField?.translateToCurrent?.(currentResolution().C, { preserve: true });
+  }
+  view.render();
+  return true;
+}
+
 function handleGuideAddressKeydown(event) {
   const input = event.target.closest?.("[data-address-input]");
   if (!input) return;
@@ -4361,6 +4411,7 @@ function handleGuideAddressKeydown(event) {
   }
   if (event.key === "Escape") {
     event.preventDefault();
+    clearGuideAddressPreview();
     view.renderGuide();
   }
 }
@@ -4451,11 +4502,23 @@ elements["sections-list"].addEventListener("change", event => {
   applyGuideAddressInput(event.target.closest("[data-address-input]"));
 });
 elements["sections-list"].addEventListener("keydown", handleGuideAddressKeydown);
+elements["sections-list"].addEventListener("input", event => {
+  previewGuideAddressInput(event.target.closest("[data-address-input]"));
+});
+elements["sections-list"].addEventListener("focusout", event => {
+  if (event.target.closest?.("[data-address-input]")) clearGuideAddressPreview();
+});
 elements["pins-list"].addEventListener("click", handleGuideClick);
 elements["pins-list"].addEventListener("change", event => {
   applyGuideAddressInput(event.target.closest("[data-address-input]"));
 });
 elements["pins-list"].addEventListener("keydown", handleGuideAddressKeydown);
+elements["pins-list"].addEventListener("input", event => {
+  previewGuideAddressInput(event.target.closest("[data-address-input]"));
+});
+elements["pins-list"].addEventListener("focusout", event => {
+  if (event.target.closest?.("[data-address-input]")) clearGuideAddressPreview();
+});
 elements["sections-list"].addEventListener("pointerover", event => {
   const item = event.target.closest("[data-section-preview-id]");
   if (!item || item.contains(event.relatedTarget)) return;

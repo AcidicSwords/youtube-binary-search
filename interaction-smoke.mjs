@@ -22,6 +22,24 @@ await flush();
 assert.equal(byId.get("field-outer-offset").value, "10");
 assert.match(byId.get("status").textContent, /positive number/);
 
+// One breathing-rate pair, not two independent side rates.
+await poll();
+await flush();
+const breathOptions = descendants(byId.get("field-breath-rate"))
+  .map(option => option.textContent);
+assert.deepEqual(breathOptions, ["0.75× / 1.25×", "0.5× / 1.5×", "0.25× / 1.75×"],
+  "The Field exposes one symmetric breathing-rate pair per step.");
+assert.equal(byId.get("field-breath-rate").value, "0.5");
+byId.get("field-breath-rate").value = "0.25";
+byId.get("field-breath-rate").dispatch("change");
+await flush();
+await poll();
+assert.equal(byId.get("field-breath-rate").value, "0.25");
+byId.get("field-breath-rate").value = "0.5";
+byId.get("field-breath-rate").dispatch("change");
+await flush();
+await poll();
+
 // 0 < inner < outer holds against the sibling bound.
 byId.get("field-inner-offset").value = "40";
 byId.get("field-inner-offset").dispatch("change");

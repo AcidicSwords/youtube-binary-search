@@ -240,4 +240,26 @@ dispatchDocument("keydown", { key: "z", code: "KeyZ" });
 await flush();
 assert.equal(pinAddress(), "1:07", "One Guide nudge gesture is one Undo checkpoint.");
 
-console.log("Nudge tests passed: source-time quantum, Current drag commit and cancel, Shift-drag precision, Shift-wheel accumulation and targeting, keyboard nudging, one Undo per gesture, and Guide increments sharing the same operation.");
+// An Address input previews the candidate Field Frame before commit, and
+// Escape cancels without writing Session state.
+const committedPinAddress = () => descendants(byId.get("pin-lane"))
+  .find(node => node.dataset.pinGo)?.["aria-label"];
+const previewInput = descendants(byId.get("pins-list"))
+  .find(node => node.dataset.addressInput === "pin");
+const addressBeforePreview = committedPinAddress();
+previewInput.value = "0:20";
+byId.get("pins-list").dispatch("input", { target: previewInput });
+await flush();
+assert.equal(byId.get("field-transport-state").textContent, "Pin Frame",
+  "Typing an Address previews the candidate Field Frame.");
+assert.equal(env.center().currentTime, 20);
+assert.equal(committedPinAddress(), addressBeforePreview,
+  "Previewing an Address writes no Session state.");
+byId.get("pins-list").dispatch("keydown", { target: previewInput, key: "Escape" });
+await flush();
+await poll();
+assert.notEqual(byId.get("field-transport-state").textContent, "Pin Frame",
+  "Escape cancels the candidate Frame.");
+assert.equal(committedPinAddress(), addressBeforePreview);
+
+console.log("Nudge tests passed: source-time quantum, Current drag commit and cancel, Shift-drag precision, Shift-wheel accumulation and targeting, keyboard nudging, one Undo per gesture, Guide increments sharing the same operation, and Guide Address preview and cancellation.");
