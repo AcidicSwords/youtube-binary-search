@@ -802,6 +802,11 @@ Range.start <= Current <= Range.end
 Working Interval ⊆ Range in source time
 Working Interval ⊆ Resolution ⊆ Range in Timeline Space
 spatial extent is reported as a factor on source, never as a duration
+every readout announcing a movement states the source time it actually crosses
+Addresses are written with a colon and durations with units
+every readout answers something no other readout already answers
+one operand has one control; activation and dragging are never split in two
+the play command means ordinary playback wherever it is issued
 a focused extent spans the whole drawn timeline at every Weight
 the viewport changes what is drawn and never what is computed
 Working Interval is one continuous source extent
@@ -833,6 +838,7 @@ Timeline direct manipulation and Guide exact editing call the same operation
 one drag, wheel series, or held-key nudge creates at most one Undo checkpoint
 fine Nudge acts in source time, not Timeline Space
 Guide owns no independent drag geometry
+a Guide row is expanded exactly when it is the selected retained object
 preview, breathing, Context, and semantic state cannot overwrite one another
 ```
 

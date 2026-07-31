@@ -101,12 +101,20 @@ assert.match(app, /elements\[id\]\.hidden = !controlsVisible/);
 assert.match(app, /"reader-column"\]\.classList\.toggle\("rail-collapsed",\s*!compact && !open\)/);
 assert.match(html, /id="timeline-ruler"[\s\S]*id="section-lane"[\s\S]*id="pin-lane"/);
 assert.match(html, /timeline-legend[\s\S]*timeline-key-sections[\s\S]*timeline-key-interval[\s\S]*timeline-key-pins/);
-assert.match(html, /id="timeline-current-time"[\s\S]*id="cursor-time"/);
+// Current reads its own Address on the map, under its marker. The header keeps
+// only what the map does not already answer.
+assert.doesNotMatch(html, /id="timeline-current-time"/,
+  "Current must not be reprinted in the timeline header.");
+assert.match(html, /id="cursor-time"[\s\S]*id="duration-time"/);
+assert.match(view, /current-marker-time[\s\S]*currentMarkerTime\.textContent = formatTime\(candidate\)/);
 assert.doesNotMatch(html, /id="fold-lane"/);
 assert.match(html, /id="step-size-settings"[\s\S]*id="step-mode-fixed"[\s\S]*id="step-mode-adaptive"/);
 assert.match(html, /data-step-fraction="0\.03125"[\s\S]*data-step-fraction="0\.0625"[\s\S]*data-step-fraction="0\.125"/);
-assert.match(html, /Manual lateral distance/);
-assert.match(html, /active Range’s weighted timeline width/);
+assert.match(html, /Manual map distance/);
+// Step distance is a map distance. The setting must say so, because the number
+// only equals source seconds at neutral Weight.
+assert.match(html, /Step distance is measured across the map/);
+assert.match(html, /active Range’s weighted map width/);
 assert.match(html, /id="deform"[^>]*aria-keyshortcuts="T"/);
 assert.match(html, /id="deform-down"[^>]*aria-keyshortcuts="Alt\+T"/);
 assert.match(html, /id="deform-up"[^>]*aria-keyshortcuts="Shift\+T"/);
@@ -133,7 +141,11 @@ assert.match(
 );
 assert.match(app, /pin-cluster-menu"\]\.addEventListener\("pointerdown"[\s\S]*beginGuideDrag\("pin"[\s\S]*origin:\s*"cluster-menu"/);
 assert.match(app, /pin-cluster-menu"\]\.addEventListener\("click"[\s\S]*activatePinClusterChoice/);
-assert.match(view, /className\s*=\s*"pin-cluster-drag"[\s\S]*dataset\.pinDrag\s*=\s*pin\.id/);
+// A Pin in the cluster menu is one control obeying the map's rule: click Goes,
+// drag moves. A separate drag handle is a grammar used nowhere else.
+assert.doesNotMatch(view, /pin-cluster-drag/,
+  "The cluster menu must not carry a separate drag handle.");
+assert.match(view, /button\.dataset\.pinGo = pin\.id[\s\S]*button\.dataset\.pinDrag = pin\.id/);
 assert.match(app, /"pin-lane"\]\.addEventListener\("pointerdown"[\s\S]*beginGuideDrag\("pin"/);
 assert.match(app, /function syncIntervalPinSelection[\s\S]*findPinAt\(guide\(\), interval\.start\)[\s\S]*findPinAt\(guide\(\), interval\.end\)/);
 assert.doesNotMatch(app, /togglePinSelection|selectTimelinePin|data-select-pin/);

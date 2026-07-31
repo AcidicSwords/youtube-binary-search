@@ -1023,4 +1023,81 @@ byId.get("focus-toggle").focus();
 dispatchDocument("pointerup", { target: byId.get("focus-toggle"), pointerId: 8 });
 assert.equal(env.document.activeElement, null, "Pointer activation must not leave a control visually selected.");
 
+// One expansion rule for every Guide row: a row is open exactly when it is the
+// selected object. Previously a Pin row opened itself whenever it happened to
+// bound the Working Interval while an equivalently placed Section row only
+// highlighted, so drawing an Interval silently opened rows nobody chose.
+{
+  const guideRows = list => descendants(byId.get(list))
+    .filter(node => node.classList?.contains?.("guide-item"));
+  const openRows = list => guideRows(list).filter(row =>
+    descendants(row).some(node => node.classList?.contains?.("guide-addresses"))
+  );
+  const selectedRows = list => guideRows(list).filter(row =>
+    row.classList.contains("retained-selected")
+  );
+  for (const list of ["pins-list", "sections-list"]) {
+    assert.equal(
+      openRows(list).length,
+      selectedRows(list).length,
+      `Every open ${list} row must be a selected row, and every selected row open.`
+    );
+    assert.ok(
+      openRows(list).length <= 1,
+      `At most one ${list} row may be open at a time.`
+    );
+  }
+  const extentOnly = guideRows("pins-list").filter(row =>
+    row.classList.contains("extent-selected")
+    && !row.classList.contains("retained-selected")
+  );
+  for (const row of extentOnly) {
+    assert.ok(
+      !descendants(row).some(node => node.classList?.contains?.("guide-addresses")),
+      "Bounding the Working Interval highlights a Pin row; it must not open it."
+    );
+  }
+}
+
+// Information presentation: every readout must answer something no other
+// readout already answers.
+{
+  // The ruler spans the drawn extent, so a Range reaching that edge would have
+  // its boundary guide print the same Address the edge tick already prints.
+  const rulerLabels = descendants(byId.get("timeline-ruler"))
+    .map(node => node.textContent)
+    .filter(Boolean);
+  const guides = descendants(byId.get("timeline-ruler"))
+    .filter(node => node.classList?.contains?.("timeline-range-guide"));
+  assert.equal(byId.get("range-label").textContent, "0:00–1:40");
+  assert.equal(guides.length, 0,
+    "A Range filling the drawn map must not relabel the ruler's own edges.");
+  assert.ok(rulerLabels.some(text => text.startsWith("0:00")),
+    "The ruler still answers where the drawn map begins.");
+
+  // Current reads its own Address on the map rather than from a header.
+  const markerTime = descendants(byId.get("current-marker"))
+    .find(node => node.classList?.contains?.("current-marker-time"));
+  assert.ok(markerTime, "Current must carry its own source Address.");
+  assert.equal(markerTime.textContent, currentText().replace("Current ", ""));
+
+  // Cursor reports observation that has left Current; while it has not, a
+  // Cursor readout would be a second copy of Current.
+  assert.equal(byId.get("cursor-time").textContent, "—",
+    "An undisplaced Cursor must report nothing rather than repeat Current.");
+
+  // The Working Interval is printed once, by section-window. Operator metas say
+  // what their operator does and name the extent rather than reprinting it.
+  const workingExtent = byId.get("section-window").textContent;
+  assert.match(workingExtent, /\d:\d\d–\d:\d\d/);
+  const extent = workingExtent.match(/(\d+:\d\d–\d+:\d\d)/)[1];
+  for (const id of ["release-meta", "deform-meta", "focus-toggle-meta"]) {
+    assert.ok(
+      !byId.get(id).textContent.includes(extent),
+      `${id} must not reprint the extent section-window already shows.`
+    );
+  }
+  assert.equal(byId.get("release-meta").textContent, "Working Interval");
+}
+
 console.log("Interaction smoke passed: direct P/Shift+P creation, retained Section editing, spatial Pin unlink/link, Timeline Section node dragging, Guide exact Address editing, operational clustered Pins, Shift Pin traversal, local Refine preview, unsaved Working Focus, Switch involution, Undo/Redo ownership, composable Step intervals, shared activation, bounded Field breathing, immutable configured offsets, whole-Field side Step, universal Space playback, and coherent focus release.");

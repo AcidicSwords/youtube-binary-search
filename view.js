@@ -247,6 +247,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements.status.classList.toggle("error", isError);
   }
 
+  // One reused node: the label belongs to the marker and never accumulates.
+  const currentMarkerTime = document.createElement("span");
+  currentMarkerTime.className = "current-marker-time";
+  currentMarkerTime.setAttribute("aria-hidden", "true");
+
   function percent(time) {
     const projection = timelineProjection();
     if (!(projection.viewSpan > 0)) return 0;
@@ -398,24 +403,16 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         button.classList.add("snap-target");
         if (state().guideDrag?.snapArmed) button.classList.add("snap-armed");
       }
-      button.title = `${pinLabel(pin)} at ${formatTime(pin.sourceT ?? pin.t)}; click to select`;
+      // A Pin in the cluster menu is the same operand as a Pin on the map, so it
+      // obeys the same rule: press and move drags it, release without moving
+      // Goes to it. Splitting that into a choose button plus a separate drag
+      // handle was a grammar this interface uses nowhere else.
+      button.dataset.pinDrag = pin.id;
+      button.title = sectionsForPin(guide(), pin.id).length === 1
+        ? `${pinLabel(pin)} at ${formatTime(pin.sourceT ?? pin.t)}; click to go, drag to move — pause over another Pin, then release to link`
+        : `${pinLabel(pin)} at ${formatTime(pin.sourceT ?? pin.t)}; click to go, drag to move`;
       button.append(label, time);
-      const drag = document.createElement("button");
-      drag.type = "button";
-      drag.className = "pin-cluster-drag";
-      drag.dataset.pinDrag = pin.id;
-      if (pinClusterTrigger?.dataset?.clusterIndex !== undefined) {
-        drag.dataset.clusterIndex = pinClusterTrigger.dataset.clusterIndex;
-      }
-      drag.setAttribute(
-        "aria-label",
-        `Move ${pinLabel(pin)} from ${formatTime(pin.sourceT ?? pin.t)}${sectionsForPin(guide(), pin.id).length === 1 ? "; pause over another Pin, then release to link" : ""}`
-      );
-      drag.title = sectionsForPin(guide(), pin.id).length === 1
-        ? "Drag horizontally; pause over another Pin, then release to link"
-        : "Drag horizontally to move this exact Pin";
-      drag.textContent = "â†”";
-      row.append(button, drag);
+      row.append(button);
       menu.appendChild(row);
     }
     const width = elements.timeline.clientWidth || 1;
@@ -484,10 +481,18 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       }
     }
 
+    // A Range boundary is only worth labelling where the ruler does not already
+    // answer it. The ruler spans the drawn extent, so whenever Range reaches
+    // that edge its guide would print the same Address the edge tick prints,
+    // one on top of the other.
     for (const [role, source] of [
       ["start", range().start],
       ["end", range().end]
     ]) {
+      const drawnEdge = role === "start"
+        ? projection.viewExtent.start
+        : projection.viewExtent.end;
+      if (Math.abs(source - drawnEdge) <= EPSILON) continue;
       const boundary = document.createElement("span");
       boundary.className = `timeline-range-guide ${role}`;
       boundary.style.left = `${percent(source)}%`;
@@ -638,7 +643,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     );
     const pinTop = 17;
     const trackTop = 44;
-    const rulerTop = trackTop + 36;
+    const rulerTop = trackTop + 58;
     const sectionTop = rulerTop + 38;
     const timelineHeight = sectionTop + sectionBandHeight + 4;
     setStyleProperty(elements.timeline, "--track-top", `${trackTop}px`);
@@ -992,9 +997,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         );
 
         item.append(header);
-        if (selected || section.id === focusedId) {
-          item.append(actions, addresses);
-        }
+        // One rule for every Guide row: a row is expanded exactly when it is
+        // the selected object. Participating in the Working Interval, being
+        // focused, or being a snap target are conditions worth showing, and
+        // they are shown as highlights — they do not open rows on their own,
+        // because rows that open themselves make selection unreadable.
+        if (selected) item.append(actions, addresses);
         elements["sections-list"].appendChild(item);
       }
     }
@@ -1068,7 +1076,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         addresses.className = "guide-addresses";
         addresses.append(addressControl("pin", pin.id, "Address", pin.t));
         item.append(header);
-        if (selected || extentSelected) item.append(positionTrack, addresses);
+        if (selected) item.append(positionTrack, addresses);
         elements["pins-list"].appendChild(item);
       }
     }
@@ -1164,7 +1172,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? clamp(physical, activeRange.start, activeRange.end)
       : semanticCurrent;
 
-    elements["cursor-time"].textContent = formatTime(cursor);
+    // Cursor reports observation that has left Current. While it has not, this
+    // readout would print a second copy of Current, so it reports nothing --
+    // the same rule the Cursor marker follows on the map.
+    elements["cursor-time"].textContent = physicallyDisplaced || moving
+      ? formatTime(cursor)
+      : "—";
     const transport = state().transport;
     const playbackProjection = transport.kind === TRANSPORT_KIND.PLAYBACK
       ? projectPlayback(model(), {
@@ -1395,7 +1408,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       || (performingStepGesture ? null : previewAction);
     const focused = focusedProjection();
 
-    elements["timeline-current-time"].textContent = formatTime(semanticCurrent);
     elements["timeline-key-sections"].dataset.active = String(
       Boolean(sortedSections(guide()).length)
     );
@@ -1450,9 +1462,22 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     );
     elements["step-size-seconds"].value = String(configuredReach.forward);
     const adaptiveStep = configuredReach.mode === STEP_REACH_MODE.ADAPTIVE;
+    // Adaptive Reach derives a live map distance from the weighted Range, so it
+    // is reported as the source time the next forward Step would actually
+    // cross rather than as its raw map size.
+    const adaptiveSourceSpan = loaded && currentResolution
+      ? Math.abs(
+          projection.stepTarget(
+            semanticCurrent,
+            effectiveReach.forward,
+            "forward",
+            activeRange
+          ) - semanticCurrent
+        )
+      : null;
     elements["step-size-summary"].textContent = adaptiveStep
       ? `1/${Math.round(1 / configuredReach.fraction)} Range${
-          loaded ? ` · ${formatDuration(effectiveReach.forward)}` : ""
+          adaptiveSourceSpan === null ? "" : ` · ${formatDuration(adaptiveSourceSpan)}`
         }`
       : `${formatDuration(configuredReach.forward)} manual`;
     elements["step-mode-fixed"].setAttribute("aria-pressed", String(!adaptiveStep));
@@ -1680,12 +1705,21 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           rangeStretch ? ` · ${rangeStretch} spatial` : ""
         }`
       : "Range-level resolution";
+    // Step Reach is a distance on the map, and inside a weighted Section a
+    // given map distance covers less or more source time. Every readout that
+    // announces a movement states the source time that movement actually
+    // crosses, so "10s · to 0:43" can never appear beside a Current of 0:38.
+    // The configured setting keeps its own number: it is a map distance, and a
+    // map distance is stated in the source time it equals at neutral Weight.
+    const stepSourceSpan = destination => formatDuration(
+      Math.abs(destination - semanticCurrent)
+    );
     elements["step-backward-meta"].textContent = actionModel?.stepBackward
       ? shiftLayer
         ? previous
           ? `${formatTime(previous.t)} · ${pinLabel(previous)}`
           : "No Pin backward"
-        : `${formatDuration(effectiveReach.backward)} · to ${formatTime(actionModel.stepBackward.destination)}`
+        : `${stepSourceSpan(actionModel.stepBackward.destination)} · to ${formatTime(actionModel.stepBackward.destination)}`
       : shiftLayer && previous
         ? `${formatTime(previous.t)} · ${pinLabel(previous)}`
         : "Range start";
@@ -1694,12 +1728,24 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         ? next
           ? `${formatTime(next.t)} · ${pinLabel(next)}`
           : "No Pin forward"
-        : `${formatDuration(effectiveReach.forward)} · to ${formatTime(actionModel.stepForward.destination)}`
+        : `${stepSourceSpan(actionModel.stepForward.destination)} · to ${formatTime(actionModel.stepForward.destination)}`
       : shiftLayer && next
         ? `${formatTime(next.t)} · ${pinLabel(next)}`
         : "Range end";
+    // The Working Interval is already named and printed by section-window. An
+    // operator meta earns its line by saying what that operator will do, and
+    // reprints an extent only when the extent is not the one already shown.
+    const isWorkingInterval = extent => Boolean(
+      currentInterval
+      && extent
+      && Math.abs(extent.start - currentInterval.start) <= EPSILON
+      && Math.abs(extent.end - currentInterval.end) <= EPSILON
+    );
+    const targetLabel = extent => isWorkingInterval(extent)
+      ? "Working Interval"
+      : formatRange(extent);
     elements["release-meta"].textContent = currentInterval
-      ? formatRange(currentInterval)
+      ? "Working Interval"
       : "No Interval";
     const selectedMatchesInterval = selectedSection && (
       !currentInterval
@@ -1716,12 +1762,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? "Normalize"
       : "Deform";
     elements["deform-meta"].textContent = deformTarget
-      ? `${deformIsWeighted ? "restore 1×" : "restore last"} · ${formatRange(deformTarget)}`
+      ? `${deformIsWeighted ? "restore 1×" : "restore last"} · ${targetLabel(deformTarget)}`
       : "No target";
     elements["focus-toggle-meta"].textContent = focused
       ? `restore ${formatRange(model().focus.returnRange)}`
       : currentInterval
-        ? formatRange(currentInterval)
+        ? "Working Interval"
         : selectedSection
           ? formatRange(selectedSection)
           : "No target";
@@ -1778,6 +1824,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "aria-valuetext",
       `${formatTime(candidate)}; Current${dragging ? " candidate" : ""}`
     );
+    // Current reads its own source Address on the map, where it is looked at.
+    if (!currentMarkerTime.parentElement) {
+      elements["current-marker"].appendChild(currentMarkerTime);
+    }
+    currentMarkerTime.textContent = formatTime(candidate);
     elements["current-departure-marker"].hidden = !dragging;
     if (dragging) {
       setMarkerPosition(

@@ -681,6 +681,32 @@ kbd {
   content: "";
 }
 
+/* Current carries its own source Address. The map is where Current is read, so
+   the Address belongs under the marker rather than in a header that repeats it
+   from across the panel. */
+.current-marker-time {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  z-index: 1;
+  margin-top: 3px;
+  padding: 1px 5px;
+  transform: translateX(-50%);
+  border-radius: 4px;
+  background: rgba(11, 14, 19, 0.82);
+  color: var(--text);
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.current-marker.is-dragging .current-marker-time {
+  background: rgba(11, 14, 19, 0.92);
+  color: var(--accent-strong);
+}
+
 .current-marker.is-dragging {
   background: var(--accent);
   box-shadow: 0 0 0 3px rgb(var(--resolution-rgb) / 0.22);
@@ -1058,8 +1084,7 @@ kbd {
 
 .pin-cluster-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 40px;
-  gap: 4px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .pin-cluster-menu [role="menuitem"] {
@@ -1069,6 +1094,8 @@ kbd {
   grid-template-columns: 8px minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
+  /* The row is the Pin's drag surface, so it owns the touch stream. */
+  touch-action: none;
   padding: 4px 8px;
   border: 1px solid rgba(246, 200, 110, 0.2);
   border-radius: 7px;
@@ -1113,26 +1140,6 @@ kbd {
 .pin-cluster-menu [role="menuitem"] time {
   color: var(--muted);
   font: 600 0.64rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
-
-.pin-cluster-menu .pin-cluster-drag {
-  width: 40px;
-  min-width: 40px;
-  min-height: 44px;
-  padding: 0;
-  border: 1px solid rgba(246, 200, 110, 0.24);
-  border-radius: 7px;
-  color: var(--muted);
-  background: rgba(246, 200, 110, 0.04);
-  cursor: ew-resize;
-  touch-action: none;
-}
-
-.pin-cluster-menu .pin-cluster-drag:hover,
-.pin-cluster-menu .pin-cluster-drag:focus-visible {
-  color: var(--text);
-  border-color: rgba(246, 200, 110, 0.52);
-  background: rgba(246, 200, 110, 0.09);
 }
 
 /* Parameters | operators | retained structure */

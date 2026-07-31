@@ -170,11 +170,14 @@ const sectionMain = sectionNodes.find(node =>
 byId.get("sections-list").dispatch("click", { target: sectionMain });
 await flush();
 assert.equal(currentText(), "Current 0:40");
-assert.equal(
-  byId.get("release-meta").textContent,
-  "0:30–0:50",
+// section-window is where an extent is printed; release-meta names what
+// Release will remove rather than reprinting the same range beside it.
+assert.match(
+  byId.get("section-window").textContent,
+  /0:30–0:50/,
   "Selecting a Section must make its full extent the Working Interval."
 );
+assert.equal(byId.get("release-meta").textContent, "Working Interval");
 sectionNodes = descendants(byId.get("sections-list"));
 const focusAction = sectionNodes.find(node =>
   node.dataset.focusSection === sectionId
@@ -396,6 +399,62 @@ assert.deepEqual(
     weightBefore,
     "The paired stepper must return it."
   );
+}
+
+// Presentation law: Step Reach is a distance on the map, so inside a weighted
+// Section a given map distance covers a different amount of source time. Every
+// readout that announces a movement must state the source time it will actually
+// cross, or the interface reads "10s · to 0:43" beside a Current of 0:38.
+{
+  byId.get("context-seconds").value = "0";
+  byId.get("context-seconds").dispatch("change");
+  byId.get("step-mode-fixed").dispatch("click", { detail: 1 });
+  byId.get("step-size-seconds").value = "10";
+  byId.get("step-size-seconds").dispatch("change");
+  await flush();
+  const readout = id => byId.get(id).textContent;
+  const spanOf = text => text.split("·")[0].trim();
+  const destinationOf = text => text.split("to ")[1]?.trim();
+  const seconds = stamp => {
+    const parts = String(stamp).split(":").map(Number);
+    return parts.reduce((total, part) => total * 60 + part, 0);
+  };
+  const currentSeconds = () => seconds(currentText().replace("Current ", ""));
+
+  // At neutral Weight the map and the source correspond, so the announced span
+  // is the plain configured distance.
+  await setSectionWeight("1");
+  await flush();
+  byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 100 });
+  await flush();
+  const neutralForward = readout("step-forward-meta");
+  assert.equal(
+    Math.round(seconds(destinationOf(neutralForward)) - currentSeconds()),
+    10,
+    "At 1x the announced Step destination is ten source seconds ahead."
+  );
+  assert.equal(spanOf(neutralForward), "10s");
+
+  // Inside a 2x Section the same map distance covers half the source time, and
+  // the announced span must follow the destination rather than the setting.
+  await setSectionWeight("2");
+  await flush();
+  byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 400 });
+  await flush();
+  const weightedForward = readout("step-forward-meta");
+  const crossed = seconds(destinationOf(weightedForward)) - currentSeconds();
+  assert.ok(crossed > 0 && crossed < 10,
+    `A 2x Section must shorten the source distance one Step crosses, got ${crossed}.`);
+  assert.equal(
+    spanOf(weightedForward),
+    `${crossed}s`,
+    "The announced span must equal the source time actually crossed."
+  );
+  assert.notEqual(spanOf(weightedForward), "10s",
+    "The raw map distance must never be announced as the source distance.");
+  // The configured setting keeps its own number: it is a map distance, stated
+  // in the source time it equals at neutral Weight.
+  assert.equal(readout("step-size-summary"), "10s manual");
 }
 
 console.log("Section weight smoke passed: shared familiar scale, Guide-only tuning, positive compression, expansion, gradients, ordinary Pins, weighted Step, and identity recovery.");
