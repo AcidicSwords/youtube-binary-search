@@ -85,14 +85,12 @@ import {
   isYouTubeApiReady,
   parseYouTubeUrl
 } from "./youtube.js";
+import { createStepFieldController } from "./step-field.js";
 import {
-  DEFAULT_FIELD_RESPONSE,
   DEFAULT_FIELD_BREATH,
-  createStepFieldController,
-  normalizeFieldResponse,
   normalizeFieldBreath,
   breathRateFromResponse
-} from "./step-field.js";
+} from "./step-field-geometry.js";
 import {
   FIELD_FRAME_OWNER,
   createFieldFrameSequencer
@@ -2658,14 +2656,6 @@ function beginGuideDrag(kind, id, event, options = {}) {
   if (!pin && !section) return;
   const timelineSurface = elements.timeline.contains?.(event.target);
   const surface = options.surface || (timelineSurface ? "timeline" : "relative");
-  const guideMapSurface = event.target?.closest?.(".section-endpoints")
-    || event.target?.closest?.(".pin-position-track");
-  const guideItemWidth = guideMapSurface
-    ? guideMapSurface.getBoundingClientRect().width
-    : event.target
-      ?.closest?.(".guide-item")
-      ?.getBoundingClientRect?.()
-      ?.width;
   const timelineWidth = elements.timeline.getBoundingClientRect().width;
   state.guideDrag = {
     kind,
@@ -2673,9 +2663,7 @@ function beginGuideDrag(kind, id, event, options = {}) {
     pointerId: event.pointerId,
     originClientX: event.clientX,
     surface,
-    surfaceWidth: Number(options.surfaceWidth)
-      || (surface === "relative" ? guideItemWidth : timelineWidth)
-      || timelineWidth,
+    surfaceWidth: Number(options.surfaceWidth) || timelineWidth,
     origin: options.origin || (timelineSurface ? "timeline" : "guide"),
     sectionId: options.sectionId || null,
     originSource: pin?.t ?? section.start,
@@ -3395,8 +3383,12 @@ function nudgeQuantum() {
   return frameDuration() ?? normalizeNudgeSeconds(state.nudgeSeconds);
 }
 
+function formatQuantum(value) {
+  return `${Number(Number(value).toFixed(3))} s`;
+}
+
 function nudgeUnitLabel() {
-  return frameDuration() ? "frame" : `${nudgeQuantum()} s`;
+  return frameDuration() ? "frame" : formatQuantum(nudgeQuantum());
 }
 
 function beginNudgeGesture(target) {
@@ -3766,6 +3758,24 @@ function toggleControls() {
 function toggleRangeTools() {
   elements["range-tools"].open = !elements["range-tools"].open;
   elements["range-state"].setAttribute("aria-expanded", String(elements["range-tools"].open));
+}
+
+// Escape is the universal cancel. A live direct manipulation owns it first, so
+// the same key that abandons a drag never also closes the surface behind it.
+function cancelActiveManipulation() {
+  if (state.currentDrag) {
+    finishCurrentDrag({ pointerId: state.currentDrag.pointerId }, { cancel: true });
+    return true;
+  }
+  if (state.guideDrag) {
+    finishGuideDrag({ pointerId: state.guideDrag.pointerId }, { cancel: true });
+    return true;
+  }
+  if (state.dragHandle) {
+    cancelRangeDrag();
+    return true;
+  }
+  return false;
 }
 
 function stopOrClose() {
@@ -4304,7 +4314,7 @@ elements["nudge-seconds"].addEventListener("change", event => {
   }
   state.nudgeSeconds = normalizeNudgeSeconds(parsed);
   persistPreferences();
-  setStatus(`Nudge set to ${state.nudgeSeconds} s.`);
+  setStatus(`Nudge set to ${formatQuantum(state.nudgeSeconds)}.`);
   view.render();
 });
 elements["step-size-seconds"].addEventListener("change", event => {
@@ -4498,8 +4508,10 @@ function previewGuideAddressInput(input) {
     const step = fieldStepPreview(address, "pin");
     frame = { kind: "pin", start: step.start, center: address, end: step.end };
   }
+  // Center shows what the drag path shows for the same edit: a Section's
+  // midpoint, a Pin's own Address. Tail and Lead carry the edited edges.
   state.directFrame = frame;
-  placePlayer(address);
+  placePlayer(frame.center);
   stepField?.previewExtent?.(frame);
   return true;
 }
@@ -4747,7 +4759,7 @@ document.addEventListener("keydown", event => {
   }
   if (event.key === "Escape") {
     event.preventDefault();
-    stopOrClose();
+    if (!cancelActiveManipulation()) stopOrClose();
     return;
   }
   // On compact screens the Guide is modal. Its controls, not the hidden reader,

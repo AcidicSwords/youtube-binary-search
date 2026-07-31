@@ -133,6 +133,10 @@
 
 - Press the Current marker and release without moving. Confirm nothing moves and
   no history entry appears.
+- Drag each manipulable object, then edit the same object's Address in Guide.
+  Confirm both present identical Tail, Center and Lead addresses.
+- Press Escape during a Current drag, a Pin drag, a Section drag, and a Range
+  drag. Confirm each abandons only that gesture and leaves its surface open.
 - Drag Current forward, then back past its own departure. Confirm the Working
   Interval extends and then shortens from the same anchor, and that neither drag
   draws a new interval around the landing point.

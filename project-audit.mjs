@@ -180,6 +180,11 @@ assert.match(app, /function beginCurrentDrag[\s\S]*state\.currentDrag = \{/,
   "Current is its own gesture owner on the Temporal Topography.");
 assert.match(app, /function finishCurrentDrag[\s\S]*completePendingStep\(\)/,
   "Dragging Current settles as one Step transaction.");
+assert.match(app, /function cancelActiveManipulation[\s\S]*currentDrag[\s\S]*guideDrag[\s\S]*dragHandle/,
+  "Escape must cancel the live gesture before it closes anything behind it.");
+assert.match(app, /if \(!cancelActiveManipulation\(\)\) stopOrClose\(\)/);
+assert.match(app, /previewGuideAddressInput[\s\S]*placePlayer\(frame\.center\)/,
+  "An exact edit must present the Frame its drag presents.");
 assert.doesNotMatch(view, /guide-action-move/);
 assert.match(app, /function previewGuideDrag[\s\S]*kind:\s*"section"[\s\S]*start:[\s\S]*center:[\s\S]*end:/);
 assert.match(field, /function previewExtent[\s\S]*renderPreview/);
@@ -301,8 +306,12 @@ assert.ok(
   barZ > surfaceZ,
   "The pane bar must paint above the play/pause surface so Tune inputs stay clickable."
 );
-assert.match(field, /side\.placementGeneration !== runtime\.frameGeneration/,
-  "A callback belonging to a superseded Field Frame must be discarded.");
+// Coalescing comes from parkSide recording the newest desired address before
+// any early return, so a late callback decodes the current Frame by itself.
+assert.match(field, /side\.desiredAddress = target;[\s\S]{0,400}?if \(!force && \(alreadyThere \|\| recentlyPlaced\)\)/,
+  "parkSide must record the newest desired address before it may return early.");
+assert.doesNotMatch(field, /placementGeneration/,
+  "An inert stale-frame token must not survive as decoration.");
 assert.match(app, /function setStepMode/);
 assert.match(app, /function setStepFraction/);
 assert.match(app, /function wrapPlaybackRange/);

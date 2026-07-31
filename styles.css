@@ -1914,12 +1914,6 @@ kbd {
 
 .danger-text { color: var(--danger); }
 
-.section-endpoints {
-  position: relative;
-  height: 43px;
-  margin: 0 10px 9px;
-  color: var(--muted);
-}
 
 .pin-position-track {
   --section-color: var(--pin);
@@ -1985,44 +1979,9 @@ kbd {
   transform: translateX(-50%) scale(1.06);
 }
 
-.section-span-link {
-  position: absolute;
-  top: 20px;
-  left: clamp(
-    17px,
-    var(--section-start),
-    calc(100% - 17px)
-  );
-  width: max(
-    2px,
-    calc(var(--section-end) - var(--section-start))
-  );
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--section-color) 74%, transparent),
-    color-mix(in srgb, var(--section-color) 28%, transparent) 50%,
-    color-mix(in srgb, var(--section-color) 74%, transparent)
-  );
-  box-shadow: 0 0 6px color-mix(in srgb, var(--section-color) 16%, transparent);
-}
 
 .section-span-link::before,
-.section-span-link::after {
-  position: absolute;
-  top: 50%;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--section-color);
-  content: "";
-  transform: translate(-50%, -50%);
-}
 
-.section-span-link::after {
-  right: 0;
-  transform: translate(50%, -50%);
-}
 
 .guide-scrim { display: none; }
 
@@ -2236,9 +2195,6 @@ kbd {
     margin-top: 1px;
   }
 
-  .section-endpoints {
-    padding: 0 7px 7px;
-  }
 }
 
 @media (max-width: 1239px) {
