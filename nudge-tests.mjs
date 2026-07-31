@@ -1,0 +1,288 @@
+// Nudge and direct Current manipulation.
+//
+// Nudge is a source-time operation with one implementation: Timeline
+// Shift-wheel, Shift-drag, the keyboard, and every Guide increment control all
+// call it, and one continuous gesture settles as one Undo transaction.
+import assert from "node:assert/strict";
+import { createSmokeEnvironment, descendants } from "./smoke-harness.mjs";
+
+const env = createSmokeEnvironment();
+const { byId, flush, poll, dispatchDocument, currentText } = env;
+
+await import(`./app.js?nudge=${Date.now()}`);
+window.onYouTubeIframeAPIReady();
+await flush();
+
+byId.get("youtube-url").value = "https://youtu.be/dQw4w9WgXcQ";
+byId.get("load-video").click();
+await flush(5);
+byId.get("context-seconds").value = "0";
+byId.get("context-seconds").dispatch("change");
+await flush();
+
+// A verified frame duration is unavailable from the YouTube adapter, so the
+// quantum is displayed and applied as seconds and never called a frame step.
+assert.equal(byId.get("nudge-seconds").value, "0.042");
+
+// The default quantum must actually move Current. A quantum at or below the
+// kernel's semantic equality tolerance would resolve to the same Address and
+// silently do nothing, so exercise the shipped default before changing it.
+byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 400 });
+await flush(4);
+await poll();
+assert.equal(currentText(), "Current 0:40");
+dispatchDocument("keydown", { key: ".", code: "Period" });
+await flush();
+assert.notEqual(currentText(), "Current 0:40",
+  "One default-quantum Nudge must produce a real semantic movement.");
+assert.match(byId.get("status").textContent, /Nudge Current forward/);
+await env.delay(600);
+await flush();
+
+// Rejecting a quantum that would be swallowed by semantic equality.
+byId.get("nudge-seconds").value = "0.001";
+byId.get("nudge-seconds").dispatch("change");
+await flush();
+assert.ok(Number(byId.get("nudge-seconds").value) > 0.04,
+  "A configured quantum may never fall to or below the semantic tolerance.");
+
+byId.get("nudge-seconds").value = "0.5";
+byId.get("nudge-seconds").dispatch("change");
+await flush();
+assert.match(byId.get("status").textContent, /Nudge set to 0\.5 s/);
+
+// Current drag is an exact Go gesture, not a Pin move. A stationary press
+// performs no movement at all.
+byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 500 });
+await flush();
+await poll();
+assert.equal(currentText(), "Current 0:50");
+const historyBeforePress = byId.get("return-action").disabled;
+byId.get("current-marker").dispatch("pointerdown", {
+  target: byId.get("current-marker"),
+  clientX: 500,
+  pointerId: 71,
+  button: 0,
+  buttons: 1
+});
+dispatchDocument("pointerup", {
+  target: byId.get("current-marker"),
+  clientX: 500,
+  pointerId: 71,
+  buttons: 0
+});
+await flush();
+assert.equal(currentText(), "Current 0:50", "A stationary press performs no movement.");
+assert.equal(byId.get("return-action").disabled, historyBeforePress);
+
+// Crossing the drag threshold previews a candidate Address. Session Current
+// remains unchanged and the original Current stays as a departure marker.
+byId.get("current-marker").dispatch("pointerdown", {
+  target: byId.get("current-marker"),
+  clientX: 500,
+  pointerId: 72,
+  button: 0,
+  buttons: 1
+});
+dispatchDocument("pointermove", {
+  target: byId.get("current-marker"),
+  clientX: 650,
+  pointerId: 72,
+  buttons: 1
+});
+await flush();
+assert.equal(currentText(), "Current 0:50", "Session Current is unchanged during the drag.");
+assert.equal(byId.get("current-departure-marker").hidden, false,
+  "The original Current remains as a faint departure marker.");
+assert.equal(byId.get("current-marker").style.left, "65%",
+  "The Current marker follows the candidate Timeline position.");
+assert.equal(byId.get("field-transport-state").textContent, "Current Frame",
+  "Direct manipulation temporarily supplies an exact Field Frame.");
+assert.equal(env.center().currentTime, 65, "Center displays the candidate frame.");
+
+// Release commits one exact Go and exactly one Undo checkpoint.
+dispatchDocument("pointerup", {
+  target: byId.get("current-marker"),
+  clientX: 650,
+  pointerId: 72,
+  buttons: 0
+});
+await flush();
+await poll();
+assert.equal(currentText(), "Current 1:05");
+assert.equal(byId.get("current-departure-marker").hidden, true);
+assert.match(byId.get("status").textContent, /Moved Current to 1:05/);
+dispatchDocument("keydown", { key: "z", code: "KeyZ" });
+await flush();
+assert.equal(currentText(), "Current 0:50", "One drag creates at most one Undo checkpoint.");
+dispatchDocument("keydown", { key: "c", code: "KeyC" });
+await flush();
+assert.equal(currentText(), "Current 1:05");
+
+// Cancellation restores the original Current presentation and creates no
+// semantic change and no history.
+byId.get("current-marker").dispatch("pointerdown", {
+  target: byId.get("current-marker"),
+  clientX: 650,
+  pointerId: 73,
+  button: 0,
+  buttons: 1
+});
+dispatchDocument("pointermove", {
+  target: byId.get("current-marker"),
+  clientX: 800,
+  pointerId: 73,
+  buttons: 1
+});
+await flush();
+assert.equal(byId.get("current-marker").style.left, "80%");
+dispatchDocument("pointercancel", {
+  target: byId.get("current-marker"),
+  pointerId: 73
+});
+await flush();
+await poll();
+assert.equal(currentText(), "Current 1:05", "Cancellation creates no semantic change.");
+assert.equal(byId.get("current-departure-marker").hidden, true);
+assert.equal(byId.get("current-marker").style.left, "65%");
+
+// Shift-drag is precision mode: reduced gain, quantized in source time.
+byId.get("current-marker").dispatch("pointerdown", {
+  target: byId.get("current-marker"),
+  clientX: 650,
+  pointerId: 74,
+  button: 0,
+  buttons: 1,
+  shiftKey: true
+});
+dispatchDocument("pointermove", {
+  target: byId.get("current-marker"),
+  clientX: 750,
+  pointerId: 74,
+  buttons: 1,
+  shiftKey: true
+});
+await flush();
+// 100px of a 1000px Timeline over a 100 s Range is 10 s at full gain; precision
+// mode reduces that to 2 s and snaps it to the 0.5 s quantum.
+assert.equal(byId.get("current-marker").style.left, "67%");
+dispatchDocument("pointerup", {
+  target: byId.get("current-marker"),
+  clientX: 750,
+  pointerId: 74,
+  buttons: 0
+});
+await flush();
+await poll();
+assert.equal(currentText(), "Current 1:07");
+
+// Shift + wheel over empty Timeline nudges Current, and one continuous wheel
+// series settles as one Undo transaction.
+const wheel = (deltaY, target = byId.get("timeline")) => byId.get("timeline")
+  .dispatch("wheel", { target, deltaY, deltaX: 0, shiftKey: true });
+const plainWheel = byId.get("timeline")
+  .dispatch("wheel", { target: byId.get("timeline"), deltaY: -120, deltaX: 0 });
+await flush();
+assert.equal(plainWheel.defaultPrevented, false,
+  "The browser default is prevented only for an acquired Timeline nudge target.");
+assert.equal(currentText(), "Current 1:07");
+
+const shiftWheel = wheel(-120);
+await flush();
+assert.equal(shiftWheel.defaultPrevented, true);
+assert.equal(currentText(), "Current 1:09.5", "Wheel-up nudges forward by five quanta.");
+wheel(-12);
+await flush();
+assert.equal(currentText(), "Current 1:09.5",
+  "High-resolution deltas accumulate until one discrete quantum is crossed.");
+wheel(-12);
+await flush();
+assert.equal(currentText(), "Current 1:10", "Accumulated deltas then produce one nudge.");
+wheel(60);
+await flush();
+assert.equal(currentText(), "Current 1:09", "Wheel-down nudges backward.");
+await env.delay(600);
+await flush();
+dispatchDocument("keydown", { key: "z", code: "KeyZ" });
+await flush();
+assert.equal(currentText(), "Current 1:07",
+  "One continuous wheel gesture settles as one Undo transaction.");
+
+// Keyboard nudging uses the same operation and the same batching.
+dispatchDocument("keydown", { key: ".", code: "Period" });
+dispatchDocument("keydown", { key: ".", code: "Period", repeat: true });
+dispatchDocument("keydown", { key: ".", code: "Period", repeat: true });
+await flush();
+assert.equal(currentText(), "Current 1:08.5");
+await env.delay(600);
+await flush();
+dispatchDocument("keydown", { key: "z", code: "KeyZ" });
+await flush();
+assert.equal(currentText(), "Current 1:07",
+  "Repeated keydown events belong to one held nudge gesture.");
+dispatchDocument("keydown", { key: ",", code: "Comma" });
+await flush();
+assert.equal(currentText(), "Current 1:06.5", "`,` nudges to the previous quantum.");
+await env.delay(600);
+await flush();
+
+// A Pin under the pointer owns the nudge instead of Current.
+byId.get("pin-label").value = "Nudge target";
+byId.get("pin-capture").dispatch("submit");
+await flush();
+// Move Current away so the Pin is an independent manipulable object.
+byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 300 });
+await flush();
+await poll();
+const pinMarker = descendants(byId.get("pin-lane"))
+  .find(node => node.dataset.pinGo && /1:06\.5/.test(node["aria-label"] || ""));
+assert.ok(pinMarker, "The retained Pin must be an exact manipulable object.");
+const currentBeforePinNudge = currentText();
+assert.equal(currentBeforePinNudge, "Current 0:30");
+wheel(-24, pinMarker);
+await flush();
+assert.equal(currentText(), currentBeforePinNudge,
+  "Nudging a Pin must not move Current.");
+const pinAddress = () => descendants(byId.get("pins-list"))
+  .find(node => node.dataset.addressInput === "pin")?.value;
+assert.equal(pinAddress(), "1:07", "Shift-wheel over a Pin nudges that Pin.");
+await env.delay(600);
+await flush();
+
+// The Guide increment controls call the same Nudge operation.
+const guideNudgeForward = descendants(byId.get("pins-list"))
+  .find(node => node.dataset.nudgeTarget === "pin" && node.dataset.nudgeDirection === "1");
+assert.ok(guideNudgeForward, "Guide must expose the shared Nudge increments.");
+byId.get("pins-list").dispatch("click", { target: guideNudgeForward });
+await flush();
+assert.equal(pinAddress(), "1:07.5",
+  "Guide increments and Timeline Shift-wheel are one operation.");
+await env.delay(600);
+await flush();
+dispatchDocument("keydown", { key: "z", code: "KeyZ" });
+await flush();
+assert.equal(pinAddress(), "1:07", "One Guide nudge gesture is one Undo checkpoint.");
+
+// An Address input previews the candidate Field Frame before commit, and
+// Escape cancels without writing Session state.
+const committedPinAddress = () => descendants(byId.get("pin-lane"))
+  .find(node => node.dataset.pinGo)?.["aria-label"];
+const previewInput = descendants(byId.get("pins-list"))
+  .find(node => node.dataset.addressInput === "pin");
+const addressBeforePreview = committedPinAddress();
+previewInput.value = "0:20";
+byId.get("pins-list").dispatch("input", { target: previewInput });
+await flush();
+assert.equal(byId.get("field-transport-state").textContent, "Pin Frame",
+  "Typing an Address previews the candidate Field Frame.");
+assert.equal(env.center().currentTime, 20);
+assert.equal(committedPinAddress(), addressBeforePreview,
+  "Previewing an Address writes no Session state.");
+byId.get("pins-list").dispatch("keydown", { target: previewInput, key: "Escape" });
+await flush();
+await poll();
+assert.notEqual(byId.get("field-transport-state").textContent, "Pin Frame",
+  "Escape cancels the candidate Frame.");
+assert.equal(committedPinAddress(), addressBeforePreview);
+
+console.log("Nudge tests passed: source-time quantum, Current drag commit and cancel, Shift-drag precision, Shift-wheel accumulation and targeting, keyboard nudging, one Undo per gesture, Guide increments sharing the same operation, and Guide Address preview and cancellation.");

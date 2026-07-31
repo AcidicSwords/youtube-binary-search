@@ -1,13 +1,33 @@
 // Step Field execution controller. Tail and Lead are muted physical projections of Session state.
-// Session owns semantic Current/Interval. This controller owns only physical pane addresses,
-// offsets, rates, and Hold/Stretch state.
+// Session owns semantic Current/Interval. This controller owns only physical Tail/Lead players,
+// Field Frame placement, the slideshow transition lifecycle, the breathing runtime, boundary
+// synchronization, Hold, and stale-event rejection. It imports neither operator arithmetic nor
+// Guide topology.
 import { EPSILON, clamp } from "./range-geometry.js";
 import { YOUTUBE_STATE, createYouTubePlayer, isYouTubeApiReady } from "./youtube.js";
+import {
+  FIELD_FRAME_OWNER,
+  FIELD_FRAME_DIRECTION,
+  classifyDirection,
+  directFrame
+} from "./field-frame.js";
 import {
   STEP_FIELD_PHASE,
   FIELD_REACH_TOLERANCE,
   DEFAULT_FIELD_RESPONSE,
+  BREATH_PHASE,
+  BREATH_RATE_STEPS,
+  DEFAULT_FIELD_BREATH,
   normalizeFieldResponse,
+  normalizeFieldBreath,
+  breathRatePair,
+  breathRateFromResponse,
+  breathSideRate,
+  effectiveBreathBounds,
+  createBreathRuntime,
+  advanceBreath,
+  holdBreath,
+  resumeBreath,
   deriveFieldBounds,
   deriveStepField,
   normalizeFieldReach,
@@ -21,7 +41,13 @@ import {
 export {
   STEP_FIELD_PHASE,
   DEFAULT_FIELD_RESPONSE,
+  DEFAULT_FIELD_BREATH,
+  BREATH_PHASE,
+  BREATH_RATE_STEPS,
   normalizeFieldResponse,
+  normalizeFieldBreath,
+  breathRatePair,
+  breathRateFromResponse,
   deriveFieldBounds,
   deriveStepField,
   normalizeFieldReach,
@@ -43,18 +69,36 @@ const DIRECT_PLACE_TOLERANCE = 1.35;
 const RATE_RETRY_MS = 550;
 const PLACE_RETRY_MS = 260;
 const MAX_CENTER_DELTA = 2.5;
+// One directional slideshow transition. The semantic commit never waits for it.
+export const FIELD_TRANSITION_MS = 260;
 
 function defaultPreferences() {
   return {
     stepFieldEnabled: true,
     tailVisible: true,
     leadVisible: true,
+    reducedMotion: false,
+    breathRate: DEFAULT_FIELD_BREATH.rate,
     ...DEFAULT_FIELD_RESPONSE
   };
 }
 
 function snapshotReach(snapshot) {
   return normalizeFieldReach(snapshot?.stepReach);
+}
+
+// The configured breathing relation. A snapshot without an explicit Field
+// Breath still describes one: its outer offset is the legacy configured Offset
+// and its inner offset is a proportional fraction of it.
+function snapshotBreath(snapshot) {
+  if (snapshot?.fieldBreath) return normalizeFieldBreath(snapshot.fieldBreath);
+  const reach = snapshotReach(snapshot);
+  const outer = Math.max(reach.backward, reach.forward);
+  return normalizeFieldBreath({
+    inner: Math.max(EPSILON, outer / 4),
+    outer,
+    rate: DEFAULT_FIELD_BREATH.rate
+  });
 }
 
 function structuralKey(snapshot) {
@@ -95,11 +139,9 @@ export function createStepFieldController({
     "step-field", "step-field-toggle", "step-field-meta",
     "tail-pane", "tail-meta", "tail-player-surface", "tail-collapse", "tail-restore",
     "lead-pane", "lead-meta", "lead-player-surface", "lead-collapse", "lead-restore",
-    "center-meta", "tail-rate-select", "lead-rate-select",
-    "tail-field-toggle", "tail-field-toggle-label", "tail-offset-state",
-    "lead-field-toggle", "lead-field-toggle-label", "lead-offset-state",
+    "center-meta", "tail-offset-state", "lead-offset-state",
     "field-both-toggle", "field-both-toggle-label", "field-transport-state", "field-rate-state",
-    "field-span-label"
+    "field-span-label", "field-breath-rate"
   ];
   const elements = Object.fromEntries(ids.map(id => [id, document?.getElementById?.(id) || null]));
 
@@ -119,7 +161,16 @@ export function createStepFieldController({
     suspended: false,
     preview: null,
     field: null,
-    fieldKey: ""
+    fieldKey: "",
+    // Breathing runtime. Held until a genuine Center playback gesture begins.
+    breath: createBreathRuntime(DEFAULT_FIELD_BREATH),
+    // Field Frame placement and its one directional transition. The generation
+    // token discards player callbacks belonging to a superseded Frame.
+    frame: null,
+    frameIdentity: null,
+    frameGeneration: 0,
+    transition: { direction: FIELD_FRAME_DIRECTION.NONE, generation: 0, at: 0 },
+    transitionTimer: null
   };
 
   function createSideState(role, elementId, requestedRate) {
@@ -147,6 +198,8 @@ export function createStepFieldController({
       desiredAddress: null,
       lastPlacedAddress: null,
       lastPlaceAt: 0,
+      placementGeneration: 0,
+      waiting: false,
       rateAvailable: true,
       blocked: false,
       error: false,
@@ -192,8 +245,10 @@ export function createStepFieldController({
     return role === "tail" ? "backward" : "forward";
   }
 
+  // The configured Outer Offset is the Field-level breathing bound. Both sides
+  // share it; there is no independent per-side configured Offset.
   function configuredOffset(role, snapshot = getSnapshot?.()) {
-    return snapshotReach(snapshot)[directionFor(role)];
+    return snapshotBreath(snapshot).outer;
   }
 
   function effectiveOffset(role, center, snapshot = getSnapshot?.()) {
@@ -229,46 +284,69 @@ export function createStepFieldController({
     return clamp(Math.max(0, raw), 0, Math.max(0, maximum));
   }
 
-  function snapshotPreview(snapshot = getSnapshot?.()) {
-    const value = snapshot?.fieldPreview;
-    if (
-      !value
-      || ![
-        "step",
-        "refine",
-        "reopen",
-        "resolution",
-        "context",
-        "section"
-      ].includes(value.kind)
-      || !snapshot?.range
-    ) {
-      return null;
-    }
+  // The application resolves the ambient Frame owner and hands this controller
+  // finished source Addresses. Nothing here recomputes an operator target.
+  function snapshotFrame(snapshot = getSnapshot?.()) {
+    const value = snapshot?.fieldFrame ?? snapshot?.fieldPreview;
+    if (!value || !snapshot?.range) return null;
     const center = clamp(
       Number(value.center),
       snapshot.range.start,
       snapshot.range.end
     );
+    const tail = Number(value.tail ?? value.start);
+    const lead = Number(value.lead ?? value.end);
     if (
       !Number.isFinite(center)
-      || !Number.isFinite(value.start)
-      || !Number.isFinite(value.end)
+      || !Number.isFinite(tail)
+      || !Number.isFinite(lead)
     ) return null;
-    const start = clamp(value.start, snapshot.range.start, center);
-    const end = clamp(value.end, center, snapshot.range.end);
+    const owner = [
+      FIELD_FRAME_OWNER.CONTEXT,
+      FIELD_FRAME_OWNER.OPERATOR,
+      FIELD_FRAME_OWNER.DIRECT
+    ].includes(value.owner)
+      ? value.owner
+      : value.kind === "context"
+        ? FIELD_FRAME_OWNER.CONTEXT
+        : FIELD_FRAME_OWNER.OPERATOR;
     return {
-      kind: value.kind,
-      start,
+      owner,
+      kind: value.kind || "step",
+      tail: clamp(Math.min(tail, center), snapshot.range.start, center),
       center,
-      end,
+      lead: clamp(Math.max(lead, center), center, snapshot.range.end),
+      direction: value.direction || FIELD_FRAME_DIRECTION.NONE,
+      revision: Number.isFinite(value.revision) ? value.revision : null,
+      outgoing: Number.isFinite(value.outgoing) ? value.outgoing : null,
       backwardDistance: Number(value.backwardDistance),
       forwardDistance: Number(value.forwardDistance)
     };
   }
 
+  function activeFrame(snapshot = getSnapshot?.()) {
+    return runtime.preview || snapshotFrame(snapshot);
+  }
+
+  // Retained for the existing call sites that describe a Frame by its extent.
   function activePreview(snapshot = getSnapshot?.()) {
-    return runtime.preview || snapshotPreview(snapshot);
+    const frame = activeFrame(snapshot);
+    if (!frame) return null;
+    return {
+      ...frame,
+      start: frame.tail,
+      end: frame.lead
+    };
+  }
+
+  function frameIdentityOf(frame) {
+    if (!frame) return null;
+    return [
+      frame.owner,
+      frame.kind,
+      frame.tail.toFixed(3),
+      frame.lead.toFixed(3)
+    ].join("|");
   }
 
   function fieldIsEnabled(prefs = preferences()) {
@@ -346,20 +424,10 @@ export function createStepFieldController({
     elements["lead-restore"]?.addEventListener?.("click", () => {
       changePreferences({ leadVisible: true, stepFieldEnabled: true });
     });
-    elements["tail-rate-select"]?.addEventListener?.("change", event => {
-      changePreferences({ tailRate: Number(event.target.value) });
-      if (!suspensionRequired() && sides.tail.mode === FIELD_SIDE_MODE.STRETCHING) {
-        requestStretchRate(sides.tail, true);
-      }
+    // One breathing-rate pair, not two conceptually independent side rates.
+    elements["field-breath-rate"]?.addEventListener?.("change", event => {
+      changePreferences({ breathRate: Number(event.target.value) });
     });
-    elements["lead-rate-select"]?.addEventListener?.("change", event => {
-      changePreferences({ leadRate: Number(event.target.value) });
-      if (!suspensionRequired() && sides.lead.mode === FIELD_SIDE_MODE.STRETCHING) {
-        requestStretchRate(sides.lead, true);
-      }
-    });
-    elements["tail-field-toggle"]?.addEventListener?.("click", () => toggleSide("tail"));
-    elements["lead-field-toggle"]?.addEventListener?.("click", () => toggleSide("lead"));
     elements["field-both-toggle"]?.addEventListener?.("click", toggleBoth);
   }
 
@@ -382,7 +450,14 @@ export function createStepFieldController({
           side.playback = name;
           if (name === YOUTUBE_STATE.CUED) {
             side.sourceReady = true;
-            if (Number.isFinite(side.desiredAddress)) side.adapter?.place?.(side.desiredAddress);
+            // A callback belonging to a superseded Field Frame is discarded:
+            // rapid traversal must settle on the latest resulting Frame rather
+            // than replaying every obsolete intermediate placement.
+            const staleFrame = side.placementGeneration !== 0
+              && side.placementGeneration !== runtime.frameGeneration;
+            if (Number.isFinite(side.desiredAddress) && !staleFrame) {
+              side.adapter?.place?.(side.desiredAddress);
+            }
             if (side.pendingPlay && sidePlaybackAllowed(role)) {
               side.adapter?.play?.();
               side.playback = "starting";
@@ -398,7 +473,7 @@ export function createStepFieldController({
             side.activated = true;
             side.blocked = false;
             refreshSideSnapshot(side);
-            populateRateControl(role, preferences());
+            populateBreathRateControl(preferences());
             // Delayed iframe events cannot revive a hidden, disabled, suspended,
             // or no-longer-playing projection after its owner has changed.
             if (!sidePlaybackAllowed(role)) {
@@ -592,64 +667,47 @@ export function createStepFieldController({
       .sort((a, b) => a - b);
   }
 
-  function populateRateControl(role, prefs) {
-    const side = sides[role];
-    const select = elements[`${role}-rate-select`];
-    if (!select || !side.ready) return;
-    refreshSideSnapshot(side);
-    const rates = directionalRates(side);
-    const key = rates.join("|");
+  // One combined breathing-rate pair. The configured value is the outward rate
+  // difference; the inward phase exchanges the sides without rewriting it.
+  function populateBreathRateControl(prefs) {
+    const select = elements["field-breath-rate"];
+    if (!select) return;
+    const steps = BREATH_RATE_STEPS;
+    const key = steps.join("|");
     if (select.dataset.rates !== key) {
       select.replaceChildren();
-      if (!rates.length) {
+      for (const step of steps) {
+        const pair = breathRatePair(step);
         const option = document.createElement("option");
-        option.value = "1";
-        option.textContent = side.role === "tail" ? "No slow rate" : "No fast rate";
+        option.value = String(step);
+        option.textContent = `${pair.tailRate}\u00d7 / ${pair.leadRate}\u00d7`;
         select.appendChild(option);
-      } else {
-        for (const rate of rates) {
-          const option = document.createElement("option");
-          option.value = String(rate);
-          option.textContent = `${rate}×`;
-          select.appendChild(option);
-        }
       }
       select.dataset.rates = key;
     }
-    select.disabled = !rates.length;
-    const requested = Number(prefs[`${role}Rate`]);
-    const resolved = rates.length ? chooseNearestRate(rates, requested) : 1;
-    select.value = String(resolved);
-    select.dataset.requested = String(requested);
+    select.value = String(normalizeFieldBreath({ rate: prefs.breathRate }).rate);
   }
 
   function requestStretchRate(side, force = false) {
-    side.requestedRate = Number(preferences()[`${side.role}Rate`]);
-    refreshSideSnapshot(side);
-    const rate = chooseDirectionalRate(side.availableRates, side.requestedRate, side.role);
-    if (rate === null && !side.ratesKnown) {
-      // getAvailablePlaybackRates commonly reports only 1× until the iframe has
-      // actually entered playback. Unknown is not the same as unsupported.
-      side.rateAvailable = true;
-      requestRate(side, 1, force);
-      return undefined;
-    }
-    side.rateAvailable = rate !== null;
-    if (rate === null) {
-      requestRate(side, 1, force);
-      return null;
-    }
-    requestRate(side, rate, force);
-    return rate;
+    const configured = snapshotBreath(getSnapshot?.());
+    const pair = breathRatePair(configured.rate);
+    const desired = side.role === "tail" ? pair.tailRate : pair.leadRate;
+    return requestBreathRate(side, desired, force);
   }
 
   function establishSide(side, center, snapshot) {
-    const offset = effectiveOffset(side.role, center, snapshot);
+    // A fresh Field is Held at its configured outer offset. Breathing begins at
+    // the inner boundary only when Center playback resumes the cycle.
+    const bounds = sideBreathBounds(side.role, center, snapshot);
+    const offset = bounds.outer;
     side.mode = FIELD_SIDE_MODE.HELD;
     side.offset = offset;
     side.progressOffset = offset;
+    side.waiting = false;
     side.configuredOffset = configuredOffset(side.role, snapshot);
     side.beforeStretchOffset = offset;
+    runtime.breath.sides[side.role].offset = offset;
+    runtime.breath.sides[side.role].waiting = false;
     if (sideIsVisible(side.role)) {
       pauseSide(side);
       parkAtRelation(side, center, snapshot, { force: true });
@@ -660,6 +718,7 @@ export function createStepFieldController({
 
   function establish(snapshot, address = snapshot.current) {
     const center = clamp(address, snapshot.range.start, snapshot.range.end);
+    runtime.breath = holdBreath(runtime.breath, snapshotBreath(snapshot));
     for (const side of Object.values(sides)) establishSide(side, center, snapshot);
     runtime.structuralKey = structuralKey(snapshot);
     runtime.semanticCurrent = center;
@@ -684,15 +743,18 @@ export function createStepFieldController({
         side.pendingPlay = false;
         continue;
       }
-      const maximum = effectiveOffset(side.role, nextCenter, snapshot);
+      const bounds = sideBreathBounds(side.role, nextCenter, snapshot);
       const retained = side.offset > REACH_TOLERANCE
         ? side.offset
         : side.configuredOffset;
-      const offset = preserve ? clamp(retained, 0, maximum) : maximum;
+      const offset = preserve ? clamp(retained, 0, bounds.outer) : bounds.outer;
       side.mode = FIELD_SIDE_MODE.HELD;
       side.offset = offset;
       side.progressOffset = offset;
+      side.waiting = false;
       side.configuredOffset = configuredOffset(side.role, snapshot);
+      runtime.breath.sides[side.role].offset = offset;
+      runtime.breath.sides[side.role].waiting = false;
       pauseSide(side);
       if (!preview) {
         parkAtRelation(side, nextCenter, snapshot, { force: true });
@@ -713,10 +775,14 @@ export function createStepFieldController({
     else publish(snapshot);
   }
 
-  function reconfigureOffset(role) {
+  // Reconcile the live relation with a newly configured Inner/Outer Offset. A
+  // side already following its configured bound follows the new one; a partial
+  // relation is preserved and only clamped into the new [x, y] when necessary.
+  // Editing configuration never becomes a Hold and never rewrites Session state.
+  function reconfigureOffset(role = "both") {
     const snapshot = getSnapshot?.();
-    const side = sides[role];
-    if (!side || !snapshot?.videoLoaded || !snapshot.range) return false;
+    if (!snapshot?.videoLoaded || !snapshot.range) return false;
+    const roles = role === "both" || !sides[role] ? ["tail", "lead"] : [role];
     const prefs = preferences();
     const preview = activePreview(snapshot);
     const center = clamp(
@@ -726,36 +792,30 @@ export function createStepFieldController({
     );
     if (!Number.isFinite(center)) return false;
 
-    const previousMaximum = Math.min(
-      Math.max(0, side.configuredOffset),
-      role === "tail"
-        ? Math.max(0, center - snapshot.range.start)
-        : Math.max(0, snapshot.range.end - center)
-    );
-    const followedConfiguredTarget = Math.abs(
-      side.offset - previousMaximum
-    ) <= REACH_TOLERANCE;
-    const maximum = effectiveOffset(role, center, snapshot);
-    side.configuredOffset = configuredOffset(role, snapshot);
-
-    if (side.mode === FIELD_SIDE_MODE.HELD) {
-      side.offset = followedConfiguredTarget
-        ? maximum
-        : clamp(side.offset, 0, maximum);
-      side.progressOffset = side.offset;
-      side.beforeStretchOffset = side.offset;
-      if (sideIsVisible(role, prefs) && !preview) {
+    for (const name of roles) {
+      const side = sides[name];
+      const previousMaximum = Math.min(
+        Math.max(0, side.configuredOffset),
+        name === "tail"
+          ? Math.max(0, center - snapshot.range.start)
+          : Math.max(0, snapshot.range.end - center)
+      );
+      const followedConfiguredTarget = Math.abs(
+        side.offset - previousMaximum
+      ) <= REACH_TOLERANCE;
+      const bounds = sideBreathBounds(name, center, snapshot);
+      side.configuredOffset = configuredOffset(name, snapshot);
+      const attained = followedConfiguredTarget
+        ? bounds.outer
+        : clamp(side.offset, Math.min(bounds.inner, bounds.outer), bounds.outer);
+      side.offset = attained;
+      side.progressOffset = attained;
+      side.beforeStretchOffset = clamp(side.beforeStretchOffset, 0, bounds.outer);
+      runtime.breath.sides[name].offset = attained;
+      if (side.mode === FIELD_SIDE_MODE.HELD && sideIsVisible(name, prefs) && !preview) {
         pauseSide(side);
         parkAtRelation(side, center, snapshot, { force: true });
       }
-    } else {
-      side.offset = clamp(side.offset, 0, maximum);
-      side.progressOffset = clamp(side.progressOffset, side.offset, maximum);
-      side.beforeStretchOffset = clamp(
-        side.beforeStretchOffset,
-        0,
-        maximum
-      );
     }
 
     runtime.semanticCurrent = center;
@@ -765,51 +825,88 @@ export function createStepFieldController({
     return true;
   }
 
+  // Direct manipulation temporarily supplies an exact Field Frame. It never
+  // mutates the configured breathing relation or the ambient Frame.
   function previewExtent(config = {}) {
     const snapshot = getSnapshot?.();
     if (!snapshot?.videoLoaded || !snapshot.range) return false;
-    const kind = config.kind;
-    if (kind !== "pin" && kind !== "section") return false;
-    if (
-      !Number.isFinite(config.start)
-      || !Number.isFinite(config.end)
-    ) return false;
-    const center = clamp(
-      Number(config.center),
-      snapshot.range.start,
-      snapshot.range.end
-    );
-    if (!Number.isFinite(center)) return false;
-    const tailDistance = Math.max(
-      0,
-      center - clamp(config.start, snapshot.range.start, center)
-    );
-    const leadDistance = Math.max(
-      0,
-      clamp(config.end, center, snapshot.range.end) - center
-    );
-    runtime.preview = {
-      kind,
-      center,
-      start: center - tailDistance,
-      end: center + leadDistance
+    const frame = directFrame({
+      kind: config.kind,
+      start: config.start,
+      center: config.center,
+      end: config.end,
+      range: snapshot.range
+    });
+    if (!frame) return false;
+    runtime.preview = frame;
+    renderPreview(snapshot, frame);
+    return true;
+  }
+
+  // One visual event attached to one semantic movement. The commit has already
+  // happened; this only classifies and marks the direction it should read as.
+  function beginFrameTransition(frame) {
+    const identity = frameIdentityOf(frame);
+    if (identity === runtime.frameIdentity) {
+      // Context transport moves Center inside a frame it already owns. That is
+      // not a reframing and must not trigger another Tail/Lead reassignment.
+      runtime.frame = frame;
+      return false;
+    }
+    const previous = runtime.frame;
+    const direction = Number.isFinite(frame.outgoing)
+      ? classifyDirection(frame.outgoing, frame.center)
+      : previous
+        ? classifyDirection(previous.center, frame.center)
+        : frame.direction || FIELD_FRAME_DIRECTION.NONE;
+    runtime.frame = frame;
+    runtime.frameIdentity = identity;
+    // Repeated same-direction movements coalesce: the generation advances while
+    // the visible transition simply continues from where it already is.
+    runtime.frameGeneration += 1;
+    runtime.transition = {
+      direction: direction || FIELD_FRAME_DIRECTION.NONE,
+      generation: runtime.frameGeneration,
+      at: Date.now()
     };
-    renderPreview(snapshot, runtime.preview);
+    if (runtime.transitionTimer !== null) {
+      clearTimeout(runtime.transitionTimer);
+      runtime.transitionTimer = null;
+    }
+    if (
+      runtime.transition.direction !== FIELD_FRAME_DIRECTION.NONE
+      && typeof setTimeout === "function"
+    ) {
+      const generation = runtime.frameGeneration;
+      runtime.transitionTimer = setTimeout(() => {
+        runtime.transitionTimer = null;
+        if (runtime.frameGeneration !== generation) return;
+        runtime.transition = {
+          direction: FIELD_FRAME_DIRECTION.NONE,
+          generation,
+          at: Date.now()
+        };
+        render(getSnapshot?.(), runtime.field);
+      }, FIELD_TRANSITION_MS);
+      runtime.transitionTimer?.unref?.();
+    }
     return true;
   }
 
   function renderPreview(
     snapshot = getSnapshot?.(),
-    preview = activePreview(snapshot)
+    frame = activeFrame(snapshot)
   ) {
-    if (!preview || !snapshot?.videoLoaded || !snapshot.range) return null;
+    if (!frame || !snapshot?.videoLoaded || !snapshot.range) return null;
+    const preview = { ...frame, start: frame.tail, end: frame.lead };
     const prefs = preferences();
-    // Immediate semantic transitions can request a preview before the next
+    // Immediate semantic transitions can request a Frame before the next
     // polling render. Make the hosts measurable before creating side players.
     if (Object.values(sides).some(side => !side.adapter)) {
       render(snapshot, runtime.field);
     }
     ensurePlayers(prefs);
+    beginFrameTransition(frame);
     const addresses = {
       tail: preview.start,
       lead: preview.end
@@ -817,6 +914,7 @@ export function createStepFieldController({
     for (const role of ["tail", "lead"]) {
       if (!sideIsVisible(role, prefs)) continue;
       const side = sides[role];
+      side.placementGeneration = runtime.frameGeneration;
       pauseSide(side);
       parkSide(side, addresses[role]);
     }
@@ -872,29 +970,89 @@ export function createStepFieldController({
     return true;
   }
 
+  // Effective breathing bounds for one side, clipped by the room Range leaves it.
+  function sideBreathBounds(role, center, snapshot = getSnapshot?.()) {
+    return effectiveBreathBounds(
+      snapshotBreath(snapshot),
+      effectiveOffset(role, center, snapshot)
+    );
+  }
+
+  function breathSides(center, snapshot = getSnapshot?.(), prefs = preferences()) {
+    return Object.fromEntries(["tail", "lead"].map(role => [role, {
+      operational: sideIsVisible(role, prefs) && sideCanRun(sides[role]),
+      available: effectiveOffset(role, center, snapshot)
+    }]));
+  }
+
+  function syncBreathOffsets(center, snapshot = getSnapshot?.()) {
+    for (const role of ["tail", "lead"]) {
+      const side = sides[role];
+      const bounds = sideBreathBounds(role, center, snapshot);
+      const offset = clamp(runtime.breath.sides[role].offset, 0, bounds.outer);
+      runtime.breath.sides[role].offset = offset;
+      side.offset = offset;
+      side.progressOffset = offset;
+      side.waiting = Boolean(runtime.breath.sides[role].waiting);
+      side.mode = runtime.breath.held
+        ? FIELD_SIDE_MODE.HELD
+        : FIELD_SIDE_MODE.STRETCHING;
+    }
+  }
+
+  // A fresh playback gesture begins the cycle at the inner boundary: x → expand
+  // → y → contract → x. The deliberate Stretch control instead resumes from the
+  // attained relation and its preserved direction.
+  function startBreathCycle(center, snapshot = getSnapshot?.()) {
+    const configured = snapshotBreath(snapshot);
+    runtime.breath = {
+      phase: BREATH_PHASE.EXPANDING,
+      held: false,
+      sides: Object.fromEntries(["tail", "lead"].map(role => {
+        const bounds = sideBreathBounds(role, center, snapshot);
+        return [role, { offset: Math.min(bounds.inner, bounds.outer), waiting: false }];
+      }))
+    };
+    return configured;
+  }
+
+  // Breathing begins at the inner boundary and expands outward. Tail is always
+  // behind Center and Lead always ahead; neither reaches Center.
   function beginStretch(side, center, snapshot, { play = false } = {}) {
     if (!sideCanRun(side)) return false;
     side.beforeStretchOffset = side.offset;
     side.mode = FIELD_SIDE_MODE.STRETCHING;
-    side.offset = 0;
-    side.progressOffset = 0;
+    const bounds = sideBreathBounds(side.role, center, snapshot);
+    const offset = clamp(
+      runtime.breath.sides[side.role].offset > EPSILON
+        ? runtime.breath.sides[side.role].offset
+        : bounds.inner,
+      Math.min(bounds.inner, bounds.outer),
+      bounds.outer
+    );
+    runtime.breath.sides[side.role].offset = offset;
+    runtime.breath.sides[side.role].waiting = false;
+    side.offset = offset;
+    side.progressOffset = offset;
     side.configuredOffset = configuredOffset(side.role, snapshot);
+    side.waiting = false;
     side.blocked = false;
     side.adapter?.mute?.();
     requestRate(side, 1, true);
 
-    // Stretch is one operation: refold to physical Center, then diverge toward
-    // the configured maximum. The source must already be cued before the trusted
-    // play gesture; a cue and play issued together race in the YouTube iframe.
-    side.desiredAddress = center;
-    side.lastPlacedAddress = center;
+    // The source must already be cued before the trusted play gesture; a cue and
+    // play issued together race in the YouTube iframe.
+    const address = exactAddress(side.role, center, offset, snapshot.range);
+    side.desiredAddress = address;
+    side.lastPlacedAddress = address;
     side.lastPlaceAt = Date.now();
+    side.placementGeneration = runtime.frameGeneration;
     side.pendingPlay = Boolean(play);
     if (side.sourceReady) {
-      side.adapter?.place?.(center);
+      side.adapter?.place?.(address);
     } else if (side.playback !== "loading") {
       side.playback = "loading";
-      side.adapter?.cue?.(side.videoId, center);
+      side.adapter?.cue?.(side.videoId, address);
     }
     if (play && side.sourceReady) {
       side.adapter?.play?.();
@@ -924,6 +1082,11 @@ export function createStepFieldController({
     );
     const started = { tail: false, lead: false };
     runtime.centerWasRunning = true;
+    // Ordinary playback hands presentation to the Field Breath. Preview and
+    // Breath are mutually exclusive presentation owners. A fresh play gesture
+    // starts the cycle at the inner boundary and expands outward.
+    runtime.preview = null;
+    startBreathCycle(center, snapshot);
     for (const role of ["tail", "lead"]) {
       const side = sides[role];
       if (
@@ -982,8 +1145,17 @@ export function createStepFieldController({
       );
       side.adapter?.mute?.();
       side.adapter?.place?.(side.desiredAddress);
+      // Resuming after a wrap continues the preserved breathing phase. The
+      // outward pair is only correct while expanding; a contracting Field needs
+      // the exchanged rates immediately, not one controller tick later.
       if (side.mode === FIELD_SIDE_MODE.STRETCHING) {
-        requestStretchRate(side, true);
+        requestBreathRate(side, breathSideRate({
+          role,
+          phase: runtime.breath.phase,
+          rate: snapshotBreath(snapshot).rate,
+          waiting: runtime.breath.sides[role].waiting,
+          held: runtime.breath.held
+        }), true);
       } else {
         requestRate(side, 1, true);
       }
@@ -1025,18 +1197,24 @@ export function createStepFieldController({
     };
   }
 
-  function stretch(role) {
+  // Breathing is one coordinated Field relation, so Stretch resumes the cycle on
+  // every operational side at once. A dormant side is simply not an operand.
+  function stretch(role = "both") {
     const snapshot = getSnapshot?.();
-    const side = sides[role];
     const suspendedNow = suspensionRequired(snapshot);
-    if (
-      suspendedNow
-      || !sideIsOperational(role, snapshot)
-    ) return;
+    if (suspendedNow || !snapshot?.range) return;
+    const roles = role === "both"
+      ? controllableRoles(snapshot)
+      : sideIsOperational(role, snapshot) ? [role] : [];
+    if (!roles.length) return;
     const center = clamp(Number(snapshot.center?.time ?? snapshot.current), snapshot.range.start, snapshot.range.end);
     const centerRunning = [YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(snapshot.center?.state);
     if (centerRunning) runtime.centerWasRunning = true;
-    beginStretch(side, center, snapshot, { play: centerRunning && !suspendedNow });
+    // Stretch resumes from the attained relation and the preserved direction.
+    runtime.breath = resumeBreath(runtime.breath, snapshotBreath(snapshot));
+    for (const name of roles) {
+      beginStretch(sides[name], center, snapshot, { play: centerRunning && !suspendedNow });
+    }
     publish(snapshot);
   }
 
@@ -1055,44 +1233,55 @@ export function createStepFieldController({
     return plausible ? measured : clamp(side.progressOffset, 0, maximum);
   }
 
-  function hold(role) {
+  // Hold alone stops the breathing cycle. It preserves each attained offset
+  // within [x, y], sets every held side to Center rate, and preserves the
+  // breathing direction for later resumption. It writes no Session state.
+  function hold(role = "both") {
     const snapshot = getSnapshot?.();
-    const side = sides[role];
-    if (
-      suspensionRequired(snapshot)
-      || !sideIsOperational(role, snapshot)
-    ) return null;
+    if (suspensionRequired(snapshot) || !snapshot?.range) return null;
+    const roles = role === "both"
+      ? controllableRoles(snapshot)
+      : sideIsOperational(role, snapshot) ? [role] : [];
+    if (!roles.length) return null;
     const center = clamp(Number(snapshot.center?.time ?? snapshot.current), snapshot.range.start, snapshot.range.end);
-    let offset;
-    if (side.mode === FIELD_SIDE_MODE.STRETCHING) {
-      offset = measuredOffset(side, center, snapshot);
-      // Holding an armed-but-paused zero-width Stretch restores the visible field
-      // instead of accidentally redefining Step Reach to its minimum.
-      if (offset <= REACH_TOLERANCE && !runtime.centerWasRunning && side.beforeStretchOffset > REACH_TOLERANCE) {
-        offset = clamp(side.beforeStretchOffset, 0, effectiveOffset(role, center, snapshot));
+    let attained = null;
+    for (const name of roles) {
+      const side = sides[name];
+      const bounds = sideBreathBounds(name, center, snapshot);
+      let offset = side.mode === FIELD_SIDE_MODE.STRETCHING
+        ? measuredOffset(side, center, snapshot)
+        : clamp(side.offset, 0, bounds.outer);
+      // Holding an armed-but-not-yet-playing Field keeps its visible relation
+      // instead of collapsing the Field onto Center.
+      if (
+        offset <= REACH_TOLERANCE
+        && !runtime.centerWasRunning
+        && side.beforeStretchOffset > REACH_TOLERANCE
+      ) {
+        offset = clamp(side.beforeStretchOffset, 0, bounds.outer);
       }
-    } else {
-      offset = clamp(side.offset, 0, effectiveOffset(role, center, snapshot));
+      offset = clamp(offset, Math.min(bounds.inner, bounds.outer), bounds.outer);
+      runtime.breath.sides[name].offset = offset;
+      side.offset = offset;
+      side.progressOffset = offset;
+      side.configuredOffset = configuredOffset(name, snapshot);
+      side.waiting = false;
+      requestRate(side, 1, true);
+      side.desiredAddress = exactAddress(name, center, offset, snapshot.range);
+      if (runtime.centerWasRunning) {
+        if (Math.abs(readSide(side).time - side.desiredAddress) > DRIFT_TOLERANCE) {
+          side.adapter?.place?.(side.desiredAddress);
+        }
+        side.adapter?.play?.();
+      } else {
+        parkSide(side, side.desiredAddress, { force: true });
+      }
+      attained = attained === null ? offset : attained;
     }
-    side.mode = FIELD_SIDE_MODE.HELD;
-    side.offset = offset;
-    side.progressOffset = offset;
-    side.configuredOffset = configuredOffset(role, snapshot);
-    requestRate(side, 1, true);
-    side.desiredAddress = exactAddress(
-      role,
-      center,
-      offset,
-      snapshot.range
-    );
-    if (runtime.centerWasRunning) {
-      if (Math.abs(readSide(side).time - side.desiredAddress) > DRIFT_TOLERANCE) side.adapter?.place?.(side.desiredAddress);
-      side.adapter?.play?.();
-    } else {
-      parkSide(side, side.desiredAddress, { force: true });
-    }
+    runtime.breath = holdBreath(runtime.breath, snapshotBreath(snapshot));
+    for (const name of roles) sides[name].mode = FIELD_SIDE_MODE.HELD;
     publish(snapshot);
-    return offset;
+    return attained;
   }
 
   function freezeSideForPause(side, center, snapshot) {
@@ -1113,31 +1302,23 @@ export function createStepFieldController({
     side.mode = FIELD_SIDE_MODE.HELD;
     side.offset = offset;
     side.progressOffset = offset;
+    side.waiting = false;
+    // Native pause freezes the attained breathing relation without changing the
+    // configured pair or the direction the cycle would resume in.
+    runtime.breath.sides[side.role].offset = offset;
+    runtime.breath.sides[side.role].waiting = false;
     requestRate(side, 1, true);
     parkAtRelation(side, center, snapshot, { force: true });
   }
 
-  function toggleSide(role) {
-    const side = sides[role];
-    if (side.mode === FIELD_SIDE_MODE.HELD) stretch(role);
-    else hold(role);
-  }
-
+  // One combined Stretch/Hold control. Breathing is a coordinated Field
+  // relation, so there is no independent per-side Stretch/Hold gesture.
   function toggleBoth() {
     if (suspensionRequired()) return;
-    const prefs = preferences();
-    const roles = controllableRoles(getSnapshot?.(), prefs);
+    const roles = controllableRoles(getSnapshot?.(), preferences());
     if (!roles.length) return;
-    const allHeld = roles.every(role => sides[role].mode === FIELD_SIDE_MODE.HELD);
-    if (allHeld) {
-      for (const role of roles) stretch(role);
-      return;
-    }
-    for (const role of roles) {
-      if (sides[role].mode !== FIELD_SIDE_MODE.STRETCHING) continue;
-      hold(role);
-    }
-    publish(getSnapshot?.());
+    if (runtime.breath.held) stretch("both");
+    else hold("both");
   }
 
   function ensureSidePlaying(side) {
@@ -1173,93 +1354,117 @@ export function createStepFieldController({
     return false;
   }
 
-  function driveSide(role, center, centerDelta, snapshot, centerRunning) {
+  // Breathing rates change with the phase, so the request is a nearest match to
+  // the state machine's intent rather than a fixed per-side preference.
+  function requestBreathRate(side, desiredRate, force = false) {
+    refreshSideSnapshot(side);
+    const rates = [...new Set(side.availableRates || [1])]
+      .filter(rate => Number.isFinite(rate) && rate > 0);
+    const chosen = rates.length ? chooseNearestRate(rates, desiredRate) : 1;
+    // getAvailablePlaybackRates commonly reports only 1× until the iframe has
+    // actually entered playback. Unknown is not the same as unsupported.
+    side.rateAvailable = !side.ratesKnown
+      || Math.abs(chosen - desiredRate) <= 0.001;
+    side.requestedRate = desiredRate;
+    requestRate(side, chosen, force);
+    return chosen;
+  }
+
+  // The whole Field breathes as one relation, so the state machine advances once
+  // per tick and both sides are placed from its authoritative offsets.
+  function driveField(center, centerDelta, snapshot, centerRunning) {
+    const prefs = preferences();
+    const configured = snapshotBreath(snapshot);
+    const participation = Object.fromEntries(["tail", "lead"].map(role => {
+      const available = effectiveOffset(role, center, snapshot);
+      return [role, {
+        operational: Boolean(
+          prefs[`${role}Visible`]
+          && sideCanRun(sides[role])
+          && effectiveBreathBounds(configured, available).operational
+        ),
+        available
+      }];
+    }));
+    const advanced = advanceBreath(runtime.breath, {
+      breath: configured,
+      centerDelta: centerRunning ? centerDelta : 0,
+      sides: participation
+    });
+    runtime.breath = {
+      phase: advanced.phase,
+      held: advanced.held,
+      sides: {
+        tail: {
+          offset: advanced.sides.tail.offset,
+          waiting: advanced.sides.tail.waiting
+        },
+        lead: {
+          offset: advanced.sides.lead.offset,
+          waiting: advanced.sides.lead.waiting
+        }
+      }
+    };
+    return Object.fromEntries(["tail", "lead"].map(role => [
+      role,
+      driveSide(role, center, snapshot, centerRunning, advanced.sides[role], participation[role])
+    ]));
+  }
+
+  function driveSide(role, center, snapshot, centerRunning, breathSide, participation) {
     const side = sides[role];
     const prefs = preferences();
-    const visible = prefs[`${role}Visible`];
-    const maximum = effectiveOffset(role, center, snapshot);
-    if (!visible || !sideCanRun(side)) {
+    if (!prefs[`${role}Visible`] || !sideCanRun(side)) {
       pauseSide(side);
       return { available: false, held: false, offset: 0 };
     }
-    if (maximum <= EPSILON) {
+    if (!participation.operational) {
+      // The side cannot preserve the configured inner offset, so it does not
+      // breathe and takes no part in the barrier. It still shows the frame the
+      // remaining room allows rather than collapsing onto Center.
+      const parked = Math.max(0, breathSide.bounds.parked ?? 0);
       side.mode = FIELD_SIDE_MODE.HELD;
-      side.offset = 0;
-      side.progressOffset = 0;
+      side.offset = parked;
+      side.progressOffset = parked;
+      side.waiting = false;
       side.configuredOffset = configuredOffset(role, snapshot);
+      runtime.breath.sides[role].offset = parked;
       pauseSide(side);
-      parkSide(side, center);
-      return { available: false, held: true, offset: 0 };
+      parkSide(side, exactAddress(role, center, parked, snapshot.range));
+      return { available: false, held: true, offset: parked };
     }
 
     side.configuredOffset = configuredOffset(role, snapshot);
+    side.waiting = Boolean(breathSide.waiting);
+    side.mode = runtime.breath.held
+      ? FIELD_SIDE_MODE.HELD
+      : FIELD_SIDE_MODE.STRETCHING;
+
     if (!centerRunning) {
       stabilizeParkedSide(side, center, snapshot);
-      return { available: true, held: side.mode === FIELD_SIDE_MODE.HELD, offset: side.offset };
-    }
-
-    if (side.mode === FIELD_SIDE_MODE.HELD) {
-      side.offset = clamp(side.offset, 0, maximum);
-      side.progressOffset = side.offset;
-      requestRate(side, 1);
-      ensureSidePlaying(side);
-      const desired = exactAddress(
-        role,
-        center,
-        side.offset,
-        snapshot.range
-      );
-      side.desiredAddress = desired;
-      correctRunningSide(side, desired);
-      return { available: true, held: true, offset: side.offset };
+      return {
+        available: true,
+        held: side.mode === FIELD_SIDE_MODE.HELD,
+        offset: side.offset
+      };
     }
 
     ensureSidePlaying(side);
-    const rate = requestStretchRate(side);
-    if (rate === undefined) {
-      const actual = measuredOffset(side, center, snapshot);
-      side.offset = clamp(actual, 0, maximum);
-      return { available: true, held: false, offset: side.offset };
-    }
-    const confirmed = Number.isFinite(side.actualRate) ? side.actualRate : 1;
-    const differential = role === "tail" ? Math.max(0, 1 - confirmed) : Math.max(0, confirmed - 1);
-    if (centerDelta > 0 && rate !== null) {
-      side.progressOffset = Math.min(maximum, side.progressOffset + differential * centerDelta);
-    }
-
-    const actual = measuredOffset(side, center, snapshot);
-    side.offset = clamp(actual, 0, maximum);
-    const desiredOffset = Math.min(maximum, Math.max(side.progressOffset, side.offset));
-    side.progressOffset = desiredOffset;
-    const desired = exactAddress(
-      role,
-      center,
-      desiredOffset,
-      snapshot.range
-    );
+    requestBreathRate(side, breathSide.rate);
+    // The pure state machine owns the offset; the physical side is corrected
+    // toward it, so a missing directional rate degrades to placement instead of
+    // leaving the relation stuck at a boundary.
+    const offset = clamp(breathSide.offset, 0, breathSide.bounds.outer);
+    side.offset = offset;
+    side.progressOffset = offset;
+    const desired = exactAddress(role, center, offset, snapshot.range);
     side.desiredAddress = desired;
     correctRunningSide(side, desired);
-
-    const reached = desiredOffset >= maximum - REACH_TOLERANCE
-      || side.offset >= maximum - REACH_TOLERANCE;
-    if (reached || rate === null) {
-      // A source without a directional rate still remains usable: place the side
-      // at the requested frame and hold it instead of leaving the control stuck.
-      side.mode = FIELD_SIDE_MODE.HELD;
-      side.offset = maximum;
-      side.progressOffset = maximum;
-      side.desiredAddress = exactAddress(
-        role,
-        center,
-        maximum,
-        snapshot.range
-      );
-      if (Math.abs(readSide(side).time - side.desiredAddress) > DRIFT_TOLERANCE) side.adapter?.place?.(side.desiredAddress);
-      requestRate(side, 1, true);
-      ensureSidePlaying(side);
-      return { available: true, held: true, offset: maximum };
-    }
-    return { available: true, held: false, offset: side.offset };
+    return {
+      available: true,
+      held: runtime.breath.held || Boolean(breathSide.waiting),
+      offset
+    };
   }
 
   function stepSelection(role) {
@@ -1451,6 +1656,23 @@ export function createStepFieldController({
     root.classList.toggle("is-suspended", runtime.suspended);
     root.classList.toggle("is-preview", Boolean(preview));
     root.dataset.phase = runtime.phase;
+    // The directional slideshow class is presentation only. Reduced motion
+    // settles on the resulting Frame without the travelling transition.
+    const transitionDirection = prefs.reducedMotion
+      ? FIELD_FRAME_DIRECTION.NONE
+      : runtime.transition.direction;
+    root.dataset.transition = transitionDirection;
+    root.dataset.frameOwner = preview?.owner || "operator";
+    root.dataset.frameRevision = String(runtime.frameGeneration);
+    root.classList.toggle(
+      "is-traversing-forward",
+      transitionDirection === FIELD_FRAME_DIRECTION.FORWARD
+    );
+    root.classList.toggle(
+      "is-traversing-backward",
+      transitionDirection === FIELD_FRAME_DIRECTION.BACKWARD
+    );
+    root.classList.toggle("is-breathing", !runtime.breath.held && !preview);
 
     elements["tail-pane"]?.classList?.toggle("is-collapsed", !prefs.tailVisible);
     elements["lead-pane"]?.classList?.toggle("is-collapsed", !prefs.leadVisible);
@@ -1474,30 +1696,16 @@ export function createStepFieldController({
         : "—"
     );
 
-    const reach = snapshotReach(snapshot);
+    const configuredBreath = snapshotBreath(snapshot);
     for (const role of ["tail", "lead"]) {
       const side = sides[role];
-      const direction = directionFor(role);
       const actual = field?.[role]?.offset ?? side.offset;
-      const target = reach[direction];
       const availableDistance = effectiveOffset(role, snapshot.current, snapshot);
-      const canFieldControl = sideIsOperational(role, snapshot, prefs);
       const canStep = Boolean(stepSelection(role));
-      const nextAction = side.mode === FIELD_SIDE_MODE.HELD ? "Stretch" : "Hold";
-      setText(elements[`${role}-field-toggle-label`], nextAction);
-      setText(elements[`${role}-offset-state`], `${formatOffset(actual)} / ${formatOffset(target)}`);
-      elements[`${role}-field-toggle`]?.setAttribute?.("aria-pressed", String(side.mode === FIELD_SIDE_MODE.HELD));
-      if (elements[`${role}-field-toggle`]) {
-        elements[`${role}-field-toggle`].disabled = runtime.suspended
-          || !canFieldControl
-          || side.error;
-        elements[`${role}-field-toggle`].setAttribute(
-          "aria-label",
-          `${role === "tail" ? "Tail" : "Lead"} is ${
-            side.mode === FIELD_SIDE_MODE.HELD ? "Held" : "Stretching"
-          }; ${nextAction}`
-        );
-      }
+      setText(
+        elements[`${role}-offset-state`],
+        `${formatOffset(actual)} in ${formatOffset(configuredBreath.inner)}–${formatOffset(configuredBreath.outer)}`
+      );
       const surface = elements[`${role}-player-surface`];
       surface?.setAttribute?.("aria-disabled", String(!canStep));
       if (surface) surface.tabIndex = canStep ? 0 : -1;
@@ -1515,38 +1723,42 @@ export function createStepFieldController({
       sideIsVisible(role, prefs)
     );
     const availableRoles = controllableRoles(snapshot, prefs);
-    const bothHeld = availableRoles.length > 0
-      && availableRoles.every(role => sides[role].mode === FIELD_SIDE_MODE.HELD);
+    // Breathing is one Field relation, so the combined control reports one state.
+    const held = runtime.breath.held;
     const bothLabel = availableRoles.length === 1
       ? visibleRoles.length === 1 ? "visible side" : "available side"
       : "both";
-    setText(elements["field-both-toggle-label"], bothHeld ? `Stretch ${bothLabel}` : `Hold ${bothLabel}`);
-    elements["field-both-toggle"]?.setAttribute?.("aria-pressed", String(bothHeld));
+    setText(elements["field-both-toggle-label"], held ? `Stretch ${bothLabel}` : `Hold ${bothLabel}`);
+    elements["field-both-toggle"]?.setAttribute?.("aria-pressed", String(held));
     if (elements["field-both-toggle"]) {
       elements["field-both-toggle"].disabled = runtime.suspended
         || !shown
         || !availableRoles.length;
       elements["field-both-toggle"].setAttribute(
         "aria-label",
-        `${bothHeld ? "Field is Held; Stretch" : "Field is Stretching; Hold"} ${bothLabel}`
+        `${held ? "Field is Held; Stretch" : "Field is breathing; Hold"} ${bothLabel}`
       );
     }
-    const previewLabel = {
+    const frameLabel = {
       step: "Step",
       refine: "Refine",
       reopen: "Reopen",
       resolution: "Resolution",
+      go: "Go",
       context: "Context",
+      current: "Current",
       pin: "Pin",
       section: "Section"
-    }[preview?.kind] || "Field";
+    }[preview?.kind] || "Step";
     setText(elements["field-transport-state"], preview
-      ? `${previewLabel} preview`
+      ? `${frameLabel} Frame`
       : runtime.suspended
       ? "Field suspended"
-      : runtime.phase === STEP_FIELD_PHASE.PARTIAL
-        ? "Partially Held"
-        : runtime.phase.charAt(0).toUpperCase() + runtime.phase.slice(1));
+      : runtime.breath.held
+        ? "Held"
+        : runtime.breath.phase === BREATH_PHASE.CONTRACTING
+          ? "Breathing in"
+          : "Breathing out");
     setText(elements["field-rate-state"], `Tail ${sides.tail.actualRate}× · Center 1× · Lead ${sides.lead.actualRate}×`);
     setText(elements["field-span-label"], preview
       ? `${formatTime(preview.start)}–${formatTime(preview.end)}`
@@ -1563,8 +1775,7 @@ export function createStepFieldController({
     render(snapshot);
     if (snapshot.videoLoaded) ensurePlayers(prefs);
     syncVideo(snapshot);
-    populateRateControl("tail", prefs);
-    populateRateControl("lead", prefs);
+    populateBreathRateControl(prefs);
 
     if (!snapshot.videoLoaded || !snapshot.videoId) {
       const idlePhase = fieldIsEnabled(prefs)
@@ -1632,8 +1843,9 @@ export function createStepFieldController({
       // transient Context cursor or an in-flight placement.
       pauseSides({ center: snapshot.current, freeze: false });
     } else if (discontinuity) {
-      // A native scrub or clock jump starts a fresh physical formation at the new
+      // A native scrub or clock jump starts a fresh breathing cycle at the new
       // Center without creating a semantic Interval here.
+      startBreathCycle(center, snapshot);
       for (const role of ["tail", "lead"]) {
         const side = sides[role];
         if (sideIsOperational(role, snapshot, prefs)) {
@@ -1653,10 +1865,12 @@ export function createStepFieldController({
       snapshotReach(snapshot),
       snapshot.range
     );
-    const sideStates = {
-      tail: driveSide("tail", relationalCenter, centerDelta, snapshot, centerRunning && !runtime.suspended),
-      lead: driveSide("lead", relationalCenter, centerDelta, snapshot, centerRunning && !runtime.suspended)
-    };
+    const sideStates = driveField(
+      relationalCenter,
+      centerDelta,
+      snapshot,
+      centerRunning && !runtime.suspended
+    );
     runtime.phase = runtime.suspended
       ? STEP_FIELD_PHASE.SUSPENDED
       : resolveFieldPhase({
@@ -1728,6 +1942,13 @@ export function createStepFieldController({
     runtime.suspended = false;
     runtime.field = null;
     runtime.fieldKey = "";
+    runtime.frame = null;
+    runtime.frameIdentity = null;
+    runtime.transition = {
+      direction: FIELD_FRAME_DIRECTION.NONE,
+      generation: runtime.frameGeneration,
+      at: 0
+    };
     onChange?.(null);
   }
 
@@ -1745,8 +1966,7 @@ export function createStepFieldController({
     render(snapshot);
     ensurePlayers(prefs);
     syncVideo(snapshot);
-    populateRateControl("tail", prefs);
-    populateRateControl("lead", prefs);
+    populateBreathRateControl(prefs);
     establish(snapshot, snapshot.current);
     runtime.suspended = suspensionRequired(snapshot);
     runtime.phase = !prefs.stepFieldEnabled || (!prefs.tailVisible && !prefs.leadVisible)
@@ -1785,19 +2005,25 @@ export function createStepFieldController({
     previewExtent,
     clearPreview,
     getStepSelection: stepSelection,
-    hold(role = "both") {
-      if (role === "both") {
-        const prefs = preferences();
-        for (const name of ["tail", "lead"].filter(name => prefs[`${name}Visible`])) {
-          hold(name);
+    hold,
+    stretch,
+    toggleField: toggleBoth,
+    breath() {
+      return {
+        phase: runtime.breath.phase,
+        held: runtime.breath.held,
+        configured: snapshotBreath(getSnapshot?.()),
+        sides: {
+          tail: { ...runtime.breath.sides.tail },
+          lead: { ...runtime.breath.sides.lead }
         }
-      } else hold(role);
+      };
     },
-    stretch(role = "both") {
-      if (role === "both") {
-        const prefs = preferences();
-        for (const name of ["tail", "lead"].filter(name => prefs[`${name}Visible`])) stretch(name);
-      } else stretch(role);
+    frame() {
+      return runtime.frame ? { ...runtime.frame } : null;
+    },
+    transition() {
+      return { ...runtime.transition, generation: runtime.frameGeneration };
     },
     snapshot() {
       return {

@@ -1,6 +1,9 @@
-# Binary YouTube Reader
+# Video Cartography
 
-Binary YouTube Reader turns a linear video into a spatial map. Source time remains exact while the reader refines neighborhoods, draws a Working Interval, retains Pins and Sections, and changes how much timeline space a Section receives.
+**A spatial comprehension workspace for video.**
+See the phases. Map the whole.
+
+Video Cartography turns a linear video into a spatial map. Source time remains exact while the reader refines neighborhoods, draws a Working Interval, retains Pins and Sections, and changes how much timeline space a Section receives.
 
 A Section weight is a spatial scale, not a playback rate. It copies the familiar Tail/Lead rate ladder:
 
@@ -86,7 +89,7 @@ Step Reach is independent from the three-player Field.
 - Manual mode accepts a distance in timeline units.
 - Range-relative mode derives Reach from the active Range’s weighted timeline width.
 - `1/32`, `1/16`, and `1/8` are the adaptive presets.
-- Hold and Stretch change only live Tail/Lead relations. They never overwrite configured Offset, Step Reach, or Section weight.
+- Stretch and Hold change only the live Tail/Lead relation. They never overwrite the configured Inner/Outer Offset, Step Reach, or Section weight.
 
 Changing Section weight recomputes adaptive Reach because the active spatial width changed. It does not change fixed Reach.
 
@@ -106,12 +109,13 @@ The timeline places Pins above the weighted track and its source ruler, then
 lane-packs overlapping Sections into a relationship tree below. Each thin
 Section wire has Start, midpoint, and End nodes with faint relations back to
 its Pin/track positions. Click a Section to make its complete extent the
-Working Interval and return Current to its center. Drag its Guide endpoints or
-complete profile while the three viewers preview the resulting extent. The
+Working Interval and return Current to its center. Drag its Start or End node to
+move that endpoint Pin, or its midpoint node to translate the whole Section,
+while the three viewers show the resulting extent. The
 collapsible right rail has two exclusive modes: full-height Guide, or Operators
 with Parameters. Guide and the operator controls never compete for vertical
 space. Collapse either mode to leave Viewer and Timeline as one panoramic
-surface; reopen Guide with its header control or `G` for exact weights and
+surface; reopen Guide with its header control or `G` for exact weights, Addresses, and
 endpoint editing. Unlink separates one shared Section endpoint; drag that Pin
 onto another Pin's visible candidate, pause until it arms, then release to link
 their ownership again. Unlink asks for confirmation; proximity alone never
@@ -125,27 +129,40 @@ Playback and Context use source time only. A proper focused Range loops; the ful
 
 Playback settlement preserves or extends watched Working Interval coverage and never shortens it.
 
-Center is the audible player. Tail and Lead are optional muted projections:
+Center is the audible player. Tail and Lead are optional muted projections.
 
-- Offset is physical Field spacing, not timeline Step size.
-- Stretch forms a side relation during genuine Center playback.
-- Hold freezes a live measured relation without saving it into Offset.
-- Tune changes only its owning side: a full held side follows its new Offset,
-  while a partial Hold keeps its attained relation within the new bound.
+During traversal, Tail–Center–Lead behave as a stable directional slideshow
+around Current. During playback, the Field breathes continuously between inner
+and outer offsets until Hold preserves the attained relation.
+
+- The **Field Frame** is the settled Tail–Center–Lead presentation outside
+  ordinary playback. It is resolved once per semantic movement, and each
+  movement produces one directional transition: forward traversal moves the
+  visible strip leftward, backward traversal moves it rightward.
+- Context has priority over operator framing while it is enabled. Its Tail and
+  Lead are the frozen observation edges; only Center follows the Cursor, and
+  Context beginning, pausing, stopping or settling reassigns neither side.
+- Without Context, the Frame uses the current operator: exact Step destinations,
+  Refine or Reopen midpoints, a retained Section's Start and End, or an exact
+  Go-derived neighbourhood.
+- The **Field Breath** is the live relation during Center playback. Tail stays
+  behind Center and Lead stays ahead while both travel between the configured
+  Inner and Outer Offsets. A side reaching a boundary first waits there at
+  Center rate until every operational side arrives, then the cycle reverses.
+- One combined Stretch/Hold control owns that cycle, and one symmetric breathing
+  rate pair — `0.75×/1.25×`, `0.5×/1.5×`, `0.25×/1.75×` — describes both sides.
+- Hold alone stops breathing. It preserves each attained offset, sets every held
+  side to Center rate, and preserves the direction for later resumption. A held
+  Field is not a configured Offset change and creates no Undo checkpoint.
 - A collapsed or Field-off side is dormant and cannot be revived by a delayed
-  player event; unavailable panes are not Step or Hold/Stretch operands.
+  player event; unavailable panes are excluded from the breathing barrier and
+  are not Step operands.
 - Context duration and Field Offset are independent observation settings. A
   2.5-second Offset and either half of a 5-second Context can describe the same
   displacement, but changing either value never rewrites the other.
-- Field Offsets belong exclusively to live Stretch/Hold geometry.
-- Outside playback, Step is the default spatial preview. Refine shows its next
-  weighted midpoints; Reopen shows the newly available Refine midpoints;
-  Context temporarily shows its source-time bounds and Cursor; Pin dragging
-  applies spatial Step around the Pin; and a Section shows
-  Start/midpoint/End while Current owns that midpoint.
-- Hover and keyboard-focus previews stay on the temporal map. Direct Pin or
-  Section manipulation temporarily recruits the panoramic Viewer for exact
-  frame preview, then restores the current operator-owned preview.
+- Direct manipulation temporarily supplies an exact Frame — a Current, Pin or
+  Section candidate — and one transition returns to the ambient Frame when the
+  gesture ends. Hover and keyboard focus remain map-only dry runs.
 - Timeline weighting only changes where source Addresses are drawn and navigated.
 
 ## Run locally
@@ -164,8 +181,42 @@ Run the release gate with:
 npm run check
 ```
 
+## Direct manipulation and fine adjustment
+
+The Temporal Topography owns spatial direct manipulation. Current, Pins, Section
+Start/End/midpoint nodes, and Range boundaries are all dragged there:
+
+```text
+Current marker          → Go
+Pin marker              → Move Pin
+Section Start or End    → Move endpoint Pin
+Section midpoint        → Translate Section
+Range boundary          → Change Range
+```
+
+Dragging Current is an exact Go gesture: the marker follows a candidate Address,
+the original Current remains as a faint departure marker, Session Current is
+unchanged until release, and the release commits one Go with one Undo
+checkpoint. A stationary press moves nothing.
+
+Fine adjustment is called Nudge, because a verified source frame duration is not
+available from every media adapter. It acts in source time:
+
+- `Shift` + wheel up/right nudges forward, down/left nudges backward, and the
+  exact object under the pointer owns the gesture;
+- `Shift`-drag enters precision mode: reduced gain, quantized to the same Nudge
+  quantum, same gesture owner;
+- `,` and `.` nudge the selected map object, or Current when unambiguous;
+- Guide's `−`/`+` controls invoke the same operation.
+
+One drag, wheel series, or held-key repetition creates at most one Undo
+checkpoint. Guide owns exact topology and numeric editing — Address inputs,
+Nudge increments, Go, Weight, Rename, Delete — and no second drag geometry.
+
 ## Canonical project documents
 
+- `PROJECT.md` — canonical project establishment
+- `GLOSSARY.md` — normative lexicon
 - `SPEC.md` — normative state, geometry, and operator laws
 - `IMPLEMENTATION.md` — module ownership and transaction architecture
 - `INTERFACE.md` — visible grammar and direct manipulation

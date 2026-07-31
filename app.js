@@ -72,6 +72,7 @@ import {
   idleTransport,
   isTransportActive,
   transportFieldRange,
+  deriveContextWindow,
   isProperRange,
   createContextTransport,
   createPlaybackTransport,
@@ -86,9 +87,16 @@ import {
 } from "./youtube.js";
 import {
   DEFAULT_FIELD_RESPONSE,
+  DEFAULT_FIELD_BREATH,
   createStepFieldController,
-  normalizeFieldResponse
+  normalizeFieldResponse,
+  normalizeFieldBreath,
+  breathRateFromResponse
 } from "./step-field.js";
+import {
+  FIELD_FRAME_OWNER,
+  createFieldFrameSequencer
+} from "./field-frame.js";
 import {
   DEFAULT_STEP_GESTURE_TIMING,
   bindStepPress,
@@ -117,6 +125,41 @@ const NATIVE_POSITION_TOLERANCE_SECONDS = 0.25;
 const MAX_CONTEXT_SECONDS = 300;
 const PIN_SNAP_DISTANCE_PX = 16;
 const PIN_SNAP_ARM_MS = 450;
+// Nudge is a configured source-time quantum. It is only ever called a frame
+// step when the active media adapter supplies a verified frame duration.
+//
+// The quantum must stay strictly greater than the semantic equality tolerance
+// the Session kernel uses, or a single Nudge would resolve to the Address it
+// started from and move nothing. 1/24 s is the smallest frame-like increment
+// that clears EPSILON.
+const DEFAULT_NUDGE_SECONDS = 1 / 24;
+const MIN_NUDGE_SECONDS = EPSILON * 1.02;
+const MAX_NUDGE_SECONDS = 10;
+const NUDGE_WHEEL_THRESHOLD = 24;
+const NUDGE_GESTURE_SETTLE_MS = 420;
+const PRECISION_DRAG_GAIN = 0.2;
+
+function normalizeNudgeSeconds(value, fallback = DEFAULT_NUDGE_SECONDS) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return fallback;
+  // A configured quantum at or below EPSILON would silently disable Nudge.
+  return clamp(numeric, MIN_NUDGE_SECONDS, MAX_NUDGE_SECONDS);
+}
+
+function legacyFieldBreath(value) {
+  const legacy = value?.fieldOffsets;
+  const outer = Math.max(
+    Number(legacy?.backward) || 0,
+    Number(legacy?.forward) || 0
+  ) || DEFAULT_FIELD_BREATH.outer;
+  return {
+    inner: Math.max(MIN_NUDGE_SECONDS, outer / 4),
+    outer,
+    rate: value?.fieldResponse
+      ? breathRateFromResponse(value.fieldResponse)
+      : DEFAULT_FIELD_BREATH.rate
+  };
+}
 
 function normalizeContextSeconds(value, fallback = 5) {
   if (value === null || value === undefined || String(value).trim() === "") return fallback;
@@ -134,10 +177,13 @@ function readPreferences() {
     return {
       contextSeconds: normalizeContextSeconds(value?.contextSeconds),
       stepReach: normalizeStepReach(value?.stepReach ?? legacyStep),
-      fieldOffsets: normalizeStepReach(
-        value?.fieldOffsets ?? value?.stepReach ?? legacyStep
+      // One bounded breathing relation replaces the two independent side
+      // Offsets. A legacy pair migrates once: its widest side becomes the outer
+      // offset and its saved rates become the nearest symmetric breathing pair.
+      fieldBreath: normalizeFieldBreath(
+        value?.fieldBreath ?? legacyFieldBreath(value)
       ),
-      fieldResponse: normalizeFieldResponse(value?.fieldResponse),
+      nudgeSeconds: normalizeNudgeSeconds(value?.nudgeSeconds),
       stepFieldEnabled: value?.stepFieldEnabled !== false,
       tailVisible: value?.tailVisible !== false,
       leadVisible: value?.leadVisible !== false
@@ -146,8 +192,8 @@ function readPreferences() {
     return {
       contextSeconds: 5,
       stepReach: normalizeStepReach(10),
-      fieldOffsets: normalizeStepReach(10),
-      fieldResponse: { ...DEFAULT_FIELD_RESPONSE },
+      fieldBreath: { ...DEFAULT_FIELD_BREATH },
+      nudgeSeconds: DEFAULT_NUDGE_SECONDS,
       stepFieldEnabled: true,
       tailVisible: true,
       leadVisible: true
@@ -166,8 +212,8 @@ const state = {
   availableRates: [1],
   transport: idleTransport(),
   pendingStep: null,
-  fieldOffsets: normalizeStepReach(preferences.fieldOffsets),
-  fieldResponse: normalizeFieldResponse(preferences.fieldResponse),
+  fieldBreath: normalizeFieldBreath(preferences.fieldBreath),
+  nudgeSeconds: normalizeNudgeSeconds(preferences.nudgeSeconds),
   contextSeconds: preferences.contextSeconds,
   stepFieldEnabled: preferences.stepFieldEnabled,
   tailVisible: preferences.tailVisible,
@@ -191,7 +237,14 @@ const state = {
   carryModifier: false,
   shiftLayer: false,
   shiftKeyHeld: false,
-  field: null
+  field: null,
+  // Direct manipulation of Current on the Temporal Topography. It is an exact
+  // Go gesture, not a Pin move, and it owns the Field Frame while it runs.
+  currentDrag: null,
+  // The exact Frame supplied by whichever direct manipulation is active.
+  directFrame: null,
+  // One wheel series or held-key repetition settles as one Undo transaction.
+  nudgeGesture: null
 };
 
 let player = null;
@@ -230,8 +283,20 @@ function configuredStepReach() {
   return normalizeStepReach(model()?.stepReach ?? preferences.stepReach);
 }
 
+function currentFieldBreath() {
+  return normalizeFieldBreath(state.fieldBreath ?? preferences.fieldBreath);
+}
+
+// Field Offsets remain physical observation settings that are independent from
+// the semantic Step Reach. The outer offset is the Field's breathing bound.
 function currentFieldOffsets() {
-  return normalizeStepReach(state.fieldOffsets ?? preferences.fieldOffsets);
+  const breath = currentFieldBreath();
+  return normalizeStepReach({
+    backward: breath.outer,
+    forward: breath.outer,
+    linked: true,
+    mode: STEP_REACH_MODE.FIXED
+  });
 }
 
 function fieldStepPreview(center, kind = "step") {
@@ -257,29 +322,13 @@ function fieldStepPreview(center, kind = "step") {
   };
 }
 
-function fieldOperatorPreview() {
-  if (!state.videoLoaded || !currentResolution() || !activeRange()) return null;
-  const transport = state.transport;
-  if (transport.kind === TRANSPORT_KIND.CONTEXT) {
-    return {
-      kind: "context",
-      start: transport.start,
-      center: transport.anchor,
-      end: transport.end
-    };
-  }
-  if (
-    transport.kind !== TRANSPORT_KIND.IDLE
-    || state.dragHandle
-    || state.guideDrag?.moved
-    || [YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(
-      playerSnapshot().state
-    )
-  ) return null;
-
+// The next settled Field Frame is resolved once per semantic movement. Context
+// has priority over operator framing, but only while Context is enabled.
+function operatorFrameRequest() {
   const center = currentResolution().C;
   const projection = timelineProjection();
   const operator = model().lastOperator;
+  const range = activeRange();
   if ([
     "refineBackward",
     "refineForward",
@@ -289,36 +338,119 @@ function fieldOperatorPreview() {
     const targets = getTargets(currentResolution(), projection.metric);
     return {
       kind: "refine",
-      start: targets.backward ?? center,
       center,
-      end: targets.forward ?? center
+      backward: targets.backward ?? center,
+      forward: targets.forward ?? center,
+      range
     };
-  }
-  if (operator === "section") {
-    const interval = currentInterval();
-    const midpoint = interval ? (interval.start + interval.end) / 2 : NaN;
-    if (
-      Number.isFinite(midpoint)
-      && Math.abs(center - midpoint) <= EPSILON
-    ) {
-      return {
-        kind: "section",
-        start: interval.start,
-        center,
-        end: interval.end
-      };
-    }
   }
   if (operator === "reopen") {
     const targets = getTargets(currentResolution(), projection.metric);
     return {
       kind: "reopen",
-      start: targets.backward ?? center,
       center,
-      end: targets.forward ?? center
+      backward: targets.backward ?? center,
+      forward: targets.forward ?? center,
+      range
     };
   }
-  return fieldStepPreview(center);
+  if (operator === "section") {
+    // A retained Section supplies its Start and End only while Current owns its
+    // midpoint. Otherwise the Frame returns to the exact Step neighbourhood.
+    const interval = currentInterval();
+    const midpoint = interval ? (interval.start + interval.end) / 2 : NaN;
+    if (Number.isFinite(midpoint) && Math.abs(center - midpoint) <= EPSILON) {
+      return {
+        kind: "section",
+        center,
+        backward: interval.start,
+        forward: interval.end,
+        range
+      };
+    }
+  }
+  const step = fieldStepPreview(center);
+  return {
+    kind: "step",
+    center,
+    backward: step.start,
+    forward: step.end,
+    backwardDistance: step.backwardDistance,
+    forwardDistance: step.forwardDistance,
+    range
+  };
+}
+
+function fieldFrameRequest() {
+  if (!state.videoLoaded || !currentResolution() || !activeRange()) return null;
+  // Direct manipulation temporarily supplies an exact Frame and has priority
+  // over both Context and operator framing for the gesture's lifetime.
+  if (state.directFrame) {
+    return { ...state.directFrame, owner: FIELD_FRAME_OWNER.DIRECT, range: activeRange() };
+  }
+  const transport = state.transport;
+  const contextRunning = transport.kind === TRANSPORT_KIND.CONTEXT;
+  if (
+    !contextRunning
+    && (
+      transport.kind !== TRANSPORT_KIND.IDLE
+      || state.dragHandle
+      || state.guideDrag?.moved
+      || [YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(
+        playerSnapshot().state
+      )
+    )
+  ) {
+    // Ordinary Center playback hands presentation to the Field Breath.
+    return null;
+  }
+  // Context has priority over operator framing whenever Context is *enabled* —
+  // not merely while its transport is running. The edges are the bounded
+  // observation window before, during, and after transport, so beginning,
+  // pausing, stopping, or settling Context reassigns neither side.
+  if (state.contextSeconds > EPSILON) {
+    const window = contextRunning
+      ? { start: transport.start, end: transport.end }
+      : deriveContextWindow(
+        currentResolution().C,
+        activeRange(),
+        state.contextSeconds
+      );
+    if (window) {
+      return {
+        owner: FIELD_FRAME_OWNER.CONTEXT,
+        start: window.start,
+        end: window.end,
+        current: currentResolution().C,
+        cursor: contextRunning ? safeCurrentTime() : undefined,
+        range: activeRange()
+      };
+    }
+  }
+  return operatorFrameRequest();
+}
+
+// One sequencer owns stable Frame identity, so republishing the same state and
+// Context transport inside a settled window create no new transition.
+const fieldFrames = createFieldFrameSequencer();
+
+function fieldOperatorPreview() {
+  const request = fieldFrameRequest();
+  if (!request) {
+    fieldFrames.reset();
+    return null;
+  }
+  const frame = fieldFrames.resolve(request);
+  if (!frame) return null;
+  // Side Step distance is semantic Reach, not the clipped Frame geometry, so it
+  // travels with the Frame rather than being re-derived from its addresses.
+  return Number.isFinite(request.backwardDistance)
+    ? {
+      ...frame,
+      backwardDistance: request.backwardDistance,
+      forwardDistance: request.forwardDistance
+    }
+    : frame;
 }
 
 function reachFor(direction) {
@@ -419,11 +551,8 @@ function persistPreferences() {
       model()?.stepReach ?? preferences.stepReach,
       preferences.stepReach
     );
-    preferences.fieldOffsets = normalizeStepReach(
-      state.fieldOffsets,
-      preferences.fieldOffsets
-    );
-    preferences.fieldResponse = normalizeFieldResponse(state.fieldResponse);
+    preferences.fieldBreath = normalizeFieldBreath(state.fieldBreath);
+    preferences.nudgeSeconds = normalizeNudgeSeconds(state.nudgeSeconds);
     preferences.contextSeconds = state.contextSeconds;
     preferences.stepFieldEnabled = state.stepFieldEnabled;
     preferences.tailVisible = state.tailVisible;
@@ -432,8 +561,8 @@ function persistPreferences() {
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify({
       contextSeconds: preferences.contextSeconds,
       stepReach: preferences.stepReach,
-      fieldOffsets: preferences.fieldOffsets,
-      fieldResponse: preferences.fieldResponse,
+      fieldBreath: preferences.fieldBreath,
+      nudgeSeconds: preferences.nudgeSeconds,
       stepFieldEnabled: preferences.stepFieldEnabled,
       tailVisible: preferences.tailVisible,
       leadVisible: preferences.leadVisible
@@ -2442,6 +2571,19 @@ function sourceFromRelativeDragDelta(event, drag) {
   return drag.projection.timelineToSource(coordinate);
 }
 
+// Fine movement is performed in source time and then reprojected, so Section
+// Weight cannot change the temporal size of one nudge.
+function precisionDragSource(event, drag) {
+  const range = activeRange();
+  const rect = elements.timeline.getBoundingClientRect();
+  const width = Number(drag.surfaceWidth) || Number(rect.width) || 1;
+  const span = Math.max(EPSILON, range.end - range.start);
+  const quantum = nudgeQuantum();
+  const raw = drag.originSource
+    + (event.clientX - drag.originClientX) / width * span * PRECISION_DRAG_GAIN;
+  return clamp(Math.round(raw / quantum) * quantum, range.start, range.end);
+}
+
 function pinSnapCandidate(drag, address) {
   if (drag.kind !== "pin" || !Number.isFinite(address)) return null;
   const sourceGuide = drag.originModel?.guide || model().guide;
@@ -2545,6 +2687,7 @@ function beginGuideDrag(kind, id, event, options = {}) {
     originFuture: null,
     projection: projectionForModel(model()),
     threshold: Number(options.threshold) || 6,
+    precision: event.shiftKey === true,
     moved: false,
     changed: false,
     blockedReason: null,
@@ -2568,19 +2711,23 @@ function previewGuideDrag(drag) {
     drag.previewCenter = center;
     placePlayer(center);
   }
-  stepField?.previewExtent?.(
-    section
-      ? {
-          kind: "section",
-          start: section.start,
-          center: section.midpoint,
-          end: section.end
-        }
-      : fieldStepPreview(center, "pin")
-  );
+  const frame = section
+    ? {
+        kind: "section",
+        start: section.start,
+        center: section.midpoint,
+        end: section.end
+      }
+    : (() => {
+      const step = fieldStepPreview(center, "pin");
+      return { kind: "pin", start: step.start, center, end: step.end };
+    })();
+  state.directFrame = frame;
+  stepField?.previewExtent?.(frame);
 }
 
 function clearGuideDragPreview({ restore = true } = {}) {
+  state.directFrame = null;
   stepField?.clearPreview?.({ restore: false });
   if (!restore || !state.videoLoaded || !currentResolution()) return;
   const current = currentResolution().C;
@@ -2623,13 +2770,18 @@ function updateGuideDrag(event) {
   event.preventDefault?.();
   event.stopPropagation?.();
 
-  const source = drag.surface === "relative"
-    ? sourceFromRelativeDragDelta(event, drag)
-    : sourceFromPointerInProjection(
-        event,
-        drag.projection,
-        drag.originSource
-      );
+  // Shift-drag is precision mode: it reduces movement gain and quantizes the
+  // resulting source Address, keeping the same semantic gesture owner.
+  drag.precision = drag.precision || event.shiftKey === true;
+  const source = drag.precision
+    ? precisionDragSource(event, drag)
+    : drag.surface === "relative"
+      ? sourceFromRelativeDragDelta(event, drag)
+      : sourceFromPointerInProjection(
+          event,
+          drag.projection,
+          drag.originSource
+        );
   const baseSession = {
     model: drag.originModel,
     history: drag.originHistory,
@@ -2806,6 +2958,146 @@ function finishGuideDrag(event, options = {}) {
     );
   }
   return true;
+}
+
+// Dragging Current is an exact Go gesture. Pressing Current acquires the marker
+// before the Timeline can interpret the gesture as generic Go; only crossing the
+// movement threshold begins the candidate preview.
+function beginCurrentDrag(event) {
+  if (
+    !state.videoLoaded
+    || state.dragHandle
+    || state.guideDrag
+    || state.currentDrag
+    || !currentResolution()
+  ) return;
+  event.stopPropagation?.();
+  state.currentDrag = {
+    pointerId: event.pointerId,
+    originClientX: event.clientX,
+    originSource: currentResolution().C,
+    // The projection captured at pointer-down stays authoritative so the
+    // geometry cannot jump if Weight or another derived condition changes.
+    projection: projectionForModel(model()),
+    candidate: currentResolution().C,
+    threshold: 6,
+    moved: false,
+    precision: event.shiftKey === true
+  };
+}
+
+function currentDragCandidate(event, drag) {
+  const range = activeRange();
+  if (drag.precision || event.shiftKey === true) {
+    // Shift-drag is precision mode: reduced gain, quantized in source time and
+    // then reprojected. Section Weight cannot change the size of one quantum.
+    const rect = elements.timeline.getBoundingClientRect();
+    const width = Number(rect.width) || 1;
+    const span = range.end - range.start;
+    const quantum = nudgeQuantum();
+    const raw = drag.originSource
+      + (event.clientX - drag.originClientX) / width * span * PRECISION_DRAG_GAIN;
+    return clamp(Math.round(raw / quantum) * quantum, range.start, range.end);
+  }
+  return clamp(
+    sourceFromPointerInProjection(event, drag.projection, drag.originSource),
+    range.start,
+    range.end
+  );
+}
+
+function updateCurrentDrag(event) {
+  const drag = state.currentDrag;
+  if (!drag || event.pointerId !== drag.pointerId) return;
+  if (!drag.moved && Math.abs(event.clientX - drag.originClientX) < drag.threshold) {
+    return;
+  }
+  if (!drag.moved) {
+    drag.moved = true;
+    settleBeforeAction();
+    drag.originSource = currentResolution().C;
+    drag.projection = projectionForModel(model());
+    try {
+      elements.timeline.setPointerCapture?.(event.pointerId);
+    } catch {
+      // Document-level listeners retain the gesture if capture is unavailable.
+    }
+  }
+  event.preventDefault?.();
+  event.stopPropagation?.();
+  drag.precision = drag.precision || event.shiftKey === true;
+  drag.candidate = currentDragCandidate(event, drag);
+  // Center displays the candidate frame; Session Current remains unchanged.
+  placePlayer(drag.candidate);
+  showCurrentDragFrame(drag.candidate);
+  view.render();
+}
+
+// The candidate Field Frame during a Current drag: the Context Frame when
+// Context is enabled, otherwise the exact Go/operator Frame around the
+// candidate Address.
+function showCurrentDragFrame(candidate) {
+  const contextHalf = state.contextSeconds / 2;
+  const range = activeRange();
+  const frame = state.contextSeconds > 0
+    ? {
+        kind: "current",
+        start: Math.max(range.start, candidate - contextHalf),
+        center: candidate,
+        end: Math.min(range.end, candidate + contextHalf)
+      }
+    : (() => {
+        const step = fieldStepPreview(candidate, "current");
+        return { kind: "current", start: step.start, center: candidate, end: step.end };
+      })();
+  state.directFrame = frame;
+  stepField?.previewExtent?.(frame);
+}
+
+function finishCurrentDrag(event, options = {}) {
+  const drag = state.currentDrag;
+  if (!drag || (event?.pointerId !== undefined && event.pointerId !== drag.pointerId)) {
+    return false;
+  }
+  state.currentDrag = null;
+  try {
+    if (
+      !elements.timeline.hasPointerCapture
+      || elements.timeline.hasPointerCapture(drag.pointerId)
+    ) {
+      elements.timeline.releasePointerCapture?.(drag.pointerId);
+    }
+  } catch {
+    // The document-level release remains authoritative if capture was lost.
+  }
+  state.directFrame = null;
+  // A stationary press performs no movement.
+  if (!drag.moved) return false;
+  state.guideClickSuppressed = true;
+  window.setTimeout(() => {
+    state.guideClickSuppressed = false;
+  }, 0);
+  if (options.cancel === true) {
+    // Cancellation restores the original Current presentation and creates no
+    // semantic change and no history.
+    stepField?.clearPreview?.({ restore: false });
+    locateAddress(currentResolution().C);
+    stepField?.translateToCurrent?.(currentResolution().C, { preserve: true });
+    view.render();
+    return false;
+  }
+  stepField?.clearPreview?.({ restore: false });
+  const committed = moveToAddress(drag.candidate, {
+    operator: "timeline",
+    label: "Go",
+    status: destination => `Moved Current to ${formatTime(destination)}.`
+  });
+  if (!committed) {
+    locateAddress(currentResolution().C);
+    stepField?.translateToCurrent?.(currentResolution().C, { preserve: true });
+    view.render();
+  }
+  return committed;
 }
 
 function handleTimelineClick(event) {
@@ -3051,27 +3343,206 @@ function setStepFraction(value) {
   }, `Set Adaptive Step to 1/${Math.round(1 / fraction)}`);
 }
 
-function changeFieldOffset(direction, value) {
+function prefersReducedMotion() {
+  return Boolean(
+    window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches
+  );
+}
+
+// Inner and Outer Offset are the bounds of one Field relation, not two
+// independent side settings. 0 < x < y is enforced against the sibling bound.
+function changeFieldBoundary(boundary, value) {
   const parsed = Number(value);
   if (!String(value).trim() || !Number.isFinite(parsed) || parsed <= 0) {
     setStatus("Field Offset must be a positive number.", true);
     view.render();
     return false;
   }
+  const breath = currentFieldBreath();
   const amount = clamp(parsed, 0.25, 300);
-  state.fieldOffsets = normalizeStepReach({
-    ...currentFieldOffsets(),
-    [direction]: amount,
-    linked: false,
-    mode: STEP_REACH_MODE.FIXED
-  });
+  const next = boundary === "inner"
+    ? { ...breath, inner: Math.min(amount, breath.outer) }
+    : { ...breath, outer: Math.max(amount, breath.inner) };
+  state.fieldBreath = normalizeFieldBreath(next);
   persistPreferences();
-  stepField?.reconfigureOffset?.(
-    direction === "backward" ? "tail" : "lead"
+  stepField?.reconfigureOffset?.();
+  setStatus(
+    `${boundary === "inner" ? "Inner" : "Outer"} Field offset set to ${
+      boundary === "inner" ? state.fieldBreath.inner : state.fieldBreath.outer
+    }s.`
   );
-  setStatus(`${direction === "backward" ? "Tail" : "Lead"} Field offset set to ${amount}s.`);
   view.render();
   return true;
+}
+
+// Nudge is a source-time operation. There is one implementation regardless of
+// whether it is invoked from the Timeline, Guide, keyboard, or pointer.
+function frameDuration() {
+  const reported = Number(player?.frameDuration?.());
+  return Number.isFinite(reported) && reported > 0 ? reported : null;
+}
+
+function nudgeQuantum() {
+  return frameDuration() ?? normalizeNudgeSeconds(state.nudgeSeconds);
+}
+
+function nudgeUnitLabel() {
+  return frameDuration() ? "frame" : `${nudgeQuantum()} s`;
+}
+
+function beginNudgeGesture(target) {
+  const key = nudgeTargetKey(target);
+  if (state.nudgeGesture?.key === key) {
+    window.clearTimeout(state.nudgeGesture.timer);
+  } else {
+    settleNudgeGesture();
+    state.nudgeGesture = {
+      key,
+      origin: snapshotModel(model(), { cloneGuide: true }),
+      history: state.session.history,
+      future: state.session.future || [],
+      accumulator: 0,
+      changed: false,
+      timer: null
+    };
+  }
+  state.nudgeGesture.timer = window.setTimeout(
+    settleNudgeGesture,
+    NUDGE_GESTURE_SETTLE_MS
+  );
+  return state.nudgeGesture;
+}
+
+// One continuous wheel series or held-key repetition settles as exactly one
+// Undo transaction.
+function settleNudgeGesture() {
+  const gesture = state.nudgeGesture;
+  if (!gesture) return false;
+  window.clearTimeout(gesture.timer);
+  state.nudgeGesture = null;
+  if (!gesture.changed) return false;
+  const committed = checkpoint(state.session, gesture.label || "Nudge", gesture.origin);
+  state.session = committed.session;
+  syncIntervalPinSelection();
+  persistGuide();
+  view.invalidateTimelinePins();
+  view.renderGuide();
+  view.render();
+  return true;
+}
+
+function nudgeTargetKey(target) {
+  return `${target.kind}:${target.id || "current"}`;
+}
+
+// The one Nudge operation. Timeline Shift-wheel, keyboard, and every Guide
+// increment control route through here, so they always agree.
+function nudgeTarget(target, direction, options = {}) {
+  if (!state.videoLoaded || !currentResolution()) return false;
+  const steps = Number.isFinite(options.steps) ? Math.trunc(options.steps) : 1;
+  if (!steps) return false;
+  const delta = direction * steps * nudgeQuantum();
+  const gesture = beginNudgeGesture(target);
+  const base = {
+    model: gesture.origin,
+    history: gesture.history,
+    future: gesture.future
+  };
+  // Each nudge amends the same origin snapshot; only settlement appends history.
+  const amendable = { model: model(), history: base.history, future: base.future };
+  let result = null;
+  if (target.kind === "current") {
+    gesture.label = "Nudge Current";
+    // Dragging or nudging Current is an exact Go, not a separate operator.
+    const destination = clamp(
+      currentResolution().C + delta,
+      activeRange().start,
+      activeRange().end
+    );
+    result = goTo(amendable, destination, { operator: "timeline", amend: true });
+    if (result.changed) state.session = result.session;
+  } else if (target.kind === "pin") {
+    gesture.label = "Nudge Pin";
+    const pin = getPin(guide(), target.id);
+    if (!pin) return false;
+    result = moveGuidePin(amendable, target.id, pin.t + delta, { amend: true });
+    if (result.changed) state.session = result.session;
+  } else if (target.kind === "section") {
+    gesture.label = "Nudge Section";
+    const section = resolveSection(guide(), target.id);
+    if (!section) return false;
+    result = moveGuideSection(amendable, target.id, delta, { amend: true });
+    if (result.changed) state.session = result.session;
+  } else {
+    return false;
+  }
+  if (!result?.changed) {
+    view.render();
+    return false;
+  }
+  gesture.changed = true;
+  locateAddress(currentResolution().C);
+  syncIntervalPinSelection();
+  view.invalidateTimelinePins();
+  view.renderGuide();
+  view.render();
+  setStatus(
+    `${gesture.label} ${direction > 0 ? "forward" : "backward"} by ${
+      steps === 1 ? "one" : steps
+    } ${nudgeUnitLabel()}.`
+  );
+  return true;
+}
+
+// The exact manipulable object under the pointer owns the Nudge. An empty
+// Timeline nudges Current.
+function nudgeTargetFromElement(node) {
+  const pin = node?.closest?.("[data-pin-go]") || node?.closest?.("[data-pin-drag]");
+  if (pin) {
+    return { kind: "pin", id: pin.dataset.pinGo || pin.dataset.pinDrag };
+  }
+  const sectionNode = node?.closest?.("[data-section-node]");
+  if (sectionNode) {
+    const role = sectionNode.dataset.sectionNode;
+    const section = resolveSection(guide(), sectionNode.dataset.sectionId);
+    if (!section) return { kind: "current" };
+    if (role === "start") return { kind: "pin", id: section.startPin.id };
+    if (role === "end") return { kind: "pin", id: section.endPin.id };
+    return { kind: "section", id: section.id };
+  }
+  const section = node?.closest?.("[data-section-go]");
+  if (section) return { kind: "section", id: section.dataset.sectionGo };
+  return { kind: "current" };
+}
+
+function selectedNudgeTarget() {
+  const selected = state.selectedRetained;
+  if (selected?.kind === "pin" && getPin(guide(), selected.id)) {
+    return { kind: "pin", id: selected.id };
+  }
+  if (selected?.kind === "section" && resolveSection(guide(), selected.id)) {
+    return { kind: "section", id: selected.id };
+  }
+  return { kind: "current" };
+}
+
+// High-resolution trackpad deltas accumulate until one discrete quantum is
+// crossed. The browser default is prevented only for an acquired target.
+function handleTimelineWheel(event) {
+  if (!event.shiftKey || !state.videoLoaded || !currentResolution()) return;
+  const target = nudgeTargetFromElement(event.target);
+  if (!target) return;
+  event.preventDefault();
+  const gesture = beginNudgeGesture(target);
+  const raw = Math.abs(event.deltaX) > Math.abs(event.deltaY)
+    ? event.deltaX
+    : event.deltaY;
+  gesture.accumulator += raw;
+  const steps = Math.trunc(gesture.accumulator / NUDGE_WHEEL_THRESHOLD);
+  if (!steps) return;
+  gesture.accumulator -= steps * NUDGE_WHEEL_THRESHOLD;
+  // Wheel-up and wheel-right are forward.
+  nudgeTarget(target, steps < 0 ? 1 : -1, { steps: Math.abs(steps) });
 }
 
 function syncContextControl() {
@@ -3276,12 +3747,16 @@ function initializePlayerApi() {
       // Step Field offsets are physical observation settings. They are
       // intentionally independent from the semantic Step Reach.
       stepReach: currentFieldOffsets(),
-      // The semantic owner supplies exact, temporary preview geometry. The
-      // Field controller never imports timeline projection or Context math.
-      fieldPreview: fieldOperatorPreview(),
+      fieldBreath: currentFieldBreath(),
+      // The application resolves the ambient Frame owner and supplies exact
+      // source Addresses. The Field controller never imports timeline
+      // projection, operator arithmetic, or Context math.
+      fieldFrame: fieldOperatorPreview(),
       transportKind: state.transport.kind,
       pendingStep: Boolean(state.pendingStep),
-      dragging: Boolean(state.dragHandle || state.guideDrag?.moved),
+      dragging: Boolean(
+        state.dragHandle || state.guideDrag?.moved || state.currentDrag?.moved
+      ),
       center: playerSnapshot(),
       playerState: state.playerState
     }),
@@ -3289,15 +3764,18 @@ function initializePlayerApi() {
       stepFieldEnabled: state.stepFieldEnabled,
       tailVisible: state.tailVisible,
       leadVisible: state.leadVisible,
-      tailRate: state.fieldResponse.tailRate,
-      leadRate: state.fieldResponse.leadRate
+      breathRate: currentFieldBreath().rate,
+      reducedMotion: prefersReducedMotion()
     }),
     setPreferences: patch => {
       if (Object.hasOwn(patch, "stepFieldEnabled")) state.stepFieldEnabled = Boolean(patch.stepFieldEnabled);
       if (Object.hasOwn(patch, "tailVisible")) state.tailVisible = Boolean(patch.tailVisible);
       if (Object.hasOwn(patch, "leadVisible")) state.leadVisible = Boolean(patch.leadVisible);
-      if (Object.hasOwn(patch, "tailRate") || Object.hasOwn(patch, "leadRate")) {
-        state.fieldResponse = normalizeFieldResponse({ ...state.fieldResponse, ...patch });
+      if (Object.hasOwn(patch, "breathRate")) {
+        state.fieldBreath = normalizeFieldBreath({
+          ...currentFieldBreath(),
+          rate: patch.breathRate
+        });
       }
       persistPreferences();
     },
@@ -3345,19 +3823,30 @@ elements["youtube-url"].addEventListener("keydown", event => {
 elements.timeline.addEventListener("click", handleTimelineClick);
 elements.timeline.addEventListener("pointermove", updateRangeDrag);
 elements.timeline.addEventListener("pointermove", updateGuideDrag);
+elements.timeline.addEventListener("pointermove", updateCurrentDrag);
 elements.timeline.addEventListener("pointerup", finishRangeDrag);
 elements.timeline.addEventListener("pointerup", finishGuideDrag);
+elements.timeline.addEventListener("pointerup", finishCurrentDrag);
 elements.timeline.addEventListener("pointercancel", cancelRangeDrag);
 elements.timeline.addEventListener("pointercancel", event => {
   finishGuideDrag(event, { cancel: true });
+  finishCurrentDrag(event, { cancel: true });
 });
+// Current is its own gesture owner. Acquiring it on pointer-down keeps the
+// Timeline from interpreting the same press as a generic Go.
+elements["current-marker"].addEventListener("pointerdown", beginCurrentDrag);
+// Shift + wheel nudges the exact manipulable object under the pointer.
+elements.timeline.addEventListener("wheel", handleTimelineWheel, { passive: false });
 document.addEventListener("pointerup", finishGuideDrag);
+document.addEventListener("pointerup", finishCurrentDrag);
 document.addEventListener("pointercancel", event => {
   finishGuideDrag(event, { cancel: true });
+  finishCurrentDrag(event, { cancel: true });
 });
 document.addEventListener("pointermove", event => {
   if (elements.timeline.contains?.(event.target)) return;
   updateGuideDrag(event);
+  updateCurrentDrag(event);
 });
 elements["range-start-handle"].addEventListener("pointerdown", event => beginRangeDrag("start", event));
 elements["range-end-handle"].addEventListener("pointerdown", event => beginRangeDrag("end", event));
@@ -3413,6 +3902,15 @@ elements["section-lane"].addEventListener("click", event => {
     event.stopPropagation();
     return;
   }
+  const node = event.target.closest("[data-section-node]");
+  if (node) {
+    event.stopPropagation();
+    selectSectionAsWorkingInterval(
+      node.dataset.sectionId,
+      { carryRetained: event.altKey === true }
+    );
+    return;
+  }
   const body = event.target.closest("[data-section-go]");
   if (body) {
     event.stopPropagation();
@@ -3421,6 +3919,30 @@ elements["section-lane"].addEventListener("click", event => {
       { carryRetained: event.altKey === true }
     );
   }
+});
+// The Temporal Topography owns spatial direct manipulation. Each Section node
+// has one visually centered acquisition region and one unambiguous owner:
+// Start/End move that endpoint Pin, and the midpoint translates the Section.
+elements["section-lane"].addEventListener("pointerdown", event => {
+  const node = event.target.closest("[data-section-node]");
+  if (!node) return;
+  const section = resolveSection(guide(), node.dataset.sectionId);
+  if (!section) return;
+  event.stopPropagation();
+  const role = node.dataset.sectionNode;
+  if (role === "start" || role === "end") {
+    beginGuideDrag(
+      "pin",
+      role === "start" ? section.startPin.id : section.endPin.id,
+      event,
+      { origin: "timeline", sectionId: section.id, threshold: 6 }
+    );
+    return;
+  }
+  beginGuideDrag("section", section.id, event, {
+    origin: "timeline",
+    threshold: 6
+  });
 });
 function activatePinClusterChoice(button, event) {
   if (state.guideClickSuppressed) {
@@ -3674,11 +4196,23 @@ for (const control of document.querySelectorAll("[data-preview-action]")) {
 }
 
 // Step Field geometry
-elements["step-backward-seconds"].addEventListener("change", event => {
-  changeFieldOffset("backward", event.target.value);
+elements["field-inner-offset"].addEventListener("change", event => {
+  changeFieldBoundary("inner", event.target.value);
 });
-elements["step-forward-seconds"].addEventListener("change", event => {
-  changeFieldOffset("forward", event.target.value);
+elements["field-outer-offset"].addEventListener("change", event => {
+  changeFieldBoundary("outer", event.target.value);
+});
+elements["nudge-seconds"].addEventListener("change", event => {
+  const parsed = Number(event.target.value);
+  if (!String(event.target.value).trim() || !Number.isFinite(parsed) || parsed <= 0) {
+    setStatus("Nudge must be a positive number of seconds.", true);
+    view.render();
+    return;
+  }
+  state.nudgeSeconds = normalizeNudgeSeconds(parsed);
+  persistPreferences();
+  setStatus(`Nudge set to ${state.nudgeSeconds} s.`);
+  view.render();
 });
 elements["step-size-seconds"].addEventListener("change", event => {
   changeStepSeconds(event.target.value);
@@ -3762,6 +4296,148 @@ function trapCompactGuideFocus(event) {
   return false;
 }
 
+// Guide is the exact editor. Address inputs accept canonical timecode or plain
+// seconds, clamp against Range and structural partners, and commit as one
+// transaction. There is no second drag geometry here.
+function parseAddress(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  if (/^-?\d+(\.\d+)?$/.test(text)) return Number(text);
+  const parts = text.split(":");
+  if (parts.length > 3 || parts.some(part => !/^\d+(\.\d+)?$/.test(part.trim()))) {
+    return null;
+  }
+  return parts.reduce((total, part) => total * 60 + Number(part.trim()), 0);
+}
+
+function guideAddressTarget(input) {
+  const kind = input?.dataset?.addressInput;
+  const id = input?.dataset?.addressId;
+  if (kind === "pin") return { kind: "pin", id };
+  if (kind === "section-start" || kind === "section-end") {
+    const section = resolveSection(guide(), id);
+    if (!section) return null;
+    return {
+      kind: "pin",
+      id: kind === "section-start" ? section.startPin.id : section.endPin.id,
+      sectionId: section.id
+    };
+  }
+  if (kind === "section") return { kind: "section", id };
+  return null;
+}
+
+function applyGuideAddressInput(input) {
+  if (!input) return false;
+  clearGuideAddressPreview();
+  const target = guideAddressTarget(input);
+  if (!target) return false;
+  const parsed = parseAddress(input.value);
+  if (parsed === null || !Number.isFinite(parsed)) {
+    setStatus("Enter an Address as seconds or timecode.", true);
+    view.renderGuide();
+    return false;
+  }
+  const address = clamp(parsed, activeRange().start, activeRange().end);
+  const origin = snapshotModel(model(), { cloneGuide: true });
+  const result = target.kind === "pin"
+    ? moveGuidePin(state.session, target.id, address, { amend: true })
+    : moveGuideSection(
+      state.session,
+      target.id,
+      address - (resolveSection(guide(), target.id)?.start ?? address),
+      { amend: true }
+    );
+  if (!result.changed) {
+    setStatus(
+      result.reason === "invalid-guide-geometry"
+        ? "That Address would collapse or reverse a Section."
+        : "That Address leaves the object unchanged.",
+      result.reason === "invalid-guide-geometry"
+    );
+    view.renderGuide();
+    return false;
+  }
+  const committed = checkpoint(
+    result.session,
+    target.kind === "pin" ? "Edit Pin Address" : "Edit Section Address",
+    origin
+  );
+  state.session = committed.session;
+  syncIntervalPinSelection();
+  persistGuide();
+  locateAddress(currentResolution().C);
+  view.invalidateTimelinePins();
+  view.renderGuide();
+  view.render();
+  setStatus(`Set Address to ${formatTime(address)}.`);
+  return true;
+}
+
+// An Address input previews the candidate Field Frame before commit. Typing is
+// presentation only: it seeks the players but writes no Session state.
+function previewGuideAddressInput(input) {
+  const target = guideAddressTarget(input);
+  const parsed = parseAddress(input?.value);
+  if (!target || parsed === null || !Number.isFinite(parsed) || !state.videoLoaded) {
+    return false;
+  }
+  const address = clamp(parsed, activeRange().start, activeRange().end);
+  const section = target.sectionId
+    ? resolveSection(guide(), target.sectionId)
+    : input.dataset.addressInput === "section"
+      ? resolveSection(guide(), target.id)
+      : null;
+  let frame;
+  if (section && input.dataset.addressInput === "section") {
+    const shift = address - section.start;
+    frame = {
+      kind: "section",
+      start: section.start + shift,
+      center: section.midpoint + shift,
+      end: section.end + shift
+    };
+  } else if (section) {
+    const start = input.dataset.addressInput === "section-start" ? address : section.start;
+    const end = input.dataset.addressInput === "section-end" ? address : section.end;
+    frame = { kind: "section", start, center: (start + end) / 2, end };
+  } else {
+    const step = fieldStepPreview(address, "pin");
+    frame = { kind: "pin", start: step.start, center: address, end: step.end };
+  }
+  state.directFrame = frame;
+  placePlayer(address);
+  stepField?.previewExtent?.(frame);
+  return true;
+}
+
+function clearGuideAddressPreview() {
+  if (!state.directFrame) return false;
+  state.directFrame = null;
+  stepField?.clearPreview?.({ restore: false });
+  if (state.videoLoaded && currentResolution()) {
+    locateAddress(currentResolution().C);
+    stepField?.translateToCurrent?.(currentResolution().C, { preserve: true });
+  }
+  view.render();
+  return true;
+}
+
+function handleGuideAddressKeydown(event) {
+  const input = event.target.closest?.("[data-address-input]");
+  if (!input) return;
+  if (event.key === "Enter") {
+    event.preventDefault();
+    applyGuideAddressInput(input);
+    return;
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    clearGuideAddressPreview();
+    view.renderGuide();
+  }
+}
+
 function handleGuideClick(event) {
   if (state.guideClickSuppressed) {
     event.preventDefault?.();
@@ -3789,6 +4465,34 @@ function handleGuideClick(event) {
       { carryRetained: event.altKey === true }
     );
   }
+  const nudge = event.target.closest("[data-nudge-target]");
+  if (nudge) {
+    // Increment buttons use the same Nudge operation as Timeline Shift-wheel
+    // and keyboard nudging.
+    const kind = nudge.dataset.nudgeTarget;
+    const id = nudge.dataset.nudgeId;
+    const direction = Number(nudge.dataset.nudgeDirection) < 0 ? -1 : 1;
+    const section = kind.startsWith("section-")
+      ? resolveSection(guide(), id)
+      : null;
+    const target = kind === "pin"
+      ? { kind: "pin", id }
+      : kind === "section-start" && section
+        ? { kind: "pin", id: section.startPin.id }
+        : kind === "section-end" && section
+          ? { kind: "pin", id: section.endPin.id }
+          : { kind: "section", id };
+    nudgeTarget(target, direction);
+    return;
+  }
+  const addressGo = event.target.closest("[data-address-go]");
+  if (addressGo) {
+    return goToPin(
+      getPin(guide(), addressGo.dataset.addressGo),
+      "pin",
+      { carryRetained: event.altKey === true }
+    );
+  }
   const focus = event.target.closest("[data-focus-section]");
   if (focus) return focusSection(focus.dataset.focusSection);
   const leave = event.target.closest("[data-leave-section]");
@@ -3811,29 +4515,31 @@ function handleGuideClick(event) {
 }
 
 elements["sections-list"].addEventListener("click", handleGuideClick);
-elements["sections-list"].addEventListener("pointerdown", event => {
-  const node = event.target.closest("[data-pin-drag]");
-  if (node) {
-    beginGuideDrag(
-      "pin",
-      node.dataset.pinDrag,
-      event,
-      { sectionId: node.dataset.dragSection || null }
-    );
-    return;
-  }
-  const section = event.target.closest("[data-section-drag]");
-  if (section) beginGuideDrag("section", section.dataset.sectionDrag, event);
-});
 elements["sections-list"].addEventListener("change", event => {
   const control = event.target.closest("[data-section-weight]");
-  if (!control) return;
-  changeSectionWeight(control.dataset.sectionWeight, control.value);
+  if (control) {
+    changeSectionWeight(control.dataset.sectionWeight, control.value);
+    return;
+  }
+  applyGuideAddressInput(event.target.closest("[data-address-input]"));
+});
+elements["sections-list"].addEventListener("keydown", handleGuideAddressKeydown);
+elements["sections-list"].addEventListener("input", event => {
+  previewGuideAddressInput(event.target.closest("[data-address-input]"));
+});
+elements["sections-list"].addEventListener("focusout", event => {
+  if (event.target.closest?.("[data-address-input]")) clearGuideAddressPreview();
 });
 elements["pins-list"].addEventListener("click", handleGuideClick);
-elements["pins-list"].addEventListener("pointerdown", event => {
-  const pin = event.target.closest("[data-pin-drag]");
-  if (pin) beginGuideDrag("pin", pin.dataset.pinDrag, event);
+elements["pins-list"].addEventListener("change", event => {
+  applyGuideAddressInput(event.target.closest("[data-address-input]"));
+});
+elements["pins-list"].addEventListener("keydown", handleGuideAddressKeydown);
+elements["pins-list"].addEventListener("input", event => {
+  previewGuideAddressInput(event.target.closest("[data-address-input]"));
+});
+elements["pins-list"].addEventListener("focusout", event => {
+  if (event.target.closest?.("[data-address-input]")) clearGuideAddressPreview();
 });
 elements["sections-list"].addEventListener("pointerover", event => {
   const item = event.target.closest("[data-section-preview-id]");
@@ -3960,12 +4666,22 @@ document.addEventListener("keydown", event => {
   }
   if (!state.videoLoaded) return;
 
+  // Conventional keyboard nudging. Repeated keydown events belong to one held
+  // gesture and settle as one Undo checkpoint.
+  if (plain && (event.key === "," || event.key === ".")) {
+    event.preventDefault();
+    nudgeTarget(selectedNudgeTarget(), event.key === "." ? 1 : -1);
+    return;
+  }
+
   const repeatableStep = (plain || carryChord)
     && (
       event.key === "ArrowLeft"
       || event.key === "ArrowRight"
       || code === "KeyA"
       || code === "KeyD"
+      || event.key === ","
+      || event.key === "."
     );
   if (event.repeat && !repeatableStep) return;
 

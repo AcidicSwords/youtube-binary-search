@@ -1,4 +1,4 @@
-# Binary YouTube Reader — Canonical Specification
+# Video Cartography — Canonical Specification
 
 ## 1. Authority
 
@@ -8,7 +8,7 @@ This document is normative for v7. Source time is the only persisted temporal tr
 
 A video is globally present as a source but locally actualized in playback. At any instant, its frames are linearly ordered and mutually exclusive: only one source moment can occupy the ordinary audiovisual present.
 
-Binary YouTube Reader transforms that condition into bounded spatiotemporal availability without changing source order:
+Video Cartography transforms that condition into bounded spatiotemporal availability without changing source order:
 
 ```text
 linear temporal exclusivity
@@ -43,6 +43,8 @@ An operator is not defined only by what it changes. It is equally defined by wha
 - **Section** — an edge between two Pins with positive source duration, optional title, and one canonical timeline `weight`.
 - **Focus context** — the containing Range restored by Unfocus.
 - **Step Reach** — independent fixed timeline units or an adaptive fraction of active weighted Range width.
+- **Field Breath** — the configured inner offset \(x\), outer offset \(y\) with \(0 < x < y\), and one symmetric breathing-rate pair.
+- **Nudge quantum** — the configured source-time increment used by fine adjustment, or an adapter-verified frame duration when one is available.
 
 ### 2.1 State dimensions
 
@@ -60,7 +62,7 @@ Operator contracts use the following canonical dimensions:
 | metric | Section weights and derived Timeline Space | how much map distance content receives |
 | movement magnitude | stored Step Reach and derived effective Reach | how far Step moves |
 | traversal provenance | `lastOperator` | which committed spatial grammar owns the next three-frame interpretation |
-| perceptual horizon | Field pane addresses, rates, offsets, Hold/Stretch state | what nearby moments are perceptually co-present |
+| perceptual horizon | Field Frame addresses, breathing offsets, rates, Hold state | what nearby moments are perceptually co-present |
 | reversibility | history and future | which semantic transformations can be restored |
 
 Derived values are not stored dimensions. In particular:
@@ -255,46 +257,332 @@ Playback actualizes source continuity. Cursor moves physically while Current rem
 
 Context is bounded observation around Current. It remains transient unless the user accepts Cursor. Context acceptance uses the same continuous settlement law rather than direct-Go framing.
 
-### Stretch and Hold
+### Field Frame
 
-Stretch changes the live Tail/Lead relation through playback-rate difference while Center remains the temporal anchor. Hold preserves an attained side relation. Both are runtime-only and cannot write Current, Working Interval, Resolution, Range, Guide, Weight, or Step Reach.
+The Field Frame is the stable Tail–Center–Lead presentation used outside
+ordinary Center playback:
 
-Configured Offset and attained relation are distinct. Editing one Offset can
-reconcile only that side. A side at its configured target follows the new
-target; a partial Hold preserves its attained relation unless the new bound
-clamps it. Field Off or pane collapse makes that projection dormant: it is not a
-Step, Hold, Stretch, span, activation, video-sync, or delayed-play operand.
-Operational Field controls require a visible ready source and positive
-Range-contained reach. A held Field span requires both operational sides.
+```text
+Tail | Center | Lead
+```
 
-Context duration and Field Offset are independent physical observation
-parameters. Their numeric relation may be intentionally useful but is not an
-ownership relation: neither operation reads, derives, persists, or rewrites the
-other. Configured Field Offset belongs only to live Stretch/Hold. Outside
-playback, Field preview ownership is:
+It is not a semantic operator. It is a perceptual projection of the state
+produced by an operator, by Context, or by a direct manipulation. Center equals
+Current except while Context transport is displaying its Cursor or a direct
+manipulation is displaying a candidate position.
+
+#### Frame ownership
+
+The next settled Frame is resolved once per semantic movement.
+
+When Context is enabled:
+
+```text
+Tail   = bounded Context Start
+Center = Current
+Lead   = bounded Context End
+```
+
+When Context is disabled, the current operator supplies the framing:
 
 ```text
 Step/default = exact weighted Backward target | Current | exact Forward target
 Refine       = next weighted backward midpoint | Current | next forward midpoint
 Reopen       = reopened backward midpoint | Current | reopened forward midpoint
-Context      = first source frame | playing Cursor | last source frame
-Pin drag     = weighted Step Backward | Pin | weighted Step Forward
 Section      = Start | midpoint Current | End
+Go           = exact Go-derived neighbourhood around Current
 ```
 
-`lastOperator` is part of the immutable Session snapshot solely to restore this
-interpretation through Context, Guide edits, Undo, and Redo. Direct
-manipulation overrides the ambient operator preview only for the gesture's
-lifetime. Preview never mutates configured Offset, attained Hold, Stretch
-mode, Step Reach, or Session state, and is never a Held Field span. Playback
-synchronously removes preview ownership before the trusted play gesture and
-retains the existing refold/Stretch/Hold implementation. Hover/focus dry-runs
-semantic operations on the timeline without media effects.
+Context therefore has priority over operator framing, but only while Context is
+enabled.
 
-A Section owns the ambient three-frame Viewer only while Current equals that
-Section's midpoint. Direct endpoint/whole-Section manipulation may temporarily
-preview a different midpoint; once it ends, Step resumes if committed Current
-does not equal the resulting midpoint.
+Direct manipulation temporarily supplies an exact Frame with the highest
+priority for the gesture's lifetime:
+
+```text
+Current drag             = candidate neighbourhood | candidate Current | candidate neighbourhood
+Pin drag                 = candidate surrounding frame | candidate Pin | candidate surrounding frame
+Section endpoint/profile = candidate Start | candidate midpoint | candidate End
+```
+
+When the gesture ends, the Field performs one transition back to the ambient
+Context Frame or operator Frame. Hover and keyboard focus remain map-only dry
+runs; they do not seek the video players.
+
+`lastOperator` is part of the immutable Session snapshot solely to restore this
+interpretation through Context, Guide edits, Undo, and Redo. A Section owns the
+ambient Frame only while Current equals that Section's midpoint; once a direct
+edit displaces the midpoint from Current, Step framing resumes.
+
+#### Slideshow transitions
+
+Every committed movement creates one directional transition from the currently
+displayed Frame to the next.
+
+Forward traversal moves the visible strip leftward:
+
+```text
+old Tail exits through Tail
+old Center travels toward Tail
+new Current occupies Center
+new Lead enters through Lead
+```
+
+Backward traversal moves the strip rightward, exchanging the two sides. Current
+always matches Center after the movement commits.
+
+The three roles are presented distinctly during the transition, because they are
+doing different things: the trailing side has just received the address Center
+was showing, the leading side is receiving material that was not previously
+visible, and Center sits between them. Side players cannot duplicate one
+another's surface, so the outgoing frame is handed to the trailing side by
+seeking it there rather than by moving pixels. When Step Reach matches the Field
+offset that handoff is literal; otherwise the transition is directional without
+being a frame-for-frame carousel.
+
+The visual transition neither delays nor intermediates the semantic commit.
+Session changes immediately and atomically; the Field renders a brief
+directional transition between the previous and resulting presentations. A
+movement may use the previous Current as one transient outgoing frame so it
+visibly passes toward the trailing side, and the transition then settles onto
+the newly derived Frame. This is one visual event attached to one semantic
+movement, never a sequence of reassignments.
+
+Rapid same-direction operations compose as one continuing slideshow. The
+transition system must never block a semantic movement while an animation is
+active, must coalesce repeated same-direction movements, must reverse cleanly
+when traversal direction reverses, must discard stale player-seek callbacks
+using a transition generation token, and must settle on the latest resulting
+Frame rather than rendering every obsolete intermediate Frame.
+
+Field Frame transitions create no Session history.
+
+#### Persistent Context framing
+
+```text
+before Context   Tail = Context Start | Center = Current          | Lead = Context End
+during Context   Tail = Context Start | Center = moving Cursor    | Lead = Context End
+after Context    Tail = Context Start | Center = Current/accepted | Lead = Context End
+```
+
+The side frames show whether a visible change of state occurs inside the
+observation window. If Tail and Lead display materially different states, the
+transition lies somewhere inside Context and can be located by playing or
+stopping within it. Context beginning, ending, pausing, or settling must not
+cause another Tail/Lead reassignment; Context transport operates inside one
+stable Frame.
+
+### Field Breath
+
+The Field Breath is the live Stretch relation used during ordinary Center
+playback. Preview and Breath are mutually exclusive presentation owners:
+
+```text
+ordinary playback              → Breath
+idle traversal, Context, edit  → Frame
+```
+
+#### Configured relation
+
+Let \(x\) be the inner Field offset and \(y\) the outer Field offset, with
+\(0 < x < y\). For every operational side:
+
+```text
+x ≤ side offset ≤ y
+Tail = Center − tailOffset
+Lead = Center + leadOffset
+```
+
+Neither side reaches or crosses Center during Stretch.
+
+Let Center playback rate be \(c\). The outward rates \(z\) and \(w\)
+satisfy \(z < c < w\) and, where available, \(c - z = w - c\). At Center rate
+`1×` the valid symmetric pairs are:
+
+```text
+Tail 0.75× | Center 1× | Lead 1.25×
+Tail 0.5×  | Center 1× | Lead 1.5×
+Tail 0.25× | Center 1× | Lead 1.75×
+```
+
+The interface exposes one breathing-rate pair rather than two conceptually
+independent side rates. The configured values are the outward rates; the inward
+phase temporarily exchanges them without rewriting the saved pair.
+
+#### Bounds and synchronization
+
+Expansion begins at the inner boundary with `Tail rate = z` and `Lead rate = w`.
+Tail falls farther behind Center, Lead advances farther ahead, and both approach
+\(y\).
+
+If one side reaches \(y\) before the other, it clamps exactly to \(y\), is
+placed at the exact boundary-relative source Address, takes Center's rate \(c\),
+follows Center while preserving that offset, and is marked as waiting at the
+outer boundary. When every operational side has reached its effective outer
+boundary, contraction begins. Unavailable, collapsed, hidden, or Range-clipped
+sides are excluded from the barrier.
+
+Contraction exchanges the side rates: `Tail rate = w` and `Lead rate = z`. Tail
+catches Center while remaining behind it, Center catches Lead while Lead remains
+ahead of it, and both offsets decrease toward \(x\). The inner boundary uses
+the same clamp-and-wait rule, and when all operational sides reach \(x\) the
+outward assignment is restored.
+
+```text
+x → expand → y → contract → x → repeat
+```
+
+Effective bounds are Range-clipped at the outer end only. The minimum offset is a
+law, not a preference: a side with less room than \(x\) cannot preserve the
+required separation, so it is non-operational, excluded from the barrier, and
+parked at whatever room remains. \(x\) is never silently reduced to fit, and a
+configured pair always satisfies \(0 < x < y\).
+
+Resuming after a proper-Range wrap continues the preserved breathing phase. The
+outward pair is correct only while expanding; a contracting Field is resumed with
+the exchanged rates.
+
+#### Hold
+
+Hold alone stops the breathing cycle. It preserves each attained offset within
+\([x, y]\), sets every held side to Center rate, keeps Tail behind and Lead
+ahead during continued playback, and preserves the current breathing direction
+for later resumption. Stretch resumes from the attained relation.
+
+A held Field is not a configured Offset change. Hold creates no Session mutation
+and no Undo checkpoint.
+
+Breathing is a coordinated Field relation and uses one combined Stretch/Hold
+control. Tail and Lead retain individual visibility, but there are no
+independent side Stretch/Hold controls.
+
+Stretch and Hold are runtime-only and cannot write Current, Working Interval,
+Resolution, Range, Guide, Weight, or Step Reach.
+
+Configured Offset and attained relation are distinct. A side already following
+its configured bound follows a new one; a partial relation is preserved and only
+clamped when the new bound requires it. Field Off or pane collapse makes that
+projection dormant: it is not a Step, Hold, Stretch, span, activation,
+video-sync, or delayed-play operand. Operational Field controls require a visible
+ready source and positive Range-contained reach. A held Field span requires both
+operational sides.
+
+Context duration and Field Offset are independent physical observation
+parameters. Their numeric relation may be intentionally useful but is not an
+ownership relation: neither operation reads, derives, persists, or rewrites the
+other.
+
+Preview, breathing, Context, and semantic state cannot overwrite one another's
+configuration.
+
+### Current drag as Go
+
+Dragging Current is an exact Go gesture. It is not Pin movement and it does not
+require a new operator:
+
+```text
+Current drag → candidate exact Address → release → one Go transaction
+```
+
+Pressing Current acquires the Current marker before the Timeline can interpret
+the gesture as generic Go. Crossing the drag threshold begins the candidate
+presentation. During the drag the Current marker follows the candidate Timeline
+position, the candidate is converted through the canonical Timeline Space
+inverse, Center displays the candidate frame, the Field displays the candidate
+Context Frame when Context is enabled and the candidate Go Frame otherwise, the
+original Current may remain as a faint departure marker, and Session Current
+remains unchanged.
+
+On release, one exact Go is committed from the original Current to the candidate
+Current: one Working Interval, at most one Undo checkpoint, and one Field
+transition in the corresponding traversal direction. On cancellation the original
+Current presentation is restored and no semantic change or history is created. A
+stationary press performs no movement.
+
+### Nudge
+
+Fine adjustment is called Nudge unless the active media adapter supplies a
+verified frame duration:
+
+```text
+verified frame duration available → one-frame Nudge
+frame duration unavailable        → configured source-time quantum
+```
+
+A default approximate quantum may be provided, but it is displayed as seconds
+rather than described as an exact source frame. The quantum must remain strictly
+greater than the semantic equality tolerance the kernel uses to decide that a
+movement happened; otherwise one Nudge resolves to the Address it started from
+and the operation is silently inert.
+
+Nudge acts in source time and is then reprojected. Section Weight must not change
+the temporal size of one Nudge.
+
+Within the Timeline, `Shift` + wheel upward or rightward nudges forward and
+downward or leftward nudges backward. The target is the exact manipulable object
+under the pointer:
+
+```text
+Current           → nudge Current through Go
+Pin               → nudge that Pin
+Section endpoint  → nudge that endpoint Pin
+Section midpoint  → translate the complete Section
+empty Timeline    → nudge Current
+```
+
+The browser default is prevented only when a valid Timeline nudge target has been
+acquired. High-resolution trackpad deltas accumulate until one discrete Nudge
+threshold is crossed, and one continuous wheel gesture settles as one Undo
+transaction.
+
+`Shift`-drag enters precision mode: it reduces movement gain, quantizes the
+resulting source Address to the active Nudge quantum, retains the same semantic
+gesture owner, and produces one transaction on release.
+
+`,` and `.` nudge the selected or focused map object when unambiguous, and
+otherwise Current. Repeated keydown events belong to one held nudge gesture and
+settle as one Undo checkpoint.
+
+There is one Nudge implementation regardless of whether it is invoked from the
+Timeline, Guide, keyboard, or pointer.
+
+### Direct manipulation surfaces
+
+The Temporal Topography owns spatial direct manipulation because it displays the
+actual global geometry:
+
+```text
+Current marker          → Go
+Pin marker              → Move Pin
+Section Start or End    → Move endpoint Pin
+Section midpoint        → Translate Section
+Range boundary          → Change Range
+```
+
+Every object has one visually centered acquisition region and one unambiguous
+gesture owner. Direct manipulation uses the projection captured at pointer-down,
+so the geometry does not jump if Weight or another derived condition changes
+during the gesture.
+
+### Exact Guide editing
+
+Guide owns exact topology, metadata, and numeric editing. It does not duplicate
+the Timeline's spatial drag system.
+
+A Pin row contains a Title, an Address input, `−`/`+` Nudge controls, Go, a
+reference count, Rename, and Delete. Editing a shared Pin's Address updates every
+referencing Section through existing shared ownership.
+
+A Section row contains a Title, Start and End Address inputs, a Duration readout,
+`−`/`+` controls for each endpoint, optional whole-Section translation controls,
+Weight, Focus, Unlink, Rename, and Delete. The full-map profile remains a
+read-only positional representation and acquisition link to the Timeline.
+
+Address inputs accept canonical timecode or seconds, clamp against Range and
+structural partners, reject Section collapse or reversal, preview the candidate
+Field Frame before commit, commit on Enter or explicit Apply, cancel on Escape,
+and create one Undo transaction. Increment buttons use the same Nudge operation
+as Timeline Shift-wheel and keyboard nudging.
 
 ### Alt Carry
 
@@ -489,6 +777,23 @@ Release is the only operator whose sole effect is clearing the Working Interval
 Timeline Space is derived and never persisted
 each operator changes only dimensions permitted by its effect contract
 presentation preview and semantic commit invoke the same operator implementation
+
+Center equals Current whenever Context or direct preview does not own Center
+Context start and end do not change merely because Context transport stops
+a semantic movement produces at most one Field Frame transition
+Field Frame transitions never create Session history
+rapid transitions settle on the latest committed state
+Tail remains behind Center during breathing
+Lead remains ahead of Center during breathing
+breathing offsets remain within effective [x, y] bounds
+a side waiting at a breathing boundary runs at Center rate
+Hold alone changes Stretching into Held
+dragging Current invokes Go
+Timeline direct manipulation and Guide exact editing call the same operation
+one drag, wheel series, or held-key nudge creates at most one Undo checkpoint
+fine Nudge acts in source time, not Timeline Space
+Guide owns no independent drag geometry
+preview, breathing, Context, and semantic state cannot overwrite one another
 ```
 
 Source-contiguous media behavior and strict spatial invertibility are the highest-priority invariants.
@@ -1033,11 +1338,18 @@ range-geometry.js               Range and Resolution arithmetic
 timeline-projection.js          positive metric and inverse
 guide.js                        Pin/Section topology and weights
 transport.js                    Playback and Context projection
-step-field-geometry.js          Field source geometry
-step-field.js                   Field runtime
+field-frame.js                  Field Frame derivation, direction, transitions
+step-field-geometry.js          Field source geometry and the breathing machine
+step-field.js                   Field runtime, Frame placement, breathing, Hold
 app.js                          action routing and adapter composition
 view.js                         grammar-derived presentation
 ```
+
+`field-frame.js` owns Context Frame derivation, operator fallback Frame
+derivation, direct-manipulation Frame validation, movement direction
+classification, transition descriptors, and stable Frame identity. It does not
+mutate Session, seek players, calculate semantic operator targets independently,
+own Context transport, or own breathing.
 
 No new module may import DOM or media APIs unless its ownership explicitly requires them.
 

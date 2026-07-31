@@ -1,0 +1,37 @@
+# Video Cartography — Canonical Glossary
+
+- **Source** — the authoritative linear audiovisual sequence.
+- **Address** — one exact source-time position.
+- **Panoramic Phase Field / Field** — Tail, Center, and Lead presented as one local perceptual surface.
+- **Field Frame** — the stable idle, Context, operator, or direct-manipulation three-frame presentation.
+- **Field Breath** — the bounded live expansion and contraction of Tail and Lead during playback.
+- **Tail** — the source phase behind Center.
+- **Center** — the audible actualized source phase; Current when idle, Cursor during observation.
+- **Lead** — the source phase ahead of Center.
+- **Stretch** — begin or resume Field Breath.
+- **Hold** — preserve the attained Field relation at Center rate.
+- **Inner Offset** — the minimum Tail/Lead separation from Center during Breath.
+- **Outer Offset** — the maximum Tail/Lead separation from Center during Breath.
+- **Temporal Topography** — the complete source projected into navigable Timeline Space.
+- **Timeline Space** — the derived positive spatial coordinate used for map layout and navigation.
+- **Range** — admissible source territory.
+- **Resolution** — the active neighbourhood and discrimination grain.
+- **Current** — committed semantic Address.
+- **Cursor** — transient physically observed Address.
+- **Working Interval** — one retained continuous traversal with directed departure and arrival.
+- **Pin** — a retained source landmark with optional title.
+- **Section** — a retained edge between two Pins with optional title and one canonical Weight.
+- **Weight** — one Section's positive map-scale factor; never playback rate.
+- **Guide** — the persistent graph of Pins and Sections.
+- **Refine** — choose a directional spatial midpoint at finer Resolution while retaining the established path when possible.
+- **Local Refine** — choose the same midpoint while recording only the immediate Current-to-midpoint traversal.
+- **Step** — traverse a known distance in Timeline Space.
+- **Pin traversal** — traverse to the next retained landmark using Step's interval law.
+- **Go** — commit to an exact known Address.
+- **Reopen** — restore Range-level Resolution without changing Current or retained coverage.
+- **Switch Endpoint** — continue from the opposite side of the same Working Interval.
+- **Release** — clear only the Working Interval.
+- **Deform** — create/reuse a Section and change its Weight.
+- **Focus / Unfocus** — install an extent as Range / restore its containing Range.
+- **Context** — bounded source-contiguous observation around Current before or during acceptance.
+- **Nudge** — precise source-time movement of Current or retained topology; an exact frame only when proven by the media adapter.

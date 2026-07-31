@@ -436,3 +436,119 @@
   .field-control input { font-size: 16px; }
   .pane-collapse { width: var(--touch); }
 }
+
+
+/* Directional Field transitions.
+
+   Every committed movement produces one transition from the currently displayed
+   Frame to the next. The strip travels leftward on forward traversal and
+   rightward on backward traversal, and the semantic commit never waits for it:
+   Session has already changed when these classes appear.
+
+   The three roles are animated distinctly rather than identically, because they
+   are doing different things. On forward traversal the trailing pane has just
+   received the address Center was showing, so it enters already bright — it is
+   carrying the outgoing frame. The leading pane is receiving material that was
+   not previously visible anywhere, so it fades up. Center sits between them.
+   That asymmetry is what makes the direction readable.
+
+   The panes cannot duplicate one another's video: three YouTube iframes cannot
+   be reparented without reloading, so the outgoing frame is handed to the
+   trailing side by seeking it there, not by moving a pixel surface. When Step
+   Reach matches the Field offset the trailing pane's new address is exactly the
+   address Center just left, and the handoff is literal. Otherwise it is
+   directional but not a frame-for-frame carousel. */
+.step-field {
+  --field-transition-ms: 300ms;
+  --field-travel: clamp(24px, 12%, 96px);
+}
+
+.step-field.is-traversing-forward,
+.step-field.is-traversing-backward {
+  overflow: hidden;
+}
+
+.step-field.is-traversing-forward .step-pane,
+.step-field.is-traversing-backward .step-pane {
+  animation-duration: var(--field-transition-ms);
+  animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation-fill-mode: both;
+}
+
+.step-field.is-traversing-forward .tail-pane { animation-name: field-forward-trailing; }
+.step-field.is-traversing-forward .step-pane-center { animation-name: field-forward-center; }
+.step-field.is-traversing-forward .lead-pane { animation-name: field-forward-leading; }
+
+.step-field.is-traversing-backward .lead-pane { animation-name: field-backward-trailing; }
+.step-field.is-traversing-backward .step-pane-center { animation-name: field-backward-center; }
+.step-field.is-traversing-backward .tail-pane { animation-name: field-backward-leading; }
+
+/* Forward: the strip moves leftward, so every pane arrives from the right. */
+@keyframes field-forward-trailing {
+  from { transform: translateX(var(--field-travel)); opacity: 1; }
+  to { transform: translateX(0); opacity: 0.96; }
+}
+@keyframes field-forward-center {
+  from { transform: translateX(var(--field-travel)); opacity: 0.72; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes field-forward-leading {
+  from { transform: translateX(var(--field-travel)); opacity: 0.28; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* Backward: the strip moves rightward, so every pane arrives from the left. */
+@keyframes field-backward-trailing {
+  from { transform: translateX(calc(-1 * var(--field-travel))); opacity: 1; }
+  to { transform: translateX(0); opacity: 0.96; }
+}
+@keyframes field-backward-center {
+  from { transform: translateX(calc(-1 * var(--field-travel))); opacity: 0.72; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes field-backward-leading {
+  from { transform: translateX(calc(-1 * var(--field-travel))); opacity: 0.28; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* The Field breathes between its inner and outer offsets during ordinary
+   playback. The marker is informational; the relation itself is physical. */
+.step-field.is-breathing .center-field-summary strong {
+  color: var(--accent, #79a8ff);
+}
+
+.field-side-state {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 3px 7px;
+  color: var(--muted);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.field-side-state small {
+  overflow: hidden;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.62rem;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.center-field-settings .field-settings-popover { right: 0; }
+
+/* Reduced motion settles directly on the resulting Frame. The controller also
+   stops emitting the directional classes, so this is a second guarantee. */
+@media (prefers-reduced-motion: reduce) {
+  .step-field.is-traversing-forward .step-pane,
+  .step-field.is-traversing-backward .step-pane {
+    animation: none;
+  }
+  .step-field.is-traversing-forward,
+  .step-field.is-traversing-backward { overflow: visible; }
+}

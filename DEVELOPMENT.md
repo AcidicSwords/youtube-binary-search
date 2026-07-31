@@ -12,10 +12,15 @@
 7. Step Reach, Field Offset, and Section weight have separate ownership.
 8. Shared Pins form a graph; do not invent a stored Section hierarchy.
 9. Pin linking is visible spatial acquisition; do not persist a hidden return target.
+10. Ambient Field state is a stable Frame, not a temporary transport result.
+11. The Temporal Topography owns spatial direct manipulation; Guide owns exact editing.
+12. The minimum Field offset is a law; Range clipping may remove a side, never shrink `x`.
+13. Any fine-adjustment quantum must exceed the kernel's semantic equality tolerance.
 
 ## Change routing
 
 - Session/operator law: `session.js`, with pure geometry in `range-geometry.js`
+- Field Frame derivation, direction, and transitions: `field-frame.js`
 - Section density, mapping, and Pin positions: `timeline-projection.js`
 - Pin/Section lifecycle, weight validation, and migration: `guide.js`
 - Context/playback runtime: `transport.js`
@@ -42,11 +47,28 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
   target, and merge Pin identity only on release.
 - Recompute adaptive Step from active weighted Range width, never from source duration or Field Offset.
 - Keep fixed Step Reach unchanged when Section geometry changes.
-- Hold and Stretch may update neither `fieldOffsets`, `stepReach`, nor Guide.
-- Keep configured Field Offset separate from attained Hold/Stretch relation.
-  One-side Tune may command only that side; hidden/off panes must remain
-  dormant and reject stale player events.
+- Hold and Stretch may update neither `fieldBreath`, `stepReach`, nor Guide.
+- Keep configured Field Offset separate from attained breathing relation.
+  Hidden/off panes must remain dormant, reject stale player events, and stay
+  outside the breathing synchronization barrier.
 - Guide precision editing and Deform stepping must call the same Session transactions.
+- Ambient Field state is a stable Frame, not a temporary transport result.
+  Resolve the next Frame once per semantic movement, never once per publish.
+- Context ending cannot trigger reframing. Context transport may move Center
+  only; its Tail and Lead edges are frozen for the window's whole lifetime.
+- No second drag implementation may exist in Guide. Spatial gestures belong to
+  the Timeline; Guide edits Addresses, metadata, and topology exactly.
+- No control may claim exact frame stepping without an adapter-provided frame
+  duration. Without one, the operation is Nudge and its quantum is seconds.
+- Never reduce the configured inner offset to fit the room a side has. If the
+  room is smaller than `x`, the side is non-operational and leaves the barrier.
+- Never introduce a movement quantum at or below `EPSILON`; Session treats such a
+  destination as the Address it started from, so the control becomes inert.
+- Resume breathing with the rate of the phase actually preserved, never with a
+  fixed outward pair.
+- Rapid visual transitions cannot block semantic commits. A transition is
+  attached to a commit that has already happened; discard superseded player
+  callbacks with the transition generation token rather than serializing them.
 
 ## Testing map
 
@@ -66,11 +88,16 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
 - `field-grammar-tests.mjs` — UI ownership
 - `field-bounds-tests.mjs` — hard Range boundaries
 - `field-coherence-tests.mjs` — Step/Offset independence
+- `field-frame-tests.mjs` — Frame ownership, stable identity, transition descriptors
+- `field-breath-tests.mjs` — bounded breathing, barriers, Range clipping, Hold
+- `field-slideshow-tests.mjs` — directional transitions, coalescing, stale-event rejection
+- `nudge-tests.mjs` — Current drag, Shift-wheel/drag, keyboard nudging, one-Undo batching
 - `semantic-state-space-tests.mjs` — extended state-space proof
 
-Smoke tests cover startup, persistent Guide selection, Guide-relative
-endpoint/profile drag, spatial Pin unlink/link, operational Pin clusters, Context, gestures, transport
-wrapping, Section weighting, palette contracts, and metadata. Static palette,
+Smoke tests cover startup, persistent Guide selection, Timeline Section
+endpoint/midpoint drag, Guide exact Address editing, spatial Pin unlink/link,
+operational Pin clusters, Context, gestures, transport wrapping, Section
+weighting, palette contracts, and metadata. Static palette,
 hit-region, and preview-layer ownership belongs to `project-audit.mjs`; live
 visual judgment belongs to `VALIDATION.md`.
 
@@ -87,6 +114,8 @@ Also inspect wide, narrow, and coarse-pointer layouts with:
 - dense Section lanes and Pin clusters;
 - compressed and expanded gradients;
 - a focused weighted Section;
-- a proper Range during playback wrap.
+- a proper Range during playback wrap;
+- a full breathing cycle at each rate pair, including a Range-clipped side;
+- rapid same-direction and reversing traversal, with reduced motion enabled.
 
 No release is complete while canonical documents, audits, visible labels, or file names describe retired behavior.

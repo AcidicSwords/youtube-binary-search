@@ -6,7 +6,7 @@
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="theme-color" content="#0e1116">
   <meta name="description" content="Read YouTube videos as ordered spatial ranges using refinement, linked Pins, and weighted Sections.">
-  <title>Binary YouTube Reader</title>
+  <title>Video Cartography</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="step-field.css">
@@ -17,7 +17,7 @@
     <header id="load-bar" class="load-bar">
       <div class="brand-block">
         <div>
-          <h1>Binary YouTube Reader</h1>
+          <h1>Video Cartography</h1>
           <p>Resolve a video spatially, link Addresses as Pins and Sections, and weight how much timeline space each Section receives.</p>
         </div>
       </div>
@@ -49,27 +49,12 @@
                   <span id="tail-meta" class="step-pane-meta">—</span>
                 </div>
                 <div class="pane-bar-actions">
-                  <details class="field-settings tail-field-settings">
-                    <summary aria-label="Tune Tail rate and offset">Tune</summary>
-                    <div class="field-settings-popover">
-                      <label class="field-control field-offset-control" for="step-backward-seconds">
-                        <span>Offset</span>
-                        <span><input id="step-backward-seconds" type="number" min="0.25" max="300" step="0.25" value="10" disabled> s</span>
-                      </label>
-                      <label class="field-control field-rate-control" for="tail-rate-select">
-                        <span>Rate</span>
-                        <select id="tail-rate-select" aria-label="Tail stretch rate" disabled><option value="0.5">0.5×</option></select>
-                      </label>
-                    </div>
-                  </details>
                   <button id="tail-collapse" class="pane-collapse" type="button" aria-label="Collapse Tail" title="Collapse Tail"><span aria-hidden="true">‹</span></button>
                 </div>
               </div>
               <div id="tail-player-surface" class="player-wrap side-player-surface" role="button" tabindex="0" aria-label="Step Backward"><div id="player-tail"></div></div>
-              <div class="pane-field-controls tail-field-controls" aria-label="Tail Field controls">
-                <button id="tail-field-toggle" class="field-mode-toggle" type="button" aria-pressed="false" disabled>
-                  <span id="tail-field-toggle-label">Stretch</span><small id="tail-offset-state">0 / 10 s</small>
-                </button>
+              <div class="pane-field-controls tail-field-controls" aria-label="Tail Field state">
+                <p class="field-side-state"><span>Tail</span><small id="tail-offset-state">0 s in 2.5–10 s</small></p>
               </div>
               <button id="tail-restore" class="step-pane-restore" type="button" aria-label="Show Tail" hidden>
                 <span aria-hidden="true">←</span><span>Tail</span>
@@ -87,6 +72,27 @@
                     <strong id="field-transport-state">Off</strong>
                     <small id="field-rate-state">Tail — · Center 1× · Lead —</small>
                   </div>
+                  <details class="field-settings center-field-settings">
+                    <summary aria-label="Tune the Field breathing relation">Tune</summary>
+                    <div class="field-settings-popover">
+                      <label class="field-control field-offset-control" for="field-inner-offset">
+                        <span>Inner offset</span>
+                        <span><input id="field-inner-offset" type="number" min="0.25" max="300" step="0.25" value="2.5" disabled> s</span>
+                      </label>
+                      <label class="field-control field-offset-control" for="field-outer-offset">
+                        <span>Outer offset</span>
+                        <span><input id="field-outer-offset" type="number" min="0.25" max="300" step="0.25" value="10" disabled> s</span>
+                      </label>
+                      <label class="field-control field-rate-control" for="field-breath-rate">
+                        <span>Breath rate</span>
+                        <select id="field-breath-rate" aria-label="Field breathing rate pair"><option value="0.5">0.5× / 1.5×</option></select>
+                      </label>
+                      <label class="field-control field-nudge-control" for="nudge-seconds">
+                        <span>Nudge</span>
+                        <span><input id="nudge-seconds" type="number" min="0.042" max="10" step="0.001" value="0.042"> s</span>
+                      </label>
+                    </div>
+                  </details>
                   <button id="step-field-toggle" class="field-toggle" type="button" aria-pressed="true" aria-label="Hide Step Field">
                     <span>Field</span><span id="step-field-meta">Ready</span>
                   </button>
@@ -113,27 +119,12 @@
                   <span id="lead-meta" class="step-pane-meta">—</span>
                 </div>
                 <div class="pane-bar-actions">
-                  <details class="field-settings lead-field-settings">
-                    <summary aria-label="Tune Lead rate and offset">Tune</summary>
-                    <div class="field-settings-popover">
-                      <label class="field-control field-rate-control" for="lead-rate-select">
-                        <span>Rate</span>
-                        <select id="lead-rate-select" aria-label="Lead stretch rate" disabled><option value="2">2×</option></select>
-                      </label>
-                      <label class="field-control field-offset-control" for="step-forward-seconds">
-                        <span>Offset</span>
-                        <span><input id="step-forward-seconds" type="number" min="0.25" max="300" step="0.25" value="10" disabled> s</span>
-                      </label>
-                    </div>
-                  </details>
                   <button id="lead-collapse" class="pane-collapse" type="button" aria-label="Collapse Lead" title="Collapse Lead"><span aria-hidden="true">›</span></button>
                 </div>
               </div>
               <div id="lead-player-surface" class="player-wrap side-player-surface" role="button" tabindex="0" aria-label="Step Forward"><div id="player-lead"></div></div>
-              <div class="pane-field-controls" aria-label="Lead Field controls">
-                <button id="lead-field-toggle" class="field-mode-toggle" type="button" aria-pressed="false" disabled>
-                  <span id="lead-field-toggle-label">Stretch</span><small id="lead-offset-state">0 / 10 s</small>
-                </button>
+              <div class="pane-field-controls" aria-label="Lead Field state">
+                <p class="field-side-state"><span>Lead</span><small id="lead-offset-state">0 s in 2.5–10 s</small></p>
               </div>
               <button id="lead-restore" class="step-pane-restore" type="button" aria-label="Show Lead" hidden>
                 <span>Lead</span><span aria-hidden="true">→</span>
@@ -187,7 +178,8 @@
             <span id="resolution-end-marker" class="marker resolution-marker" aria-hidden="true"></span>
             <span id="backward-target-marker" class="marker target-marker" aria-hidden="true"></span>
             <span id="forward-target-marker" class="marker target-marker" aria-hidden="true"></span>
-            <span id="current-marker" class="marker current-marker" aria-hidden="true"></span>
+            <span id="current-departure-marker" class="marker current-departure-marker" aria-hidden="true" hidden></span>
+            <button id="current-marker" class="marker current-marker" type="button" role="slider" aria-label="Current; drag to Go, Shift-drag for precision" aria-orientation="horizontal" aria-valuemin="0" aria-valuenow="0"></button>
             <span id="cursor-marker" class="marker cursor-marker" aria-hidden="true" hidden></span>
             <span id="preview-resolution-start-marker" class="marker preview-resolution-marker" aria-hidden="true" hidden></span>
             <span id="preview-resolution-end-marker" class="marker preview-resolution-marker" aria-hidden="true" hidden></span>

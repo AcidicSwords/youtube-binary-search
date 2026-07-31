@@ -24,7 +24,7 @@ function element(tagName = "DIV") {
 }
 
 function makeHarness({
-  rates = [0.5, 1, 2],
+  rates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
   deferredCue = false,
   delayedPlay = false,
   ratesAfterPlay = null
@@ -51,6 +51,7 @@ function makeHarness({
     current: 50,
     range: { start: 0, end: 100 },
     stepReach: { backward: 10, forward: 10, linked: true },
+    fieldBreath: { inner: 2, outer: 10, rate: 0.5 },
     pendingStep: false,
     dragging: false,
     rangeDragging: false,
@@ -172,27 +173,38 @@ function makeHarness({
     assert.deepEqual(started, { tail: true, lead: true }, "A Context settled in the same gesture stack must not leave stale suspension behind.");
     assert.deepEqual(h.snapshot.interval, semanticInterval, "Physical Field activation must not mutate semantic Interval.");
     assert.ok(["cue", "place"].includes(h.tail().commands.at(-2)?.[0]));
-    assert.equal(h.tail().commands.at(-2)?.[1], 50);
+    assert.equal(h.tail().commands.at(-2)?.[1], 48, "A fresh breath begins at the inner offset behind Center.");
     assert.deepEqual(h.tail().commands.at(-1), ["play"]);
     assert.ok(["cue", "place"].includes(h.lead().commands.at(-2)?.[0]));
-    assert.equal(h.lead().commands.at(-2)?.[1], 50);
+    assert.equal(h.lead().commands.at(-2)?.[1], 52, "A fresh breath begins at the inner offset ahead of Center.");
     assert.deepEqual(h.lead().commands.at(-1), ["play"]);
+    assert.equal(h.controller.breath().phase, "expanding");
+    assert.equal(h.controller.breath().held, false);
 
     h.snapshot = {
       ...h.snapshot,
       transportKind: "playback",
       center: { ...h.snapshot.center, time: 52, state: YOUTUBE_STATE.PLAYING }
     };
-    h.tail().setTime(51);
-    h.lead().setTime(54);
     h.controller.tick();
-    assert.equal(h.tail().rate, 0.5);
-    assert.equal(h.lead().rate, 2);
+    assert.equal(h.tail().rate, 0.5, "Expansion applies the outward Tail rate z < c.");
+    assert.equal(h.lead().rate, 1.5, "Expansion applies the outward Lead rate w > c.");
+    // Center moved 50 -> 52 at the configured 0.5 rate difference, so each side
+    // has grown from the 2 s inner boundary to 3 s.
+    assert.equal(h.controller.breath().sides.tail.offset, 3);
+    assert.equal(h.controller.breath().sides.lead.offset, 3);
+    assert.ok(h.tail().time < 52, "Tail must remain behind Center while it expands.");
+    assert.ok(h.lead().time > 52, "Lead must remain ahead of Center while it expands.");
 
-    h.controller.hold("tail");
+    h.controller.hold("both");
     assert.equal(h.controller.snapshot().tailMode, FIELD_SIDE_MODE.HELD);
-    assert.equal(h.controller.getStepSelection("tail").distance, 1);
+    assert.equal(h.controller.snapshot().leadMode, FIELD_SIDE_MODE.HELD);
+    assert.equal(h.controller.breath().held, true, "Hold alone changes Stretching into Held.");
+    assert.equal(h.controller.breath().phase, "expanding", "Hold preserves the breathing direction.");
     assert.deepEqual(h.snapshot.interval, semanticInterval, "Hold changes runtime Field state only; it must not redefine Interval.");
+    const heldTail = h.controller.breath().sides.tail.offset;
+    const heldLead = h.controller.breath().sides.lead.offset;
+    assert.ok(heldTail >= 2 && heldTail <= 10, "A held offset stays inside the configured [x, y] bounds.");
 
     h.snapshot = {
       ...h.snapshot,
@@ -200,50 +212,40 @@ function makeHarness({
       center: { ...h.snapshot.center, time: 52, state: YOUTUBE_STATE.PAUSED }
     };
     h.controller.pause({ center: 52, freeze: true });
-    assert.equal(h.tail().time, 51);
-    assert.equal(h.lead().time, 54);
     assert.equal(h.tail().state, YOUTUBE_STATE.PAUSED);
     assert.equal(h.lead().state, YOUTUBE_STATE.PAUSED);
+    assert.equal(h.tail().time, 52 - heldTail);
+    assert.equal(h.lead().time, 52 + heldLead);
 
     h.controller.translateToCurrent(60, { preserve: true });
-    assert.equal(h.tail().time, 59, "Whole-Field translation must preserve Tail's held 1 s offset.");
-    assert.equal(h.lead().time, 62, "Whole-Field translation must preserve Lead's held 2 s offset.");
-    assert.equal(h.controller.getStepSelection("tail").distance, 1);
+    assert.equal(h.tail().time, 60 - heldTail, "Whole-Field translation must preserve Tail's attained offset.");
+    assert.equal(h.lead().time, 60 + heldLead, "Whole-Field translation must preserve Lead's attained offset.");
+    assert.equal(h.controller.getStepSelection("tail").distance, heldTail);
   } finally {
     h.restore();
   }
 }
 
+// The Outer Offset is one Field-level configuration. Editing it reconciles the
+// live relation without becoming a Hold and without writing Session state.
 {
   const h = makeHarness();
   try {
     h.controller.tick();
-    const leadPlaces = h.lead().commands.filter(command =>
-      command[0] === "place"
-    ).length;
     h.snapshot = {
       ...h.snapshot,
-      stepReach: {
-        ...h.snapshot.stepReach,
-        backward: 20,
-        linked: false
-      }
+      fieldBreath: { inner: 2, outer: 20, rate: 0.5 }
     };
-    assert.equal(h.controller.reconfigureOffset("tail"), true);
+    assert.equal(h.controller.reconfigureOffset(), true);
     assert.equal(
       h.tail().time,
       30,
-      "A Tail Offset change must move a Tail that was following its configured target."
+      "A side already following its configured Outer Offset follows the new one."
     );
     assert.equal(
       h.lead().time,
-      60,
-      "Changing Tail Offset must not disturb Lead."
-    );
-    assert.equal(
-      h.lead().commands.filter(command => command[0] === "place").length,
-      leadPlaces,
-      "One side's Tune interaction must issue no placement command to its sibling."
+      70,
+      "Both sides reconcile against the one configured Field relation."
     );
 
     h.controller.playFromGesture({ center: 50 });
@@ -252,23 +254,21 @@ function makeHarness({
       transportKind: "playback",
       center: { ...h.snapshot.center, time: 52, state: YOUTUBE_STATE.PLAYING }
     };
-    h.tail().setTime(51);
     h.controller.tick();
-    h.controller.hold("tail");
-    assert.equal(h.controller.getStepSelection("tail").distance, 1);
+    h.controller.hold("both");
+    const partial = h.controller.breath().sides.tail.offset;
+    assert.ok(partial > 2 && partial < 20, "The Field was Held part-way through its breath.");
     h.snapshot = {
       ...h.snapshot,
-      stepReach: {
-        ...h.snapshot.stepReach,
-        backward: 30
-      }
+      fieldBreath: { inner: 2, outer: 30, rate: 0.5 }
     };
-    h.controller.reconfigureOffset("tail");
+    h.controller.reconfigureOffset();
     assert.equal(
-      h.controller.getStepSelection("tail").distance,
-      1,
-      "A partial held relation must remain held when only its configured maximum changes."
+      h.controller.breath().sides.tail.offset,
+      partial,
+      "A partial held relation must remain held when only its configured Outer Offset changes."
     );
+    assert.equal(h.controller.breath().held, true, "Configuration edits are not a Hold or a Stretch.");
   } finally {
     h.restore();
   }
@@ -340,12 +340,8 @@ function makeHarness({
   try {
     h.snapshot = {
       ...h.snapshot,
-      stepReach: {
-        backward: 2.5,
-        forward: 2.5,
-        linked: true
-      },
-      fieldPreview: {
+      fieldBreath: { inner: 1, outer: 2.5, rate: 0.5 },
+      fieldFrame: {
         kind: "step",
         start: 35,
         center: 50,
@@ -357,7 +353,7 @@ function makeHarness({
     h.controller.tick();
     assert.equal(h.tail().time, 35, "Step preview must use the semantic Backward destination, not Field Offset.");
     assert.equal(h.lead().time, 72, "Step preview must use the semantic Forward destination, not Field Offset.");
-    assert.equal(h.elements.get("field-transport-state").textContent, "Step preview");
+    assert.equal(h.elements.get("field-transport-state").textContent, "Step Frame");
     assert.equal(h.controller.snapshot().span.held, false, "A temporary preview must not become a Held Field span.");
     assert.equal(h.controller.getStepSelection("tail").distance, 15);
     assert.equal(h.controller.getStepSelection("tail").address, 35);
@@ -365,12 +361,12 @@ function makeHarness({
     assert.equal(h.controller.getStepSelection("lead").address, 72);
     assert.equal(h.elements.get("tail-player-surface").getAttribute("aria-disabled"), "false");
     assert.equal(h.elements.get("lead-player-surface").getAttribute("aria-disabled"), "false");
-    assert.equal(h.elements.get("tail-field-toggle").disabled, true);
-    assert.equal(h.elements.get("lead-field-toggle").disabled, true);
+    assert.equal(h.elements.get("field-both-toggle").disabled, true,
+      "A Field Frame makes the combined Stretch/Hold control non-actionable.");
 
     h.snapshot = {
       ...h.snapshot,
-      fieldPreview: {
+      fieldFrame: {
         kind: "refine",
         start: 42,
         center: 50,
@@ -380,13 +376,13 @@ function makeHarness({
     h.controller.tick();
     assert.equal(h.tail().time, 42);
     assert.equal(h.lead().time, 63);
-    assert.equal(h.elements.get("field-transport-state").textContent, "Refine preview");
+    assert.equal(h.elements.get("field-transport-state").textContent, "Refine Frame");
     assert.equal(h.controller.getStepSelection("tail"), null);
     assert.equal(h.controller.getStepSelection("lead"), null);
 
     h.snapshot = {
       ...h.snapshot,
-      fieldPreview: {
+      fieldFrame: {
         kind: "reopen",
         start: 25,
         center: 50,
@@ -396,7 +392,7 @@ function makeHarness({
     h.controller.tick();
     assert.equal(h.tail().time, 25);
     assert.equal(h.lead().time, 75);
-    assert.equal(h.elements.get("field-transport-state").textContent, "Reopen preview");
+    assert.equal(h.elements.get("field-transport-state").textContent, "Reopen Frame");
     assert.equal(h.controller.getStepSelection("tail"), null);
     assert.equal(h.controller.getStepSelection("lead"), null);
 
@@ -408,7 +404,7 @@ function makeHarness({
         time: 48.25,
         state: YOUTUBE_STATE.PLAYING
       },
-      fieldPreview: {
+      fieldFrame: {
         kind: "context",
         start: 47.5,
         center: 50,
@@ -419,7 +415,7 @@ function makeHarness({
     assert.equal(h.tail().time, 47.5, "Context preview must park Tail on the first observed frame.");
     assert.equal(h.lead().time, 52.5, "Context preview must park Lead on the last observed frame.");
     assert.equal(h.elements.get("center-meta").textContent, "48.25", "Context Center meta must follow the playing Cursor.");
-    assert.equal(h.elements.get("field-transport-state").textContent, "Context preview");
+    assert.equal(h.elements.get("field-transport-state").textContent, "Context Frame");
     assert.equal(h.controller.getStepSelection("tail"), null);
     assert.equal(h.controller.getStepSelection("lead"), null);
     assert.equal(h.elements.get("tail-player-surface").getAttribute("aria-disabled"), "true");
@@ -446,7 +442,7 @@ function makeHarness({
   try {
     h.snapshot = {
       ...h.snapshot,
-      fieldPreview: {
+      fieldFrame: {
         kind: "step",
         start: 40,
         center: 50,
@@ -456,7 +452,7 @@ function makeHarness({
       }
     };
     h.controller.tick();
-    assert.equal(h.elements.get("field-transport-state").textContent, "Step preview");
+    assert.equal(h.elements.get("field-transport-state").textContent, "Step Frame");
 
     const started = h.controller.playFromGesture({ center: 50 });
     assert.deepEqual(
@@ -466,7 +462,7 @@ function makeHarness({
     );
     h.snapshot = {
       ...h.snapshot,
-      fieldPreview: null,
+      fieldFrame: null,
       transportKind: "playback",
       center: {
         ...h.snapshot.center,
@@ -483,9 +479,9 @@ function makeHarness({
       "Stretch/Hold playback must not retain the preceding operator-preview presentation."
     );
     assert.equal(h.tail().rate, 0.5);
-    assert.equal(h.lead().rate, 2);
-    assert.equal(h.elements.get("tail-field-toggle").disabled, false);
-    assert.equal(h.elements.get("lead-field-toggle").disabled, false);
+    assert.equal(h.lead().rate, 1.5);
+    assert.equal(h.elements.get("field-both-toggle").disabled, false,
+      "Ordinary playback restores the combined Stretch/Hold control.");
   } finally {
     h.restore();
   }
@@ -525,10 +521,14 @@ function makeHarness({
     };
     h.controller.tick();
     const field = h.controller.snapshot();
-    assert.equal(field.tailMode, FIELD_SIDE_MODE.HELD);
-    assert.equal(field.leadMode, FIELD_SIDE_MODE.HELD);
-    assert.equal(h.tail().time, 41, "A source without a slow rate must park Tail at its current target instead of getting stuck.");
-    assert.equal(h.lead().time, 61, "A source without a fast rate must park Lead at its current target instead of getting stuck.");
+    assert.equal(field.tailRuntime.rateAvailable, false, "A 1x-only source cannot supply breathing rates.");
+    assert.equal(field.leadRuntime.rateAvailable, false);
+    // The pure breathing state machine still owns the relation, so a source
+    // without directional rates degrades to placement rather than getting stuck.
+    assert.equal(h.controller.breath().sides.tail.offset, 2.5);
+    assert.equal(h.controller.breath().sides.lead.offset, 2.5);
+    assert.ok(h.tail().time < 51, "Tail must remain behind Center.");
+    assert.ok(h.lead().time > 51, "Lead must remain ahead of Center.");
   } finally {
     h.restore();
   }
@@ -539,11 +539,7 @@ function makeHarness({
   try {
     h.snapshot = {
       ...h.snapshot,
-      stepReach: {
-        backward: 2.5,
-        forward: 2.5,
-        linked: true
-      }
+      fieldBreath: { inner: 1, outer: 2.5, rate: 0.5 }
     };
     h.controller.tick();
     assert.equal(h.tail().time, 47.5);
@@ -572,7 +568,7 @@ function makeHarness({
     assert.equal(h.elements.get("center-meta").textContent, "50");
     assert.equal(h.elements.get("tail-meta").textContent, "20");
     assert.equal(h.elements.get("lead-meta").textContent, "90");
-    assert.equal(h.elements.get("field-transport-state").textContent, "Section preview");
+    assert.equal(h.elements.get("field-transport-state").textContent, "Section Frame");
     h.controller.tick();
     assert.equal(h.tail().time, 20, "Polling must not dislodge an active Section preview.");
     assert.equal(h.lead().time, 90, "Polling must preserve the exact preview End.");
@@ -612,7 +608,7 @@ function makeHarness({
     });
     assert.equal(h.tail().time, 0, "Pin preview Field must clamp Tail at Range Start.");
     assert.equal(h.lead().time, 3.5, "Pin preview Field must use its supplied spatial Step target.");
-    assert.equal(h.elements.get("field-transport-state").textContent, "Pin preview");
+    assert.equal(h.elements.get("field-transport-state").textContent, "Pin Frame");
   } finally {
     h.restore();
   }
@@ -648,7 +644,7 @@ function makeHarness({
     rates: [1],
     deferredCue: true,
     delayedPlay: true,
-    ratesAfterPlay: [0.5, 1, 2]
+    ratesAfterPlay: [0.5, 1, 1.5, 2]
   });
   try {
     h.controller.tick();
@@ -663,8 +659,8 @@ function makeHarness({
     assert.deepEqual(started, { tail: true, lead: true });
     assert.equal(h.tail().commands.filter(command => command[0] === "cue").length, tailCueCount, "Trusted Play must not re-cue Tail.");
     assert.equal(h.lead().commands.filter(command => command[0] === "cue").length, leadCueCount, "Trusted Play must not re-cue Lead.");
-    assert.deepEqual(h.tail().commands.slice(-2), [["place", 50], ["play"]]);
-    assert.deepEqual(h.lead().commands.slice(-2), [["place", 50], ["play"]]);
+    assert.deepEqual(h.tail().commands.slice(-2), [["place", 48], ["play"]]);
+    assert.deepEqual(h.lead().commands.slice(-2), [["place", 52], ["play"]]);
 
     h.snapshot = {
       ...h.snapshot,
@@ -683,10 +679,10 @@ function makeHarness({
     };
     h.controller.tick();
     assert.equal(h.tail().rate, 0.5);
-    assert.equal(h.lead().rate, 2);
+    assert.equal(h.lead().rate, 1.5);
   } finally {
     h.restore();
   }
 }
 
-console.log("Field runtime tests passed: decoded paused frames, fresh refold/stretch, rate confirmation, Hold isolation, side-owned tuning, dormant hidden/off panes, stale-event rejection, exact pause, whole-Field Step geometry, retained-object drag previews, unsupported-rate fallback, and boundary recovery.");
+console.log("Field runtime tests passed: decoded paused frames, Field Frame placement, breathing entry and rates, Hold isolation, Field-level Offset reconciliation, dormant hidden/off panes, stale-event rejection, exact pause, whole-Field Step geometry, direct-manipulation Frames, unsupported-rate fallback, and boundary recovery.");

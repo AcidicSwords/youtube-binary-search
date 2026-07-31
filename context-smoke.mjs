@@ -20,9 +20,9 @@ const lead = env.lead();
 assert.ok(center && tail && lead, "Center and side players must exist for Context preview coverage.");
 assert.equal(byId.get("context-setting-value").textContent, "5 s centered on Current");
 
-// Arm Tail Stretch while Center is paused. A traversal must run Context only in
-// Center; the side remains suspended even though it is armed to stretch.
-byId.get("tail-field-toggle").click();
+// Arm the Field while Center is paused. A traversal must run Context only in
+// Center; the sides remain suspended even though the Field is armed to breathe.
+byId.get("field-both-toggle").click();
 const tailPlaysBeforeContext = tail.commands.filter(command => command[0] === "play").length;
 center.deferNextPlacement = true;
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 500 });
@@ -35,7 +35,7 @@ assert.equal(center.state, 1, "Automatic Context must play Center.");
 assert.equal(byId.get("current-marker").style.left, "50%", "Context must not displace semantic Current.");
 
 await poll();
-assert.equal(byId.get("field-transport-state").textContent, "Context preview");
+assert.equal(byId.get("field-transport-state").textContent, "Context Frame");
 assert.equal(tail.currentTime, 47.5, "Tail must preview the first Context frame.");
 assert.equal(lead.currentTime, 52.5, "Lead must preview the last Context frame.");
 assert.equal(byId.get("field-span-label").textContent, "0:47.5–0:52.5");
@@ -44,7 +44,7 @@ assert.equal(byId.get("lead-player-surface")["aria-disabled"], "true");
 assert.equal(
   tail.commands.filter(command => command[0] === "play").length,
   tailPlaysBeforeContext,
-  "Context must not activate an armed side Field."
+  "Context must not activate an armed Field breath."
 );
 
 // A stale pre-placement Cursor cannot terminate Context. Once the player enters
@@ -58,25 +58,45 @@ assert.equal(center.currentTime, 50);
 assert.equal(center.state, 2);
 assert.equal(currentText(), "Current 0:50");
 assert.equal(byId.get("cursor-marker").hidden, true);
-assert.equal(byId.get("field-transport-state").textContent, "Step preview");
-assert.equal(tail.currentTime, 40, "After direct traversal, Tail must return to spatial Step Backward.");
-assert.equal(lead.currentTime, 60, "After direct traversal, Lead must return to spatial Step Forward.");
+// Context ending is not a reframing. While Context is enabled its bounded edges
+// own Tail and Lead before, during, and after transport; only Center returns
+// from Cursor to Current.
+assert.equal(byId.get("field-transport-state").textContent, "Context Frame");
+assert.equal(tail.currentTime, 47.5, "Context Start must survive Context stopping.");
+assert.equal(lead.currentTime, 52.5, "Context End must survive Context stopping.");
 
-// Context is a temporary source-time owner. When it follows Refine, completing
-// the observation must restore Refine's next spatial midpoint choices.
+// A further traversal moves the whole window; the edges still do not follow the
+// Cursor and are not reassigned when the observation completes.
 byId.get("refine-forward").click();
 await flush();
 assert.equal(currentText(), "Current 1:15");
 assert.equal(center.currentTime, 72.5);
 await poll();
-assert.equal(byId.get("field-transport-state").textContent, "Context preview");
+assert.equal(byId.get("field-transport-state").textContent, "Context Frame");
+assert.equal(tail.currentTime, 72.5);
+assert.equal(lead.currentTime, 77.5);
 center.currentTime = 78;
 await poll();
 await flush();
 assert.equal(center.currentTime, 75);
-assert.equal(byId.get("field-transport-state").textContent, "Refine preview");
+assert.equal(byId.get("field-transport-state").textContent, "Context Frame");
+assert.equal(tail.currentTime, 72.5, "Context settlement changes no side-frame ownership.");
+assert.equal(lead.currentTime, 77.5);
+
+// Operator framing is the fallback for a disabled Context, not for a finished
+// one. Turning Context off reveals Refine's next weighted midpoints.
+byId.get("context-seconds").value = "0";
+byId.get("context-seconds").dispatch("change");
+await flush();
+await poll();
+assert.equal(byId.get("field-transport-state").textContent, "Refine Frame");
 assert.equal(tail.currentTime, 37.5);
 assert.equal(lead.currentTime, 87.5);
+byId.get("context-seconds").value = "5";
+byId.get("context-seconds").dispatch("change");
+await flush();
+await poll();
+assert.equal(byId.get("field-transport-state").textContent, "Context Frame");
 
 // Undo restores both the semantic frame and its prior preview owner; its own
 // observation remains temporary as well.
@@ -88,7 +108,7 @@ center.currentTime = 54;
 await poll();
 await flush();
 assert.equal(center.currentTime, 50);
-assert.equal(byId.get("field-transport-state").textContent, "Step preview");
+assert.equal(byId.get("field-transport-state").textContent, "Context Frame");
 
 // Held Step owns its repeat cadence instead of trusting browser key-repeat.
 // Native repeat events are ignored, the app advances after its initial delay,

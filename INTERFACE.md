@@ -1,4 +1,4 @@
-# Binary YouTube Reader — Interface Grammar
+# Video Cartography — Interface Grammar
 
 ## Layout
 
@@ -22,7 +22,10 @@ Parameters expose Active Range, Context duration, and Step Reach. Resolution rem
   one compact monospaced level. A one-label disclosure is never styled as a
   value merely because it is also its last child.
 
-Tail/Lead Offset fields remain beside their players. Field Offset never relabels or rewrites Step Reach or Section weight.
+Inner Offset, Outer Offset, the breathing rate pair, and the Nudge quantum share
+one compact Tune disclosure in the Center bar, because they describe one Field
+relation rather than two independent sides. Field Offset never relabels or
+rewrites Step Reach or Section weight.
 
 ## Timeline
 
@@ -72,6 +75,33 @@ they pack under compression and spread under expansion.
 
 Persistent names and selectors do not consume map lanes. Click a span to make
 its complete extent the Working Interval and return Current to its center.
+
+The Temporal Topography owns spatial direct manipulation, so every draggable
+object lives here with one visually centered acquisition region and one
+unambiguous gesture owner:
+
+```text
+Current marker          → Go
+Pin marker              → Move Pin
+Section Start or End    → Move endpoint Pin
+Section midpoint        → Translate Section
+Range boundary          → Change Range
+```
+
+The Current marker is itself a control. Pressing it acquires Current before the
+Timeline can read the press as generic Go; crossing the movement threshold shows
+a candidate Address while the original Current stays as a faint departure marker,
+and release commits one exact Go. A stationary press moves nothing, and Escape or
+a cancelled pointer restores the original presentation without history.
+
+Each Section wire carries Start, midpoint and End nodes as its acquisition
+regions. Coarse pointers receive enlarged hit areas without enlarging the marks.
+`Shift`-drag on any of these enters precision mode: reduced gain, quantized to
+the Nudge quantum, same gesture owner, one transaction on release. `Shift` +
+wheel nudges the exact object under the pointer — Current, a Pin, a Section
+endpoint, the whole Section, or Current over empty Timeline — and `,` and `.`
+nudge the selected map object from the keyboard.
+
 Timeline Section bodies are acquisition-only. A Timeline Pin is itself the
 direct manipulation surface: release without movement moves Current to it, and
 drag moves that exact Pin. Pin selection is derived from the Working Interval:
@@ -159,14 +189,22 @@ and its centered hit region are one control: click moves Current to the Pin;
 drag moves the Pin only after crossing the movement threshold.
 
 Guide’s exact selector and Deform’s step controls are two views of the same transaction.
-Guide Section rows project the Section against the complete timeline and connect
-their Start and End Pin controls as one owned extent. Selected endpoint controls
-sit at their actual full-map positions, leaving proportional travel in either
-direction. Drag either endpoint node to edit that shared Pin; drag the profile
-between them to translate the complete
-Section; click an endpoint to Go. Every Guide drag updates the Timeline in the
-same gesture. Endpoint node weight and Pin metadata expose how many Sections
-share each Pin. Unlink clones only this Section's endpoint at the same Address,
+
+Guide is the exact editor. A Pin row exposes its Title, Address input, `−`/`+`
+Nudge controls, Go, reference count, Rename, and Delete. A Section row exposes
+its Title, Start and End Address inputs, a Duration readout, `−`/`+` controls for
+each endpoint and for the whole Section, Weight, Focus, Unlink, Rename, and
+Delete. Address inputs accept canonical timecode or seconds, clamp against Range
+and structural partners, reject Section collapse or reversal, commit on Enter,
+cancel on Escape, and create one Undo transaction. The increment controls invoke
+the same Nudge operation as Timeline Shift-wheel and keyboard nudging.
+
+Guide Section rows still project the Section against the complete timeline and
+connect their Start and End Pin controls as one owned extent, but that full-map
+profile is a read-only positional representation and an acquisition link: it owns
+no drag geometry. Click an endpoint to Go, edit its Address to move it exactly,
+or drag it on the Timeline to move it spatially. Endpoint node weight and Pin
+metadata expose how many Sections share each Pin. Unlink clones only this Section's endpoint at the same Address,
 so subsequent movement is independent. Linking is spatial rather than a
 separate command: confirm Unlink, then drag its independent endpoint Pin within
 16 pixels of another valid Pin. An amber candidate means ordinary movement is
@@ -199,40 +237,23 @@ Weight remains editable during playback; the map changes around the moving Curso
 Tail and Lead form one panoramic surface around Center. Center is subtly larger;
 the smaller side projections are vertically centered with equal separation so
 their scale reads as temporal distance and curvature rather than three separate
-top-aligned players. Information and intermittent Tune controls live in each
-top bar. Only Hold/Stretch remains centered beneath each projection:
+top-aligned players. Identity and address live in each top bar, the Field's one
+Tune disclosure sits in the Center bar, and one combined Stretch/Hold control
+sits beneath Center:
 
 ```text
-Tail:   identity · address | Tune · collapse
-Center: identity · address | Field state
-Lead:   identity · address | Tune · collapse
-Bottom:                Hold/Stretch
+Tail:   identity · address | collapse
+Center: identity · address | Field state · Tune · Field
+Lead:   identity · address | collapse
+Bottom:            Stretch / Hold
 ```
 
-Center alone is audible. Tail and Lead are muted projections. Their rate selectors supply the familiar numeric vocabulary reused by Section weight, but the controls have independent state and affect different axes.
+Center alone is audible. Tail and Lead are muted projections.
 
-Hold and Stretch change live playback state only. Offset changes only through explicit input. Timeline deformation cannot change a player rate or Field relation.
-Automatic Context controls the duration of a transient Center observation;
-Field Offset controls the source-time displacement of Tail or Lead from
-semantic Current. They can be tuned into a useful proportion—such as 2.5
-seconds on each side of a 5-second Context—but neither derives from or updates
-the other.
-Configured Offset and attained relation are displayed together but remain
-different state. Tuning one side never parks, holds, stretches, or retargets its
-sibling. If a side is fully held at its configured target, it follows a new
-target; a partial Hold remains partial unless the new bound requires clamping.
-Empty or invalid Offset input is rejected and the last canonical value is
-restored.
+### Field Frame
 
-Field Off and pane collapse are operational boundaries, not merely visual
-styles. Their side players pause once and remain dormant; delayed CUED or
-PLAYING events cannot reactivate them. A side surface and its Hold/Stretch
-control become actionable only after that visible source frame is ready and a
-non-zero Range-contained relation exists. The combined control targets the
-currently available sides, and a held Field span exists only while both sides
-are visible and available.
-
-Outside playback, the panoramic Viewer becomes an operator-owned preview:
+Outside ordinary playback the Field is a stable Frame, not a continuously
+changing preview:
 
 - Step is the default: Tail and Lead park on the exact weighted Step Backward
   and Step Forward destinations while Center remains at Current;
@@ -241,29 +262,92 @@ Outside playback, the panoramic Viewer becomes an operator-owned preview:
 - Reopen parks them on the Refine midpoints made available by the reopened
   Neighborhood;
 - Context parks Tail on its first frame and Lead on its last frame while Center
-  plays through that window;
-- Pin manipulation centers the Pin and applies spatial Step around it;
-- Section selection shows exact Start, midpoint, and End while Current owns
-  that midpoint; direct manipulation temporarily shows the edited extent.
+  follows the Cursor through that window;
+- a retained Section shows exact Start, midpoint, and End while Current owns
+  that midpoint;
+- direct manipulation temporarily shows the candidate extent.
+
+Every committed movement produces one directional transition between the
+displayed Frame and the next. Forward traversal moves the visible strip leftward
+and backward traversal moves it rightward, so frames enter through Tail or Lead,
+pass through Center as they become Current, and leave through the opposite side.
+Rapid same-direction movements compose as one continuing slideshow; a reversal
+turns cleanly. The three panes are animated distinctly so the direction and the
+handoff are readable: the trailing pane enters already bright because it now
+carries the address Center just left, and the leading pane fades up because its
+material was not previously visible. The transition never delays the semantic
+commit, and it never creates history.
+
+Context beginning, moving, pausing, or settling reassigns neither side. Its Tail
+and Lead are the frozen observation edges, so materially different side frames
+mean the transition being sought lies inside the window.
 
 Side panes remain Step controls only when they display Step targets or live
-playback relations. Context, Pin, and Section previews make those surfaces
-temporarily non-actionable; Refine and Reopen previews are also informative
-rather than disguised Step controls. Hover/focus dry-runs remain on the
-temporal map.
-Starting playback clears preview ownership synchronously, refolds both sides to
-Center, and resumes the existing Stretch/Hold runtime.
+playback relations. Context, Current, Pin, and Section Frames make those surfaces
+temporarily non-actionable; Refine and Reopen Frames are informative rather than
+disguised Step controls. Hover and keyboard focus stay on the temporal map.
+
+### Field Breath
+
+During ordinary Center playback the Field breathes. Tail stays behind Center and
+Lead stays ahead while both travel between the configured Inner and Outer
+Offsets:
+
+```text
+Inner offset   x
+Outer offset   y
+Breath rate    one symmetric pair
+Field          Stretch / Hold
+```
+
+The breathing rate pair is one control, not two: `0.75×/1.25×`, `0.5×/1.5×`, or
+`0.25×/1.75×` around Center's `1×`. The configured values are the outward rates;
+contraction exchanges them without rewriting the saved pair. A side that reaches
+a boundary first waits there at Center rate until every operational side arrives,
+then the whole Field reverses direction. A side without room for the Inner Offset
+cannot hold the required separation, so it stops breathing entirely and parks at
+the room it has rather than creeping toward Center.
+
+Hold alone stops the cycle. It preserves each attained offset, sets every held
+side to Center rate, and preserves the direction for later resumption; Stretch
+resumes from the attained relation. Hold changes no configuration and creates no
+Undo checkpoint. There are no independent per-side Stretch/Hold controls.
+
+Automatic Context controls the duration of a transient Center observation; Field
+Offset controls the source-time displacement of Tail and Lead from Current. They
+can be tuned into a useful proportion — such as 2.5 seconds on each side of a
+5-second Context — but neither derives from or updates the other. Empty or
+invalid Offset input is rejected and the last canonical value is restored;
+`0 < inner < outer` is enforced against the sibling bound.
+
+Field Off and pane collapse are operational boundaries, not merely visual
+styles. Their side players pause once and remain dormant; delayed CUED or
+PLAYING events cannot reactivate them, and a dormant side is excluded from the
+breathing barrier so it cannot stall the Field. A side surface becomes actionable
+only after that visible source frame is ready and a non-zero Range-contained
+relation exists. A held Field span exists only while both sides are visible and
+available.
+
+Starting playback clears Frame ownership synchronously and begins the breath at
+the inner offset.
+
+### Direct manipulation Frames
 
 Direct manipulation temporarily turns the panoramic Viewer into an exact
-preview instrument. A Pin drag parks Center on that Pin and places Tail/Lead at
-its exact weighted Step destinations. A Section endpoint or whole-Section drag parks
-Tail at Start, Center at midpoint, and Lead at End. Releasing commits one Guide
-transaction; cancelling restores the prior semantic Current and preview. If an
-endpoint edit leaves Current away from the new midpoint, the idle Viewer
+instrument. A Current drag centers the candidate Address and surrounds it with
+the candidate Context Frame when Context is enabled, or the candidate Go Frame
+otherwise. A Pin drag centers that Pin and places Tail/Lead at its exact weighted
+Step destinations. A Section endpoint or whole-Section drag parks Tail at Start,
+Center at midpoint, and Lead at End. Releasing commits one transaction and one
+transition back to the ambient Frame; cancelling restores the prior presentation.
+If an endpoint edit leaves Current away from the new midpoint, the idle Viewer
 returns to Current-centered Step rather than mislabeling Current as midpoint.
-This frame preview begins only after the pointer crosses the drag threshold.
-Ordinary hover and keyboard focus preview the dry-run geometry on the timeline
-without seeking or pausing any player.
+These Frames begin only after the pointer crosses the drag threshold. Ordinary
+hover and keyboard focus preview the dry-run geometry on the timeline without
+seeking or pausing any player.
+
+Users who prefer reduced motion receive the same resulting Frames without the
+travelling transition.
 
 ## Accessibility and touch
 
@@ -280,3 +364,5 @@ without seeking or pausing any player.
 - Gradients are supplemented by numeric weight labels and compressed/expanded state text.
 - Compact visible markers retain coarse-pointer touch targets.
 - Plain `Z` is Undo and plain `C` is Redo.
+- `,` and `.` nudge the selected map object, or Current when unambiguous.
+- Reduced-motion users receive settled Field Frames without directional travel.

@@ -197,8 +197,7 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
   byId.get("section-source").value = "interval";
   addOption(byId.get("section-source"), "interval", "Working Section");
   addOption(byId.get("section-source"), "field-span", "Held Field span");
-  addOption(byId.get("tail-rate-select"), "1", "Loading");
-  addOption(byId.get("lead-rate-select"), "1", "Loading");
+  addOption(byId.get("field-breath-rate"), "0.5", "0.5\u00d7 / 1.5\u00d7");
 
   const documentListeners = new Map();
   const body = new FakeElement("body", "BODY");

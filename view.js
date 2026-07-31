@@ -261,12 +261,14 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : TIMELINE_PIN_HIT_SIZE;
   }
 
+  // Guide's full-map profile is a read-only positional representation and an
+  // acquisition link back to the Timeline. It owns no drag geometry: spatial
+  // direct manipulation belongs to the Temporal Topography.
   function endpointButton(role, pin, references, sectionId = null) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "endpoint-button";
     button.dataset.pinGo = pin.id;
-    button.dataset.pinDrag = pin.id;
     if (sectionId) button.dataset.dragSection = sectionId;
     setStyleProperty(button, "--endpoint-position", `${percent(pin.t)}%`);
     setStyleProperty(
@@ -280,7 +282,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     text.textContent = `${formatTime(pin.t)} ${pin.label || ""}`.trim();
     text.className = "sr-only";
     button.append(roleLabel, text);
-    const description = `${role} Pin at ${formatTime(pin.t)}; drag to adjust the Section bound${references === 1 ? " and pause over another Pin, then release to link" : ""}, click to Go; ${references} Section${references === 1 ? "" : "s"}`;
+    const description = `${role} Pin at ${formatTime(pin.t)}; click to Go, edit its Address below or drag it on the Timeline; ${references} Section${references === 1 ? "" : "s"}`;
     button.setAttribute("aria-label", description);
     button.title = description;
     return button;
@@ -291,7 +293,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     button.type = "button";
     button.className = "endpoint-button pin-position-node";
     button.dataset.pinGo = pin.id;
-    button.dataset.pinDrag = pin.id;
     setStyleProperty(button, "--endpoint-position", `${percent(pin.t)}%`);
     setStyleProperty(
       button,
@@ -304,10 +305,61 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     text.className = "sr-only";
     text.textContent = `${formatTime(pin.t)} ${pin.label || ""}`.trim();
     button.append(roleLabel, text);
-    const description = `${pinLabel(pin)} at ${formatTime(pin.t)}; drag to move on the full temporal map${references === 1 ? " and pause over another Pin, then release to link" : ""}, click to Go`;
+    const description = `${pinLabel(pin)} at ${formatTime(pin.t)}; click to Go, edit its Address below or drag it on the Timeline`;
     button.setAttribute("aria-label", description);
     button.title = description;
     return button;
+  }
+
+  // One exact Address editor: a numeric field plus the shared Nudge increments.
+  function addressField(kind, id, label, address, options = {}) {
+    const row = document.createElement("div");
+    row.className = "guide-address-row";
+    const field = document.createElement("label");
+    field.className = "guide-address-field";
+    const name = document.createElement("span");
+    name.textContent = label;
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "guide-address-input";
+    input.inputMode = "decimal";
+    input.dataset.addressInput = kind;
+    input.dataset.addressId = id;
+    input.value = formatTime(address);
+    input.setAttribute("aria-label", `${label} Address; timecode or seconds`);
+    field.append(name, input);
+    const controls = document.createElement("div");
+    controls.className = "guide-address-controls";
+    for (const direction of [-1, 1]) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "guide-nudge";
+      button.dataset.nudgeTarget = kind;
+      button.dataset.nudgeId = id;
+      button.dataset.nudgeDirection = String(direction);
+      button.textContent = direction < 0 ? "−" : "+";
+      const description = `Nudge ${label} ${direction < 0 ? "backward" : "forward"} one quantum`;
+      button.setAttribute("aria-label", description);
+      button.title = description;
+      controls.appendChild(button);
+    }
+    if (options.goPinId) {
+      const go = document.createElement("button");
+      go.type = "button";
+      go.className = "guide-action guide-address-go";
+      go.dataset.addressGo = options.goPinId;
+      go.textContent = "Go";
+      go.setAttribute("aria-label", `Move Current to ${label} at ${formatTime(address)}`);
+      controls.appendChild(go);
+    }
+    row.append(field, controls);
+    if (options.readout) {
+      const readout = document.createElement("span");
+      readout.className = "guide-address-readout";
+      readout.textContent = options.readout;
+      row.appendChild(readout);
+    }
+    return row;
   }
 
   function closePinClusterMenu(options = {}) {
@@ -634,9 +686,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       body.appendChild(span);
 
       const sectionY = sectionTop + visibleLane * sectionLaneHeight + 10;
+      const midpointCoordinate = projection.sourceToTimeline(section.midpoint);
       const relationPoints = [
         ["start", projected.start, pinTop + 7],
-        ["midpoint", projection.sourceToTimeline(section.midpoint), trackTop + 30],
+        ["midpoint", midpointCoordinate, trackTop + 30],
         ["end", projected.end, pinTop + 7]
       ];
       for (const [role, coordinate, relationTop] of relationPoints) {
@@ -653,6 +706,34 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         sectionLane.appendChild(relation);
       }
       sectionLane.appendChild(body);
+
+      // Each Section node is one visually centered acquisition region with one
+      // unambiguous gesture owner: Start and End move that endpoint Pin, the
+      // midpoint translates the complete Section.
+      const nodePoints = [
+        ["start", projected.start, "Start", section.start],
+        ["midpoint", midpointCoordinate, "profile", section.midpoint],
+        ["end", projected.end, "End", section.end]
+      ];
+      for (const [role, coordinate, roleLabel, address] of nodePoints) {
+        const node = document.createElement("button");
+        node.type = "button";
+        node.className = `timeline-section-node ${role}`;
+        node.dataset.sectionNode = role;
+        node.dataset.sectionId = section.id;
+        if (selected) node.classList.add("retained-selected");
+        node.style.left = `${
+          coordinate / Math.max(projection.timelineExtent, EPSILON) * 100
+        }%`;
+        setStyleProperty(node, "--section-offset", `${visibleLane * sectionLaneHeight}px`);
+        setStyleProperty(node, "--section-color", color);
+        const description = role === "midpoint"
+          ? `${sectionLabel(section)} ${roleLabel} at ${formatTime(address)}; drag to translate the complete Section, Shift-drag or Shift-wheel to nudge`
+          : `${sectionLabel(section)} ${roleLabel} Pin at ${formatTime(address)}; drag to move that endpoint Pin, Shift-drag or Shift-wheel to nudge`;
+        node.setAttribute("aria-label", description);
+        node.title = description;
+        sectionLane.appendChild(node);
+      }
     }
   }
 
@@ -851,8 +932,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         ].join(" · ");
         const profile = document.createElement("span");
         profile.className = "guide-section-profile";
-        profile.dataset.sectionDrag = section.id;
-        profile.title = `Drag to move ${sectionLabel(section)} with both endpoint Pins`;
+        profile.title = `${sectionLabel(section)} across the complete timeline; drag it on the Timeline to translate it`;
         profile.setAttribute("aria-hidden", "true");
         setStyleProperty(profile, "--profile-start", `${percent(section.start)}%`);
         setStyleProperty(
@@ -933,9 +1013,25 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           endpointButton("End", section.endPin, endReferences, section.id)
         );
 
+        // Exact topology and numeric editing. Guide no longer duplicates the
+        // Timeline's spatial drag system.
+        const addresses = document.createElement("div");
+        addresses.className = "guide-addresses";
+        addresses.append(
+          addressField("section-start", section.id, "Start", section.start, {
+            goPinId: section.startPin.id
+          }),
+          addressField("section-end", section.id, "End", section.end, {
+            goPinId: section.endPin.id
+          }),
+          addressField("section", section.id, "Section", section.start, {
+            readout: `Duration ${formatDuration(section.end - section.start)}`
+          })
+        );
+
         item.append(header);
         if (selected || section.id === focusedId) {
-          item.append(actions, endpoints);
+          item.append(actions, endpoints, addresses);
         }
         elements["sections-list"].appendChild(item);
       }
@@ -1006,8 +1102,18 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         positionLine.className = "pin-position-line";
         positionLine.setAttribute("aria-hidden", "true");
         positionTrack.append(positionLine, pinPositionButton(pin, references));
+        const addresses = document.createElement("div");
+        addresses.className = "guide-addresses";
+        addresses.append(
+          addressField("pin", pin.id, "Address", pin.t, {
+            goPinId: pin.id,
+            readout: references
+              ? `${references} reference${references === 1 ? "" : "s"}`
+              : "unshared"
+          })
+        );
         item.append(header);
-        if (selected || extentSelected) item.append(positionTrack);
+        if (selected || extentSelected) item.append(positionTrack, addresses);
         elements["pins-list"].appendChild(item);
       }
     }
@@ -1326,10 +1432,16 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? `${currentState.contextSeconds} s centered on Current`
       : "Off";
 
-    const fieldOffsets = currentState.fieldOffsets
-      || { backward: 10, forward: 10 };
-    elements["step-backward-seconds"].value = String(fieldOffsets.backward);
-    elements["step-forward-seconds"].value = String(fieldOffsets.forward);
+    // One bounded breathing relation: 0 < inner < outer.
+    const fieldBreath = currentState.fieldBreath || { inner: 2.5, outer: 10, rate: 0.5 };
+    elements["field-inner-offset"].value = String(fieldBreath.inner);
+    elements["field-outer-offset"].value = String(fieldBreath.outer);
+    elements["field-inner-offset"].max = String(fieldBreath.outer);
+    elements["field-outer-offset"].min = String(fieldBreath.inner);
+    // The stored quantum stays exact; only its presentation is rounded.
+    elements["nudge-seconds"].value = String(
+      Number((currentState.nudgeSeconds ?? 1 / 24).toFixed(3))
+    );
     elements["step-size-seconds"].value = String(configuredReach.forward);
     const adaptiveStep = configuredReach.mode === STEP_REACH_MODE.ADAPTIVE;
     elements["step-size-summary"].textContent = adaptiveStep
@@ -1425,7 +1537,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     for (const id of [
       "go-range-start", "range-start-here", "range-midpoint",
       "go-range-end", "range-end-here", "full-video-range",
-      "step-backward-seconds", "step-forward-seconds",
+      "field-inner-offset", "field-outer-offset",
       "context-seconds",
       "section-source", "section-label", "pin-label"
     ]) {
@@ -1606,7 +1718,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     if (!loaded || !currentResolution) {
       for (const id of [
         "range-start-handle", "range-end-handle", "resolution-start-marker",
-        "resolution-end-marker", "backward-target-marker", "forward-target-marker", "current-marker", "cursor-marker"
+        "resolution-end-marker", "backward-target-marker", "forward-target-marker", "current-marker", "cursor-marker",
+        "current-departure-marker"
       ]) elements[id].hidden = true;
       elements["interval-fill"].hidden = true;
       elements["field-span-fill"].hidden = true;
@@ -1632,7 +1745,34 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     setSegment(elements["range-fill"], activeRange.start, activeRange.end);
     setMarkerPosition(elements["range-start-handle"], activeRange.start);
     setMarkerPosition(elements["range-end-handle"], activeRange.end);
-    setMarkerPosition(elements["current-marker"], semanticCurrent);
+
+    // Dragging Current is an exact Go gesture: the marker follows the candidate
+    // Address while the original Current stays as a faint departure marker and
+    // Session Current remains unchanged until release.
+    const currentDrag = state().currentDrag;
+    const dragging = Boolean(currentDrag?.moved);
+    const candidate = dragging ? currentDrag.candidate : semanticCurrent;
+    setMarkerPosition(elements["current-marker"], candidate);
+    elements["current-marker"].classList.toggle("is-dragging", dragging);
+    elements["current-marker"].classList.toggle(
+      "is-precision",
+      dragging && currentDrag.precision === true
+    );
+    elements["current-marker"].setAttribute(
+      "aria-valuenow",
+      String(candidate)
+    );
+    elements["current-marker"].setAttribute(
+      "aria-valuetext",
+      `${formatTime(candidate)}; Current${dragging ? " candidate" : ""}`
+    );
+    elements["current-departure-marker"].hidden = !dragging;
+    if (dragging) {
+      setMarkerPosition(
+        elements["current-departure-marker"],
+        currentDrag.originSource
+      );
+    }
 
     elements["range-start-handle"].setAttribute("aria-valuemin", "0");
     elements["range-start-handle"].setAttribute("aria-valuemax", String(Math.max(0, activeRange.end - minRangeSeconds)));
