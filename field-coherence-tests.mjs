@@ -17,11 +17,10 @@ import {
 import { getActionRanges, normalizeDirectionalReach } from "./range-geometry.js";
 import {
   deriveFieldBounds,
-  chooseDirectionalRate,
   fieldPreferenceRequiresEstablish,
-  createStepFieldController,
-  normalizeFieldResponse
+  createStepFieldController
 } from "./step-field.js";
+import { chooseNearestRate, breathRateFromResponse } from "./step-field-geometry.js";
 
 assert.deepEqual(normalizeStepReach(8), {
   backward: 8,
@@ -49,8 +48,10 @@ assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: false }), false);
 assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: true }), true);
 assert.equal(fieldPreferenceRequiresEstablish({ stepFieldEnabled: false }), false);
 assert.equal(fieldPreferenceRequiresEstablish({ stepFieldEnabled: true }), true);
-assert.deepEqual(normalizeFieldResponse({ tailRate: 0.75, leadRate: 1.5 }), { tailRate: 0.75, leadRate: 1.5 });
-assert.deepEqual(normalizeFieldResponse({ tailRate: 2, leadRate: 0.5 }), { tailRate: 0.5, leadRate: 2 });
+// A legacy saved side-rate pair migrates once into the nearest symmetric
+// breathing rate; the two sides are never configured independently again.
+assert.equal(breathRateFromResponse({ tailRate: 0.75, leadRate: 1.25 }), 0.25);
+assert.equal(breathRateFromResponse({ tailRate: 0.5, leadRate: 2 }), 0.75);
 
 {
   let session = createSession({ duration: 200, current: 100, stepReach: { backward: 5, forward: 15, linked: false } });
@@ -128,10 +129,12 @@ assert.deepEqual(normalizeFieldResponse({ tailRate: 2, leadRate: 0.5 }), { tailR
   assert.equal(actions.stepForward.destination, 65);
 }
 
-assert.equal(chooseDirectionalRate([0.25, 0.5, 1, 1.5, 2], 0.75, "tail"), 0.5);
-assert.equal(chooseDirectionalRate([0.25, 0.5, 1, 1.5, 2], 1.75, "lead"), 1.5);
-assert.equal(chooseDirectionalRate([1], 0.5, "tail"), null);
-assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
+// Breathing asks for the rate its current phase intends and takes the nearest
+// the source actually offers, so direction-filtered selection is not a separate
+// policy any more.
+assert.equal(chooseNearestRate([0.25, 0.5, 1, 1.5, 2], 0.5), 0.5);
+assert.equal(chooseNearestRate([0.25, 0.5, 1, 1.5, 2], 1.5), 1.5);
+assert.equal(chooseNearestRate([1], 0.5), 1);
 
 {
   const originalYT = globalThis.YT;
@@ -273,7 +276,9 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
     "All Step surfaces must preserve the shared semantic transaction while optionally carrying a retained Pin or Section."
   );
   assert.match(app, /stepField\?\.translateToCurrent/);
-  assert.match(field, /DEFAULT_FIELD_RESPONSE/);
+  assert.match(field, /BREATH_PHASE/);
+  assert.doesNotMatch(field, /chooseDirectionalRate|requestStretchRate/,
+    "The breathing runtime resolves rates from its phase, not from a side policy.");
   assert.match(field, /onAutoplayBlocked:[\s\S]*playback = "blocked"/);
   assert.match(field, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*side\.adapter\?\.play/,
     "Playback must refold and prime each side at 1× before directional divergence.");

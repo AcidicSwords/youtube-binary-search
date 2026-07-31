@@ -14,14 +14,11 @@ import {
 import {
   STEP_FIELD_PHASE,
   FIELD_REACH_TOLERANCE,
-  DEFAULT_FIELD_RESPONSE,
   BREATH_PHASE,
   BREATH_RATE_STEPS,
   DEFAULT_FIELD_BREATH,
-  normalizeFieldResponse,
   normalizeFieldBreath,
   breathRatePair,
-  breathRateFromResponse,
   breathSideRate,
   effectiveBreathBounds,
   createBreathRuntime,
@@ -32,7 +29,6 @@ import {
   deriveStepField,
   normalizeFieldReach,
   chooseNearestRate,
-  chooseDirectionalRate,
   hasCenterDiscontinuity,
   resolveFieldPhase,
   deriveObservedField
@@ -40,19 +36,15 @@ import {
 
 export {
   STEP_FIELD_PHASE,
-  DEFAULT_FIELD_RESPONSE,
   DEFAULT_FIELD_BREATH,
   BREATH_PHASE,
   BREATH_RATE_STEPS,
-  normalizeFieldResponse,
   normalizeFieldBreath,
   breathRatePair,
-  breathRateFromResponse,
   deriveFieldBounds,
   deriveStepField,
   normalizeFieldReach,
   chooseNearestRate,
-  chooseDirectionalRate,
   resolveFieldPhase,
   deriveObservedField
 } from "./step-field-geometry.js";
@@ -78,8 +70,7 @@ function defaultPreferences() {
     tailVisible: true,
     leadVisible: true,
     reducedMotion: false,
-    breathRate: DEFAULT_FIELD_BREATH.rate,
-    ...DEFAULT_FIELD_RESPONSE
+    breathRate: DEFAULT_FIELD_BREATH.rate
   };
 }
 
@@ -146,8 +137,8 @@ export function createStepFieldController({
   const elements = Object.fromEntries(ids.map(id => [id, document?.getElementById?.(id) || null]));
 
   const sides = {
-    tail: createSideState("tail", "player-tail", DEFAULT_FIELD_RESPONSE.tailRate),
-    lead: createSideState("lead", "player-lead", DEFAULT_FIELD_RESPONSE.leadRate)
+    tail: createSideState("tail", "player-tail"),
+    lead: createSideState("lead", "player-lead")
   };
 
   const runtime = {
@@ -173,11 +164,11 @@ export function createStepFieldController({
     transitionTimer: null
   };
 
-  function createSideState(role, elementId, requestedRate) {
+  function createSideState(role, elementId) {
     return {
       role,
       elementId,
-      requestedRate,
+      requestedRate: 1,
       desiredRate: 1,
       actualRate: 1,
       availableRates: [1],
@@ -198,7 +189,6 @@ export function createStepFieldController({
       desiredAddress: null,
       lastPlacedAddress: null,
       lastPlaceAt: 0,
-      placementGeneration: 0,
       waiting: false,
       rateAvailable: true,
       blocked: false,
@@ -450,12 +440,10 @@ export function createStepFieldController({
           side.playback = name;
           if (name === YOUTUBE_STATE.CUED) {
             side.sourceReady = true;
-            // A callback belonging to a superseded Field Frame is discarded:
-            // rapid traversal must settle on the latest resulting Frame rather
-            // than replaying every obsolete intermediate placement.
-            const staleFrame = side.placementGeneration !== 0
-              && side.placementGeneration !== runtime.frameGeneration;
-            if (Number.isFinite(side.desiredAddress) && !staleFrame) {
+            // parkSide records the newest desired address before any early
+            // return, so a late callback always decodes the current Frame and
+            // never replays an obsolete one.
+            if (Number.isFinite(side.desiredAddress)) {
               side.adapter?.place?.(side.desiredAddress);
             }
             if (side.pendingPlay && sidePlaybackAllowed(role)) {
@@ -661,12 +649,6 @@ export function createStepFieldController({
     }
   }
 
-  function directionalRates(side) {
-    return [...new Set(side.availableRates || readSide(side).availableRates || [])]
-      .filter(rate => Number.isFinite(rate) && (side.role === "tail" ? rate < 1 : rate > 1))
-      .sort((a, b) => a - b);
-  }
-
   // One combined breathing-rate pair. The configured value is the outward rate
   // difference; the inward phase exchanges the sides without rewriting it.
   function populateBreathRateControl(prefs) {
@@ -686,13 +668,6 @@ export function createStepFieldController({
       select.dataset.rates = key;
     }
     select.value = String(normalizeFieldBreath({ rate: prefs.breathRate }).rate);
-  }
-
-  function requestStretchRate(side, force = false) {
-    const configured = snapshotBreath(getSnapshot?.());
-    const pair = breathRatePair(configured.rate);
-    const desired = side.role === "tail" ? pair.tailRate : pair.leadRate;
-    return requestBreathRate(side, desired, force);
   }
 
   function establishSide(side, center, snapshot) {
@@ -913,10 +888,8 @@ export function createStepFieldController({
     };
     for (const role of ["tail", "lead"]) {
       if (!sideIsVisible(role, prefs)) continue;
-      const side = sides[role];
-      side.placementGeneration = runtime.frameGeneration;
-      pauseSide(side);
-      parkSide(side, addresses[role]);
+      pauseSide(sides[role]);
+      parkSide(sides[role], addresses[role]);
     }
     const hasVisibleField = ["tail", "lead"].some(role =>
       sideIsVisible(role, prefs)
@@ -978,28 +951,6 @@ export function createStepFieldController({
     );
   }
 
-  function breathSides(center, snapshot = getSnapshot?.(), prefs = preferences()) {
-    return Object.fromEntries(["tail", "lead"].map(role => [role, {
-      operational: sideIsVisible(role, prefs) && sideCanRun(sides[role]),
-      available: effectiveOffset(role, center, snapshot)
-    }]));
-  }
-
-  function syncBreathOffsets(center, snapshot = getSnapshot?.()) {
-    for (const role of ["tail", "lead"]) {
-      const side = sides[role];
-      const bounds = sideBreathBounds(role, center, snapshot);
-      const offset = clamp(runtime.breath.sides[role].offset, 0, bounds.outer);
-      runtime.breath.sides[role].offset = offset;
-      side.offset = offset;
-      side.progressOffset = offset;
-      side.waiting = Boolean(runtime.breath.sides[role].waiting);
-      side.mode = runtime.breath.held
-        ? FIELD_SIDE_MODE.HELD
-        : FIELD_SIDE_MODE.STRETCHING;
-    }
-  }
-
   // A fresh playback gesture begins the cycle at the inner boundary: x → expand
   // → y → contract → x. The deliberate Stretch control instead resumes from the
   // attained relation and its preserved direction.
@@ -1046,7 +997,6 @@ export function createStepFieldController({
     side.desiredAddress = address;
     side.lastPlacedAddress = address;
     side.lastPlaceAt = Date.now();
-    side.placementGeneration = runtime.frameGeneration;
     side.pendingPlay = Boolean(play);
     if (side.sourceReady) {
       side.adapter?.place?.(address);

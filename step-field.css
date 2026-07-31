@@ -212,7 +212,7 @@
   z-index: 12;
   display: grid;
   width: min(210px, calc(100vw - 24px));
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   padding: 7px;
   border: 1px solid var(--line-strong);
@@ -455,9 +455,12 @@
    the trailing pane has just received the address Center was showing, so it is
    already settled, while the leading pane is receiving material that was not
    previously visible and rises into place. */
+/* Kept equal to FIELD_TRANSITION_MS in step-field.js, which clears the class. */
+.step-field { --field-transition-ms: 260ms; }
+
 .step-field.is-traversing-forward .step-pane,
 .step-field.is-traversing-backward .step-pane {
-  animation-duration: var(--field-transition-ms, 260ms);
+  animation-duration: var(--field-transition-ms);
   animation-timing-function: ease-out;
   animation-fill-mode: both;
 }

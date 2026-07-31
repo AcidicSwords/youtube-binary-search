@@ -80,6 +80,10 @@ The Timeline is the Temporal Topography: the complete source projected into late
 
 Section factors compose multiplicatively. Their signed logarithms compose visually as one continuous compression/expansion atmosphere, while projected source-time contours retain exact metric meaning.
 
+Spatial extent is reported as a factor on source, never as a duration, because a map distance only means something against the source it stretches. At `1×` the two correspond and no factor is shown. Sections whose factors cancel leave the whole traversal unchanged while the interior still warps.
+
+Focus draws the map across the focused extent alone, so a focused Section or Working Interval spans the whole timeline at every Weight. That viewport is presentation: it changes what is drawn, never what is computed.
+
 Current, Pins, Section endpoints, whole Sections, and Range boundaries are manipulated spatially on the Temporal Topography. Section wires carry their own roles: pressing near an end acquires that endpoint Pin, pressing the middle translates the Section. Guide objects remain source topology rather than generic interface selections.
 
 Dragging or nudging Current is a Step, not a Go. It extends or shortens the traversal already established rather than drawing a new Working Interval around wherever it lands. Drawing a new neighbourhood is what an exact Go is for.

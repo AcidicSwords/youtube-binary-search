@@ -14,6 +14,8 @@
 - **Outer Offset** — the maximum Tail/Lead separation from Center during Breath.
 - **Temporal Topography** — the complete source projected into navigable Timeline Space.
 - **Timeline Space** — the derived positive spatial coordinate used for map layout and navigation.
+- **Stretch factor** — a spatial extent expressed as the factor it applies to its own source span. Spatial extent is always reported this way and never as a duration; at `1×` it is omitted.
+- **Viewport** — the source extent the map is drawn across. Presentation only: Focus takes it so the focused extent fills the timeline, and no operator can observe it.
 - **Range** — admissible source territory.
 - **Resolution** — the active neighbourhood and discrimination grain.
 - **Current** — committed semantic Address.
@@ -32,6 +34,6 @@
 - **Switch Endpoint** — continue from the opposite side of the same Working Interval.
 - **Release** — clear only the Working Interval.
 - **Deform** — create/reuse a Section and change its Weight.
-- **Focus / Unfocus** — install an extent as Range / restore its containing Range.
+- **Focus / Unfocus** — install an extent as Range and draw the map across it alone / restore its containing Range and the whole map.
 - **Context** — bounded source-contiguous observation around Current before or during acceptance.
 - **Nudge** — precise source-time movement of Current or retained topology; an exact frame only when proven by the media adapter.

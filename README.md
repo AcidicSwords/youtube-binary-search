@@ -5,10 +5,10 @@ See the phases. Map the whole.
 
 Video Cartography turns a linear video into a spatial map. Source time remains exact while the reader refines neighborhoods, draws a Working Interval, retains Pins and Sections, and changes how much timeline space a Section receives.
 
-A Section weight is a spatial scale, not a playback rate. It copies the familiar Tail/Lead rate ladder:
+A Section weight is a spatial scale, not a playback rate. Its interior copies the familiar Tail/Lead rate ladder, and it extends one step past that ladder at each end:
 
 ```text
-0.25×  0.5×  0.75×  1×  1.25×  1.5×  1.75×  2×
+0.125×  0.25×  0.5×  0.75×  1×  1.25×  1.5×  1.75×  2×  4×
 ```
 
 The correspondence is perceptual:
@@ -89,6 +89,7 @@ Step Reach is independent from the three-player Field.
 - Manual mode accepts a distance in timeline units.
 - Range-relative mode derives Reach from the active Range’s weighted timeline width.
 - `1/32`, `1/16`, and `1/8` are the adaptive presets.
+- The fine Nudge quantum sits with them: both answer how far one movement goes.
 - Stretch and Hold change only the live Tail/Lead relation. They never overwrite the configured Inner/Outer Offset, Step Reach, or Section weight.
 
 Changing Section weight recomputes adaptive Reach because the active spatial width changed. It does not change fixed Reach.

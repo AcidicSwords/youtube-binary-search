@@ -16,20 +16,27 @@ Parameters in flow and present Guide as a modal sheet.
 Parameters expose Active Range, Context duration, and Step Reach. Resolution remains visible on the Timeline, so the wide rail does not duplicate it.
 
 - **Manual** exposes editable spatial units.
+- **Fine Nudge distance** is the source-time quantum every Nudge surface uses.
 - **Range-relative** exposes `1/32`, `1/16`, and `1/8`.
 - The summary shows the stored mode and current effective distance.
 - Single labels share one compact sans-serif level; trailing state values share
   one compact monospaced level. A one-label disclosure is never styled as a
   value merely because it is also its last child.
 
-Inner Offset, Outer Offset, the breathing rate pair, and the Nudge quantum share
-one compact Tune disclosure in the Center bar, because they describe one Field
-relation rather than two independent sides. Field Offset never relabels or
-rewrites Step Reach or Section weight.
+Movement distance holds both magnitudes a traversal can use: Step Reach with its
+mode and presets, and the fine Nudge quantum. They belong together because both
+answer "how far does one movement go"; neither is a Field setting.
+
+Inner Offset, Outer Offset, and the breathing rate pair share one compact Tune
+disclosure in the Center bar, because they describe one Field relation rather
+than two independent sides. Field Offset never relabels or rewrites Step Reach,
+the Nudge quantum, or Section weight.
 
 ## Timeline
 
 The temporal map uses lateral Timeline Space while the ruler labels source timestamps.
+
+Spatial extent is never printed as a duration. Wherever a spatial figure appears — total source, active Resolution, the Range Reopen would restore — it is shown as the stretch factor it applies to that scope's own source span, and it is omitted entirely at `1×`, where the map and the source already correspond. A one-minute source with one 15 s Section at `2×` reads `1:00 · 1.25× spatial`.
 
 Visual order:
 
@@ -110,10 +117,10 @@ direct manipulation surface: release without movement moves Current to it, and
 drag moves that exact Pin. Pin selection is derived from the Working Interval:
 any Pins aligned with its Start and End are highlighted together. Guide
 also provides the Section's name, endpoint relations, Focus, and complete
-familiar weight ladder:
+weight ladder:
 
 ```text
-0.25×  0.5×  0.75×  1×  1.25×  1.5×  1.75×  2×
+0.125×  0.25×  0.5×  0.75×  1×  1.25×  1.5×  1.75×  2×  4×
 ```
 
 Weight changes timeline geometry only. Section wires use a warm structural
@@ -148,7 +155,7 @@ R Release             T Deform           F Focus / Unfocus
 Plain `T` normalizes a weighted Section to `1×` or restores its remembered
 non-neutral value. `Shift+T` raises weight one canonical step and `Alt+T`
 lowers it one step. The small `−/+` controls appear when Deform is hovered or
-focused; Guide retains the exact eight-value selector.
+focused; Guide retains the exact canonical selector.
 
 The Shift layer relabels only directional families:
 
@@ -193,6 +200,9 @@ drag moves the Pin only after crossing the movement threshold.
 
 Guide’s exact selector and Deform’s step controls are two views of the same transaction.
 
+Guide rows share one gutter and one control height, so title, actions and the
+Address line read as one stack rather than three separately measured bands.
+
 Guide is the exact editor. A Pin row exposes its Title, Address input, `−`/`+`
 Nudge controls, Go, reference count, Rename, and Delete. A Section row exposes
 its Title, Start and End Address inputs, a Duration readout, `−`/`+` controls for
@@ -229,7 +239,7 @@ Previous/Next Pin stops.
 
 ## Focus and playback
 
-Focus clamps Range without changing Section weight or the global timeline projection. Unfocus restores the containing Range.
+Focus clamps Range without changing any Section weight, and draws the map across the focused extent alone: a focused Section or Working Interval spans the whole timeline whatever its Weight, and its interior still warps according to the Weights inside it. Everything outside the focused extent is not drawn, so nothing piles against the edges. Pressing and dragging use the same drawn map, so a pressed position always addresses what is under it. Unfocus restores the containing Range and the whole map.
 
 Native playback loops when Range is a proper subset of the video. There is no separate Loop operator. Playback remains source-contiguous and always uses media runtime rate, never Section weight.
 

@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   STEP_FIELD_PHASE,
+  chooseNearestRate,
   deriveStepField,
-  chooseDirectionalRate,
   resolveFieldPhase,
   deriveObservedField
 } from "./step-field-geometry.js";
@@ -39,10 +39,9 @@ const held = deriveObservedField({
 assert.equal(held.span.held, true);
 assert.deepEqual({ start: held.span.start, end: held.span.end }, { start: 50, end: 70 });
 
-assert.equal(chooseDirectionalRate([0.25, 0.5, 1, 1.5, 2], 0.6, "tail"), 0.5);
-assert.equal(chooseDirectionalRate([0.25, 0.5, 1, 1.5, 2], 1.8, "lead"), 2);
-assert.equal(chooseDirectionalRate([1], 0.5, "tail"), null);
-assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
+assert.equal(chooseNearestRate([0.25, 0.5, 1, 1.5, 2], 0.6), 0.5);
+assert.equal(chooseNearestRate([0.25, 0.5, 1, 1.5, 2], 1.8), 2);
+assert.equal(chooseNearestRate([1], 0.5), 1);
 
 assert.equal(resolveFieldPhase({
   enabled: true,

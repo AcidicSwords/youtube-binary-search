@@ -22,7 +22,9 @@
 
 ## Canonical weight scale
 
-- Confirm Guide’s Section selector contains, in order: `0.25×`, `0.5×`, `0.75×`, `1×`, `1.25×`, `1.5×`, `1.75×`, `2×`.
+- Confirm Guide’s Section selector contains, in order: `0.125×`, `0.25×`, `0.5×`, `0.75×`, `1×`, `1.25×`, `1.5×`, `1.75×`, `2×`, `4×`.
+- Confirm every spatial figure is shown as a factor, never as a duration: with all weights at `1×` no factor appears anywhere; adding one 15 s `2×` Section to a one-minute source shows `1:00 · 1.25× spatial`; adding a second 15 s Section at `0.5×` removes the factor again.
+- Confirm Focus draws the map across the focused extent: focus a `0.5×` Section and a `2×` Section in turn and check each spans the full timeline, that no unfocused Section or Pin is drawn against either edge, and that pressing anywhere on the timeline lands on the Address drawn there. Unfocus must restore the whole map.
 - Confirm plain `T` toggles `1×` against the last non-neutral weight, `Shift+T`
   moves one step up, and `Alt+T` moves one step down without issuing a player
   or Field command.
@@ -133,6 +135,17 @@
 
 - Press the Current marker and release without moving. Confirm nothing moves and
   no history entry appears.
+- Confirm the fine Nudge distance sits inside Movement distance beside Step
+  Reach, and that the Field Tune popover holds only Inner, Outer and rate.
+- With no video loaded, confirm every Parameters and Field input is disabled.
+- Narrow the Guide rail until it wraps. Confirm no Address field, Weight select,
+  or action button is clipped by the card, and that every row shares one gutter.
+- Confirm the keyboard reference lists Nudge, Shift-wheel and Shift-drag, and
+  that its Weight chord matches the one the application binds.
+- Drag each manipulable object, then edit the same object's Address in Guide.
+  Confirm both present identical Tail, Center and Lead addresses.
+- Press Escape during a Current drag, a Pin drag, a Section drag, and a Range
+  drag. Confirm each abandons only that gesture and leaves its surface open.
 - Drag Current forward, then back past its own departure. Confirm the Working
   Interval extends and then shortens from the same anchor, and that neither drag
   draws a new interval around the landing point.

@@ -38,7 +38,7 @@ const close = (actual, expected, message = "values differ") => {
 
 assert.deepEqual(
   SECTION_WEIGHT_VALUES,
-  [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
+  [0.125, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 4]
 );
 const invalidGuide = createGuide("invalid-weight");
 assert.throws(

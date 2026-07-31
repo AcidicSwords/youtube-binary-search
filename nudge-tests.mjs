@@ -49,7 +49,7 @@ assert.ok(Number(byId.get("nudge-seconds").value) > 0.04,
 byId.get("nudge-seconds").value = "0.5";
 byId.get("nudge-seconds").dispatch("change");
 await flush();
-assert.match(byId.get("status").textContent, /Nudge set to 0\.5 s/);
+assert.match(byId.get("status").textContent, /Nudge set to 0\.5s/);
 
 // Current drag is an exact Go gesture, not a Pin move. A stationary press
 // performs no movement at all.
@@ -323,4 +323,52 @@ assert.notEqual(byId.get("field-transport-state").textContent, "Pin Frame",
   "Escape cancels the candidate Frame.");
 assert.equal(committedPinAddress(), addressBeforePreview);
 
-console.log("Nudge tests passed: source-time quantum, Current drag commit and cancel, Shift-drag precision, Shift-wheel accumulation and targeting, keyboard nudging, one Undo per gesture, Guide increments sharing the same operation, and Guide Address preview and cancellation.");
+// Editing an Address and dragging the same object are one operation, so they
+// must also present the same Frame: Tail and Lead carry the edited edges while
+// Center shows what that object's own drag would show.
+{
+  byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 200 });
+  await flush(3);
+  byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 400 });
+  await flush(3);
+  byId.get("section-label").value = "Frame parity";
+  byId.get("section-capture").dispatch("submit");
+  await flush(3);
+  const row = descendants(byId.get("sections-list")).find(node => node.dataset.sectionGo);
+  byId.get("sections-list").dispatch("click", { target: row });
+  await flush(3);
+  await poll();
+
+  const wire = descendants(byId.get("section-lane"))
+    .find(node => node.dataset.sectionGo);
+  wire.rect = { left: 200, width: 200 };
+  byId.get("section-lane").dispatch("pointerdown", {
+    target: wire, clientX: 205, pointerId: 91, button: 0, buttons: 1
+  });
+  dispatchDocument("pointermove", {
+    target: wire, clientX: 100, pointerId: 91, buttons: 1
+  });
+  await flush(2);
+  const dragged = [env.tail().currentTime, env.center().currentTime, env.lead().currentTime];
+  dispatchDocument("pointercancel", { target: wire, pointerId: 91 });
+  await flush(3);
+  await poll();
+
+  const startInput = descendants(byId.get("sections-list"))
+    .find(node => node.dataset.addressInput === "section-start");
+  startInput.value = "0:10";
+  byId.get("sections-list").dispatch("input", { target: startInput });
+  await flush(2);
+  const edited = [env.tail().currentTime, env.center().currentTime, env.lead().currentTime];
+  assert.deepEqual(edited, [10, 25, 40],
+    "An exact edit shows Start, midpoint and End.");
+  assert.deepEqual(
+    dragged.map(value => Math.round(value)),
+    edited.map(value => Math.round(value)),
+    "Dragging an endpoint and editing its Address present the same Frame."
+  );
+  byId.get("sections-list").dispatch("keydown", { target: startInput, key: "Escape" });
+  await flush(2);
+}
+
+console.log("Nudge tests passed: source-time quantum, Current drag commit and cancel, Shift-drag precision, Shift-wheel accumulation and targeting, keyboard nudging, one Undo per gesture, Guide increments sharing the same operation, Guide Address preview and cancellation, and drag/edit Frame parity.");

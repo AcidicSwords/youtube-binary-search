@@ -11,6 +11,8 @@ export const STEP_FIELD_PHASE = Object.freeze({
 });
 
 export const FIELD_REACH_TOLERANCE = 0.16;
+// Retained only to migrate a legacy saved side-rate pair into one symmetric
+// breathing rate. Nothing at runtime configures the two sides independently.
 export const DEFAULT_FIELD_RESPONSE = Object.freeze({ tailRate: 0.5, leadRate: 2 });
 
 // Field Breath: bounded expansion and contraction during ordinary Center
@@ -361,17 +363,6 @@ export function chooseNearestRate(availableRates, requestedRate) {
     .filter(rate => Number.isFinite(rate) && rate > 0)
     .sort((a, b) => a - b);
   if (!rates.length) return 1;
-  return rates.reduce((best, rate) => (
-    Math.abs(rate - requestedRate) < Math.abs(best - requestedRate) ? rate : best
-  ), rates[0]);
-}
-
-export function chooseDirectionalRate(availableRates, requestedRate, role) {
-  const rates = [...new Set(availableRates || [])]
-    .filter(rate => Number.isFinite(rate) && rate > 0)
-    .filter(rate => role === "tail" ? rate < 1 : role === "lead" ? rate > 1 : rate === 1)
-    .sort((a, b) => a - b);
-  if (!rates.length) return null;
   return rates.reduce((best, rate) => (
     Math.abs(rate - requestedRate) < Math.abs(best - requestedRate) ? rate : best
   ), rates[0]);

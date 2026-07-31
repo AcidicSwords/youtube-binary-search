@@ -85,11 +85,7 @@
                       </label>
                       <label class="field-control field-rate-control" for="field-breath-rate">
                         <span>Breath rate</span>
-                        <select id="field-breath-rate" aria-label="Field breathing rate pair"><option value="0.5">0.5× / 1.5×</option></select>
-                      </label>
-                      <label class="field-control field-nudge-control" for="nudge-seconds">
-                        <span>Nudge</span>
-                        <span><input id="nudge-seconds" type="number" min="0.042" max="10" step="0.001" value="0.042"> s</span>
+                        <select id="field-breath-rate" aria-label="Field breathing rate pair" disabled><option value="0.5">0.5× / 1.5×</option></select>
                       </label>
                     </div>
                   </details>
@@ -208,7 +204,7 @@
             </div>
 
             <details id="step-size-settings" class="tool-disclosure step-size-settings">
-              <summary><span>Step size</span><span id="step-size-summary">10 s manual</span></summary>
+              <summary><span>Movement distance</span><span id="step-size-summary">10 s manual</span></summary>
               <div class="step-size-body">
                 <div class="segmented-control" role="group" aria-label="Step size mode">
                   <button id="step-mode-fixed" type="button" aria-pressed="true">Manual</button>
@@ -228,6 +224,15 @@
                   <button id="step-fraction-8" type="button" data-step-fraction="0.125" aria-pressed="false">1/8</button>
                 </div>
                 <p class="setting-note">Adaptive size follows the active Range’s weighted timeline width.</p>
+                <label class="compact-setting" for="nudge-seconds">
+                  <span>Fine Nudge distance</span>
+                  <span class="number-with-unit">
+                    <input id="nudge-seconds" type="number" min="0.042" max="10" step="0.001"
+                      value="0.042" inputmode="decimal" disabled>
+                    <span>s</span>
+                  </span>
+                </label>
+                <p class="setting-note">Nudge moves in source time. It is called a frame only when the media adapter proves an exact frame duration.</p>
               </div>
             </details>
 
@@ -272,7 +277,7 @@
                 <span><kbd>⇧A</kbd>/<kbd>⇧D</kbd> Pins</span>
                 <span><kbd>R</kbd> Release Interval</span>
                 <span><kbd>T</kbd> Deform / Normalize</span>
-                <span><kbd>⇧T</kbd>/<kbd>Ctrl T</kbd> Weight up / down</span>
+                <span><kbd>⇧T</kbd>/<kbd>Alt T</kbd> Weight up / down</span>
                 <span><kbd>F</kbd> Focus / Unfocus</span>
                 <span><kbd>Alt</kbd> Carry selected retained object</span>
                 <span><kbd>P</kbd> Pin Current</span>
@@ -280,9 +285,12 @@
                 <span><kbd>⇧P</kbd> Save Working Section</span>
                 <span><kbd>G</kbd> Guide</span>
                 <span><kbd>[</kbd>/<kbd>]</kbd> Step size</span>
+                <span><kbd>,</kbd>/<kbd>.</kbd> Nudge</span>
+                <span><kbd>⇧</kbd>+wheel Nudge under pointer</span>
+                <span><kbd>⇧</kbd>+drag Precision</span>
                 <span><kbd>Z</kbd> Undo</span>
                 <span><kbd>C</kbd> Redo</span>
-                <span><kbd>Esc</kbd> Stop or close</span>
+                <span><kbd>Esc</kbd> Cancel gesture, then stop or close</span>
               </div>
             </details>
           </aside>

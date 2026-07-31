@@ -85,14 +85,12 @@ import {
   isYouTubeApiReady,
   parseYouTubeUrl
 } from "./youtube.js";
+import { createStepFieldController } from "./step-field.js";
 import {
-  DEFAULT_FIELD_RESPONSE,
   DEFAULT_FIELD_BREATH,
-  createStepFieldController,
-  normalizeFieldResponse,
   normalizeFieldBreath,
   breathRateFromResponse
-} from "./step-field.js";
+} from "./step-field-geometry.js";
 import {
   FIELD_FRAME_OWNER,
   createFieldFrameSequencer
@@ -2522,11 +2520,9 @@ function timeFromPointer(
 ) {
   const rect = elements.timeline.getBoundingClientRect();
   if (!Number.isFinite(rect.width) || rect.width <= 0) return currentResolution().C;
-  const coordinate = clamp(
-    (event.clientX - rect.left) / rect.width,
-    0,
-    1
-  ) * projection.timelineExtent;
+  const coordinate = projection.fractionToCoordinate(
+    (event.clientX - rect.left) / rect.width
+  );
   const source = projection.timelineToSource(coordinate);
   if (!constrainToRange) return source;
   const range = activeRange();
@@ -2548,11 +2544,9 @@ function sourceFromPointerInProjection(
 ) {
   const rect = elements.timeline.getBoundingClientRect();
   if (!Number.isFinite(rect.width) || rect.width <= 0) return originSource;
-  const coordinate = clamp(
-    (event.clientX - rect.left) / rect.width,
-    0,
-    1
-  ) * projection.timelineExtent;
+  const coordinate = projection.fractionToCoordinate(
+    (event.clientX - rect.left) / rect.width
+  );
   return projection.timelineToSource(coordinate);
 }
 
@@ -2562,11 +2556,11 @@ function sourceFromRelativeDragDelta(event, drag) {
   const originCoordinate = drag.projection.sourceToTimeline(drag.originSource);
   const coordinate = clamp(
     originCoordinate
-      + (event.clientX - drag.originClientX)
-      / width
-      * drag.projection.timelineExtent,
-    0,
-    drag.projection.timelineExtent
+      + drag.projection.fractionToDistance(
+          (event.clientX - drag.originClientX) / width
+        ),
+    drag.projection.viewStart,
+    drag.projection.viewEnd
   );
   return drag.projection.timelineToSource(coordinate);
 }
@@ -2591,10 +2585,8 @@ function pinSnapCandidate(drag, address) {
   const width = Number(drag.surfaceWidth);
   if (!Number.isFinite(width) || width <= 0) return null;
   const coordinate = drag.projection.sourceToTimeline(address);
-  const maximumDistance = (
-    PIN_SNAP_DISTANCE_PX
-    / width
-    * drag.projection.timelineExtent
+  const maximumDistance = drag.projection.fractionToDistance(
+    PIN_SNAP_DISTANCE_PX / width
   );
   return sourceGuide.pins
     .filter(pin =>
@@ -2658,14 +2650,6 @@ function beginGuideDrag(kind, id, event, options = {}) {
   if (!pin && !section) return;
   const timelineSurface = elements.timeline.contains?.(event.target);
   const surface = options.surface || (timelineSurface ? "timeline" : "relative");
-  const guideMapSurface = event.target?.closest?.(".section-endpoints")
-    || event.target?.closest?.(".pin-position-track");
-  const guideItemWidth = guideMapSurface
-    ? guideMapSurface.getBoundingClientRect().width
-    : event.target
-      ?.closest?.(".guide-item")
-      ?.getBoundingClientRect?.()
-      ?.width;
   const timelineWidth = elements.timeline.getBoundingClientRect().width;
   state.guideDrag = {
     kind,
@@ -2673,9 +2657,7 @@ function beginGuideDrag(kind, id, event, options = {}) {
     pointerId: event.pointerId,
     originClientX: event.clientX,
     surface,
-    surfaceWidth: Number(options.surfaceWidth)
-      || (surface === "relative" ? guideItemWidth : timelineWidth)
-      || timelineWidth,
+    surfaceWidth: Number(options.surfaceWidth) || timelineWidth,
     origin: options.origin || (timelineSurface ? "timeline" : "guide"),
     sectionId: options.sectionId || null,
     originSource: pin?.t ?? section.start,
@@ -3395,8 +3377,12 @@ function nudgeQuantum() {
   return frameDuration() ?? normalizeNudgeSeconds(state.nudgeSeconds);
 }
 
+function formatQuantum(value) {
+  return `${Number(Number(value).toFixed(3))}s`;
+}
+
 function nudgeUnitLabel() {
-  return frameDuration() ? "frame" : `${nudgeQuantum()} s`;
+  return frameDuration() ? "frame" : formatQuantum(nudgeQuantum());
 }
 
 function beginNudgeGesture(target) {
@@ -3543,8 +3529,8 @@ function nudgeTarget(target, direction, options = {}) {
 const HOLD_REPEAT_DELAY_MS = 380;
 const HOLD_REPEAT_INTERVAL_MS = 80;
 
-// Delegated so it survives Guide re-rendering: the container is bound once and
-// resolves the pressed control at pointer-down.
+// Bound once to a container. With a selector it delegates, so it survives Guide
+// re-rendering; without one the container is itself the control.
 function bindHoldRepeat(container, selector, act) {
   if (!container?.addEventListener) return;
   let delayTimer = null;
@@ -3570,15 +3556,19 @@ function bindHoldRepeat(container, selector, act) {
     }, HOLD_REPEAT_DELAY_MS);
   };
 
+  const resolve = target => (
+    selector ? target?.closest?.(selector) : container
+  );
+
   container.addEventListener("pointerdown", event => {
     if (Number.isFinite(event.button) && event.button !== 0) return;
-    const control = event.target.closest?.(selector);
+    const control = resolve(event.target);
     if (!control) return;
     event.preventDefault();
     start(control);
   });
   container.addEventListener("keydown", event => {
-    const control = event.target.closest?.(selector);
+    const control = resolve(event.target);
     if (!control || (event.key !== "Enter" && event.key !== " ")) return;
     event.preventDefault();
     if (!event.repeat) start(control);
@@ -3766,6 +3756,24 @@ function toggleControls() {
 function toggleRangeTools() {
   elements["range-tools"].open = !elements["range-tools"].open;
   elements["range-state"].setAttribute("aria-expanded", String(elements["range-tools"].open));
+}
+
+// Escape is the universal cancel. A live direct manipulation owns it first, so
+// the same key that abandons a drag never also closes the surface behind it.
+function cancelActiveManipulation() {
+  if (state.currentDrag) {
+    finishCurrentDrag({ pointerId: state.currentDrag.pointerId }, { cancel: true });
+    return true;
+  }
+  if (state.guideDrag) {
+    finishGuideDrag({ pointerId: state.guideDrag.pointerId }, { cancel: true });
+    return true;
+  }
+  if (state.dragHandle) {
+    cancelRangeDrag();
+    return true;
+  }
+  return false;
 }
 
 function stopOrClose() {
@@ -4197,8 +4205,8 @@ elements["switch-endpoint"].addEventListener("click", event => {
 elements.release.addEventListener("click", releaseWorkingInterval);
 elements.deform.addEventListener("click", deformWorkingOrSelected);
 // Weight steppers repeat while held, like every other increment control.
-bindHoldRepeat(elements["deform-down"], "#deform-down", () => stepDeformWeight(-1));
-bindHoldRepeat(elements["deform-up"], "#deform-up", () => stepDeformWeight(1));
+bindHoldRepeat(elements["deform-down"], null, () => stepDeformWeight(-1));
+bindHoldRepeat(elements["deform-up"], null, () => stepDeformWeight(1));
 elements["focus-toggle"].addEventListener("click", focusOrUnfocus);
 elements["shift-layer-toggle"].addEventListener("click", () => {
   state.shiftLayer = !state.shiftLayer;
@@ -4304,7 +4312,7 @@ elements["nudge-seconds"].addEventListener("change", event => {
   }
   state.nudgeSeconds = normalizeNudgeSeconds(parsed);
   persistPreferences();
-  setStatus(`Nudge set to ${state.nudgeSeconds} s.`);
+  setStatus(`Nudge set to ${formatQuantum(state.nudgeSeconds)}.`);
   view.render();
 });
 elements["step-size-seconds"].addEventListener("change", event => {
@@ -4498,8 +4506,10 @@ function previewGuideAddressInput(input) {
     const step = fieldStepPreview(address, "pin");
     frame = { kind: "pin", start: step.start, center: address, end: step.end };
   }
+  // Center shows what the drag path shows for the same edit: a Section's
+  // midpoint, a Pin's own Address. Tail and Lead carry the edited edges.
   state.directFrame = frame;
-  placePlayer(address);
+  placePlayer(frame.center);
   stepField?.previewExtent?.(frame);
   return true;
 }
@@ -4747,7 +4757,7 @@ document.addEventListener("keydown", event => {
   }
   if (event.key === "Escape") {
     event.preventDefault();
-    stopOrClose();
+    if (!cancelActiveManipulation()) stopOrClose();
     return;
   }
   // On compact screens the Guide is modal. Its controls, not the hidden reader,

@@ -159,7 +159,9 @@ assert.match(app, /"section-lane"\]\.addEventListener\("pointerdown"[\s\S]*?sect
 assert.doesNotMatch(view, /timeline-section-node/,
   "No separate Section node chrome may be drawn over the map.");
 assert.doesNotMatch(styles, /\.timeline-section-node/);
-assert.match(app, /function sourceFromRelativeDragDelta[\s\S]*surfaceWidth[\s\S]*originClientX[\s\S]*timelineExtent/);
+// Relative dragging converts pixels through the drawn span, so a focused map
+// drags at the scale it is actually drawn at.
+assert.match(app, /function sourceFromRelativeDragDelta[\s\S]*surfaceWidth[\s\S]*fractionToDistance[\s\S]*originClientX[\s\S]*viewStart[\s\S]*viewEnd/);
 assert.match(view, /function pinPositionButton[\s\S]*className\s*=\s*"endpoint-button pin-position-node"[\s\S]*dataset\.pinGo/);
 assert.doesNotMatch(view, /dataset\.sectionDrag/,
   "Guide's full-map profile is a read-only positional representation.");
@@ -180,6 +182,11 @@ assert.match(app, /function beginCurrentDrag[\s\S]*state\.currentDrag = \{/,
   "Current is its own gesture owner on the Temporal Topography.");
 assert.match(app, /function finishCurrentDrag[\s\S]*completePendingStep\(\)/,
   "Dragging Current settles as one Step transaction.");
+assert.match(app, /function cancelActiveManipulation[\s\S]*currentDrag[\s\S]*guideDrag[\s\S]*dragHandle/,
+  "Escape must cancel the live gesture before it closes anything behind it.");
+assert.match(app, /if \(!cancelActiveManipulation\(\)\) stopOrClose\(\)/);
+assert.match(app, /previewGuideAddressInput[\s\S]*placePlayer\(frame\.center\)/,
+  "An exact edit must present the Frame its drag presents.");
 assert.doesNotMatch(view, /guide-action-move/);
 assert.match(app, /function previewGuideDrag[\s\S]*kind:\s*"section"[\s\S]*start:[\s\S]*center:[\s\S]*end:/);
 assert.match(field, /function previewExtent[\s\S]*renderPreview/);
@@ -197,7 +204,22 @@ assert.match(view, /\["start",\s*projected\.start[\s\S]*\["midpoint",\s*midpoint
 assert.match(app, /function bindHoldRepeat\(container, selector, act\)[\s\S]*HOLD_REPEAT_INTERVAL_MS/);
 assert.match(app, /bindGuideNudgeControls\(elements\["sections-list"\]\)/);
 assert.match(app, /bindGuideNudgeControls\(elements\["pins-list"\]\)/);
-assert.match(app, /bindHoldRepeat\(elements\["deform-up"\]/);
+assert.match(app, /bindHoldRepeat\(elements\["deform-up"\], null/);
+// Nudge is a movement magnitude and sits with Step Reach, not with the Field's
+// physical observation settings.
+assert.match(html, /id="step-size-settings"[\s\S]*id="step-size-seconds"[\s\S]*id="nudge-seconds"[\s\S]*<\/details>/);
+assert.doesNotMatch(html, /field-settings-popover[\s\S]{0,400}nudge-seconds/);
+// One gutter and one control height across a Guide card.
+assert.match(styles, /\.guide-item \{[\s\S]*--guide-gutter:[\s\S]*--guide-control:/);
+for (const rule of ["guide-item-main", "guide-item-actions", "guide-addresses"]) {
+  assert.match(
+    styles,
+    new RegExp(`\\.${rule} \\{[^}]*var\\(--guide-gutter\\)`),
+    `${rule} must share the Guide gutter.`
+  );
+}
+assert.match(styles, /\.section-item \.guide-item-actions \{[^}]*minmax\(0, 1fr\)/,
+  "Guide action columns must be able to shrink inside the clipped card.");
 // Current moves by Step law, never by Go, so a drag or Nudge extends or
 // shortens the retained traversal instead of redrawing it.
 assert.match(app, /function stepCurrentBySourceDelta[\s\S]*stepSession\(/);
@@ -301,8 +323,12 @@ assert.ok(
   barZ > surfaceZ,
   "The pane bar must paint above the play/pause surface so Tune inputs stay clickable."
 );
-assert.match(field, /side\.placementGeneration !== runtime\.frameGeneration/,
-  "A callback belonging to a superseded Field Frame must be discarded.");
+// Coalescing comes from parkSide recording the newest desired address before
+// any early return, so a late callback decodes the current Frame by itself.
+assert.match(field, /side\.desiredAddress = target;[\s\S]{0,400}?if \(!force && \(alreadyThere \|\| recentlyPlaced\)\)/,
+  "parkSide must record the newest desired address before it may return early.");
+assert.doesNotMatch(field, /placementGeneration/,
+  "An inert stale-frame token must not survive as decoration.");
 assert.match(app, /function setStepMode/);
 assert.match(app, /function setStepFraction/);
 assert.match(app, /function wrapPlaybackRange/);

@@ -7,7 +7,7 @@
 | `session.js` | canonical model, semantic transactions, endpoint frames, history |
 | `range-geometry.js` | pure Resolution and interval arithmetic |
 | `guide.js` | shared Pin graph, Section weights, lifecycle, persistence, migration |
-| `timeline-projection.js` | positive spatial density, source/timeline mapping, Pin ordering |
+| `timeline-projection.js` | positive spatial density, source/timeline mapping, the drawn viewport, Pin ordering |
 | `transport.js` | Context and native-playback runtime values |
 | `step-gesture.js` | press/repeat/settlement and one-Undo gesture boundary |
 | `field-frame.js` | pure Field Frame derivation, direction, and transition descriptors |
