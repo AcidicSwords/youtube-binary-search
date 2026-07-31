@@ -159,7 +159,9 @@ assert.match(app, /"section-lane"\]\.addEventListener\("pointerdown"[\s\S]*?sect
 assert.doesNotMatch(view, /timeline-section-node/,
   "No separate Section node chrome may be drawn over the map.");
 assert.doesNotMatch(styles, /\.timeline-section-node/);
-assert.match(app, /function sourceFromRelativeDragDelta[\s\S]*surfaceWidth[\s\S]*originClientX[\s\S]*timelineExtent/);
+// Relative dragging converts pixels through the drawn span, so a focused map
+// drags at the scale it is actually drawn at.
+assert.match(app, /function sourceFromRelativeDragDelta[\s\S]*surfaceWidth[\s\S]*fractionToDistance[\s\S]*originClientX[\s\S]*viewStart[\s\S]*viewEnd/);
 assert.match(view, /function pinPositionButton[\s\S]*className\s*=\s*"endpoint-button pin-position-node"[\s\S]*dataset\.pinGo/);
 assert.doesNotMatch(view, /dataset\.sectionDrag/,
   "Guide's full-map profile is a read-only positional representation.");

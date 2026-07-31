@@ -13,7 +13,7 @@ const {
   tail,
   lead
 } = env;
-const canonicalWeights = ["0.25", "0.5", "0.75", "1", "1.25", "1.5", "1.75", "2"];
+const canonicalWeights = ["0.125", "0.25", "0.5", "0.75", "1", "1.25", "1.5", "1.75", "2", "4"];
 const playerCommandCounts = () => [
   center().commands.length,
   tail().commands.length,
@@ -70,7 +70,7 @@ assert.equal(weightControl.value, "1");
 assert.deepEqual(
   weightControl.options.map(option => option.value),
   canonicalWeights,
-  "Section weights must use the familiar Tail/Lead scale."
+  "Section weights must offer the whole canonical ladder."
 );
 
 let timelineNodes = descendants(byId.get("section-lane"));
@@ -98,7 +98,7 @@ dispatchDocument("keydown", { key: "c", code: "KeyC" });
 await flush();
 assert.equal(
   byId.get("duration-time").textContent,
-  "1:30 spatial · 1:40 source"
+  "1:40 · 0.9× spatial"
 );
 assert.deepEqual(
   playerCommandCounts(),
@@ -108,7 +108,7 @@ assert.deepEqual(
 
 assert.equal(
   byId.get("duration-time").textContent,
-  "1:30 spatial · 1:40 source"
+  "1:40 · 0.9× spatial"
 );
 timelineNodes = descendants(byId.get("deformation-field"));
 const gradient = timelineNodes.find(node =>
@@ -184,12 +184,31 @@ await flush();
 assert.equal(byId.get("range-label").textContent, "0:30–0:50");
 assert.equal(
   byId.get("duration-time").textContent,
-  "1:30 spatial · 1:40 source"
+  "1:40 · 0.9× spatial"
+);
+// Focus makes the relation the world, so the focused extent is drawn across
+// the whole timeline whatever its Weight.
+assert.deepEqual(
+  {
+    left: byId.get("range-fill").style.left,
+    width: byId.get("range-fill").style.width
+  },
+  { left: "0%", width: "100%" },
+  "A focused Section must span the full timeline."
 );
 
 byId.get("focus-toggle").click();
 await flush();
 assert.equal(byId.get("range-label").textContent, "0:00–1:40");
+// Unfocused, the same Section is once more a band inside the whole map.
+assert.deepEqual(
+  {
+    left: byId.get("range-fill").style.left,
+    width: byId.get("range-fill").style.width
+  },
+  { left: "0%", width: "100%" },
+  "The unfocused world is the whole source."
+);
 
 // Expansion uses the same control and the opposite field while preserving
 // exact source duration and invertibility.
@@ -203,7 +222,7 @@ assert.deepEqual(
 );
 assert.equal(
   byId.get("duration-time").textContent,
-  "2:00 spatial · 1:40 source"
+  "1:40 · 1.2× spatial"
 );
 assert.ok(
   descendants(byId.get("deformation-field"))
@@ -276,7 +295,7 @@ assert.deepEqual(
 assert.equal(byId.get("sections-list-count").textContent, "2");
 assert.equal(
   byId.get("duration-time").textContent,
-  "1:37.5 spatial · 1:40 source"
+  "1:40 · 0.975× spatial"
 );
 
 // Plain T is a reversible normalize/restore toggle; Shift and Alt move
@@ -288,7 +307,7 @@ dispatchDocument("keydown", { key: "t", code: "KeyT" });
 await flush();
 assert.equal(
   byId.get("duration-time").textContent,
-  "1:37.5 spatial · 1:40 source"
+  "1:40 · 0.975× spatial"
 );
 dispatchDocument("keydown", { key: "t", code: "KeyT", shiftKey: true });
 await flush();
@@ -297,7 +316,7 @@ dispatchDocument("keydown", { key: "t", code: "KeyT", altKey: true });
 await flush();
 assert.equal(
   byId.get("duration-time").textContent,
-  "1:37.5 spatial · 1:40 source"
+  "1:40 · 0.975× spatial"
 );
 assert.deepEqual(
   playerCommandCounts(),

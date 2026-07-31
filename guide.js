@@ -5,7 +5,13 @@ export const PIN_KIND = Object.freeze({
   ENDPOINT: "section-endpoint"
 });
 
+// The canonical ladder. Its interior is a familiar linear quarter-step scale
+// around 1; its two ends are deliberate extremes — 0.125 to fold a Section
+// nearly out of the way, 4 to open one far past ordinary inspection. Nothing
+// between 2 and 4, or below 0.125, earns its place on a ladder that must stay
+// steppable one press at a time.
 export const SECTION_WEIGHT_VALUES = Object.freeze([
+  0.125,
   0.25,
   0.5,
   0.75,
@@ -13,7 +19,8 @@ export const SECTION_WEIGHT_VALUES = Object.freeze([
   1.25,
   1.5,
   1.75,
-  2
+  2,
+  4
 ]);
 export const DEFAULT_SECTION_WEIGHT = 1;
 export const DEFAULT_DEFORM_WEIGHT = 0.5;

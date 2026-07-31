@@ -86,10 +86,10 @@ x  Timeline Space   map position, Step distance, Refine midpoints,
 Each Section weight is selected from:
 
 ```text
-W = {0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2}
+W = {0.125, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 4}
 ```
 
-The set deliberately mirrors the familiar Tail/Lead rate scale, but the values act on different axes. Section weights have no playback or Field effect.
+The interior of the ladder mirrors the familiar Tail/Lead rate scale, and the two ends extend past it: `0.125` folds a Section nearly out of the way, `4` opens one far past ordinary inspection. The values act on a different axis from playback rate. Section weights have no playback or Field effect.
 
 At source Address \(u\), let the effective spatial density be the product of every Section weight covering that Address:
 
@@ -106,6 +106,18 @@ x(\sigma)=\int_0^\sigma \rho(u)\,du
 This is equivalent to a piecewise-linear map whose slope changes only at Section endpoints. Because every factor is positive, \(x\) is continuous, strictly increasing, and has one ordinary inverse. No source Address can coincide with, hide behind, or become unreachable from another.
 
 For one isolated Section of source duration \(d\), its timeline extent is \(w d\). Overlapping scales compose multiplicatively because independent spatial scale transforms compose by multiplication. The selected Section values remain canonical even when their local product is outside the selector ladder.
+
+### Reporting spatial extent
+
+Timeline Space is not a duration and must never be reported as one. A spatial extent only means something against the source extent it stretches, so every spatial figure is presented as the factor it applies to its own source span:
+
+```text
+stretch(a, b) = x(b) − x(a)  /  (b − a)
+```
+
+At `1` the map and the source correspond exactly and the factor is omitted rather than shown, because there is nothing to report. A one-minute source containing one 15 s Section at `2×` reads `1:00 · 1.25× spatial`: traversing it with spatial operators covers a quarter more map than source. Two disjoint 15 s Sections at `0.5×` and `1.5×` cancel, so the same source reads `1:00` with no factor at all — the interior warps while the whole traversal costs exactly what it did before.
+
+The factor is reported at each scope against that scope's own source span: the whole source, the active Resolution, and the Range that Reopen would restore.
 
 ## 4. Section-weight law
 
@@ -244,6 +256,17 @@ rather than weight bars; dotted relations are presentation only.
 ### Focus / Unfocus
 
 Focus installs a Section or Working Interval as Range without changing any Section weight. Unfocus restores the containing Range exactly.
+
+Focus is the operator that makes a relation *become the world*, so while it is held the map is drawn across the focused extent alone: the focused Section or Working Interval spans the whole timeline whatever its Weight. A `0.5×` Section and a `4×` Section both fill the timeline once focused, because a focused extent no longer competes for map distance — it *is* the map.
+
+This is the viewport, and it is presentation only:
+
+- it never enters `x(σ)`, its inverse, Step distance, Refine midpoints, adaptive Reach, or any stored value;
+- an ordinary Range does not take it, because admissible territory is still territory inside a visible world;
+- Timeline hit-testing and dragging use the same viewport the map is drawn with, so a pressed position always addresses what is drawn under it;
+- Unfocus restores the whole map exactly.
+
+Weight still decides how map distance is distributed *inside* a focused extent, so a focused Section containing an unevenly weighted interior still warps internally.
 
 ### Go
 
@@ -778,6 +801,9 @@ effective spatial density > 0
 Range.start <= Current <= Range.end
 Working Interval ⊆ Range in source time
 Working Interval ⊆ Resolution ⊆ Range in Timeline Space
+spatial extent is reported as a factor on source, never as a duration
+a focused extent spans the whole drawn timeline at every Weight
+the viewport changes what is drawn and never what is computed
 Working Interval is one continuous source extent
 every source Address has one timeline position and one inverse
 playback, Context, and Field geometry are source-time operations

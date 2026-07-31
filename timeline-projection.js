@@ -99,7 +99,8 @@ function findTimelineSegment(segments, coordinate) {
  */
 export function createTimelineProjection({
   duration = 0,
-  guide = null
+  guide = null,
+  view = null
 } = {}) {
   const end = Math.max(0, Number(duration) || 0);
   const {
@@ -209,9 +210,53 @@ export function createTimelineProjection({
     fromCoordinate: timelineToSource
   });
 
+  // The viewport is the source extent the map is drawn across. It is a
+  // presentation extent and nothing else: it never touches sourceToTimeline,
+  // timelineToSource, or any Step, Refine, or Reach arithmetic, so no operator
+  // can observe it. Its only job is to answer "where across the drawn map does
+  // this coordinate fall", which is what Focus needs in order to make the
+  // focused extent occupy the whole timeline.
+  const viewExtent = Object.freeze(
+    Number.isFinite(view?.start) && Number.isFinite(view?.end)
+      && view.end - view.start > EPSILON
+      ? { start: clamp(view.start, 0, end), end: clamp(view.end, 0, end) }
+      : { start: 0, end }
+  );
+  const viewStart = sourceToTimeline(viewExtent.start);
+  const viewEnd = sourceToTimeline(viewExtent.end);
+  const viewSpan = Math.max(viewEnd - viewStart, 0);
+
+  function coordinateToFraction(coordinate) {
+    if (!(viewSpan > 0)) return 0;
+    return (Number(coordinate) - viewStart) / viewSpan;
+  }
+
+  function fractionToCoordinate(fraction) {
+    return viewStart + clamp(Number(fraction) || 0, 0, 1) * viewSpan;
+  }
+
+  // A pixel-space length converted into timeline units. Widths and distances
+  // scale by the drawn span, never by the whole map.
+  function fractionToDistance(fraction) {
+    return (Number(fraction) || 0) * viewSpan;
+  }
+
+  function withinView(source) {
+    return source >= viewExtent.start - EPSILON
+      && source <= viewExtent.end + EPSILON;
+  }
+
   return Object.freeze({
     duration: end,
     timelineExtent,
+    viewExtent,
+    viewStart,
+    viewEnd,
+    viewSpan,
+    coordinateToFraction,
+    fractionToCoordinate,
+    fractionToDistance,
+    withinView,
     segments,
     weightedSections,
     sourceToTimeline,
@@ -227,9 +272,15 @@ export function createTimelineProjection({
   });
 }
 
+// Focus is the operator that makes a relation become the world. Once a Section
+// or Working Interval is the world, the map must be drawn across it: the
+// focused extent occupies the whole timeline. An ordinary Range is admissible
+// territory inside a world that is still visible around it, so it does not
+// take the viewport.
 export function projectionForModel(model) {
   return createTimelineProjection({
     duration: model?.duration,
-    guide: model?.guide
+    guide: model?.guide,
+    view: model?.focus ? model.range : null
   });
 }

@@ -56,6 +56,27 @@ export function formatTime(seconds) {
   return `${hours ? `${hours}:` : ""}${minuteText}:${String(secs).padStart(2, "0")}${fraction}`;
 }
 
+// Spatial time is not a duration. It is how much map a source span is given,
+// and it only means anything against the source span it stretches. Reporting
+// it as an absolute figure invites reading it as real elapsed time, so every
+// spatial span is reported as the factor it applies to its own source — and
+// only when that factor is not 1, because at 1 the map and the source already
+// correspond and there is nothing to say.
+const STRETCH_TOLERANCE = 1e-6;
+
+export function stretchFactor(spatialSpan, sourceSpan) {
+  if (!Number.isFinite(spatialSpan) || !Number.isFinite(sourceSpan)) return null;
+  if (!(sourceSpan > STRETCH_TOLERANCE)) return null;
+  const factor = spatialSpan / sourceSpan;
+  if (!Number.isFinite(factor) || factor <= 0) return null;
+  return Math.abs(factor - 1) <= STRETCH_TOLERANCE ? null : factor;
+}
+
+export function formatStretch(spatialSpan, sourceSpan) {
+  const factor = stretchFactor(spatialSpan, sourceSpan);
+  return factor === null ? null : `${Number(factor.toFixed(3))}×`;
+}
+
 export function formatDuration(seconds) {
   if (!Number.isFinite(seconds)) return "—";
   const value = Math.max(0, seconds);
@@ -82,14 +103,21 @@ export function formatRange(extent) {
   return extent ? `${formatTime(extent.start)}–${formatTime(extent.end)}` : "—";
 }
 
+// `viewStart` is the coordinate the map is drawn from; it defaults to 0, so an
+// unfocused timeline packs exactly as before. Under Focus the drawn window
+// starts partway along the map and controls must stay inside that window.
 export function packTimelineSectionLanes(entries, options = {}) {
   const timelineExtent = Number(options.timelineExtent);
+  const viewStart = Number(options.viewStart) || 0;
   const requestedControlExtent = Math.max(
     0,
     Number(options.controlExtent) || 0
   );
-  const controlExtent = Number.isFinite(timelineExtent)
-    ? Math.min(requestedControlExtent, Math.max(0, timelineExtent))
+  const drawnSpan = Number.isFinite(timelineExtent)
+    ? Math.max(0, timelineExtent - viewStart)
+    : Number.NaN;
+  const controlExtent = Number.isFinite(drawnSpan)
+    ? Math.min(requestedControlExtent, drawnSpan)
     : requestedControlExtent;
   const controlHalf = controlExtent / 2;
   const laneEnds = [];
@@ -98,8 +126,8 @@ export function packTimelineSectionLanes(entries, options = {}) {
     const controlCoordinate = Number.isFinite(timelineExtent)
       ? clamp(
           midpoint,
-          controlHalf,
-          Math.max(controlHalf, timelineExtent - controlHalf)
+          viewStart + controlHalf,
+          Math.max(viewStart + controlHalf, timelineExtent - controlHalf)
         )
       : midpoint;
     const visualStart = Math.min(
@@ -221,9 +249,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
   function percent(time) {
     const projection = timelineProjection();
-    if (!(projection.timelineExtent > 0)) return 0;
+    if (!(projection.viewSpan > 0)) return 0;
     const raw = clamp(
-      (projection.sourceToTimeline(time) / projection.timelineExtent) * 100,
+      projection.coordinateToFraction(projection.sourceToTimeline(time)) * 100,
       0,
       100
     );
@@ -438,7 +466,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const width = Math.max(320, elements.timeline.clientWidth || 1);
     const divisions = clamp(Math.floor(width / 112), 4, 10);
     for (let index = 0; index <= divisions; index += 1) {
-      const coordinate = projection.timelineExtent * index / divisions;
+      const coordinate = projection.fractionToCoordinate(index / divisions);
       const source = projection.timelineToSource(coordinate);
       const tick = document.createElement("span");
       tick.className = "timeline-ruler-tick";
@@ -476,15 +504,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const midpoint = projection.sourceToTimeline(section.midpoint);
     const halfSpan = Math.max(
       (projected.end - projected.start) / 2,
-      projection.timelineExtent * 0.002
+      projection.fractionToDistance(0.002)
     );
     const bleed = Math.max(
-      projection.timelineExtent * 0.018,
+      projection.fractionToDistance(0.018),
       halfSpan * 0.55
     );
     const spanRatio = clamp(
       (projected.end - projected.start)
-      / Math.max(projection.timelineExtent, EPSILON),
+      / Math.max(projection.viewSpan, EPSILON),
       0,
       1
     );
@@ -516,7 +544,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     let expansion = false;
     for (let index = 0; index <= samples; index += 1) {
       const ratio = index / samples;
-      const coordinate = projection.timelineExtent * ratio;
+      const coordinate = projection.fractionToCoordinate(ratio);
       const signedDensity = sections.reduce(
         (sum, section) =>
           sum
@@ -551,12 +579,14 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       48,
       112
     );
+    // Contours mark equal source increments, so uneven spacing reads directly
+    // as compression or expansion. They span whatever source extent is drawn.
+    const contourSpan = projection.viewExtent.end - projection.viewExtent.start;
     for (let index = 1; index < contourCount; index += 1) {
       const contour = document.createElement("i");
-      const source = projection.duration * index / contourCount;
+      const source = projection.viewExtent.start + contourSpan * index / contourCount;
       contour.style.left = `${
-        projection.sourceToTimeline(source)
-        / Math.max(projection.timelineExtent, EPSILON)
+        clamp(projection.coordinateToFraction(projection.sourceToTimeline(source)), 0, 1)
         * 100
       }%`;
       contours.appendChild(contour);
@@ -580,6 +610,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       .filter(entry =>
         entry.projected
         && entry.projected.end - entry.projected.start > EPSILON
+        // Only what the map actually draws. Outside Focus this excludes
+        // nothing; inside it, unfocused Sections would otherwise pile up
+        // against the edges at coordinates the viewer cannot reach.
+        && entry.projected.end > projection.viewStart - EPSILON
+        && entry.projected.start < projection.viewEnd + EPSILON
       )
       .sort((first, second) =>
         first.projected.start - second.projected.start
@@ -587,10 +622,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       );
 
     const packedSections = packTimelineSectionLanes(entries, {
-      timelineExtent: projection.timelineExtent,
-      controlExtent: projection.timelineExtent
-        * TIMELINE_SECTION_HIT_WIDTH
-        / timelineWidth
+      timelineExtent: projection.viewEnd,
+      viewStart: projection.viewStart,
+      controlExtent: projection.fractionToDistance(
+        TIMELINE_SECTION_HIT_WIDTH / timelineWidth
+      )
     });
     const visibleLaneCount = Math.min(
       packedSections.laneCount,
@@ -617,11 +653,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       const color = sectionColor(section.id);
       const selected = state().selectedRetained?.kind === "section"
         && state().selectedRetained.id === section.id;
-      const left = projected.start / Math.max(projection.timelineExtent, EPSILON) * 100;
-      const width = (
-        (projected.end - projected.start)
-        / Math.max(projection.timelineExtent, EPSILON)
-      ) * 100;
+      const leftFraction = clamp(projection.coordinateToFraction(projected.start), 0, 1);
+      const rightFraction = clamp(projection.coordinateToFraction(projected.end), 0, 1);
+      const left = leftFraction * 100;
+      const width = (rightFraction - leftFraction) * 100;
       const span = document.createElement("span");
       span.className = "timeline-section-span";
       if (selected) span.classList.add("retained-selected");
@@ -664,7 +699,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         relation.className = `timeline-section-relation ${role}`;
         if (selected) relation.classList.add("retained-selected");
         relation.style.left = `${
-          coordinate / Math.max(projection.timelineExtent, EPSILON) * 100
+          clamp(projection.coordinateToFraction(coordinate), 0, 1) * 100
         }%`;
         relation.style.top = `${relationTop}px`;
         relation.style.height = `${Math.max(0, sectionY - relationTop)}px`;
@@ -689,7 +724,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       .map(pin => ({
         ...pin,
         sourceT: pin.t,
-        t: projection.sourceToTimeline(pin.t)
+        // Clustering happens in drawn-map units, so coordinates are expressed
+        // relative to the drawn window rather than to the whole map.
+        t: projection.sourceToTimeline(pin.t) - projection.viewStart
       }));
     const sectionKey = sortedSections(guide())
       .map(section =>
@@ -712,7 +749,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const snapKey = `${state().guideDrag?.snapTargetPinId || "none"}:${
       state().guideDrag?.snapArmed === true ? "armed" : "candidate"
     }`;
-    const key = `${activeRange.start}|${activeRange.end}|${width}|${sectionLaneHeight}|${pinClusterGap}|${projection.timelineExtent}|${sectionKey}|${selectedKey}|${intervalKey}|${snapKey}|${pinKey}`;
+    const key = `${activeRange.start}|${activeRange.end}|${width}|${sectionLaneHeight}|${pinClusterGap}|${projection.viewStart}:${projection.viewEnd}|${sectionKey}|${selectedKey}|${intervalKey}|${snapKey}|${pinKey}`;
     if (key === renderedPinKey) return;
     renderedPinKey = key;
     const clusterDrag = state().guideDrag?.origin === "cluster-menu";
@@ -721,7 +758,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     renderTimelineSections(projection, sectionLaneHeight);
     renderedClusters = clusterPinsByPixels(
       pins,
-      projection.timelineExtent,
+      projection.viewSpan,
       width,
       pinClusterGap
     );
@@ -1320,10 +1357,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["timeline-key-pins"].dataset.active = String(
       Boolean(visiblePins(guide()).length)
     );
-    elements["duration-time"].textContent = Math.abs(
-      projection.timelineExtent - model().duration
-    ) > EPSILON
-      ? `${formatTime(projection.timelineExtent)} spatial · ${formatTime(model().duration)} source`
+    const overallStretch = formatStretch(projection.timelineExtent, model().duration);
+    elements["duration-time"].textContent = overallStretch
+      ? `${formatTime(model().duration)} · ${overallStretch} spatial`
       : formatTime(model().duration);
     elements["range-label"].textContent = loaded ? formatRange(activeRange) : "—";
     const resolutionTimelineExtent = currentResolution
@@ -1332,13 +1368,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const resolutionSourceDuration = currentResolution
       ? currentResolution.R - currentResolution.L
       : null;
+    const resolutionStretch = formatStretch(
+      resolutionTimelineExtent,
+      resolutionSourceDuration
+    );
     elements["resolution-label"].textContent = currentResolution
       ? `${
-          formatDuration(resolutionTimelineExtent)
+          formatDuration(resolutionSourceDuration)
         }${
-          Math.abs(resolutionSourceDuration - resolutionTimelineExtent) > EPSILON
-            ? ` spatial · ${formatDuration(resolutionSourceDuration)} source`
-            : ""
+          resolutionStretch ? ` · ${resolutionStretch} spatial` : ""
         } · ${
           currentState.session.model.resolutionBasis === RESOLUTION_BASIS.MOVEMENT
             ? "Movement scale"
@@ -1583,10 +1621,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           ? `draw Current-to-midpoint Interval · to ${formatTime(targets.forward)}`
           : `${classifyRetainedRefineRelation(currentInterval, semanticCurrent, targets.forward) === "full" ? "full movement" : "retain anchor"} · to ${formatTime(targets.forward)}`
     );
+    const rangeSourceSpan = activeRange.end - activeRange.start;
+    const rangeStretch = formatStretch(
+      projection.timelineDistance(activeRange.start, activeRange.end),
+      rangeSourceSpan
+    );
     elements["reopen-meta"].textContent = actionModel?.reopen
-      ? `${formatDuration(
-          projection.timelineDistance(activeRange.start, activeRange.end)
-        )} spatial extent available`
+      ? `${formatDuration(rangeSourceSpan)} Range${
+          rangeStretch ? ` · ${rangeStretch} spatial` : ""
+        }`
       : "Range-level resolution";
     elements["step-backward-meta"].textContent = actionModel?.stepBackward
       ? shiftLayer

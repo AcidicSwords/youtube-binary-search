@@ -2520,11 +2520,9 @@ function timeFromPointer(
 ) {
   const rect = elements.timeline.getBoundingClientRect();
   if (!Number.isFinite(rect.width) || rect.width <= 0) return currentResolution().C;
-  const coordinate = clamp(
-    (event.clientX - rect.left) / rect.width,
-    0,
-    1
-  ) * projection.timelineExtent;
+  const coordinate = projection.fractionToCoordinate(
+    (event.clientX - rect.left) / rect.width
+  );
   const source = projection.timelineToSource(coordinate);
   if (!constrainToRange) return source;
   const range = activeRange();
@@ -2546,11 +2544,9 @@ function sourceFromPointerInProjection(
 ) {
   const rect = elements.timeline.getBoundingClientRect();
   if (!Number.isFinite(rect.width) || rect.width <= 0) return originSource;
-  const coordinate = clamp(
-    (event.clientX - rect.left) / rect.width,
-    0,
-    1
-  ) * projection.timelineExtent;
+  const coordinate = projection.fractionToCoordinate(
+    (event.clientX - rect.left) / rect.width
+  );
   return projection.timelineToSource(coordinate);
 }
 
@@ -2560,11 +2556,11 @@ function sourceFromRelativeDragDelta(event, drag) {
   const originCoordinate = drag.projection.sourceToTimeline(drag.originSource);
   const coordinate = clamp(
     originCoordinate
-      + (event.clientX - drag.originClientX)
-      / width
-      * drag.projection.timelineExtent,
-    0,
-    drag.projection.timelineExtent
+      + drag.projection.fractionToDistance(
+          (event.clientX - drag.originClientX) / width
+        ),
+    drag.projection.viewStart,
+    drag.projection.viewEnd
   );
   return drag.projection.timelineToSource(coordinate);
 }
@@ -2589,10 +2585,8 @@ function pinSnapCandidate(drag, address) {
   const width = Number(drag.surfaceWidth);
   if (!Number.isFinite(width) || width <= 0) return null;
   const coordinate = drag.projection.sourceToTimeline(address);
-  const maximumDistance = (
-    PIN_SNAP_DISTANCE_PX
-    / width
-    * drag.projection.timelineExtent
+  const maximumDistance = drag.projection.fractionToDistance(
+    PIN_SNAP_DISTANCE_PX / width
   );
   return sourceGuide.pins
     .filter(pin =>

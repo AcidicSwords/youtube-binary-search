@@ -5,10 +5,10 @@ See the phases. Map the whole.
 
 Video Cartography turns a linear video into a spatial map. Source time remains exact while the reader refines neighborhoods, draws a Working Interval, retains Pins and Sections, and changes how much timeline space a Section receives.
 
-A Section weight is a spatial scale, not a playback rate. It copies the familiar Tail/Lead rate ladder:
+A Section weight is a spatial scale, not a playback rate. Its interior copies the familiar Tail/Lead rate ladder, and it extends one step past that ladder at each end:
 
 ```text
-0.25×  0.5×  0.75×  1×  1.25×  1.5×  1.75×  2×
+0.125×  0.25×  0.5×  0.75×  1×  1.25×  1.5×  1.75×  2×  4×
 ```
 
 The correspondence is perceptual:
