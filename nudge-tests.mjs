@@ -22,7 +22,30 @@ await flush();
 
 // A verified frame duration is unavailable from the YouTube adapter, so the
 // quantum is displayed and applied as seconds and never called a frame step.
-assert.equal(byId.get("nudge-seconds").value, "0.04");
+assert.equal(byId.get("nudge-seconds").value, "0.042");
+
+// The default quantum must actually move Current. A quantum at or below the
+// kernel's semantic equality tolerance would resolve to the same Address and
+// silently do nothing, so exercise the shipped default before changing it.
+byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 400 });
+await flush(4);
+await poll();
+assert.equal(currentText(), "Current 0:40");
+dispatchDocument("keydown", { key: ".", code: "Period" });
+await flush();
+assert.notEqual(currentText(), "Current 0:40",
+  "One default-quantum Nudge must produce a real semantic movement.");
+assert.match(byId.get("status").textContent, /Nudge Current forward/);
+await env.delay(600);
+await flush();
+
+// Rejecting a quantum that would be swallowed by semantic equality.
+byId.get("nudge-seconds").value = "0.001";
+byId.get("nudge-seconds").dispatch("change");
+await flush();
+assert.ok(Number(byId.get("nudge-seconds").value) > 0.04,
+  "A configured quantum may never fall to or below the semantic tolerance.");
+
 byId.get("nudge-seconds").value = "0.5";
 byId.get("nudge-seconds").dispatch("change");
 await flush();

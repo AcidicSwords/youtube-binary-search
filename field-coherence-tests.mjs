@@ -281,7 +281,7 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
     "A breathing side must reconcile to the nearest supported rate for its current phase.");
   assert.match(view, /effectiveStepReach/);
   assert.match(app, /preferences\.stepReach = normalizeStepReach/);
-  assert.match(implementation, /^# Binary YouTube Reader — Canonical Implementation/m);
+  assert.match(implementation, /^# Video Cartography — Canonical Implementation/m);
   assert.doesNotMatch(readme, /Application Continue/);
   assert.match(readme, /Step size|Step Size/);
 }

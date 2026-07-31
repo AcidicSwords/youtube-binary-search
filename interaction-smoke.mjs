@@ -40,12 +40,14 @@ byId.get("field-breath-rate").dispatch("change");
 await flush();
 await poll();
 
-// 0 < inner < outer holds against the sibling bound.
+// 0 < inner < outer holds strictly. An inner offset that reaches the outer one
+// describes a Field with no breath, so it is repaired to the midpoint rather
+// than accepted as equal.
 byId.get("field-inner-offset").value = "40";
 byId.get("field-inner-offset").dispatch("change");
 await flush();
-assert.equal(byId.get("field-inner-offset").value, "10",
-  "The inner offset can never exceed the outer offset.");
+assert.equal(byId.get("field-inner-offset").value, "5",
+  "The inner offset can never reach or exceed the outer offset.");
 byId.get("field-inner-offset").value = "2.5";
 byId.get("field-inner-offset").dispatch("change");
 await flush();

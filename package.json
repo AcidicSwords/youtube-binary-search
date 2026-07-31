@@ -1,6 +1,7 @@
 {
-  "name": "binary-youtube-reader",
-  "version": "7.0.0",
+  "name": "video-cartography",
+  "version": "8.0.0",
+  "description": "A spatial comprehension workspace for video.",
   "private": true,
   "type": "module",
   "scripts": {

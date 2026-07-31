@@ -1,4 +1,4 @@
-# Binary YouTube Reader — Canonical Specification
+# Video Cartography — Canonical Specification
 
 ## 1. Authority
 
@@ -8,7 +8,7 @@ This document is normative for v7. Source time is the only persisted temporal tr
 
 A video is globally present as a source but locally actualized in playback. At any instant, its frames are linearly ordered and mutually exclusive: only one source moment can occupy the ordinary audiovisual present.
 
-Binary YouTube Reader transforms that condition into bounded spatiotemporal availability without changing source order:
+Video Cartography transforms that condition into bounded spatiotemporal availability without changing source order:
 
 ```text
 linear temporal exclusivity
@@ -331,6 +331,15 @@ new Lead enters through Lead
 Backward traversal moves the strip rightward, exchanging the two sides. Current
 always matches Center after the movement commits.
 
+The three roles are presented distinctly during the transition, because they are
+doing different things: the trailing side has just received the address Center
+was showing, the leading side is receiving material that was not previously
+visible, and Center sits between them. Side players cannot duplicate one
+another's surface, so the outgoing frame is handed to the trailing side by
+seeking it there rather than by moving pixels. When Step Reach matches the Field
+offset that handoff is literal; otherwise the transition is directional without
+being a frame-for-frame carousel.
+
 The visual transition neither delays nor intermediates the semantic commit.
 Session changes immediately and atomically; the Field renders a brief
 directional transition between the previous and resulting presentations. A
@@ -423,8 +432,15 @@ outward assignment is restored.
 x → expand → y → contract → x → repeat
 ```
 
-Effective bounds are Range-clipped. A side with less room than \(y\) breathes
-inside whatever remains and still never crosses Center.
+Effective bounds are Range-clipped at the outer end only. The minimum offset is a
+law, not a preference: a side with less room than \(x\) cannot preserve the
+required separation, so it is non-operational, excluded from the barrier, and
+parked at whatever room remains. \(x\) is never silently reduced to fit, and a
+configured pair always satisfies \(0 < x < y\).
+
+Resuming after a proper-Range wrap continues the preserved breathing phase. The
+outward pair is correct only while expanding; a contracting Field is resumed with
+the exchanged rates.
 
 #### Hold
 
@@ -494,7 +510,10 @@ frame duration unavailable        → configured source-time quantum
 ```
 
 A default approximate quantum may be provided, but it is displayed as seconds
-rather than described as an exact source frame.
+rather than described as an exact source frame. The quantum must remain strictly
+greater than the semantic equality tolerance the kernel uses to decide that a
+movement happened; otherwise one Nudge resolves to the Address it started from
+and the operation is silently inert.
 
 Nudge acts in source time and is then reprojected. Section Weight must not change
 the temporal size of one Nudge.

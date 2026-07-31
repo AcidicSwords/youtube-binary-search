@@ -1,4 +1,4 @@
-# Binary YouTube Reader — Canonical Implementation
+# Video Cartography — Canonical Implementation
 
 ## Ownership
 

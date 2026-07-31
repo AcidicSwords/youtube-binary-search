@@ -38,8 +38,8 @@ function run(runtime, steps, options = {}) {
 {
   assert.deepEqual(normalizeFieldBreath({ inner: 3, outer: 12, rate: 0.25 }),
     { inner: 3, outer: 12, rate: 0.25 });
-  assert.equal(normalizeFieldBreath({ inner: 30, outer: 12 }).inner, 12,
-    "The inner offset can never exceed the outer offset.");
+  assert.ok(normalizeFieldBreath({ inner: 30, outer: 12 }).inner < 12,
+    "The inner offset can never reach or exceed the outer offset.");
   assert.deepEqual(normalizeFieldBreath(null), DEFAULT_FIELD_BREATH);
   assert.equal(normalizeFieldBreath({ rate: 4 }).rate, DEFAULT_FIELD_BREATH.rate);
 
@@ -57,13 +57,30 @@ function run(runtime, steps, options = {}) {
   assert.equal(breathRateFromResponse({ tailRate: 0.75, leadRate: 1.25 }), 0.25);
 }
 
-// Range clipping
+// Range clipping never reduces the minimum offset. x is a law, not a preference.
 {
   const clipped = effectiveBreathBounds(breath, 4);
   assert.deepEqual({ inner: clipped.inner, outer: clipped.outer }, { inner: 2, outer: 4 });
-  const tiny = effectiveBreathBounds(breath, 1);
-  assert.deepEqual({ inner: tiny.inner, outer: tiny.outer }, { inner: 1, outer: 1 });
+  assert.equal(clipped.operational, true, "Room for x and more than x is breathable.");
+
+  const tooTight = effectiveBreathBounds(breath, 1);
+  assert.equal(tooTight.inner, 2, "The configured inner offset is never silently reduced.");
+  assert.equal(tooTight.operational, false,
+    "A side with less room than x cannot preserve the minimum offset and must not breathe.");
+  assert.equal(tooTight.parked, 1, "It still shows the frame its remaining room allows.");
+
   assert.equal(effectiveBreathBounds(breath, 0).operational, false);
+  assert.equal(effectiveBreathBounds(breath, 1000).operational, true);
+}
+
+// 0 < inner < outer is enforced, never merely clamped to equality.
+{
+  const collapsed = normalizeFieldBreath({ inner: 10, outer: 10, rate: 0.5 });
+  assert.ok(collapsed.inner < collapsed.outer,
+    "A collapsed pair must be pushed strictly inside the outer offset.");
+  assert.ok(collapsed.inner > 0);
+  const inverted = normalizeFieldBreath({ inner: 30, outer: 12 });
+  assert.ok(inverted.inner < inverted.outer && inverted.inner > 0);
 }
 
 // Rate assignment per phase
@@ -115,6 +132,7 @@ function run(runtime, steps, options = {}) {
 
 // Asynchronous boundary waiting
 {
+  // Tail has room for x but not for y: it breathes inside a clipped outer bound.
   const asymmetric = {
     tail: { operational: true, available: 4 },
     lead: { operational: true, available: 1000 }
@@ -137,17 +155,19 @@ function run(runtime, steps, options = {}) {
   assert.equal(state.sides.tail.waiting, false, "Contraction releases every boundary waiter at once.");
 }
 
-// Sides that are not operational are excluded from the barrier
+// Sides that cannot hold the minimum offset are excluded from the barrier
 {
   const oneSided = {
-    tail: { operational: false, available: 0 },
+    // Room for less than x: excluded by the law, not by visibility.
+    tail: { operational: true, available: 1 },
     lead: { operational: true, available: 1000 }
   };
   let state = resumeBreath(createBreathRuntime(breath), breath);
   state = run(state, 30, { sides: oneSided }).state;
   assert.equal(state.phase, BREATH_PHASE.CONTRACTING,
     "A dormant side must not stall the Field at its outer boundary.");
-  assert.equal(state.sides.tail.excluded, true);
+  assert.equal(state.sides.tail.excluded, true,
+    "A side without room for the configured inner offset must not stall the Field.");
 }
 
 // Hold preserves the attained relation and the resumption direction
@@ -189,4 +209,35 @@ function run(runtime, steps, options = {}) {
   assert.ok(resumed.sides.tail.offset < state.sides.tail.offset);
 }
 
-console.log("Field Breath tests passed: symmetric rate pair, bounded expansion/contraction, Range clipping, asynchronous boundary waiting, exclusion, and deliberate Hold.");
+// A resumption must command the rates of the phase it is actually in. Using the
+// outward pair unconditionally contradicts a preserved contracting phase.
+{
+  let state = resumeBreath(createBreathRuntime(breath), breath);
+  while (state.phase === BREATH_PHASE.EXPANDING) {
+    state = advanceBreath(state, { breath, centerDelta: 1, sides: bothOperational });
+  }
+  assert.equal(state.phase, BREATH_PHASE.CONTRACTING);
+  for (const role of ["tail", "lead"]) {
+    const resumed = breathSideRate({
+      role,
+      phase: state.phase,
+      rate: breath.rate,
+      waiting: state.sides[role].waiting,
+      held: false
+    });
+    const outward = breathSideRate({
+      role,
+      phase: BREATH_PHASE.EXPANDING,
+      rate: breath.rate
+    });
+    assert.notEqual(resumed, outward,
+      `Resuming a contracting ${role} must not command the outward rate.`);
+  }
+  assert.equal(
+    breathSideRate({ role: "tail", phase: state.phase, rate: breath.rate }),
+    1.5,
+    "A contracting Tail catches Center."
+  );
+}
+
+console.log("Field Breath tests passed: symmetric rate pair, bounded expansion/contraction, Range clipping, asynchronous boundary waiting, exclusion, deliberate Hold, and phase-aware resumption.");

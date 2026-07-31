@@ -1438,7 +1438,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["field-outer-offset"].value = String(fieldBreath.outer);
     elements["field-inner-offset"].max = String(fieldBreath.outer);
     elements["field-outer-offset"].min = String(fieldBreath.inner);
-    elements["nudge-seconds"].value = String(currentState.nudgeSeconds ?? 0.04);
+    // The stored quantum stays exact; only its presentation is rounded.
+    elements["nudge-seconds"].value = String(
+      Number((currentState.nudgeSeconds ?? 1 / 24).toFixed(3))
+    );
     elements["step-size-seconds"].value = String(configuredReach.forward);
     const adaptiveStep = configuredReach.mode === STEP_REACH_MODE.ADAPTIVE;
     elements["step-size-summary"].textContent = adaptiveStep

@@ -78,6 +78,13 @@
   same direction it was travelling.
 - Repeat the Hold and resume during contraction.
 - Confirm reaching the outer offset begins contraction rather than becoming Hold.
+- Move Current until one side has less room than the Inner Offset. Confirm that
+  side stops breathing, parks at the room it has, and does not creep closer to
+  Center; confirm the other side keeps breathing and is not stalled by it.
+- Set the Inner Offset equal to the Outer Offset and confirm `0 < x < y` is
+  restored rather than accepted.
+- Wrap a proper Range while the Field is contracting. Confirm the resumed side
+  rates are the contracting pair, not the outward pair.
 
 ## Step size and Field independence
 
@@ -147,6 +154,10 @@
   nudge is unchanged.
 - Confirm no control claims a frame step while the adapter reports no frame
   duration; the quantum must be shown in seconds.
+- Nudge once at the shipped default quantum and confirm Current actually moves.
+  Enter a quantum below the semantic tolerance and confirm it is rejected.
+- During a transition, confirm the trailing pane reads as carrying what Center
+  just showed and the leading pane reads as new material.
 - Edit a Pin Address in Guide and drag the same Pin on the Timeline. Confirm both
   produce the same model and the same single Undo entry per gesture.
 - Enter an invalid Address, one outside Range, and one that would collapse or

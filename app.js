@@ -72,6 +72,7 @@ import {
   idleTransport,
   isTransportActive,
   transportFieldRange,
+  deriveContextWindow,
   isProperRange,
   createContextTransport,
   createPlaybackTransport,
@@ -126,8 +127,13 @@ const PIN_SNAP_DISTANCE_PX = 16;
 const PIN_SNAP_ARM_MS = 450;
 // Nudge is a configured source-time quantum. It is only ever called a frame
 // step when the active media adapter supplies a verified frame duration.
-const DEFAULT_NUDGE_SECONDS = 0.04;
-const MIN_NUDGE_SECONDS = 0.001;
+//
+// The quantum must stay strictly greater than the semantic equality tolerance
+// the Session kernel uses, or a single Nudge would resolve to the Address it
+// started from and move nothing. 1/24 s is the smallest frame-like increment
+// that clears EPSILON.
+const DEFAULT_NUDGE_SECONDS = 1 / 24;
+const MIN_NUDGE_SECONDS = EPSILON * 1.02;
 const MAX_NUDGE_SECONDS = 10;
 const NUDGE_WHEEL_THRESHOLD = 24;
 const NUDGE_GESTURE_SETTLE_MS = 420;
@@ -136,6 +142,7 @@ const PRECISION_DRAG_GAIN = 0.2;
 function normalizeNudgeSeconds(value, fallback = DEFAULT_NUDGE_SECONDS) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric <= 0) return fallback;
+  // A configured quantum at or below EPSILON would silently disable Nudge.
   return clamp(numeric, MIN_NUDGE_SECONDS, MAX_NUDGE_SECONDS);
 }
 
@@ -382,28 +389,43 @@ function fieldFrameRequest() {
     return { ...state.directFrame, owner: FIELD_FRAME_OWNER.DIRECT, range: activeRange() };
   }
   const transport = state.transport;
-  if (transport.kind === TRANSPORT_KIND.CONTEXT) {
-    // Context edges are the frozen observation window. They do not follow the
-    // Cursor and they do not change when Context stops.
-    return {
-      owner: FIELD_FRAME_OWNER.CONTEXT,
-      start: transport.start,
-      end: transport.end,
-      current: currentResolution().C,
-      cursor: safeCurrentTime(),
-      range: activeRange()
-    };
-  }
+  const contextRunning = transport.kind === TRANSPORT_KIND.CONTEXT;
   if (
-    transport.kind !== TRANSPORT_KIND.IDLE
-    || state.dragHandle
-    || state.guideDrag?.moved
-    || [YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(
-      playerSnapshot().state
+    !contextRunning
+    && (
+      transport.kind !== TRANSPORT_KIND.IDLE
+      || state.dragHandle
+      || state.guideDrag?.moved
+      || [YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(
+        playerSnapshot().state
+      )
     )
   ) {
     // Ordinary Center playback hands presentation to the Field Breath.
     return null;
+  }
+  // Context has priority over operator framing whenever Context is *enabled* —
+  // not merely while its transport is running. The edges are the bounded
+  // observation window before, during, and after transport, so beginning,
+  // pausing, stopping, or settling Context reassigns neither side.
+  if (state.contextSeconds > EPSILON) {
+    const window = contextRunning
+      ? { start: transport.start, end: transport.end }
+      : deriveContextWindow(
+        currentResolution().C,
+        activeRange(),
+        state.contextSeconds
+      );
+    if (window) {
+      return {
+        owner: FIELD_FRAME_OWNER.CONTEXT,
+        start: window.start,
+        end: window.end,
+        current: currentResolution().C,
+        cursor: contextRunning ? safeCurrentTime() : undefined,
+        range: activeRange()
+      };
+    }
   }
   return operatorFrameRequest();
 }

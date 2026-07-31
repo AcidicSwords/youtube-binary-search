@@ -1,6 +1,9 @@
-# Binary YouTube Reader
+# Video Cartography
 
-Binary YouTube Reader turns a linear video into a spatial map. Source time remains exact while the reader refines neighborhoods, draws a Working Interval, retains Pins and Sections, and changes how much timeline space a Section receives.
+**A spatial comprehension workspace for video.**
+See the phases. Map the whole.
+
+Video Cartography turns a linear video into a spatial map. Source time remains exact while the reader refines neighborhoods, draws a Working Interval, retains Pins and Sections, and changes how much timeline space a Section receives.
 
 A Section weight is a spatial scale, not a playback rate. It copies the familiar Tail/Lead rate ladder:
 
@@ -212,7 +215,8 @@ Nudge increments, Go, Weight, Rename, Delete — and no second drag geometry.
 
 ## Canonical project documents
 
-- `PROJECT.md` — project objective and the Field's perceptual role
+- `PROJECT.md` — canonical project establishment
+- `GLOSSARY.md` — normative lexicon
 - `SPEC.md` — normative state, geometry, and operator laws
 - `IMPLEMENTATION.md` — module ownership and transaction architecture
 - `INTERFACE.md` — visible grammar and direct manipulation

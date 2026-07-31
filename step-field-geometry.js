@@ -29,21 +29,23 @@ export const DEFAULT_FIELD_BREATH = Object.freeze({
 });
 export const BREATH_BOUND_TOLERANCE = 0.02;
 
+// The configured relation is 0 < x < y. A pair that collapses has no breath to
+// describe, so the inner offset is pushed strictly inside the outer one rather
+// than being accepted as equal.
 export function normalizeFieldBreath(value = DEFAULT_FIELD_BREATH) {
   const rawOuter = Number(value?.outer);
   const outer = Number.isFinite(rawOuter) && rawOuter > 0
     ? rawOuter
     : DEFAULT_FIELD_BREATH.outer;
   const rawInner = Number(value?.inner);
-  const inner = Number.isFinite(rawInner) && rawInner > 0
-    ? Math.min(rawInner, outer)
-    : Math.min(DEFAULT_FIELD_BREATH.inner, outer);
+  const requestedInner = Number.isFinite(rawInner) && rawInner > 0
+    ? rawInner
+    : DEFAULT_FIELD_BREATH.inner;
+  const inner = requestedInner < outer ? requestedInner : outer / 2;
   const rawRate = Number(value?.rate);
   const rate = Number.isFinite(rawRate) && rawRate > 0 && rawRate < 1
     ? rawRate
     : DEFAULT_FIELD_BREATH.rate;
-  // 0 < x < y is the configured relation. A collapsed pair is still usable: it
-  // simply describes a Field that breathes nowhere.
   return { inner, outer, rate };
 }
 
@@ -70,16 +72,23 @@ export function breathRateFromResponse(response = DEFAULT_FIELD_RESPONSE) {
   );
 }
 
-// Effective bounds are Range-clipped. A side with less room than `inner`
-// breathes inside whatever remains and never crosses Center.
+// Effective bounds are Range-clipped, but the minimum offset is a law, not a
+// preference: Tail must stay at least x behind Center and Lead at least x ahead.
+// A side with less room than x therefore cannot breathe at all. It is marked
+// non-operational, excluded from the synchronization barrier, and parked at
+// whatever room remains — the inner offset is never silently reduced.
 export function effectiveBreathBounds(breath, available) {
   const { inner, outer } = normalizeFieldBreath(breath);
   const room = Number.isFinite(available) ? Math.max(0, available) : 0;
   const effectiveOuter = Math.min(outer, room);
+  const operational = room >= inner - FIELD_REACH_TOLERANCE
+    && effectiveOuter > inner - FIELD_REACH_TOLERANCE;
   return {
-    inner: Math.min(inner, effectiveOuter),
+    inner,
     outer: effectiveOuter,
-    operational: effectiveOuter > FIELD_REACH_TOLERANCE
+    // What the side may still display while it cannot breathe.
+    parked: effectiveOuter,
+    operational
   };
 }
 

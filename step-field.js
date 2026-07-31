@@ -22,6 +22,7 @@ import {
   normalizeFieldBreath,
   breathRatePair,
   breathRateFromResponse,
+  breathSideRate,
   effectiveBreathBounds,
   createBreathRuntime,
   advanceBreath,
@@ -1144,8 +1145,17 @@ export function createStepFieldController({
       );
       side.adapter?.mute?.();
       side.adapter?.place?.(side.desiredAddress);
+      // Resuming after a wrap continues the preserved breathing phase. The
+      // outward pair is only correct while expanding; a contracting Field needs
+      // the exchanged rates immediately, not one controller tick later.
       if (side.mode === FIELD_SIDE_MODE.STRETCHING) {
-        requestStretchRate(side, true);
+        requestBreathRate(side, breathSideRate({
+          role,
+          phase: runtime.breath.phase,
+          rate: snapshotBreath(snapshot).rate,
+          waiting: runtime.breath.sides[role].waiting,
+          held: runtime.breath.held
+        }), true);
       } else {
         requestRate(side, 1, true);
       }
@@ -1371,7 +1381,7 @@ export function createStepFieldController({
         operational: Boolean(
           prefs[`${role}Visible`]
           && sideCanRun(sides[role])
-          && available > EPSILON
+          && effectiveBreathBounds(configured, available).operational
         ),
         available
       }];
@@ -1409,14 +1419,19 @@ export function createStepFieldController({
       return { available: false, held: false, offset: 0 };
     }
     if (!participation.operational) {
+      // The side cannot preserve the configured inner offset, so it does not
+      // breathe and takes no part in the barrier. It still shows the frame the
+      // remaining room allows rather than collapsing onto Center.
+      const parked = Math.max(0, breathSide.bounds.parked ?? 0);
       side.mode = FIELD_SIDE_MODE.HELD;
-      side.offset = 0;
-      side.progressOffset = 0;
+      side.offset = parked;
+      side.progressOffset = parked;
       side.waiting = false;
       side.configuredOffset = configuredOffset(role, snapshot);
+      runtime.breath.sides[role].offset = parked;
       pauseSide(side);
-      parkSide(side, center);
-      return { available: false, held: true, offset: 0 };
+      parkSide(side, exactAddress(role, center, parked, snapshot.range));
+      return { available: false, held: true, offset: parked };
     }
 
     side.configuredOffset = configuredOffset(role, snapshot);

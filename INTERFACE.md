@@ -1,4 +1,4 @@
-# Binary YouTube Reader — Interface Grammar
+# Video Cartography — Interface Grammar
 
 ## Layout
 
@@ -272,8 +272,11 @@ displayed Frame and the next. Forward traversal moves the visible strip leftward
 and backward traversal moves it rightward, so frames enter through Tail or Lead,
 pass through Center as they become Current, and leave through the opposite side.
 Rapid same-direction movements compose as one continuing slideshow; a reversal
-turns cleanly. The transition never delays the semantic commit, and it never
-creates history.
+turns cleanly. The three panes are animated distinctly so the direction and the
+handoff are readable: the trailing pane enters already bright because it now
+carries the address Center just left, and the leading pane fades up because its
+material was not previously visible. The transition never delays the semantic
+commit, and it never creates history.
 
 Context beginning, moving, pausing, or settling reassigns neither side. Its Tail
 and Lead are the frozen observation edges, so materially different side frames
@@ -301,7 +304,9 @@ The breathing rate pair is one control, not two: `0.75×/1.25×`, `0.5×/1.5×`,
 `0.25×/1.75×` around Center's `1×`. The configured values are the outward rates;
 contraction exchanges them without rewriting the saved pair. A side that reaches
 a boundary first waits there at Center rate until every operational side arrives,
-then the whole Field reverses direction.
+then the whole Field reverses direction. A side without room for the Inner Offset
+cannot hold the required separation, so it stops breathing entirely and parks at
+the room it has rather than creeping toward Center.
 
 Hold alone stops the cycle. It preserves each attained offset, sets every held
 side to Center rate, and preserves the direction for later resumption; Stretch

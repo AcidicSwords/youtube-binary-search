@@ -40,6 +40,7 @@ for (const retiredArtifact of [
 const docs = Object.fromEntries([
   "README.md",
   "PROJECT.md",
+  "GLOSSARY.md",
   "SPEC.md",
   "IMPLEMENTATION.md",
   "INTERFACE.md",
@@ -67,11 +68,13 @@ function contrastRatio(first, second) {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
-assert.equal(pkg.version, "7.0.0");
-assert.match(docs["SPEC.md"], /^# Binary YouTube Reader — Canonical Specification\r?\n/);
-assert.match(docs["IMPLEMENTATION.md"], /^# Binary YouTube Reader — Canonical Implementation\r?\n/);
-assert.match(docs["INTERFACE.md"], /^# Binary YouTube Reader — Interface Grammar\r?\n/);
-for (const name of ["PROJECT.md", "SPEC.md", "IMPLEMENTATION.md", "INTERFACE.md", "DEVELOPMENT.md", "VALIDATION.md"]) {
+assert.equal(pkg.name, "video-cartography");
+assert.equal(pkg.version, "8.0.0");
+assert.ok(pkg.description, "The package must carry the project description.");
+assert.match(docs["SPEC.md"], /^# Video Cartography — Canonical Specification\r?\n/);
+assert.match(docs["IMPLEMENTATION.md"], /^# Video Cartography — Canonical Implementation\r?\n/);
+assert.match(docs["INTERFACE.md"], /^# Video Cartography — Interface Grammar\r?\n/);
+for (const name of ["PROJECT.md", "GLOSSARY.md", "SPEC.md", "IMPLEMENTATION.md", "INTERFACE.md", "DEVELOPMENT.md", "VALIDATION.md"]) {
   assert.ok(docs["README.md"].includes(`\`${name}\``), `README must link ${name}`);
 }
 
@@ -263,6 +266,22 @@ assert.match(fieldGeometry, /export function advanceBreath/);
 assert.match(fieldGeometry, /export function holdBreath/);
 assert.match(fieldGeometry, /export function effectiveBreathBounds/);
 assert.match(field, /runtime\.frameGeneration/);
+// The three Field roles must be animated distinctly. One shared keyframe for all
+// three panes cannot express which side received the outgoing frame.
+for (const role of ["tail-pane", "step-pane-center", "lead-pane"]) {
+  assert.match(
+    fieldCss,
+    new RegExp(`is-traversing-forward \\.${role.replace(/[.*+?^$()|[\]\\]/g, "\\$&")}\\s*\\{\\s*animation-name`),
+    `Forward transition must give ${role} its own animation.`
+  );
+}
+assert.equal(
+  new Set(
+    (fieldCss.match(/is-traversing-forward [^{]*\{ animation-name: ([a-z-]+); \}/g) || [])
+  ).size,
+  3,
+  "Forward traversal must animate trailing, center, and leading roles differently."
+);
 assert.match(field, /side\.placementGeneration !== runtime\.frameGeneration/,
   "A callback belonging to a superseded Field Frame must be discarded.");
 assert.match(app, /function setStepMode/);
@@ -355,6 +374,19 @@ assert.match(docs["INTERFACE.md"], /Stretch \/ Hold/);
 assert.match(docs["README.md"], /stable directional slideshow\s*\n?around Current/);
 assert.match(docs["README.md"], /breathes continuously between inner\s*\n?and outer offsets until Hold preserves the attained relation/);
 assert.match(docs["PROJECT.md"], /Field Frame/);
+assert.match(docs["PROJECT.md"], /^# Video Cartography\r?\n/);
+assert.match(docs["GLOSSARY.md"], /^# Video Cartography — Canonical Glossary\r?\n/);
+for (const term of [
+  "Panoramic Phase Field", "Field Frame", "Field Breath", "Inner Offset",
+  "Outer Offset", "Temporal Topography", "Nudge"
+]) {
+  assert.match(
+    docs["GLOSSARY.md"],
+    new RegExp(`\\*\\*[^*]*${term}[^*]*\\*\\* —`),
+    `Glossary must define ${term}`
+  );
+}
+assert.match(docs["PROJECT.md"], /minimum offset is a law rather than a preference/);
 assert.match(docs["PROJECT.md"], /Field Breath/);
 assert.match(docs["SPEC.md"], /### Field Frame/);
 assert.match(docs["SPEC.md"], /#### Slideshow transitions/);

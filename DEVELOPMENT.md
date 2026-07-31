@@ -14,6 +14,8 @@
 9. Pin linking is visible spatial acquisition; do not persist a hidden return target.
 10. Ambient Field state is a stable Frame, not a temporary transport result.
 11. The Temporal Topography owns spatial direct manipulation; Guide owns exact editing.
+12. The minimum Field offset is a law; Range clipping may remove a side, never shrink `x`.
+13. Any fine-adjustment quantum must exceed the kernel's semantic equality tolerance.
 
 ## Change routing
 
@@ -58,6 +60,12 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
   the Timeline; Guide edits Addresses, metadata, and topology exactly.
 - No control may claim exact frame stepping without an adapter-provided frame
   duration. Without one, the operation is Nudge and its quantum is seconds.
+- Never reduce the configured inner offset to fit the room a side has. If the
+  room is smaller than `x`, the side is non-operational and leaves the barrier.
+- Never introduce a movement quantum at or below `EPSILON`; Session treats such a
+  destination as the Address it started from, so the control becomes inert.
+- Resume breathing with the rate of the phase actually preserved, never with a
+  fixed outward pair.
 - Rapid visual transitions cannot block semantic commits. A transition is
   attached to a commit that has already happened; discard superseded player
   callbacks with the transition generation token rather than serializing them.
