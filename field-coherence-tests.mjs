@@ -2,8 +2,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   createSession,
+  goTo,
+  workFromExtent,
+  refine,
+  reopen,
   setStepReach,
   step,
+  redo,
   returnState,
   normalizeStepReach,
   MIN_STEP_REACH_SECONDS,
@@ -63,6 +68,41 @@ assert.deepEqual(normalizeFieldResponse({ tailRate: 2, leadRate: 0.5 }), { tailR
   assert.deepEqual(restored.session.model.stepReach, {
     backward: 5, forward: 15, linked: false, mode: "fixed", fraction: 1 / 16
   });
+}
+
+{
+  let session = createSession({ duration: 100, current: 50 });
+  assert.equal(session.model.lastOperator, null);
+
+  let result = goTo(session, 60, { operator: "timeline" });
+  assert.equal(result.session.model.lastOperator, "timeline");
+  session = result.session;
+
+  result = refine(session, "forward");
+  assert.equal(result.session.model.lastOperator, "refineForward");
+  session = result.session;
+
+  result = reopen(session);
+  assert.equal(result.session.model.lastOperator, "reopen");
+  session = result.session;
+
+  result = workFromExtent(session, { start: 20, end: 80 });
+  assert.equal(result.session.model.lastOperator, "section");
+  session = result.session;
+
+  result = step(session, "backward");
+  assert.equal(result.session.model.lastOperator, "stepBackward");
+  const undone = returnState(result.session);
+  assert.equal(
+    undone.session.model.lastOperator,
+    "section",
+    "Undo must restore the preview owner with the semantic frame."
+  );
+  assert.equal(
+    redo(undone.session).session.model.lastOperator,
+    "stepBackward",
+    "Redo must restore the preview owner with the traversed frame."
+  );
 }
 
 {
@@ -141,6 +181,7 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   const app = readFileSync("app.js", "utf8");
   const field = readFileSync("step-field.js", "utf8");
   const fieldCss = readFileSync("step-field.css", "utf8");
+  const styles = readFileSync("styles.css", "utf8");
   const view = readFileSync("view.js", "utf8");
   const implementation = readFileSync("IMPLEMENTATION.md", "utf8");
   const readme = readFileSync("README.md", "utf8");
@@ -158,18 +199,23 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
   }
   assert.equal((html.match(/id=["']tail-rate-select["']/g) || []).length, 1);
   assert.equal((html.match(/id=["']lead-rate-select["']/g) || []).length, 1);
-  assert.match(html, /id=["']tail-pane["'][\s\S]*id=["']player-tail["'][\s\S]*id=["']tail-rate-select["']/);
-  assert.match(html, /id=["']lead-pane["'][\s\S]*id=["']player-lead["'][\s\S]*id=["']lead-rate-select["']/);
+  assert.match(html, /id=["']tail-pane["'][\s\S]*id=["']tail-rate-select["'][\s\S]*id=["']player-tail["']/);
+  assert.match(html, /id=["']lead-pane["'][\s\S]*id=["']lead-rate-select["'][\s\S]*id=["']player-lead["']/);
   assert.doesNotMatch(fieldCss, /\.step-pane-action/, "Side players must not use a transparent overlay element.");
   assert.match(fieldCss, /\.side-player-surface iframe[\s\S]*pointer-events:\s*none/);
   assert.match(
     fieldCss,
-    /\.pane-field-controls\s*\{[\s\S]*--field-step-track:[\s\S]*grid-template-columns:\s*var\(--field-rate-track\)\s*var\(--field-offset-track\)\s*var\(--field-mode-track\)\s*var\(--field-step-track\)/
+    /\.pane-field-controls\s*\{[\s\S]*display:\s*flex[\s\S]*justify-content:\s*center/
   );
   assert.match(
-    fieldCss,
-    /\.tail-field-controls\s*\{[\s\S]*grid-template-columns:\s*var\(--field-step-track\)\s*var\(--field-mode-track\)\s*var\(--field-offset-track\)\s*var\(--field-rate-track\)/,
-    "Mirrored Tail/Lead controls must map equal functions to equal track sizes."
+    html,
+    /tail-field-settings[\s\S]*field-settings-popover[\s\S]*step-backward-seconds[\s\S]*tail-rate-select/,
+    "Intermittent Tail rate and offset controls must share one compact Tune disclosure."
+  );
+  assert.match(
+    html,
+    /lead-field-settings[\s\S]*field-settings-popover[\s\S]*lead-rate-select[\s\S]*step-forward-seconds/,
+    "Intermittent Lead rate and offset controls must share one compact Tune disclosure."
   );
   assert.doesNotMatch(field, /bindSideStepSurface/,
     "Step Field must expose geometry while the application owns the shared Step gesture.");
@@ -182,11 +228,47 @@ assert.equal(chooseDirectionalRate([1], 2, "lead"), null);
     "Phone layout must explicitly stack Center, Tail, Lead without relying on auto-placement."
   );
   assert.match(fieldCss, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);
+  assert.match(
+    styles,
+    /\.center-transport-surface:hover:not\(:disabled\),[\s\S]*background:\s*transparent[\s\S]*transform:\s*none/,
+    "Center hover may emphasize its transport icon but must not dim or shift the primary frame."
+  );
   assert.match(app, /setStepReach as setSessionStepReach/);
   assert.match(app, /stepReach: currentFieldOffsets\(\)/);
+  assert.match(app, /fieldPreview:\s*fieldOperatorPreview\(\)/);
+  assert.match(
+    app,
+    /function fieldOperatorPreview[\s\S]*kind:\s*"context"[\s\S]*transport\.start[\s\S]*transport\.anchor[\s\S]*transport\.end/
+  );
+  assert.match(
+    app,
+    /function fieldStepPreview[\s\S]*kind,[\s\S]*projection\.stepTarget\([\s\S]*"backward"[\s\S]*projection\.stepTarget\([\s\S]*"forward"/,
+    "Paused Field preview must consume the exact weighted Step destinations from the semantic owner."
+  );
+  assert.match(
+    app,
+    /fieldStepPreview\(center,\s*"pin"\)/,
+    "Pin dragging must preview spatial Step targets rather than physical Field offsets."
+  );
   assert.doesNotMatch(app, /onHoldOffsets:/);
   assert.doesNotMatch(field, /onHoldOffsets/);
   assert.match(app, /function changeFieldOffset[\s\S]*state\.fieldOffsets = normalizeStepReach/);
+  assert.match(app, /seconds:\s*state\.contextSeconds/);
+  assert.doesNotMatch(
+    app,
+    /fieldOffsets\s*=\s*[^;\n]*contextSeconds|contextSeconds\s*=\s*[^;\n]*fieldOffsets/,
+    "Context duration and physical Field offsets must remain independently owned."
+  );
+  assert.match(
+    app,
+    /function changeFieldOffset[\s\S]*stepField\?\.reconfigureOffset\?\.\([\s\S]*direction === "backward" \? "tail" : "lead"/,
+    "Changing one configured Field Offset must reconcile only its owning side."
+  );
+  assert.doesNotMatch(
+    app,
+    /lastStepReachEdited|stepReachLastEdited/,
+    "Field tuning must not write a dead or cross-owned Step direction preference."
+  );
   assert.match(
     app,
     /performStep\(selection\.direction, selection\.distance,\s*\{[\s\S]*carryRetained: selection\.carryRetained === true/,

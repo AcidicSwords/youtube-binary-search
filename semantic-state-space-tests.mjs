@@ -9,7 +9,6 @@ import {
   focusWorkingSection,
   goTo,
   leaveSection,
-  overwriteGuideSection,
   pinCurrent,
   localRefine,
   reopen,
@@ -99,17 +98,9 @@ function refineExpectation(session, direction) {
   const current = session.model.resolution.C;
   const target = getTargets(session.model.resolution)[direction];
   if (target === null) return null;
-  const interval = session.model.interval;
-  const inside = Boolean(
-    interval
-    && Math.abs(interval.arrival - current) <= EPSILON
-    && Math.abs(interval.departure - current) > EPSILON
-    && target >= interval.start - EPSILON
-    && target <= interval.end + EPSILON
-  );
   return {
-    relation: inside ? "shorten" : "replace",
-    departure: inside ? interval.departure : current,
+    relation: "draw",
+    departure: current,
     target
   };
 }
@@ -120,7 +111,7 @@ for (let run = 0; run < RUNS; run += 1) {
   let session = createSession({ duration: 600, current: random() * 600 });
   for (let index = 0; index < OPERATIONS_PER_RUN; index += 1) {
     const before = session;
-    const operation = Math.floor(random() * 17);
+    const operation = Math.floor(random() * 16);
     const expectedRefine = operation === 0
       ? refineExpectation(session, "backward")
       : operation === 1
@@ -161,12 +152,7 @@ for (let run = 0; run < RUNS; run += 1) {
         : { session, changed: false };
     } else if (operation === 13) result = leaveSection(session);
     else if (operation === 14) result = focusWorkingSection(session);
-    else if (operation === 15) {
-      const sections = session.model.guide.sections;
-      result = sections.length
-        ? overwriteGuideSection(session, sections[Math.floor(random() * sections.length)].id)
-        : { session, changed: false };
-    } else {
+    else {
       // Metamorphic check: Endpoint Transposition must remain an involution for
       // every randomly reached valid Interval, not only hand-authored examples.
       const once = switchEndpoint(session);

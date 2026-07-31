@@ -28,11 +28,15 @@ import {
   renamePin,
   getPin,
   sectionsForPin,
+  canLinkPins,
   visiblePins,
   deletePin,
+  movePin,
   createSection,
   createSectionFromTimes,
   resolveSection,
+  unlinkSectionEndpoint,
+  linkPins,
   renameSection,
   replaceSectionExtent,
   deleteSection,
@@ -52,6 +56,7 @@ import {
   copy,
   snapshotModel,
   goTo,
+  workFromExtent,
   refine,
   localRefine,
   step,
@@ -65,11 +70,13 @@ import {
   completePlayback,
   pinCurrent,
   saveIntervalAsSection,
-  overwriteGuideSection,
   renameGuidePin,
   deleteGuidePin,
   renameGuideSection,
   deleteGuideSection,
+  moveGuidePin,
+  unlinkGuideSectionEndpoint,
+  linkGuidePins,
   switchEndpoint,
   returnState
 } from "./session.js";
@@ -265,7 +272,7 @@ assert.equal(generatedSection.start, 30);
 assert.equal(generatedSection.end, 45);
 assert.equal(generatedSection.id, generated.section.id);
 assert.equal(generatedSection.label, "Generated");
-assert.equal(getPin(guide, replacedEndPinId), null, "Overwrite must remove an unshared retired endpoint.");
+assert.equal(getPin(guide, replacedEndPinId), null, "Replacing an extent must remove an unshared retired endpoint.");
 assert.equal(deleteSection(guide, generatedSection.id), true);
 assert.equal(getPin(guide, generatedSection.startPinId), null);
 assert.equal(getPin(guide, generatedSection.endPinId), null);
@@ -285,6 +292,101 @@ const clustered = clusterPinsByPixels([
 ], 100, 1000, 18);
 assert.equal(clustered.length, 2);
 assert.equal(clustered[0].pins.length, 2);
+
+// Shared endpoint identity is explicit graph ownership. Unlink clones one
+// Section's endpoint at the same Address without storing a hidden return path.
+// Spatial Link merges that Pin into the coincident target chosen by the drag.
+const ownershipGuide = createGuide("ownership");
+const ownershipA = ensurePin(ownershipGuide, 10, { kind: PIN_KIND.ENDPOINT }).pin;
+const ownershipB = ensurePin(ownershipGuide, 20, { kind: PIN_KIND.ENDPOINT }).pin;
+const ownershipC = ensurePin(ownershipGuide, 30, { kind: PIN_KIND.ENDPOINT }).pin;
+const ownershipFirst = createSection(
+  ownershipGuide,
+  ownershipA.id,
+  ownershipB.id,
+  { label: "First" }
+).section;
+const ownershipSecond = createSection(
+  ownershipGuide,
+  ownershipB.id,
+  ownershipC.id,
+  { label: "Second" }
+).section;
+assert.equal(sectionsForPin(ownershipGuide, ownershipB.id).length, 2);
+assert.equal(
+  canLinkPins(ownershipGuide, ownershipB.id, ownershipA.id).reason,
+  "shared-source-pin",
+  "A shared junction must be Unlinked before one edge can be spatially linked elsewhere."
+);
+const unlinkedOwnership = unlinkSectionEndpoint(
+  ownershipGuide,
+  ownershipSecond.id,
+  "start"
+);
+assert.equal(unlinkedOwnership.changed, true);
+assert.equal(unlinkedOwnership.section.start, 20);
+assert.notEqual(unlinkedOwnership.section.startPinId, ownershipB.id);
+assert.equal(unlinkedOwnership.pin.provenance, "unlink");
+assert.equal(
+  canLinkPins(
+    ownershipGuide,
+    unlinkedOwnership.section.startPinId,
+    ownershipB.id
+  ).allowed,
+  true
+);
+const persistedOwnership = sanitizeGuide(
+  JSON.parse(JSON.stringify(ownershipGuide)),
+  "ownership",
+  40
+);
+assert.equal(persistedOwnership.pins.length, 4);
+assert.notEqual(
+  resolveSection(persistedOwnership, ownershipFirst.id).endPinId,
+  resolveSection(persistedOwnership, ownershipSecond.id).startPinId
+);
+const linkedOwnership = linkPins(
+  ownershipGuide,
+  unlinkedOwnership.section.startPinId,
+  ownershipB.id
+);
+assert.equal(linkedOwnership.changed, true);
+assert.equal(resolveSection(ownershipGuide, ownershipSecond.id).startPinId, ownershipB.id);
+assert.equal(ownershipGuide.pins.length, 3);
+const independentlyUnlinked = unlinkSectionEndpoint(
+  ownershipGuide,
+  ownershipSecond.id,
+  "start"
+);
+movePin(ownershipGuide, independentlyUnlinked.section.startPinId, 22, 40);
+assert.equal(resolveSection(ownershipGuide, ownershipFirst.id).end, 20);
+assert.equal(resolveSection(ownershipGuide, ownershipSecond.id).start, 22);
+assert.equal(
+  canLinkPins(
+    ownershipGuide,
+    independentlyUnlinked.section.startPinId,
+    ownershipB.id
+  ).allowed,
+  true
+);
+assert.equal(
+  linkPins(
+    ownershipGuide,
+    independentlyUnlinked.section.startPinId,
+    ownershipB.id
+  ).reason,
+  "pins-not-coincident"
+);
+movePin(ownershipGuide, independentlyUnlinked.section.startPinId, 20, 40);
+const linkedAfterSnap = linkPins(
+  ownershipGuide,
+  independentlyUnlinked.section.startPinId,
+  ownershipB.id
+);
+assert.equal(linkedAfterSnap.changed, true);
+assert.equal(resolveSection(ownershipGuide, ownershipSecond.id).start, 20);
+assert.equal(resolveSection(ownershipGuide, ownershipSecond.id).startPinId, ownershipB.id);
+assert.equal(ownershipGuide.pins.length, 3);
 
 const normalizedV3 = normalizeGuide({
   pins: [
@@ -322,6 +424,86 @@ assert.equal(validateGuide(migratedV1, 20), true);
 
 // Session kernel: operators deform one returnStateable model.
 let session = createSession({ duration: 100, current: 50, guide: createGuide("video") });
+const pinExtentResult = workFromExtent(
+  session,
+  { start: 20, end: 60 },
+  { operator: "pin-extent", label: "Select Pin Extent" }
+);
+assert.equal(pinExtentResult.changed, true);
+assert.deepEqual(pinExtentResult.session.model.resolution, {
+  L: 20,
+  C: 40,
+  R: 60,
+  level: 0
+});
+assert.deepEqual(
+  {
+    start: pinExtentResult.session.model.interval.start,
+    end: pinExtentResult.session.model.interval.end
+  },
+  { start: 20, end: 60 }
+);
+
+const intervalGuide = createGuide("interval-pin-drag");
+const intervalStartPin = ensurePin(
+  intervalGuide,
+  20,
+  { kind: PIN_KIND.EXPLICIT }
+).pin;
+const intervalEndPin = ensurePin(
+  intervalGuide,
+  60,
+  { kind: PIN_KIND.EXPLICIT }
+).pin;
+let intervalPinSession = workFromExtent(
+  createSession({ duration: 100, current: 40, guide: intervalGuide }),
+  { start: 20, end: 60 },
+  { label: "Working Interval" }
+).session;
+let intervalPinMove = moveGuidePin(intervalPinSession, intervalStartPin.id, 10);
+assert.equal(intervalPinMove.changed, true);
+assert.deepEqual(
+  {
+    start: intervalPinMove.session.model.interval.start,
+    end: intervalPinMove.session.model.interval.end
+  },
+  { start: 10, end: 60 }
+);
+intervalPinSession = intervalPinMove.session;
+intervalPinMove = moveGuidePin(intervalPinSession, intervalEndPin.id, 75);
+assert.equal(intervalPinMove.changed, true);
+assert.deepEqual(
+  {
+    start: intervalPinMove.session.model.interval.start,
+    end: intervalPinMove.session.model.interval.end
+  },
+  { start: 10, end: 75 }
+);
+
+let ownershipSession = createSession({
+  duration: 40,
+  current: 20,
+  guide: persistedOwnership
+});
+const persistedSecondStart = resolveSection(
+  persistedOwnership,
+  ownershipSecond.id
+).startPinId;
+let ownershipResult = linkGuidePins(
+  ownershipSession,
+  persistedSecondStart,
+  ownershipB.id
+);
+assert.equal(ownershipResult.changed, true);
+ownershipSession = ownershipResult.session;
+ownershipResult = unlinkGuideSectionEndpoint(
+  ownershipSession,
+  ownershipSecond.id,
+  "start"
+);
+assert.equal(ownershipResult.changed, true);
+assert.equal(ownershipResult.session.history.length, 2);
+
 let result = refine(session, "forward");
 assert.equal(result.changed, true);
 session = result.session;
@@ -351,14 +533,13 @@ session = result.session;
 assert.equal(session.model.resolution.C, 50);
 assert.equal(session.model.interval, null);
 
-// Shift+Refine has two Interval relations. A midpoint inside the Interval
-// shortens it by retaining the opposite endpoint. A midpoint outside replaces
-// it with the newly traversed Current-to-midpoint region. Direct Go's five-times
-// frame puts both initial midpoints outside the mapped Interval.
+// Shift+Refine always draws the newly traversed Current-to-midpoint region.
+// This deliberately selects the opposite half when its target lies inside the
+// existing Working Interval; plain Refine retains the established anchor.
 let membershipBase = createSession({ duration: 100, current: 50 });
 membershipBase = goTo(membershipBase, 70, { operator: "timeline" }).session;
 const outsideRefine = localRefine(membershipBase, "forward");
-assert.equal(outsideRefine.refineRelation, "replace");
+assert.equal(outsideRefine.refineRelation, "draw");
 assert.deepEqual(
   {
     start: outsideRefine.session.model.interval.start,
@@ -369,7 +550,7 @@ assert.deepEqual(
   { start: 70, end: 85, departure: 70, arrival: 85 }
 );
 const backwardReplacement = localRefine(membershipBase, "backward");
-assert.equal(backwardReplacement.refineRelation, "replace");
+assert.equal(backwardReplacement.refineRelation, "draw");
 assert.deepEqual(
   {
     start: backwardReplacement.session.model.interval.start,
@@ -381,7 +562,7 @@ assert.deepEqual(
   "An adjacent midpoint outside the central mapped Interval must record the complete new traversal."
 );
 const transposedReplacement = localRefine(switchEndpoint(membershipBase).session, "forward");
-assert.equal(transposedReplacement.refineRelation, "replace");
+assert.equal(transposedReplacement.refineRelation, "draw");
 assert.deepEqual(
   {
     start: transposedReplacement.session.model.interval.start,
@@ -393,8 +574,8 @@ assert.deepEqual(
   "A midpoint outside the Interval must replace it with the complete new traversal."
 );
 
-// Canonical alternating sequence: outside midpoint replaces; inside midpoint
-// shortens; the next outside midpoint replaces again.
+// When the midpoint is inside the existing movement, Shift+Refine draws the
+// other half from Current instead of retaining the previous departure.
 let membershipRefine = createSession({ duration: 100, current: 50 });
 membershipRefine = localRefine(membershipRefine, "backward").session;
 assert.deepEqual(
@@ -410,7 +591,7 @@ assert.deepEqual(
   { current: 25, L: 0, R: 50, start: 25, end: 50, departure: 50, arrival: 25 }
 );
 const replacedBackward = localRefine(membershipRefine, "backward");
-assert.equal(replacedBackward.refineRelation, "replace");
+assert.equal(replacedBackward.refineRelation, "draw");
 assert.deepEqual(
   {
     current: replacedBackward.session.model.resolution.C,
@@ -424,7 +605,7 @@ assert.deepEqual(
   { current: 12.5, L: 0, R: 25, start: 12.5, end: 25, departure: 25, arrival: 12.5 }
 );
 const shortenedForward = localRefine(membershipRefine, "forward");
-assert.equal(shortenedForward.refineRelation, "shorten");
+assert.equal(shortenedForward.refineRelation, "draw");
 assert.deepEqual(
   {
     current: shortenedForward.session.model.resolution.C,
@@ -435,10 +616,10 @@ assert.deepEqual(
     departure: shortenedForward.session.model.interval.departure,
     arrival: shortenedForward.session.model.interval.arrival
   },
-  { current: 37.5, L: 25, R: 50, start: 37.5, end: 50, departure: 50, arrival: 37.5 }
+  { current: 37.5, L: 25, R: 50, start: 25, end: 37.5, departure: 25, arrival: 37.5 }
 );
 const replacedAgain = localRefine(shortenedForward.session, "backward");
-assert.equal(replacedAgain.refineRelation, "replace");
+assert.equal(replacedAgain.refineRelation, "draw");
 assert.deepEqual(
   {
     current: replacedAgain.session.model.resolution.C,
@@ -467,7 +648,7 @@ assert.deepEqual(
   { current: 75, L: 50, R: 100, start: 50, end: 75, departure: 50, arrival: 75 }
 );
 const replacedForward = localRefine(mirroredMembership, "forward");
-assert.equal(replacedForward.refineRelation, "replace");
+assert.equal(replacedForward.refineRelation, "draw");
 assert.deepEqual(
   {
     current: replacedForward.session.model.resolution.C,
@@ -481,7 +662,7 @@ assert.deepEqual(
   { current: 87.5, L: 75, R: 100, start: 75, end: 87.5, departure: 75, arrival: 87.5 }
 );
 const shortenedBackward = localRefine(mirroredMembership, "backward");
-assert.equal(shortenedBackward.refineRelation, "shorten");
+assert.equal(shortenedBackward.refineRelation, "draw");
 assert.deepEqual(
   {
     current: shortenedBackward.session.model.resolution.C,
@@ -492,10 +673,10 @@ assert.deepEqual(
     departure: shortenedBackward.session.model.interval.departure,
     arrival: shortenedBackward.session.model.interval.arrival
   },
-  { current: 62.5, L: 50, R: 75, start: 50, end: 62.5, departure: 50, arrival: 62.5 }
+  { current: 62.5, L: 50, R: 75, start: 62.5, end: 75, departure: 75, arrival: 62.5 }
 );
 const mirroredReplace = localRefine(shortenedBackward.session, "forward");
-assert.equal(mirroredReplace.refineRelation, "replace");
+assert.equal(mirroredReplace.refineRelation, "draw");
 assert.deepEqual(
   {
     current: mirroredReplace.session.model.resolution.C,
@@ -672,7 +853,7 @@ assert.deepEqual(focusedAgain.model.interval.arrivalFrame.resolution, focusedAga
 
 // The active Interval is a semi-persistent Working Section. Focus projects it into
 // Range without retaining it in Guide; Leave preserves the deformed working
-// value, while Save and Overwrite are explicit Guide transactions.
+// value, while Save is the explicit persistence boundary.
 let working = createSession({ duration: 100, current: 50, guide: createGuide("video") });
 working = goTo(working, 70, { operator: "timeline" }).session;
 const workingBeforeFocus = copy(working.model.interval);
@@ -717,62 +898,14 @@ assert.equal(working.model.guide.sections.length, 0);
 
 working = saveIntervalAsSection(working, "Working").session;
 const retainedWorkingId = working.model.guide.sections[0].id;
-working = step(working, "forward", 10).session;
-const overwriteResult = overwriteGuideSection(working, retainedWorkingId);
-assert.equal(overwriteResult.changed, true);
-working = overwriteResult.session;
-const overwrittenWorking = resolveSection(working.model.guide, retainedWorkingId);
-assert.equal(overwrittenWorking.id, retainedWorkingId);
-assert.equal(overwrittenWorking.label, "Working");
-assert.deepEqual(
-  { start: overwrittenWorking.start, end: overwrittenWorking.end },
-  { start: 50, end: 70 }
-);
-assert.equal(working.model.guide.sections.length, 1, "Overwrite must preserve retained Section identity.");
-working = returnState(working).session;
+assert.equal(resolveSection(working.model.guide, retainedWorkingId).label, "Working");
 assert.deepEqual(
   {
     start: resolveSection(working.model.guide, retainedWorkingId).start,
     end: resolveSection(working.model.guide, retainedWorkingId).end
   },
-  { start: 50, end: 60 },
-  "Undo must restore the preceding retained Extent."
+  { start: 50, end: 60 }
 );
-
-const focusedOverwriteGuide = createGuide("video");
-const focusedOverwriteTarget = createSectionFromTimes(
-  focusedOverwriteGuide,
-  10,
-  30,
-  { label: "Editable" }
-).section;
-let focusedOverwrite = createSession({
-  duration: 100,
-  current: 20,
-  guide: focusedOverwriteGuide
-});
-focusedOverwrite = goTo(focusedOverwrite, 25, { operator: "timeline" }).session;
-focusedOverwrite = focusSection(focusedOverwrite, focusedOverwriteTarget.id).session;
-const focusedOverwriteResult = overwriteGuideSection(
-  focusedOverwrite,
-  focusedOverwriteTarget.id
-);
-assert.equal(focusedOverwriteResult.changed, true);
-assert.equal(focusedOverwriteResult.rangeChanged, true);
-focusedOverwrite = focusedOverwriteResult.session;
-assert.equal(focusedOverwrite.model.focus.kind, FOCUS_KIND.SAVED);
-assert.equal(focusedOverwrite.model.focus.sectionId, focusedOverwriteTarget.id);
-assert.deepEqual(focusedOverwrite.model.range, { start: 20, end: 25 });
-assert.deepEqual(
-  {
-    start: focusedOverwrite.model.interval.start,
-    end: focusedOverwrite.model.interval.end
-  },
-  { start: 20, end: 25 },
-  "Overwriting the focused retained Section must keep Range and Working Section coherent."
-);
-focusedOverwrite = leaveSection(focusedOverwrite).session;
-assert.deepEqual(focusedOverwrite.model.range, { start: 0, end: 100 });
 
 // Guide operations participate in the same Undo chain.
 let edited = createSession({ duration: 100, current: 40, guide: createGuide("video") });
@@ -902,8 +1035,10 @@ assert.equal(salvage.sections[0].startPinId, "pin-a");
 assert.equal(salvage.sections[0].endPinId, "pin-b");
 assert.equal(validateGuide(salvage, 100), true);
 
-assert.equal(formatTime(59.9996), "1:00.000");
-assert.equal(formatTime(3599.9996), "1:00:00.000");
+assert.equal(formatTime(59.9996), "1:00");
+assert.equal(formatTime(3599.9996), "1:00:00");
+assert.equal(formatTime(168.334), "2:48.33");
+assert.equal(formatTime(168.3), "2:48.3");
 assert.equal(formatDuration(0.25), "0.25s");
 assert.equal(formatDuration(60), "1m");
 assert.equal(formatDuration(100), "1m 40s");

@@ -59,6 +59,7 @@ Operator contracts use the following canonical dimensions:
 | topology | Pins, Sections, shared references | persistent landmarks and regions |
 | metric | Section weights and derived Timeline Space | how much map distance content receives |
 | movement magnitude | stored Step Reach and derived effective Reach | how far Step moves |
+| traversal provenance | `lastOperator` | which committed spatial grammar owns the next three-frame interpretation |
 | perceptual horizon | Field pane addresses, rates, offsets, Hold/Stretch state | what nearby moments are perceptually co-present |
 | reversibility | history and future | which semantic transformations can be restored |
 
@@ -66,7 +67,9 @@ Derived values are not stored dimensions. In particular:
 
 - changing Section weight may change projected positions, spatial midpoints, and adaptive effective Reach without changing any source Address or stored Step Reach;
 - moving Current may translate Field panes physically without allowing Field state to write Session state;
-- presentation selection, hover, preview, and viewport state are not semantic dimensions.
+- presentation selection, hover, preview, and viewport state are not semantic
+  dimensions; `lastOperator` is traversal provenance, while the preview
+  geometry derived from it remains presentation.
 
 ## 3. Source time and Timeline Space
 
@@ -112,11 +115,16 @@ Changing a Section weight:
 - preserves ordinary source order and direct reachability;
 - becomes spatially neutral at `1×`.
 
-The gradient is the visible expression of the same weight, not a second value:
+The deformation display is a projection of the same weight, not a second value:
 
-- compression converges inward below `1×`;
-- expansion opens outward above `1×`;
-- `1×` renders as a neutral span.
+- each non-neutral Section contributes a soft influence centered at its
+  projected midpoint and fading beyond its endpoints;
+- hue records sign: compression below `1×` and expansion above `1×`;
+- peak strength records the magnitude of the Section’s signed log weight;
+- overlapping influences add in log space, the visual counterpart of
+  multiplicative weight composition;
+- projected source-time contours retain the exact metric and make local density
+  visible independently of the softened atmosphere.
 
 ## 5. Operator laws
 
@@ -135,11 +143,12 @@ Positive Timeline Space guarantees a valid spatial midpoint for every positive s
 
 ### Local Refine (`Shift+Refine`)
 
-Local Refine uses the same directional midpoint and child-frame calculation, then applies midpoint membership:
-
-- a target inside the Working Interval shortens toward the opposite endpoint;
-- exact coincidence with that endpoint collapses the Working Interval;
-- a target outside replaces it with the complete Current-to-target movement.
+Local Refine uses the same directional midpoint and child-frame calculation,
+then records exactly the new pre-movement Current-to-target traversal. It never
+inherits the previous Working Interval departure. Therefore, when the midpoint
+lies inside an existing Working Interval, Local Refine preserves the
+complementary half from Current to that midpoint; plain Refine preserves the
+established anchor instead.
 
 Example on an unweighted normalized Range:
 
@@ -168,6 +177,27 @@ Hold, Stretch, and Section weight editing cannot write Step Reach.
 
 Pin traversal applies Step’s interval-anchor law to the next source-ordered retained Pin. All Pins remain visible operands. Range Start and Range End are synthetic stops and are deduplicated by real Pins at the same Address.
 
+### Pin selection and Section ownership
+
+Pin selection is derived from the Working Interval. A Pin coincident with its
+Start or End is selected automatically; when both bounds coincide with Pins,
+both endpoints are selected. Clicking a Pin moves Current to its Address and
+does not create or alter the Working Interval. Selection changes no Pin identity.
+
+Sections move together at a bound only when they reference the same Pin ID.
+Unlinking one Section endpoint creates an independent coincident Pin and rewires
+only that edge. Unlink preserves source Address and Section weight and stores no
+hidden return target. A referenced Pin links only through direct spatial
+manipulation after its edge is independent: while it is dragged within a
+16-pixel acquisition radius of another valid Pin, that Pin becomes a candidate.
+The candidate must remain stable for 450 ms before it arms; release then aligns
+and merges the source identity into the target. Leaving the radius, crossing to
+another candidate, or releasing before arming commits ordinary movement only.
+A Pin already shared by multiple Sections cannot be a link source; Unlink first
+chooses the one edge whose ownership may change. A link is
+rejected if it would collapse or reverse a Section, duplicate a Section, or
+silently discard a conflicting non-empty Pin title.
+
 ### Reopen
 
 Reopen restores Resolution endpoints to Range around unchanged Current and preserves the Working Interval.
@@ -190,7 +220,24 @@ Deform requires a positive-duration Working Interval or a selected Section and a
 - preserves the Working Interval;
 - makes `1×` neutral without deleting the Section.
 
-Changing weight on the timeline or in Guide is the same Session transaction.
+Changing weight from the operator matrix or Guide uses the same Session transaction.
+
+The input grammar separates normalization from tuning:
+
+- plain `T` toggles a weighted Section to `1×` and restores its remembered
+  non-neutral factor when pressed again;
+- `Shift+T` moves one step up the canonical ladder;
+- `Alt+T` moves one step down the canonical ladder. The browser-reserved
+  `Ctrl+T` chord is not part of the web interface grammar.
+
+Timeline presentation renders all active Section factors as one continuous
+field. The atmosphere expresses sign, log magnitude, midpoint, and softly
+diluted span without claiming an extra boundary; the same weight is visually
+more concentrated over a narrow Section and more diffuse over a broad Section.
+Contour placement expresses the exact composed density. Presentation orders
+Pins above the weighted track and source ruler, with the Section relationship
+tree below. Individual Sections remain thin selectable Start/midpoint/End wires
+rather than weight bars; dotted relations are presentation only.
 
 ### Focus / Unfocus
 
@@ -211,6 +258,43 @@ Context is bounded observation around Current. It remains transient unless the u
 ### Stretch and Hold
 
 Stretch changes the live Tail/Lead relation through playback-rate difference while Center remains the temporal anchor. Hold preserves an attained side relation. Both are runtime-only and cannot write Current, Working Interval, Resolution, Range, Guide, Weight, or Step Reach.
+
+Configured Offset and attained relation are distinct. Editing one Offset can
+reconcile only that side. A side at its configured target follows the new
+target; a partial Hold preserves its attained relation unless the new bound
+clamps it. Field Off or pane collapse makes that projection dormant: it is not a
+Step, Hold, Stretch, span, activation, video-sync, or delayed-play operand.
+Operational Field controls require a visible ready source and positive
+Range-contained reach. A held Field span requires both operational sides.
+
+Context duration and Field Offset are independent physical observation
+parameters. Their numeric relation may be intentionally useful but is not an
+ownership relation: neither operation reads, derives, persists, or rewrites the
+other. Configured Field Offset belongs only to live Stretch/Hold. Outside
+playback, Field preview ownership is:
+
+```text
+Step/default = exact weighted Backward target | Current | exact Forward target
+Refine       = next weighted backward midpoint | Current | next forward midpoint
+Reopen       = reopened backward midpoint | Current | reopened forward midpoint
+Context      = first source frame | playing Cursor | last source frame
+Pin drag     = weighted Step Backward | Pin | weighted Step Forward
+Section      = Start | midpoint Current | End
+```
+
+`lastOperator` is part of the immutable Session snapshot solely to restore this
+interpretation through Context, Guide edits, Undo, and Redo. Direct
+manipulation overrides the ambient operator preview only for the gesture's
+lifetime. Preview never mutates configured Offset, attained Hold, Stretch
+mode, Step Reach, or Session state, and is never a Held Field span. Playback
+synchronously removes preview ownership before the trusted play gesture and
+retains the existing refold/Stretch/Hold implementation. Hover/focus dry-runs
+semantic operations on the timeline without media effects.
+
+A Section owns the ambient three-frame Viewer only while Current equals that
+Section's midpoint. Direct endpoint/whole-Section manipulation may temporarily
+preview a different midpoint; once it ends, Step resumes if committed Current
+does not equal the resulting midpoint.
 
 ### Alt Carry
 
@@ -244,7 +328,7 @@ RESOLVE THE WORKING INTERVAL
 Release · Deform · Focus
 
 RETAIN AND EDIT TOPOLOGY
-Pin · Save Section · Join · Move · Overwrite · Rename · Delete
+Pin · Save Section · Join · Move · Rename · Delete
 
 RESTORE HISTORY
 Undo · Redo
@@ -326,21 +410,23 @@ The following contracts are normative. “May change” includes conditional cha
 
 | Operator | Must or may change | Must preserve |
 |---|---|---|
-| Refine | Current, Resolution, Working Interval coverage/orientation | Range, Focus, Guide topology, weights, stored Step Reach |
-| Local Refine | Current, Resolution, membership-governed Working Interval | Range, Focus, Guide topology, weights, stored Step Reach |
-| Step | Current, guarded Resolution placement, Working Interval | Range, Focus, Guide topology, weights, stored Step Reach |
+| Refine | Current, Resolution, Working Interval coverage/orientation, traversal provenance | Range, Focus, Guide topology, weights, stored Step Reach |
+| Local Refine | Current, Resolution, membership-governed Working Interval, traversal provenance | Range, Focus, Guide topology, weights, stored Step Reach |
+| Step | Current, guarded Resolution placement, Working Interval, traversal provenance | Range, Focus, Guide topology, weights, stored Step Reach |
 | Pin traversal | same semantic dimensions as Step | Pin and Section topology, weights, Range |
-| Reopen | Resolution and basis only | Current, Working Interval, Range, Focus, Guide, Step Reach |
-| Switch Endpoint | Current, Resolution frame, interval orientation | interval ordered extent, Range, Focus, Guide, weights, Step Reach |
-| Release | Working Interval only | Current, Resolution, Range, Focus, Guide, weights, Step Reach |
+| Reopen | Resolution, basis, traversal provenance | Current, Working Interval, Range, Focus, Guide, Step Reach |
+| Switch Endpoint | Current, Resolution frame, interval orientation | interval ordered extent, traversal provenance, Range, Focus, Guide, weights, Step Reach |
+| Release | Working Interval, traversal provenance reset to default Step | Current, Resolution, Range, Focus, Guide, weights, Step Reach |
 | Deform | Section creation/reuse and/or one Section weight; derived metric | all source Addresses, Current, Resolution source Addresses, Range, Focus, Working Interval, stored Step Reach, Field |
-| Focus | Range, Focus context, root Resolution; Current and Interval only when required by bounds | Guide, weights, stored Step Reach |
-| Unfocus | Range, Focus context, root Resolution; Current and Interval only when required by bounds | Guide, weights, stored Step Reach |
-| Go | Current, Resolution, Working Interval; Range/Focus only when opening the target | Guide, weights, stored Step Reach |
-| Playback settlement | Current, translated Resolution, unioned Working Interval | Range, Focus, Guide, weights, stored Step Reach |
+| Focus | Range, Focus context, root Resolution, traversal provenance; Current and Interval only when required by bounds | Guide, weights, stored Step Reach |
+| Unfocus | Range, Focus context, root Resolution, traversal provenance; Current and Interval only when required by bounds | Guide, weights, stored Step Reach |
+| Go | Current, Resolution, Working Interval, traversal provenance; Range/Focus only when opening the target | Guide, weights, stored Step Reach |
+| Section selection | Current, exact Section Resolution/Interval, traversal provenance | Range, Focus, Guide topology, weights, stored Step Reach |
+| Playback settlement | Current, translated Resolution, unioned Working Interval, traversal provenance | Range, Focus, Guide, weights, stored Step Reach |
 | Context before acceptance | Cursor and runtime transport only | every Session dimension |
 | Context acceptance | same semantic class as playback settlement | Guide, weights, Range, Focus, stored Step Reach |
 | Stretch / Hold | Field runtime relation only | every Session dimension and persisted Field Offset |
+| Offset edit | one side's configured Field bound and its necessary local reconciliation | sibling side state, every Session dimension, Step Reach, Guide, weights |
 | Alt Carry | movement operator effects plus selected Guide geometry | selected object identity and weight; unrelated Guide objects except shared-endpoint consequences |
 | Weight edit | one Section weight and derived metric | every source Address, playback, Field, stored Step Reach |
 | Move Pin | one Pin Address and all incident Section extents | unrelated Pins, Section identities and weights |
@@ -382,7 +468,6 @@ Move Pin          update every referencing Section
 Move Section      translate only its two endpoint Pins
 Delete Section    remove Section and unshared untitled endpoint Pins
 Delete Pin        dissolve all references and clean up orphan endpoints
-Overwrite         replace one Section extent from the Working Interval
 ```
 
 Arbitrary overlap, nesting, shared endpoints, and coincident extents are valid. The effective density is derived from independent Section factors; no stored hierarchy or priority is introduced.
@@ -468,7 +553,7 @@ The registry must include:
 - Playback;
 - Context and Context acceptance;
 - Stretch and Hold;
-- Pin, Save Section, Join, Weight, Move Pin, Move Section, Overwrite, Rename, Delete;
+- Pin, Save Section, Join, Weight, Move Pin, Move Section, Rename, Delete;
 - Alt Carry;
 - Undo and Redo.
 
@@ -727,6 +812,15 @@ Every registered semantic operator must be exercised in:
 ### 13.1 Matrix and hierarchy
 
 `view.js` derives the operator matrix from grammar metadata:
+
+The rendered matrix is geometrically square. Its three equal columns encode
+backward, neutral, and forward roles while its three equal rows encode
+discrimination, traversal, and lifecycle; neither semantic axis may be
+visually compressed relative to the other.
+Within each cell, the shortcut is a stable corner anchor, the operator identity
+is centered and may balance across two lines, and consequence metadata occupies
+a separate compact two-line region. Dynamic labels may change words but not
+this hierarchy.
 
 ```text
 row 0  discriminate

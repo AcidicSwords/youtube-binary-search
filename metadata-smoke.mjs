@@ -20,8 +20,8 @@ env.center().duration = 100;
 await delay(220);
 await flush();
 
-assert.equal(byId.get("range-label").textContent, "0:00.000–1:40.000");
-assert.equal(currentText(), "Current 0:00.000");
-assert.match(byId.get("status").textContent, /Loaded 1:40\.000 video/);
+assert.equal(byId.get("range-label").textContent, "0:00–1:40");
+assert.equal(currentText(), "Current 0:00");
+assert.match(byId.get("status").textContent, /Loaded 1:40 video/);
 
 console.log("Metadata smoke passed: delayed YouTube duration is retried and loaded without a false zero-length session.");

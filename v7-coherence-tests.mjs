@@ -8,6 +8,7 @@ import {
   createSession,
   snapshotModel,
   goTo,
+  goToGuideSection,
   refine,
   localRefine,
   reopen,
@@ -35,6 +36,39 @@ import {
   rebasePlaybackTransport
 } from "./transport.js";
 import { packTimelineSectionLanes } from "./view.js";
+
+// Selecting retained topology makes its full extent the Working Interval and
+// returns Current to the center. This is one semantic transaction regardless
+// of whether the gesture originates in Timeline or Guide.
+{
+  const selectionGuide = createGuide("section-selection");
+  const selected = createSectionFromTimes(selectionGuide, 40, 80, {
+    label: "Selected extent"
+  }).section;
+  const selectionSession = createSession({
+    duration: 180,
+    current: 10,
+    guide: selectionGuide
+  });
+  const selectedResult = goToGuideSection(selectionSession, selected.id);
+  assert.equal(selectedResult.changed, true);
+  assert.deepEqual(selectedResult.session.model.resolution, {
+    L: 40,
+    C: 60,
+    R: 80,
+    level: 0
+  });
+  assert.equal(selectedResult.session.model.interval.start, 40);
+  assert.equal(selectedResult.session.model.interval.end, 80);
+  assert.equal(selectedResult.session.model.interval.arrival, 60);
+  assert.equal(selectedResult.session.model.interval.departure, 40);
+  assert.equal(selectedResult.session.model.interval.operator, "section");
+  assert.equal(
+    goToGuideSection(selectedResult.session, selected.id).changed,
+    false,
+    "Selecting the already active Section must not add redundant history."
+  );
+}
 
 // Direct placement gives the new Working Interval two equal margins on each
 // side in Timeline Space: the unclipped Resolution is exactly five Interval
@@ -97,8 +131,8 @@ assert.deepEqual(
   "Moving beyond the guard must restore exactly one Step of midpoint headroom."
 );
 
-// Plain Refine is retained-anchor refinement. Shift+Refine is the local
-// membership form; alternating the two remains deterministic.
+// Plain Refine is retained-anchor refinement. Shift+Refine draws only the
+// Current-to-midpoint traversal; alternating the two remains deterministic.
 let retained = createSession({ duration: 100, current: 50 });
 retained = refine(retained, "backward").session;
 retained = refine(retained, "backward").session;
@@ -121,14 +155,14 @@ const mixed = localRefine(retained, "forward").session;
 assert.deepEqual(mixed.model.resolution, { L: 12.5, C: 31.25, R: 50, level: 3 });
 assert.deepEqual(
   { start: mixed.model.interval.start, end: mixed.model.interval.end },
-  { start: 31.25, end: 50 }
+  { start: 12.5, end: 31.25 }
 );
 
 // Reopen abandons the local frame without changing the Working Interval.
 // Crossing the old departure makes it part of the new path: plain Refine must
 // then record the complete Current-to-target movement rather than discard the
 // Current-to-departure portion. Continuing away from the departure still
-// retains it. Local Refine independently applies its membership law.
+// retains it. Local Refine independently draws its new traversal.
 let reopenedReverse = createSession({ duration: 100, current: 50 });
 reopenedReverse = refine(reopenedReverse, "backward").session;
 reopenedReverse = reopen(reopenedReverse).session;
@@ -155,7 +189,7 @@ assert.deepEqual(
   { start: 12.5, end: 50, departure: 50, arrival: 12.5 }
 );
 const oppositeLocal = localRefine(reopenedReverse, "forward");
-assert.equal(oppositeLocal.refineRelation, "replace");
+assert.equal(oppositeLocal.refineRelation, "draw");
 assert.deepEqual(
   {
     start: oppositeLocal.session.model.interval.start,

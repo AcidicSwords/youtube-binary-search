@@ -33,13 +33,12 @@ function assertLoopContained(session) {
   }
 }
 
-// Shift+Refine owns local binary subdivision by target membership. A direct
-// movement's five-times frame initially puts its adjacent midpoints outside the
-// mapped Interval, so either direction replaces it with the new traversal.
+// Shift+Refine owns local binary subdivision by drawing the new
+// Current-to-midpoint traversal, independent of the previous Interval.
 let composed = createSession({ duration: 100, current: 50 });
 composed = goTo(composed, 70, { operator: "directA" }).session;
 const replaced = localRefine(composed, "forward");
-assert.equal(replaced.refineRelation, "replace");
+assert.equal(replaced.refineRelation, "draw");
 assert.deepEqual(
   {
     start: replaced.session.model.interval.start,
@@ -51,7 +50,7 @@ assert.deepEqual(
 );
 
 const replacedBackward = localRefine(composed, "backward");
-assert.equal(replacedBackward.refineRelation, "replace");
+assert.equal(replacedBackward.refineRelation, "draw");
 assert.deepEqual(
   {
     start: replacedBackward.session.model.interval.start,
@@ -63,7 +62,7 @@ assert.deepEqual(
 );
 
 const replacedPast = localRefine(switchEndpoint(composed).session, "forward");
-assert.equal(replacedPast.refineRelation, "replace");
+assert.equal(replacedPast.refineRelation, "draw");
 assert.deepEqual(
   {
     start: replacedPast.session.model.interval.start,
@@ -165,4 +164,4 @@ assert.equal(
   "range-start"
 );
 
-console.log("Semantic composition tests passed: membership-based Refine replacement/shortening, one-sided linear endpoint pushes, Interval containment, and truthful Refine limits.");
+console.log("Semantic composition tests passed: Current-to-midpoint Local Refine drawing, one-sided linear endpoint pushes, Interval containment, and truthful Refine limits.");

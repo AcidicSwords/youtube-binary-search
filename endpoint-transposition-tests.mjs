@@ -70,7 +70,7 @@ let overrun = createSession({ duration: 100, current: 50 });
 overrun = goTo(overrun, 70, { operator: "timeline" }).session;
 overrun = switchEndpoint(overrun).session;
 const overrunResult = localRefine(overrun, "forward");
-assert.equal(overrunResult.refineRelation, "replace");
+assert.equal(overrunResult.refineRelation, "draw");
 assert.deepEqual(
   {
     start: overrunResult.session.model.interval.start,
@@ -268,4 +268,4 @@ assert.match(styles, /"refine-backward reopen refine-forward"/);
 assert.match(styles, /"step-backward switch-endpoint step-forward"/);
 assert.match(styles, /"release deform focus"/);
 
-console.log("Endpoint Transposition tests passed: endpoint frames, involution, Refine membership, Step composition, collapse, Undo separation, and v7 matrix wiring.");
+console.log("Endpoint Transposition tests passed: endpoint frames, involution, Local Refine drawing, Step composition, collapse, Undo separation, and v7 matrix wiring.");

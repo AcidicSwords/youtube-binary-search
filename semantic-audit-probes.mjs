@@ -152,14 +152,12 @@ finding(
   "side-step-enabled-at-hard-range-boundary",
   environment.byId.get("step-backward").disabled === true
     && (
-      environment.byId.get("tail-step-button").disabled === false
-      || environment.byId.get("tail-field-toggle").disabled === false
+      environment.byId.get("tail-field-toggle").disabled === false
       || environment.byId.get("tail-player-surface")["aria-disabled"] !== "true"
       || environment.byId.get("tail-player-surface").tabIndex !== -1
     ),
   {
     matrixStepBackwardDisabled: environment.byId.get("step-backward").disabled,
-    tailStepBackwardDisabled: environment.byId.get("tail-step-button").disabled,
     tailFieldToggleDisabled: environment.byId.get("tail-field-toggle").disabled,
     tailSurfaceDisabled: environment.byId.get("tail-player-surface")["aria-disabled"],
     tailSurfaceTabIndex: environment.byId.get("tail-player-surface").tabIndex,
@@ -184,9 +182,10 @@ environment.center().pauseVideo();
 await environment.flush(8);
 await environment.poll();
 
-// Start Context at 60 and advance only the Center Cursor. Stored Field offsets
-// should remain 10 seconds; the current controller remeasures Tail against the
-// transient Cursor and shrinks it.
+// Start Context at 60 and advance only the Center Cursor. The visible side
+// geometry must remain the exact 2.5-second Context preview while its source
+// window is active, without rewriting the configured 10-second live Field
+// offset underneath it.
 environment.byId.get("context-seconds").value = "5";
 environment.byId.get("context-seconds").dispatch("change");
 environment.byId.get("timeline").dispatch("click", { clientX: 600 });
@@ -198,11 +197,14 @@ environment.center().currentTime = 59.5;
 await environment.poll();
 const secondSuspendedTail = environment.byId.get("tail-offset-state").textContent;
 finding(
-  "context-erodes-activated-field-offset",
-  firstSuspendedTail !== "10s / 10s" || secondSuspendedTail !== "10s / 10s",
+  "context-mutates-configured-field-offset",
+  firstSuspendedTail !== "2.5s / 10s"
+    || secondSuspendedTail !== "2.5s / 10s"
+    || environment.byId.get("step-backward-seconds").value !== "10",
   {
     afterFirstContextTick: firstSuspendedTail,
     afterSecondContextTick: secondSuspendedTail,
+    configuredTailOffset: environment.byId.get("step-backward-seconds").value,
     tailMeta: environment.byId.get("tail-meta").textContent
   }
 );

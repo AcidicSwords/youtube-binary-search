@@ -115,6 +115,139 @@ export function sectionsForPin(guide, pinId) {
   );
 }
 
+function sectionEndpointKey(role) {
+  return role === "start" ? "startPinId" : role === "end" ? "endPinId" : null;
+}
+
+export function unlinkSectionEndpoint(guide, sectionId, role) {
+  const section = guide.sections.find(item => item.id === sectionId);
+  const key = sectionEndpointKey(role);
+  if (!section || !key) {
+    return {
+      changed: false,
+      reason: section ? "invalid-endpoint-role" : "missing-section"
+    };
+  }
+  const source = getPin(guide, section[key]);
+  if (!source) return { changed: false, reason: "missing-pin" };
+  if (sectionsForPin(guide, source.id).length <= 1) {
+    return { changed: false, reason: "unshared-pin" };
+  }
+
+  const changedAt = now();
+  const pin = {
+    id: makeId("pin"),
+    videoId: guide.videoId,
+    t: source.t,
+    label: "",
+    kind: PIN_KIND.ENDPOINT,
+    provenance: "unlink",
+    createdAt: changedAt,
+    updatedAt: changedAt
+  };
+  guide.pins.push(pin);
+  guide.pins = sortPins(guide.pins);
+  section[key] = pin.id;
+  section.updatedAt = changedAt;
+  guide.updatedAt = changedAt;
+  return {
+    changed: true,
+    pin,
+    section: resolveSection(guide, section),
+    previousPinId: source.id
+  };
+}
+
+export function canLinkPins(guide, sourcePinId, targetPinId) {
+  const source = getPin(guide, sourcePinId);
+  const target = getPin(guide, targetPinId);
+  if (!source || !target) {
+    return {
+      allowed: false,
+      reason: source ? "missing-target-pin" : "missing-source-pin"
+    };
+  }
+  if (source.id === target.id) {
+    return { allowed: false, reason: "same-pin" };
+  }
+  const sections = sectionsForPin(guide, source.id);
+  if (!sections.length) {
+    return { allowed: false, reason: "unreferenced-source-pin" };
+  }
+  if (sections.length > 1) {
+    return { allowed: false, reason: "shared-source-pin" };
+  }
+  for (const section of sections) {
+    const startPinId = section.startPinId === source.id
+      ? target.id
+      : section.startPinId;
+    const endPinId = section.endPinId === source.id
+      ? target.id
+      : section.endPinId;
+    const start = getPin(guide, startPinId);
+    const end = getPin(guide, endPinId);
+    if (
+      !start
+      || !end
+      || start.id === end.id
+      || end.t <= start.t + EPSILON
+    ) {
+      return { allowed: false, reason: "invalid-link-geometry" };
+    }
+    if (findDuplicateSection(
+      guide,
+      startPinId,
+      endPinId,
+      section.label,
+      section.id
+    )) {
+      return { allowed: false, reason: "duplicate-section" };
+    }
+  }
+  if (
+    source.label?.trim()
+    && target.label?.trim()
+    && source.label.trim() !== target.label.trim()
+  ) {
+    return { allowed: false, reason: "label-conflict" };
+  }
+  return { allowed: true, source, target, sections };
+}
+
+export function linkPins(guide, sourcePinId, targetPinId) {
+  const link = canLinkPins(guide, sourcePinId, targetPinId);
+  if (!link.allowed) return { changed: false, reason: link.reason };
+  if (Math.abs(link.source.t - link.target.t) > EPSILON) {
+    return { changed: false, reason: "pins-not-coincident" };
+  }
+
+  const changedAt = now();
+  for (const section of link.sections) {
+    if (section.startPinId === link.source.id) {
+      section.startPinId = link.target.id;
+    }
+    if (section.endPinId === link.source.id) {
+      section.endPinId = link.target.id;
+    }
+    section.updatedAt = changedAt;
+  }
+  if (!link.target.label?.trim() && link.source.label?.trim()) {
+    link.target.label = link.source.label.trim();
+  }
+  if (link.source.kind === PIN_KIND.EXPLICIT) {
+    link.target.kind = PIN_KIND.EXPLICIT;
+  }
+  link.target.updatedAt = changedAt;
+  guide.pins = guide.pins.filter(pin => pin.id !== link.source.id);
+  guide.updatedAt = changedAt;
+  return {
+    changed: true,
+    pin: link.target,
+    linkedPinId: link.source.id,
+    sectionIds: link.sections.map(section => section.id)
+  };
+}
+
 export function visiblePins(guide) {
   return sortPins(guide.pins);
 }
@@ -670,6 +803,7 @@ export function sanitizeGuide(input, videoId, duration) {
   const source = input && Array.isArray(input.pins) && Array.isArray(input.sections)
     ? input
     : normalizeGuide(input, videoId);
+  const preserveIndependentCoincidentPins = Number(source?.version) >= 7;
   const guide = createGuide(videoId);
   const idMap = new Map();
   const usedIds = new Set();
@@ -685,7 +819,9 @@ export function sanitizeGuide(input, videoId, duration) {
       || !Object.values(PIN_KIND).includes(sourcePin.kind)
     ) continue;
 
-    const coincident = findPinAt(guide, address);
+    const coincident = preserveIndependentCoincidentPins
+      ? null
+      : findPinAt(guide, address);
     if (coincident) {
       idMap.set(sourcePin.id, coincident.id);
       if (sourcePin.kind === PIN_KIND.EXPLICIT) coincident.kind = PIN_KIND.EXPLICIT;

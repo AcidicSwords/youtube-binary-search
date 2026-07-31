@@ -102,7 +102,7 @@ assert.equal(resolveFieldPhase({
 
   for (const id of [
     "step-field", "player-tail", "player", "player-lead", "center-transport-surface",
-    "tail-player-surface", "lead-player-surface", "tail-step-button", "lead-step-button",
+    "tail-player-surface", "lead-player-surface",
     "tail-field-toggle", "lead-field-toggle", "field-both-toggle",
     "tail-rate-select", "lead-rate-select",
     "step-backward-seconds", "step-forward-seconds",
@@ -133,8 +133,8 @@ assert.equal(resolveFieldPhase({
   assert.match(fieldSource, /function toggleBoth\(\)/);
   assert.match(fieldSource, /function freezeSideForPause\(side, center, snapshot\)/);
   assert.match(fieldSource, /function translateToCurrent\(current, \{ preserve = true \} = \{\}\)/);
-  assert.match(fieldSource, /const retained = side\.offset > REACH_TOLERANCE \? side\.offset : side\.targetOffset/,
-    "Semantic traversal must translate the stored Field relation instead of remeasuring asynchronous iframe clocks.");
+  assert.match(fieldSource, /const retained = side\.offset > REACH_TOLERANCE[\s\S]*side\.offset[\s\S]*side\.configuredOffset/,
+    "Semantic traversal must translate a live held relation, falling back only to its distinct configured Offset.");
   assert.match(fieldSource, /Context and semantic gestures are Center-only/);
   assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*side\.adapter\?\.play\?\.\(\)/,
     "Every play must refold and prime a side at 1× before directional-rate discovery.");
@@ -158,10 +158,12 @@ assert.equal(resolveFieldPhase({
     "YouTube side iframes must not be covered by a transparent action element.");
   assert.match(html, /id="tail-player-surface"[\s\S]*role="button"[\s\S]*id="player-tail"/);
   assert.match(html, /id="lead-player-surface"[\s\S]*role="button"[\s\S]*id="player-lead"/);
-  assert.match(html, /id="player-tail"[\s\S]*id="tail-step-button"[\s\S]*id="tail-field-toggle"[\s\S]*id="step-backward-seconds"[\s\S]*id="tail-rate-select"/,
-    "Tail controls must mirror Lead from the outside edge toward Center.");
-  assert.match(html, /id="player-lead"[\s\S]*id="lead-rate-select"[\s\S]*id="step-forward-seconds"[\s\S]*id="lead-field-toggle"[\s\S]*id="lead-step-button"/,
-    "Lead controls must mirror Tail from Center toward the outside edge.");
+  assert.match(html, /id="step-backward-seconds"[\s\S]*id="tail-rate-select"[\s\S]*id="player-tail"[\s\S]*id="tail-field-toggle"/,
+    "Tail keeps intermittent Tune in its identity bar and only Hold/Stretch beneath its Step surface.");
+  assert.match(html, /id="lead-rate-select"[\s\S]*id="step-forward-seconds"[\s\S]*id="player-lead"[\s\S]*id="lead-field-toggle"/,
+    "Lead keeps intermittent Tune in its identity bar and only Hold/Stretch beneath its Step surface.");
+  assert.doesNotMatch(html, /id="(?:tail|lead)-step-button"/,
+    "The side video surfaces already own Step; duplicate footer buttons must not return.");
   assert.match(css, /\.side-player-surface iframe[\s\S]*pointer-events:\s*none/,
     "Side video surfaces must route clicks to semantic Step instead of independently toggling muted iframes.");
   assert.match(html, /id="center-transport-surface"/,
@@ -186,8 +188,12 @@ assert.equal(resolveFieldPhase({
     /@container \(max-width: 680px\)[\s\S]*\.step-field\.tail-collapsed\.lead-collapsed:not\(\.field-off\)[\s\S]*grid-template-areas:\s*"center"\s*"tail"\s*"lead"/,
     "Phone stacking must override the more-specific collapsed medium layout."
   );
-  assert.match(fieldSource, /const visibleRoles = \["tail", "lead"\]\.filter[\s\S]*visibleRoles\.every/,
-    "Combined Field state must derive from visible projections only.");
+  assert.match(fieldSource, /const availableRoles = controllableRoles\(snapshot, prefs\)[\s\S]*availableRoles\.every/,
+    "Combined Field state must derive from currently operational projections only.");
+  assert.match(fieldSource, /function sideIsOperational\([\s\S]*sideIsVisible[\s\S]*side\.sourceReady[\s\S]*effectiveOffset/,
+    "One operational predicate must govern side controls, side Step, and combined Field actions.");
+  assert.match(fieldSource, /function sidePlaybackAllowed\([\s\S]*runtime\.centerWasRunning[\s\S]*!runtime\.suspended/,
+    "Delayed side-player events must re-check current Field ownership before playing.");
   assert.match(fieldSource, /runtime\.restoreRoles/,
     "Restoring one collapsed projection must not force a sibling re-establishment.");
   assert.match(fieldSource, /side\.ready = Boolean\(side\.adapter\)/);
@@ -196,8 +202,8 @@ assert.equal(resolveFieldPhase({
     "Reloading a video must release stale side-source errors, including same-video reloads.");
   assert.match(css, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);
   assert.match(css, /@container \(max-width: 680px\)/);
-  assert.doesNotMatch(css, /@media \(min-width: 1221px\)/);
-  assert.match(layoutCss, /@media \(min-width: 1221px\)/);
+  assert.match(css, /@media \(min-width: 1240px\)/);
+  assert.match(layoutCss, /@media \(min-width: 1240px\)/);
   assert.match(packageJson.scripts.check, /step-field\.js/);
   assert.match(packageJson.scripts.test, /step-field-tests\.mjs/);
 }

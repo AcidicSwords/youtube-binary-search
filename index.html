@@ -27,11 +27,14 @@
           <input id="youtube-url" type="url" inputmode="url" autocomplete="off" placeholder="Paste a YouTube link">
           <button id="load-video" class="primary" type="button">Load</button>
         </div>
-        <button id="guide-toggle" class="guide-toggle" type="button" aria-controls="guide-panel" aria-expanded="true">
+        <div class="rail-toggle-group" aria-label="Workspace panels">
+        <button id="guide-toggle" class="guide-toggle rail-toggle" type="button" aria-controls="command-workspace" aria-expanded="true">
           <span>Guide</span>
           <span class="guide-toggle-count"><span id="header-section-count">0</span>/<span id="header-pin-count">0</span></span>
           <kbd>G</kbd>
         </button>
+        <button id="operator-toggle" class="rail-toggle" type="button" aria-controls="command-workspace" aria-expanded="false">Operators</button>
+        </div>
       </div>
     </header>
 
@@ -45,24 +48,28 @@
                   <span class="step-pane-role">Tail</span>
                   <span id="tail-meta" class="step-pane-meta">—</span>
                 </div>
-                <button id="tail-collapse" class="pane-collapse" type="button" aria-label="Hide Tail" title="Hide Tail">×</button>
+                <div class="pane-bar-actions">
+                  <details class="field-settings tail-field-settings">
+                    <summary aria-label="Tune Tail rate and offset">Tune</summary>
+                    <div class="field-settings-popover">
+                      <label class="field-control field-offset-control" for="step-backward-seconds">
+                        <span>Offset</span>
+                        <span><input id="step-backward-seconds" type="number" min="0.25" max="300" step="0.25" value="10" disabled> s</span>
+                      </label>
+                      <label class="field-control field-rate-control" for="tail-rate-select">
+                        <span>Rate</span>
+                        <select id="tail-rate-select" aria-label="Tail stretch rate" disabled><option value="0.5">0.5×</option></select>
+                      </label>
+                    </div>
+                  </details>
+                  <button id="tail-collapse" class="pane-collapse" type="button" aria-label="Collapse Tail" title="Collapse Tail"><span aria-hidden="true">‹</span></button>
+                </div>
               </div>
               <div id="tail-player-surface" class="player-wrap side-player-surface" role="button" tabindex="0" aria-label="Step Backward"><div id="player-tail"></div></div>
               <div class="pane-field-controls tail-field-controls" aria-label="Tail Field controls">
-                <button id="tail-step-button" class="field-step-button" type="button" aria-keyshortcuts="ArrowLeft" disabled>
-                  <span>Step Backward</span><kbd>←</kbd>
-                </button>
                 <button id="tail-field-toggle" class="field-mode-toggle" type="button" aria-pressed="false" disabled>
                   <span id="tail-field-toggle-label">Stretch</span><small id="tail-offset-state">0 / 10 s</small>
                 </button>
-                <label class="field-control field-offset-control" for="step-backward-seconds">
-                  <span>Offset</span>
-                  <span><input id="step-backward-seconds" type="number" min="0.25" max="300" step="0.25" value="10" disabled> s</span>
-                </label>
-                <label class="field-control field-rate-control" for="tail-rate-select">
-                  <span>Rate</span>
-                  <select id="tail-rate-select" aria-label="Tail stretch rate" disabled><option value="0.5">0.5×</option></select>
-                </label>
               </div>
               <button id="tail-restore" class="step-pane-restore" type="button" aria-label="Show Tail" hidden>
                 <span aria-hidden="true">←</span><span>Tail</span>
@@ -75,9 +82,15 @@
                   <span class="step-pane-role">Center</span>
                   <span id="center-meta" class="step-pane-meta">—</span>
                 </div>
-                <button id="step-field-toggle" class="field-toggle" type="button" aria-pressed="true" aria-label="Hide Step Field">
-                  <span>Field</span><span id="step-field-meta">Ready</span>
-                </button>
+                <div class="pane-bar-actions center-bar-actions">
+                  <div class="field-state-readout center-field-summary">
+                    <strong id="field-transport-state">Off</strong>
+                    <small id="field-rate-state">Tail — · Center 1× · Lead —</small>
+                  </div>
+                  <button id="step-field-toggle" class="field-toggle" type="button" aria-pressed="true" aria-label="Hide Step Field">
+                    <span>Field</span><span id="step-field-meta">Ready</span>
+                  </button>
+                </div>
               </div>
               <div class="player-wrap center-player-wrap">
                 <div id="player"></div>
@@ -87,10 +100,6 @@
                 </button>
               </div>
               <div class="pane-field-controls center-field-controls" aria-label="Combined Field controls">
-                <div class="field-state-readout">
-                  <span>Field</span><strong id="field-transport-state">Off</strong>
-                  <small id="field-rate-state">Tail — · Center 1× · Lead —</small>
-                </div>
                 <button id="field-both-toggle" class="field-mode-toggle field-both-toggle" type="button" aria-pressed="false" disabled>
                   <span id="field-both-toggle-label">Stretch both</span><small id="field-span-label">Current —</small>
                 </button>
@@ -103,23 +112,27 @@
                   <span class="step-pane-role">Lead</span>
                   <span id="lead-meta" class="step-pane-meta">—</span>
                 </div>
-                <button id="lead-collapse" class="pane-collapse" type="button" aria-label="Hide Lead" title="Hide Lead">×</button>
+                <div class="pane-bar-actions">
+                  <details class="field-settings lead-field-settings">
+                    <summary aria-label="Tune Lead rate and offset">Tune</summary>
+                    <div class="field-settings-popover">
+                      <label class="field-control field-rate-control" for="lead-rate-select">
+                        <span>Rate</span>
+                        <select id="lead-rate-select" aria-label="Lead stretch rate" disabled><option value="2">2×</option></select>
+                      </label>
+                      <label class="field-control field-offset-control" for="step-forward-seconds">
+                        <span>Offset</span>
+                        <span><input id="step-forward-seconds" type="number" min="0.25" max="300" step="0.25" value="10" disabled> s</span>
+                      </label>
+                    </div>
+                  </details>
+                  <button id="lead-collapse" class="pane-collapse" type="button" aria-label="Collapse Lead" title="Collapse Lead"><span aria-hidden="true">›</span></button>
+                </div>
               </div>
               <div id="lead-player-surface" class="player-wrap side-player-surface" role="button" tabindex="0" aria-label="Step Forward"><div id="player-lead"></div></div>
               <div class="pane-field-controls" aria-label="Lead Field controls">
-                <label class="field-control field-rate-control" for="lead-rate-select">
-                  <span>Rate</span>
-                  <select id="lead-rate-select" aria-label="Lead stretch rate" disabled><option value="2">2×</option></select>
-                </label>
-                <label class="field-control field-offset-control" for="step-forward-seconds">
-                  <span>Offset</span>
-                  <span><input id="step-forward-seconds" type="number" min="0.25" max="300" step="0.25" value="10" disabled> s</span>
-                </label>
                 <button id="lead-field-toggle" class="field-mode-toggle" type="button" aria-pressed="false" disabled>
                   <span id="lead-field-toggle-label">Stretch</span><small id="lead-offset-state">0 / 10 s</small>
-                </button>
-                <button id="lead-step-button" class="field-step-button" type="button" aria-keyshortcuts="ArrowRight" disabled>
-                  <span>Step Forward</span><kbd>→</kbd>
                 </button>
               </div>
               <button id="lead-restore" class="step-pane-restore" type="button" aria-label="Show Lead" hidden>
@@ -146,15 +159,16 @@
               <span id="timeline-key-pins" class="timeline-key key-pins" title="Pins: retained source Addresses"><i aria-hidden="true"></i>Pins</span>
             </div>
             <div class="timeline-header">
-              <span><small>Current</small><strong id="timeline-current-time" aria-label="Committed Current">0:00.000</strong></span>
-              <span><small>Cursor</small><strong id="cursor-time" aria-label="Observed position">0:00.000</strong></span>
-              <span><small>Duration</small><strong id="duration-time">0:00.000</strong></span>
+              <span><small>Current</small><strong id="timeline-current-time" aria-label="Committed Current">0:00</strong></span>
+              <span><small>Cursor</small><strong id="cursor-time" aria-label="Observed position">0:00</strong></span>
+              <span><small>Duration</small><strong id="duration-time">0:00</strong></span>
             </div>
           </div>
 
           <div id="timeline" class="timeline" aria-label="Temporal map in weighted timeline space. Click inside Range to go directly to an Address.">
             <div id="timeline-ruler" class="timeline-ruler" aria-hidden="true"></div>
             <div class="track">
+              <div id="deformation-field" class="deformation-field" aria-hidden="true"></div>
               <div id="range-fill" class="range-fill"></div>
               <div id="resolution-fill" class="resolution-fill"></div>
               <div id="interval-fill" class="interval-fill" hidden></div>
@@ -183,7 +197,7 @@
           </div>
         </section>
 
-        <div class="command-workspace">
+        <div id="command-workspace" class="command-workspace">
           <aside id="parameter-panel" class="panel parameter-panel" aria-labelledby="parameters-heading">
             <div class="panel-heading compact-heading">
               <div>
@@ -201,7 +215,7 @@
               <span>Resolution</span><strong id="resolution-label">—</strong>
             </div>
 
-            <details id="step-size-settings" class="tool-disclosure step-size-settings" open>
+            <details id="step-size-settings" class="tool-disclosure step-size-settings">
               <summary><span>Step size</span><span id="step-size-summary">10 s manual</span></summary>
               <div class="step-size-body">
                 <div class="segmented-control" role="group" aria-label="Step size mode">
@@ -265,12 +279,13 @@
                 <span><kbd>⇧Q</kbd>/<kbd>⇧E</kbd> Local Refine</span>
                 <span><kbd>⇧A</kbd>/<kbd>⇧D</kbd> Pins</span>
                 <span><kbd>R</kbd> Release Interval</span>
-                <span><kbd>T</kbd> Deform Section</span>
+                <span><kbd>T</kbd> Deform / Normalize</span>
+                <span><kbd>⇧T</kbd>/<kbd>Ctrl T</kbd> Weight up / down</span>
                 <span><kbd>F</kbd> Focus / Unfocus</span>
                 <span><kbd>Alt</kbd> Carry selected retained object</span>
-                <span><kbd>P</kbd> Pin Current in Guide</span>
+                <span><kbd>P</kbd> Pin Current</span>
                 <span><kbd>Space</kbd> Native play/pause</span>
-                <span><kbd>⇧P</kbd> Save Section in Guide</span>
+                <span><kbd>⇧P</kbd> Save Working Section</span>
                 <span><kbd>G</kbd> Guide</span>
                 <span><kbd>[</kbd>/<kbd>]</kbd> Step size</span>
                 <span><kbd>Z</kbd> Undo</span>
@@ -296,67 +311,58 @@
 
             <div class="navigation-deck">
               <button id="refine-backward" class="nav-action primary direction backward" type="button" data-preview-action="refineBackward" aria-keyshortcuts="Q Shift+Q" disabled>
-                <span class="action-name"><kbd>Q</kbd> <span id="refine-backward-label">Refine Backward</span></span>
+                <span class="action-name"><kbd>Q</kbd> <span id="refine-backward-label" class="action-label">Refine Backward</span></span>
                 <span id="backward-meta" class="action-meta">—</span>
               </button>
               <button id="reopen" class="nav-action reopen-action" type="button" data-preview-action="reopen" aria-keyshortcuts="W" disabled>
-                <span class="action-name"><kbd>W</kbd> Reopen</span>
+                <span class="action-name"><kbd>W</kbd> <span class="action-label">Reopen</span></span>
                 <span id="reopen-meta" class="action-meta">—</span>
               </button>
               <button id="refine-forward" class="nav-action primary direction forward" type="button" data-preview-action="refineForward" aria-keyshortcuts="E Shift+E" disabled>
-                <span class="action-name"><kbd>E</kbd> <span id="refine-forward-label">Refine Forward</span></span>
+                <span class="action-name"><kbd>E</kbd> <span id="refine-forward-label" class="action-label">Refine Forward</span></span>
                 <span id="forward-meta" class="action-meta">—</span>
               </button>
 
               <button id="step-backward" class="nav-action direction backward" type="button" data-preview-action="stepBackward" aria-keyshortcuts="A ArrowLeft Shift+A Shift+ArrowLeft" disabled>
-                <span class="action-name"><kbd>A</kbd> <span id="step-backward-label">Step Backward</span></span>
+                <span class="action-name"><kbd>A</kbd> <span id="step-backward-label" class="action-label">Step Backward</span></span>
                 <span id="step-backward-meta" class="action-meta">—</span>
               </button>
               <button id="switch-endpoint" class="nav-action endpoint-action" type="button" data-preview-action="switchEndpoint" aria-keyshortcuts="S" disabled>
-                <span class="action-name"><kbd>S</kbd> Switch Endpoint</span>
+                <span class="action-name"><kbd>S</kbd> <span class="action-label">Switch Endpoint</span></span>
                 <span id="switch-endpoint-meta" class="action-meta">No Interval</span>
               </button>
               <button id="step-forward" class="nav-action direction forward" type="button" data-preview-action="stepForward" aria-keyshortcuts="D ArrowRight Shift+D Shift+ArrowRight" disabled>
-                <span class="action-name"><kbd>D</kbd> <span id="step-forward-label">Step Forward</span></span>
+                <span class="action-name"><kbd>D</kbd> <span id="step-forward-label" class="action-label">Step Forward</span></span>
                 <span id="step-forward-meta" class="action-meta">—</span>
               </button>
 
               <button id="release" class="nav-action lifecycle-action" type="button" data-preview-action="release" aria-keyshortcuts="R" disabled>
-                <span class="action-name"><kbd>R</kbd> Release</span>
+                <span class="action-name"><kbd>R</kbd> <span class="action-label">Release</span></span>
                 <span id="release-meta" class="action-meta">No Interval</span>
               </button>
               <div class="deform-control">
                 <button id="deform" class="nav-action lifecycle-action deform-action" type="button" data-preview-action="deform" aria-keyshortcuts="T" disabled>
-                  <span class="action-name"><kbd>T</kbd> Deform</span>
+                  <span class="action-name"><kbd>T</kbd> <span id="deform-label" class="action-label">Deform</span></span>
                   <span id="deform-meta" class="action-meta">No target</span>
                 </button>
-                <label class="deform-weight-control" for="deform-weight-select">
-                  <span class="sr-only">Section timeline weight</span>
-                  <select id="deform-weight-select" aria-label="Section timeline weight">
-                    <option value="0.25">0.25×</option>
-                    <option value="0.5" selected>0.5×</option>
-                    <option value="0.75">0.75×</option>
-                    <option value="1">1×</option>
-                    <option value="1.25">1.25×</option>
-                    <option value="1.5">1.5×</option>
-                    <option value="1.75">1.75×</option>
-                    <option value="2">2×</option>
-                  </select>
-                </label>
+                <div class="deform-steps" aria-label="Deformation weight">
+                  <button id="deform-down" class="deform-step" type="button" aria-keyshortcuts="Alt+T" title="Move deformation one weight step down (Alt+T)" disabled>−</button>
+                  <button id="deform-up" class="deform-step" type="button" aria-keyshortcuts="Shift+T" title="Move deformation one weight step up (Shift+T)" disabled>+</button>
+                </div>
               </div>
               <button id="focus-toggle" class="nav-action lifecycle-action focus-action" type="button" data-preview-action="focus" aria-keyshortcuts="F" disabled>
-                <span class="action-name"><kbd>F</kbd> <span id="focus-toggle-label">Focus</span></span>
+                <span class="action-name"><kbd>F</kbd> <span id="focus-toggle-label" class="action-label">Focus</span></span>
                 <span id="focus-toggle-meta" class="action-meta">No target</span>
               </button>
             </div>
 
             <div class="history-actions">
               <button id="return-action" class="history-action undo-action" type="button" aria-keyshortcuts="Z" disabled>
-                <span class="action-name"><kbd>Z</kbd> Undo</span>
+                <span class="action-name"><kbd>Z</kbd> <span class="action-label">Undo</span></span>
                 <span id="return-meta" class="action-meta">Nothing to undo</span>
               </button>
               <button id="redo-action" class="history-action redo-action" type="button" aria-keyshortcuts="C" disabled>
-                <span class="action-name"><kbd>C</kbd> Redo</span>
+                <span class="action-name"><kbd>C</kbd> <span class="action-label">Redo</span></span>
                 <span id="redo-meta" class="action-meta">Nothing to redo</span>
               </button>
             </div>
@@ -369,7 +375,7 @@
                 <h2>Guide</h2>
               </div>
               <div class="guide-header-actions">
-                <button id="guide-close" class="guide-close" type="button" aria-label="Close Guide">×</button>
+                <button id="guide-close" class="guide-close" type="button" aria-label="Collapse Guide" title="Collapse Guide"><span aria-hidden="true">›</span></button>
               </div>
             </div>
 
@@ -388,7 +394,9 @@
             </section>
 
             <section id="guide-sections-panel" class="guide-tab-panel" role="tabpanel" aria-labelledby="guide-tab-sections">
-              <form id="section-capture" class="guide-create-form section-create-form">
+              <details class="guide-create-disclosure">
+                <summary><span>Save a Section</span><kbd>⇧P</kbd></summary>
+                <form id="section-capture" class="guide-create-form section-create-form">
                 <div class="guide-create-heading">
                   <span class="eyebrow">Create Section</span>
                   <strong id="section-window">No current extent</strong>
@@ -407,12 +415,15 @@
                   <button id="focus-working-section" type="button" disabled>Focus Working</button>
                   <button id="save-section" class="primary" type="submit" aria-keyshortcuts="Shift+P" disabled>Save Section</button>
                 </div>
-              </form>
+                </form>
+              </details>
               <div id="sections-list" class="guide-list"><p class="empty-state">No Sections for this video.</p></div>
             </section>
 
             <section id="guide-pins-panel" class="guide-tab-panel" role="tabpanel" aria-labelledby="guide-tab-pins" hidden>
-              <form id="pin-capture" class="guide-create-form pin-create-form">
+              <details class="guide-create-disclosure">
+                <summary><span>Save a Pin</span><kbd>P</kbd></summary>
+                <form id="pin-capture" class="guide-create-form pin-create-form">
                 <div class="guide-create-heading">
                   <span class="eyebrow">Create Pin</span>
                   <strong id="pin-current-position">Current —</strong>
@@ -421,7 +432,8 @@
                   <input id="pin-label" type="text" maxlength="100" placeholder="Optional Pin title" disabled>
                 </label>
                 <button id="pin-current" class="primary" type="submit" aria-keyshortcuts="P" disabled>Pin Current</button>
-              </form>
+                </form>
+              </details>
               <div id="pins-list" class="guide-list"><p class="empty-state">No Pins for this video.</p></div>
             </section>
 
