@@ -39,16 +39,26 @@ assert.equal(
   80,
   "Held Step must move the visible Center on each repeat, not only its semantic marker."
 );
-// A Step target answers "where would a Step land". While the Step is being
-// performed several times a second that question is answered by the movement,
-// and two markers recomputed per repeat streak across the map as artifacts.
+// Predictive chrome answers "what would this do" and "where would it land".
+// While the operator is being performed several times a second, the movement
+// itself is answering, and every one of these elements recomputes on every
+// repeat -- which is what drew streaks across the map. Pressing the control
+// also focuses it, and focus arms the operator preview, so the whole
+// predictive apparatus must be checked, not only the Step targets.
 assert.deepEqual(
-  {
-    backward: byId.get("backward-target-marker").hidden,
-    forward: byId.get("forward-target-marker").hidden
-  },
-  { backward: true, forward: true },
-  "Step targets must stand down while a Step gesture is running."
+  [
+    "backward-target-marker",
+    "forward-target-marker",
+    "preview-resolution-fill",
+    "action-preview-fill",
+    "preview-resolution-start-marker",
+    "preview-resolution-end-marker",
+    "preview-backward-target-marker",
+    "preview-forward-target-marker",
+    "preview-current-marker"
+  ].filter(id => byId.get(id).hidden !== true),
+  [],
+  "No predictive chrome may be drawn while a Step gesture is running."
 );
 
 const sidePlacesBeforeRelease = {

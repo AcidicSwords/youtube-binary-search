@@ -1372,17 +1372,27 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
             : "stepForward"
         )
       : null;
+    // Pressing a Step control focuses it, and focus legitimately arms the
+    // operator preview — so a held Step would otherwise draw the whole
+    // predictive apparatus, five markers and two extents, and recompute all of
+    // it on every repeat. An operator preview answers "what would this do";
+    // while the operator is running, the movement is answering that several
+    // times a second. It stands down for the gesture, exactly as the Step
+    // targets and Cursor do.
+    const performingStepGesture = currentState.stepGestureActive === true;
+    const armedPreviewAction = performingStepGesture ? null : resolvedPreviewAction;
     const previewResult = dragAction
       ? previewTransition(currentState.session, dragAction, {
           seconds: dragDistance
         })
-      : resolvedPreviewAction
-        ? previewTransition(currentState.session, resolvedPreviewAction, {
+      : armedPreviewAction
+        ? previewTransition(currentState.session, armedPreviewAction, {
             seconds: effectiveReach[previewDirection],
             destination: previewPin?.t
           })
         : null;
-    const previewKind = dragAction || previewAction;
+    const previewKind = dragAction
+      || (performingStepGesture ? null : previewAction);
     const focused = focusedProjection();
 
     elements["timeline-current-time"].textContent = formatTime(semanticCurrent);
