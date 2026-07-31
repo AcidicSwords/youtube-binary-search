@@ -36,6 +36,10 @@ the Nudge quantum, or Section weight.
 
 The temporal map uses lateral Timeline Space while the ruler labels source timestamps.
 
+Two time forms carry one rule each. An **Address** is written with a colon — `0:30`, `1:15.5` — and answers *where*. A **duration** is written with units — `10s`, `1m 40s` — and answers *how much*. Sub-second precision is kept only where the quantity is genuinely sub-second, such as a Nudge quantum; nothing is reported to millisecond resolution.
+
+Every readout must answer something no other readout already answers. Concretely: Current carries its own Address under its marker on the map, so no header repeats it; Cursor reports only when observation has left Current, because otherwise it is a second copy of Current; a Range boundary is labelled only where the ruler's own edge does not already label it; and an operator's line says what that operator will do, naming the Working Interval rather than reprinting an extent that is already on screen.
+
 Spatial extent is never printed as a duration. Wherever a spatial figure appears — total source, active Resolution, the Range Reopen would restore — it is shown as the stretch factor it applies to that scope's own source span, and it is omitted entirely at `1×`, where the map and the source already correspond. A one-minute source with one 15 s Section at `2×` reads `1:00 · 1.25× spatial`.
 
 Visual order:

@@ -170,11 +170,14 @@ const sectionMain = sectionNodes.find(node =>
 byId.get("sections-list").dispatch("click", { target: sectionMain });
 await flush();
 assert.equal(currentText(), "Current 0:40");
-assert.equal(
-  byId.get("release-meta").textContent,
-  "0:30–0:50",
+// section-window is where an extent is printed; release-meta names what
+// Release will remove rather than reprinting the same range beside it.
+assert.match(
+  byId.get("section-window").textContent,
+  /0:30–0:50/,
   "Selecting a Section must make its full extent the Working Interval."
 );
+assert.equal(byId.get("release-meta").textContent, "Working Interval");
 sectionNodes = descendants(byId.get("sections-list"));
 const focusAction = sectionNodes.find(node =>
   node.dataset.focusSection === sectionId

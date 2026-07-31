@@ -247,6 +247,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements.status.classList.toggle("error", isError);
   }
 
+  // One reused node: the label belongs to the marker and never accumulates.
+  const currentMarkerTime = document.createElement("span");
+  currentMarkerTime.className = "current-marker-time";
+  currentMarkerTime.setAttribute("aria-hidden", "true");
+
   function percent(time) {
     const projection = timelineProjection();
     if (!(projection.viewSpan > 0)) return 0;
@@ -398,24 +403,16 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         button.classList.add("snap-target");
         if (state().guideDrag?.snapArmed) button.classList.add("snap-armed");
       }
-      button.title = `${pinLabel(pin)} at ${formatTime(pin.sourceT ?? pin.t)}; click to select`;
+      // A Pin in the cluster menu is the same operand as a Pin on the map, so it
+      // obeys the same rule: press and move drags it, release without moving
+      // Goes to it. Splitting that into a choose button plus a separate drag
+      // handle was a grammar this interface uses nowhere else.
+      button.dataset.pinDrag = pin.id;
+      button.title = sectionsForPin(guide(), pin.id).length === 1
+        ? `${pinLabel(pin)} at ${formatTime(pin.sourceT ?? pin.t)}; click to go, drag to move — pause over another Pin, then release to link`
+        : `${pinLabel(pin)} at ${formatTime(pin.sourceT ?? pin.t)}; click to go, drag to move`;
       button.append(label, time);
-      const drag = document.createElement("button");
-      drag.type = "button";
-      drag.className = "pin-cluster-drag";
-      drag.dataset.pinDrag = pin.id;
-      if (pinClusterTrigger?.dataset?.clusterIndex !== undefined) {
-        drag.dataset.clusterIndex = pinClusterTrigger.dataset.clusterIndex;
-      }
-      drag.setAttribute(
-        "aria-label",
-        `Move ${pinLabel(pin)} from ${formatTime(pin.sourceT ?? pin.t)}${sectionsForPin(guide(), pin.id).length === 1 ? "; pause over another Pin, then release to link" : ""}`
-      );
-      drag.title = sectionsForPin(guide(), pin.id).length === 1
-        ? "Drag horizontally; pause over another Pin, then release to link"
-        : "Drag horizontally to move this exact Pin";
-      drag.textContent = "â†”";
-      row.append(button, drag);
+      row.append(button);
       menu.appendChild(row);
     }
     const width = elements.timeline.clientWidth || 1;
@@ -484,10 +481,18 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       }
     }
 
+    // A Range boundary is only worth labelling where the ruler does not already
+    // answer it. The ruler spans the drawn extent, so whenever Range reaches
+    // that edge its guide would print the same Address the edge tick prints,
+    // one on top of the other.
     for (const [role, source] of [
       ["start", range().start],
       ["end", range().end]
     ]) {
+      const drawnEdge = role === "start"
+        ? projection.viewExtent.start
+        : projection.viewExtent.end;
+      if (Math.abs(source - drawnEdge) <= EPSILON) continue;
       const boundary = document.createElement("span");
       boundary.className = `timeline-range-guide ${role}`;
       boundary.style.left = `${percent(source)}%`;
@@ -638,7 +643,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     );
     const pinTop = 17;
     const trackTop = 44;
-    const rulerTop = trackTop + 36;
+    const rulerTop = trackTop + 58;
     const sectionTop = rulerTop + 38;
     const timelineHeight = sectionTop + sectionBandHeight + 4;
     setStyleProperty(elements.timeline, "--track-top", `${trackTop}px`);
@@ -1167,7 +1172,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? clamp(physical, activeRange.start, activeRange.end)
       : semanticCurrent;
 
-    elements["cursor-time"].textContent = formatTime(cursor);
+    // Cursor reports observation that has left Current. While it has not, this
+    // readout would print a second copy of Current, so it reports nothing --
+    // the same rule the Cursor marker follows on the map.
+    elements["cursor-time"].textContent = physicallyDisplaced || moving
+      ? formatTime(cursor)
+      : "—";
     const transport = state().transport;
     const playbackProjection = transport.kind === TRANSPORT_KIND.PLAYBACK
       ? projectPlayback(model(), {
@@ -1398,7 +1408,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       || (performingStepGesture ? null : previewAction);
     const focused = focusedProjection();
 
-    elements["timeline-current-time"].textContent = formatTime(semanticCurrent);
     elements["timeline-key-sections"].dataset.active = String(
       Boolean(sortedSections(guide()).length)
     );
@@ -1723,8 +1732,20 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : shiftLayer && next
         ? `${formatTime(next.t)} · ${pinLabel(next)}`
         : "Range end";
+    // The Working Interval is already named and printed by section-window. An
+    // operator meta earns its line by saying what that operator will do, and
+    // reprints an extent only when the extent is not the one already shown.
+    const isWorkingInterval = extent => Boolean(
+      currentInterval
+      && extent
+      && Math.abs(extent.start - currentInterval.start) <= EPSILON
+      && Math.abs(extent.end - currentInterval.end) <= EPSILON
+    );
+    const targetLabel = extent => isWorkingInterval(extent)
+      ? "Working Interval"
+      : formatRange(extent);
     elements["release-meta"].textContent = currentInterval
-      ? formatRange(currentInterval)
+      ? "Working Interval"
       : "No Interval";
     const selectedMatchesInterval = selectedSection && (
       !currentInterval
@@ -1741,12 +1762,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? "Normalize"
       : "Deform";
     elements["deform-meta"].textContent = deformTarget
-      ? `${deformIsWeighted ? "restore 1×" : "restore last"} · ${formatRange(deformTarget)}`
+      ? `${deformIsWeighted ? "restore 1×" : "restore last"} · ${targetLabel(deformTarget)}`
       : "No target";
     elements["focus-toggle-meta"].textContent = focused
       ? `restore ${formatRange(model().focus.returnRange)}`
       : currentInterval
-        ? formatRange(currentInterval)
+        ? "Working Interval"
         : selectedSection
           ? formatRange(selectedSection)
           : "No target";
@@ -1803,6 +1824,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "aria-valuetext",
       `${formatTime(candidate)}; Current${dragging ? " candidate" : ""}`
     );
+    // Current reads its own source Address on the map, where it is looked at.
+    if (!currentMarkerTime.parentElement) {
+      elements["current-marker"].appendChild(currentMarkerTime);
+    }
+    currentMarkerTime.textContent = formatTime(candidate);
     elements["current-departure-marker"].hidden = !dragging;
     if (dragging) {
       setMarkerPosition(
