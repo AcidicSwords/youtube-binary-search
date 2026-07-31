@@ -196,6 +196,38 @@ assert.deepEqual(
   { left: "0%", width: "100%" },
   "A focused Section must span the full timeline."
 );
+// The boundary that defines the world cannot be dragged from inside it. Such a
+// drag could only ever pull the boundary inward — the Range it defines is also
+// the limit the drag clamps to — while re-normalizing the drawn map under the
+// finger on every move.
+{
+  const boundaryPin = descendants(byId.get("pin-lane"))
+    .find(node => node.dataset.pinGo);
+  assert.ok(boundaryPin, "A focused Section must still draw its endpoint Pins.");
+  const rangeBeforeDrag = byId.get("range-label").textContent;
+  byId.get("pin-lane").dispatch("pointerdown", {
+    target: boundaryPin,
+    pointerId: 55,
+    button: 0,
+    clientX: 300
+  });
+  await flush();
+  assert.match(byId.get("status").textContent, /Unfocus to move the boundary/,
+    "Dragging a focused boundary Pin must be refused, with the reason.");
+  dispatchDocument("pointermove", { pointerId: 55, clientX: 700, buttons: 1 });
+  dispatchDocument("pointerup", { pointerId: 55, clientX: 700 });
+  await flush();
+  assert.equal(byId.get("range-label").textContent, rangeBeforeDrag,
+    "A refused drag moves no boundary.");
+  assert.deepEqual(
+    {
+      left: byId.get("range-fill").style.left,
+      width: byId.get("range-fill").style.width
+    },
+    { left: "0%", width: "100%" },
+    "And the drawn scale never snaps around under the gesture."
+  );
+}
 
 byId.get("focus-toggle").click();
 await flush();

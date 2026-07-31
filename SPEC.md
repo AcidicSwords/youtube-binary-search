@@ -824,6 +824,10 @@ breathing offsets remain within effective [x, y] bounds
 a side waiting at a breathing boundary runs at Center rate
 Hold alone changes Stretching into Held
 dragging or nudging Current invokes Step, never Go
+a Current drag previews the Interval and neighbourhood its Step will commit
+what a direct gesture previews is what its release commits
+Cursor is drawn only where observation has left Current
+a focused extent's own boundary cannot be dragged from inside it
 Timeline direct manipulation and Guide exact editing call the same operation
 one drag, wheel series, or held-key nudge creates at most one Undo checkpoint
 fine Nudge acts in source time, not Timeline Space

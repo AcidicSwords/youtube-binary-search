@@ -100,6 +100,24 @@ assert.equal(byId.get("current-marker").style.left, "65%",
 assert.equal(byId.get("field-transport-state").textContent, "Current Frame",
   "Direct manipulation temporarily supplies an exact Field Frame.");
 assert.equal(env.center().currentTime, 65, "Center displays the candidate frame.");
+// The drag commits a Step, so it must show the Step it will commit. Without a
+// live preview the Working Interval and neighbourhood stand still under a
+// moving marker and jump on release, which reads as a different gesture.
+assert.equal(byId.get("action-preview-fill").hidden, false,
+  "Dragging Current must preview the Working Interval the Step will land.");
+assert.equal(byId.get("action-preview-fill").dataset.kind, "stepForward",
+  "The previewed extent is a Step, never a Go.");
+assert.equal(byId.get("preview-resolution-fill").hidden, false,
+  "The neighbourhood the Step will establish is previewed with it.");
+const previewedInterval = {
+  left: byId.get("action-preview-fill").style.left,
+  width: byId.get("action-preview-fill").style.width
+};
+// Cursor reports observation that has left Current. A drag seeks the player to
+// the candidate, so Cursor has not left Current and must draw no second marker
+// stacked under the one the finger is holding.
+assert.equal(byId.get("cursor-marker").hidden, true,
+  "A Current drag must not draw a Cursor under the Current marker.");
 
 // Release commits one exact Go and exactly one Undo checkpoint.
 dispatchDocument("pointerup", {
@@ -115,6 +133,16 @@ assert.equal(byId.get("current-departure-marker").hidden, true);
 // Dragging Current is Step, not Go: it extends the retained traversal from the
 // same departure instead of drawing a new Working Interval around the landing.
 assert.match(byId.get("status").textContent, /Stepped Forward to 1:05/);
+assert.equal(byId.get("action-preview-fill").hidden, true,
+  "The preview is released with the gesture.");
+assert.deepEqual(
+  {
+    left: byId.get("interval-fill").style.left,
+    width: byId.get("interval-fill").style.width
+  },
+  previewedInterval,
+  "What the drag previewed is exactly what the release commits."
+);
 assert.ok(
   byId.get("section-window").textContent.startsWith(intervalStartBeforeDrag),
   "Dragging Current extends the retained traversal from its existing anchor."

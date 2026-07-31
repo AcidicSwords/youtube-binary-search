@@ -2666,6 +2666,25 @@ function updatePinSnapTarget(drag, target) {
   }, PIN_SNAP_ARM_MS);
 }
 
+// A focused extent is the world, and its own boundary cannot be moved from
+// inside it. Dragging such a Pin could only ever pull the boundary inward,
+// because the Range it defines is simultaneously the limit the drag clamps to,
+// and every move re-normalizes the drawn map underneath the finger. Refusing
+// the gesture is the honest answer: Unfocus first, or edit the Address in the
+// Guide, where the same change is an exact edit rather than a spatial one.
+function composesFocusedRange(pin, section) {
+  if (!model().focus) return false;
+  const range = activeRange();
+  const onBoundary = address => Number.isFinite(address)
+    && (
+      Math.abs(address - range.start) <= EPSILON
+      || Math.abs(address - range.end) <= EPSILON
+    );
+  if (pin) return onBoundary(pin.t);
+  if (section) return onBoundary(section.start) || onBoundary(section.end);
+  return false;
+}
+
 function beginGuideDrag(kind, id, event, options = {}) {
   if (
     !state.videoLoaded
@@ -2676,6 +2695,12 @@ function beginGuideDrag(kind, id, event, options = {}) {
   const pin = kind === "pin" ? getPin(guide(), id) : null;
   const section = kind === "section" ? resolveSection(guide(), id) : null;
   if (!pin && !section) return;
+  if (composesFocusedRange(pin, section)) {
+    setStatus(
+      "Focus made this the world; Unfocus to move the boundary that defines it."
+    );
+    return;
+  }
   const timelineSurface = elements.timeline.contains?.(event.target);
   const surface = options.surface || (timelineSurface ? "timeline" : "relative");
   const timelineWidth = elements.timeline.getBoundingClientRect().width;
