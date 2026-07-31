@@ -5,7 +5,8 @@
 1. Source time is canonical.
 2. Timeline Space is derived, positive, and pure.
 3. Section weight changes map geometry only.
-4. Playback, Context, and Field geometry remain source-time systems.
+4. Playback, Context, and live Field geometry remain source-time systems;
+   paused operator previews may supply addresses derived from Timeline Space.
 5. A gesture creates at most one Undo checkpoint.
 6. Current and Cursor remain distinct.
 7. Step Reach, Field Offset, and Section weight have separate ownership.
@@ -32,7 +33,9 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
 - Persist only a canonical Section factor, never Timeline Space, segment products, lane placement, or gradient state.
 - Keep every effective density strictly positive.
 - Compose overlapping Section factors deterministically and without priority.
-- Never make playback, Context, YouTube adapters, or Field geometry consult Section weights.
+- Never make playback, Context, YouTube adapters, or live Field geometry consult
+  Section weights. Only the semantic operator owner may project preview
+  addresses through Timeline Space.
 - Preserve arbitrary overlap, asymmetric nesting, shared endpoints, and coincident extents.
 - Unlink must preserve Address and require confirmation. Link must start from
   one independent endpoint, visibly arm after deliberate dwell on a valid
@@ -40,6 +43,9 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
 - Recompute adaptive Step from active weighted Range width, never from source duration or Field Offset.
 - Keep fixed Step Reach unchanged when Section geometry changes.
 - Hold and Stretch may update neither `fieldOffsets`, `stepReach`, nor Guide.
+- Keep configured Field Offset separate from attained Hold/Stretch relation.
+  One-side Tune may command only that side; hidden/off panes must remain
+  dormant and reject stale player events.
 - Guide precision editing and Deform stepping must call the same Session transactions.
 
 ## Testing map

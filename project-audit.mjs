@@ -149,7 +149,7 @@ assert.match(view, /function pinPositionButton[\s\S]*className\s*=\s*"endpoint-b
 assert.match(styles, /\.pin-position-track[\s\S]*height:\s*43px[\s\S]*margin:\s*0 10px 9px/);
 assert.doesNotMatch(view, /guide-action-move/);
 assert.match(app, /function previewGuideDrag[\s\S]*kind:\s*"section"[\s\S]*start:[\s\S]*center:[\s\S]*end:/);
-assert.match(field, /function previewExtent[\s\S]*renderDragPreview/);
+assert.match(field, /function previewExtent[\s\S]*renderPreview/);
 assert.match(field, /function clearPreview[\s\S]*restore/);
 assert.match(app, /function sectionForSelectedPinExtent[\s\S]*startPinId[\s\S]*endPinId/);
 assert.match(app, /function handleTimelineClick[\s\S]*closest\("\[data-section-go\]"\)/);

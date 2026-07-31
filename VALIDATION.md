@@ -41,6 +41,19 @@
 - Focus and Unfocus; confirm adaptive distance updates.
 - Hold and Stretch Tail, Lead, and both sides. Neither configured Offset, Step Reach, nor Section weight may change.
 - Confirm side Step uses visible differential without rewriting semantic Reach.
+- Hold one side at a partial relation, edit its configured Offset, and confirm
+  the partial Hold remains while the sibling receives no seek, pause, rate, or
+  mode change. Repeat with the side fully at its target and confirm it follows
+  the new target.
+- Clear or invalidate an Offset input; confirm the canonical value returns and
+  no preference changes.
+- Collapse a side while its source is preparing or playback is starting, then
+  deliver the delayed player event; confirm it remains paused and cannot Step.
+  Repeat with Field Off. Poll repeatedly and confirm dormant panes receive no
+  further player commands.
+- At a Range boundary, confirm only sides with positive reach participate in
+  the combined Hold/Stretch action. A hidden, errored, or preparing side must
+  not advertise side Step or contribute a held Field span.
 - Step toward a Resolution endpoint repeatedly. It must remain fixed through the one-Step midpoint guard, then advance only enough to restore headroom.
 
 ## Positive projection
@@ -176,10 +189,29 @@
   displacement and viewer preview.
 - Drag a Guide Section profile; confirm both endpoint Pins translate by the same
   amount and cancellation restores the complete original extent.
-- During a Pin drag, confirm Center previews the Pin while Tail/Lead preserve the
-  configured Field. During either Section drag, confirm Tail, Center, and Lead
+- During a Pin drag, confirm Center previews the Pin while Tail/Lead show the
+  exact weighted Step destinations around it. During either Section drag,
+  confirm Tail, Center, and Lead
   preview Start, midpoint, and End respectively, then restore ordinary Field
   state on release or cancellation.
+- Set Step Reach to 10 seconds, Context to 5 seconds, and both Field Offsets to
+  2.5 seconds. Confirm idle Field shows exact weighted Step targets; Context
+  shows its first/last source frames; Pin drag still uses weighted Step; and the
+  2.5-second Offsets appear only during Stretch/Hold. Confirm no setting
+  rewrites either of the others.
+- Refine once and confirm Tail/Lead show the next backward/forward weighted
+  midpoints. Reopen and confirm they show the newly available Refine midpoints.
+  Let Context complete after each traversal and confirm it returns to that last
+  semantic preview.
+- Pause after attaining asymmetric Stretch/Hold relations. Confirm Step preview
+  replaces the visible side frames without rewriting those stored runtime
+  relations, and the next Play still performs the ordinary refold/Stretch.
+- Start playback from every idle preview kind. Confirm preview labeling and
+  non-Held spans disappear synchronously, both sides refold to Center, configured
+  physical Offsets/rates govern Stretch/Hold, and pausing returns to Step.
+- Hover and keyboard-focus operator controls without pressing them. Confirm the
+  timeline previews their exact dry-run result while Center, Tail, and Lead do
+  not seek, pause, or change rate.
 - In compact Guide, switch between Sections and Pins and operate each control;
   confirm background surfaces are inert while the sheet never falls through to
   its scrim.

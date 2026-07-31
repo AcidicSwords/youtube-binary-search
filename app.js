@@ -3,6 +3,7 @@ import {
   EPSILON,
   clamp,
   contains,
+  getTargets,
   refineBlockReason
 } from "./range-geometry.js";
 import {
@@ -124,10 +125,6 @@ function normalizeContextSeconds(value, fallback = 5) {
   return clamp(numeric, 0, MAX_CONTEXT_SECONDS);
 }
 
-function normalizeLastStepReachEdited(value) {
-  return value === "backward" ? "backward" : "forward";
-}
-
 function readPreferences() {
   try {
     const value = JSON.parse(localStorage.getItem(PREFERENCES_KEY) || "null");
@@ -140,7 +137,6 @@ function readPreferences() {
       fieldOffsets: normalizeStepReach(
         value?.fieldOffsets ?? value?.stepReach ?? legacyStep
       ),
-      stepReachLastEdited: normalizeLastStepReachEdited(value?.stepReachLastEdited),
       fieldResponse: normalizeFieldResponse(value?.fieldResponse),
       stepFieldEnabled: value?.stepFieldEnabled !== false,
       tailVisible: value?.tailVisible !== false,
@@ -151,7 +147,6 @@ function readPreferences() {
       contextSeconds: 5,
       stepReach: normalizeStepReach(10),
       fieldOffsets: normalizeStepReach(10),
-      stepReachLastEdited: "forward",
       fieldResponse: { ...DEFAULT_FIELD_RESPONSE },
       stepFieldEnabled: true,
       tailVisible: true,
@@ -171,7 +166,6 @@ const state = {
   availableRates: [1],
   transport: idleTransport(),
   pendingStep: null,
-  lastStepReachEdited: preferences.stepReachLastEdited,
   fieldOffsets: normalizeStepReach(preferences.fieldOffsets),
   fieldResponse: normalizeFieldResponse(preferences.fieldResponse),
   contextSeconds: preferences.contextSeconds,
@@ -238,6 +232,93 @@ function configuredStepReach() {
 
 function currentFieldOffsets() {
   return normalizeStepReach(state.fieldOffsets ?? preferences.fieldOffsets);
+}
+
+function fieldStepPreview(center, kind = "step") {
+  const reach = currentStepReach();
+  const projection = timelineProjection();
+  return {
+    kind,
+    start: projection.stepTarget(
+      center,
+      reach.backward,
+      "backward",
+      activeRange()
+    ),
+    center,
+    end: projection.stepTarget(
+      center,
+      reach.forward,
+      "forward",
+      activeRange()
+    ),
+    backwardDistance: reach.backward,
+    forwardDistance: reach.forward
+  };
+}
+
+function fieldOperatorPreview() {
+  if (!state.videoLoaded || !currentResolution() || !activeRange()) return null;
+  const transport = state.transport;
+  if (transport.kind === TRANSPORT_KIND.CONTEXT) {
+    return {
+      kind: "context",
+      start: transport.start,
+      center: transport.anchor,
+      end: transport.end
+    };
+  }
+  if (
+    transport.kind !== TRANSPORT_KIND.IDLE
+    || state.dragHandle
+    || state.guideDrag?.moved
+    || [YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(
+      playerSnapshot().state
+    )
+  ) return null;
+
+  const center = currentResolution().C;
+  const projection = timelineProjection();
+  const operator = model().lastOperator;
+  if ([
+    "refineBackward",
+    "refineForward",
+    "localRefineBackward",
+    "localRefineForward"
+  ].includes(operator)) {
+    const targets = getTargets(currentResolution(), projection.metric);
+    return {
+      kind: "refine",
+      start: targets.backward ?? center,
+      center,
+      end: targets.forward ?? center
+    };
+  }
+  if (operator === "section") {
+    const interval = currentInterval();
+    const midpoint = interval ? (interval.start + interval.end) / 2 : NaN;
+    if (
+      Number.isFinite(midpoint)
+      && Math.abs(center - midpoint) <= EPSILON
+    ) {
+      return {
+        kind: "section",
+        start: interval.start,
+        center,
+        end: interval.end
+      };
+    }
+  }
+  if (operator === "reopen") {
+    const targets = getTargets(currentResolution(), projection.metric);
+    return {
+      kind: "reopen",
+      start: targets.backward ?? center,
+      center,
+      end: targets.forward ?? center
+    };
+  }
+  return fieldStepPreview(center);
 }
 
 function reachFor(direction) {
@@ -338,7 +419,6 @@ function persistPreferences() {
       model()?.stepReach ?? preferences.stepReach,
       preferences.stepReach
     );
-    preferences.stepReachLastEdited = normalizeLastStepReachEdited(state.lastStepReachEdited);
     preferences.fieldOffsets = normalizeStepReach(
       state.fieldOffsets,
       preferences.fieldOffsets
@@ -352,7 +432,6 @@ function persistPreferences() {
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify({
       contextSeconds: preferences.contextSeconds,
       stepReach: preferences.stepReach,
-      stepReachLastEdited: preferences.stepReachLastEdited,
       fieldOffsets: preferences.fieldOffsets,
       fieldResponse: preferences.fieldResponse,
       stepFieldEnabled: preferences.stepFieldEnabled,
@@ -538,9 +617,9 @@ function startContext(anchor, options = {}) {
   state.transport = options.retarget && state.playerState === YOUTUBE_STATE.PLAYING
     ? withTransportPhase(transport, "playing")
     : transport;
-  // Context observes only Center. Preserve the already-translated Field relation
-  // around the semantic anchor instead of remeasuring against the old Cursor.
-  // Retargeting an active Context reuses its already-suspended Field.
+  // Context playback belongs only to Center. Tail and Lead pause their stored
+  // playback relation and temporarily preview the exact Context bounds.
+  // Retargeting an active Context reuses that already-suspended Field.
   if (!options.retarget) stepField?.pause({ center: anchor, freeze: false });
   player.setRate(1);
   placePlayer(transport.start);
@@ -2497,7 +2576,7 @@ function previewGuideDrag(drag) {
           center: section.midpoint,
           end: section.end
         }
-      : { kind: "pin", center }
+      : fieldStepPreview(center, "pin")
   );
 }
 
@@ -2973,9 +3052,13 @@ function setStepFraction(value) {
 }
 
 function changeFieldOffset(direction, value) {
-  const amount = clamp(Number(value), 0.25, 300);
-  if (!Number.isFinite(amount)) return;
-  state.lastStepReachEdited = direction;
+  const parsed = Number(value);
+  if (!String(value).trim() || !Number.isFinite(parsed) || parsed <= 0) {
+    setStatus("Field Offset must be a positive number.", true);
+    view.render();
+    return false;
+  }
+  const amount = clamp(parsed, 0.25, 300);
   state.fieldOffsets = normalizeStepReach({
     ...currentFieldOffsets(),
     [direction]: amount,
@@ -2983,11 +3066,12 @@ function changeFieldOffset(direction, value) {
     mode: STEP_REACH_MODE.FIXED
   });
   persistPreferences();
-  stepField?.translateToCurrent(currentResolution()?.C || 0, {
-    preserve: true
-  });
+  stepField?.reconfigureOffset?.(
+    direction === "backward" ? "tail" : "lead"
+  );
   setStatus(`${direction === "backward" ? "Tail" : "Lead"} Field offset set to ${amount}s.`);
   view.render();
+  return true;
 }
 
 function syncContextControl() {
@@ -3192,6 +3276,9 @@ function initializePlayerApi() {
       // Step Field offsets are physical observation settings. They are
       // intentionally independent from the semantic Step Reach.
       stepReach: currentFieldOffsets(),
+      // The semantic owner supplies exact, temporary preview geometry. The
+      // Field controller never imports timeline projection or Context math.
+      fieldPreview: fieldOperatorPreview(),
       transportKind: state.transport.kind,
       pendingStep: Boolean(state.pendingStep),
       dragging: Boolean(state.dragHandle || state.guideDrag?.moved),

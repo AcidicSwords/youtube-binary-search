@@ -14,6 +14,14 @@ await flush(5);
 assert.equal(currentText(), "Current 0:00");
 assert.equal(byId.get("duration-time").textContent, "1:40");
 
+// Tune rejects an empty/invalid Offset without silently converting it to the
+// minimum or leaving the field showing a value the model did not accept.
+byId.get("step-backward-seconds").value = "";
+byId.get("step-backward-seconds").dispatch("change");
+await flush();
+assert.equal(byId.get("step-backward-seconds").value, "10");
+assert.match(byId.get("status").textContent, /positive number/);
+
 // Keep this smoke focused on direct interaction; automatic Context has its own
 // dedicated smoke test.
 byId.get("context-seconds").value = "0";
@@ -30,6 +38,56 @@ assert.equal(byId.get("step-size-summary").textContent, "1/8 Range · 12.5s");
 byId.get("step-mode-fixed").click();
 await flush();
 assert.equal(byId.get("step-size-summary").textContent, "10s manual");
+
+// Idle Viewer ownership follows the last semantic operator. Step is the
+// default; Refine and Reopen expose the exact next weighted midpoint choices.
+await poll();
+await flush(3);
+const previewTail = env.tail();
+const previewLead = env.lead();
+assert.equal(byId.get("field-transport-state").textContent, "Step preview");
+assert.equal(previewTail.currentTime, 0);
+assert.equal(previewLead.currentTime, 10);
+byId.get("refine-forward").click();
+await flush();
+await poll();
+assert.equal(currentText(), "Current 0:50");
+assert.equal(byId.get("field-transport-state").textContent, "Refine preview");
+assert.equal(previewTail.currentTime, 25);
+assert.equal(previewLead.currentTime, 75);
+byId.get("refine-forward").click();
+await flush();
+await poll();
+assert.equal(currentText(), "Current 1:15");
+assert.equal(byId.get("field-transport-state").textContent, "Refine preview");
+assert.equal(previewTail.currentTime, 37.5);
+assert.equal(previewLead.currentTime, 87.5);
+byId.get("return-action").click();
+byId.get("return-action").click();
+await flush();
+await poll();
+assert.equal(currentText(), "Current 0:00");
+
+byId.get("timeline").dispatch("click", {
+  target: byId.get("timeline"),
+  clientX: 100
+});
+await flush();
+assert.equal(currentText(), "Current 0:10");
+byId.get("reopen").click();
+await flush();
+await poll();
+assert.equal(byId.get("field-transport-state").textContent, "Reopen preview");
+assert.equal(previewTail.currentTime, 5);
+assert.equal(previewLead.currentTime, 55);
+byId.get("return-action").click();
+byId.get("return-action").click();
+await flush();
+await poll();
+assert.equal(currentText(), "Current 0:00");
+assert.equal(byId.get("field-transport-state").textContent, "Step preview");
+assert.equal(previewTail.currentTime, 0);
+assert.equal(previewLead.currentTime, 10);
 
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 500 });
 await flush();
@@ -311,6 +369,9 @@ await flush(4);
 assert.ok(players.has("player-tail") && players.has("player-lead"));
 const tail = env.tail();
 const lead = env.lead();
+assert.equal(byId.get("field-transport-state").textContent, "Section preview");
+assert.equal(tail.currentTime, 25, "Tail must preview the selected Section start.");
+assert.equal(lead.currentTime, 50, "Lead must preview the selected Section end.");
 assert.equal(byId.get("center-transport-surface").disabled, false);
 assert.equal(tail.playerVars.controls, 0);
 assert.equal(lead.playerVars.controls, 0);
@@ -374,7 +435,11 @@ assert.ok(
 );
 dispatchDocument("pointerup", { target: startEndpoint, pointerId: 41 });
 await flush();
-assert.notEqual(byId.get("field-transport-state").textContent, "Section preview");
+assert.equal(
+  byId.get("field-transport-state").textContent,
+  "Step preview",
+  "After an endpoint edit displaces the retained midpoint from Current, the Viewer must return to Current-centered Step."
+);
 assert.ok(
   descendants(byId.get("sections-list")).some(node => node.dataset.sectionWeight),
   "Endpoint drag must preserve the parent Section's operational controls."
@@ -462,7 +527,9 @@ assert.equal(center.currentTime, 47.5);
 assert.equal(lead.currentTime, 60);
 dispatchDocument("pointercancel", { target: sectionProfile, pointerId: 42 });
 await flush();
-assert.notEqual(byId.get("field-transport-state").textContent, "Section preview");
+assert.equal(byId.get("field-transport-state").textContent, "Section preview");
+assert.equal(tail.currentTime, 25);
+assert.equal(lead.currentTime, 50);
 assert.ok(
   descendants(byId.get("sections-list")).some(node => /0:25–0:50/.test(node.textContent)),
   "Cancelling a whole-Section Guide drag must restore its original Extent."
@@ -536,8 +603,8 @@ assert.equal(byId.get("step-forward-seconds").value, "10");
 assert.equal(byId.get("field-both-toggle-label").textContent, "Stretch both");
 assert.equal(byId.get("section-window").textContent, intervalBeforeStretch);
 
-// Native pause freezes and parks exact side frames. Playback accumulates watched
-// coverage without shortening it; the Field remains a separate physical object.
+// Native pause settles playback, preserves its attained relation internally,
+// then returns the panes to the exact semantic Step preview.
 center.currentTime = 58;
 tail.currentTime = 54;
 lead.currentTime = 66;
@@ -547,8 +614,9 @@ await poll();
 assert.equal(byId.get("center-transport-surface").hidden, false, "Paused Center must restore the shared activation surface.");
 assert.equal(currentText(), "Current 0:58");
 assert.match(byId.get("section-window").textContent, /0:25–0:58/);
-assert.equal(tail.currentTime, 54, "Paused Tail must display its represented backward frame.");
-assert.equal(lead.currentTime, 66, "Paused Lead must display its represented forward frame.");
+assert.equal(byId.get("field-transport-state").textContent, "Step preview");
+assert.equal(tail.currentTime, 48, "Paused Tail must preview the exact Step Backward destination.");
+assert.equal(lead.currentTime, 68, "Paused Lead must preview the exact Step Forward destination.");
 assert.equal(tail.state, 2);
 assert.equal(lead.state, 2);
 
@@ -563,28 +631,27 @@ await flush();
 assert.equal(currentText(), "Current 0:58");
 assert.match(byId.get("section-window").textContent, /0:25–0:58/);
 
-// Side Step uses the visible pane offset and translates the complete Field.
-// Repeated clicks therefore behave like a temporal slideshow while Step edits
-// the same semantic Interval.
+// Side panes display and invoke the same semantic Step destinations. The stored
+// playback Hold relation remains separate and returns only when playback starts.
 byId.get("tail-player-surface").click();
 await env.delay(150);
 await flush();
 await poll();
-assert.equal(currentText(), "Current 0:54");
-assert.equal(center.currentTime, 54);
-assert.equal(tail.currentTime, 50);
-assert.equal(lead.currentTime, 62);
-assert.match(byId.get("section-window").textContent, /0:25–0:54/);
+assert.equal(currentText(), "Current 0:48");
+assert.equal(center.currentTime, 48);
+assert.equal(tail.currentTime, 38);
+assert.equal(lead.currentTime, 58);
+assert.match(byId.get("section-window").textContent, /0:25–0:48/);
 
 byId.get("lead-player-surface").click();
 await env.delay(150);
 await flush();
 await poll();
-assert.equal(currentText(), "Current 1:02");
-assert.equal(center.currentTime, 62);
-assert.equal(tail.currentTime, 58);
-assert.equal(lead.currentTime, 70);
-assert.match(byId.get("section-window").textContent, /0:25–1:02/);
+assert.equal(currentText(), "Current 0:58");
+assert.equal(center.currentTime, 58);
+assert.equal(tail.currentTime, 48);
+assert.equal(lead.currentTime, 68);
+assert.match(byId.get("section-window").textContent, /0:25–0:58/);
 
 // Space uses the same shared activation and always begins a fresh refold/stretch.
 const tailPlayBeforeSpace = tail.commands.filter(command => command[0] === "play").length;
@@ -594,8 +661,8 @@ const focusedSpace = dispatchDocument("keydown", { key: " ", code: "Space" });
 assert.equal(focusedSpace.defaultPrevented, true, "Space must remain playback while a button has focus.");
 assert.equal(tail.commands.filter(command => command[0] === "play").length, tailPlayBeforeSpace + 1);
 assert.equal(lead.commands.filter(command => command[0] === "play").length, leadPlayBeforeSpace + 1);
-assert.deepEqual(tail.commands.slice(-2), [["place", 62], ["play"]]);
-assert.deepEqual(lead.commands.slice(-2), [["place", 62], ["play"]]);
+assert.deepEqual(tail.commands.slice(-2), [["place", 58], ["play"]]);
+assert.deepEqual(lead.commands.slice(-2), [["place", 58], ["play"]]);
 await flush();
 assert.equal(center.state, 1);
 center.iframe.focus();

@@ -113,9 +113,36 @@ Section-weight edits neither settle nor rebase an active transport. The timeline
 
 Field Offset is configured physical state. Only explicit Offset input updates `fieldOffsets`. Hold and Stretch maintain runtime side state without reporting or persisting their measured relation, and neither can call `setStepReach()` or a Section-weight transaction.
 
+Each side keeps `configuredOffset` separate from its live `offset`.
+`reconfigureOffset(role)` reconciles only the edited side: a relation following
+its old configured maximum follows the new one, while a partial Hold is
+preserved and only clamped when necessary. The sibling receives no player
+command.
+
+`sideIsOperational()` is the common availability boundary for the side Step
+surface, its Hold/Stretch control, and the combined Field control. It requires
+Field On, a visible ready source, completed establishment, and non-zero
+Range-contained reach. Published Field identity includes enabled/visible state,
+target geometry, span availability, and activation so application state cannot
+retain a stale held span after collapse or Field Off.
+
+Pause clears pending play intent. CUED and PLAYING callbacks re-check current
+visibility, Field ownership, suspension, and Center playback intent before
+acting. Hidden/off panes are omitted from polling placement and video-sync
+paths, so a delayed iframe callback cannot resurrect them and repeated ticks
+issue no dormant player commands.
+
 Field target placement and measurement are source-time arithmetic. The projection is used only by the timeline view when drawing those source Addresses.
 
-All semantic Step surfaces resolve through `step-gesture.js`. A repeated press parks Center, Tail, and Lead at each committed Current, keeps one history origin, and starts automatic Context at most once after settlement.
+`app.js` alone derives ambient `fieldPreview` geometry. Idle Step uses the same
+`projection.stepTarget()` calls and effective Reach as the committed Step;
+Context uses the active transport's exact `start`, `anchor`, and `end`.
+`step-field.js` only validates and displays those source Addresses, so it does
+not import timeline projection or Context arithmetic.
+
+All semantic Step surfaces resolve through `step-gesture.js`. A repeated press
+commits Center at each Current, retargets the adjacent Step preview, keeps one
+history origin, and starts automatic Context at most once after settlement.
 
 ## Timeline and direct manipulation
 
@@ -150,10 +177,26 @@ equal and the Start/End controls retain travel on both sides. Timeline Pins use
 the same relation count. These are pure projections of Guide ownership and
 persist no additional topology.
 
+Session snapshots retain `lastOperator`, so Undo and Redo restore the same
+three-frame interpretation as the spatial state. `app.js` owns preview
+selection: Context temporarily takes precedence; otherwise Refine and Reopen
+derive exact weighted midpoint targets, a selected Section uses its exact
+extent only while Current is its midpoint, and Step is the default. An edited
+Section whose midpoint no longer equals Current therefore returns to Step
+after its direct preview ends. The Field controller receives only source
+addresses and imports neither projection nor operator arithmetic.
+
 During a retained-object drag, `app.js` supplies one temporary extent to
-`step-field.js`. Pin preview derives Tail/Lead from configured Field offsets;
-Section preview uses exact Start/midpoint/End addresses. The preview owns no
-Session state and is cleared before normal Current/Field translation resumes.
+`step-field.js`. Pin preview uses exact spatial Step targets around the Pin;
+Section preview uses exact Start/midpoint/End addresses. Configured Field
+offsets remain exclusive to live Stretch/Hold. `previewExtent()` accepts only
+those two complete request forms. Polling re-publishes the active preview
+instead of running ordinary side motion. Direct preview has precedence over
+the ambient operator or Context preview and restores that ambient owner when
+cleared. Preview spans are never published as Held Field spans, and malformed
+or unknown requests cannot acquire Field ownership. Presentation hover/focus
+remains a non-invasive Session dry run in `view.js`; only a drag that has
+crossed its movement threshold seeks the three players.
 
 There is one lateral coordinate and one Pin placement path. Vertical lanes pack
 projected extents and fold into a bounded visual band; they do not add another

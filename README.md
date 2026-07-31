@@ -130,6 +130,22 @@ Center is the audible player. Tail and Lead are optional muted projections:
 - Offset is physical Field spacing, not timeline Step size.
 - Stretch forms a side relation during genuine Center playback.
 - Hold freezes a live measured relation without saving it into Offset.
+- Tune changes only its owning side: a full held side follows its new Offset,
+  while a partial Hold keeps its attained relation within the new bound.
+- A collapsed or Field-off side is dormant and cannot be revived by a delayed
+  player event; unavailable panes are not Step or Hold/Stretch operands.
+- Context duration and Field Offset are independent observation settings. A
+  2.5-second Offset and either half of a 5-second Context can describe the same
+  displacement, but changing either value never rewrites the other.
+- Field Offsets belong exclusively to live Stretch/Hold geometry.
+- Outside playback, Step is the default spatial preview. Refine shows its next
+  weighted midpoints; Reopen shows the newly available Refine midpoints;
+  Context temporarily shows its source-time bounds and Cursor; Pin dragging
+  applies spatial Step around the Pin; and a Section shows
+  Start/midpoint/End while Current owns that midpoint.
+- Hover and keyboard-focus previews stay on the temporal map. Direct Pin or
+  Section manipulation temporarily recruits the panoramic Viewer for exact
+  frame preview, then restores the current operator-owned preview.
 - Timeline weighting only changes where source Addresses are drawn and navigated.
 
 ## Run locally

@@ -356,6 +356,7 @@ export function createSession({ duration = 0, current = 0, guide = createGuide()
       range: { start: 0, end },
       resolution: createRoot(0, C, end),
       resolutionBasis: RESOLUTION_BASIS.RANGE,
+      lastOperator: null,
       focus: null,
       interval: null,
       stepReach: normalizeStepReach(stepReach),
@@ -372,6 +373,7 @@ export function snapshotModel(model, options = {}) {
     range: clone(model.range),
     resolution: clone(model.resolution),
     resolutionBasis: model.resolutionBasis || RESOLUTION_BASIS.RANGE,
+    lastOperator: model.lastOperator || null,
     focus: clone(model.focus),
     interval: clone(model.interval),
     stepReach: normalizeStepReach(model.stepReach),
@@ -568,6 +570,7 @@ function moveDraft(model, destination, options = {}) {
   // Direct Go at Current is a true no-op. Reopen is the one explicit operation
   // that discards local scale while retaining Current and Interval.
   if (Math.abs(resolvedDestination - model.resolution.C) <= EPSILON) {
+    if (rangeChanged) model.lastOperator = options.operator || "go";
     return {
       changed: rangeChanged,
       reason: rangeChanged ? null : "same-address",
@@ -669,6 +672,7 @@ function moveDraft(model, destination, options = {}) {
       arrivalFrame: intervalArrivalFrame
     }
   );
+  model.lastOperator = options.operator || "go";
 
   const baseLabel = options.label || "Go";
   const historyLabel = opening.leftFocus && opening.openedFullVideo
@@ -749,6 +753,7 @@ export function workFromExtent(session, extent, options = {}) {
         activeSide: "end"
       }
     );
+    model.lastOperator = operator;
 
     return {
       changed: true,
@@ -901,6 +906,7 @@ export function reopen(session) {
   return commit(session, "Reopen", draft => {
     draft.resolution = reopenToRange(draft.resolution.C, draft.range);
     draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
+    draft.lastOperator = "reopen";
     return { changed: true };
   });
 }
@@ -962,6 +968,7 @@ export function releaseInterval(session) {
   if (!session.model.interval) return unchanged(session, "no-interval");
   return commit(session, "Release Working Interval", draft => {
     draft.interval = null;
+    draft.lastOperator = "release";
     return { changed: true, interval: null };
   });
 }
@@ -1064,6 +1071,7 @@ export function setRange(session, start, end, current, label = "Set Range") {
     draft.focus = null;
     draft.resolution = createRoot(next.start, next.current, next.end);
     draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
+    draft.lastOperator = "range";
     const intervalCleared = clearIntervalOutsideRange(draft);
     return {
       changed: true,
@@ -1093,6 +1101,7 @@ export function focusSection(session, sectionId) {
     const current = contains(draft.range, departure) ? departure : resolved.midpoint;
     draft.resolution = createRoot(resolved.start, current, resolved.end);
     draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
+    draft.lastOperator = "focus";
     const moved = Math.abs(current - departure) > EPSILON;
     const intervalCleared = clearIntervalOutsideRange(draft);
     return {
@@ -1128,6 +1137,7 @@ export function focusWorkingSection(session) {
     const current = clamp(departure, working.start, working.end);
     draft.resolution = createRoot(working.start, current, working.end);
     draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
+    draft.lastOperator = "focus";
     return {
       changed: true,
       rangeChanged: true,
@@ -1146,6 +1156,7 @@ export function leaveSection(session) {
     draft.range = returnRange;
     draft.resolution = createRoot(returnRange.start, current, returnRange.end);
     draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
+    draft.lastOperator = "unfocus";
     draft.focus = null;
     const intervalCleared = clearIntervalOutsideRange(draft);
     return {
@@ -1252,6 +1263,7 @@ export function projectPlayback(model, options = {}) {
       arrivalFrame: currentFrame
     }
   );
+  projected.lastOperator = options.operator || "playback";
   syncIntervalEndpointFrames(projected);
 
   return {
@@ -1277,6 +1289,7 @@ export function completePlayback(session, options) {
     draft.resolution = clone(projection.model.resolution);
     draft.resolutionBasis = projection.model.resolutionBasis;
     draft.interval = clone(projection.model.interval);
+    draft.lastOperator = projection.model.lastOperator;
     return {
       changed: true,
       place: projection.current,
@@ -1729,6 +1742,7 @@ export function previewRange(session, start, end, current) {
     draft.focus = null;
     draft.resolution = createRoot(next.start, next.current, next.end);
     draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
+    draft.lastOperator = "range";
     const intervalCleared = clearIntervalOutsideRange(draft);
     return {
       changed: true,

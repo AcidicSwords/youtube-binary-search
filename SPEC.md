@@ -59,6 +59,7 @@ Operator contracts use the following canonical dimensions:
 | topology | Pins, Sections, shared references | persistent landmarks and regions |
 | metric | Section weights and derived Timeline Space | how much map distance content receives |
 | movement magnitude | stored Step Reach and derived effective Reach | how far Step moves |
+| traversal provenance | `lastOperator` | which committed spatial grammar owns the next three-frame interpretation |
 | perceptual horizon | Field pane addresses, rates, offsets, Hold/Stretch state | what nearby moments are perceptually co-present |
 | reversibility | history and future | which semantic transformations can be restored |
 
@@ -66,7 +67,9 @@ Derived values are not stored dimensions. In particular:
 
 - changing Section weight may change projected positions, spatial midpoints, and adaptive effective Reach without changing any source Address or stored Step Reach;
 - moving Current may translate Field panes physically without allowing Field state to write Session state;
-- presentation selection, hover, preview, and viewport state are not semantic dimensions.
+- presentation selection, hover, preview, and viewport state are not semantic
+  dimensions; `lastOperator` is traversal provenance, while the preview
+  geometry derived from it remains presentation.
 
 ## 3. Source time and Timeline Space
 
@@ -256,6 +259,43 @@ Context is bounded observation around Current. It remains transient unless the u
 
 Stretch changes the live Tail/Lead relation through playback-rate difference while Center remains the temporal anchor. Hold preserves an attained side relation. Both are runtime-only and cannot write Current, Working Interval, Resolution, Range, Guide, Weight, or Step Reach.
 
+Configured Offset and attained relation are distinct. Editing one Offset can
+reconcile only that side. A side at its configured target follows the new
+target; a partial Hold preserves its attained relation unless the new bound
+clamps it. Field Off or pane collapse makes that projection dormant: it is not a
+Step, Hold, Stretch, span, activation, video-sync, or delayed-play operand.
+Operational Field controls require a visible ready source and positive
+Range-contained reach. A held Field span requires both operational sides.
+
+Context duration and Field Offset are independent physical observation
+parameters. Their numeric relation may be intentionally useful but is not an
+ownership relation: neither operation reads, derives, persists, or rewrites the
+other. Configured Field Offset belongs only to live Stretch/Hold. Outside
+playback, Field preview ownership is:
+
+```text
+Step/default = exact weighted Backward target | Current | exact Forward target
+Refine       = next weighted backward midpoint | Current | next forward midpoint
+Reopen       = reopened backward midpoint | Current | reopened forward midpoint
+Context      = first source frame | playing Cursor | last source frame
+Pin drag     = weighted Step Backward | Pin | weighted Step Forward
+Section      = Start | midpoint Current | End
+```
+
+`lastOperator` is part of the immutable Session snapshot solely to restore this
+interpretation through Context, Guide edits, Undo, and Redo. Direct
+manipulation overrides the ambient operator preview only for the gesture's
+lifetime. Preview never mutates configured Offset, attained Hold, Stretch
+mode, Step Reach, or Session state, and is never a Held Field span. Playback
+synchronously removes preview ownership before the trusted play gesture and
+retains the existing refold/Stretch/Hold implementation. Hover/focus dry-runs
+semantic operations on the timeline without media effects.
+
+A Section owns the ambient three-frame Viewer only while Current equals that
+Section's midpoint. Direct endpoint/whole-Section manipulation may temporarily
+preview a different midpoint; once it ends, Step resumes if committed Current
+does not equal the resulting midpoint.
+
 ### Alt Carry
 
 Alt Carry modifies a semantic movement by translating the selected retained Pin or Section through the same Timeline Space displacement as Current, subject to structural bounds. It preserves the selected object’s spatial relation to Current as far as topology permits.
@@ -370,21 +410,23 @@ The following contracts are normative. “May change” includes conditional cha
 
 | Operator | Must or may change | Must preserve |
 |---|---|---|
-| Refine | Current, Resolution, Working Interval coverage/orientation | Range, Focus, Guide topology, weights, stored Step Reach |
-| Local Refine | Current, Resolution, membership-governed Working Interval | Range, Focus, Guide topology, weights, stored Step Reach |
-| Step | Current, guarded Resolution placement, Working Interval | Range, Focus, Guide topology, weights, stored Step Reach |
+| Refine | Current, Resolution, Working Interval coverage/orientation, traversal provenance | Range, Focus, Guide topology, weights, stored Step Reach |
+| Local Refine | Current, Resolution, membership-governed Working Interval, traversal provenance | Range, Focus, Guide topology, weights, stored Step Reach |
+| Step | Current, guarded Resolution placement, Working Interval, traversal provenance | Range, Focus, Guide topology, weights, stored Step Reach |
 | Pin traversal | same semantic dimensions as Step | Pin and Section topology, weights, Range |
-| Reopen | Resolution and basis only | Current, Working Interval, Range, Focus, Guide, Step Reach |
-| Switch Endpoint | Current, Resolution frame, interval orientation | interval ordered extent, Range, Focus, Guide, weights, Step Reach |
-| Release | Working Interval only | Current, Resolution, Range, Focus, Guide, weights, Step Reach |
+| Reopen | Resolution, basis, traversal provenance | Current, Working Interval, Range, Focus, Guide, Step Reach |
+| Switch Endpoint | Current, Resolution frame, interval orientation | interval ordered extent, traversal provenance, Range, Focus, Guide, weights, Step Reach |
+| Release | Working Interval, traversal provenance reset to default Step | Current, Resolution, Range, Focus, Guide, weights, Step Reach |
 | Deform | Section creation/reuse and/or one Section weight; derived metric | all source Addresses, Current, Resolution source Addresses, Range, Focus, Working Interval, stored Step Reach, Field |
-| Focus | Range, Focus context, root Resolution; Current and Interval only when required by bounds | Guide, weights, stored Step Reach |
-| Unfocus | Range, Focus context, root Resolution; Current and Interval only when required by bounds | Guide, weights, stored Step Reach |
-| Go | Current, Resolution, Working Interval; Range/Focus only when opening the target | Guide, weights, stored Step Reach |
-| Playback settlement | Current, translated Resolution, unioned Working Interval | Range, Focus, Guide, weights, stored Step Reach |
+| Focus | Range, Focus context, root Resolution, traversal provenance; Current and Interval only when required by bounds | Guide, weights, stored Step Reach |
+| Unfocus | Range, Focus context, root Resolution, traversal provenance; Current and Interval only when required by bounds | Guide, weights, stored Step Reach |
+| Go | Current, Resolution, Working Interval, traversal provenance; Range/Focus only when opening the target | Guide, weights, stored Step Reach |
+| Section selection | Current, exact Section Resolution/Interval, traversal provenance | Range, Focus, Guide topology, weights, stored Step Reach |
+| Playback settlement | Current, translated Resolution, unioned Working Interval, traversal provenance | Range, Focus, Guide, weights, stored Step Reach |
 | Context before acceptance | Cursor and runtime transport only | every Session dimension |
 | Context acceptance | same semantic class as playback settlement | Guide, weights, Range, Focus, stored Step Reach |
 | Stretch / Hold | Field runtime relation only | every Session dimension and persisted Field Offset |
+| Offset edit | one side's configured Field bound and its necessary local reconciliation | sibling side state, every Session dimension, Step Reach, Guide, weights |
 | Alt Carry | movement operator effects plus selected Guide geometry | selected object identity and weight; unrelated Guide objects except shared-endpoint consequences |
 | Weight edit | one Section weight and derived metric | every source Address, playback, Field, stored Step Reach |
 | Move Pin | one Pin Address and all incident Section extents | unrelated Pins, Section identities and weights |

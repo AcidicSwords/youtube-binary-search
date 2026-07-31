@@ -133,8 +133,8 @@ assert.equal(resolveFieldPhase({
   assert.match(fieldSource, /function toggleBoth\(\)/);
   assert.match(fieldSource, /function freezeSideForPause\(side, center, snapshot\)/);
   assert.match(fieldSource, /function translateToCurrent\(current, \{ preserve = true \} = \{\}\)/);
-  assert.match(fieldSource, /const retained = side\.offset > REACH_TOLERANCE \? side\.offset : side\.targetOffset/,
-    "Semantic traversal must translate the stored Field relation instead of remeasuring asynchronous iframe clocks.");
+  assert.match(fieldSource, /const retained = side\.offset > REACH_TOLERANCE[\s\S]*side\.offset[\s\S]*side\.configuredOffset/,
+    "Semantic traversal must translate a live held relation, falling back only to its distinct configured Offset.");
   assert.match(fieldSource, /Context and semantic gestures are Center-only/);
   assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*side\.adapter\?\.play\?\.\(\)/,
     "Every play must refold and prime a side at 1× before directional-rate discovery.");
@@ -188,8 +188,12 @@ assert.equal(resolveFieldPhase({
     /@container \(max-width: 680px\)[\s\S]*\.step-field\.tail-collapsed\.lead-collapsed:not\(\.field-off\)[\s\S]*grid-template-areas:\s*"center"\s*"tail"\s*"lead"/,
     "Phone stacking must override the more-specific collapsed medium layout."
   );
-  assert.match(fieldSource, /const visibleRoles = \["tail", "lead"\]\.filter[\s\S]*visibleRoles\.every/,
-    "Combined Field state must derive from visible projections only.");
+  assert.match(fieldSource, /const availableRoles = controllableRoles\(snapshot, prefs\)[\s\S]*availableRoles\.every/,
+    "Combined Field state must derive from currently operational projections only.");
+  assert.match(fieldSource, /function sideIsOperational\([\s\S]*sideIsVisible[\s\S]*side\.sourceReady[\s\S]*effectiveOffset/,
+    "One operational predicate must govern side controls, side Step, and combined Field actions.");
+  assert.match(fieldSource, /function sidePlaybackAllowed\([\s\S]*runtime\.centerWasRunning[\s\S]*!runtime\.suspended/,
+    "Delayed side-player events must re-check current Field ownership before playing.");
   assert.match(fieldSource, /runtime\.restoreRoles/,
     "Restoring one collapsed projection must not force a sibling re-establishment.");
   assert.match(fieldSource, /side\.ready = Boolean\(side\.adapter\)/);

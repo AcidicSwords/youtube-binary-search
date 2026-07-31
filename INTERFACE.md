@@ -212,12 +212,58 @@ Bottom:                Hold/Stretch
 Center alone is audible. Tail and Lead are muted projections. Their rate selectors supply the familiar numeric vocabulary reused by Section weight, but the controls have independent state and affect different axes.
 
 Hold and Stretch change live playback state only. Offset changes only through explicit input. Timeline deformation cannot change a player rate or Field relation.
+Automatic Context controls the duration of a transient Center observation;
+Field Offset controls the source-time displacement of Tail or Lead from
+semantic Current. They can be tuned into a useful proportion—such as 2.5
+seconds on each side of a 5-second Context—but neither derives from or updates
+the other.
+Configured Offset and attained relation are displayed together but remain
+different state. Tuning one side never parks, holds, stretches, or retargets its
+sibling. If a side is fully held at its configured target, it follows a new
+target; a partial Hold remains partial unless the new bound requires clamping.
+Empty or invalid Offset input is rejected and the last canonical value is
+restored.
+
+Field Off and pane collapse are operational boundaries, not merely visual
+styles. Their side players pause once and remain dormant; delayed CUED or
+PLAYING events cannot reactivate them. A side surface and its Hold/Stretch
+control become actionable only after that visible source frame is ready and a
+non-zero Range-contained relation exists. The combined control targets the
+currently available sides, and a held Field span exists only while both sides
+are visible and available.
+
+Outside playback, the panoramic Viewer becomes an operator-owned preview:
+
+- Step is the default: Tail and Lead park on the exact weighted Step Backward
+  and Step Forward destinations while Center remains at Current;
+- Refine parks Tail and Lead on the next weighted backward and forward
+  midpoints;
+- Reopen parks them on the Refine midpoints made available by the reopened
+  Neighborhood;
+- Context parks Tail on its first frame and Lead on its last frame while Center
+  plays through that window;
+- Pin manipulation centers the Pin and applies spatial Step around it;
+- Section selection shows exact Start, midpoint, and End while Current owns
+  that midpoint; direct manipulation temporarily shows the edited extent.
+
+Side panes remain Step controls only when they display Step targets or live
+playback relations. Context, Pin, and Section previews make those surfaces
+temporarily non-actionable; Refine and Reopen previews are also informative
+rather than disguised Step controls. Hover/focus dry-runs remain on the
+temporal map.
+Starting playback clears preview ownership synchronously, refolds both sides to
+Center, and resumes the existing Stretch/Hold runtime.
 
 Direct manipulation temporarily turns the panoramic Viewer into an exact
 preview instrument. A Pin drag parks Center on that Pin and places Tail/Lead at
-the configured Field offsets. A Section endpoint or whole-Section drag parks
+its exact weighted Step destinations. A Section endpoint or whole-Section drag parks
 Tail at Start, Center at midpoint, and Lead at End. Releasing commits one Guide
-transaction; cancelling restores the prior semantic Current and Field.
+transaction; cancelling restores the prior semantic Current and preview. If an
+endpoint edit leaves Current away from the new midpoint, the idle Viewer
+returns to Current-centered Step rather than mislabeling Current as midpoint.
+This frame preview begins only after the pointer crosses the drag threshold.
+Ordinary hover and keyboard focus preview the dry-run geometry on the timeline
+without seeking or pausing any player.
 
 ## Accessibility and touch
 
