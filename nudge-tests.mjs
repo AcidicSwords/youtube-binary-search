@@ -49,7 +49,7 @@ assert.ok(Number(byId.get("nudge-seconds").value) > 0.04,
 byId.get("nudge-seconds").value = "0.5";
 byId.get("nudge-seconds").dispatch("change");
 await flush();
-assert.match(byId.get("status").textContent, /Nudge set to 0\.5 s/);
+assert.match(byId.get("status").textContent, /Nudge set to 0\.5s/);
 
 // Current drag is an exact Go gesture, not a Pin move. A stationary press
 // performs no movement at all.

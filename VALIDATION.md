@@ -133,6 +133,13 @@
 
 - Press the Current marker and release without moving. Confirm nothing moves and
   no history entry appears.
+- Confirm the fine Nudge distance sits inside Movement distance beside Step
+  Reach, and that the Field Tune popover holds only Inner, Outer and rate.
+- With no video loaded, confirm every Parameters and Field input is disabled.
+- Narrow the Guide rail until it wraps. Confirm no Address field, Weight select,
+  or action button is clipped by the card, and that every row shares one gutter.
+- Confirm the keyboard reference lists Nudge, Shift-wheel and Shift-drag, and
+  that its Weight chord matches the one the application binds.
 - Drag each manipulable object, then edit the same object's Address in Guide.
   Confirm both present identical Tail, Center and Lead addresses.
 - Press Escape during a Current drag, a Pin drag, a Section drag, and a Range

@@ -212,7 +212,7 @@
   z-index: 12;
   display: grid;
   width: min(210px, calc(100vw - 24px));
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   padding: 7px;
   border: 1px solid var(--line-strong);

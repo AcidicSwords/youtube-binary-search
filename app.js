@@ -3384,7 +3384,7 @@ function nudgeQuantum() {
 }
 
 function formatQuantum(value) {
-  return `${Number(Number(value).toFixed(3))} s`;
+  return `${Number(Number(value).toFixed(3))}s`;
 }
 
 function nudgeUnitLabel() {
@@ -3535,8 +3535,8 @@ function nudgeTarget(target, direction, options = {}) {
 const HOLD_REPEAT_DELAY_MS = 380;
 const HOLD_REPEAT_INTERVAL_MS = 80;
 
-// Delegated so it survives Guide re-rendering: the container is bound once and
-// resolves the pressed control at pointer-down.
+// Bound once to a container. With a selector it delegates, so it survives Guide
+// re-rendering; without one the container is itself the control.
 function bindHoldRepeat(container, selector, act) {
   if (!container?.addEventListener) return;
   let delayTimer = null;
@@ -3562,15 +3562,19 @@ function bindHoldRepeat(container, selector, act) {
     }, HOLD_REPEAT_DELAY_MS);
   };
 
+  const resolve = target => (
+    selector ? target?.closest?.(selector) : container
+  );
+
   container.addEventListener("pointerdown", event => {
     if (Number.isFinite(event.button) && event.button !== 0) return;
-    const control = event.target.closest?.(selector);
+    const control = resolve(event.target);
     if (!control) return;
     event.preventDefault();
     start(control);
   });
   container.addEventListener("keydown", event => {
-    const control = event.target.closest?.(selector);
+    const control = resolve(event.target);
     if (!control || (event.key !== "Enter" && event.key !== " ")) return;
     event.preventDefault();
     if (!event.repeat) start(control);
@@ -4207,8 +4211,8 @@ elements["switch-endpoint"].addEventListener("click", event => {
 elements.release.addEventListener("click", releaseWorkingInterval);
 elements.deform.addEventListener("click", deformWorkingOrSelected);
 // Weight steppers repeat while held, like every other increment control.
-bindHoldRepeat(elements["deform-down"], "#deform-down", () => stepDeformWeight(-1));
-bindHoldRepeat(elements["deform-up"], "#deform-up", () => stepDeformWeight(1));
+bindHoldRepeat(elements["deform-down"], null, () => stepDeformWeight(-1));
+bindHoldRepeat(elements["deform-up"], null, () => stepDeformWeight(1));
 elements["focus-toggle"].addEventListener("click", focusOrUnfocus);
 elements["shift-layer-toggle"].addEventListener("click", () => {
   state.shiftLayer = !state.shiftLayer;

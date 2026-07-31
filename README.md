@@ -89,6 +89,7 @@ Step Reach is independent from the three-player Field.
 - Manual mode accepts a distance in timeline units.
 - Range-relative mode derives Reach from the active Range’s weighted timeline width.
 - `1/32`, `1/16`, and `1/8` are the adaptive presets.
+- The fine Nudge quantum sits with them: both answer how far one movement goes.
 - Stretch and Hold change only the live Tail/Lead relation. They never overwrite the configured Inner/Outer Offset, Step Reach, or Section weight.
 
 Changing Section weight recomputes adaptive Reach because the active spatial width changed. It does not change fixed Reach.

@@ -72,6 +72,10 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
 - Every increment control must repeat while held and settle as one transaction.
 - A pane bar that creates a stacking context must out-rank the transport surface,
   or its popovers become unclickable.
+- Settings live with the question they answer. Movement magnitudes belong to
+  Movement distance; physical observation belongs to the Field.
+- One gutter and one control height per card. A row that measures itself
+  independently will not align with the rows above it.
 - A gesture and its exact numeric equivalent must present the same Field Frame.
   If dragging an object centres the Viewer somewhere, editing its Address must
   centre it in the same place.

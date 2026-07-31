@@ -202,7 +202,22 @@ assert.match(view, /\["start",\s*projected\.start[\s\S]*\["midpoint",\s*midpoint
 assert.match(app, /function bindHoldRepeat\(container, selector, act\)[\s\S]*HOLD_REPEAT_INTERVAL_MS/);
 assert.match(app, /bindGuideNudgeControls\(elements\["sections-list"\]\)/);
 assert.match(app, /bindGuideNudgeControls\(elements\["pins-list"\]\)/);
-assert.match(app, /bindHoldRepeat\(elements\["deform-up"\]/);
+assert.match(app, /bindHoldRepeat\(elements\["deform-up"\], null/);
+// Nudge is a movement magnitude and sits with Step Reach, not with the Field's
+// physical observation settings.
+assert.match(html, /id="step-size-settings"[\s\S]*id="step-size-seconds"[\s\S]*id="nudge-seconds"[\s\S]*<\/details>/);
+assert.doesNotMatch(html, /field-settings-popover[\s\S]{0,400}nudge-seconds/);
+// One gutter and one control height across a Guide card.
+assert.match(styles, /\.guide-item \{[\s\S]*--guide-gutter:[\s\S]*--guide-control:/);
+for (const rule of ["guide-item-main", "guide-item-actions", "guide-addresses"]) {
+  assert.match(
+    styles,
+    new RegExp(`\\.${rule} \\{[^}]*var\\(--guide-gutter\\)`),
+    `${rule} must share the Guide gutter.`
+  );
+}
+assert.match(styles, /\.section-item \.guide-item-actions \{[^}]*minmax\(0, 1fr\)/,
+  "Guide action columns must be able to shrink inside the clipped card.");
 // Current moves by Step law, never by Go, so a drag or Nudge extends or
 // shortens the retained traversal instead of redrawing it.
 assert.match(app, /function stepCurrentBySourceDelta[\s\S]*stepSession\(/);

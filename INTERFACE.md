@@ -16,16 +16,21 @@ Parameters in flow and present Guide as a modal sheet.
 Parameters expose Active Range, Context duration, and Step Reach. Resolution remains visible on the Timeline, so the wide rail does not duplicate it.
 
 - **Manual** exposes editable spatial units.
+- **Fine Nudge distance** is the source-time quantum every Nudge surface uses.
 - **Range-relative** exposes `1/32`, `1/16`, and `1/8`.
 - The summary shows the stored mode and current effective distance.
 - Single labels share one compact sans-serif level; trailing state values share
   one compact monospaced level. A one-label disclosure is never styled as a
   value merely because it is also its last child.
 
-Inner Offset, Outer Offset, the breathing rate pair, and the Nudge quantum share
-one compact Tune disclosure in the Center bar, because they describe one Field
-relation rather than two independent sides. Field Offset never relabels or
-rewrites Step Reach or Section weight.
+Movement distance holds both magnitudes a traversal can use: Step Reach with its
+mode and presets, and the fine Nudge quantum. They belong together because both
+answer "how far does one movement go"; neither is a Field setting.
+
+Inner Offset, Outer Offset, and the breathing rate pair share one compact Tune
+disclosure in the Center bar, because they describe one Field relation rather
+than two independent sides. Field Offset never relabels or rewrites Step Reach,
+the Nudge quantum, or Section weight.
 
 ## Timeline
 
@@ -192,6 +197,9 @@ and its centered hit region are one control: click moves Current to the Pin;
 drag moves the Pin only after crossing the movement threshold.
 
 Guide’s exact selector and Deform’s step controls are two views of the same transaction.
+
+Guide rows share one gutter and one control height, so title, actions and the
+Address line read as one stack rather than three separately measured bands.
 
 Guide is the exact editor. A Pin row exposes its Title, Address input, `−`/`+`
 Nudge controls, Go, reference count, Rename, and Delete. A Section row exposes

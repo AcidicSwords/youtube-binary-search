@@ -325,4 +325,26 @@ assert.deepEqual(
   "Editing Guide weight during playback must leave all media runtime untouched."
 );
 
+// The Deform steppers use the same hold-repeat binding as every other increment
+// control, so they fire on press rather than on click.
+{
+  const weightBefore = descendants(byId.get("sections-list"))
+    .find(node => node.dataset.sectionWeight)?.value;
+  byId.get("deform-up").dispatch("pointerdown", { button: 0, pointerId: 95 });
+  byId.get("deform-up").dispatch("pointerup", { pointerId: 95 });
+  await flush(2);
+  const weightAfter = descendants(byId.get("sections-list"))
+    .find(node => node.dataset.sectionWeight)?.value;
+  assert.notEqual(weightAfter, weightBefore,
+    "Pressing the Deform stepper must raise the Section weight one step.");
+  byId.get("deform-down").dispatch("pointerdown", { button: 0, pointerId: 96 });
+  byId.get("deform-down").dispatch("pointerup", { pointerId: 96 });
+  await flush(2);
+  assert.equal(
+    descendants(byId.get("sections-list")).find(node => node.dataset.sectionWeight)?.value,
+    weightBefore,
+    "The paired stepper must return it."
+  );
+}
+
 console.log("Section weight smoke passed: shared familiar scale, Guide-only tuning, positive compression, expansion, gradients, ordinary Pins, weighted Step, and identity recovery.");

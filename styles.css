@@ -1684,6 +1684,8 @@ kbd {
 }
 
 .guide-item {
+  --guide-gutter: 9px;
+  --guide-control: 28px;
   position: relative;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -1756,7 +1758,7 @@ kbd {
   width: 100%;
   min-width: 0;
   gap: 3px;
-  padding: 9px;
+  padding: var(--guide-gutter);
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -1777,9 +1779,9 @@ kbd {
 
 .guide-title-action {
   display: grid;
-  width: 28px;
-  height: 28px;
-  min-height: 28px;
+  width: var(--guide-control);
+  height: var(--guide-control);
+  min-height: var(--guide-control);
   place-items: center;
   padding: 0;
   border-color: transparent;
@@ -1865,18 +1867,24 @@ kbd {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  padding: 0 8px 8px;
+  padding: 0 var(--guide-gutter) var(--guide-gutter);
 }
 
 .guide-item-actions button {
-  min-height: 30px;
+  min-height: var(--guide-control);
   padding: 3px 7px;
   font-size: 0.69rem;
 }
 
+/* Two columns that may actually shrink. Without min-width the Weight select
+   pushed the row past the card and `overflow: hidden` clipped it. */
 .section-item .guide-item-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(72px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.section-item .guide-item-actions > * {
+  min-width: 0;
 }
 
 .guide-action-focus {
@@ -1891,7 +1899,8 @@ kbd {
 
 .guide-section-weight {
   display: flex;
-  min-height: 30px;
+  min-width: 0;
+  min-height: var(--guide-control);
   align-items: center;
   gap: 5px;
   padding-left: 6px;
@@ -2517,19 +2526,19 @@ kbd {
 }
 
 
-/* Guide is the exact editor: one compact Address line per object, with the
-   shared Nudge increments flanking each field. It owns no drag geometry, and it
-   does not repeat the same extent as several stacked editors. */
+/* Guide is the exact editor: one compact Address line per object, sharing the
+   card's gutter and control height so the rows read as one stack. */
 .guide-addresses {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
-  margin-top: 8px;
+  padding: 0 var(--guide-gutter) var(--guide-gutter);
 }
 
 .guide-address {
   display: inline-flex;
+  min-width: 0;
   align-items: center;
   gap: 3px;
 }
@@ -2545,18 +2554,21 @@ kbd {
 .guide-address-input {
   width: 7ch;
   min-width: 0;
-  padding: 3px 4px;
+  height: var(--guide-control);
+  padding: 0 4px;
   font-family: var(--mono, ui-monospace, monospace);
   font-size: 0.74rem;
   text-align: center;
 }
 
 .guide-nudge {
-  min-width: 22px;
-  min-height: 22px;
+  width: var(--guide-control);
+  min-width: var(--guide-control);
+  height: var(--guide-control);
+  min-height: var(--guide-control);
   padding: 0;
   border: 1px solid rgba(148, 163, 184, 0.3);
-  border-radius: 4px;
+  border-radius: 5px;
   background: rgba(148, 163, 184, 0.08);
   color: var(--text);
   font-size: 0.78rem;
@@ -2574,16 +2586,12 @@ kbd {
 }
 
 .guide-address-readout {
-  margin-left: auto;
   color: var(--text-dim);
   font-family: var(--mono, ui-monospace, monospace);
   font-size: 0.7rem;
 }
 
 @media (pointer: coarse) {
-  .guide-nudge {
-    min-width: 40px;
-    min-height: 40px;
-  }
+  .guide-item { --guide-control: 40px; }
   .guide-address-input { width: 8ch; }
 }

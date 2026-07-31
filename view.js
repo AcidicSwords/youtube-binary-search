@@ -1357,6 +1357,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["field-inner-offset"].max = String(fieldBreath.outer);
     elements["field-outer-offset"].min = String(fieldBreath.inner);
     // The stored quantum stays exact; only its presentation is rounded.
+    // The stored quantum stays exact; only its presentation is rounded.
     elements["nudge-seconds"].value = String(
       Number((currentState.nudgeSeconds ?? 1 / 24).toFixed(3))
     );
@@ -1369,7 +1370,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : `${formatDuration(configuredReach.forward)} manual`;
     elements["step-mode-fixed"].setAttribute("aria-pressed", String(!adaptiveStep));
     elements["step-mode-adaptive"].setAttribute("aria-pressed", String(adaptiveStep));
-    elements["step-size-seconds"].disabled = adaptiveStep;
+    elements["step-size-seconds"].disabled = adaptiveStep || !loaded;
     for (const control of document.querySelectorAll("[data-step-fraction]")) {
       const selected = Math.abs(
         Number(control.dataset.stepFraction) - configuredReach.fraction
@@ -1455,8 +1456,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     for (const id of [
       "go-range-start", "range-start-here", "range-midpoint",
       "go-range-end", "range-end-here", "full-video-range",
-      "field-inner-offset", "field-outer-offset",
-      "context-seconds",
+      "field-inner-offset", "field-outer-offset", "field-breath-rate",
+      "nudge-seconds", "context-seconds",
       "section-source", "section-label", "pin-label"
     ]) {
       if (elements[id]) elements[id].disabled = interactionLocked;
