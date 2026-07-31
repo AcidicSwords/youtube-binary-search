@@ -1023,4 +1023,40 @@ byId.get("focus-toggle").focus();
 dispatchDocument("pointerup", { target: byId.get("focus-toggle"), pointerId: 8 });
 assert.equal(env.document.activeElement, null, "Pointer activation must not leave a control visually selected.");
 
+// One expansion rule for every Guide row: a row is open exactly when it is the
+// selected object. Previously a Pin row opened itself whenever it happened to
+// bound the Working Interval while an equivalently placed Section row only
+// highlighted, so drawing an Interval silently opened rows nobody chose.
+{
+  const guideRows = list => descendants(byId.get(list))
+    .filter(node => node.classList?.contains?.("guide-item"));
+  const openRows = list => guideRows(list).filter(row =>
+    descendants(row).some(node => node.classList?.contains?.("guide-addresses"))
+  );
+  const selectedRows = list => guideRows(list).filter(row =>
+    row.classList.contains("retained-selected")
+  );
+  for (const list of ["pins-list", "sections-list"]) {
+    assert.equal(
+      openRows(list).length,
+      selectedRows(list).length,
+      `Every open ${list} row must be a selected row, and every selected row open.`
+    );
+    assert.ok(
+      openRows(list).length <= 1,
+      `At most one ${list} row may be open at a time.`
+    );
+  }
+  const extentOnly = guideRows("pins-list").filter(row =>
+    row.classList.contains("extent-selected")
+    && !row.classList.contains("retained-selected")
+  );
+  for (const row of extentOnly) {
+    assert.ok(
+      !descendants(row).some(node => node.classList?.contains?.("guide-addresses")),
+      "Bounding the Working Interval highlights a Pin row; it must not open it."
+    );
+  }
+}
+
 console.log("Interaction smoke passed: direct P/Shift+P creation, retained Section editing, spatial Pin unlink/link, Timeline Section node dragging, Guide exact Address editing, operational clustered Pins, Shift Pin traversal, local Refine preview, unsaved Working Focus, Switch involution, Undo/Redo ownership, composable Step intervals, shared activation, bounded Field breathing, immutable configured offsets, whole-Field side Step, universal Space playback, and coherent focus release.");

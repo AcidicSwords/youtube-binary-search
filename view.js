@@ -992,9 +992,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         );
 
         item.append(header);
-        if (selected || section.id === focusedId) {
-          item.append(actions, addresses);
-        }
+        // One rule for every Guide row: a row is expanded exactly when it is
+        // the selected object. Participating in the Working Interval, being
+        // focused, or being a snap target are conditions worth showing, and
+        // they are shown as highlights — they do not open rows on their own,
+        // because rows that open themselves make selection unreadable.
+        if (selected) item.append(actions, addresses);
         elements["sections-list"].appendChild(item);
       }
     }
@@ -1068,7 +1071,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         addresses.className = "guide-addresses";
         addresses.append(addressControl("pin", pin.id, "Address", pin.t));
         item.append(header);
-        if (selected || extentSelected) item.append(positionTrack, addresses);
+        if (selected) item.append(positionTrack, addresses);
         elements["pins-list"].appendChild(item);
       }
     }

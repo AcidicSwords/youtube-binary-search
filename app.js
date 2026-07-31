@@ -1738,6 +1738,10 @@ function focusSection(sectionId) {
     setStatus(`“${sectionName(section)}” is already the active Range.`);
     return;
   }
+  // Focusing a Section is the strongest way of choosing it, so it selects it.
+  // A Guide row is expanded exactly when it is the selected object, and that
+  // one rule is what keeps Unfocus reachable from the row it belongs to.
+  state.selectedRetained = { kind: "section", id: sectionId };
   acceptRangeTransition(result, {
     status: `Focused “${sectionName(section)}” as Range.`,
     closeGuide: true

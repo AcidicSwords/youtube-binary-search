@@ -835,6 +835,7 @@ Timeline direct manipulation and Guide exact editing call the same operation
 one drag, wheel series, or held-key nudge creates at most one Undo checkpoint
 fine Nudge acts in source time, not Timeline Space
 Guide owns no independent drag geometry
+a Guide row is expanded exactly when it is the selected retained object
 preview, breathing, Context, and semantic state cannot overwrite one another
 ```
 

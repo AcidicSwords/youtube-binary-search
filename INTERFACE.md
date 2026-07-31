@@ -189,6 +189,8 @@ Section creation accepts:
 - held Field span;
 - two selected Pins.
 
+A Guide row is expanded exactly when it is the selected retained object, and nothing else opens one. Participating in the Working Interval, being focused, and being a snap target are all worth showing and are shown as highlights on the collapsed row, because rows that open themselves make the selection unreadable. Focusing a Section selects it, so its row carries Unfocus.
+
 Titles are optional. Each Section row exposes selection, Focus, Weight, and
 both endpoint Pins. Compact Rename and Delete controls sit beside the title;
 applicable Unlink controls sit with Focus and Weight. Direct endpoint and
