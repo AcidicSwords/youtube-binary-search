@@ -1656,58 +1656,14 @@ function requestCenterPause() {
   return true;
 }
 
-function acceptContextCursor() {
-  if (!transportIs(TRANSPORT_KIND.CONTEXT)) return false;
-  const destination = clamp(
-    safeCurrentTime(),
-    activeRange().start,
-    activeRange().end
-  );
-  const departure = currentResolution().C;
-  const parentNeighborhood = copy(currentResolution());
-  const parentResolutionBasis = model().resolutionBasis;
-  const returnModel = snapshotModel(model());
-  const returnTimelineKey = timelineGeometryKey(returnModel);
-
-  // Context remains transient unless the user explicitly accepts its Cursor.
-  // Stop the physical observation without restoring its anchor, then settle
-  // the heard movement through the continuous projection. Context acceptance
-  // moves the active endpoint through the existing spatial relation; it must
-  // not replace that relation with a tiny direct-Go frame around the Cursor.
-  settleTransport({ restoreObservation: false, render: false });
-  clearProgrammaticPlacement();
-  const result = completePlayback(state.session, {
-    current: destination,
-    departure,
-    parentNeighborhood,
-    parentResolutionBasis,
-    returnModel,
-    operator: "contextAccept",
-    label: "Set Current from Context"
-  });
-
-  if (result.changed) {
-    state.session = result.session;
-    syncIntervalPinSelection();
-    stepField?.translateToCurrent(currentResolution().C, { preserve: true });
-    if (returnTimelineKey !== timelineGeometryKey(model())) {
-      view.renderGuide();
-    }
-    setStatus(
-      `Set Current from Context to ${formatTime(currentResolution().C)}.`
-    );
-  } else {
-    stepField?.translateToCurrent(departure, { preserve: true });
-    setStatus(`Context stopped at Current ${formatTime(departure)}.`);
-  }
-  view.render();
-  return true;
-}
-
 function toggleNativePlayback() {
   if (!state.videoLoaded) return;
   if (transportIs(TRANSPORT_KIND.CONTEXT)) {
-    acceptContextCursor();
+    // Context is transient observation around Current. The play command means
+    // ordinary playback wherever it is issued, so Context yields to it rather
+    // than reinterpreting the key as "commit what I was peeking at". Current is
+    // placed exactly by dragging it, nudging it, or editing its Address.
+    startFieldPlaybackFromGesture();
     return;
   }
   if (transportIs(TRANSPORT_KIND.PLAYBACK)) {
@@ -4760,8 +4716,7 @@ document.addEventListener("keydown", event => {
   event.preventDefault();
   event.stopPropagation();
   event.stopImmediatePropagation?.();
-  if (transportIs(TRANSPORT_KIND.CONTEXT)) acceptContextCursor();
-  else toggleNativePlayback();
+  toggleNativePlayback();
 }, true);
 
 // Keyboard: spatial cluster W/A/S/D, directional arrows, and observation keys.

@@ -211,7 +211,7 @@
                   <button id="step-mode-adaptive" type="button" aria-pressed="false">Range-relative</button>
                 </div>
                 <label class="compact-setting" for="step-size-seconds">
-                  <span>Manual lateral distance</span>
+                  <span>Manual map distance</span>
                   <span class="number-with-unit">
                     <input id="step-size-seconds" type="number" min="0.25" max="300" step="0.25"
                       value="10" inputmode="decimal" disabled>
@@ -223,7 +223,7 @@
                   <button id="step-fraction-16" type="button" data-step-fraction="0.0625" aria-pressed="true">1/16</button>
                   <button id="step-fraction-8" type="button" data-step-fraction="0.125" aria-pressed="false">1/8</button>
                 </div>
-                <p class="setting-note">Adaptive size follows the active Range’s weighted timeline width.</p>
+                <p class="setting-note">Step distance is measured across the map: it equals this many source seconds at <span class="unit-mark">1×</span> Weight and covers proportionally less inside an expanded Section. Range-relative size follows the active Range’s weighted map width. Every Step readout states the source time the movement will actually cross.</p>
                 <label class="compact-setting" for="nudge-seconds">
                   <span>Fine Nudge distance</span>
                   <span class="number-with-unit">

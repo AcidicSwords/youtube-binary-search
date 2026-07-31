@@ -219,4 +219,31 @@ await flush();
 assert.equal(currentText(), "Current 1:25");
 assert.equal(center.currentTime, 85);
 
+// Space is the play command wherever it is issued. Context is transient
+// observation around Current, so it yields to playback rather than
+// reinterpreting the key as "commit the Address I was peeking at": Current is
+// unchanged, and playback departs from Current, not from the Cursor.
+byId.get("context-seconds").value = "5";
+byId.get("context-seconds").dispatch("change");
+await flush();
+byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 400 });
+await flush();
+assert.equal(currentText(), "Current 0:40");
+assert.equal(center.state, 1, "A traversal must start Context observing.");
+assert.equal(center.currentTime, 37.5, "Context begins half a window before Current.");
+const currentBeforeSpace = currentText();
+const undoBeforeSpace = byId.get("return-action").disabled;
+dispatchDocument("keydown", { key: " ", code: "Space" });
+await flush();
+assert.equal(currentText(), currentBeforeSpace,
+  "Space during Context must not move Current to the Cursor.");
+assert.equal(byId.get("return-action").disabled, undoBeforeSpace,
+  "Ending Context by playing records no semantic transaction.");
+assert.equal(center.currentTime, 40,
+  "Playback departs from Current, not from wherever observation had reached.");
+assert.equal(center.state, 1, "Ordinary playback is running.");
+dispatchDocument("keydown", { key: " ", code: "Space" });
+await flush();
+assert.equal(center.state, 2, "A second Space pauses that playback.");
+
 console.log("Context smoke passed: automatic post-traversal observation, held-key Step deferral, delayed placement, Field suspension, replacement traversal, Step during Context, Off, and Undo isolation.");

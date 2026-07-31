@@ -1450,9 +1450,22 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     );
     elements["step-size-seconds"].value = String(configuredReach.forward);
     const adaptiveStep = configuredReach.mode === STEP_REACH_MODE.ADAPTIVE;
+    // Adaptive Reach derives a live map distance from the weighted Range, so it
+    // is reported as the source time the next forward Step would actually
+    // cross rather than as its raw map size.
+    const adaptiveSourceSpan = loaded && currentResolution
+      ? Math.abs(
+          projection.stepTarget(
+            semanticCurrent,
+            effectiveReach.forward,
+            "forward",
+            activeRange
+          ) - semanticCurrent
+        )
+      : null;
     elements["step-size-summary"].textContent = adaptiveStep
       ? `1/${Math.round(1 / configuredReach.fraction)} Range${
-          loaded ? ` · ${formatDuration(effectiveReach.forward)}` : ""
+          adaptiveSourceSpan === null ? "" : ` · ${formatDuration(adaptiveSourceSpan)}`
         }`
       : `${formatDuration(configuredReach.forward)} manual`;
     elements["step-mode-fixed"].setAttribute("aria-pressed", String(!adaptiveStep));
@@ -1680,12 +1693,21 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           rangeStretch ? ` · ${rangeStretch} spatial` : ""
         }`
       : "Range-level resolution";
+    // Step Reach is a distance on the map, and inside a weighted Section a
+    // given map distance covers less or more source time. Every readout that
+    // announces a movement states the source time that movement actually
+    // crosses, so "10s · to 0:43" can never appear beside a Current of 0:38.
+    // The configured setting keeps its own number: it is a map distance, and a
+    // map distance is stated in the source time it equals at neutral Weight.
+    const stepSourceSpan = destination => formatDuration(
+      Math.abs(destination - semanticCurrent)
+    );
     elements["step-backward-meta"].textContent = actionModel?.stepBackward
       ? shiftLayer
         ? previous
           ? `${formatTime(previous.t)} · ${pinLabel(previous)}`
           : "No Pin backward"
-        : `${formatDuration(effectiveReach.backward)} · to ${formatTime(actionModel.stepBackward.destination)}`
+        : `${stepSourceSpan(actionModel.stepBackward.destination)} · to ${formatTime(actionModel.stepBackward.destination)}`
       : shiftLayer && previous
         ? `${formatTime(previous.t)} · ${pinLabel(previous)}`
         : "Range start";
@@ -1694,7 +1716,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         ? next
           ? `${formatTime(next.t)} · ${pinLabel(next)}`
           : "No Pin forward"
-        : `${formatDuration(effectiveReach.forward)} · to ${formatTime(actionModel.stepForward.destination)}`
+        : `${stepSourceSpan(actionModel.stepForward.destination)} · to ${formatTime(actionModel.stepForward.destination)}`
       : shiftLayer && next
         ? `${formatTime(next.t)} · ${pinLabel(next)}`
         : "Range end";

@@ -802,6 +802,8 @@ Range.start <= Current <= Range.end
 Working Interval ⊆ Range in source time
 Working Interval ⊆ Resolution ⊆ Range in Timeline Space
 spatial extent is reported as a factor on source, never as a duration
+every readout announcing a movement states the source time it actually crosses
+the play command means ordinary playback wherever it is issued
 a focused extent spans the whole drawn timeline at every Weight
 the viewport changes what is drawn and never what is computed
 Working Interval is one continuous source extent

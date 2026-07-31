@@ -105,8 +105,11 @@ assert.match(html, /id="timeline-current-time"[\s\S]*id="cursor-time"/);
 assert.doesNotMatch(html, /id="fold-lane"/);
 assert.match(html, /id="step-size-settings"[\s\S]*id="step-mode-fixed"[\s\S]*id="step-mode-adaptive"/);
 assert.match(html, /data-step-fraction="0\.03125"[\s\S]*data-step-fraction="0\.0625"[\s\S]*data-step-fraction="0\.125"/);
-assert.match(html, /Manual lateral distance/);
-assert.match(html, /active Range’s weighted timeline width/);
+assert.match(html, /Manual map distance/);
+// Step distance is a map distance. The setting must say so, because the number
+// only equals source seconds at neutral Weight.
+assert.match(html, /Step distance is measured across the map/);
+assert.match(html, /active Range’s weighted map width/);
 assert.match(html, /id="deform"[^>]*aria-keyshortcuts="T"/);
 assert.match(html, /id="deform-down"[^>]*aria-keyshortcuts="Alt\+T"/);
 assert.match(html, /id="deform-up"[^>]*aria-keyshortcuts="Shift\+T"/);
