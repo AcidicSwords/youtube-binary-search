@@ -778,8 +778,9 @@ kbd {
   pointer-events: none;
 }
 
-/* Cues are drawn, never operated. Nothing in this lane takes a pointer, so a
-   mark cannot be clicked, dragged, or clustered into a Pin's hit region. */
+/* Cues are drawn, never operated. Their full offered extents are visible, but
+   nothing in this lane takes a pointer, so an offer cannot become an operand
+   until the user retains it. */
 .cue-lane {
   position: absolute;
   inset: var(--cue-top, 138px) 0 auto;
@@ -792,9 +793,11 @@ kbd {
 .timeline-cue {
   position: absolute;
   top: 0;
+  min-width: 1px;
   height: 6px;
-  border-left: 1px dashed rgb(var(--section-preview-rgb) / 0.66);
-  transform: translateX(-0.5px);
+  border-inline: 1px dashed rgb(var(--section-preview-rgb) / 0.56);
+  border-radius: 2px;
+  background: rgb(var(--section-preview-rgb) / 0.1);
   pointer-events: none;
 }
 
@@ -892,7 +895,7 @@ kbd {
 .timeline-section-midpoint {
   position: absolute;
   top: 50%;
-  left: 50%;
+  left: var(--section-midpoint, 50%);
   width: 6px;
   height: 6px;
   border: 1px solid color-mix(in srgb, var(--section-color) 82%, transparent);
@@ -2611,10 +2614,33 @@ kbd {
 
 .cue-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
-/* A Group header states which of its four states it is in, so the pair of
-   checkboxes never has to be decoded. Hidden dims it; inactive marks it with a
-   dashed edge, because inactive means "contributing nothing" rather than
-   "absent". */
+/* A Group is a flat block containing its Section rows. Hidden and inactive
+   alter the block chrome without removing the controls that restore either
+   state, and an empty block remains available for authoring. */
+.guide-group-block {
+  display: grid;
+  gap: 5px;
+  padding: 5px;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, #0d1219 88%, transparent);
+}
+
+.guide-group-block.is-hidden { opacity: 0.7; }
+.guide-group-block.is-inactive { border-style: dashed; }
+
+.guide-group-sections {
+  display: grid;
+  gap: 5px;
+}
+
+.guide-group-empty {
+  margin: 0;
+  padding: 8px var(--guide-gutter, 9px);
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
 .guide-group-row,
 .guide-divider {
   display: grid;
@@ -2647,9 +2673,6 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.guide-group-row.is-hidden { opacity: 0.62; }
-.guide-group-row.is-inactive { border-top-style: dashed; }
 
 .guide-group-toggles {
   display: inline-flex;

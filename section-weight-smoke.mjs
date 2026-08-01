@@ -454,7 +454,7 @@ assert.deepEqual(
     "The raw map distance must never be announced as the source distance.");
   // The configured setting keeps its own number: it is a map distance, stated
   // in the source time it equals at neutral Weight.
-  assert.equal(readout("step-size-summary"), "10 map units manual");
+  assert.equal(readout("step-size-summary"), "10 units · manual");
 }
 
 console.log("Section weight smoke passed: shared familiar scale, Guide-only tuning, positive compression, expansion, gradients, ordinary Pins, weighted Step, and identity recovery.");

@@ -437,8 +437,8 @@ assert.ok(guard < 400, "Undo terminates rather than cycling.");
 assert.equal(byId.get("sections-list-count").textContent, "0",
   "Undoing everything empties the Guide.");
 assert.equal(byId.get("pins-list-count").textContent, "0");
-assert.equal(groupIds().length, 0,
-  "Group headers stand down with nothing to organize, rather than drawing an empty map.");
+assert.equal(groupIds().length, 1,
+  "The empty default Group remains reachable after every Section is undone.");
 assert.equal(byId.get("duration-time").textContent, "1:40",
   "and the map returns to the undeformed source.");
 assert.equal(byId.get("cues-list-count").textContent, "4",

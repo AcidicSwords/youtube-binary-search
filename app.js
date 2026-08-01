@@ -30,6 +30,7 @@ import {
 import {
   MIN_RANGE_SECONDS,
   STEP_REACH_MODE,
+  focusOwnsRangeBoundaries,
   createSession,
   copy,
   snapshotModel,
@@ -102,6 +103,7 @@ import {
 } from "./step-field-geometry.js";
 import {
   FIELD_FRAME_OWNER,
+  FIELD_FRAME_ACTIVATION,
   createFieldFrameSequencer
 } from "./field-frame.js";
 import {
@@ -280,6 +282,16 @@ function model() {
   return state.session.model;
 }
 
+function rangeBoundaryEditingLocked() {
+  return focusOwnsRangeBoundaries(model());
+}
+
+function rejectFocusedRangeBoundaryEdit() {
+  if (!rangeBoundaryEditingLocked()) return false;
+  setStatus("Unfocus to adjust the Range boundaries.");
+  return true;
+}
+
 function currentResolution() {
   return model().resolution;
 }
@@ -398,6 +410,7 @@ function operatorFrameRequest() {
     forward: step.end,
     backwardDistance: step.backwardDistance,
     forwardDistance: step.forwardDistance,
+    activation: { kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS },
     range
   };
 }
@@ -3326,6 +3339,7 @@ function beginRangeDrag(kind, event) {
   if (!state.videoLoaded) return;
   event.preventDefault();
   event.stopPropagation();
+  if (rejectFocusedRangeBoundaryEdit()) return;
   state.dragHandle = kind;
   state.rangeDragProjection = projectionForModel(model());
   // Range owns the semantic projection visible at pointer-down.
@@ -3424,7 +3438,7 @@ function adjustRangeHandle(kind, event) {
   if (!backward && !forward && !["Home", "End"].includes(event.key)) return;
   event.preventDefault();
   event.stopPropagation();
-  if (!state.videoLoaded) return;
+  if (!state.videoLoaded || rejectFocusedRangeBoundaryEdit()) return;
 
   const range = activeRange();
   const amount = reachFor(forward ? "forward" : "backward") * (event.shiftKey ? 5 : 1);
@@ -3477,8 +3491,8 @@ function commitStepReach(nextReach, label, options = {}) {
   const effective = currentStepReach();
   setStatus(
     result.stepReach.mode === STEP_REACH_MODE.ADAPTIVE
-      ? `${label}: 1/${Math.round(1 / result.stepReach.fraction)} of active Range (${effective.forward.toFixed(2)} map units).`
-      : `${label}: ${result.stepReach.forward} map units.`
+      ? `${label}: 1/${Math.round(1 / result.stepReach.fraction)} of active Range (${effective.forward.toFixed(2)} Timeline units).`
+      : `${label}: ${result.stepReach.forward} Timeline units.`
   );
   view.render();
   return true;
@@ -3554,7 +3568,7 @@ function prefersReducedMotion() {
 function changeFieldBoundary(boundary, value) {
   const parsed = Number(value);
   if (!String(value).trim() || !Number.isFinite(parsed) || parsed <= 0) {
-    setStatus("Field Offset must be a positive number.", true);
+    setStatus("Panorama offset must be a positive number.", true);
     view.render();
     return false;
   }
@@ -3567,7 +3581,7 @@ function changeFieldBoundary(boundary, value) {
   persistPreferences();
   stepField?.reconfigureOffset?.();
   setStatus(
-    `${boundary === "inner" ? "Inner" : "Outer"} Field offset set to ${
+    `${boundary === "inner" ? "Inner" : "Outer"} Panorama offset set to ${
       boundary === "inner" ? state.fieldBreath.inner : state.fieldBreath.outer
     }s.`
   );
@@ -4451,6 +4465,7 @@ document.addEventListener("pointerdown", event => {
 });
 
 elements["range-start-here"].addEventListener("click", () => {
+  if (rejectFocusedRangeBoundaryEdit()) return;
   setRange(
     currentResolution().C,
     activeRange().end,
@@ -4460,6 +4475,7 @@ elements["range-start-here"].addEventListener("click", () => {
   );
 });
 elements["range-end-here"].addEventListener("click", () => {
+  if (rejectFocusedRangeBoundaryEdit()) return;
   setRange(
     activeRange().start,
     currentResolution().C,
@@ -4483,9 +4499,9 @@ elements["range-midpoint"].addEventListener("click", event => {
   );
   moveToAddress(middle, {
     operator: "rangeMidpoint",
-    label: "Go to Range Midpoint",
+    label: "Go to Timeline Midpoint",
     carryRetained: event.altKey === true,
-    status: destination => `Moved to Range midpoint at ${formatTime(destination)}.`
+    status: destination => `Moved to Timeline midpoint at ${formatTime(destination)}.`
   });
 });
 elements["go-range-end"].addEventListener("click", event => {

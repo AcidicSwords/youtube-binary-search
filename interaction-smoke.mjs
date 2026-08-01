@@ -67,7 +67,7 @@ await flush();
 assert.equal(byId.get("step-size-summary").textContent, "1/8 Range · 12.5s");
 byId.get("step-mode-fixed").click();
 await flush();
-assert.equal(byId.get("step-size-summary").textContent, "10 map units manual");
+assert.equal(byId.get("step-size-summary").textContent, "10 units · manual");
 
 // Idle Viewer ownership follows the last semantic operator. Step is the
 // default; Refine and Reopen expose the exact next weighted midpoint choices.
@@ -246,9 +246,17 @@ await flush();
 assert.equal(byId.get("range-label").textContent, "0:25–0:50");
 assert.equal(byId.get("focused-section-title").textContent, "Working Section");
 assert.equal(byId.get("sections-list-count").textContent, "0");
+assert.equal(byId.get("range-start-handle").hidden, true,
+  "Focus removes the competing spatial Range Start control.");
+assert.equal(byId.get("range-end-handle").hidden, true,
+  "Focus removes the competing spatial Range End control.");
+assert.equal(byId.get("range-start-here").disabled, true);
+assert.equal(byId.get("range-end-here").disabled, true);
 byId.get("leave-section").click();
 await flush();
 assert.equal(byId.get("range-label").textContent, "0:00–1:40");
+assert.equal(byId.get("range-start-handle").hidden, false);
+assert.equal(byId.get("range-end-handle").hidden, false);
 assert.equal(byId.get("sections-list-count").textContent, "0");
 assert.match(byId.get("section-window").textContent, /0:25–0:50/);
 

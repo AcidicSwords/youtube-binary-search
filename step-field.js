@@ -8,6 +8,7 @@ import { YOUTUBE_STATE, createYouTubePlayer, isYouTubeApiReady } from "./youtube
 import {
   FIELD_FRAME_OWNER,
   FIELD_FRAME_DIRECTION,
+  FIELD_FRAME_ACTIVATION,
   classifyDirection,
   directFrame
 } from "./field-frame.js";
@@ -309,6 +310,9 @@ export function createStepFieldController({
       direction: value.direction || FIELD_FRAME_DIRECTION.NONE,
       revision: Number.isFinite(value.revision) ? value.revision : null,
       outgoing: Number.isFinite(value.outgoing) ? value.outgoing : null,
+      activation: value.activation?.kind === FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS
+        ? { kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS }
+        : null,
       backwardDistance: Number(value.backwardDistance),
       forwardDistance: Number(value.forwardDistance)
     };
@@ -335,7 +339,8 @@ export function createStepFieldController({
       frame.owner,
       frame.kind,
       frame.tail.toFixed(3),
-      frame.lead.toFixed(3)
+      frame.lead.toFixed(3),
+      frame.activation?.kind || "observe"
     ].join("|");
   }
 
@@ -1422,17 +1427,18 @@ export function createStepFieldController({
     const preview = activePreview(snapshot);
     if (preview) {
       if (
-        preview.kind !== "step"
+        preview.activation?.kind !== FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS
         || !sideIsOperational(role, snapshot)
       ) return null;
       const address = role === "tail" ? preview.start : preview.end;
       const sourceOffset = Math.abs(preview.center - address);
-      const distance = role === "tail"
+      if (!(sourceOffset > EPSILON)) return null;
+      const declaredDistance = role === "tail"
         ? preview.backwardDistance
         : preview.forwardDistance;
-      if (!(sourceOffset > EPSILON && Number.isFinite(distance) && distance > 0)) {
-        return null;
-      }
+      const distance = Number.isFinite(declaredDistance) && declaredDistance > 0
+        ? declaredDistance
+        : sourceOffset;
       return {
         role,
         direction: directionFor(role),
@@ -1482,7 +1488,7 @@ export function createStepFieldController({
     if (activePreview(snapshot) && Number.isFinite(side.desiredAddress)) {
       return formatTime(side.desiredAddress);
     }
-    if (runtime.suspended) return "Field suspended";
+    if (runtime.suspended) return "Panorama suspended";
     if (!side.sourceReady && !side.error) return "Preparing video";
     if (side.blocked) return "Playback blocked — retry Play";
     if (side.error) return "Player unavailable";
@@ -1633,7 +1639,7 @@ export function createStepFieldController({
 
     if (elements["step-field-toggle"]) elements["step-field-toggle"].disabled = !loaded;
     elements["step-field-toggle"]?.setAttribute?.("aria-pressed", String(shown));
-    elements["step-field-toggle"]?.setAttribute?.("aria-label", `${shown ? "Hide" : "Show"} Step Field`);
+    elements["step-field-toggle"]?.setAttribute?.("aria-label", `${shown ? "Hide" : "Show"} Panorama`);
     setText(elements["step-field-meta"], !loaded ? "Load video" : shown ? "On" : "Off");
     setText(
       elements["center-meta"],
@@ -1686,7 +1692,7 @@ export function createStepFieldController({
         || !availableRoles.length;
       elements["field-both-toggle"].setAttribute(
         "aria-label",
-        `${held ? "Field is Held; Stretch" : "Field is breathing; Hold"} ${bothLabel}`
+        `${held ? "Panorama is held; Stretch" : "Panorama is moving; Hold"} ${bothLabel}`
       );
     }
     const frameLabel = {
@@ -1703,7 +1709,7 @@ export function createStepFieldController({
     setText(elements["field-transport-state"], preview
       ? `${frameLabel} Frame`
       : runtime.suspended
-      ? "Field suspended"
+      ? "Panorama suspended"
       : runtime.breath.held
         ? "Held"
         : runtime.breath.phase === BREATH_PHASE.CONTRACTING

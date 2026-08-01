@@ -63,6 +63,14 @@ export const FOCUS_KIND = Object.freeze({
   WORKING: "working-section"
 });
 
+// Focus makes its extent the active world. Spatial Range boundary controls must
+// therefore stand down until Focus is left; exact retained-object editing may
+// still rebase that world through the Guide. One shared predicate keeps every
+// surface from inventing its own exception.
+export function focusOwnsRangeBoundaries(model) {
+  return Boolean(model?.focus);
+}
+
 const DEFAULT_STEP_REACH = Object.freeze({
   backward: 10,
   forward: 10,
