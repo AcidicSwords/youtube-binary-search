@@ -120,11 +120,54 @@ assert.deepEqual(guideCounts(), emptyGuide,
 assert.equal(byId.get("cues-list-count").textContent, "3",
   "Undo does not withdraw the offer.");
 
+// --- Drawn on the map, and drawn only -----------------------------------------
+// The list says what the creator called each part; only the map says where
+// those parts fall against the structure already built. Drawing them must not
+// smuggle in an operand: every pointer route in the timeline -- hit-testing,
+// drag acquisition, Pin clustering -- dispatches on a data attribute, so a
+// drawn Cue that carried one would become traversable by a rendering decision
+// instead of by the reader retaining it.
+const cueMarks = () => descendants(byId.get("cue-lane"))
+  .filter(node => node.className === "timeline-cue");
+
+assert.equal(byId.get("cue-lane-toggle").disabled, false,
+  "With an offer standing there is something to draw.");
+assert.equal(cueMarks().length, 0,
+  "but an offer alone draws nothing.");
+
+const undoLabelBeforeDrawing = byId.get("return-action").textContent;
+byId.get("cue-lane-toggle").click();
+await flush();
+assert.equal(byId.get("cue-lane-toggle")["aria-pressed"], "true");
+assert.equal(cueMarks().length, 3, "Show draws every offered Cue at once.");
+assert.equal(timelinePins(), 0,
+  "Drawing a Cue creates no Pin, so nothing new is clusterable or traversable.");
+for (const mark of descendants(byId.get("cue-lane"))) {
+  assert.deepEqual(Object.keys(mark.dataset || {}), [],
+    "A drawn Cue carries no data attribute, so no pointer handler can dispatch on it.");
+  assert.notEqual(mark.tagName, "BUTTON",
+    "and it is a mark, not a control.");
+}
+assert.deepEqual(guideCounts(), emptyGuide,
+  "Drawing retains nothing.");
+assert.equal(byId.get("return-action").textContent, undoLabelBeforeDrawing,
+  "and records no transaction, because it changed no state a transaction owns.");
+
+byId.get("cue-lane-toggle").click();
+await flush();
+assert.equal(cueMarks().length, 0, "Hide withdraws the drawing.");
+assert.equal(byId.get("cue-lane-toggle")["aria-pressed"], "false");
+
 // --- Clearing the offer touches nothing else ----------------------------------
+byId.get("cue-lane-toggle").click();
+await flush();
 byId.get("cue-clear").click();
 await flush();
 assert.equal(byId.get("cues-list-count").textContent, "0");
 assert.equal(byId.get("cue-source").value, "");
+assert.equal(cueMarks().length, 0,
+  "Clearing the offer clears the drawing with it.");
+assert.equal(byId.get("cue-lane-toggle").disabled, true);
 assert.deepEqual(guideCounts(), emptyGuide);
 
-console.log("Cue smoke passed: a pasted description offers navigable chapters without populating Pins, Sections, the map or history; Cues navigate and compose by the rules retained objects already use; and retaining one saves an ordinary Section carrying the creator's title.");
+console.log("Cue smoke passed: a pasted description offers navigable chapters without populating Pins, Sections, the map or history; Cues navigate and compose by the rules retained objects already use; drawing them on the map adds marks that carry no pointer semantics; and retaining one saves an ordinary Section carrying the creator's title.");

@@ -778,6 +778,37 @@ kbd {
   pointer-events: none;
 }
 
+/* Cues are drawn, never operated. Nothing in this lane takes a pointer, so a
+   mark cannot be clicked, dragged, or clustered into a Pin's hit region. */
+.cue-lane {
+  position: absolute;
+  inset: var(--cue-top, 138px) 0 auto;
+  height: 14px;
+  color: var(--faint);
+  font: 600 0.56rem system-ui, sans-serif;
+  pointer-events: none;
+}
+
+.timeline-cue {
+  position: absolute;
+  top: 0;
+  height: 6px;
+  border-left: 1px dashed rgb(var(--section-preview-rgb) / 0.66);
+  transform: translateX(-0.5px);
+  pointer-events: none;
+}
+
+.timeline-cue-name {
+  position: absolute;
+  top: 7px;
+  left: 3px;
+  max-width: 96px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 0.72;
+}
+
 .timeline-ruler {
   position: absolute;
   inset: var(--ruler-top, 130px) 0 auto;

@@ -576,6 +576,40 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     field.append(atmosphere, contours);
   }
 
+  // Cues drawn on the map, and nothing more than drawn. A Cue is a candidate
+  // Address the creator wrote down; it is not in the Guide, not in the
+  // projection's segments, and not traversable until it is retained. So this
+  // lane holds spans, never buttons, and carries no data attribute any
+  // pointer handler reads: hit-testing, drag acquisition and Pin clustering
+  // all work from those, and inheriting one of them would make a Cue
+  // traversable by a rendering decision rather than by the user retaining it.
+  // Returns whether anything was drawn, so the lanes below can make room.
+  function renderTimelineCues(projection) {
+    const lane = elements["cue-lane"];
+    if (!lane) return false;
+    lane.replaceChildren();
+    const cues = state().cuesOnTimeline ? state().cues || [] : [];
+    if (!cues.length) return false;
+    for (const cue of cues) {
+      const coordinate = projection.sourceToTimeline(cue.time);
+      if (
+        coordinate < projection.viewStart - EPSILON
+        || coordinate > projection.viewEnd + EPSILON
+      ) continue;
+      const tick = document.createElement("span");
+      tick.className = "timeline-cue";
+      tick.style.left = `${
+        clamp(projection.coordinateToFraction(coordinate), 0, 1) * 100
+      }%`;
+      const name = document.createElement("span");
+      name.className = "timeline-cue-name";
+      name.textContent = cueName(cue) || formatTime(cue.time);
+      tick.appendChild(name);
+      lane.appendChild(tick);
+    }
+    return lane.children.length > 0;
+  }
+
   function renderTimelineSections(projection, sectionLaneHeight) {
     const sectionLane = elements["section-lane"];
     if (!sectionLane) return;
@@ -622,11 +656,13 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const pinTop = 17;
     const trackTop = 44;
     const rulerTop = trackTop + 58;
-    const sectionTop = rulerTop + 38;
+    const cueBand = renderTimelineCues(projection) ? 15 : 0;
+    const sectionTop = rulerTop + 38 + cueBand;
     const timelineHeight = sectionTop + sectionBandHeight + 4;
     setStyleProperty(elements.timeline, "--track-top", `${trackTop}px`);
     setStyleProperty(elements.timeline, "--ruler-top", `${rulerTop}px`);
     setStyleProperty(elements.timeline, "--pin-top", `${pinTop}px`);
+    setStyleProperty(elements.timeline, "--cue-top", `${rulerTop + 34}px`);
     setStyleProperty(elements.timeline, "--section-top", `${sectionTop}px`);
     setStyleProperty(elements.timeline, "--timeline-height", `${timelineHeight}px`);
 
@@ -734,7 +770,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const snapKey = `${state().guideDrag?.snapTargetPinId || "none"}:${
       state().guideDrag?.snapArmed === true ? "armed" : "candidate"
     }`;
-    const key = `${activeRange.start}|${activeRange.end}|${width}|${sectionLaneHeight}|${pinClusterGap}|${projection.viewStart}:${projection.viewEnd}|${sectionKey}|${selectedKey}|${intervalKey}|${snapKey}|${pinKey}`;
+    const cueKey = state().cuesOnTimeline
+      ? (state().cues || []).map(cue => cue.time).join(",")
+      : "off";
+    const key = `${activeRange.start}|${activeRange.end}|${width}|${sectionLaneHeight}|${pinClusterGap}|${projection.viewStart}:${projection.viewEnd}|${sectionKey}|${selectedKey}|${intervalKey}|${snapKey}|${pinKey}|${cueKey}`;
     if (key === renderedPinKey) return;
     renderedPinKey = key;
     const clusterDrag = state().guideDrag?.origin === "cluster-menu";
@@ -1184,6 +1223,14 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
   function renderCues() {
     const cues = state().cues || [];
     elements["cues-list-count"].textContent = String(cues.length);
+    const laneToggle = elements["cue-lane-toggle"];
+    const showing = Boolean(state().cuesOnTimeline);
+    laneToggle.disabled = !cues.length;
+    laneToggle.setAttribute("aria-pressed", showing ? "true" : "false");
+    laneToggle.textContent = showing ? "Hide on timeline" : "Show on timeline";
+    laneToggle.title = showing
+      ? "Stop drawing the offered Cues on the map"
+      : "Draw every offered Cue on the map as a mark you can read but not act on";
     elements["cues-list"].replaceChildren();
     if (!cues.length) {
       const empty = document.createElement("p");

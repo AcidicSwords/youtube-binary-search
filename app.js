@@ -228,6 +228,9 @@ const state = {
   // Offered candidates. Never persisted, never projected, never traversed --
   // a Cue is structure only once the reader retains it.
   cues: [],
+  // Whether the offered Cues are drawn on the map. A drawing only: it changes
+  // what is visible and nothing about what any operator can reach.
+  cuesOnTimeline: false,
   guideOpen: false,
   railMode: "guide",
   compactGuide: null,
@@ -3751,6 +3754,7 @@ function offerCues(event = null) {
   });
   state.cues = cues;
   view.renderGuide();
+  view.render();
   setStatus(cues.length
     ? `Offered ${cues.length} Cue${cues.length === 1 ? "" : "s"}. Nothing is retained until you say so.`
     : "No Addresses found in that text.", !cues.length);
@@ -3758,9 +3762,25 @@ function offerCues(event = null) {
 
 function clearCues() {
   state.cues = [];
+  state.cuesOnTimeline = false;
   elements["cue-source"].value = "";
   view.renderGuide();
+  view.render();
   setStatus("Cleared the offered Cues.");
+}
+
+// Drawing every Cue at once answers the question the list cannot: where the
+// creator's divisions fall relative to the structure already built. It is a
+// drawing and stays one -- the marks are inert, so the only way a Cue becomes
+// something to act on is still to retain it.
+function toggleCueLane() {
+  if (!(state.cues || []).length) return;
+  state.cuesOnTimeline = !state.cuesOnTimeline;
+  view.renderGuide();
+  view.render();
+  setStatus(state.cuesOnTimeline
+    ? `Drawing ${state.cues.length} Cue${state.cues.length === 1 ? "" : "s"} on the map. They mark, they do not act.`
+    : "Cues are no longer drawn on the map.");
 }
 
 function goToCue(index, { composing = false } = {}) {
@@ -4602,6 +4622,7 @@ elements["guide-compose-toggle"].addEventListener("click", () => {
 
 elements["cue-capture"].addEventListener("submit", offerCues);
 elements["cue-clear"].addEventListener("click", clearCues);
+elements["cue-lane-toggle"].addEventListener("click", toggleCueLane);
 elements["cues-list"].addEventListener("click", event => {
   const retain = event.target.closest("[data-cue-retain]");
   if (retain) return retainCue(retain.dataset.cueRetain);

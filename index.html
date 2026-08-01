@@ -162,6 +162,7 @@
               <div id="action-preview-fill" class="action-preview-fill" hidden></div>
               <div id="field-span-fill" class="field-span-fill" hidden></div>
             </div>
+            <div id="cue-lane" class="cue-lane" aria-hidden="true"></div>
             <div id="section-lane" class="section-lane" aria-label="Sections"></div>
             <div id="pin-lane" class="pin-lane" aria-label="Pins"></div>
             <div id="pin-cluster-menu" class="pin-cluster-menu" role="menu" aria-label="Nearby Pins" hidden></div>
@@ -447,6 +448,9 @@
                   </div>
                 </form>
               </details>
+              <div class="compact-actions cue-lane-actions">
+                <button id="cue-lane-toggle" type="button" class="guide-action" aria-pressed="false" disabled>Show on timeline</button>
+              </div>
               <div id="cues-list" class="guide-list"><p class="empty-state">No Cues offered. Paste a description to navigate its chapters.</p></div>
             </section>
 
