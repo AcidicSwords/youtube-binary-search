@@ -10,7 +10,8 @@ import {
   DEFAULT_SECTION_WEIGHT,
   normalizeSectionWeight,
   sortedSections,
-  orderedPins
+  orderedPins,
+  sectionIsActive
 } from "./guide.js";
 
 function activeWeight(section) {
@@ -23,7 +24,12 @@ function sectionActsOnSegment(section, start, end) {
 }
 
 function buildSegments(duration, guide) {
-  const sections = sortedSections(guide || { sections: [], pins: [] })
+  // A Section deforms the map only while its Group is active. Nothing is
+  // frozen: an inactive Group simply stops contributing to the density product,
+  // so toggling it is exact and instantaneous in both directions.
+  const source = guide || { sections: [], pins: [], groups: [] };
+  const sections = sortedSections(source)
+    .filter(section => sectionIsActive(source, section))
     .filter(section => Math.abs(activeWeight(section) - 1) > EPSILON);
   const boundaries = [...new Set([
     0,
