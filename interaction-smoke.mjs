@@ -67,7 +67,7 @@ await flush();
 assert.equal(byId.get("step-size-summary").textContent, "1/8 Range · 12.5s");
 byId.get("step-mode-fixed").click();
 await flush();
-assert.equal(byId.get("step-size-summary").textContent, "10s manual");
+assert.equal(byId.get("step-size-summary").textContent, "10 map units manual");
 
 // Idle Viewer ownership follows the last semantic operator. Step is the
 // default; Refine and Reopen expose the exact next weighted midpoint choices.

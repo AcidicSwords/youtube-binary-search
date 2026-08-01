@@ -1330,6 +1330,10 @@ export function saveExtentAsSection(session, extent, label, provenance = "extent
     || !Number.isFinite(extent.end)
     || extent.end - extent.start <= EPSILON
   ) return unchanged(session, "no-extent");
+  if (
+    extent.start < -EPSILON
+    || extent.end > session.model.duration + EPSILON
+  ) return unchanged(session, "extent-out-of-bounds");
   const text = String(label || "").trim();
 
   const selectedStartPin = getPin(session.model.guide, extent.startPinId);
@@ -1528,9 +1532,8 @@ export function renameGuideGroup(session, groupId, label) {
   if (next === (group.label?.trim() || "")) return unchanged(session, "unchanged-group");
   const name = next || group.label?.trim() || "Group";
   return commit(session, `Rename Group “${name}”`, draft => {
-    const target = draft.guide.groups?.find(entry => entry.id === groupId);
+    const target = setGroupState(draft.guide, groupId, { label: next });
     if (!target) return { changed: false, reason: "missing-group" };
-    target.label = next;
     return { changed: true, guideChanged: true, value: target };
   }, { guideEdit: true });
 }

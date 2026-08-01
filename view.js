@@ -1478,7 +1478,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       const preparing = Boolean(activation && !activation.ready);
       surface.disabled = !currentState.videoLoaded || preparing;
       const label = contextObservation
-        ? "Set Current Here"
+        ? "Stop Context and Play"
         : ordinaryPlayback
           ? "Pause Field"
           : "Play Field";
@@ -1695,7 +1695,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? `1/${Math.round(1 / configuredReach.fraction)} Range${
           adaptiveSourceSpan === null ? "" : ` · ${formatDuration(adaptiveSourceSpan)}`
         }`
-      : `${formatDuration(configuredReach.forward)} manual`;
+      : `${Number(Number(configuredReach.forward).toFixed(3))} map units manual`;
     elements["step-mode-fixed"].setAttribute("aria-pressed", String(!adaptiveStep));
     elements["step-mode-adaptive"].setAttribute("aria-pressed", String(adaptiveStep));
     elements["step-size-seconds"].disabled = adaptiveStep || !loaded;
