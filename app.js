@@ -35,6 +35,8 @@ import {
   goToGuideSection as goToSessionGuideSection,
   workFromExtent,
   setGuideGroupState,
+  createGuideGroup,
+  assignGuideSectionGroup,
   refine as refineSession,
   localRefine as localRefineSession,
   step as stepSession,
@@ -4547,6 +4549,20 @@ elements["guide-tab-sections"].addEventListener("click", () => selectGuideTab("s
 elements["guide-tab-pins"].addEventListener("click", () => selectGuideTab("pins"));
 elements["guide-tab-cues"].addEventListener("click", () => selectGuideTab("cues"));
 elements["sections-list"].addEventListener("change", event => {
+  const move = event.target.closest?.("[data-section-group]");
+  if (move) {
+    settleBeforeAction();
+    const moved = assignGuideSectionGroup(
+      state.session,
+      move.dataset.sectionGroup,
+      move.value
+    );
+    if (!moved.changed) return view.renderGuide();
+    state.session = moved.session;
+    view.renderGuide();
+    view.render();
+    return setStatus(`${moved.session.history.at(-1)?.label || "Section moved"}.`);
+  }
   const toggle = event.target.closest?.("[data-group-toggle]");
   if (!toggle) return;
   const key = toggle.dataset.groupState;
@@ -4566,6 +4582,18 @@ elements["sections-list"].addEventListener("change", event => {
 // inert while the Guide is open -- so on a phone the Guide had no route to
 // composition at all. This is the same one-shot state reached from where the
 // objects being composed actually are.
+elements["sections-list"].addEventListener("click", event => {
+  if (!event.target.closest?.("[data-group-add]")) return;
+  event.stopPropagation();
+  settleBeforeAction();
+  const created = createGuideGroup(state.session, `Group ${(guide().groups?.length || 1)}`);
+  if (!created.changed) return;
+  state.session = created.session;
+  view.renderGuide();
+  view.render();
+  setStatus("Added a Group. Move Sections into it from their Group control.");
+});
+
 elements["guide-compose-toggle"].addEventListener("click", () => {
   state.shiftLayer = !state.shiftLayer;
   view.renderGuide();

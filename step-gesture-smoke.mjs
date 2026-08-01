@@ -49,12 +49,7 @@ assert.deepEqual(
   [
     "backward-target-marker",
     "forward-target-marker",
-    "preview-resolution-fill",
     "action-preview-fill",
-    "preview-resolution-start-marker",
-    "preview-resolution-end-marker",
-    "preview-backward-target-marker",
-    "preview-forward-target-marker",
     "preview-current-marker"
   ].filter(id => byId.get(id).hidden !== true),
   [],

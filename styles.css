@@ -462,7 +462,6 @@ kbd {
 .resolution-fill,
 .interval-fill,
 .section-preview-fill,
-.preview-resolution-fill,
 .action-preview-fill {
   position: absolute;
   pointer-events: none;
@@ -575,7 +574,6 @@ kbd {
 }
 
 .section-preview-fill,
-.preview-resolution-fill,
 .action-preview-fill {
   z-index: 5;
   inset-block: 2px;
@@ -587,10 +585,6 @@ kbd {
   background: rgb(var(--section-preview-rgb) / 0.075);
 }
 
-.preview-resolution-fill {
-  border-inline: 1px dashed rgb(var(--preview-rgb) / 0.68);
-  background: rgb(var(--preview-rgb) / 0.075);
-}
 .action-preview-fill {
   border: 1px dashed rgb(var(--preview-rgb) / 0.68);
   background: rgb(var(--preview-rgb) / 0.07);
@@ -754,8 +748,6 @@ kbd {
   transform: translateX(-50%);
 }
 
-.preview-resolution-marker,
-.preview-target-marker,
 .preview-current-marker {
   z-index: 7;
   width: 1px;
@@ -764,11 +756,6 @@ kbd {
   background: rgba(202, 179, 255, 0.84);
 }
 
-.preview-target-marker {
-  top: calc(var(--track-top, 104px) - 2px);
-  height: 16px;
-  background: rgba(221, 207, 255, 0.92);
-}
 
 .preview-current-marker {
   top: calc(var(--track-top, 104px) - 8px);

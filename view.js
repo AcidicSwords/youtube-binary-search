@@ -963,7 +963,23 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           link.title = `Give this Section an independent ${role} Pin at the same Address; drag it onto another Pin to link`;
           endpointLinks.push(link);
         }
-        actions.append(focus, weightControl, ...endpointLinks);
+        // A Section's Group sits with its Weight: both say how this Section
+        // takes part in the map, and both are chosen from a fixed set.
+        const groupControl = document.createElement("label");
+        groupControl.className = "guide-weight";
+        const groupLabel = document.createElement("span");
+        groupLabel.textContent = "Group";
+        const groupSelect = document.createElement("select");
+        groupSelect.dataset.sectionGroup = section.id;
+        for (const group of guide().groups || []) {
+          const option = document.createElement("option");
+          option.value = group.id;
+          option.textContent = group.label?.trim() || "Map";
+          groupSelect.appendChild(option);
+        }
+        groupSelect.value = section.groupId || "group-default";
+        groupControl.append(groupLabel, groupSelect);
+        actions.append(focus, weightControl, groupControl, ...endpointLinks);
 
         // Exact topology and numeric editing on one line. Guide no longer
         // duplicates the Timeline's spatial drag system, and it no longer
@@ -1153,6 +1169,13 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       row.append(name, meta, toggles);
       elements["sections-list"].appendChild(row);
     }
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "guide-action guide-group-add";
+    add.dataset.groupAdd = "new";
+    add.textContent = "New Group";
+    add.title = "Start a Group so a set of Sections can be hidden or deactivated together";
+    elements["sections-list"].appendChild(add);
   }
 
   // Cues are offered, never placed. They render as candidates: the creator's
@@ -1219,15 +1242,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const structuralExtent = structural?.[kind] || null;
     const previewInterval = predicted?.interval || removedInterval || structuralExtent;
 
-    elements["preview-resolution-fill"].hidden = !previewResolution;
     elements["action-preview-fill"].hidden = !previewInterval;
-    if (previewResolution) {
-      setSegment(
-        elements["preview-resolution-fill"],
-        previewResolution.L,
-        previewResolution.R
-      );
-    }
     if (previewInterval) {
       elements["action-preview-fill"].dataset.kind = kind;
       if (removedInterval) elements["action-preview-fill"].dataset.effect = "remove";
@@ -1242,34 +1257,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       elements["action-preview-fill"].removeAttribute("data-effect");
     }
 
-    const markerIds = [
-      "preview-resolution-start-marker",
-      "preview-resolution-end-marker",
-      "preview-backward-target-marker",
-      "preview-forward-target-marker",
-      "preview-current-marker"
-    ];
-    for (const id of markerIds) elements[id].hidden = !previewResolution;
+    // A preview answers one question: where would this land, and across what.
+    // It answered five at once -- a neighbourhood fill and four bound markers
+    // besides -- which is more chrome than any committed state draws, and the
+    // operators that push a midpoint show it in the destination anyway. The
+    // extent and the destination are all that remain; the rest was noise the
+    // moment the movement was invoked, so it is gone rather than hidden.
+    elements["preview-current-marker"].hidden = !previewResolution;
     if (!previewResolution) return;
-
-    setMarkerPosition(
-      elements["preview-resolution-start-marker"],
-      previewResolution.L
-    );
-    setMarkerPosition(
-      elements["preview-resolution-end-marker"],
-      previewResolution.R
-    );
     setMarkerPosition(elements["preview-current-marker"], previewResolution.C);
-    const targets = getTargets(previewResolution, timelineProjection().metric);
-    elements["preview-backward-target-marker"].hidden = targets.backward === null;
-    elements["preview-forward-target-marker"].hidden = targets.forward === null;
-    if (targets.backward !== null) {
-      setMarkerPosition(elements["preview-backward-target-marker"], targets.backward);
-    }
-    if (targets.forward !== null) {
-      setMarkerPosition(elements["preview-forward-target-marker"], targets.forward);
-    }
   }
 
   function renderSectionPreview() {
@@ -1907,15 +1903,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       elements["interval-fill"].hidden = true;
       elements["field-span-fill"].hidden = true;
       elements["section-preview-fill"].hidden = true;
-      elements["preview-resolution-fill"].hidden = true;
       elements["action-preview-fill"].hidden = true;
-      for (const id of [
-        "preview-resolution-start-marker",
-        "preview-resolution-end-marker",
-        "preview-backward-target-marker",
-        "preview-forward-target-marker",
-        "preview-current-marker"
-      ]) elements[id].hidden = true;
+      elements["preview-current-marker"].hidden = true;
       renderTimelinePins();
       renderTransport();
       return;
