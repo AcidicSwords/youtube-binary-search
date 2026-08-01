@@ -200,11 +200,17 @@ Nesting needs no operator of its own. Click one Section, `Shift`+click another, 
 
 The Guide reads left to right as the arc from potential to structure: **Chapters** are candidates a description offers, **Pins** are the Addresses you made objects, and **Sections** are compositions of Pins that persist and deform.
 
-The Pins tab separates the two jobs a Pin can do: **Section endpoints**, which hold Sections together, and **Standalone** Pins, which mark a place and are never hidden by a Group. Unlink belongs with the endpoints it acts on.
+The Pins tab separates the two jobs a Pin can do: **Section endpoints**, which hold Sections together, and **Standalone** Pins, which mark a place and are never hidden by a Group. **Unlink** lives here, on the shared Pin itself: a selected Pin holding more than one Section offers one Unlink per Section, each naming the Section it releases, so which Section is being taken off the Pin is stated rather than inferred from `Start`/`End`. Reading a Section to operate on a Pin left the Pin — the only object the operation is about — out of view.
 
-The Sections tab carries **Groups**. A Group is a set of Sections with two independent states — `Visible` draws its Sections and their endpoint Pins on the map; `Active` lets its Weights deform it. Hidden and active is the map baked, terrain without landmarks; visible and inactive is topology without terrain. The header names which of the four a Group is in, so the pair of checkboxes never has to be decoded.
+A Section's endpoints *are* Pins, so a selected Section names them: its `Start` and `End` labels are the route to those Pins, selecting each where Pins are edited. Nothing moves and nothing is recorded; selection is the whole mechanism, because a selected Guide row is an expanded one already.
+
+The Sections tab carries **Groups**. A Group is a set of Sections with two independent states — `Visible` draws its Sections and their endpoint Pins on the map; `Active` lets its Weights deform it. Hidden and active is the map baked, terrain without landmarks; visible and inactive is topology without terrain. The header names which of the four a Group is in, so the pair of checkboxes never has to be decoded. `New Group` starts one, Rename and Remove sit beside its name exactly as they do on a Pin or a Section — removing a Group returns its Sections to the map and destroys nothing — and a Section's Group sits beside its Weight — both say how that Section takes part in the map, and both are chosen from a fixed set.
 
 A third Guide tab holds **Cues** — candidate Addresses parsed from a pasted description. Chapters a creator wrote partition the video semantically, so a Cue owns an extent running to the next Cue's Address, and clicking one takes that extent exactly as clicking a Section does. `Shift`+click extends across Cues by the same rule. Cues render as dashed, quieter rows carrying one action, `Retain`, because there is nothing to edit in something that is not yet structure. Nothing about a Cue reaches the Guide, the map, traversal, or history until it is retained.
+
+`Show on timeline` draws every offered Cue at once, in its own lane. The list says what the creator called each part; only the map says where those parts fall against the structure already built, which is the comparison that decides what is worth retaining. The lane holds marks, not controls: every pointer route into the timeline — hit-testing, drag acquisition, Pin clustering — dispatches on a data attribute, and a drawn Cue carries none, so it cannot become traversable by a rendering decision. Drawing changes nothing a transaction owns, and clearing the offer clears the drawing with it.
+
+An unnamed Section has one name everywhere it is named: `Section` plus its Address. A Guide row states the Address in a field of its own, so its title stays bare; every other context — a transaction label, a status line, an Unlink button on a shared Pin — carries the full form, because a Pin holding two unnamed Sections would otherwise offer two buttons reading `Unlink Section`.
 
 A Guide entry is a **name**, an **Address**, and only facts not derivable from those two. A Pin exists so the viewer need not remember a time, so the time is a field of the entry and never baked into its title: an unnamed Pin is called `Section Start` or `Pin`, never `Start of Section 2:12.3–2:42.04`, which repeats the Address and then truncates. An unnamed Section is called `Section`; its extent, duration and Weight are its line. Nothing states the same fact twice inside one entry — the Weight factor already says whether it compresses or expands, and the duration is stated once.
 
@@ -212,12 +218,12 @@ A Pin has one Address and no extent, so its row draws no positional track: one p
 
 A Guide row is expanded exactly when it is the selected retained object, and nothing else opens one. Participating in the Working Interval, being focused, and being a snap target are all worth showing and are shown as highlights on the collapsed row, because rows that open themselves make the selection unreadable. Focusing a Section selects it, so its row carries Unfocus.
 
-Titles are optional. Each Section row exposes selection, Focus, Weight, and
-both endpoint Pins. Compact Rename and Delete controls sit beside the title;
-applicable Unlink controls sit with Focus and Weight. Direct endpoint and
-whole-profile dragging make a separate replacement action redundant. A selected
-Pin row exposes the same full-map track and draggable node as Section endpoints,
-with Rename and Delete beside its title. On the Timeline, the visible Pin
+Titles are optional. Each Section row exposes selection, Focus, Weight, Group,
+and both endpoint Pins. Compact Rename and Delete controls sit beside the title.
+Direct endpoint and whole-profile dragging make a separate replacement action
+redundant. A selected Pin row exposes its exact Address, its Rename and Delete
+controls beside the title, and — when it holds more than one Section — an
+Unlink per Section it holds. On the Timeline, the visible Pin
 and its centered hit region are one control: click moves Current to the Pin;
 drag moves the Pin only after crossing the movement threshold.
 

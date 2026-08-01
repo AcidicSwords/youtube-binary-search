@@ -1,5 +1,9 @@
 // DOM projection layer. It derives presentation from state and does not own semantic transactions.
 import { cueName } from "./cues.js";
+import { formatTime, formatRange, sectionDisplayName } from "./format.js";
+// Re-exported so the presentation layer stays the single import site for text
+// formatting, while the kernel takes them from the shared module directly.
+export { formatTime, formatRange };
 import {
   EPSILON,
   clamp,
@@ -13,10 +17,13 @@ import {
 import {
   PIN_KIND,
   SECTION_WEIGHT_VALUES,
+  DEFAULT_GROUP_ID,
   findPinAt,
   getPin,
   orderedPins,
   allPins,
+  sectionIsActive,
+  sectionIsVisible,
   sectionsForPin,
   resolveSection,
   previousPin,
@@ -43,20 +50,6 @@ const COARSE_TIMELINE_SECTION_LANE_HEIGHT = 48;
 const TIMELINE_SECTION_MAX_LANES = 5;
 const TIMELINE_PIN_HIT_SIZE = 52;
 const COARSE_TIMELINE_PIN_HIT_SIZE = 56;
-
-export function formatTime(seconds) {
-  if (!Number.isFinite(seconds)) return "—";
-  const totalCentiseconds = Math.max(0, Math.round(seconds * 100));
-  const hours = Math.floor(totalCentiseconds / 360_000);
-  const minutes = Math.floor((totalCentiseconds % 360_000) / 6_000);
-  const secs = Math.floor((totalCentiseconds % 6_000) / 100);
-  const centiseconds = totalCentiseconds % 100;
-  const minuteText = hours ? String(minutes).padStart(2, "0") : String(minutes);
-  const fraction = centiseconds
-    ? `.${String(centiseconds).padStart(2, "0").replace(/0$/, "")}`
-    : "";
-  return `${hours ? `${hours}:` : ""}${minuteText}:${String(secs).padStart(2, "0")}${fraction}`;
-}
 
 // Spatial time is not a duration. It is how much map a source span is given,
 // and it only means anything against the source span it stretches. Reporting
@@ -99,10 +92,6 @@ export function formatDuration(seconds) {
   if (minutes) parts.push(`${minutes}m`);
   if (remainingSeconds > 0.005) parts.push(`${formatSeconds(remainingSeconds)}s`);
   return parts.join(" ") || "0s";
-}
-
-export function formatRange(extent) {
-  return extent ? `${formatTime(extent.start)}–${formatTime(extent.end)}` : "—";
 }
 
 // `viewStart` is the coordinate the map is drawn from; it defaults to 0, so an
@@ -310,10 +299,23 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     return button;
   }
 
-  function addressControl(kind, id, label, address) {
+  // `revealPinId` names the Pin this Address actually belongs to. A Section's
+  // endpoints are Pins -- editing one here edits that Pin -- so the label says
+  // so and goes there, rather than leaving the reader to find it by Address in
+  // a list ordered by Address.
+  function addressControl(kind, id, label, address, { revealPinId = null } = {}) {
     const field = document.createElement("span");
     field.className = "guide-address";
-    const name = document.createElement("small");
+    let name;
+    if (revealPinId) {
+      name = document.createElement("button");
+      name.type = "button";
+      name.className = "guide-address-reveal";
+      name.dataset.revealPin = revealPinId;
+      name.title = `Show this endpoint's Pin in Pins`;
+    } else {
+      name = document.createElement("small");
+    }
     name.textContent = label;
     const input = document.createElement("input");
     input.type = "text";
@@ -514,6 +516,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     if (!field) return;
     field.replaceChildren();
     const sections = sortedSections(guide())
+      .filter(section => sectionIsActive(guide(), section))
       .filter(section => Math.abs(section.weight - 1) > EPSILON);
     const atmosphere = document.createElement("span");
     atmosphere.className = "deformation-atmosphere";
@@ -573,6 +576,40 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     field.append(atmosphere, contours);
   }
 
+  // Cues drawn on the map, and nothing more than drawn. A Cue is a candidate
+  // Address the creator wrote down; it is not in the Guide, not in the
+  // projection's segments, and not traversable until it is retained. So this
+  // lane holds spans, never buttons, and carries no data attribute any
+  // pointer handler reads: hit-testing, drag acquisition and Pin clustering
+  // all work from those, and inheriting one of them would make a Cue
+  // traversable by a rendering decision rather than by the user retaining it.
+  // Returns whether anything was drawn, so the lanes below can make room.
+  function renderTimelineCues(projection) {
+    const lane = elements["cue-lane"];
+    if (!lane) return false;
+    lane.replaceChildren();
+    const cues = state().cuesOnTimeline ? state().cues || [] : [];
+    if (!cues.length) return false;
+    for (const cue of cues) {
+      const coordinate = projection.sourceToTimeline(cue.time);
+      if (
+        coordinate < projection.viewStart - EPSILON
+        || coordinate > projection.viewEnd + EPSILON
+      ) continue;
+      const tick = document.createElement("span");
+      tick.className = "timeline-cue";
+      tick.style.left = `${
+        clamp(projection.coordinateToFraction(coordinate), 0, 1) * 100
+      }%`;
+      const name = document.createElement("span");
+      name.className = "timeline-cue-name";
+      name.textContent = cueName(cue) || formatTime(cue.time);
+      tick.appendChild(name);
+      lane.appendChild(tick);
+    }
+    return lane.children.length > 0;
+  }
+
   function renderTimelineSections(projection, sectionLaneHeight) {
     const sectionLane = elements["section-lane"];
     if (!sectionLane) return;
@@ -582,6 +619,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const timelineWidth = Math.max(1, elements.timeline.clientWidth || 1);
 
     const entries = sortedSections(guide())
+      .filter(section => sectionIsVisible(guide(), section))
       .map(section => ({
         section,
         projected: projection.projectExtent(section)
@@ -618,11 +656,13 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const pinTop = 17;
     const trackTop = 44;
     const rulerTop = trackTop + 58;
-    const sectionTop = rulerTop + 38;
+    const cueBand = renderTimelineCues(projection) ? 15 : 0;
+    const sectionTop = rulerTop + 38 + cueBand;
     const timelineHeight = sectionTop + sectionBandHeight + 4;
     setStyleProperty(elements.timeline, "--track-top", `${trackTop}px`);
     setStyleProperty(elements.timeline, "--ruler-top", `${rulerTop}px`);
     setStyleProperty(elements.timeline, "--pin-top", `${pinTop}px`);
+    setStyleProperty(elements.timeline, "--cue-top", `${rulerTop + 34}px`);
     setStyleProperty(elements.timeline, "--section-top", `${sectionTop}px`);
     setStyleProperty(elements.timeline, "--timeline-height", `${timelineHeight}px`);
 
@@ -710,6 +750,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const sectionKey = sortedSections(guide())
       .map(section =>
         `${section.id}:${section.start}:${section.end}:${section.weight}:${section.label}`
+        + `:${sectionIsVisible(guide(), section) ? "v" : "h"}`
+        + `:${sectionIsActive(guide(), section) ? "a" : "i"}`
       )
       .join(",");
     const selectedKey = [
@@ -728,7 +770,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const snapKey = `${state().guideDrag?.snapTargetPinId || "none"}:${
       state().guideDrag?.snapArmed === true ? "armed" : "candidate"
     }`;
-    const key = `${activeRange.start}|${activeRange.end}|${width}|${sectionLaneHeight}|${pinClusterGap}|${projection.viewStart}:${projection.viewEnd}|${sectionKey}|${selectedKey}|${intervalKey}|${snapKey}|${pinKey}`;
+    const cueKey = state().cuesOnTimeline
+      ? (state().cues || []).map(cue => cue.time).join(",")
+      : "off";
+    const key = `${activeRange.start}|${activeRange.end}|${width}|${sectionLaneHeight}|${pinClusterGap}|${projection.viewStart}:${projection.viewEnd}|${sectionKey}|${selectedKey}|${intervalKey}|${snapKey}|${pinKey}|${cueKey}`;
     if (key === renderedPinKey) return;
     renderedPinKey = key;
     const clusterDrag = state().guideDrag?.origin === "cluster-menu";
@@ -942,22 +987,23 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         }
         weightSelect.value = String(section.weight);
         weightControl.append(weightLabel, weightSelect);
-        const endpointLinks = [];
-        for (const [role, pin, references] of [
-          ["start", section.startPin, startReferences],
-          ["end", section.endPin, endReferences]
-        ]) {
-          if (references <= 1) continue;
-          const link = document.createElement("button");
-          link.type = "button";
-          link.className = "guide-action guide-action-link";
-          link.dataset.sectionEndpoint = role;
-          link.dataset.unlinkSectionEndpoint = section.id;
-          link.textContent = `Unlink ${role === "start" ? "Start" : "End"}`;
-          link.title = `Give this Section an independent ${role} Pin at the same Address; drag it onto another Pin to link`;
-          endpointLinks.push(link);
+        // A Section's Group sits with its Weight: both say how this Section
+        // takes part in the map, and both are chosen from a fixed set.
+        const groupControl = document.createElement("label");
+        groupControl.className = "guide-weight";
+        const groupLabel = document.createElement("span");
+        groupLabel.textContent = "Group";
+        const groupSelect = document.createElement("select");
+        groupSelect.dataset.sectionGroup = section.id;
+        for (const group of guide().groups || []) {
+          const option = document.createElement("option");
+          option.value = group.id;
+          option.textContent = group.label?.trim() || "Map";
+          groupSelect.appendChild(option);
         }
-        actions.append(focus, weightControl, ...endpointLinks);
+        groupSelect.value = section.groupId || "group-default";
+        groupControl.append(groupLabel, groupSelect);
+        actions.append(focus, weightControl, groupControl);
 
         // Exact topology and numeric editing on one line. Guide no longer
         // duplicates the Timeline's spatial drag system, and it no longer
@@ -967,8 +1013,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         // Duration is already stated on the row's own line; repeating it beside
         // the End field made the same fact appear twice in one card.
         addresses.append(
-          addressControl("section-start", section.id, "Start", section.start),
-          addressControl("section-end", section.id, "End", section.end)
+          addressControl("section-start", section.id, "Start", section.start, {
+            revealPinId: section.startPin?.id
+          }),
+          addressControl("section-end", section.id, "End", section.end, {
+            revealPinId: section.endPin?.id
+          })
         );
 
         item.append(header);
@@ -1070,11 +1120,46 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         addresses.className = "guide-addresses";
         addresses.append(addressControl("pin", pin.id, "Address", pin.t));
         item.append(header);
+        // Unlink is a Pin operation: it takes one Section off a shared Pin and
+        // gives it its own at the same Address. It used to sit in the Section
+        // row, which meant reading a Section to learn something about a Pin,
+        // and made the shared Pin -- the only object the operation is about --
+        // the one thing not in view. Here the Pin names every Section it holds,
+        // so which one is being taken off is stated rather than inferred.
+        const shared = references > 1
+          ? sectionsForPin(guide(), pin.id)
+            .map(section => resolveSection(guide(), section))
+            .filter(Boolean)
+          : [];
+        if (shared.length) {
+          const unlinks = document.createElement("div");
+          unlinks.className = "guide-item-actions pin-unlink-actions";
+          for (const section of shared) {
+            const role = section.startPin?.id === pin.id ? "start" : "end";
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "guide-action guide-action-link";
+            button.dataset.sectionEndpoint = role;
+            button.dataset.unlinkSectionEndpoint = section.id;
+            // Named by Address, not by the bare title: a Pin holding two
+            // unnamed Sections would otherwise offer two buttons reading
+            // "Unlink Section", which identifies neither. A Guide row states
+            // the Address in a field of its own and so keeps its title bare;
+            // this button has no such field.
+            button.textContent = `Unlink ${sectionDisplayName(section)}`;
+            button.title = `Give ${sectionDisplayName(section)} its own ${role} Pin at this Address; drag it onto another Pin to link again`;
+            unlinks.appendChild(button);
+          }
+          if (selected) item.append(unlinks);
+        }
         if (selected) item.append(addresses);
         elements["pins-list"].appendChild(item);
       }
     }
 
+    const composing = state().shiftLayer === true;
+    elements["guide-compose-toggle"].setAttribute("aria-pressed", String(composing));
+    elements["guide-compose-toggle"].classList.toggle("active", composing);
     renderCues();
     invalidateTimelinePins();
     renderTimelinePins();
@@ -1141,9 +1226,43 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         label.append(box, caption);
         toggles.appendChild(label);
       }
-      row.append(name, meta, toggles);
+      // A Group is a retained object with a name, so it gets the same two title
+      // controls every other retained object has. The default Group is the map
+      // itself -- every Section belongs somewhere, so there is nothing for it
+      // to be deleted into, and it carries neither control.
+      if (group.id !== DEFAULT_GROUP_ID) {
+        const titleActions = document.createElement("span");
+        titleActions.className = "guide-title-actions";
+        const rename = document.createElement("button");
+        rename.type = "button";
+        rename.className = "guide-title-action guide-title-rename";
+        rename.dataset.renameGroup = group.id;
+        rename.textContent = "✎";
+        rename.setAttribute("aria-label", `Rename ${group.label || "Group"}`);
+        rename.title = `Rename ${group.label || "Group"}`;
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "guide-title-action guide-title-delete danger-text";
+        remove.dataset.deleteGroup = group.id;
+        remove.textContent = "×";
+        remove.setAttribute("aria-label", `Remove ${group.label || "Group"}`);
+        remove.title = counted
+          ? `Remove this Group; its ${counted} Section${counted === 1 ? " returns" : "s return"} to the map`
+          : "Remove this Group";
+        titleActions.append(rename, remove);
+        row.append(name, meta, toggles, titleActions);
+      } else {
+        row.append(name, meta, toggles);
+      }
       elements["sections-list"].appendChild(row);
     }
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "guide-action guide-group-add";
+    add.dataset.groupAdd = "new";
+    add.textContent = "New Group";
+    add.title = "Start a Group so a set of Sections can be hidden or deactivated together";
+    elements["sections-list"].appendChild(add);
   }
 
   // Cues are offered, never placed. They render as candidates: the creator's
@@ -1152,6 +1271,14 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
   function renderCues() {
     const cues = state().cues || [];
     elements["cues-list-count"].textContent = String(cues.length);
+    const laneToggle = elements["cue-lane-toggle"];
+    const showing = Boolean(state().cuesOnTimeline);
+    laneToggle.disabled = !cues.length;
+    laneToggle.setAttribute("aria-pressed", showing ? "true" : "false");
+    laneToggle.textContent = showing ? "Hide on timeline" : "Show on timeline";
+    laneToggle.title = showing
+      ? "Stop drawing the offered Cues on the map"
+      : "Draw every offered Cue on the map as a mark you can read but not act on";
     elements["cues-list"].replaceChildren();
     if (!cues.length) {
       const empty = document.createElement("p");
@@ -1210,15 +1337,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const structuralExtent = structural?.[kind] || null;
     const previewInterval = predicted?.interval || removedInterval || structuralExtent;
 
-    elements["preview-resolution-fill"].hidden = !previewResolution;
     elements["action-preview-fill"].hidden = !previewInterval;
-    if (previewResolution) {
-      setSegment(
-        elements["preview-resolution-fill"],
-        previewResolution.L,
-        previewResolution.R
-      );
-    }
     if (previewInterval) {
       elements["action-preview-fill"].dataset.kind = kind;
       if (removedInterval) elements["action-preview-fill"].dataset.effect = "remove";
@@ -1233,34 +1352,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       elements["action-preview-fill"].removeAttribute("data-effect");
     }
 
-    const markerIds = [
-      "preview-resolution-start-marker",
-      "preview-resolution-end-marker",
-      "preview-backward-target-marker",
-      "preview-forward-target-marker",
-      "preview-current-marker"
-    ];
-    for (const id of markerIds) elements[id].hidden = !previewResolution;
+    // A preview answers one question: where would this land, and across what.
+    // It answered five at once -- a neighbourhood fill and four bound markers
+    // besides -- which is more chrome than any committed state draws, and the
+    // operators that push a midpoint show it in the destination anyway. The
+    // extent and the destination are all that remain; the rest was noise the
+    // moment the movement was invoked, so it is gone rather than hidden.
+    elements["preview-current-marker"].hidden = !previewResolution;
     if (!previewResolution) return;
-
-    setMarkerPosition(
-      elements["preview-resolution-start-marker"],
-      previewResolution.L
-    );
-    setMarkerPosition(
-      elements["preview-resolution-end-marker"],
-      previewResolution.R
-    );
     setMarkerPosition(elements["preview-current-marker"], previewResolution.C);
-    const targets = getTargets(previewResolution, timelineProjection().metric);
-    elements["preview-backward-target-marker"].hidden = targets.backward === null;
-    elements["preview-forward-target-marker"].hidden = targets.forward === null;
-    if (targets.backward !== null) {
-      setMarkerPosition(elements["preview-backward-target-marker"], targets.backward);
-    }
-    if (targets.forward !== null) {
-      setMarkerPosition(elements["preview-forward-target-marker"], targets.forward);
-    }
   }
 
   function renderSectionPreview() {
@@ -1898,15 +1998,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       elements["interval-fill"].hidden = true;
       elements["field-span-fill"].hidden = true;
       elements["section-preview-fill"].hidden = true;
-      elements["preview-resolution-fill"].hidden = true;
       elements["action-preview-fill"].hidden = true;
-      for (const id of [
-        "preview-resolution-start-marker",
-        "preview-resolution-end-marker",
-        "preview-backward-target-marker",
-        "preview-forward-target-marker",
-        "preview-current-marker"
-      ]) elements[id].hidden = true;
+      elements["preview-current-marker"].hidden = true;
       renderTimelinePins();
       renderTransport();
       return;

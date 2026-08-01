@@ -107,8 +107,15 @@ assert.equal(byId.get("action-preview-fill").hidden, false,
   "Dragging Current must preview the Working Interval the Step will land.");
 assert.equal(byId.get("action-preview-fill").dataset.kind, "stepForward",
   "The previewed extent is a Step, never a Go.");
-assert.equal(byId.get("preview-resolution-fill").hidden, false,
-  "The neighbourhood the Step will establish is previewed with it.");
+// A preview answers where the movement lands and across what. The
+// neighbourhood it would establish is not drawn at all -- the elements that
+// drew it no longer exist: the operators that push a midpoint already show it
+// in the destination, and five extra elements read as noise rather than
+// information.
+assert.equal(byId.get("preview-resolution-fill"), undefined,
+  "A preview has no neighbourhood chrome left to draw.");
+assert.equal(byId.get("preview-current-marker").hidden, false,
+  "It draws the destination the movement lands on.");
 const previewedInterval = {
   left: byId.get("action-preview-fill").style.left,
   width: byId.get("action-preview-fill").style.width

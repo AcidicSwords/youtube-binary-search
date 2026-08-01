@@ -325,13 +325,27 @@ const originalSectionMain = descendants(guideItemNamed("Quarter to middle"))
   .find(node => node.dataset.sectionGo);
 byId.get("sections-list").dispatch("click", { target: originalSectionMain });
 await flush();
-const unlinkEnd = descendants(byId.get("sections-list"))
+// A Section's endpoint is a Pin, so the Section states which Pin and goes
+// there; the operation that acts on that Pin lives where the Pin does.
+assert.equal(
+  descendants(byId.get("sections-list")).some(node => node.dataset.unlinkSectionEndpoint),
+  false,
+  "Unlink is a Pin operation and must not be reachable from a Section row."
+);
+const revealEnd = descendants(byId.get("sections-list"))
+  .find(node => node.dataset.revealPin && node.textContent === "End");
+assert.ok(revealEnd, "A Section names the Pin each endpoint is.");
+byId.get("sections-list").dispatch("click", { target: revealEnd });
+await flush();
+assert.equal(byId.get("guide-tab-pins")["aria-selected"], "true",
+  "Clicking an endpoint shows the Pin where Pins are operated on.");
+const unlinkEnd = descendants(byId.get("pins-list"))
   .find(node =>
     node.dataset.unlinkSectionEndpoint
     && node.dataset.sectionEndpoint === "end"
   );
-assert.ok(unlinkEnd, "A shared Section endpoint must expose Unlink.");
-byId.get("sections-list").dispatch("click", { target: unlinkEnd });
+assert.ok(unlinkEnd, "The shared Pin offers to release each Section it holds.");
+byId.get("pins-list").dispatch("click", { target: unlinkEnd });
 await flush();
 assert.equal(
   byId.get("pins-list-count").textContent,
@@ -427,8 +441,19 @@ dispatchDocument("pointerup", {
 await flush();
 assert.equal(byId.get("pins-list-count").textContent, "3");
 assert.match(byId.get("status").textContent, /Linked with/);
+// The inverse action is immediately available again, on the Pin the link just
+// created: the same route back, reached the same way.
+byId.get("sections-list").dispatch("click", {
+  target: descendants(guideItemNamed("Quarter to middle")).find(node => node.dataset.sectionGo)
+});
+await flush();
+byId.get("sections-list").dispatch("click", {
+  target: descendants(byId.get("sections-list"))
+    .find(node => node.dataset.revealPin && node.textContent === "End")
+});
+await flush();
 assert.ok(
-  descendants(byId.get("sections-list"))
+  descendants(byId.get("pins-list"))
     .some(node =>
       node.dataset.unlinkSectionEndpoint
       && node.dataset.sectionEndpoint === "end"

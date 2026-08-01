@@ -107,6 +107,29 @@ assert.match(workingWindow(), /0:10–1:20/,
 assert.equal(byId.get("shift-layer-state").textContent, "Off",
   "Composing consumes the one-shot Shift layer.");
 
+// --- Composition is reachable from the Guide itself ---------------------------
+// The operator matrix's Shift layer is inert while the compact Guide is open,
+// so on a phone the Guide had no route to composition at all. Its own control
+// mirrors the same one-shot state rather than owning a second one.
+await clickSection("0:10–0:20");
+byId.get("guide-compose-toggle").click();
+await flush();
+assert.equal(byId.get("guide-compose-toggle")["aria-pressed"], "true");
+assert.equal(byId.get("shift-layer-state").textContent, "On",
+  "The Guide control and the operator matrix surface one state, never two.");
+await clickSection("1:00–1:20");
+assert.match(workingWindow(), /0:10–1:20/,
+  "Composing from the Guide extends exactly as Shift does.");
+assert.equal(byId.get("guide-compose-toggle")["aria-pressed"], "false",
+  "and both controls release the one-shot layer together.");
+assert.equal(byId.get("shift-layer-state").textContent, "Off");
+await clickSection("0:10–0:20");
+assert.match(workingWindow(), /0:10–0:20/,
+  "so the next plain click starts over.");
+// Re-compose the span the next section acts on.
+await clickSection("1:00–1:20", { shiftKey: true });
+assert.match(workingWindow(), /0:10–1:20/);
+
 // --- The payoff: a span is an ordinary extent ---------------------------------
 // So Deform retains it as one parent Section containing the two it was composed
 // from. Nesting by construction, with no nesting feature.

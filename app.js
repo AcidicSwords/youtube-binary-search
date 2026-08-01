@@ -10,6 +10,8 @@ import {
   DEFAULT_DEFORM_WEIGHT,
   DEFAULT_SECTION_WEIGHT,
   SECTION_WEIGHT_VALUES,
+  DEFAULT_GROUP_ID,
+  sortedSections,
   createGuide,
   findPinAt,
   getPin,
@@ -35,6 +37,10 @@ import {
   goToGuideSection as goToSessionGuideSection,
   workFromExtent,
   setGuideGroupState,
+  createGuideGroup,
+  renameGuideGroup,
+  deleteGuideGroup,
+  assignGuideSectionGroup,
   refine as refineSession,
   localRefine as localRefineSession,
   step as stepSession,
@@ -103,6 +109,7 @@ import {
   createStepGestureController
 } from "./step-gesture.js";
 import { parseCueList, cueName } from "./cues.js";
+import { sectionDisplayName } from "./format.js";
 import { createView } from "./view.js";
 
 const STORAGE_V7_PREFIX = "binary-youtube-reader:v7:";
@@ -226,6 +233,9 @@ const state = {
   // Offered candidates. Never persisted, never projected, never traversed --
   // a Cue is structure only once the reader retains it.
   cues: [],
+  // Whether the offered Cues are drawn on the map. A drawing only: it changes
+  // what is visible and nothing about what any operator can reach.
+  cuesOnTimeline: false,
   guideOpen: false,
   railMode: "guide",
   compactGuide: null,
@@ -534,9 +544,9 @@ const view = createView({
 });
 const { elements, formatTime, formatRange, setStatus } = view;
 
-function sectionName(section) {
-  return section?.label?.trim() || `Section ${formatRange(section)}`;
-}
+// One definition, shared with the kernel's transaction labels, so the object an
+// Undo names is the object the status named when it happened.
+const sectionName = sectionDisplayName;
 
 function storageKey(prefix = STORAGE_V7_PREFIX) {
   return `${prefix}${state.videoId}`;
@@ -1197,6 +1207,13 @@ function moveToAddress(destination, options = {}) {
   if (!result.changed) {
     locateAddress(departure);
     setStatus(options.unchangedStatus || `Already at ${formatTime(departure)}.`);
+    // Selection is a fact the Guide shows, and it is not the same fact as
+    // Current's Address. Selecting a Section whose midpoint Current already
+    // occupies moves nothing and still changes which row is selected, so an
+    // operator that declares it touches the Guide gets its Guide render even
+    // on the unchanged path -- otherwise the Guide keeps showing whatever was
+    // selected before.
+    if (options.renderGuide === true) view.renderGuide();
     view.render();
     return false;
   }
@@ -2028,6 +2045,63 @@ function deleteSectionById(sectionId) {
   });
 }
 
+// A Group is a retained object carrying a name, so it is renamed and removed by
+// the same dialog every other retained object uses. Removing one is
+// non-destructive by construction: a Group organizes Sections, it does not own
+// them, so its Sections return to the map.
+function groupById(groupId) {
+  return (guide().groups || []).find(group => group.id === groupId) || null;
+}
+
+function renameGroupById(groupId) {
+  const group = groupById(groupId);
+  if (!group || groupId === DEFAULT_GROUP_ID) return;
+  openGuideDialog({
+    action: "rename-group",
+    id: groupId,
+    title: "Rename Group",
+    showInput: true,
+    value: group.label,
+    confirmLabel: "Save"
+  });
+}
+
+function deleteGroupById(groupId) {
+  const group = groupById(groupId);
+  if (!group || groupId === DEFAULT_GROUP_ID) return;
+  const counted = sortedSections(guide())
+    .filter(section => section.groupId === groupId).length;
+  openGuideDialog({
+    action: "delete-group",
+    id: groupId,
+    title: "Remove Group",
+    message: counted
+      ? `Remove “${group.label?.trim() || "Group"}”? Its ${counted} Section${counted === 1 ? " returns" : "s return"} to the map; nothing is deleted.`
+      : `Remove “${group.label?.trim() || "Group"}”?`,
+    showInput: false,
+    confirmLabel: "Remove",
+    danger: true
+  });
+}
+
+// A Section's endpoints are Pins. Revealing one selects it where Pins live and
+// are edited, rather than duplicating a second Pin editor inside the Section
+// row: one object, one place it is operated on. Selection is the whole
+// mechanism -- a selected Guide row is an expanded Guide row already -- so this
+// moves nothing and records no transaction.
+function revealPin(pinId) {
+  const pin = getPin(guide(), pinId);
+  if (!pin) return;
+  selectGuideTab("pins");
+  state.selectedRetained = { kind: "pin", id: pin.id };
+  view.renderGuide();
+  view.render();
+  elements["pins-list"]
+    ?.querySelector?.(`[data-pin-go="${pin.id}"]`)
+    ?.scrollIntoView?.({ block: "nearest" });
+  setStatus(`Showing ${pinNameFor(pin.id)} in Pins.`);
+}
+
 function confirmSectionEndpointUnlink(sectionId, role) {
   const section = resolveSection(guide(), sectionId);
   if (!section || !["start", "end"].includes(role)) return;
@@ -2100,6 +2174,16 @@ function submitGuideDialog(event) {
   } else if (action.action === "delete-section") {
     result = deleteGuideSection(state.session, action.id);
     status = result.changed ? "Deleted Section." : "Section could not be deleted.";
+  } else if (action.action === "rename-group") {
+    result = renameGuideGroup(state.session, action.id, value);
+    status = result.changed
+      ? value ? "Renamed Group." : "Removed the Group title."
+      : "Group title is unchanged.";
+  } else if (action.action === "delete-group") {
+    result = deleteGuideGroup(state.session, action.id);
+    status = result.changed
+      ? "Removed the Group. Its Sections returned to the map."
+      : "Group could not be removed.";
   } else if (action.action === "unlink-section-endpoint") {
     result = unlinkGuideSectionEndpoint(
       state.session,
@@ -2240,6 +2324,9 @@ function composingGuideClick(event) {
 function consumeShiftLayer() {
   if (!state.shiftLayer) return;
   state.shiftLayer = false;
+  // Both controls that surface this one-shot state have to release together,
+  // or the Guide keeps claiming a layer the operator matrix has already spent.
+  view.renderGuide();
   view.render();
 }
 
@@ -3746,6 +3833,7 @@ function offerCues(event = null) {
   });
   state.cues = cues;
   view.renderGuide();
+  view.render();
   setStatus(cues.length
     ? `Offered ${cues.length} Cue${cues.length === 1 ? "" : "s"}. Nothing is retained until you say so.`
     : "No Addresses found in that text.", !cues.length);
@@ -3753,9 +3841,25 @@ function offerCues(event = null) {
 
 function clearCues() {
   state.cues = [];
+  state.cuesOnTimeline = false;
   elements["cue-source"].value = "";
   view.renderGuide();
+  view.render();
   setStatus("Cleared the offered Cues.");
+}
+
+// Drawing every Cue at once answers the question the list cannot: where the
+// creator's divisions fall relative to the structure already built. It is a
+// drawing and stays one -- the marks are inert, so the only way a Cue becomes
+// something to act on is still to retain it.
+function toggleCueLane() {
+  if (!(state.cues || []).length) return;
+  state.cuesOnTimeline = !state.cuesOnTimeline;
+  view.renderGuide();
+  view.render();
+  setStatus(state.cuesOnTimeline
+    ? `Drawing ${state.cues.length} Cue${state.cues.length === 1 ? "" : "s"} on the map. They mark, they do not act.`
+    : "Cues are no longer drawn on the map.");
 }
 
 function goToCue(index, { composing = false } = {}) {
@@ -4544,6 +4648,20 @@ elements["guide-tab-sections"].addEventListener("click", () => selectGuideTab("s
 elements["guide-tab-pins"].addEventListener("click", () => selectGuideTab("pins"));
 elements["guide-tab-cues"].addEventListener("click", () => selectGuideTab("cues"));
 elements["sections-list"].addEventListener("change", event => {
+  const move = event.target.closest?.("[data-section-group]");
+  if (move) {
+    settleBeforeAction();
+    const moved = assignGuideSectionGroup(
+      state.session,
+      move.dataset.sectionGroup,
+      move.value
+    );
+    if (!moved.changed) return view.renderGuide();
+    state.session = moved.session;
+    view.renderGuide();
+    view.render();
+    return setStatus(`${moved.session.history.at(-1)?.label || "Section moved"}.`);
+  }
   const toggle = event.target.closest?.("[data-group-toggle]");
   if (!toggle) return;
   const key = toggle.dataset.groupState;
@@ -4559,8 +4677,41 @@ elements["sections-list"].addEventListener("change", event => {
   setStatus(`${result.session.history.at(-1)?.label || "Group updated"}.`);
 });
 
+// The Shift layer lives in the operator matrix, which the compact layout makes
+// inert while the Guide is open -- so on a phone the Guide had no route to
+// composition at all. This is the same one-shot state reached from where the
+// objects being composed actually are.
+elements["sections-list"].addEventListener("click", event => {
+  const renameGroup = event.target.closest?.("[data-rename-group]");
+  if (renameGroup) {
+    event.stopPropagation();
+    return renameGroupById(renameGroup.dataset.renameGroup);
+  }
+  const removeGroup = event.target.closest?.("[data-delete-group]");
+  if (removeGroup) {
+    event.stopPropagation();
+    return deleteGroupById(removeGroup.dataset.deleteGroup);
+  }
+  if (!event.target.closest?.("[data-group-add]")) return;
+  event.stopPropagation();
+  settleBeforeAction();
+  const created = createGuideGroup(state.session, `Group ${(guide().groups?.length || 1)}`);
+  if (!created.changed) return;
+  state.session = created.session;
+  view.renderGuide();
+  view.render();
+  setStatus("Added a Group. Move Sections into it from their Group control.");
+});
+
+elements["guide-compose-toggle"].addEventListener("click", () => {
+  state.shiftLayer = !state.shiftLayer;
+  view.renderGuide();
+  view.render();
+});
+
 elements["cue-capture"].addEventListener("submit", offerCues);
 elements["cue-clear"].addEventListener("click", clearCues);
+elements["cue-lane-toggle"].addEventListener("click", toggleCueLane);
 elements["cues-list"].addEventListener("click", event => {
   const retain = event.target.closest("[data-cue-retain]");
   if (retain) return retainCue(retain.dataset.cueRetain);
@@ -4829,6 +4980,8 @@ function handleGuideClick(event) {
       { carryRetained: event.altKey === true }
     );
   }
+  const reveal = event.target.closest("[data-reveal-pin]");
+  if (reveal) return revealPin(reveal.dataset.revealPin);
   const focus = event.target.closest("[data-focus-section]");
   if (focus) return focusSection(focus.dataset.focusSection);
   const leave = event.target.closest("[data-leave-section]");

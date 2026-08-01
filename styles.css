@@ -462,7 +462,6 @@ kbd {
 .resolution-fill,
 .interval-fill,
 .section-preview-fill,
-.preview-resolution-fill,
 .action-preview-fill {
   position: absolute;
   pointer-events: none;
@@ -575,7 +574,6 @@ kbd {
 }
 
 .section-preview-fill,
-.preview-resolution-fill,
 .action-preview-fill {
   z-index: 5;
   inset-block: 2px;
@@ -587,10 +585,6 @@ kbd {
   background: rgb(var(--section-preview-rgb) / 0.075);
 }
 
-.preview-resolution-fill {
-  border-inline: 1px dashed rgb(var(--preview-rgb) / 0.68);
-  background: rgb(var(--preview-rgb) / 0.075);
-}
 .action-preview-fill {
   border: 1px dashed rgb(var(--preview-rgb) / 0.68);
   background: rgb(var(--preview-rgb) / 0.07);
@@ -693,7 +687,8 @@ kbd {
   padding: 1px 5px;
   transform: translateX(-50%);
   border-radius: 4px;
-  background: rgba(11, 14, 19, 0.82);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-3);
   color: var(--text);
   font-size: 0.66rem;
   font-variant-numeric: tabular-nums;
@@ -703,8 +698,9 @@ kbd {
 }
 
 .current-marker.is-dragging .current-marker-time {
-  background: rgba(11, 14, 19, 0.92);
-  color: var(--accent-strong);
+  border-color: rgba(121, 168, 255, 0.72);
+  background: color-mix(in srgb, var(--accent) 26%, var(--surface-3));
+  color: #fff;
 }
 
 .current-marker.is-dragging {
@@ -752,8 +748,6 @@ kbd {
   transform: translateX(-50%);
 }
 
-.preview-resolution-marker,
-.preview-target-marker,
 .preview-current-marker {
   z-index: 7;
   width: 1px;
@@ -762,11 +756,6 @@ kbd {
   background: rgba(202, 179, 255, 0.84);
 }
 
-.preview-target-marker {
-  top: calc(var(--track-top, 104px) - 2px);
-  height: 16px;
-  background: rgba(221, 207, 255, 0.92);
-}
 
 .preview-current-marker {
   top: calc(var(--track-top, 104px) - 8px);
@@ -787,6 +776,37 @@ kbd {
   position: absolute;
   inset: 0;
   pointer-events: none;
+}
+
+/* Cues are drawn, never operated. Nothing in this lane takes a pointer, so a
+   mark cannot be clicked, dragged, or clustered into a Pin's hit region. */
+.cue-lane {
+  position: absolute;
+  inset: var(--cue-top, 138px) 0 auto;
+  height: 14px;
+  color: var(--faint);
+  font: 600 0.56rem system-ui, sans-serif;
+  pointer-events: none;
+}
+
+.timeline-cue {
+  position: absolute;
+  top: 0;
+  height: 6px;
+  border-left: 1px dashed rgb(var(--section-preview-rgb) / 0.66);
+  transform: translateX(-0.5px);
+  pointer-events: none;
+}
+
+.timeline-cue-name {
+  position: absolute;
+  top: 7px;
+  left: 3px;
+  max-width: 96px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 0.72;
 }
 
 .timeline-ruler {
@@ -2486,12 +2506,32 @@ kbd {
   gap: 3px;
 }
 
-.guide-address > small {
+.guide-address > small,
+.guide-address-reveal {
   margin-right: 2px;
   color: var(--text-dim);
   font-size: 0.66rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+/* The label reads as a label and behaves as a link, because that is what it
+   is: the name of the Pin this Address belongs to, and the way to it. */
+.guide-address-reveal {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px dashed rgba(144, 158, 181, 0.4);
+  background: none;
+  font-family: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+}
+
+.guide-address-reveal:hover,
+.guide-address-reveal:focus-visible {
+  color: var(--text);
+  border-bottom-color: currentColor;
 }
 
 .guide-address-input {
@@ -2586,6 +2626,12 @@ kbd {
   color: var(--muted);
 }
 
+/* A Group carrying Rename and Remove takes a fourth column, in the same place
+   and at the same size those controls occupy on a Pin or a Section row. */
+.guide-group-row:has(.guide-title-actions) {
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto auto;
+}
+
 .guide-group-name,
 .guide-divider-name {
   color: var(--text);
@@ -2621,3 +2667,17 @@ kbd {
 .guide-group-toggle input { min-height: 0; }
 
 .guide-divider { grid-template-columns: minmax(0, auto) minmax(0, 1fr); }
+
+/* Composition reached from the Guide itself. It mirrors the operator matrix's
+   Shift layer rather than owning a second state, so the two can never disagree. */
+.guide-compose-toggle {
+  min-height: var(--compact-control-height);
+  padding: 0 10px;
+  font-size: 0.74rem;
+}
+
+.guide-compose-toggle.active {
+  border-color: rgba(188, 154, 255, 0.72);
+  color: var(--text);
+  background: rgba(188, 154, 255, 0.16);
+}
