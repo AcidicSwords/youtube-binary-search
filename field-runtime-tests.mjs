@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createStepFieldController, FIELD_SIDE_MODE } from "./step-field.js";
 import { YOUTUBE_STATE } from "./youtube.js";
+import { FIELD_FRAME_ACTIVATION } from "./field-frame.js";
 
 function element(tagName = "DIV") {
   const listeners = new Map();
@@ -343,6 +344,7 @@ function makeHarness({
       fieldBreath: { inner: 1, outer: 2.5, rate: 0.5 },
       fieldFrame: {
         kind: "step",
+        activation: { kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS },
         start: 35,
         center: 50,
         end: 72,
@@ -363,6 +365,22 @@ function makeHarness({
     assert.equal(h.elements.get("lead-player-surface").getAttribute("aria-disabled"), "false");
     assert.equal(h.elements.get("field-both-toggle").disabled, true,
       "A Field Frame makes the combined Stretch/Hold control non-actionable.");
+
+    h.snapshot = {
+      ...h.snapshot,
+      fieldFrame: {
+        kind: "step",
+        start: 35,
+        center: 50,
+        end: 72,
+        backwardDistance: 15,
+        forwardDistance: 22
+      }
+    };
+    h.controller.tick();
+    assert.equal(h.controller.getStepSelection("tail"), null,
+      "Step-shaped geometry without an activation contract remains observation-only.");
+    assert.equal(h.elements.get("tail-player-surface").getAttribute("aria-disabled"), "true");
 
     h.snapshot = {
       ...h.snapshot,
@@ -444,6 +462,7 @@ function makeHarness({
       ...h.snapshot,
       fieldFrame: {
         kind: "step",
+        activation: { kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS },
         start: 40,
         center: 50,
         end: 60,

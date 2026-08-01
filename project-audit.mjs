@@ -111,11 +111,11 @@ assert.match(view, /current-marker-time[\s\S]*currentMarkerTime\.textContent = f
 assert.doesNotMatch(html, /id="fold-lane"/);
 assert.match(html, /id="step-size-settings"[\s\S]*id="step-mode-fixed"[\s\S]*id="step-mode-adaptive"/);
 assert.match(html, /data-step-fraction="0\.03125"[\s\S]*data-step-fraction="0\.0625"[\s\S]*data-step-fraction="0\.125"/);
-assert.match(html, /Manual map distance/);
-// Step distance is a map distance. The setting must say so, because the number
-// only equals source seconds at neutral Weight.
-assert.match(html, /Step distance is measured across the map/);
-assert.match(html, /active Range’s weighted map width/);
+assert.match(html, /Manual distance/);
+// Step distance is a Timeline distance. The setting must say so, because the
+// number only equals source seconds at neutral Weight.
+assert.match(html, /Step distance is measured across the Timeline/);
+assert.match(html, /active Range’s weighted Timeline width/);
 assert.match(html, /id="deform"[^>]*aria-keyshortcuts="T"/);
 assert.match(html, /id="deform-down"[^>]*aria-keyshortcuts="Alt\+T"/);
 assert.match(html, /id="deform-up"[^>]*aria-keyshortcuts="Shift\+T"/);
@@ -383,7 +383,8 @@ assert.match(view, /timelinePinClusterGap/);
 assert.match(view, /COARSE_TIMELINE_PIN_HIT_SIZE\s*=\s*56/);
 assert.match(view, /TIMELINE_PIN_HIT_SIZE\s*=\s*52/);
 assert.match(view, /TIMELINE_SECTION_HIT_WIDTH\s*=\s*28/);
-assert.match(view, /TIMELINE_SECTION_MAX_LANES\s*=\s*5/);
+assert.doesNotMatch(view, /TIMELINE_SECTION_MAX_LANES|lane %/);
+assert.match(view, /packedSections\.laneCount \* sectionLaneHeight/);
 assert.match(view, /--pin-hit-size/);
 assert.match(styles, /\.timeline-pin:active:not\(:disabled\)[\s\S]*transform:\s*translate\(-50%, -50%\)/);
 assert.doesNotMatch(view, /dataset\.(references|pinKind)/);

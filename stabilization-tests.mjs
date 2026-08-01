@@ -229,9 +229,9 @@ const clone = value => structuredClone(value);
   assert.ok(app.includes("accept(created, {"));
   assert.equal(app.includes("state.session = moved.session;"), false);
 
-  assert.ok(view.includes('"Stop Context and Play"'));
+  assert.ok(view.includes('"Stop Context and Play from Current"'));
   assert.ok(html.includes("Current; drag to Step, Shift-drag for precision"));
-  assert.ok(html.includes("map units"));
+  assert.ok(html.includes("one unit equals one source second"));
 }
 
 console.log("stabilization invariants passed");
