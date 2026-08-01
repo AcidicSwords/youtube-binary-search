@@ -381,6 +381,7 @@
             <div class="guide-tabs" role="tablist" aria-label="Guide views">
               <button id="guide-tab-sections" class="guide-tab active" type="button" role="tab" aria-selected="true" aria-controls="guide-sections-panel" tabindex="0">Sections <span id="sections-list-count">0</span></button>
               <button id="guide-tab-pins" class="guide-tab" type="button" role="tab" aria-selected="false" aria-controls="guide-pins-panel" tabindex="-1">Pins <span id="pins-list-count">0</span></button>
+              <button id="guide-tab-cues" class="guide-tab" type="button" role="tab" aria-selected="false" aria-controls="guide-cues-panel" tabindex="-1">Cues <span id="cues-list-count">0</span></button>
             </div>
 
             <section id="focused-section" class="focused-section" hidden>
@@ -434,6 +435,23 @@
                 </form>
               </details>
               <div id="pins-list" class="guide-list"><p class="empty-state">No Pins for this video.</p></div>
+            </section>
+
+            <section id="guide-cues-panel" class="guide-tab-panel" role="tabpanel" aria-labelledby="guide-tab-cues" hidden>
+              <details class="guide-create-disclosure">
+                <summary><span>Offer chapters</span></summary>
+                <form id="cue-capture" class="guide-create-form cue-create-form">
+                  <label for="cue-source">Paste a video description
+                    <textarea id="cue-source" rows="4" placeholder="0:00 Intro&#10;1:23 The setup&#10;…" disabled></textarea>
+                  </label>
+                  <p class="setting-note">Chapters a creator wrote are a partition someone who understood the video already drew. They are offered here, never placed: nothing enters the Guide, the map, or traversal until you retain it.</p>
+                  <div class="compact-actions cue-actions">
+                    <button id="cue-parse" class="primary" type="submit" disabled>Offer</button>
+                    <button id="cue-clear" type="button" disabled>Clear</button>
+                  </div>
+                </form>
+              </details>
+              <div id="cues-list" class="guide-list"><p class="empty-state">No Cues offered. Paste a description to navigate its chapters.</p></div>
             </section>
 
           </aside>

@@ -125,6 +125,7 @@ Module boundaries instantiate the conceptual distinctions:
 - `timeline-projection.js` owns the positive source↔Timeline Space map;
 - `guide.js` owns persistent Pin/Section topology and Weight;
 - `transport.js` owns Context and playback runtime;
+- `cues.js` owns pure candidate Addresses parsed from offered text;
 - `field-frame.js` owns pure Frame derivation, stable Frame identity, traversal
   direction, transition descriptors, and the revisioned Frame sequencer;
 - `step-field-geometry.js` owns pure Field and breathing arithmetic;
@@ -153,7 +154,7 @@ The map becomes more useful through use while the source remains unchanged.
 
 ## Natural extensions
 
-Transcript cues are exact Addresses. Transcript selection is a Working Interval. Search results remain ephemeral until retained. Chapters import as boundary Pins and neutral Sections. Ordinary player conveniences such as Center playback rate, captions, volume, quality, fullscreen, and verified frame stepping remain media-runtime controls and cannot acquire the meanings of Field rate, Step Reach, Resolution, or Section Weight.
+Chapters, transcript cues and search results are **Cues**: exact Addresses offered as candidates. A creator's chapter list is a partition someone who understood the video already drew, so it is worth navigating immediately — but it is not the reader's map, and it is never placed. A Cue enters no Guide, deforms nothing, and stops no traversal until the reader retains it, at which point it becomes an ordinary Pin or Section carrying the creator's title. Ordinary player conveniences such as Center playback rate, captions, volume, quality, fullscreen, and verified frame stepping remain media-runtime controls and cannot acquire the meanings of Field rate, Step Reach, Resolution, or Section Weight.
 
 ## Non-goals
 

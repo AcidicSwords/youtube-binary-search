@@ -1,4 +1,5 @@
 // DOM projection layer. It derives presentation from state and does not own semantic transactions.
+import { cueName } from "./cues.js";
 import {
   EPSILON,
   clamp,
@@ -1053,8 +1054,64 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       }
     }
 
+    renderCues();
     invalidateTimelinePins();
     renderTimelinePins();
+  }
+
+  // Cues are offered, never placed. They render as candidates: the creator's
+  // own title and extent, one action that turns a candidate into structure, and
+  // nothing that edits anything — because there is nothing yet to edit.
+  function renderCues() {
+    const cues = state().cues || [];
+    elements["cues-list-count"].textContent = String(cues.length);
+    elements["cues-list"].replaceChildren();
+    if (!cues.length) {
+      const empty = document.createElement("p");
+      empty.className = "empty-state";
+      empty.textContent = state().videoLoaded
+        ? "No Cues offered. Paste a description to navigate its chapters."
+        : "Load a video, then paste its description.";
+      elements["cues-list"].appendChild(empty);
+      return;
+    }
+    for (const cue of cues) {
+      const item = document.createElement("article");
+      item.className = "guide-item cue-item";
+      const main = document.createElement("button");
+      main.type = "button";
+      main.className = "guide-item-main";
+      main.dataset.cueGo = String(cue.index);
+      const title = document.createElement("span");
+      title.className = "guide-item-title";
+      title.textContent = cueName(cue) || "Cue";
+      const meta = document.createElement("span");
+      meta.className = "guide-item-time";
+      const spans = cue.end > cue.start + EPSILON;
+      meta.textContent = spans
+        ? `${formatRange(cue)} · ${formatDuration(cue.end - cue.start)}`
+        : formatTime(cue.time);
+      main.title = spans
+        ? `${cueName(cue) || "Cue"} at ${formatTime(cue.time)}; click to go and take its extent, Shift+click to extend the Working Interval`
+        : `${cueName(cue) || "Cue"} at ${formatTime(cue.time)}; click to go`;
+      main.append(title, meta);
+      const actions = document.createElement("div");
+      actions.className = "guide-item-actions cue-item-actions";
+      const retain = document.createElement("button");
+      retain.type = "button";
+      retain.className = "guide-action";
+      retain.dataset.cueRetain = String(cue.index);
+      retain.textContent = spans ? "Retain Section" : "Retain Pin";
+      retain.title = spans
+        ? "Save this Cue's extent as a Section, keeping the creator's title"
+        : "Save this Cue's Address as a Pin, keeping the creator's title";
+      actions.append(retain);
+      const header = document.createElement("div");
+      header.className = "guide-item-header";
+      header.append(main, actions);
+      item.append(header);
+      elements["cues-list"].appendChild(item);
+    }
   }
 
   function renderActionPreview(previewResult, structural, kind = previewAction) {
@@ -1542,7 +1599,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "go-range-end", "range-end-here", "full-video-range",
       "field-inner-offset", "field-outer-offset", "field-breath-rate",
       "nudge-seconds", "context-seconds",
-      "section-source", "section-label", "pin-label"
+      "section-source", "section-label", "pin-label",
+      "cue-source", "cue-parse", "cue-clear"
     ]) {
       if (elements[id]) elements[id].disabled = interactionLocked;
     }

@@ -14,6 +14,7 @@
 - **Outer Offset** — the maximum Tail/Lead separation from Center during Breath.
 - **Temporal Topography** — the complete source projected into navigable Timeline Space.
 - **Timeline Space** — the derived positive spatial coordinate used for map layout and navigation.
+- **Cue** — an Address offered as a candidate, parsed from a creator's chapters or any pasted text. Never persisted, never projected, never traversed; it becomes structure only when retained.
 - **Stretch factor** — a spatial extent expressed as the factor it applies to its own source span. Spatial extent is always reported this way and never as a duration; at `1×` it is omitted.
 - **Viewport** — the source extent the map is drawn across. Presentation only: Focus takes it so the focused extent fills the timeline, and no operator can observe it.
 - **Range** — admissible source territory.

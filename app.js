@@ -101,6 +101,7 @@ import {
   bindStepPress,
   createStepGestureController
 } from "./step-gesture.js";
+import { parseCueList, cueName } from "./cues.js";
 import { createView } from "./view.js";
 
 const STORAGE_V7_PREFIX = "binary-youtube-reader:v7:";
@@ -221,6 +222,9 @@ const state = {
   rangeDragOrigin: null,
   rangeDragProjection: null,
   guideTab: "sections",
+  // Offered candidates. Never persisted, never projected, never traversed --
+  // a Cue is structure only once the reader retains it.
+  cues: [],
   guideOpen: false,
   railMode: "guide",
   compactGuide: null,
@@ -2239,8 +2243,14 @@ function consumeShiftLayer() {
 }
 
 function extendIntervalToRetained(kind, id, name) {
+  return extendIntervalToExtent(retainedExtentOf(kind, id), name, { kind, id });
+}
+
+// The same extension law, expressed over a bare extent so that a Cue -- which
+// is not in the Guide and owns no identity -- composes exactly as a Section
+// does. Composition is a fact about extents, not about retained objects.
+function extendIntervalToExtent(extent, name, selection = null) {
   const interval = currentInterval();
-  const extent = retainedExtentOf(kind, id);
   if (!interval || !extent) return false;
   const span = {
     start: Math.min(interval.start, extent.start),
@@ -2248,7 +2258,7 @@ function extendIntervalToRetained(kind, id, name) {
   };
   if (span.end - span.start <= EPSILON) return false;
   const label = `Extend to ${name}`;
-  state.selectedRetained = { kind, id };
+  if (selection) state.selectedRetained = { ...selection };
   moveToAddress((span.start + span.end) / 2, {
     operator: "section",
     label,
@@ -3709,8 +3719,110 @@ function syncContextControl() {
   elements["context-seconds"].value = String(state.contextSeconds);
 }
 
+// Cues: a creator's chapters offered as candidates.
+//
+// They are parsed from a pasted description, held only in interface state, and
+// never enter the Guide, the projection, or traversal. Navigating one is an
+// ordinary Go; composing two is the ordinary extension law; and retaining one
+// is the ordinary save, carrying the creator's own title across.
+function cueAt(index) {
+  return state.cues[Number(index)] || null;
+}
+
+function cueLabelFor(cue) {
+  return cueName(cue) || `Cue at ${formatTime(cue.time)}`;
+}
+
+function cueSpans(cue) {
+  return cue.end - cue.start > EPSILON;
+}
+
+function offerCues(event = null) {
+  event?.preventDefault?.();
+  if (!state.videoLoaded) return;
+  const cues = parseCueList(elements["cue-source"].value, {
+    duration: model().duration
+  });
+  state.cues = cues;
+  view.renderGuide();
+  setStatus(cues.length
+    ? `Offered ${cues.length} Cue${cues.length === 1 ? "" : "s"}. Nothing is retained until you say so.`
+    : "No Addresses found in that text.", !cues.length);
+}
+
+function clearCues() {
+  state.cues = [];
+  elements["cue-source"].value = "";
+  view.renderGuide();
+  setStatus("Cleared the offered Cues.");
+}
+
+function goToCue(index, { composing = false } = {}) {
+  const cue = cueAt(index);
+  if (!cue) return;
+  if (composing && extendIntervalToExtent(cue, cueLabelFor(cue))) return;
+  settleBeforeAction();
+  if (!cueSpans(cue)) {
+    return moveToAddress(cue.time, {
+      operator: "cue",
+      label: `Go to ${cueLabelFor(cue)}`,
+      status: destination => `Current is at ${cueLabelFor(cue)}, ${formatTime(destination)}.`
+    });
+  }
+  moveToAddress((cue.start + cue.end) / 2, {
+    operator: "section",
+    label: `Go to ${cueLabelFor(cue)}`,
+    transaction: sourceSession => workFromExtent(sourceSession, cue, {
+      operator: "section",
+      label: `Go to ${cueLabelFor(cue)}`
+    }),
+    status: destination =>
+      `${cueLabelFor(cue)} is the Working Interval; Current is centered at ${formatTime(destination)}.`
+  });
+}
+
+// Retention is the moment a candidate becomes structure, and it is the ordinary
+// save -- so a retained Cue is indistinguishable afterwards from one the reader
+// drew. The creator's title comes across because it is the thing worth keeping.
+function retainCue(index) {
+  const cue = cueAt(index);
+  if (!cue) return;
+  settleBeforeAction();
+  const label = cueName(cue) || "";
+  if (!cueSpans(cue)) {
+    goToCue(index);
+    const pinned = pinSessionCurrent(state.session, label);
+    if (!pinned.changed) return setStatus("That Address already holds a Pin.");
+    state.session = pinned.session;
+    state.selectedRetained = { kind: "pin", id: pinned.value.pin.id };
+    selectGuideTab("pins");
+    view.renderGuide();
+    view.render();
+    return setStatus(`Retained ${cueLabelFor(cue)} as a Pin.`);
+  }
+  const saved = saveExtentAsSection(state.session, cue, label, "cue");
+  if (!saved.changed) {
+    const existing = saved.value?.section;
+    if (existing) {
+      state.selectedRetained = { kind: "section", id: existing.id };
+      selectGuideTab("sections");
+      view.renderGuide();
+      view.render();
+    }
+    return setStatus("That extent is already a retained Section.");
+  }
+  state.session = saved.session;
+  state.selectedRetained = { kind: "section", id: saved.value.section.id };
+  selectGuideTab("sections");
+  view.renderGuide();
+  view.render();
+  setStatus(`Retained ${cueLabelFor(cue)} as a Section.`);
+}
+
+const GUIDE_TABS = ["sections", "pins", "cues"];
+
 function selectGuideTab(tab, { focus = false } = {}) {
-  const names = ["sections", "pins"];
+  const names = GUIDE_TABS;
   const resolved = names.includes(tab) ? tab : "sections";
   state.guideTab = resolved;
   for (const name of names) {
@@ -4429,7 +4541,16 @@ elements["guide-close"].addEventListener("click", closeGuide);
 elements["guide-scrim"].addEventListener("click", closeGuide);
 elements["guide-tab-sections"].addEventListener("click", () => selectGuideTab("sections"));
 elements["guide-tab-pins"].addEventListener("click", () => selectGuideTab("pins"));
-for (const id of ["guide-tab-sections", "guide-tab-pins"]) {
+elements["guide-tab-cues"].addEventListener("click", () => selectGuideTab("cues"));
+elements["cue-capture"].addEventListener("submit", offerCues);
+elements["cue-clear"].addEventListener("click", clearCues);
+elements["cues-list"].addEventListener("click", event => {
+  const retain = event.target.closest("[data-cue-retain]");
+  if (retain) return retainCue(retain.dataset.cueRetain);
+  const go = event.target.closest("[data-cue-go]");
+  if (go) return goToCue(go.dataset.cueGo, { composing: composingGuideClick(event) });
+});
+for (const id of ["guide-tab-sections", "guide-tab-pins", "guide-tab-cues"]) {
   elements[id].addEventListener("keydown", handleGuideTabKeydown);
 }
 elements["guide-dialog-form"].addEventListener("submit", submitGuideDialog);
@@ -4440,7 +4561,7 @@ elements["guide-dialog"].addEventListener("cancel", event => {
 });
 
 function handleGuideTabKeydown(event) {
-  const names = ["sections", "pins"];
+  const names = GUIDE_TABS;
   const currentIndex = names.indexOf(state.guideTab);
   let nextIndex = null;
   if (event.key === "ArrowLeft") nextIndex = (currentIndex + names.length - 1) % names.length;
