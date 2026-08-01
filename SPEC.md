@@ -849,6 +849,8 @@ an endpoint Pin is drawn while any Section referencing it is visible
 a Pin referencing no Section is never hidden by a Group
 retaining a Cue is the ordinary save and carries the offered title
 an operation acting on a Pin is reached from that Pin
+one name identifies an unnamed Section everywhere it is named
+a Group is renamed and removed like any other retained object, destroying nothing
 composition yields an extent, never a set, so every operator consumes it unchanged
 a Guide row is expanded exactly when it is the selected retained object
 preview, breathing, Context, and semantic state cannot overwrite one another

@@ -25,6 +25,8 @@
 - Paste a description carrying chapters into the Cues tab. Confirm the Cue count rises while Pins, Sections, the map and Undo are untouched; that clicking a Cue takes its extent; that `Shift`+click extends across two; and that `Retain` produces an ordinary Section carrying the creator's title.
 - Confirm `Show on timeline` draws a mark per Cue and that no mark can be clicked, dragged, or joined to a Pin cluster; that Undo is unchanged by drawing; and that `Clear` removes both the offer and the drawing.
 - Confirm a selected Section's `Start` and `End` labels select the corresponding Pin in the Pins tab without moving Current, and that a Pin holding two Sections offers one Unlink per Section, each naming it.
+- Confirm a Group is renamed and removed from its own row, that removing one returns its Sections to the map, and that Undo restores it in the state it was removed in.
+- Confirm two unnamed Sections sharing one Pin offer two distinguishable Unlink buttons, and that Undo labels name the same object the status named.
 - Confirm a Group's two checkboxes are independent and that its header names the state: hidden and active draws no Section bar and no endpoint Pin while its Weights still deform the map; visible and inactive draws the bar and the Pins with no deformation gradient.
 - Confirm Guide’s Section selector contains, in order: `0.125×`, `0.25×`, `0.5×`, `0.75×`, `1×`, `1.25×`, `1.5×`, `1.75×`, `2×`, `4×`.
 - Confirm every spatial figure is shown as a factor, never as a duration: with all weights at `1×` no factor appears anywhere; adding one 15 s `2×` Section to a one-minute source shows `1:00 · 1.25× spatial`; adding a second 15 s Section at `0.5×` removes the factor again.

@@ -8,6 +8,7 @@ const styles = read("styles.css");
 const fieldCss = read("step-field.css");
 const grammarCss = read("field-grammar.css");
 const app = read("app.js");
+const format = read("format.js");
 const view = read("view.js");
 const session = read("session.js");
 const guide = read("guide.js");
@@ -156,7 +157,13 @@ assert.match(view, /guideTitleActions[\s\S]*guide-title-rename[\s\S]*guide-title
 // Unlink acts on a shared Pin, so it lives with Pins and names the Section it
 // releases. Reading a Section to operate on a Pin put the one object the
 // operation is about out of view.
-assert.match(view, /pin-unlink-actions[\s\S]*Unlink \$\{sectionLabel\(section\)\}/);
+assert.match(view, /pin-unlink-actions[\s\S]*Unlink \$\{sectionDisplayName\(section\)\}/);
+// One definition of an unnamed Section's name, shared by the kernel's
+// transaction labels and every context with no Address field of its own.
+assert.match(format, /export function sectionDisplayName[\s\S]*Section \$\{formatRange\(section\)\}/);
+assert.match(session, /import \{ sectionDisplayName \} from "\.\/format\.js"/);
+assert.doesNotMatch(session, /"Untitled Section"/);
+assert.match(app, /const sectionName = sectionDisplayName/);
 assert.doesNotMatch(view, /Unlink \$\{role === "start" \? "Start" : "End"\}/);
 // And the Section states which Pin each endpoint is, rather than leaving it to
 // be found by Address in a list ordered by Address.

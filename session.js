@@ -1,4 +1,5 @@
 // Immutable semantic kernel and Undo history. This module does not touch the DOM or media players.
+import { sectionDisplayName } from "./format.js";
 import {
   EPSILON,
   RESOLUTION_BASIS,
@@ -987,10 +988,6 @@ function sameExtent(first, second) {
   );
 }
 
-function sectionDisplayName(section) {
-  return section?.label?.trim() || "Untitled Section";
-}
-
 export function deformSection(
   session,
   sectionId = null,
@@ -1521,6 +1518,20 @@ export function createGuideGroup(session, label = "") {
   return commit(session, `Add Group${label ? ` “${label}”` : ""}`, draft => {
     const group = createGroup(draft.guide, label);
     return { changed: true, guideChanged: true, value: group };
+  }, { guideEdit: true });
+}
+
+export function renameGuideGroup(session, groupId, label) {
+  const group = session.model.guide.groups?.find(entry => entry.id === groupId);
+  if (!group || groupId === DEFAULT_GROUP_ID) return unchanged(session, "missing-group");
+  const next = typeof label === "string" ? label.trim() : "";
+  if (next === (group.label?.trim() || "")) return unchanged(session, "unchanged-group");
+  const name = next || group.label?.trim() || "Group";
+  return commit(session, `Rename Group “${name}”`, draft => {
+    const target = draft.guide.groups?.find(entry => entry.id === groupId);
+    if (!target) return { changed: false, reason: "missing-group" };
+    target.label = next;
+    return { changed: true, guideChanged: true, value: target };
   }, { guideEdit: true });
 }
 

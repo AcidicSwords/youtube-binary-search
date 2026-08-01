@@ -10,6 +10,8 @@ import {
   DEFAULT_DEFORM_WEIGHT,
   DEFAULT_SECTION_WEIGHT,
   SECTION_WEIGHT_VALUES,
+  DEFAULT_GROUP_ID,
+  sortedSections,
   createGuide,
   findPinAt,
   getPin,
@@ -36,6 +38,8 @@ import {
   workFromExtent,
   setGuideGroupState,
   createGuideGroup,
+  renameGuideGroup,
+  deleteGuideGroup,
   assignGuideSectionGroup,
   refine as refineSession,
   localRefine as localRefineSession,
@@ -105,6 +109,7 @@ import {
   createStepGestureController
 } from "./step-gesture.js";
 import { parseCueList, cueName } from "./cues.js";
+import { sectionDisplayName } from "./format.js";
 import { createView } from "./view.js";
 
 const STORAGE_V7_PREFIX = "binary-youtube-reader:v7:";
@@ -539,9 +544,9 @@ const view = createView({
 });
 const { elements, formatTime, formatRange, setStatus } = view;
 
-function sectionName(section) {
-  return section?.label?.trim() || `Section ${formatRange(section)}`;
-}
+// One definition, shared with the kernel's transaction labels, so the object an
+// Undo names is the object the status named when it happened.
+const sectionName = sectionDisplayName;
 
 function storageKey(prefix = STORAGE_V7_PREFIX) {
   return `${prefix}${state.videoId}`;
@@ -2040,6 +2045,45 @@ function deleteSectionById(sectionId) {
   });
 }
 
+// A Group is a retained object carrying a name, so it is renamed and removed by
+// the same dialog every other retained object uses. Removing one is
+// non-destructive by construction: a Group organizes Sections, it does not own
+// them, so its Sections return to the map.
+function groupById(groupId) {
+  return (guide().groups || []).find(group => group.id === groupId) || null;
+}
+
+function renameGroupById(groupId) {
+  const group = groupById(groupId);
+  if (!group || groupId === DEFAULT_GROUP_ID) return;
+  openGuideDialog({
+    action: "rename-group",
+    id: groupId,
+    title: "Rename Group",
+    showInput: true,
+    value: group.label,
+    confirmLabel: "Save"
+  });
+}
+
+function deleteGroupById(groupId) {
+  const group = groupById(groupId);
+  if (!group || groupId === DEFAULT_GROUP_ID) return;
+  const counted = sortedSections(guide())
+    .filter(section => section.groupId === groupId).length;
+  openGuideDialog({
+    action: "delete-group",
+    id: groupId,
+    title: "Remove Group",
+    message: counted
+      ? `Remove “${group.label?.trim() || "Group"}”? Its ${counted} Section${counted === 1 ? " returns" : "s return"} to the map; nothing is deleted.`
+      : `Remove “${group.label?.trim() || "Group"}”?`,
+    showInput: false,
+    confirmLabel: "Remove",
+    danger: true
+  });
+}
+
 // A Section's endpoints are Pins. Revealing one selects it where Pins live and
 // are edited, rather than duplicating a second Pin editor inside the Section
 // row: one object, one place it is operated on. Selection is the whole
@@ -2130,6 +2174,16 @@ function submitGuideDialog(event) {
   } else if (action.action === "delete-section") {
     result = deleteGuideSection(state.session, action.id);
     status = result.changed ? "Deleted Section." : "Section could not be deleted.";
+  } else if (action.action === "rename-group") {
+    result = renameGuideGroup(state.session, action.id, value);
+    status = result.changed
+      ? value ? "Renamed Group." : "Removed the Group title."
+      : "Group title is unchanged.";
+  } else if (action.action === "delete-group") {
+    result = deleteGuideGroup(state.session, action.id);
+    status = result.changed
+      ? "Removed the Group. Its Sections returned to the map."
+      : "Group could not be removed.";
   } else if (action.action === "unlink-section-endpoint") {
     result = unlinkGuideSectionEndpoint(
       state.session,
@@ -4628,6 +4682,16 @@ elements["sections-list"].addEventListener("change", event => {
 // composition at all. This is the same one-shot state reached from where the
 // objects being composed actually are.
 elements["sections-list"].addEventListener("click", event => {
+  const renameGroup = event.target.closest?.("[data-rename-group]");
+  if (renameGroup) {
+    event.stopPropagation();
+    return renameGroupById(renameGroup.dataset.renameGroup);
+  }
+  const removeGroup = event.target.closest?.("[data-delete-group]");
+  if (removeGroup) {
+    event.stopPropagation();
+    return deleteGroupById(removeGroup.dataset.deleteGroup);
+  }
   if (!event.target.closest?.("[data-group-add]")) return;
   event.stopPropagation();
   settleBeforeAction();

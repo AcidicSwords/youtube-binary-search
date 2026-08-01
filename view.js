@@ -1,5 +1,9 @@
 // DOM projection layer. It derives presentation from state and does not own semantic transactions.
 import { cueName } from "./cues.js";
+import { formatTime, formatRange, sectionDisplayName } from "./format.js";
+// Re-exported so the presentation layer stays the single import site for text
+// formatting, while the kernel takes them from the shared module directly.
+export { formatTime, formatRange };
 import {
   EPSILON,
   clamp,
@@ -13,6 +17,7 @@ import {
 import {
   PIN_KIND,
   SECTION_WEIGHT_VALUES,
+  DEFAULT_GROUP_ID,
   findPinAt,
   getPin,
   orderedPins,
@@ -45,20 +50,6 @@ const COARSE_TIMELINE_SECTION_LANE_HEIGHT = 48;
 const TIMELINE_SECTION_MAX_LANES = 5;
 const TIMELINE_PIN_HIT_SIZE = 52;
 const COARSE_TIMELINE_PIN_HIT_SIZE = 56;
-
-export function formatTime(seconds) {
-  if (!Number.isFinite(seconds)) return "—";
-  const totalCentiseconds = Math.max(0, Math.round(seconds * 100));
-  const hours = Math.floor(totalCentiseconds / 360_000);
-  const minutes = Math.floor((totalCentiseconds % 360_000) / 6_000);
-  const secs = Math.floor((totalCentiseconds % 6_000) / 100);
-  const centiseconds = totalCentiseconds % 100;
-  const minuteText = hours ? String(minutes).padStart(2, "0") : String(minutes);
-  const fraction = centiseconds
-    ? `.${String(centiseconds).padStart(2, "0").replace(/0$/, "")}`
-    : "";
-  return `${hours ? `${hours}:` : ""}${minuteText}:${String(secs).padStart(2, "0")}${fraction}`;
-}
 
 // Spatial time is not a duration. It is how much map a source span is given,
 // and it only means anything against the source span it stretches. Reporting
@@ -101,10 +92,6 @@ export function formatDuration(seconds) {
   if (minutes) parts.push(`${minutes}m`);
   if (remainingSeconds > 0.005) parts.push(`${formatSeconds(remainingSeconds)}s`);
   return parts.join(" ") || "0s";
-}
-
-export function formatRange(extent) {
-  return extent ? `${formatTime(extent.start)}–${formatTime(extent.end)}` : "—";
 }
 
 // `viewStart` is the coordinate the map is drawn from; it defaults to 0, so an
@@ -1154,8 +1141,13 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
             button.className = "guide-action guide-action-link";
             button.dataset.sectionEndpoint = role;
             button.dataset.unlinkSectionEndpoint = section.id;
-            button.textContent = `Unlink ${sectionLabel(section)}`;
-            button.title = `Give ${sectionLabel(section)} its own ${role} Pin at this Address; drag it onto another Pin to link again`;
+            // Named by Address, not by the bare title: a Pin holding two
+            // unnamed Sections would otherwise offer two buttons reading
+            // "Unlink Section", which identifies neither. A Guide row states
+            // the Address in a field of its own and so keeps its title bare;
+            // this button has no such field.
+            button.textContent = `Unlink ${sectionDisplayName(section)}`;
+            button.title = `Give ${sectionDisplayName(section)} its own ${role} Pin at this Address; drag it onto another Pin to link again`;
             unlinks.appendChild(button);
           }
           if (selected) item.append(unlinks);
@@ -1234,7 +1226,34 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         label.append(box, caption);
         toggles.appendChild(label);
       }
-      row.append(name, meta, toggles);
+      // A Group is a retained object with a name, so it gets the same two title
+      // controls every other retained object has. The default Group is the map
+      // itself -- every Section belongs somewhere, so there is nothing for it
+      // to be deleted into, and it carries neither control.
+      if (group.id !== DEFAULT_GROUP_ID) {
+        const titleActions = document.createElement("span");
+        titleActions.className = "guide-title-actions";
+        const rename = document.createElement("button");
+        rename.type = "button";
+        rename.className = "guide-title-action guide-title-rename";
+        rename.dataset.renameGroup = group.id;
+        rename.textContent = "✎";
+        rename.setAttribute("aria-label", `Rename ${group.label || "Group"}`);
+        rename.title = `Rename ${group.label || "Group"}`;
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "guide-title-action guide-title-delete danger-text";
+        remove.dataset.deleteGroup = group.id;
+        remove.textContent = "×";
+        remove.setAttribute("aria-label", `Remove ${group.label || "Group"}`);
+        remove.title = counted
+          ? `Remove this Group; its ${counted} Section${counted === 1 ? " returns" : "s return"} to the map`
+          : "Remove this Group";
+        titleActions.append(rename, remove);
+        row.append(name, meta, toggles, titleActions);
+      } else {
+        row.append(name, meta, toggles);
+      }
       elements["sections-list"].appendChild(row);
     }
     const add = document.createElement("button");

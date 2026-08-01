@@ -2626,6 +2626,12 @@ kbd {
   color: var(--muted);
 }
 
+/* A Group carrying Rename and Remove takes a fourth column, in the same place
+   and at the same size those controls occupy on a Pin or a Section row. */
+.guide-group-row:has(.guide-title-actions) {
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto auto;
+}
+
 .guide-group-name,
 .guide-divider-name {
   color: var(--text);
