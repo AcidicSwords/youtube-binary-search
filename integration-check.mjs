@@ -190,9 +190,20 @@ assert.match(
   app,
   /"section-lane"\]\.addEventListener\("click"[\s\S]*?selectSectionAsWorkingInterval/
 );
+// A plain Guide click replaces the Working Interval; Shift extends it to
+// include the clicked object. One rule serves Pins and Sections alike, because
+// an extent is what every operator consumes.
 assert.match(
   app,
-  /function handleGuideClick[\s\S]*?const sectionGo[\s\S]*?selectSectionAsWorkingInterval\([\s\S]*?dataset\.sectionGo/
+  /function handleGuideClick[\s\S]*?dataset\.sectionGo[\s\S]*?selectSectionAsWorkingInterval\(/
+);
+assert.match(
+  app,
+  /function handleGuideClick[\s\S]*?composing && extendIntervalToRetained\(\s*"pin"[\s\S]*?composing && extendIntervalToRetained\(\s*"section"/
+);
+assert.match(
+  app,
+  /function extendIntervalToRetained[\s\S]*?Math\.min\(interval\.start[\s\S]*?Math\.max\(interval\.end[\s\S]*?workFromExtent[\s\S]*?consumeShiftLayer\(\)/
 );
 assert.match(
   app,

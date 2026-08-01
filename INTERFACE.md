@@ -193,6 +193,10 @@ Section creation accepts:
 - held Field span;
 - two selected Pins.
 
+Clicking a Guide entry replaces the Working Interval with it. `Shift`+click — or the one-shot Shift layer, for pointer-only use — **extends** the Working Interval to include the clicked entry instead. One rule serves Pins and Sections alike, because an extent, not a set of objects, is what every operator consumes: a composed span is immediately Deformable, Focusable, and retainable. Extension only ever grows the span; a plain click starts over, so the ordinary meaning of a click is always reachable.
+
+Nesting needs no operator of its own. Click one Section, `Shift`+click another, Deform: the span becomes a parent Section carrying its own Weight, with the two it was composed from inside it.
+
 A Guide entry is a **name**, an **Address**, and only facts not derivable from those two. A Pin exists so the viewer need not remember a time, so the time is a field of the entry and never baked into its title: an unnamed Pin is called `Section Start` or `Pin`, never `Start of Section 2:12.3–2:42.04`, which repeats the Address and then truncates. An unnamed Section is called `Section`; its extent, duration and Weight are its line. Nothing states the same fact twice inside one entry — the Weight factor already says whether it compresses or expands, and the duration is stated once.
 
 A Pin has one Address and no extent, so its row draws no positional track: one point plotted across the whole map is the Temporal Topography redrawn at useless scale. Position is read and moved on the map; the Guide holds the exact Address.
