@@ -829,10 +829,12 @@ breathing offsets remain within effective [x, y] bounds
 a side waiting at a breathing boundary runs at Center rate
 Hold alone changes Stretching into Held
 dragging or nudging Current invokes Step, never Go
-a Current drag previews the Interval and neighbourhood its Step will commit
+a Current drag previews the Interval its Step will commit
+a preview draws the extent and the destination, and nothing else
 what a direct gesture previews is what its release commits
 Cursor is drawn only where observation has left Current
 predictive chrome stands down while the movement it predicts is being performed
+an operator that touches the Guide renders it even when the movement is unchanged
 a focused extent's own boundary cannot be dragged from inside it
 Timeline direct manipulation and Guide exact editing call the same operation
 one drag, wheel series, or held-key nudge creates at most one Undo checkpoint
@@ -840,11 +842,13 @@ fine Nudge acts in source time, not Timeline Space
 Guide owns no independent drag geometry
 a plain Guide click replaces the Working Interval; Shift extends it
 a Cue is never persisted, projected, or traversable until it is retained
+a drawn Cue carries no attribute a pointer handler dispatches on
 Groups partition the Sections; a Section is never half-hidden
 a Section deforms the map only while its Group is active
 an endpoint Pin is drawn while any Section referencing it is visible
 a Pin referencing no Section is never hidden by a Group
 retaining a Cue is the ordinary save and carries the offered title
+an operation acting on a Pin is reached from that Pin
 composition yields an extent, never a set, so every operator consumes it unchanged
 a Guide row is expanded exactly when it is the selected retained object
 preview, breathing, Context, and semantic state cannot overwrite one another

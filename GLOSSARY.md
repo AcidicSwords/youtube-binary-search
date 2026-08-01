@@ -26,6 +26,8 @@
 - **Section** — a retained edge between two Pins with optional title and one canonical Weight.
 - **Weight** — one Section's positive map-scale factor; never playback rate.
 - **Guide** — the persistent graph of Pins and Sections.
+- **Group** — a partition of Sections carrying two independent states: `visible` draws its Sections and their endpoint Pins; `active` lets its Weights deform the map. Hidden and active is the map baked; visible and inactive is topology without terrain.
+- **Unlink** — take one Section off a shared endpoint Pin and give it its own Pin at the same Address. Reached from the Pin, which is the object it acts on.
 - **Refine** — choose a directional spatial midpoint at finer Resolution while retaining the established path when possible.
 - **Local Refine** — choose the same midpoint while recording only the immediate Current-to-midpoint traversal.
 - **Step** — traverse a known distance in Timeline Space.

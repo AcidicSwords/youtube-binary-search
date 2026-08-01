@@ -23,6 +23,9 @@
 ## Canonical weight scale
 
 - Paste a description carrying chapters into the Cues tab. Confirm the Cue count rises while Pins, Sections, the map and Undo are untouched; that clicking a Cue takes its extent; that `Shift`+click extends across two; and that `Retain` produces an ordinary Section carrying the creator's title.
+- Confirm `Show on timeline` draws a mark per Cue and that no mark can be clicked, dragged, or joined to a Pin cluster; that Undo is unchanged by drawing; and that `Clear` removes both the offer and the drawing.
+- Confirm a selected Section's `Start` and `End` labels select the corresponding Pin in the Pins tab without moving Current, and that a Pin holding two Sections offers one Unlink per Section, each naming it.
+- Confirm a Group's two checkboxes are independent and that its header names the state: hidden and active draws no Section bar and no endpoint Pin while its Weights still deform the map; visible and inactive draws the bar and the Pins with no deformation gradient.
 - Confirm Guide’s Section selector contains, in order: `0.125×`, `0.25×`, `0.5×`, `0.75×`, `1×`, `1.25×`, `1.5×`, `1.75×`, `2×`, `4×`.
 - Confirm every spatial figure is shown as a factor, never as a duration: with all weights at `1×` no factor appears anywhere; adding one 15 s `2×` Section to a one-minute source shows `1:00 · 1.25× spatial`; adding a second 15 s Section at `0.5×` removes the factor again.
 - Confirm Focus draws the map across the focused extent: focus a `0.5×` Section and a `2×` Section in turn and check each spans the full timeline, that no unfocused Section or Pin is drawn against either edge, and that pressing anywhere on the timeline lands on the Address drawn there. Unfocus must restore the whole map.
@@ -331,6 +334,9 @@
 - Hover and keyboard-focus operator controls without pressing them. Confirm the
   timeline previews their exact dry-run result while Center, Tail, and Lead do
   not seek, pause, or change rate.
+- Confirm that preview is the extent and the destination only: no second
+  neighbourhood fill, no neighbourhood bounds, and no Step targets are drawn
+  ahead of the movement that would establish them.
 - In compact Guide, switch between Sections and Pins and operate each control;
   confirm background surfaces are inert while the sheet never falls through to
   its scrim.
