@@ -43,7 +43,7 @@ import {
 } from "./guide.js";
 import { projectionForModel } from "./timeline-projection.js";
 
-export const HISTORY_LIMIT = 100;
+const HISTORY_LIMIT = 100;
 export const MIN_RANGE_SECONDS = 0.25;
 export const MIN_STEP_REACH_SECONDS = 0.25;
 export const MAX_STEP_REACH_SECONDS = 300;
@@ -57,7 +57,7 @@ export const FOCUS_KIND = Object.freeze({
   WORKING: "working-section"
 });
 
-export const DEFAULT_STEP_REACH = Object.freeze({
+const DEFAULT_STEP_REACH = Object.freeze({
   backward: 10,
   forward: 10,
   linked: true,
@@ -153,7 +153,7 @@ export function copy(value) {
 
 const clone = copy;
 
-export function createEndpointFrame(resolution, resolutionBasis = RESOLUTION_BASIS.RANGE) {
+function createEndpointFrame(resolution, resolutionBasis = RESOLUTION_BASIS.RANGE) {
   if (
     !resolution
     || !Number.isFinite(resolution.L)
@@ -289,7 +289,7 @@ function syncIntervalEndpointFrames(model) {
   interval.arrivalFrame = currentEndpointFrame(model);
 }
 
-export function createInterval(departure, arrival, operator, medium = "direct", endpointFrames = {}) {
+function createInterval(departure, arrival, operator, medium = "direct", endpointFrames = {}) {
   if (
     !Number.isFinite(departure)
     || !Number.isFinite(arrival)

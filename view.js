@@ -14,7 +14,7 @@ import {
   SECTION_WEIGHT_VALUES,
   findPinAt,
   getPin,
-  visiblePins,
+  orderedPins,
   sectionsForPin,
   resolveSection,
   previousPin,
@@ -64,7 +64,7 @@ export function formatTime(seconds) {
 // correspond and there is nothing to say.
 const STRETCH_TOLERANCE = 1e-6;
 
-export function stretchFactor(spatialSpan, sourceSpan) {
+function stretchFactor(spatialSpan, sourceSpan) {
   if (!Number.isFinite(spatialSpan) || !Number.isFinite(sourceSpan)) return null;
   if (!(sourceSpan > STRETCH_TOLERANCE)) return null;
   const factor = spatialSpan / sourceSpan;
@@ -72,7 +72,7 @@ export function stretchFactor(spatialSpan, sourceSpan) {
   return Math.abs(factor - 1) <= STRETCH_TOLERANCE ? null : factor;
 }
 
-export function formatStretch(spatialSpan, sourceSpan) {
+function formatStretch(spatialSpan, sourceSpan) {
   const factor = stretchFactor(spatialSpan, sourceSpan);
   return factor === null ? null : `${Number(factor.toFixed(3))}×`;
 }
@@ -696,7 +696,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     setStyleProperty(elements.timeline, "--pin-hit-size", `${pinClusterGap}px`);
     const activeRange = range();
     const projection = timelineProjection();
-    const pins = visiblePins(guide())
+    const pins = orderedPins(guide())
       .filter(pin => contains(activeRange, pin.t))
       .map(pin => ({
         ...pin,
@@ -823,7 +823,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
   }
 
   function renderGuide() {
-    const pins = visiblePins(guide());
+    const pins = orderedPins(guide());
     const sections = sortedSections(guide());
     const focusedId = focusedSectionId();
     const counts = {
@@ -1388,7 +1388,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["timeline-key-interval"].dataset.active = String(Boolean(currentInterval));
     elements["timeline-key-field"].dataset.active = String(Boolean(fieldSpan));
     elements["timeline-key-pins"].dataset.active = String(
-      Boolean(visiblePins(guide()).length)
+      Boolean(orderedPins(guide()).length)
     );
     const overallStretch = formatStretch(projection.timelineExtent, model().duration);
     elements["duration-time"].textContent = overallStretch

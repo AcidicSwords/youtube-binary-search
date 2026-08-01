@@ -29,7 +29,7 @@ export const DEFAULT_FIELD_BREATH = Object.freeze({
   outer: 10,
   rate: 0.5
 });
-export const BREATH_BOUND_TOLERANCE = 0.02;
+const BREATH_BOUND_TOLERANCE = 0.02;
 
 // The configured relation is 0 < x < y. A pair that collapses has no breath to
 // describe, so the inner offset is pushed strictly inside the outer one rather
@@ -247,7 +247,7 @@ export function resumeBreath(runtime, breath = DEFAULT_FIELD_BREATH) {
   return { ...state, held: false };
 }
 
-export function normalizeFieldResponse(value = DEFAULT_FIELD_RESPONSE) {
+function normalizeFieldResponse(value = DEFAULT_FIELD_RESPONSE) {
   const tailRate = Number(value?.tailRate);
   const leadRate = Number(value?.leadRate);
   return {

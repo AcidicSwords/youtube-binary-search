@@ -35,7 +35,7 @@ export function createRoot(start, current, end, level = 0) {
   return assertNeighborhood({ L: start, C: clamp(current, start, end), R: end, level });
 }
 
-export function assertNeighborhood(neighborhood) {
+function assertNeighborhood(neighborhood) {
   if (
     !neighborhood
     || !Number.isFinite(neighborhood.L)
