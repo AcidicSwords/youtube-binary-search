@@ -216,7 +216,7 @@ history origin, and starts automatic Context at most once after settlement.
 `view.js` renders:
 
 - adaptive source timestamp guides positioned in Timeline Space;
-- a named layer key plus distinct Current and physical Cursor readouts;
+- a named layer key, Current's own Address carried under its marker, and a physical Cursor readout that reports only once observation has left Current;
 - free/shared Pins above the weighted track;
 - Range ground, Resolution contour, directional Working-Interval ridge,
   Held Field overlay, and exact dry-run previews;

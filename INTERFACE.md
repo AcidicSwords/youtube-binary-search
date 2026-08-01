@@ -135,8 +135,9 @@ compete for the same pointer. A cluster opens a compact vertical chooser at its
 map position; the chooser scrolls through dense groups without spreading across
 the Timeline and does not move Current until an exact Pin is chosen. Shared
 endpoints gain visual weight without acquiring a different interaction rule.
-Choosing keeps the exact row visibly selected; click goes to it and horizontal
-movement uses the row's dedicated drag handle. The cluster itself opens on
+Choosing keeps the exact row visibly selected. A row is one control obeying the
+map's own rule: click goes to that Pin, drag moves it. Splitting activation from
+dragging would be a grammar used nowhere else in the interface. The cluster itself opens on
 pointer-down, before the Timeline can interpret the gesture as Go. This resolves
 a cluster before manipulation instead of asking overlapping Timeline markers
 to compete for the gesture.
@@ -384,8 +385,9 @@ travelling transition.
 - Every form control has a programmatic name.
 - Every button declares a type.
 - Matrix and Guide actions remain keyboard reachable.
-- Space owns shared play/pause or Context acceptance everywhere outside text
-  editing and modal Guide work; Enter activates a focused Step control.
+- Space is the play command everywhere outside text editing and modal Guide
+  work: it starts or stops ordinary playback, and running Context yields to it
+  rather than reinterpreting the key. Enter activates a focused Step control.
 - Pointer release clears pointer-acquired control focus, and Center playback
   state changes release iframe focus back to the reader.
 - Narrow Timeline preserves vertical page scrolling; wide desktop keeps the application frame fixed and scrolls only the active right-rail surface.

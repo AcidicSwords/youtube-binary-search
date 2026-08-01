@@ -274,11 +274,11 @@ Timeline Go converts one visible Timeline Space coordinate through the unique in
 
 Every non-zero Go records the complete departure-to-arrival Working Interval and seeds a movement-scale Resolution around it. In Timeline Space, the Working Interval occupies the central fifth: two equal Interval-width margins precede it and two follow it. Range clipping removes unavailable margin without shifting the Interval or compensating on the other side.
 
-### Playback and Context acceptance
+### Playback and Context settlement
 
 Playback actualizes source continuity. Cursor moves physically while Current remains semantic until settlement. Settlement translates the active Resolution through the observed path and unions watched source coverage into the Working Interval; it never shortens prior coverage.
 
-Context is bounded observation around Current. It remains transient unless the user accepts Cursor. Context acceptance uses the same continuous settlement law rather than direct-Go framing.
+Context is bounded observation around Current, and it is transient without exception: it commits nothing. It ends by completing its window, by being superseded by the next traversal, by being turned off, or by yielding to the play command — and in every case Current is exactly where it was. Placing Current exactly is what dragging it, nudging it, and editing its Address are for.
 
 ### Field Frame
 
@@ -385,7 +385,7 @@ Field Frame transitions create no Session history.
 ```text
 before Context   Tail = Context Start | Center = Current          | Lead = Context End
 during Context   Tail = Context Start | Center = moving Cursor    | Lead = Context End
-after Context    Tail = Context Start | Center = Current/accepted | Lead = Context End
+after Context    Tail = Context Start | Center = Current           | Lead = Context End
 ```
 
 The side frames show whether a visible change of state occurs inside the
@@ -743,8 +743,7 @@ The following contracts are normative. “May change” includes conditional cha
 | Go | Current, Resolution, Working Interval, traversal provenance; Range/Focus only when opening the target | Guide, weights, stored Step Reach |
 | Section selection | Current, exact Section Resolution/Interval, traversal provenance | Range, Focus, Guide topology, weights, stored Step Reach |
 | Playback settlement | Current, translated Resolution, unioned Working Interval, traversal provenance | Range, Focus, Guide, weights, stored Step Reach |
-| Context before acceptance | Cursor and runtime transport only | every Session dimension |
-| Context acceptance | same semantic class as playback settlement | Guide, weights, Range, Focus, stored Step Reach |
+| Context | Cursor and runtime transport only | every Session dimension |
 | Stretch / Hold | Field runtime relation only | every Session dimension and persisted Field Offset |
 | Offset edit | one side's configured Field bound and its necessary local reconciliation | sibling side state, every Session dimension, Step Reach, Guide, weights |
 | Alt Carry | movement operator effects plus selected Guide geometry | selected object identity and weight; unrelated Guide objects except shared-endpoint consequences |
@@ -905,7 +904,7 @@ The registry must include:
 - Focus and Unfocus;
 - Go;
 - Playback;
-- Context and Context acceptance;
+- Context;
 - Stretch and Hold;
 - Pin, Save Section, Join, Weight, Move Pin, Move Section, Rename, Delete;
 - Alt Carry;
