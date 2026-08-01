@@ -2506,12 +2506,32 @@ kbd {
   gap: 3px;
 }
 
-.guide-address > small {
+.guide-address > small,
+.guide-address-reveal {
   margin-right: 2px;
   color: var(--text-dim);
   font-size: 0.66rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+/* The label reads as a label and behaves as a link, because that is what it
+   is: the name of the Pin this Address belongs to, and the way to it. */
+.guide-address-reveal {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px dashed rgba(144, 158, 181, 0.4);
+  background: none;
+  font-family: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+}
+
+.guide-address-reveal:hover,
+.guide-address-reveal:focus-visible {
+  color: var(--text);
+  border-bottom-color: currentColor;
 }
 
 .guide-address-input {

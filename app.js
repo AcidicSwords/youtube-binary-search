@@ -1202,6 +1202,13 @@ function moveToAddress(destination, options = {}) {
   if (!result.changed) {
     locateAddress(departure);
     setStatus(options.unchangedStatus || `Already at ${formatTime(departure)}.`);
+    // Selection is a fact the Guide shows, and it is not the same fact as
+    // Current's Address. Selecting a Section whose midpoint Current already
+    // occupies moves nothing and still changes which row is selected, so an
+    // operator that declares it touches the Guide gets its Guide render even
+    // on the unchanged path -- otherwise the Guide keeps showing whatever was
+    // selected before.
+    if (options.renderGuide === true) view.renderGuide();
     view.render();
     return false;
   }
@@ -2031,6 +2038,24 @@ function deleteSectionById(sectionId) {
     confirmLabel: "Delete",
     danger: true
   });
+}
+
+// A Section's endpoints are Pins. Revealing one selects it where Pins live and
+// are edited, rather than duplicating a second Pin editor inside the Section
+// row: one object, one place it is operated on. Selection is the whole
+// mechanism -- a selected Guide row is an expanded Guide row already -- so this
+// moves nothing and records no transaction.
+function revealPin(pinId) {
+  const pin = getPin(guide(), pinId);
+  if (!pin) return;
+  selectGuideTab("pins");
+  state.selectedRetained = { kind: "pin", id: pin.id };
+  view.renderGuide();
+  view.render();
+  elements["pins-list"]
+    ?.querySelector?.(`[data-pin-go="${pin.id}"]`)
+    ?.scrollIntoView?.({ block: "nearest" });
+  setStatus(`Showing ${pinNameFor(pin.id)} in Pins.`);
 }
 
 function confirmSectionEndpointUnlink(sectionId, role) {
@@ -4891,6 +4916,8 @@ function handleGuideClick(event) {
       { carryRetained: event.altKey === true }
     );
   }
+  const reveal = event.target.closest("[data-reveal-pin]");
+  if (reveal) return revealPin(reveal.dataset.revealPin);
   const focus = event.target.closest("[data-focus-section]");
   if (focus) return focusSection(focus.dataset.focusSection);
   const leave = event.target.closest("[data-leave-section]");

@@ -312,10 +312,23 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     return button;
   }
 
-  function addressControl(kind, id, label, address) {
+  // `revealPinId` names the Pin this Address actually belongs to. A Section's
+  // endpoints are Pins -- editing one here edits that Pin -- so the label says
+  // so and goes there, rather than leaving the reader to find it by Address in
+  // a list ordered by Address.
+  function addressControl(kind, id, label, address, { revealPinId = null } = {}) {
     const field = document.createElement("span");
     field.className = "guide-address";
-    const name = document.createElement("small");
+    let name;
+    if (revealPinId) {
+      name = document.createElement("button");
+      name.type = "button";
+      name.className = "guide-address-reveal";
+      name.dataset.revealPin = revealPinId;
+      name.title = `Show this endpoint's Pin in Pins`;
+    } else {
+      name = document.createElement("small");
+    }
     name.textContent = label;
     const input = document.createElement("input");
     input.type = "text";
@@ -987,21 +1000,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         }
         weightSelect.value = String(section.weight);
         weightControl.append(weightLabel, weightSelect);
-        const endpointLinks = [];
-        for (const [role, pin, references] of [
-          ["start", section.startPin, startReferences],
-          ["end", section.endPin, endReferences]
-        ]) {
-          if (references <= 1) continue;
-          const link = document.createElement("button");
-          link.type = "button";
-          link.className = "guide-action guide-action-link";
-          link.dataset.sectionEndpoint = role;
-          link.dataset.unlinkSectionEndpoint = section.id;
-          link.textContent = `Unlink ${role === "start" ? "Start" : "End"}`;
-          link.title = `Give this Section an independent ${role} Pin at the same Address; drag it onto another Pin to link`;
-          endpointLinks.push(link);
-        }
         // A Section's Group sits with its Weight: both say how this Section
         // takes part in the map, and both are chosen from a fixed set.
         const groupControl = document.createElement("label");
@@ -1018,7 +1016,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         }
         groupSelect.value = section.groupId || "group-default";
         groupControl.append(groupLabel, groupSelect);
-        actions.append(focus, weightControl, groupControl, ...endpointLinks);
+        actions.append(focus, weightControl, groupControl);
 
         // Exact topology and numeric editing on one line. Guide no longer
         // duplicates the Timeline's spatial drag system, and it no longer
@@ -1028,8 +1026,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         // Duration is already stated on the row's own line; repeating it beside
         // the End field made the same fact appear twice in one card.
         addresses.append(
-          addressControl("section-start", section.id, "Start", section.start),
-          addressControl("section-end", section.id, "End", section.end)
+          addressControl("section-start", section.id, "Start", section.start, {
+            revealPinId: section.startPin?.id
+          }),
+          addressControl("section-end", section.id, "End", section.end, {
+            revealPinId: section.endPin?.id
+          })
         );
 
         item.append(header);
@@ -1131,6 +1133,33 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         addresses.className = "guide-addresses";
         addresses.append(addressControl("pin", pin.id, "Address", pin.t));
         item.append(header);
+        // Unlink is a Pin operation: it takes one Section off a shared Pin and
+        // gives it its own at the same Address. It used to sit in the Section
+        // row, which meant reading a Section to learn something about a Pin,
+        // and made the shared Pin -- the only object the operation is about --
+        // the one thing not in view. Here the Pin names every Section it holds,
+        // so which one is being taken off is stated rather than inferred.
+        const shared = references > 1
+          ? sectionsForPin(guide(), pin.id)
+            .map(section => resolveSection(guide(), section))
+            .filter(Boolean)
+          : [];
+        if (shared.length) {
+          const unlinks = document.createElement("div");
+          unlinks.className = "guide-item-actions pin-unlink-actions";
+          for (const section of shared) {
+            const role = section.startPin?.id === pin.id ? "start" : "end";
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "guide-action guide-action-link";
+            button.dataset.sectionEndpoint = role;
+            button.dataset.unlinkSectionEndpoint = section.id;
+            button.textContent = `Unlink ${sectionLabel(section)}`;
+            button.title = `Give ${sectionLabel(section)} its own ${role} Pin at this Address; drag it onto another Pin to link again`;
+            unlinks.appendChild(button);
+          }
+          if (selected) item.append(unlinks);
+        }
         if (selected) item.append(addresses);
         elements["pins-list"].appendChild(item);
       }
