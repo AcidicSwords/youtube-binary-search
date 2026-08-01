@@ -198,6 +198,12 @@ Clicking a Guide entry replaces the Working Interval with it. `Shift`+click — 
 
 Nesting needs no operator of its own. Click one Section, `Shift`+click another, Deform: the span becomes a parent Section carrying its own Weight, with the two it was composed from inside it.
 
+The Guide reads left to right as the arc from potential to structure: **Chapters** are candidates a description offers, **Pins** are the Addresses you made objects, and **Sections** are compositions of Pins that persist and deform.
+
+The Pins tab separates the two jobs a Pin can do: **Section endpoints**, which hold Sections together, and **Standalone** Pins, which mark a place and are never hidden by a Group. Unlink belongs with the endpoints it acts on.
+
+The Sections tab carries **Groups**. A Group is a set of Sections with two independent states — `Visible` draws its Sections and their endpoint Pins on the map; `Active` lets its Weights deform it. Hidden and active is the map baked, terrain without landmarks; visible and inactive is topology without terrain. The header names which of the four a Group is in, so the pair of checkboxes never has to be decoded.
+
 A third Guide tab holds **Cues** — candidate Addresses parsed from a pasted description. Chapters a creator wrote partition the video semantically, so a Cue owns an extent running to the next Cue's Address, and clicking one takes that extent exactly as clicking a Section does. `Shift`+click extends across Cues by the same rule. Cues render as dashed, quieter rows carrying one action, `Retain`, because there is nothing to edit in something that is not yet structure. Nothing about a Cue reaches the Guide, the map, traversal, or history until it is retained.
 
 A Guide entry is a **name**, an **Address**, and only facts not derivable from those two. A Pin exists so the viewer need not remember a time, so the time is a field of the entry and never baked into its title: an unnamed Pin is called `Section Start` or `Pin`, never `Start of Section 2:12.3–2:42.04`, which repeats the Address and then truncates. An unnamed Section is called `Section`; its extent, duration and Weight are its line. Nothing states the same fact twice inside one entry — the Weight factor already says whether it compresses or expands, and the duration is stated once.

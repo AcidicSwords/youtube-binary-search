@@ -29,6 +29,11 @@ import {
   isSectionWeight,
   normalizeSectionWeight,
   setSectionWeight,
+  DEFAULT_GROUP_ID,
+  createGroup,
+  setGroupState,
+  assignSectionGroup,
+  deleteGroup,
   movePin,
   translateSection,
   createSection,
@@ -1486,6 +1491,65 @@ function rebaseWorkingIntervalBounds(model, movements) {
   interval.start = start;
   interval.end = end;
   return { changed: true, cleared: false };
+}
+
+// Group edits are ordinary Guide transactions, so every toggle is one Undoable
+// step and nothing about a Group needs its own history model.
+export function setGuideGroupState(session, groupId, changes) {
+  const group = session.model.guide.groups?.find(entry => entry.id === groupId);
+  if (!group) return unchanged(session, "missing-group");
+  const next = {
+    visible: typeof changes?.visible === "boolean" ? changes.visible : group.visible,
+    active: typeof changes?.active === "boolean" ? changes.active : group.active
+  };
+  if (next.visible === group.visible && next.active === group.active) {
+    return unchanged(session, "unchanged-group");
+  }
+  const name = group.label?.trim() || "Group";
+  const changed = next.visible !== group.visible ? "visible" : "active";
+  const label = changed === "visible"
+    ? `${next.visible ? "Show" : "Hide"} “${name}”`
+    : `${next.active ? "Activate" : "Deactivate"} “${name}”`;
+  return commit(session, label, draft => {
+    const applied = setGroupState(draft.guide, groupId, next);
+    if (!applied) return { changed: false, reason: "missing-group" };
+    return { changed: true, guideChanged: true, value: applied };
+  }, { guideEdit: true });
+}
+
+export function createGuideGroup(session, label = "") {
+  return commit(session, `Add Group${label ? ` “${label}”` : ""}`, draft => {
+    const group = createGroup(draft.guide, label);
+    return { changed: true, guideChanged: true, value: group };
+  }, { guideEdit: true });
+}
+
+export function assignGuideSectionGroup(session, sectionId, groupId) {
+  const section = resolveSection(session.model.guide, sectionId);
+  const group = session.model.guide.groups?.find(entry => entry.id === groupId);
+  if (!section || !group) return unchanged(session, "missing-group");
+  if (section.groupId === groupId) return unchanged(session, "unchanged-group");
+  const name = group.label?.trim() || "Group";
+  return commit(session, `Move “${sectionDisplayName(section)}” to “${name}”`, draft => {
+    if (!assignSectionGroup(draft.guide, sectionId, groupId)) {
+      return { changed: false, reason: "missing-group" };
+    }
+    return { changed: true, guideChanged: true };
+  }, { guideEdit: true });
+}
+
+// A Group is an organizing choice, not an owner: deleting one returns its
+// Sections to the default rather than destroying anything.
+export function deleteGuideGroup(session, groupId) {
+  const group = session.model.guide.groups?.find(entry => entry.id === groupId);
+  if (!group || groupId === DEFAULT_GROUP_ID) return unchanged(session, "undeletable-group");
+  const name = group.label?.trim() || "Group";
+  return commit(session, `Remove Group “${name}”`, draft => {
+    if (!deleteGroup(draft.guide, groupId)) {
+      return { changed: false, reason: "missing-group" };
+    }
+    return { changed: true, guideChanged: true };
+  }, { guideEdit: true });
 }
 
 export function setGuideSectionWeight(session, sectionId, weight) {

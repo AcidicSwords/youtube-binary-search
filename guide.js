@@ -54,14 +54,94 @@ function now() {
   return Date.now();
 }
 
+// A Group is a set of Sections carrying two independent states.
+//
+//   visible  -- are its Sections and their endpoint Pins on the map?
+//   active   -- does its deformation apply?
+//
+// Nothing is frozen, so nothing can go stale: a Group either contributes to the
+// density product or it does not, and editing a Weight inside an active Group
+// updates the map immediately. "Baked" is not a feature here, it is the state
+// hidden + active -- terrain without landmarks. Groups partition the Sections:
+// every Section belongs to exactly one, so a Section can never be half-hidden.
+export const DEFAULT_GROUP_ID = "group-default";
+
+export function createGroup(guide, label = "", { id = null } = {}) {
+  const group = {
+    id: id || makeId("group"),
+    label: String(label || "").trim(),
+    visible: true,
+    active: true,
+    createdAt: now()
+  };
+  guide.groups.push(group);
+  guide.updatedAt = now();
+  return group;
+}
+
+export function resolveGroup(guide, groupId) {
+  return guide.groups.find(group => group.id === groupId)
+    || guide.groups.find(group => group.id === DEFAULT_GROUP_ID)
+    || guide.groups[0]
+    || null;
+}
+
+export function groupForSection(guide, section) {
+  return resolveGroup(guide, section?.groupId);
+}
+
+export function sectionIsActive(guide, section) {
+  return groupForSection(guide, section)?.active !== false;
+}
+
+export function sectionIsVisible(guide, section) {
+  return groupForSection(guide, section)?.visible !== false;
+}
+
+export function setGroupState(guide, groupId, changes = {}) {
+  const group = guide.groups.find(entry => entry.id === groupId);
+  if (!group) return null;
+  if (typeof changes.visible === "boolean") group.visible = changes.visible;
+  if (typeof changes.active === "boolean") group.active = changes.active;
+  if (typeof changes.label === "string") group.label = changes.label.trim();
+  guide.updatedAt = now();
+  return group;
+}
+
+export function assignSectionGroup(guide, sectionId, groupId) {
+  const section = guide.sections.find(entry => entry.id === sectionId);
+  const group = guide.groups.find(entry => entry.id === groupId);
+  if (!section || !group) return false;
+  section.groupId = group.id;
+  guide.updatedAt = now();
+  return true;
+}
+
+// Deleting a Group returns its Sections to the default rather than destroying
+// them: a Group is an organizing choice, not an owner.
+export function deleteGroup(guide, groupId) {
+  if (groupId === DEFAULT_GROUP_ID) return false;
+  const index = guide.groups.findIndex(group => group.id === groupId);
+  if (index < 0) return false;
+  guide.groups.splice(index, 1);
+  for (const section of guide.sections) {
+    if (section.groupId === groupId) section.groupId = DEFAULT_GROUP_ID;
+  }
+  guide.updatedAt = now();
+  return true;
+}
+
 export function createGuide(videoId = null) {
-  return {
-    version: 7,
+  const guide = {
+    version: 8,
     videoId,
     pins: [],
     sections: [],
+    groups: [],
     updatedAt: now()
   };
+  createGroup(guide, "Map", { id: DEFAULT_GROUP_ID });
+  return guide;
 }
 
 function sortPins(pins) {
@@ -255,9 +335,25 @@ export function linkPins(guide, sourcePinId, targetPinId) {
   };
 }
 
-// Pins in map order. The name states exactly that: this is the ordering every
-// consumer needs, and nothing here filters anything out.
+// Pins in map order, minus those hidden by a Group.
+//
+// An endpoint Pin belongs to its Sections, so it is drawn and traversable while
+// any Section referencing it sits in a visible Group. A Pin referencing no
+// Section is standalone and is never hidden -- which is exactly what lets a
+// lone Pin stay reachable inside terrain a hidden Group has compressed.
 export function orderedPins(guide) {
+  return sortPins(guide.pins.filter(pin => pinIsVisible(guide, pin)));
+}
+
+export function pinIsVisible(guide, pin) {
+  const owners = sectionsForPin(guide, pin.id);
+  if (!owners.length) return true;
+  return owners.some(section => sectionIsVisible(guide, section));
+}
+
+// Every Pin, whatever its Group hides. Editing and organization operate on the
+// whole retained set; only the map and traversal respect visibility.
+export function allPins(guide) {
   return sortPins(guide.pins);
 }
 
@@ -327,6 +423,7 @@ export function createSection(guide, startPinId, endPinId, options = {}) {
     endPinId: end.id,
     label,
     weight: normalizeSectionWeight(requestedWeight),
+    groupId: resolveGroup(guide, options.groupId)?.id || DEFAULT_GROUP_ID,
     provenance: options.provenance || null,
     createdAt,
     updatedAt: Number(options.updatedAt) || createdAt
@@ -694,6 +791,25 @@ export function normalizeGuide(parsed, videoId) {
     : (Array.isArray(parsed?.marks) ? parsed.marks : []);
   const sections = Array.isArray(parsed?.sections) ? parsed.sections : [];
 
+  // Groups arrived in v8. A guide written before them keeps every Section in
+  // the default Group, which is precisely the behaviour it already had.
+  for (const source of (Array.isArray(parsed?.groups) ? parsed.groups : [])) {
+    if (!source?.id || source.id === DEFAULT_GROUP_ID) {
+      if (source?.id === DEFAULT_GROUP_ID) {
+        setGroupState(guide, DEFAULT_GROUP_ID, {
+          visible: source.visible !== false,
+          active: source.active !== false,
+          label: String(source.label || "Map")
+        });
+      }
+      continue;
+    }
+    const group = createGroup(guide, String(source.label || ""), { id: source.id });
+    group.visible = source.visible !== false;
+    group.active = source.active !== false;
+    group.createdAt = Number(source.createdAt) || group.createdAt;
+  }
+
   const idMap = new Map();
   for (const source of sourcePins) {
     if (!source?.id || !Number.isFinite(Number(source.t))) continue;
@@ -730,6 +846,7 @@ export function normalizeGuide(parsed, videoId) {
         : source.collapsed === true
           ? 0.25
           : normalizeSectionWeight(source.weight),
+      groupId: source.groupId || DEFAULT_GROUP_ID,
       provenance: source.provenance || null,
       createdAt: Number(source.createdAt) || now(),
       updatedAt: Number(source.updatedAt) || Number(source.createdAt) || now()

@@ -209,7 +209,11 @@ const migrated = normalizeGuide({
     }
   ]
 }, "legacy");
-assert.equal(migrated.version, 7);
+// Groups arrived in v8; a legacy guide migrates into one default Group holding
+// every Section, which is precisely the behaviour it already had.
+assert.equal(migrated.version, 8);
+assert.deepEqual(migrated.groups.map(group => group.id), ["group-default"]);
+assert.ok(migrated.sections.every(section => section.groupId === "group-default"));
 assert.equal(migrated.sections[0].weight, 0.25);
 assert.equal(migrated.sections[1].weight, 1);
 assert.equal("collapsed" in migrated.sections[0], false);

@@ -34,6 +34,7 @@ import {
   goToGuidePin as goToSessionGuidePin,
   goToGuideSection as goToSessionGuideSection,
   workFromExtent,
+  setGuideGroupState,
   refine as refineSession,
   localRefine as localRefineSession,
   step as stepSession,
@@ -4542,6 +4543,22 @@ elements["guide-scrim"].addEventListener("click", closeGuide);
 elements["guide-tab-sections"].addEventListener("click", () => selectGuideTab("sections"));
 elements["guide-tab-pins"].addEventListener("click", () => selectGuideTab("pins"));
 elements["guide-tab-cues"].addEventListener("click", () => selectGuideTab("cues"));
+elements["sections-list"].addEventListener("change", event => {
+  const toggle = event.target.closest?.("[data-group-toggle]");
+  if (!toggle) return;
+  const key = toggle.dataset.groupState;
+  if (key !== "visible" && key !== "active") return;
+  settleBeforeAction();
+  const result = setGuideGroupState(state.session, toggle.dataset.groupToggle, {
+    [key]: toggle.checked === true
+  });
+  if (!result.changed) return view.renderGuide();
+  state.session = result.session;
+  view.renderGuide();
+  view.render();
+  setStatus(`${result.session.history.at(-1)?.label || "Group updated"}.`);
+});
+
 elements["cue-capture"].addEventListener("submit", offerCues);
 elements["cue-clear"].addEventListener("click", clearCues);
 elements["cues-list"].addEventListener("click", event => {

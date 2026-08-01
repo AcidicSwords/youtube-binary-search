@@ -2570,3 +2570,54 @@ kbd {
 }
 
 .cue-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* A Group header states which of its four states it is in, so the pair of
+   checkboxes never has to be decoded. Hidden dims it; inactive marks it with a
+   dashed edge, because inactive means "contributing nothing" rather than
+   "absent". */
+.guide-group-row,
+.guide-divider {
+  display: grid;
+  align-items: center;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 7px var(--guide-gutter, 9px);
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.guide-group-name,
+.guide-divider-name {
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.guide-group-meta,
+.guide-divider-meta {
+  font-size: 0.7rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guide-group-row.is-hidden { opacity: 0.62; }
+.guide-group-row.is-inactive { border-top-style: dashed; }
+
+.guide-group-toggles {
+  display: inline-flex;
+  gap: 10px;
+}
+
+.guide-group-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.guide-group-toggle input { min-height: 0; }
+
+.guide-divider { grid-template-columns: minmax(0, auto) minmax(0, 1fr); }
