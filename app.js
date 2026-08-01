@@ -2240,6 +2240,9 @@ function composingGuideClick(event) {
 function consumeShiftLayer() {
   if (!state.shiftLayer) return;
   state.shiftLayer = false;
+  // Both controls that surface this one-shot state have to release together,
+  // or the Guide keeps claiming a layer the operator matrix has already spent.
+  view.renderGuide();
   view.render();
 }
 
@@ -4557,6 +4560,16 @@ elements["sections-list"].addEventListener("change", event => {
   view.renderGuide();
   view.render();
   setStatus(`${result.session.history.at(-1)?.label || "Group updated"}.`);
+});
+
+// The Shift layer lives in the operator matrix, which the compact layout makes
+// inert while the Guide is open -- so on a phone the Guide had no route to
+// composition at all. This is the same one-shot state reached from where the
+// objects being composed actually are.
+elements["guide-compose-toggle"].addEventListener("click", () => {
+  state.shiftLayer = !state.shiftLayer;
+  view.renderGuide();
+  view.render();
 });
 
 elements["cue-capture"].addEventListener("submit", offerCues);

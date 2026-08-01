@@ -2623,3 +2623,17 @@ kbd {
 .guide-group-toggle input { min-height: 0; }
 
 .guide-divider { grid-template-columns: minmax(0, auto) minmax(0, 1fr); }
+
+/* Composition reached from the Guide itself. It mirrors the operator matrix's
+   Shift layer rather than owning a second state, so the two can never disagree. */
+.guide-compose-toggle {
+  min-height: var(--compact-control-height);
+  padding: 0 10px;
+  font-size: 0.74rem;
+}
+
+.guide-compose-toggle.active {
+  border-color: rgba(188, 154, 255, 0.72);
+  color: var(--text);
+  background: rgba(188, 154, 255, 0.16);
+}

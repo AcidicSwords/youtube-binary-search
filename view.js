@@ -1081,6 +1081,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       }
     }
 
+    const composing = state().shiftLayer === true;
+    elements["guide-compose-toggle"].setAttribute("aria-pressed", String(composing));
+    elements["guide-compose-toggle"].classList.toggle("active", composing);
     renderCues();
     invalidateTimelinePins();
     renderTimelinePins();
