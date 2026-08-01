@@ -16,6 +16,7 @@ import {
   findPinAt,
   getPin,
   orderedPins,
+  allPins,
   sectionsForPin,
   resolveSection,
   previousPin,
@@ -824,7 +825,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
   }
 
   function renderGuide() {
-    const pins = orderedPins(guide());
+    const pins = allPins(guide());
     const sections = sortedSections(guide());
     const focusedId = focusedSectionId();
     const counts = {
@@ -852,6 +853,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         : "Load a video to see its Sections.";
       elements["sections-list"].appendChild(empty);
     } else {
+      renderGroupHeaders(sections);
       for (const section of sections) {
         const startReferences = sectionsForPin(guide(), section.startPin.id).length;
         const endReferences = sectionsForPin(guide(), section.endPin.id).length;
@@ -989,7 +991,26 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         : "Load a video to see its Pins.";
       elements["pins-list"].appendChild(empty);
     } else {
-      for (const pin of pins) {
+      const endpoints = pins.filter(pin => sectionsForPin(guide(), pin.id).length);
+      const standalone = pins.filter(pin => !sectionsForPin(guide(), pin.id).length);
+      let rendered = 0;
+      for (const pin of [...endpoints, ...standalone]) {
+        // Two kinds of Pin do two different jobs: one holds Sections together,
+        // one marks a place. Splitting them is what lets Unlink live with the
+        // Pins it acts on rather than inside the Section view.
+        if (rendered === 0 && endpoints.length) {
+          elements["pins-list"].appendChild(pinDivider(
+            "Section endpoints",
+            `${endpoints.length} Pin${endpoints.length === 1 ? "" : "s"} holding Sections together`
+          ));
+        }
+        if (rendered === endpoints.length && standalone.length) {
+          elements["pins-list"].appendChild(pinDivider(
+            "Standalone",
+            `${standalone.length} Pin${standalone.length === 1 ? "" : "s"} marking a place, never hidden by a Group`
+          ));
+        }
+        rendered += 1;
         const references = sectionsForPin(guide(), pin.id).length;
         const selected = state().selectedRetained?.kind === "pin"
           && state().selectedRetained.id === pin.id;
@@ -1057,6 +1078,72 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     renderCues();
     invalidateTimelinePins();
     renderTimelinePins();
+  }
+
+  // A Group carries two independent states, so it gets two checkboxes and
+  // nothing else. Hidden and active is the map baked; visible and inactive is
+  // topology without terrain. The header states which of the four it is, so the
+  // pair never has to be decoded.
+  function groupStateName(group) {
+    if (group.visible && group.active) return "authoring";
+    if (!group.visible && group.active) return "baked · terrain only";
+    if (group.visible && !group.active) return "topology only";
+    return "dormant";
+  }
+
+  function pinDivider(title, meta) {
+    const row = document.createElement("div");
+    row.className = "guide-divider";
+    const name = document.createElement("span");
+    name.className = "guide-divider-name";
+    name.textContent = title;
+    const detail = document.createElement("span");
+    detail.className = "guide-divider-meta";
+    detail.textContent = meta;
+    row.append(name, detail);
+    return row;
+  }
+
+  function renderGroupHeaders(sections) {
+    // The header is the only place the four states are reachable, so it is
+    // drawn whenever there is a Section to be in a Group -- one compact row,
+    // and nothing at all before there is anything to organize.
+    const groups = guide().groups || [];
+    if (!sections.length) return;
+    for (const group of groups) {
+      const counted = sections.filter(section => section.groupId === group.id).length;
+      const row = document.createElement("div");
+      row.className = "guide-group-row";
+      row.classList.toggle("is-hidden", !group.visible);
+      row.classList.toggle("is-inactive", !group.active);
+      const name = document.createElement("span");
+      name.className = "guide-group-name";
+      name.textContent = group.label?.trim() || "Map";
+      const meta = document.createElement("span");
+      meta.className = "guide-group-meta";
+      meta.textContent = `${counted} Section${counted === 1 ? "" : "s"} · ${groupStateName(group)}`;
+      const toggles = document.createElement("div");
+      toggles.className = "guide-group-toggles";
+      for (const [key, text, title] of [
+        ["visible", "Visible", "Draw this Group's Sections and their endpoint Pins on the map"],
+        ["active", "Active", "Let this Group's Weights deform the map"]
+      ]) {
+        const label = document.createElement("label");
+        label.className = "guide-group-toggle";
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.checked = group[key] !== false;
+        box.dataset.groupToggle = group.id;
+        box.dataset.groupState = key;
+        box.title = title;
+        const caption = document.createElement("span");
+        caption.textContent = text;
+        label.append(box, caption);
+        toggles.appendChild(label);
+      }
+      row.append(name, meta, toggles);
+      elements["sections-list"].appendChild(row);
+    }
   }
 
   // Cues are offered, never placed. They render as candidates: the creator's
