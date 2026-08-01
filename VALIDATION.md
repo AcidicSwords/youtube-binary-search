@@ -22,6 +22,7 @@
 
 ## Canonical weight scale
 
+- Paste a description carrying chapters into the Cues tab. Confirm the Cue count rises while Pins, Sections, the map and Undo are untouched; that clicking a Cue takes its extent; that `Shift`+click extends across two; and that `Retain` produces an ordinary Section carrying the creator's title.
 - Confirm Guide’s Section selector contains, in order: `0.125×`, `0.25×`, `0.5×`, `0.75×`, `1×`, `1.25×`, `1.5×`, `1.75×`, `2×`, `4×`.
 - Confirm every spatial figure is shown as a factor, never as a duration: with all weights at `1×` no factor appears anywhere; adding one 15 s `2×` Section to a one-minute source shows `1:00 · 1.25× spatial`; adding a second 15 s Section at `0.5×` removes the factor again.
 - Confirm Focus draws the map across the focused extent: focus a `0.5×` Section and a `2×` Section in turn and check each spans the full timeline, that no unfocused Section or Pin is drawn against either edge, and that pressing anywhere on the timeline lands on the Address drawn there. Unfocus must restore the whole map.

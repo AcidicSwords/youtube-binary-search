@@ -107,6 +107,8 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
 - `field-coherence-tests.mjs` — Step/Offset independence
 - `field-frame-tests.mjs` — Frame ownership, stable identity, transition descriptors
 - `field-breath-tests.mjs` — bounded breathing, barriers, Range clipping, Hold
+- `cue-tests.mjs` — timestamp forms, lenient description parsing, contiguous partition
+- `cue-smoke.mjs` — offering retains nothing; navigation, composition, and retention
 - `field-slideshow-tests.mjs` — directional transitions, coalescing, stale-event rejection
 - `nudge-tests.mjs` — Current drag, Shift-wheel/drag, keyboard nudging, one-Undo batching
 - `semantic-state-space-tests.mjs` — extended state-space proof

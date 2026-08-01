@@ -198,6 +198,8 @@ Clicking a Guide entry replaces the Working Interval with it. `Shift`+click — 
 
 Nesting needs no operator of its own. Click one Section, `Shift`+click another, Deform: the span becomes a parent Section carrying its own Weight, with the two it was composed from inside it.
 
+A third Guide tab holds **Cues** — candidate Addresses parsed from a pasted description. Chapters a creator wrote partition the video semantically, so a Cue owns an extent running to the next Cue's Address, and clicking one takes that extent exactly as clicking a Section does. `Shift`+click extends across Cues by the same rule. Cues render as dashed, quieter rows carrying one action, `Retain`, because there is nothing to edit in something that is not yet structure. Nothing about a Cue reaches the Guide, the map, traversal, or history until it is retained.
+
 A Guide entry is a **name**, an **Address**, and only facts not derivable from those two. A Pin exists so the viewer need not remember a time, so the time is a field of the entry and never baked into its title: an unnamed Pin is called `Section Start` or `Pin`, never `Start of Section 2:12.3–2:42.04`, which repeats the Address and then truncates. An unnamed Section is called `Section`; its extent, duration and Weight are its line. Nothing states the same fact twice inside one entry — the Weight factor already says whether it compresses or expands, and the duration is stated once.
 
 A Pin has one Address and no extent, so its row draws no positional track: one point plotted across the whole map is the Temporal Topography redrawn at useless scale. Position is read and moved on the map; the Guide holds the exact Address.

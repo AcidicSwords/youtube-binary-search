@@ -2538,3 +2538,35 @@ kbd {
   .guide-item { --guide-control: 40px; }
   .guide-address-input { width: calc(10ch + 14px); }
 }
+
+/* Cues are candidates, not structure. They read quieter than a retained entry
+   so the Guide never looks fuller than the map actually is, and they carry one
+   action -- the one that makes them real. */
+.cue-item {
+  border-style: dashed;
+  opacity: 0.88;
+}
+
+.cue-item .guide-item-title { color: var(--muted); }
+
+.cue-item:hover,
+.cue-item:focus-within {
+  border-style: solid;
+  opacity: 1;
+}
+
+.cue-create-form textarea {
+  width: 100%;
+  min-height: 84px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: #0d1219;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.76rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.cue-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }

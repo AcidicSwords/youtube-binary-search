@@ -839,6 +839,8 @@ one drag, wheel series, or held-key nudge creates at most one Undo checkpoint
 fine Nudge acts in source time, not Timeline Space
 Guide owns no independent drag geometry
 a plain Guide click replaces the Working Interval; Shift extends it
+a Cue is never persisted, projected, or traversable until it is retained
+retaining a Cue is the ordinary save and carries the offered title
 composition yields an extent, never a set, so every operator consumes it unchanged
 a Guide row is expanded exactly when it is the selected retained object
 preview, breathing, Context, and semantic state cannot overwrite one another
