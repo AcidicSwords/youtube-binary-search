@@ -1,5 +1,7 @@
 from pathlib import Path
 
+# Keep the existing interaction smoke test aligned with the corrected visible
+# unit; this changes only the expected presentation, not the interaction.
 path = Path(__file__).resolve().parents[1] / "interaction-smoke.mjs"
 text = path.read_text(encoding="utf-8")
 old = "10s manual"
