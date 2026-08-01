@@ -17,7 +17,7 @@ import {
   createGuide,
   createSectionFromTimes,
   nextPin,
-  visiblePins
+  orderedPins
 } from "./guide.js";
 
 function assertLoopContained(session) {
@@ -88,7 +88,7 @@ assert.ok(Math.abs(composed.model.interval.arrival - 90) <= EPSILON);
 const guide = createGuide("semantic-composition");
 createSectionFromTimes(guide, 20, 40, { label: "First" });
 createSectionFromTimes(guide, 60, 80, { label: "Second" });
-assert.equal(visiblePins(guide).length, 4);
+assert.equal(orderedPins(guide).length, 4);
 
 let pinComposition = createSession({ duration: 100, current: 10, guide });
 pinComposition = goTo(pinComposition, 20, { operator: "targetA" }).session;

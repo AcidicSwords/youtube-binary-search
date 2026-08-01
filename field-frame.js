@@ -22,7 +22,7 @@ export const FIELD_FRAME_DIRECTION = Object.freeze({
   FORWARD: "forward"
 });
 
-export const OPERATOR_FRAME_KINDS = Object.freeze([
+const OPERATOR_FRAME_KINDS = Object.freeze([
   "step",
   "refine",
   "reopen",
@@ -31,7 +31,7 @@ export const OPERATOR_FRAME_KINDS = Object.freeze([
   "go"
 ]);
 
-export const DIRECT_FRAME_KINDS = Object.freeze([
+const DIRECT_FRAME_KINDS = Object.freeze([
   "current",
   "pin",
   "section",
@@ -39,7 +39,7 @@ export const DIRECT_FRAME_KINDS = Object.freeze([
 ]);
 
 // A Frame edge closer than this to its neighbour carries no separate identity.
-export const FRAME_TOLERANCE = 0.02;
+const FRAME_TOLERANCE = 0.02;
 
 function finite(value) {
   return Number.isFinite(Number(value)) ? Number(value) : null;

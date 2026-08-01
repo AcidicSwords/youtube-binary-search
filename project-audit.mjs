@@ -174,22 +174,14 @@ assert.doesNotMatch(styles, /\.timeline-section-node/);
 // Relative dragging converts pixels through the drawn span, so a focused map
 // drags at the scale it is actually drawn at.
 assert.match(app, /function sourceFromRelativeDragDelta[\s\S]*surfaceWidth[\s\S]*fractionToDistance[\s\S]*originClientX[\s\S]*viewStart[\s\S]*viewEnd/);
-assert.match(view, /function pinPositionButton[\s\S]*className\s*=\s*"endpoint-button pin-position-node"[\s\S]*dataset\.pinGo/);
+// A Pin has one Address and no extent, so a miniature track of that single
+// point is the map redrawn at useless scale. Position is read and moved on the
+// Temporal Topography; the Guide holds the exact Address.
+assert.doesNotMatch(view, /pinPositionButton|pin-position-track/,
+  "A Pin row must not redraw the map to place one point.");
+assert.doesNotMatch(styles, /\.pin-position-track|\.endpoint-button/);
 assert.doesNotMatch(view, /dataset\.sectionDrag/,
   "Guide's full-map profile is a read-only positional representation.");
-assert.match(styles, /\.pin-position-track[\s\S]*height:\s*43px[\s\S]*margin:\s*0 10px 9px/);
-// Guide's position node reports where a Pin sits and Goes to it. It owns no
-// drag geometry, so it must not offer a drag affordance it cannot honour, and
-// must not claim the touch stream for a gesture it never handles — doing so
-// left it unable to scroll or be tapped on touch devices.
-{
-  const endpointRule = styles.match(/\.endpoint-button\s*\{([\s\S]*?)\}/)?.[1];
-  assert.ok(endpointRule, "The Guide position node must keep a style rule.");
-  assert.doesNotMatch(endpointRule, /touch-action/,
-    "A control with no pointer gesture must not claim the touch stream.");
-  assert.doesNotMatch(endpointRule, /cursor:\s*(ew-resize|col-resize|grab|move)/,
-    "A read-only position node must not present a drag cursor.");
-}
 // Guide is the exact editor: Address inputs plus the shared Nudge increments.
 assert.match(view, /function addressControl\([\s\S]*dataset\.addressInput/);
 assert.match(view, /function nudgeButton\([\s\S]*dataset\.nudgeTarget/);

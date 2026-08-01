@@ -49,8 +49,10 @@
 - With Context enabled, traverse once. Confirm Tail shows Context Start, Lead
   shows Context End, and Center follows the Cursor across the window without
   either edge moving.
-- Let that Context stop, and accept its Cursor. Confirm neither Tail nor Lead is
-  reassigned by the ending or the settlement.
+- Let that Context stop. Confirm neither Tail nor Lead is reassigned by the
+  ending, and that Current has not moved to wherever the Cursor reached.
+- Press Space while Context runs. Confirm Context stops, ordinary playback
+  starts from Current, and Current is unchanged.
 - Confirm Context edges materially different from one another let you locate the
   crossing by playing or stopping inside the window.
 - With Context disabled, confirm the Frame follows the current operator: Step
@@ -289,9 +291,10 @@
   present and no state changes.
 - Collapse either rail mode (or Guide with `G`); confirm Viewer and Timeline
   expand into the released width and the corresponding header control reopens it.
-- Confirm the timeline key, Current/Cursor readouts, Range ground, Resolution
-  contour, Working-Section ridge, Field overlay, Section spans, and Pins
-  remain distinguishable at desktop and compact widths.
+- Confirm the timeline key, Current's Address beneath its marker, the Cursor
+  readout, Range ground, Resolution contour, Working-Section ridge, Field
+  overlay, Section spans, and Pins remain distinguishable and unclipped at
+  desktop and compact widths.
 - With a matrix control or side viewer focused, press Space and confirm it controls
   shared playback rather than reactivating that button.
 - Play and pause Center after interacting with its iframe, then immediately use

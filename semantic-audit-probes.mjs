@@ -19,7 +19,7 @@ import {
   nextPin,
   previousPin,
   sanitizeGuide,
-  visiblePins
+  orderedPins
 } from "./guide.js";
 import { createSmokeEnvironment } from "./smoke-harness.mjs";
 
@@ -83,10 +83,10 @@ createSectionFromTimes(guide, 10, 20, { label: "Implicit endpoints" });
 finding(
   "section-endpoints-absent-from-pin-traversal",
   guide.pins.length === 2
-    && visiblePins(guide).length === 0
+    && orderedPins(guide).length === 0
     && previousPin(guide, 15, { start: 0, end: 100 }) === null
     && nextPin(guide, 15, { start: 0, end: 100 }) === null,
-  { storedPins: guide.pins.length, traversablePins: visiblePins(guide).length }
+  { storedPins: guide.pins.length, traversablePins: orderedPins(guide).length }
 );
 
 // Runtime creation permits labels that differ only in case, but persistence

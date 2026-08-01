@@ -14,7 +14,7 @@ import {
   SECTION_WEIGHT_VALUES,
   findPinAt,
   getPin,
-  visiblePins,
+  orderedPins,
   sectionsForPin,
   resolveSection,
   previousPin,
@@ -64,7 +64,7 @@ export function formatTime(seconds) {
 // correspond and there is nothing to say.
 const STRETCH_TOLERANCE = 1e-6;
 
-export function stretchFactor(spatialSpan, sourceSpan) {
+function stretchFactor(spatialSpan, sourceSpan) {
   if (!Number.isFinite(spatialSpan) || !Number.isFinite(sourceSpan)) return null;
   if (!(sourceSpan > STRETCH_TOLERANCE)) return null;
   const factor = spatialSpan / sourceSpan;
@@ -72,7 +72,7 @@ export function stretchFactor(spatialSpan, sourceSpan) {
   return Math.abs(factor - 1) <= STRETCH_TOLERANCE ? null : factor;
 }
 
-export function formatStretch(spatialSpan, sourceSpan) {
+function formatStretch(spatialSpan, sourceSpan) {
   const factor = stretchFactor(spatialSpan, sourceSpan);
   return factor === null ? null : `${Number(factor.toFixed(3))}×`;
 }
@@ -189,13 +189,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
   const transportIs = kind => state().transport.kind === kind;
 
   function sectionLabel(section) {
-    return section?.label?.trim() || `Section ${formatRange(section)}`;
-  }
-
-  function sectionWeightState(weight) {
-    if (weight < 1 - EPSILON) return "Compresses";
-    if (weight > 1 + EPSILON) return "Expands";
-    return "Neutral";
+    return section?.label?.trim() || "Section";
   }
 
   function pinLabel(pin) {
@@ -204,13 +198,17 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const references = sectionsForPin(guide(), pin.id)
       .map(section => resolveSection(guide(), section))
       .filter(Boolean);
+    // A derived name says what this Pin is, never when it is. The Address is a
+    // field of its own, and a title that carries the range repeats it and then
+    // truncates -- the one thing a Pin exists to save you from remembering.
     if (references.length === 1) {
       const section = references[0];
       const role = section.startPinId === pin.id ? "Start" : "End";
-      return `${role} of ${sectionLabel(section)}`;
+      const named = section.label?.trim();
+      return named ? `${role} of ${named}` : `Section ${role}`;
     }
-    if (references.length > 1) return `${references.length}-Section endpoint`;
-    return pin.kind === PIN_KIND.ENDPOINT ? "Section endpoint" : "Unnamed Pin";
+    if (references.length > 1) return `Shared endpoint · ${references.length} Sections`;
+    return pin.kind === PIN_KIND.ENDPOINT ? "Section endpoint" : "Pin";
   }
 
   function guideTitleActions(kind, id, label, options = {}) {
@@ -292,32 +290,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     return document.defaultView?.matchMedia?.("(pointer: coarse)")?.matches
       ? COARSE_TIMELINE_PIN_HIT_SIZE
       : TIMELINE_PIN_HIT_SIZE;
-  }
-
-  // Guide's full-map profile is a read-only positional representation and an
-  // acquisition link back to the Timeline. It owns no drag geometry: spatial
-  // direct manipulation belongs to the Temporal Topography.
-  function pinPositionButton(pin, references) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "endpoint-button pin-position-node";
-    button.dataset.pinGo = pin.id;
-    setStyleProperty(button, "--endpoint-position", `${percent(pin.t)}%`);
-    setStyleProperty(
-      button,
-      "--endpoint-weight",
-      String(Math.min(3, Math.max(1, references)))
-    );
-    const roleLabel = document.createElement("small");
-    roleLabel.textContent = "P";
-    const text = document.createElement("span");
-    text.className = "sr-only";
-    text.textContent = `${formatTime(pin.t)} ${pin.label || ""}`.trim();
-    button.append(roleLabel, text);
-    const description = `${pinLabel(pin)} at ${formatTime(pin.t)}; click to Go, edit its Address below or drag it on the Timeline`;
-    button.setAttribute("aria-label", description);
-    button.title = description;
-    return button;
   }
 
   // One exact Address control: a compact field flanked by the shared Nudge
@@ -724,7 +696,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     setStyleProperty(elements.timeline, "--pin-hit-size", `${pinClusterGap}px`);
     const activeRange = range();
     const projection = timelineProjection();
-    const pins = visiblePins(guide())
+    const pins = orderedPins(guide())
       .filter(pin => contains(activeRange, pin.t))
       .map(pin => ({
         ...pin,
@@ -851,7 +823,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
   }
 
   function renderGuide() {
-    const pins = visiblePins(guide());
+    const pins = orderedPins(guide());
     const sections = sortedSections(guide());
     const focusedId = focusedSectionId();
     const counts = {
@@ -906,11 +878,13 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         title.textContent = sectionLabel(section);
         const time = document.createElement("span");
         time.className = "guide-item-time";
+        // Extent first: it is what a Section is. Then how much of it, then how
+        // much map it takes. The weight word is dropped because the factor
+        // already states both its direction and its size.
         time.textContent = [
-          ...(section.label?.trim() ? [formatRange(section)] : []),
+          formatRange(section),
           formatDuration(section.end - section.start),
-          `${section.weight}×`,
-          sectionWeightState(section.weight).toLowerCase()
+          `${section.weight}×`
         ].join(" · ");
         const profile = document.createElement("span");
         profile.className = "guide-section-profile";
@@ -987,13 +961,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         // repeats the same extent as three separate stacked editors.
         const addresses = document.createElement("div");
         addresses.className = "guide-addresses";
-        const duration = document.createElement("span");
-        duration.className = "guide-address-readout";
-        duration.textContent = formatDuration(section.end - section.start);
+        // Duration is already stated on the row's own line; repeating it beside
+        // the End field made the same fact appear twice in one card.
         addresses.append(
           addressControl("section-start", section.id, "Start", section.start),
-          addressControl("section-end", section.id, "End", section.end),
-          duration
+          addressControl("section-end", section.id, "End", section.end)
         );
 
         item.append(header);
@@ -1042,13 +1014,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         title.textContent = pinLabel(pin);
         const time = document.createElement("span");
         time.className = "guide-item-time";
-        time.textContent = `${formatTime(pin.t)} · ${
-          pin.kind === PIN_KIND.ENDPOINT ? "Section endpoint" : "Pin"
-        } · ${
+        // Address first, because that is what a Pin is for. The kind is already
+        // in the title, and "unshared" is the ordinary case: only a Pin that
+        // actually anchors Sections has something extra to declare.
+        time.textContent = [
+          formatTime(pin.t),
           references
             ? `anchors ${references} Section${references === 1 ? "" : "s"}`
-            : "unshared"
-        }`;
+            : null
+        ].filter(Boolean).join(" · ");
         main.append(title, time);
         const header = document.createElement("div");
         header.className = "guide-item-header";
@@ -1066,17 +1040,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           )
         );
 
-        const positionTrack = document.createElement("div");
-        positionTrack.className = "pin-position-track";
-        const positionLine = document.createElement("span");
-        positionLine.className = "pin-position-line";
-        positionLine.setAttribute("aria-hidden", "true");
-        positionTrack.append(positionLine, pinPositionButton(pin, references));
+        // A Pin has one Address and no extent, so a miniature track showing
+        // where that single point sits is the Temporal Topography redrawn at
+        // useless scale. Position is read and moved on the map; the Guide holds
+        // the exact Address.
         const addresses = document.createElement("div");
         addresses.className = "guide-addresses";
         addresses.append(addressControl("pin", pin.id, "Address", pin.t));
         item.append(header);
-        if (selected) item.append(positionTrack, addresses);
+        if (selected) item.append(addresses);
         elements["pins-list"].appendChild(item);
       }
     }
@@ -1416,7 +1388,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["timeline-key-interval"].dataset.active = String(Boolean(currentInterval));
     elements["timeline-key-field"].dataset.active = String(Boolean(fieldSpan));
     elements["timeline-key-pins"].dataset.active = String(
-      Boolean(visiblePins(guide()).length)
+      Boolean(orderedPins(guide()).length)
     );
     const overallStretch = formatStretch(projection.timelineExtent, model().duration);
     elements["duration-time"].textContent = overallStretch

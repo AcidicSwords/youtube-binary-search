@@ -33,6 +33,7 @@ import {
   goTo,
   goToGuidePin as goToSessionGuidePin,
   goToGuideSection as goToSessionGuideSection,
+  workFromExtent,
   refine as refineSession,
   localRefine as localRefineSession,
   step as stepSession,
@@ -2200,6 +2201,69 @@ function traverseToAdjacentPin(direction, carryRetained = false) {
     view.render();
   }
   return changed;
+}
+
+// Composition in the Guide.
+//
+// A plain click replaces: the clicked object becomes the Working Interval.
+// Shift extends: the Working Interval grows to include the clicked object,
+// whatever kind it is. One rule covers Pins and Sections because the extent —
+// not a set of objects — is what every operator already consumes, so a
+// composition is immediately Deformable, Focusable, and retainable as one
+// parent Section. Repeated extension grows the extent monotonically; a plain
+// click starts over. The Shift layer is one-shot, so it is consumed here as
+// every other operator honouring it consumes it.
+function pinNameFor(pinId) {
+  const pin = getPin(guide(), pinId);
+  if (!pin) return "that Pin";
+  return pin.label?.trim() ? `“${pin.label.trim()}”` : `the Pin at ${formatTime(pin.t)}`;
+}
+
+function retainedExtentOf(kind, id) {
+  if (kind === "pin") {
+    const pin = getPin(guide(), id);
+    return pin ? { start: pin.t, end: pin.t } : null;
+  }
+  const section = resolveSection(guide(), id);
+  return section ? { start: section.start, end: section.end } : null;
+}
+
+function composingGuideClick(event) {
+  return event?.shiftKey === true || state.shiftLayer;
+}
+
+function consumeShiftLayer() {
+  if (!state.shiftLayer) return;
+  state.shiftLayer = false;
+  view.render();
+}
+
+function extendIntervalToRetained(kind, id, name) {
+  const interval = currentInterval();
+  const extent = retainedExtentOf(kind, id);
+  if (!interval || !extent) return false;
+  const span = {
+    start: Math.min(interval.start, extent.start),
+    end: Math.max(interval.end, extent.end)
+  };
+  if (span.end - span.start <= EPSILON) return false;
+  const label = `Extend to ${name}`;
+  state.selectedRetained = { kind, id };
+  moveToAddress((span.start + span.end) / 2, {
+    operator: "section",
+    label,
+    transaction: sourceSession => workFromExtent(sourceSession, span, {
+      operator: "section",
+      label
+    }),
+    renderGuide: true,
+    unchangedStatus: `The Working Interval already spans ${name}.`,
+    status: destination =>
+      `Working Interval extends ${formatRange(span)}; Current is centered at ${formatTime(destination)}.`
+  });
+  consumeShiftLayer();
+  closeCompactGuideAfterSelection();
+  return true;
 }
 
 function selectSectionAsWorkingInterval(sectionId, options = {}) {
@@ -4582,11 +4646,18 @@ function handleGuideClick(event) {
     event.stopPropagation?.();
     return;
   }
+  const composing = composingGuideClick(event);
   const pinGo = event.target.closest("[data-pin-go]");
   if (pinGo) {
+    const pinId = pinGo.dataset.pinGo;
+    if (composing && extendIntervalToRetained(
+      "pin",
+      pinId,
+      pinNameFor(pinId)
+    )) return;
     const sectionId = pinGo.dataset.dragSection || null;
     return goToPin(
-      getPin(guide(), pinGo.dataset.pinGo),
+      getPin(guide(), pinId),
       "pin",
       {
         carryRetained: event.altKey === true,
@@ -4598,8 +4669,14 @@ function handleGuideClick(event) {
   }
   const sectionGo = event.target.closest("[data-section-go]");
   if (sectionGo) {
+    const id = sectionGo.dataset.sectionGo;
+    if (composing && extendIntervalToRetained(
+      "section",
+      id,
+      `“${sectionName(resolveSection(guide(), id))}”`
+    )) return;
     return selectSectionAsWorkingInterval(
-      sectionGo.dataset.sectionGo,
+      id,
       { carryRetained: event.altKey === true }
     );
   }

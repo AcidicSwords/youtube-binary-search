@@ -29,7 +29,7 @@ import {
   getPin,
   sectionsForPin,
   canLinkPins,
-  visiblePins,
+  orderedPins,
   deletePin,
   movePin,
   createSection,
@@ -260,7 +260,7 @@ let generatedSection = resolveSection(guide, generated.section.id);
 assert.equal(generatedSection.start, 30);
 assert.equal(generatedSection.end, 40);
 assert.equal(
-  visiblePins(guide).some(pin => pin.id === generatedSection.startPinId),
+  orderedPins(guide).some(pin => pin.id === generatedSection.startPinId),
   true,
   "Section endpoint Pins must remain visible and traversable."
 );

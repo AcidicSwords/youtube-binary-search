@@ -135,8 +135,9 @@ compete for the same pointer. A cluster opens a compact vertical chooser at its
 map position; the chooser scrolls through dense groups without spreading across
 the Timeline and does not move Current until an exact Pin is chosen. Shared
 endpoints gain visual weight without acquiring a different interaction rule.
-Choosing keeps the exact row visibly selected; click goes to it and horizontal
-movement uses the row's dedicated drag handle. The cluster itself opens on
+Choosing keeps the exact row visibly selected. A row is one control obeying the
+map's own rule: click goes to that Pin, drag moves it. Splitting activation from
+dragging would be a grammar used nowhere else in the interface. The cluster itself opens on
 pointer-down, before the Timeline can interpret the gesture as Go. This resolves
 a cluster before manipulation instead of asking overlapping Timeline markers
 to compete for the gesture.
@@ -192,6 +193,14 @@ Section creation accepts:
 - Working Interval;
 - held Field span;
 - two selected Pins.
+
+Clicking a Guide entry replaces the Working Interval with it. `Shift`+click — or the one-shot Shift layer, for pointer-only use — **extends** the Working Interval to include the clicked entry instead. One rule serves Pins and Sections alike, because an extent, not a set of objects, is what every operator consumes: a composed span is immediately Deformable, Focusable, and retainable. Extension only ever grows the span; a plain click starts over, so the ordinary meaning of a click is always reachable.
+
+Nesting needs no operator of its own. Click one Section, `Shift`+click another, Deform: the span becomes a parent Section carrying its own Weight, with the two it was composed from inside it.
+
+A Guide entry is a **name**, an **Address**, and only facts not derivable from those two. A Pin exists so the viewer need not remember a time, so the time is a field of the entry and never baked into its title: an unnamed Pin is called `Section Start` or `Pin`, never `Start of Section 2:12.3–2:42.04`, which repeats the Address and then truncates. An unnamed Section is called `Section`; its extent, duration and Weight are its line. Nothing states the same fact twice inside one entry — the Weight factor already says whether it compresses or expands, and the duration is stated once.
+
+A Pin has one Address and no extent, so its row draws no positional track: one point plotted across the whole map is the Temporal Topography redrawn at useless scale. Position is read and moved on the map; the Guide holds the exact Address.
 
 A Guide row is expanded exactly when it is the selected retained object, and nothing else opens one. Participating in the Working Interval, being focused, and being a snap target are all worth showing and are shown as highlights on the collapsed row, because rows that open themselves make the selection unreadable. Focusing a Section selects it, so its row carries Unfocus.
 
@@ -376,8 +385,9 @@ travelling transition.
 - Every form control has a programmatic name.
 - Every button declares a type.
 - Matrix and Guide actions remain keyboard reachable.
-- Space owns shared play/pause or Context acceptance everywhere outside text
-  editing and modal Guide work; Enter activates a focused Step control.
+- Space is the play command everywhere outside text editing and modal Guide
+  work: it starts or stops ordinary playback, and running Context yields to it
+  rather than reinterpreting the key. Enter activates a focused Step control.
 - Pointer release clears pointer-acquired control focus, and Center playback
   state changes release iframe focus back to the reader.
 - Narrow Timeline preserves vertical page scrolling; wide desktop keeps the application frame fixed and scrolls only the active right-rail surface.

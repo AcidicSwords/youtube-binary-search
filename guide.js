@@ -64,7 +64,7 @@ export function createGuide(videoId = null) {
   };
 }
 
-export function sortPins(pins) {
+function sortPins(pins) {
   return [...pins].sort((a, b) => a.t - b.t || a.createdAt - b.createdAt);
 }
 
@@ -255,7 +255,9 @@ export function linkPins(guide, sourcePinId, targetPinId) {
   };
 }
 
-export function visiblePins(guide) {
+// Pins in map order. The name states exactly that: this is the ordering every
+// consumer needs, and nothing here filters anything out.
+export function orderedPins(guide) {
   return sortPins(guide.pins);
 }
 
@@ -289,7 +291,7 @@ export function resolveSection(guide, sectionOrId) {
   };
 }
 
-export function sectionIdentityKey(startPinId, endPinId, label) {
+function sectionIdentityKey(startPinId, endPinId, label) {
   return `${startPinId}|${endPinId}|${String(label || "").trim().toLocaleLowerCase()}`;
 }
 
@@ -587,7 +589,7 @@ function timelineCoordinate(projection, source) {
 function timelineStops(guide, range, projection = null) {
   const retained = projection?.orderedPinStops
     ? projection.orderedPinStops(range, guide)
-    : visiblePins(guide)
+    : orderedPins(guide)
       .filter(pin => pin.t >= range.start - EPSILON && pin.t <= range.end + EPSILON)
       .map(pin => ({
         ...pin,

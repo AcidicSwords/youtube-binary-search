@@ -10,7 +10,7 @@ import {
   DEFAULT_SECTION_WEIGHT,
   normalizeSectionWeight,
   sortedSections,
-  visiblePins
+  orderedPins
 } from "./guide.js";
 
 function activeWeight(section) {
@@ -186,7 +186,7 @@ export function createTimelineProjection({
   }
 
   function orderedPinStops(range, sourceGuide = guide) {
-    return visiblePins(sourceGuide || { pins: [] })
+    return orderedPins(sourceGuide || { pins: [] })
       .filter(pin =>
         pin.t >= range.start - EPSILON
         && pin.t <= range.end + EPSILON
