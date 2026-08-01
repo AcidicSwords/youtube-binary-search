@@ -17,6 +17,8 @@ import {
   getPin,
   orderedPins,
   allPins,
+  sectionIsActive,
+  sectionIsVisible,
   sectionsForPin,
   resolveSection,
   previousPin,
@@ -514,6 +516,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     if (!field) return;
     field.replaceChildren();
     const sections = sortedSections(guide())
+      .filter(section => sectionIsActive(guide(), section))
       .filter(section => Math.abs(section.weight - 1) > EPSILON);
     const atmosphere = document.createElement("span");
     atmosphere.className = "deformation-atmosphere";
@@ -582,6 +585,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const timelineWidth = Math.max(1, elements.timeline.clientWidth || 1);
 
     const entries = sortedSections(guide())
+      .filter(section => sectionIsVisible(guide(), section))
       .map(section => ({
         section,
         projected: projection.projectExtent(section)
@@ -710,6 +714,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const sectionKey = sortedSections(guide())
       .map(section =>
         `${section.id}:${section.start}:${section.end}:${section.weight}:${section.label}`
+        + `:${sectionIsVisible(guide(), section) ? "v" : "h"}`
+        + `:${sectionIsActive(guide(), section) ? "a" : "i"}`
       )
       .join(",");
     const selectedKey = [

@@ -204,4 +204,25 @@ function build() {
   );
 }
 
+// --- The two states drive two different renderings ------------------------------
+// A gradient shows deformation, so it follows active. A bar is a mark, so it
+// follows visible. Same object, different attribute, different consequence.
+{
+  const { guide, terrain } = build();
+  const drawnBars = () => sortedSections(guide).filter(section => sectionIsVisible(guide, section));
+  const gradientSources = () => sortedSections(guide).filter(section => sectionIsActive(guide, section));
+
+  setGroupState(guide, terrain.id, { visible: false, active: true });
+  assert.equal(drawnBars().some(section => section.groupId === terrain.id), false,
+    "A hidden Group draws no Section bar.");
+  assert.equal(gradientSources().some(section => section.groupId === terrain.id), true,
+    "while still contributing the deformation its gradient shows.");
+
+  setGroupState(guide, terrain.id, { visible: true, active: false });
+  assert.equal(drawnBars().some(section => section.groupId === terrain.id), true,
+    "An inactive Group still draws its Section bar.");
+  assert.equal(gradientSources().some(section => section.groupId === terrain.id), false,
+    "while contributing no deformation, so no gradient.");
+}
+
 console.log("Group tests passed: four states over one partition, deformation following active, endpoint Pins following visible, standalone Pins never hidden, live Weight edits with nothing to invalidate, non-destructive deletion, and migration of guides written before Groups.");

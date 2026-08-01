@@ -693,7 +693,8 @@ kbd {
   padding: 1px 5px;
   transform: translateX(-50%);
   border-radius: 4px;
-  background: rgba(11, 14, 19, 0.82);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-3);
   color: var(--text);
   font-size: 0.66rem;
   font-variant-numeric: tabular-nums;
@@ -703,8 +704,9 @@ kbd {
 }
 
 .current-marker.is-dragging .current-marker-time {
-  background: rgba(11, 14, 19, 0.92);
-  color: var(--accent-strong);
+  border-color: rgba(121, 168, 255, 0.72);
+  background: color-mix(in srgb, var(--accent) 26%, var(--surface-3));
+  color: #fff;
 }
 
 .current-marker.is-dragging {
