@@ -174,7 +174,7 @@
             <span id="backward-target-marker" class="marker target-marker" aria-hidden="true"></span>
             <span id="forward-target-marker" class="marker target-marker" aria-hidden="true"></span>
             <span id="current-departure-marker" class="marker current-departure-marker" aria-hidden="true" hidden></span>
-            <button id="current-marker" class="marker current-marker" type="button" role="slider" aria-label="Current; drag to Go, Shift-drag for precision" aria-orientation="horizontal" aria-valuemin="0" aria-valuenow="0"></button>
+            <button id="current-marker" class="marker current-marker" type="button" role="slider" aria-label="Current; drag to Step, Shift-drag for precision" aria-orientation="horizontal" aria-valuemin="0" aria-valuenow="0"></button>
             <span id="cursor-marker" class="marker cursor-marker" aria-hidden="true" hidden></span>
             <span id="preview-current-marker" class="marker preview-current-marker" aria-hidden="true" hidden></span>
           </div>
@@ -199,7 +199,7 @@
             </div>
 
             <details id="step-size-settings" class="tool-disclosure step-size-settings">
-              <summary><span>Movement distance</span><span id="step-size-summary">10 s manual</span></summary>
+              <summary><span>Movement distance</span><span id="step-size-summary">10 map units manual</span></summary>
               <div class="step-size-body">
                 <div class="segmented-control" role="group" aria-label="Step size mode">
                   <button id="step-mode-fixed" type="button" aria-pressed="true">Manual</button>
@@ -210,7 +210,7 @@
                   <span class="number-with-unit">
                     <input id="step-size-seconds" type="number" min="0.25" max="300" step="0.25"
                       value="10" inputmode="decimal" disabled>
-                    <span>s</span>
+                    <span>map units</span>
                   </span>
                 </label>
                 <div class="adaptive-step-presets" role="group" aria-label="Range-relative Step fraction">

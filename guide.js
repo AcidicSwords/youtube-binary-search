@@ -67,15 +67,17 @@ function now() {
 export const DEFAULT_GROUP_ID = "group-default";
 
 export function createGroup(guide, label = "", { id = null } = {}) {
+  const changedAt = now();
   const group = {
     id: id || makeId("group"),
     label: String(label || "").trim(),
     visible: true,
     active: true,
-    createdAt: now()
+    createdAt: changedAt,
+    updatedAt: changedAt
   };
   guide.groups.push(group);
-  guide.updatedAt = now();
+  guide.updatedAt = changedAt;
   return group;
 }
 
@@ -104,7 +106,9 @@ export function setGroupState(guide, groupId, changes = {}) {
   if (typeof changes.visible === "boolean") group.visible = changes.visible;
   if (typeof changes.active === "boolean") group.active = changes.active;
   if (typeof changes.label === "string") group.label = changes.label.trim();
-  guide.updatedAt = now();
+  const changedAt = now();
+  group.updatedAt = changedAt;
+  guide.updatedAt = changedAt;
   return group;
 }
 
@@ -112,8 +116,10 @@ export function assignSectionGroup(guide, sectionId, groupId) {
   const section = guide.sections.find(entry => entry.id === sectionId);
   const group = guide.groups.find(entry => entry.id === groupId);
   if (!section || !group) return false;
+  const changedAt = now();
   section.groupId = group.id;
-  guide.updatedAt = now();
+  section.updatedAt = changedAt;
+  guide.updatedAt = changedAt;
   return true;
 }
 
@@ -123,11 +129,14 @@ export function deleteGroup(guide, groupId) {
   if (groupId === DEFAULT_GROUP_ID) return false;
   const index = guide.groups.findIndex(group => group.id === groupId);
   if (index < 0) return false;
+  const changedAt = now();
   guide.groups.splice(index, 1);
   for (const section of guide.sections) {
-    if (section.groupId === groupId) section.groupId = DEFAULT_GROUP_ID;
+    if (section.groupId !== groupId) continue;
+    section.groupId = DEFAULT_GROUP_ID;
+    section.updatedAt = changedAt;
   }
-  guide.updatedAt = now();
+  guide.updatedAt = changedAt;
   return true;
 }
 
@@ -796,18 +805,21 @@ export function normalizeGuide(parsed, videoId) {
   for (const source of (Array.isArray(parsed?.groups) ? parsed.groups : [])) {
     if (!source?.id || source.id === DEFAULT_GROUP_ID) {
       if (source?.id === DEFAULT_GROUP_ID) {
-        setGroupState(guide, DEFAULT_GROUP_ID, {
-          visible: source.visible !== false,
-          active: source.active !== false,
+        const group = setGroupState(guide, DEFAULT_GROUP_ID, {
+          visible: typeof source.visible === "boolean" ? source.visible : true,
+          active: typeof source.active === "boolean" ? source.active : true,
           label: String(source.label || "Map")
         });
+        group.createdAt = Number(source.createdAt) || group.createdAt;
+        group.updatedAt = Number(source.updatedAt) || group.createdAt;
       }
       continue;
     }
     const group = createGroup(guide, String(source.label || ""), { id: source.id });
-    group.visible = source.visible !== false;
-    group.active = source.active !== false;
+    group.visible = typeof source.visible === "boolean" ? source.visible : true;
+    group.active = typeof source.active === "boolean" ? source.active : true;
     group.createdAt = Number(source.createdAt) || group.createdAt;
+    group.updatedAt = Number(source.updatedAt) || group.createdAt;
   }
 
   const idMap = new Map();
@@ -892,26 +904,60 @@ export function migrateSavedRegions(parsed, videoId) {
 }
 
 export function validateGuide(guide, duration) {
-  if (!guide || !Array.isArray(guide.pins) || !Array.isArray(guide.sections)) return false;
+  if (
+    !guide
+    || Number(guide.version) !== 8
+    || !Array.isArray(guide.groups)
+    || !Array.isArray(guide.pins)
+    || !Array.isArray(guide.sections)
+  ) return false;
+
+  const end = Math.max(0, Number(duration) || 0);
   const ids = new Set();
+  const groupIds = new Set();
+  let defaultGroups = 0;
+
+  for (const group of guide.groups) {
+    if (
+      !group?.id
+      || ids.has(group.id)
+      || typeof group.label !== "string"
+      || typeof group.visible !== "boolean"
+      || typeof group.active !== "boolean"
+      || !Number.isFinite(group.createdAt)
+      || !Number.isFinite(group.updatedAt)
+    ) return false;
+    if (group.id === DEFAULT_GROUP_ID) defaultGroups += 1;
+    ids.add(group.id);
+    groupIds.add(group.id);
+  }
+  if (defaultGroups !== 1) return false;
+
   for (const pin of guide.pins) {
     if (
       !pin?.id
       || ids.has(pin.id)
       || !Number.isFinite(pin.t)
       || pin.t < 0
-      || pin.t > duration
+      || pin.t > end
       || !Object.values(PIN_KIND).includes(pin.kind)
+      || !Number.isFinite(pin.createdAt)
+      || !Number.isFinite(pin.updatedAt)
     ) return false;
     ids.add(pin.id);
   }
+
   for (const section of guide.sections) {
     if (
       !section?.id
       || ids.has(section.id)
       || !section.startPinId
       || !section.endPinId
+      || !section.groupId
+      || !groupIds.has(section.groupId)
       || !isSectionWeight(section.weight)
+      || !Number.isFinite(section.createdAt)
+      || !Number.isFinite(section.updatedAt)
       || !resolveSection(guide, section)
     ) return false;
     ids.add(section.id);
@@ -931,8 +977,46 @@ export function sanitizeGuide(input, videoId, duration) {
     : normalizeGuide(input, videoId);
   const preserveIndependentCoincidentPins = Number(source?.version) >= 7;
   const guide = createGuide(videoId);
+  guide.groups = [];
+
   const idMap = new Map();
   const usedIds = new Set();
+  const validGroupIds = new Set();
+
+  const recoverGroup = (sourceGroup, forcedId = null) => {
+    const id = forcedId || sourceGroup?.id;
+    if (!id || usedIds.has(id)) return null;
+    const createdAt = Number(sourceGroup?.createdAt) || now();
+    const group = {
+      id,
+      label: String(
+        sourceGroup?.label
+        || (id === DEFAULT_GROUP_ID ? "Map" : "")
+      ).trim(),
+      visible: typeof sourceGroup?.visible === "boolean"
+        ? sourceGroup.visible
+        : true,
+      active: typeof sourceGroup?.active === "boolean"
+        ? sourceGroup.active
+        : true,
+      createdAt,
+      updatedAt: Number(sourceGroup?.updatedAt) || createdAt
+    };
+    guide.groups.push(group);
+    usedIds.add(id);
+    validGroupIds.add(id);
+    return group;
+  };
+
+  const sourceGroups = Array.isArray(source.groups) ? source.groups : [];
+  recoverGroup(
+    sourceGroups.find(group => group?.id === DEFAULT_GROUP_ID),
+    DEFAULT_GROUP_ID
+  );
+  for (const sourceGroup of sourceGroups) {
+    if (!sourceGroup?.id || sourceGroup.id === DEFAULT_GROUP_ID) continue;
+    recoverGroup(sourceGroup);
+  }
 
   for (const sourcePin of sortPins(source.pins || [])) {
     const address = Number(sourcePin?.t);
@@ -961,6 +1045,7 @@ export function sanitizeGuide(input, videoId, duration) {
       continue;
     }
 
+    const createdAt = Number(sourcePin.createdAt) || now();
     const pin = {
       id: sourcePin.id,
       videoId,
@@ -968,8 +1053,8 @@ export function sanitizeGuide(input, videoId, duration) {
       label: String(sourcePin.label || "").trim(),
       kind: sourcePin.kind,
       provenance: sourcePin.provenance || null,
-      createdAt: Number(sourcePin.createdAt) || now(),
-      updatedAt: Number(sourcePin.updatedAt) || Number(sourcePin.createdAt) || now()
+      createdAt,
+      updatedAt: Number(sourcePin.updatedAt) || createdAt
     };
     guide.pins.push(pin);
     idMap.set(sourcePin.id, pin.id);
@@ -994,6 +1079,7 @@ export function sanitizeGuide(input, videoId, duration) {
     const duplicateKey = sectionIdentityKey(startPinId, endPinId, label);
     if (sectionKeys.has(duplicateKey)) continue;
 
+    const createdAt = Number(sourceSection.createdAt) || now();
     const section = {
       id: sourceSection.id,
       videoId,
@@ -1004,9 +1090,12 @@ export function sanitizeGuide(input, videoId, duration) {
         sourceSection.weight,
         sourceSection.collapsed === true ? 0.25 : DEFAULT_SECTION_WEIGHT
       ),
+      groupId: validGroupIds.has(sourceSection.groupId)
+        ? sourceSection.groupId
+        : DEFAULT_GROUP_ID,
       provenance: sourceSection.provenance || null,
-      createdAt: Number(sourceSection.createdAt) || now(),
-      updatedAt: Number(sourceSection.updatedAt) || Number(sourceSection.createdAt) || now()
+      createdAt,
+      updatedAt: Number(sourceSection.updatedAt) || createdAt
     };
     const resolved = resolveSection({ ...guide, sections: [section] }, section);
     if (!resolved) continue;

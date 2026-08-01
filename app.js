@@ -18,6 +18,7 @@ import {
   sectionsForPin,
   canLinkPins,
   resolveSection,
+  orderedPins,
   previousPin,
   nextPin,
   normalizeGuide,
@@ -112,6 +113,7 @@ import { parseCueList, cueName } from "./cues.js";
 import { sectionDisplayName } from "./format.js";
 import { createView } from "./view.js";
 
+const STORAGE_V8_PREFIX = "binary-youtube-reader:v8:";
 const STORAGE_V7_PREFIX = "binary-youtube-reader:v7:";
 const STORAGE_V6_PREFIX = "binary-youtube-reader:v6:";
 const STORAGE_V5_PREFIX = "binary-youtube-reader:v5:";
@@ -548,7 +550,7 @@ const { elements, formatTime, formatRange, setStatus } = view;
 // Undo names is the object the status named when it happened.
 const sectionName = sectionDisplayName;
 
-function storageKey(prefix = STORAGE_V7_PREFIX) {
+function storageKey(prefix = STORAGE_V8_PREFIX) {
   return `${prefix}${state.videoId}`;
 }
 
@@ -594,6 +596,7 @@ function persistPreferences() {
 function readStoredGuide(duration) {
   if (!state.videoId) return createGuide();
   const candidates = [
+    [STORAGE_V8_PREFIX, raw => normalizeGuide(raw, state.videoId)],
     [STORAGE_V7_PREFIX, raw => normalizeGuide(raw, state.videoId)],
     [STORAGE_V6_PREFIX, raw => normalizeGuide(raw, state.videoId)],
     [STORAGE_V5_PREFIX, raw => normalizeGuide(raw, state.videoId)],
@@ -2399,6 +2402,30 @@ function clearMetadataRetry() {
   metadataTimer = null;
 }
 
+// Cues, selections, previews, and gesture accumulators have meaning only inside
+// the source that produced them. Reset them as one boundary operation before a
+// different video is cued so no route can carry an Address or retained identity
+// across source identity.
+function resetSourceScopedState() {
+  state.cues = [];
+  state.cuesOnTimeline = false;
+  if (elements["cue-source"]) elements["cue-source"].value = "";
+  state.selectedRetained = null;
+  state.selectedPinIds = [];
+  state.deformWeightMemory.clear();
+  state.shiftLayer = false;
+  state.shiftKeyHeld = false;
+  state.guideDrag = null;
+  state.guideClickSuppressed = false;
+  state.currentDrag = null;
+  state.directFrame = null;
+  if (state.nudgeGesture?.timer) window.clearTimeout(state.nudgeGesture.timer);
+  state.nudgeGesture = null;
+  state.field = null;
+  view.setPreviewAction(null);
+  view.setPreviewSection(null);
+}
+
 function initializeVideo() {
   if (!pendingLoad) return;
   const snapshot = playerSnapshot();
@@ -2471,6 +2498,7 @@ function cuePendingVideo() {
   state.transport = idleTransport();
   state.videoLoaded = false;
   state.videoId = null;
+  resetSourceScopedState();
   state.dragHandle = null;
   state.rangeDragOrigin = null;
   state.rangeDragProjection = null;
@@ -2744,7 +2772,7 @@ function pinSnapCandidate(drag, address) {
   const maximumDistance = drag.projection.fractionToDistance(
     PIN_SNAP_DISTANCE_PX / width
   );
-  return sourceGuide.pins
+  return orderedPins(sourceGuide)
     .filter(pin =>
       pin.id !== drag.id
       && Math.abs(
@@ -3449,8 +3477,8 @@ function commitStepReach(nextReach, label, options = {}) {
   const effective = currentStepReach();
   setStatus(
     result.stepReach.mode === STEP_REACH_MODE.ADAPTIVE
-      ? `${label}: 1/${Math.round(1 / result.stepReach.fraction)} of active Range (${effective.forward.toFixed(2)}s lateral).`
-      : `${label}: ${result.stepReach.forward}s.`
+      ? `${label}: 1/${Math.round(1 / result.stepReach.fraction)} of active Range (${effective.forward.toFixed(2)} map units).`
+      : `${label}: ${result.stepReach.forward} map units.`
   );
   view.render();
   return true;
@@ -4539,12 +4567,22 @@ const directionalStep = direction => event => {
 };
 const sideStep = role => event => {
   const selection = stepField?.getStepSelection?.(role) || null;
-  return selection
-    ? {
-        ...selection,
-        carryRetained: event?.altKey === true || state.carryModifier
-      }
-    : null;
+  if (!selection || !Number.isFinite(selection.address) || !currentResolution()) {
+    return null;
+  }
+  // The Field presents an exact source Address; Step consumes Timeline Space.
+  // Convert at the application boundary so activating a visible phase lands on
+  // that phase under neutral, compressed, expanded, and overlapping terrain.
+  const distance = timelineProjection().timelineDistance(
+    currentResolution().C,
+    selection.address
+  );
+  if (!(distance > EPSILON)) return null;
+  return {
+    ...selection,
+    distance,
+    carryRetained: event?.altKey === true || state.carryModifier
+  };
 };
 
 for (const binding of [
@@ -4657,10 +4695,11 @@ elements["sections-list"].addEventListener("change", event => {
       move.value
     );
     if (!moved.changed) return view.renderGuide();
-    state.session = moved.session;
-    view.renderGuide();
-    view.render();
-    return setStatus(`${moved.session.history.at(-1)?.label || "Section moved"}.`);
+    return accept(moved, {
+      effect: false,
+      renderGuide: true,
+      status: `${moved.session.history.at(-1)?.label || "Section moved"}.`
+    });
   }
   const toggle = event.target.closest?.("[data-group-toggle]");
   if (!toggle) return;
@@ -4671,10 +4710,11 @@ elements["sections-list"].addEventListener("change", event => {
     [key]: toggle.checked === true
   });
   if (!result.changed) return view.renderGuide();
-  state.session = result.session;
-  view.renderGuide();
-  view.render();
-  setStatus(`${result.session.history.at(-1)?.label || "Group updated"}.`);
+  accept(result, {
+    effect: false,
+    renderGuide: true,
+    status: `${result.session.history.at(-1)?.label || "Group updated"}.`
+  });
 });
 
 // The Shift layer lives in the operator matrix, which the compact layout makes
@@ -4697,10 +4737,11 @@ elements["sections-list"].addEventListener("click", event => {
   settleBeforeAction();
   const created = createGuideGroup(state.session, `Group ${(guide().groups?.length || 1)}`);
   if (!created.changed) return;
-  state.session = created.session;
-  view.renderGuide();
-  view.render();
-  setStatus("Added a Group. Move Sections into it from their Group control.");
+  accept(created, {
+    effect: false,
+    renderGuide: true,
+    status: "Added a Group. Move Sections into it from their Group control."
+  });
 });
 
 elements["guide-compose-toggle"].addEventListener("click", () => {
