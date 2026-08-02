@@ -1,0 +1,32 @@
+name: Verify
+
+# The project's own proof, run where it cannot be skipped. `check` is the fast
+# DOM-free gate; `test:browser` runs the page in Chromium because a stylesheet
+# decides things no DOM-free harness can represent.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --no-audit --no-fund
+      - run: npm run check
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --no-audit --no-fund
+      - run: npx --yes playwright@1.49.0 install --with-deps chromium
+      - run: npm run test:browser

@@ -929,7 +929,66 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     }
   }
 
+  // Guide rendering replaces whole lists, which detaches whatever the reader is
+  // holding. An increment control that repeats while held is gone after the
+  // first rebuild its own edit causes: the hold ends, the keyboard loses its
+  // place, and a screen reader loses the row it was on. Identity survives the
+  // rebuild even though the node does not, so focus is restored by naming the
+  // control rather than by keeping the element.
+  function focusSignature(element) {
+    if (!element || element === document.body) return null;
+    const data = element.dataset || {};
+    for (const key of [
+      "nudgeTarget",
+      "addressInput",
+      "sectionWeight",
+      "sectionGroup",
+      "sectionGo",
+      "pinGo",
+      "cueGo",
+      "groupToggle",
+      "renameGroup",
+      "deleteGroup"
+    ]) {
+      if (data[key] === undefined) continue;
+      return [
+        key,
+        data[key],
+        data.addressId || "",
+        data.nudgeDirection || "",
+        data.groupState || ""
+      ].join("|");
+    }
+    return element.id ? `id|${element.id}` : null;
+  }
+
+  function findBySignature(signature) {
+    if (!signature) return null;
+    const [key, value, addressId, direction, groupState] = signature.split("|");
+    if (key === "id") return document.getElementById(value) || null;
+    const attribute = key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
+    const candidates = document.querySelectorAll?.(`[data-${attribute}]`) || [];
+    for (const candidate of candidates) {
+      const data = candidate.dataset || {};
+      if (data[key] !== value) continue;
+      if (addressId && (data.addressId || "") !== addressId) continue;
+      if (direction && (data.nudgeDirection || "") !== direction) continue;
+      if (groupState && (data.groupState || "") !== groupState) continue;
+      return candidate;
+    }
+    return null;
+  }
+
   function renderGuide() {
+    const held = focusSignature(document.activeElement);
+    renderGuideLists();
+    if (!held) return;
+    if (focusSignature(document.activeElement) === held) return;
+    const restored = findBySignature(held);
+    restored?.focus?.({ preventScroll: true });
+  }
+
+  function renderGuideLists() {
     const pinPartition = partitionGuidePins(guide());
     const pins = [...pinPartition.visible, ...pinPartition.hidden];
     const sections = sortedSections(guide());
