@@ -856,6 +856,8 @@ a Cue is never persisted, projected, or traversable until it is retained
 a drawn Cue carries no attribute a pointer handler dispatches on
 Groups partition the Sections; a Section is never half-hidden
 exactly one Group supplies Timeline Sections and section-bound Pins
+the Guide names that Group once, so two visible or none cannot be written down
+removing the named Group resolves to the next Group rather than to none
 any number of Groups may be active and their Weights multiply
 new Sections belong to the visible Group unless another Group is explicit
 identical Sections may coexist across Groups but not within one Group

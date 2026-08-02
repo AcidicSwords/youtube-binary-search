@@ -19,6 +19,7 @@ import {
   resolveSection,
   sectionIsActive,
   sectionIsVisible,
+  groupIsVisible,
   orderedPins,
   allPins,
   partitionGuidePins,
@@ -62,10 +63,14 @@ function build() {
 {
   const guide = createGuide("fresh");
   assert.deepEqual(guide.groups.map(group => group.id), [DEFAULT_GROUP_ID]);
-  assert.equal(guide.version, 8);
+  assert.equal(guide.version, 9);
   const group = createGroup(guide, "Terrain");
   assert.deepEqual(
-    guide.groups.map(entry => ({ id: entry.id, visible: entry.visible, active: entry.active })),
+    guide.groups.map(entry => ({
+      id: entry.id,
+      visible: groupIsVisible(guide, entry),
+      active: entry.active
+    })),
     [
       { id: group.id, visible: true, active: true },
       { id: DEFAULT_GROUP_ID, visible: false, active: true }
@@ -206,7 +211,10 @@ function build() {
   session = added.session;
   const detail = session.model.guide.groups[0];
   assert.equal(detail.label, "Detail");
-  assert.equal(session.model.guide.groups.filter(group => group.visible).length, 1);
+  assert.equal(
+    session.model.guide.groups.filter(group => groupIsVisible(session.model.guide, group)).length,
+    1
+  );
 
   const shown = setGuideGroupState(session, DEFAULT_GROUP_ID, { visible: true });
   assert.equal(shown.changed, true);
@@ -396,7 +404,7 @@ function build() {
     ],
     sections: [{ id: "sec-1", startPinId: "pin-a", endPinId: "pin-b", weight: 2, createdAt: 1 }]
   }, "legacy");
-  assert.equal(migrated.version, 8);
+  assert.equal(migrated.version, 9);
   assert.deepEqual(migrated.groups.map(group => group.id), [DEFAULT_GROUP_ID]);
   assert.ok(migrated.sections.every(section => section.groupId === DEFAULT_GROUP_ID));
   assert.equal(extentOf(migrated), DURATION + 30,
@@ -412,30 +420,79 @@ function build() {
   const restoredExtra = restored.groups.find(group => group.label === "Terrain");
   assert.ok(restoredExtra, "A named Group survives persistence.");
   assert.deepEqual(
-    { visible: restoredExtra.visible, active: restoredExtra.active },
+    { visible: groupIsVisible(restored, restoredExtra), active: restoredExtra.active },
     { visible: false, active: false },
     "and so do both of its states."
   );
 }
 
 
-// --- Older multi-visible saves are repaired deterministically --------------------
+// --- v8 saves migrate deterministically to one named visible Group ------------
+// v8 wrote a visible flag on every Group, so a save could record several
+// visible Groups or none. v9 names one on the Guide, which cannot express
+// either fault -- so migration is where the ambiguity is resolved, once, in
+// favour of the first Group the older save marked visible.
 {
-  const source = createGuide("repair");
-  const second = createGroup(source, "Second");
-  source.groups.find(group => group.id === DEFAULT_GROUP_ID).visible = true;
-  second.visible = true;
-  const normalized = normalizeGuide(JSON.parse(JSON.stringify(source)), "repair");
-  assert.equal(normalized.groups.filter(group => group.visible).length, 1);
-  assert.equal(normalized.groups[0].id, second.id,
-    "The first persisted visible Group wins and is rendered first.");
-  const sanitized = sanitizeGuide(source, "repair", DURATION);
-  assert.equal(sanitized.groups.filter(group => group.visible).length, 1);
-  assert.equal(validateGuide(sanitized, DURATION), true);
+  const legacyTwoVisible = {
+    version: 8,
+    videoId: "repair",
+    pins: [],
+    sections: [],
+    groups: [
+      { id: DEFAULT_GROUP_ID, label: "Map", visible: true, active: true, createdAt: 1, updatedAt: 1 },
+      { id: "group-second", label: "Second", visible: true, active: false, createdAt: 2, updatedAt: 2 }
+    ]
+  };
+  const migrated = normalizeGuide(JSON.parse(JSON.stringify(legacyTwoVisible)), "repair");
+  assert.equal(migrated.version, 9);
+  assert.equal(
+    migrated.groups.filter(group => groupIsVisible(migrated, group)).length,
+    1,
+    "Two visible Groups in a v8 save resolve to exactly one."
+  );
+  assert.equal(migrated.visibleGroupId, DEFAULT_GROUP_ID,
+    "and it is the first one the save marked visible.");
+  assert.equal(migrated.groups[0].id, migrated.visibleGroupId,
+    "which is rendered first.");
+  assert.equal(
+    migrated.groups.find(group => group.id === "group-second").active,
+    false,
+    "Activity crosses the migration untouched."
+  );
+  assert.equal(
+    migrated.groups.find(group => group.id === "group-second").label,
+    "Second",
+    "and so do labels and identities."
+  );
+  assert.equal(validateGuide(migrated, DURATION), true);
 
-  source.groups.forEach(group => { group.visible = true; });
-  assert.equal(validateGuide(source, DURATION), false,
-    "Invalid simultaneous Timeline owners cannot pass the Guide invariant.");
+  // None visible is the other v8 fault, and resolves to Map.
+  const legacyNoneVisible = JSON.parse(JSON.stringify(legacyTwoVisible));
+  legacyNoneVisible.groups.forEach(group => { group.visible = false; });
+  const repaired = normalizeGuide(legacyNoneVisible, "repair");
+  assert.equal(repaired.visibleGroupId, DEFAULT_GROUP_ID,
+    "A v8 save with no visible Group resolves to Map rather than to nothing.");
+  assert.equal(validateGuide(repaired, DURATION), true);
+
+  // A v9 Guide naming a Group that does not exist is repaired the same way.
+  const danglingSource = createGuide("dangling");
+  createGroup(danglingSource, "Ghost");
+  const dangling = JSON.parse(JSON.stringify(danglingSource));
+  dangling.visibleGroupId = "group-missing";
+  const resolved = normalizeGuide(dangling, "dangling");
+  assert.ok(
+    resolved.groups.some(group => group.id === resolved.visibleGroupId),
+    "A named visible Group always exists."
+  );
+  assert.equal(validateGuide(resolved, DURATION), true);
+
+  // And the invariant is checkable: a Guide whose named layer is not drawn
+  // first states one relation and renders another.
+  const disordered = createGuide("disordered");
+  createGroup(disordered, "Later");
+  disordered.visibleGroupId = DEFAULT_GROUP_ID;
+  assert.equal(validateGuide(disordered, DURATION), false,
+    "A Guide that names one visible Group and renders another cannot pass.");
 }
 
 // --- The two states drive two different renderings ------------------------------
