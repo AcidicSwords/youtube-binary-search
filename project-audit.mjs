@@ -21,6 +21,10 @@ const rangeGeometry = read("range-geometry.js");
 const stepGesture = read("step-gesture.js");
 const youtube = read("youtube.js");
 
+// Artifacts of a finished patch or migration. Each one described a state the
+// project has since left, so keeping it means shipping a document that
+// contradicts the code -- STABILIZATION_NOTES.md still said Guides persist
+// under a v8 key after v9 replaced it.
 for (const retiredArtifact of [
   ".v5.2-patch-backup",
   "BRANCH_INSTALL.md",
@@ -28,7 +32,11 @@ for (const retiredArtifact of [
   "MANUAL_SMOKE.md",
   "PATCHSET.md",
   "SHA256SUMS",
+  "STABILIZATION_NOTES.md",
   "TEST_REPORT.md",
+  "coherence.patch.gz.b64.00",
+  "coherence.patch.gz.b64.01",
+  "coherence.patch.gz.b64.02",
   "source-field.js",
   "source-field-tests.mjs",
   "structure.js",
