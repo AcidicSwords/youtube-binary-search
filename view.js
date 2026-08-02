@@ -1039,7 +1039,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         for (const group of guide().groups || []) {
           const option = document.createElement("option");
           option.value = group.id;
-          option.textContent = group.label?.trim() || "Map";
+          option.textContent = groupDisplayName(group);
           groupSelect.appendChild(option);
         }
         groupSelect.value = section.groupId || "group-default";
@@ -1223,6 +1223,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     return row;
   }
 
+  // "Map" is the default Group's own name, never a fallback for the rest: two
+  // rows reading "Map" would name the same thing twice and make the Section's
+  // Group control unusable. A Group is created with a name and cannot be left
+  // without one, so this only guards a Guide written before that was true.
+  function groupDisplayName(group) {
+    if (group.id === DEFAULT_GROUP_ID) return group.label?.trim() || "Map";
+    return group.label?.trim() || "Group";
+  }
+
   // Groups are a flat partition, so the Guide draws flat blocks rather than a
   // detached legend. Membership is visible because each Section row is inside
   // exactly one block; empty Groups remain reachable because the block exists
@@ -1242,7 +1251,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       row.className = "guide-group-row";
       const name = document.createElement("span");
       name.className = "guide-group-name";
-      name.textContent = group.label?.trim() || "Map";
+      name.textContent = groupDisplayName(group);
       const meta = document.createElement("span");
       meta.className = "guide-group-meta";
       meta.textContent = `${members.length} Section${members.length === 1 ? "" : "s"}`;

@@ -427,7 +427,7 @@ assert.ok(
 
 await clickIn("sections-list", inSections("deleteGroup")
   .find(node => node.dataset.deleteGroup === added));
-assert.match(byId.get("guide-dialog-message").textContent, /returns to the map; nothing is deleted/);
+assert.match(byId.get("guide-dialog-message").textContent, /returns to Map; nothing is deleted/);
 byId.get("guide-dialog-form").dispatch("submit");
 await flush();
 assert.equal(sectionRows().length, sectionCountBefore,

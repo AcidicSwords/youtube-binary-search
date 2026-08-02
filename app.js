@@ -2070,9 +2070,12 @@ function deletePinById(pinId) {
     id: pinId,
     cascade: references > 0,
     title: "Delete Pin",
+    // Named the way every other sentence names a Pin: a title in quotes, or
+    // "the Pin at 0:10". Quoting a bare Address reads as a title the Pin does
+    // not have.
     message: references
-      ? `Delete “${pin.label || formatTime(pin.t)}” and dissolve the ${references} Section${references === 1 ? "" : "s"} that reference it? This is one Undoable action.`
-      : `Delete “${pin.label || formatTime(pin.t)}”? This can be restored with Undo.`,
+      ? `Delete ${pinNameFor(pinId)} and dissolve the ${references} Section${references === 1 ? " that references" : "s that reference"} it? This is one Undoable action.`
+      : `Delete ${pinNameFor(pinId)}? This can be restored with Undo.`,
     showInput: false,
     confirmLabel: "Delete",
     danger: true
@@ -2137,7 +2140,9 @@ function deleteGroupById(groupId) {
     id: groupId,
     title: "Remove Group",
     message: counted
-      ? `Remove “${group.label?.trim() || "Group"}”? Its ${counted} Section${counted === 1 ? " returns" : "s return"} to the map; nothing is deleted.`
+      // "Map" is the default Group's own name, so the sentence names the place
+      // the Sections land rather than describing it.
+      ? `Remove “${group.label?.trim() || "Group"}”? Its ${counted} Section${counted === 1 ? " returns" : "s return"} to Map; nothing is deleted.`
       : `Remove “${group.label?.trim() || "Group"}”?`,
     showInput: false,
     confirmLabel: "Remove",
@@ -2233,13 +2238,24 @@ function submitGuideDialog(event) {
         ? "A Section with this title and Extent already exists."
         : "Section title is unchanged.";
   } else if (action.action === "delete-section") {
+    // Deleting the Section the map is focused on restores the containing Range,
+    // which changes the scope of everything drawn. Every other exit from a Focus
+    // says so; this one has to as well, or the map silently zooms out.
+    const wasFocused = model().focus?.sectionId === action.id
+      && model().focus?.kind !== "working-section";
     result = deleteGuideSection(state.session, action.id);
-    status = result.changed ? "Deleted Section." : "Section could not be deleted.";
+    status = result.changed
+      ? wasFocused
+        ? "Deleted the focused Section and restored its containing Range."
+        : "Deleted Section."
+      : "Section could not be deleted.";
   } else if (action.action === "rename-group") {
     result = renameGuideGroup(state.session, action.id, value);
     status = result.changed
-      ? value ? "Renamed Group." : "Removed the Group title."
-      : "Group title is unchanged.";
+      ? "Renamed Group."
+      : result.reason === "empty-group-label"
+        ? "A Group needs a name: unlike a Section, it has no Address to be known by."
+        : "Group title is unchanged.";
   } else if (action.action === "delete-group") {
     result = deleteGuideGroup(state.session, action.id);
     status = result.changed
@@ -4822,7 +4838,11 @@ elements["sections-list"].addEventListener("click", event => {
   accept(created, {
     effect: false,
     renderGuide: true,
-    status: "Added a Group. Move Sections into it from their Group control."
+    // A new Group is the layer being worked on, so it takes the Timeline the
+    // moment it exists -- and it is empty, so the map goes blank. That reads as
+    // a fault unless it is said, because the Sections it replaced are still
+    // there and one radio brings them back.
+    status: "Added a Group and put it on the Timeline. It is empty, so the map is blank until you move Sections into it."
   });
 });
 
