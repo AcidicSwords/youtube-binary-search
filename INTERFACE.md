@@ -238,7 +238,7 @@ Guide is the exact editor. A Pin row exposes its Title, Address input, `−`/`+`
 Nudge controls, Go, reference count, Rename, and Delete. A Section row exposes
 its Title, Start and End Address inputs, a Duration readout, `−`/`+` controls for
 each endpoint and for the whole Section, Weight, Focus, Unlink, Rename, and
-Delete. Address inputs accept canonical timecode or seconds, clamp against Range
+Delete. Address inputs accept canonical timecode or seconds, reject anything outside Range
 and structural partners, reject Section collapse or reversal, commit on Enter,
 cancel on Escape, and create one Undo transaction. The increment controls invoke
 the same Nudge operation as Timeline Shift-wheel and keyboard nudging.

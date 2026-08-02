@@ -141,14 +141,33 @@ try {
   // ============================================================================
   // Presentation follows width. Intent does not: rotating a device or resizing
   // a window must not open or close the Guide on the reader's behalf.
+  // The state that matters is the deliberate one. A Guide left open returns
+  // open because wide happens to default open, which proves nothing; a Guide
+  // deliberately closed must still be closed after a round trip.
   const guideOpen = () => page.getAttribute("#guide-toggle", "aria-expanded");
-  const wideState = await guideOpen();
-  await page.setViewportSize({ width: 600, height: 900 });
-  await settle(200);
-  await page.setViewportSize({ width: 1440, height: 1000 });
-  await settle(200);
-  assert.equal(await guideOpen(), wideState,
-    "Crossing the compact breakpoint and returning leaves the Guide as the reader left it.");
+  const setGuide = async open => {
+    if ((await guideOpen()) !== String(open)) {
+      await page.click("#guide-toggle");
+      await settle(150);
+    }
+  };
+  const roundTrip = async () => {
+    await page.setViewportSize({ width: 600, height: 900 });
+    await settle(200);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await settle(200);
+  };
+
+  await setGuide(false);
+  assert.equal(await guideOpen(), "false");
+  await roundTrip();
+  assert.equal(await guideOpen(), "false",
+    "A Guide deliberately closed stays closed across a breakpoint round trip.");
+
+  await setGuide(true);
+  await roundTrip();
+  assert.equal(await guideOpen(), "true",
+    "and one deliberately open stays open.");
 
   // ============================================================================
   // 7. Dense structure does not move the rest of the page
@@ -181,6 +200,7 @@ try {
   // Guide rendering replaces whole lists. An increment control that repeats
   // while held is detached by the first rebuild, which ends the hold and drops
   // keyboard position -- a defect that requires a real focus model to observe.
+  await setGuide(true);
   await page.click("#guide-tab-sections");
   await settle(120);
   const firstRow = await page.$("#sections-list [data-section-go]");

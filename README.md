@@ -17,7 +17,7 @@ The correspondence is perceptual:
 - Section weight scales the same fixed source material across the timeline.
 - Every video player still follows its own existing runtime rules; Section weight never changes playback.
 
-Because every allowed weight is positive, every source Address remains ordered, visible, and directly reachable. There are no collapsed spans, stacked endpoints, hidden Pins, directional faces, or vertical navigation rules.
+Because every allowed weight is positive, every source Address remains ordered, visible, and directly reachable. There are no collapsed spans, stacked endpoints, directional faces, or vertical navigation rules. A Pin can be hidden from the Timeline — that is what Group visibility does — but it stays in the Guide, exactly reachable, and returns the moment its layer is drawn again.
 
 ## The operator matrix
 

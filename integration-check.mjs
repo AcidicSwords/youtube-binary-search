@@ -211,7 +211,9 @@ assert.match(
 );
 assert.match(
   app,
-  /key === "t"[\s\S]*?event\.altKey !== event\.ctrlKey[\s\S]*?stepDeformWeight\(-1\)/
+  // Alt+T lowers Weight; Ctrl+T stays the browser's. A control path the
+  // declared grammar does not contain is one nobody can reason about.
+  /key === "t"[\s\S]*?!event\.ctrlKey && event\.altKey[\s\S]*?event\.altKey\) stepDeformWeight\(-1\)/
 );
 
 assert.match(youtube, /place\(address, allowSeekAhead = true\)/);
