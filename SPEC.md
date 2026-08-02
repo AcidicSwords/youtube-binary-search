@@ -878,6 +878,8 @@ no two Groups read alike, in any letter case
 the relationship band is bounded; deeper structure scrolls rather than growing it
 an edit that moves nothing settles no observation
 any operator that changes the drawn scope says so
+a focused interactive element owns Space; the reader background observes
+Guide editing restores focus by identity, because the node it rebuilds is gone
 a Group is renamed and removed like any other retained object, destroying nothing; removal is refused when returning its Sections to Map would collapse layered identities
 composition yields an extent, never a set, so every operator consumes it unchanged
 a Guide row is expanded exactly when it has Guide focus; Timeline selection is reserved for drawn spatial operands

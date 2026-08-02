@@ -1,5 +1,22 @@
 # Development
 
+## Gates
+
+`npm run check` is the fast gate: it runs every semantic, randomized, smoke and
+audit suite against a DOM-free harness, and it is the one that must pass for any
+change.
+
+`npm run test:browser` runs the page in Chromium with a deterministic media
+adapter substituted for YouTube. It exists because the DOM-free harness returns
+fixed geometry and has no stylesheet: it cannot see whether a control is where
+it is drawn, whether one element covers another, whether focus survives a
+rebuild, or which handler a key reaches. Those are not gaps in its coverage —
+they are outside what it can represent. Keep this suite small; anything provable
+without a browser belongs in `check`.
+
+`npm run verify` is both, and is what a release should pass.
+
+
 ## Principles
 
 1. Source time is canonical.

@@ -78,6 +78,12 @@ function contrastRatio(first, second) {
 }
 
 assert.equal(pkg.name, "video-cartography");
+// The DOM-free gate stays the fast one; the browser gate is separate because it
+// needs Chromium and answers different questions. `verify` is both.
+assert.equal(pkg.scripts["test:browser"], "node browser-smoke.mjs");
+assert.equal(pkg.scripts.verify, "npm run check && npm run test:browser");
+assert.ok(pkg.devDependencies?.["playwright-core"],
+  "The browser gate declares its dependency.");
 assert.equal(pkg.version, "8.0.0");
 assert.ok(pkg.description, "The package must carry the project description.");
 assert.match(docs["SPEC.md"], /^# Video Cartography — Canonical Specification\r?\n/);

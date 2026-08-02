@@ -5311,10 +5311,13 @@ elements["sections-list"].addEventListener("focusout", event => {
   view.render();
 });
 
-// Space is the reader's universal observation command. Capture it before a
-// previously focused control can consume it as native activation. Text editing
-// and modal Guide work retain ordinary keyboard rules; Enter activates a
-// focused control.
+// Space is the reader's universal observation command, and it belongs to the
+// reader only while nothing else owns it. A focused interactive element owns
+// its own Space: pressing it on Release must Release, not start playback, or
+// the keyboard says one thing and does another. Capturing Space unconditionally
+// was aimed at a stale focus stealing it, but it took the key from the control
+// the user had deliberately focused as well. Focus on the reader background --
+// which is where it sits after any traversal -- still observes.
 document.addEventListener("keydown", event => {
   if (event.key === "Alt") {
     state.carryModifier = true;
@@ -5326,6 +5329,16 @@ document.addEventListener("keydown", event => {
   const activeElement = document.activeElement;
   const editing = ["INPUT", "SELECT", "TEXTAREA"].includes(activeElement?.tagName)
     || activeElement?.isContentEditable === true;
+  // Anything that natively activates on Space, or that has been given keyboard
+  // activation of its own, keeps it.
+  const focusedControl = Boolean(activeElement)
+    && activeElement !== document.body
+    && (
+      ["BUTTON", "SUMMARY", "A", "OPTION"].includes(activeElement.tagName)
+      || activeElement.getAttribute?.("role") === "button"
+      || activeElement.getAttribute?.("role") === "slider"
+      || activeElement.getAttribute?.("role") === "menuitem"
+    );
   const plainSpace = (event.key === " " || event.code === "Space")
     && !event.ctrlKey
     && !event.metaKey
@@ -5335,6 +5348,7 @@ document.addEventListener("keydown", event => {
     !plainSpace
     || event.repeat
     || editing
+    || focusedControl
     || guideDialogOpen()
     || (compactGuideLayout() && state.guideOpen)
     || !state.videoLoaded
