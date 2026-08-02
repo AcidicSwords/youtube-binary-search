@@ -849,6 +849,9 @@ an operator that touches the Guide renders it even when the movement is unchange
 a focused extent's own boundary cannot be dragged from inside it
 Timeline direct manipulation and Guide exact editing call the same operation
 one drag, wheel series, or held-key nudge creates at most one Undo checkpoint
+one held ladder control creates at most one Undo checkpoint
+every pending gesture settles before the next transaction commits
+a reported retention is written to storage by the transaction that reported it
 fine Nudge acts in source time, not Timeline Space
 Guide owns no independent drag geometry
 a plain Guide click replaces the Working Interval; Shift extends it
@@ -868,8 +871,12 @@ Guide focus and Timeline operand selection are independent
 Guide navigation reaches hidden objects without making them Timeline operands
 retaining a Cue is the ordinary save and carries the offered title
 an operation acting on a Pin is reached from that Pin
+Address equality is not identity equality; coincident Pins are never chosen by order
 one name identifies an unnamed Section everywhere it is named
 a Group always has a name, because it has no Address to be known by
+no two Groups read alike, in any letter case
+the relationship band is bounded; deeper structure scrolls rather than growing it
+an edit that moves nothing settles no observation
 any operator that changes the drawn scope says so
 a Group is renamed and removed like any other retained object, destroying nothing; removal is refused when returning its Sections to Map would collapse layered identities
 composition yields an extent, never a set, so every operator consumes it unchanged

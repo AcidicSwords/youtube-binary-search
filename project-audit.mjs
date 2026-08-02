@@ -183,6 +183,11 @@ assert.doesNotMatch(view, /Unlink \$\{role === "start" \? "Start" : "End"\}/);
 // And the Section states which Pin each endpoint is, rather than leaving it to
 // be found by Address in a list ordered by Address.
 assert.match(view, /dataset\.revealPin = revealPinId/);
+// Address equality is not identity equality: Unlink deliberately makes
+// coincident Pins, so a creation path may reuse exactly one match and must
+// never pick among several.
+assert.match(guide, /export function pinsAt/);
+assert.match(guide, /matches\.length === 1 \? matches\[0\] : null/);
 assert.match(app, /function revealPin[\s\S]*selectGuideTab\("pins"\)[\s\S]*kind: "pin"/);
 assert.doesNotMatch(view, /Relink|data\.linkSectionEndpoint/);
 assert.doesNotMatch(view, /guide-item-more|guide-secondary-actions|More actions for/);
@@ -247,10 +252,20 @@ assert.match(styles, /\.timeline-section-relation\s*\{[^}]*repeating-linear-grad
 assert.match(view, /const pinTop\s*=\s*17[\s\S]*const trackTop\s*=\s*44[\s\S]*const sectionTop\s*=\s*rulerTop\s*\+\s*38/);
 assert.match(view, /\["start",\s*projected\.start[\s\S]*\["midpoint",\s*midpointCoordinate[\s\S]*\["end",\s*projected\.end/);
 // Increment controls repeat while held; a click-only binding cannot.
-assert.match(app, /function bindHoldRepeat\(container, selector, act\)[\s\S]*HOLD_REPEAT_INTERVAL_MS/);
+assert.match(app, /function bindHoldRepeat\(container, selector, act, \{ onSettle[\s\S]*HOLD_REPEAT_INTERVAL_MS/);
+// One hold is one decision, so a held ladder control settles as one checkpoint
+// rather than one per repeat. Weight uses the same origin-and-settle shape as
+// Nudge instead of a second history mechanism of its own.
+assert.match(app, /function beginWeightGesture[\s\S]*function settleWeightGesture[\s\S]*checkpoint\(state\.session/);
+assert.match(app, /bindHoldRepeat\(\s*elements\["deform-up"\][\s\S]*onSettle: settleWeightGesture/);
+// Every deferred gesture settles before the next transaction begins.
+assert.match(app, /function settleBeforeAction[\s\S]*settleNudgeGesture\(\);\s*settleWeightGesture\(\);/);
+// Cue retention is an ordinary accepted Guide transaction, so it persists.
+assert.match(app, /function retainCue[\s\S]*accept\(pinned,[\s\S]*accept\(saved,/);
+assert.doesNotMatch(app, /function retainCue[\s\S]*state\.session = (pinned|saved)\.session/);
 assert.match(app, /bindGuideNudgeControls\(elements\["sections-list"\]\)/);
 assert.match(app, /bindGuideNudgeControls\(elements\["pins-list"\]\)/);
-assert.match(app, /bindHoldRepeat\(elements\["deform-up"\], null/);
+assert.match(app, /bindHoldRepeat\(\s*elements\["deform-up"\],\s*null/);
 // Nudge is a movement magnitude and sits with Step Reach, not with the Field's
 // physical observation settings.
 assert.match(html, /id="step-size-settings"[\s\S]*id="step-size-seconds"[\s\S]*id="nudge-seconds"[\s\S]*<\/details>/);
@@ -398,8 +413,19 @@ assert.match(view, /timelinePinClusterGap/);
 assert.match(view, /COARSE_TIMELINE_PIN_HIT_SIZE\s*=\s*56/);
 assert.match(view, /TIMELINE_PIN_HIT_SIZE\s*=\s*52/);
 assert.match(view, /TIMELINE_SECTION_HIT_WIDTH\s*=\s*28/);
-assert.doesNotMatch(view, /TIMELINE_SECTION_MAX_LANES|lane %/);
-assert.match(view, /packedSections\.laneCount \* sectionLaneHeight/);
+// The relationship band is bounded, as the canonical documents say. Overlap
+// creates lanes without limit, so an unbounded band moved the whole workspace
+// down by a lane per overlap. The band stops at MAX_LANES and deeper structure
+// scrolls inside it -- lanes are never reused by modulo, which would overlap two
+// Sections into one control.
+assert.match(view, /TIMELINE_SECTION_MAX_LANES\s*=\s*5/);
+assert.match(view, /Math\.min\(laneCount, TIMELINE_SECTION_MAX_LANES\)/);
+assert.match(view, /classList\.toggle\("is-overflowing"/);
+assert.match(styles, /\.section-lane\.is-overflowing[\s\S]*overflow-y:\s*auto/);
+assert.doesNotMatch(view, /lane % TIMELINE_SECTION_MAX_LANES/);
+assert.match(view, /bandLanes \* sectionLaneHeight/);
+assert.match(view, /laneCount \* sectionLaneHeight/,
+  "and the true depth is still measured, so the band can scroll to it.");
 assert.match(view, /--pin-hit-size/);
 assert.match(styles, /\.timeline-pin:active:not\(:disabled\)[\s\S]*transform:\s*translate\(-50%, -50%\)/);
 assert.doesNotMatch(view, /dataset\.(references|pinKind)/);

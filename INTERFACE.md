@@ -143,7 +143,7 @@ a cluster before manipulation instead of asking overlapping Timeline markers
 to compete for the gesture.
 There is no perpendicular interaction axis, stacking, or hidden interior.
 
-The timeline packs actual overlap into a bounded five-lane visual band. Major and minor source-time guides adapt to available width. Range, Resolution, Working Interval, exact previews, Current, and Cursor all use the same projection.
+The timeline packs actual overlap into a bounded five-lane visual band, and deeper structure scrolls inside that band rather than growing it. An unbounded band moves the whole workspace down by a lane for every overlap, so building structure would gradually destabilise the instrument; nothing is overlapped and no Section loses its own control, the depth is simply reached by scrolling. Major and minor source-time guides adapt to available width. Range, Resolution, Working Interval, exact previews, Current, and Cursor all use the same projection.
 
 ## Operator matrix
 

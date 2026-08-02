@@ -48,6 +48,9 @@ import { YOUTUBE_STATE } from "./youtube.js";
 
 const TIMELINE_SECTION_HIT_WIDTH = 28;
 const TIMELINE_SECTION_LANE_HEIGHT = 20;
+// The relationship band never grows past this many lanes; deeper structure
+// scrolls inside it rather than displacing the rest of the workspace.
+const TIMELINE_SECTION_MAX_LANES = 5;
 const COARSE_TIMELINE_SECTION_LANE_HEIGHT = 48;
 const TIMELINE_PIN_HIT_SIZE = 52;
 const COARSE_TIMELINE_PIN_HIT_SIZE = 56;
@@ -685,9 +688,24 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         TIMELINE_SECTION_HIT_WIDTH / timelineWidth
       )
     });
-    const sectionBandHeight = Math.max(
-      30,
-      8 + packedSections.laneCount * sectionLaneHeight
+    // The relationship band is bounded. Overlap creates lanes without limit, and
+    // an unbounded band moved the whole workspace down by a lane per overlap --
+    // twenty overlapping Sections pushed the Timeline past a full screen, so
+    // building structure gradually destroyed the instrument's stability.
+    //
+    // The band stops growing at MAX_LANES and the lane itself scrolls beyond
+    // that. Nothing is overlapped and no Section loses its own control: the
+    // depth is still there, it is reached by scrolling the band rather than by
+    // moving everything else on the page.
+    const laneCount = Math.max(1, packedSections.laneCount);
+    const bandLanes = Math.min(laneCount, TIMELINE_SECTION_MAX_LANES);
+    const sectionBandHeight = Math.max(30, 8 + bandLanes * sectionLaneHeight);
+    const overflowing = laneCount > TIMELINE_SECTION_MAX_LANES;
+    sectionLane.classList.toggle("is-overflowing", overflowing);
+    setStyleProperty(
+      elements.timeline,
+      "--section-content-height",
+      `${8 + laneCount * sectionLaneHeight}px`
     );
     const pinTop = 17;
     const trackTop = 44;

@@ -36,6 +36,8 @@ import {
   createGroup,
   setGroupState,
   groupIsVisible,
+  groupLabelTaken,
+  nextGroupLabel,
   assignSectionGroup,
   deleteGroup,
   groupDeletionBlockReason,
@@ -1545,8 +1547,14 @@ export function setGuideGroupState(session, groupId, changes) {
 }
 
 export function createGuideGroup(session, label = "") {
-  return commit(session, `Add Group${label ? ` “${label}”` : ""}`, draft => {
-    const group = createGroup(draft.guide, label);
+  // The caller may propose a name; the Guide decides the one that is free, so
+  // creating a Group can never produce a second row reading the same.
+  const wanted = String(label || "").trim();
+  const resolved = wanted && !groupLabelTaken(session.model.guide, wanted)
+    ? wanted
+    : nextGroupLabel(session.model.guide);
+  return commit(session, `Add Group “${resolved}”`, draft => {
+    const group = createGroup(draft.guide, resolved);
     return { changed: true, guideChanged: true, value: group };
   }, { guideEdit: true });
 }
@@ -1561,6 +1569,9 @@ export function renameGuideGroup(session, groupId, label) {
   // unnamed Group in the header and in the Section's Group control alike.
   if (!next) return unchanged(session, "empty-group-label");
   if (next === (group.label?.trim() || "")) return unchanged(session, "unchanged-group");
+  if (groupLabelTaken(session.model.guide, next, groupId)) {
+    return unchanged(session, "duplicate-group-label");
+  }
   return commit(session, `Rename Group “${next}”`, draft => {
     const target = setGroupState(draft.guide, groupId, { label: next });
     if (!target) return { changed: false, reason: "missing-group" };

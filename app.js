@@ -243,6 +243,7 @@ const state = {
   // Whether the offered Cues are drawn on the map. A drawing only: it changes
   // what is visible and nothing about what any operator can reach.
   cuesOnTimeline: false,
+  weightGesture: null,
   guideOpen: false,
   railMode: "guide",
   compactGuide: null,
@@ -1228,9 +1229,19 @@ stepGesture = createStepGestureController({
   onActiveChange: setStepGesturePresentation
 });
 
+// Every deferred gesture settles here, before the next transaction begins.
+//
+// Step settled and Nudge did not, so a Nudge inside its 420 ms window could
+// still be pending when the next operator committed -- and then checkpointed
+// against an origin two transactions old. Undo stopped being monotonic: undoing
+// the Nudge reverted the operator after it, and undoing that operator moved
+// Current forward. A gesture that has changed the Session is a transaction that
+// has not been written down yet; nothing else may commit in front of it.
 function settleBeforeAction(options = {}) {
   clearNativeGo();
   stepGesture?.cancel({ finalize: false });
+  settleNudgeGesture();
+  settleWeightGesture();
   view.closePinClusterMenu();
   view.setPreviewAction(null);
   const replacingContext = options.replacingContext === true;
@@ -1248,7 +1259,7 @@ function settleBeforeAction(options = {}) {
       issuePause: !handoffTransport,
       handoffField: handoffTransport
     });
-  } else {
+  } else if (options.transport !== false) {
     settleTransport({
       issuePause: !handoffTransport,
       handoffField: handoffTransport
@@ -1422,16 +1433,26 @@ function rememberDeformWeight(sectionId, weight) {
   state.deformWeightMemory.set(sectionId || "working", weight);
 }
 
-function applyDeformWeight(weight) {
+function applyDeformWeight(weight, { gesture = false } = {}) {
   if (!state.videoLoaded) return false;
   const target = deformTarget();
   if (!target.extent) {
     setStatus("Establish a Working Interval or select a Section to deform.");
     return false;
   }
-  settleBeforeAction();
+  // Inside a hold, each repeat is applied against the gesture's own origin
+  // history, so the ladder walks without leaving a trail of Undo entries, and
+  // one checkpoint is written at release. Settling runs only when the gesture
+  // begins: a repeat must not settle the gesture it is extending, which is the
+  // same reason Nudge does its own boundary rather than calling this one.
+  const continuing = gesture && state.weightGesture?.sectionId === target.sectionId;
+  if (!continuing) settleBeforeAction();
+  const held = gesture ? beginWeightGesture(target.sectionId) : null;
+  const source = held
+    ? { model: model(), history: held.history, future: held.future }
+    : state.session;
   const result = deformSessionSection(
-    state.session,
+    source,
     target.sectionId,
     weight
   );
@@ -1456,10 +1477,20 @@ function applyDeformWeight(weight) {
   state.deformWeightMemory.delete("working");
   view.invalidateTimelinePins();
   const name = sectionName(result.section);
+  const status = `Set “${name}” to ${result.weight}× timeline weight.`;
+  if (held) {
+    held.changed = true;
+    held.label = status.replace(/\.$/, "");
+    state.session = result.session;
+    setStatus(status);
+    view.renderGuide();
+    view.render();
+    return true;
+  }
   return accept(result, {
     effect: false,
     renderGuide: true,
-    status: `Set “${name}” to ${result.weight}× timeline weight.`
+    status
   });
 }
 
@@ -1482,7 +1513,7 @@ function deformWorkingOrSelected() {
   );
 }
 
-function stepDeformWeight(direction) {
+function stepDeformWeight(direction, options = {}) {
   const target = deformTarget();
   if (!target.extent) {
     setStatus("Establish a Working Interval or select a Section to deform.");
@@ -1508,7 +1539,7 @@ function stepDeformWeight(direction) {
     return false;
   }
   rememberDeformWeight(target.sectionId, currentWeight);
-  return applyDeformWeight(nextWeight);
+  return applyDeformWeight(nextWeight, options);
 }
 
 function focusOrUnfocus() {
@@ -2208,6 +2239,14 @@ function restoreGuideMutationFocus(action) {
     ?.focus?.({ preventScroll: true });
 }
 
+// Dialog actions that change only a name. Everything else in the dialog can
+// dissolve topology or move Focus, and those do settle observation.
+const METADATA_ONLY_DIALOGS = new Set([
+  "rename-pin",
+  "rename-section",
+  "rename-group"
+]);
+
 function submitGuideDialog(event) {
   event.preventDefault();
   const action = state.guideDialog;
@@ -2216,7 +2255,11 @@ function submitGuideDialog(event) {
   let result = null;
   let status = "";
 
-  settleBeforeAction();
+  // A rename, a Group's name, a Group's layer or activity: none of these move
+  // Current, change Range, or touch the source position. Settling transport for
+  // them stopped playback for an edit that had nothing to do with it. Pending
+  // gestures still settle -- those are unwritten transactions either way.
+  settleBeforeAction({ transport: !METADATA_ONLY_DIALOGS.has(action.action) });
   if (action.action === "rename-pin") {
     result = renameGuidePin(state.session, action.id, value);
     status = result.changed ? "Renamed Pin." : "Pin title is unchanged.";
@@ -2255,7 +2298,9 @@ function submitGuideDialog(event) {
       ? "Renamed Group."
       : result.reason === "empty-group-label"
         ? "A Group needs a name: unlike a Section, it has no Address to be known by."
-        : "Group title is unchanged.";
+        : result.reason === "duplicate-group-label"
+          ? `Another Group is already called “${value}”. A Group has no Address, so its name has to tell it apart.`
+          : "Group title is unchanged.";
   } else if (action.action === "delete-group") {
     result = deleteGuideGroup(state.session, action.id);
     status = result.changed
@@ -2280,7 +2325,13 @@ function submitGuideDialog(event) {
         : `The ${action.role} endpoint could not be unlinked.`;
   }
 
-  if (result?.changed) accept(result, { renderGuide: true, status });
+  // A name change has no player consequence, so it issues none. Everything else
+  // in this dialog can dissolve topology or move Focus and keeps the effect.
+  if (result?.changed) accept(result, {
+    renderGuide: true,
+    status,
+    effect: !METADATA_ONLY_DIALOGS.has(action.action)
+  });
   else setStatus(status, !result);
   closeGuideDialog({ restoreFocus: false });
   restoreGuideMutationFocus(action);
@@ -3715,6 +3766,39 @@ function beginNudgeGesture(target) {
   return state.nudgeGesture;
 }
 
+// A held Weight control repeats the ladder step several times a second, and one
+// hold is one decision. It uses the same shape as Nudge: an origin snapshot
+// taken at press, every repeat amended against that origin's history so no
+// intermediate entry accumulates, and one checkpoint at release.
+function beginWeightGesture(sectionId) {
+  if (state.weightGesture?.sectionId !== sectionId) {
+    settleWeightGesture();
+    state.weightGesture = {
+      sectionId,
+      origin: snapshotModel(model(), { cloneGuide: true }),
+      history: state.session.history,
+      future: state.session.future || [],
+      label: null,
+      changed: false
+    };
+  }
+  return state.weightGesture;
+}
+
+function settleWeightGesture() {
+  const gesture = state.weightGesture;
+  if (!gesture) return false;
+  state.weightGesture = null;
+  if (!gesture.changed) return false;
+  const committed = checkpoint(state.session, gesture.label || "Deform", gesture.origin);
+  state.session = committed.session;
+  persistGuide();
+  view.invalidateTimelinePins();
+  view.renderGuide();
+  view.render();
+  return true;
+}
+
 // One continuous wheel series or held-key repetition settles as exactly one
 // Undo transaction.
 function settleNudgeGesture() {
@@ -3829,18 +3913,20 @@ const HOLD_REPEAT_INTERVAL_MS = 80;
 
 // Bound once to a container. With a selector it delegates, so it survives Guide
 // re-rendering; without one the container is itself the control.
-function bindHoldRepeat(container, selector, act) {
+function bindHoldRepeat(container, selector, act, { onSettle = null } = {}) {
   if (!container?.addEventListener) return;
   let delayTimer = null;
   let repeatTimer = null;
   let active = null;
 
   const stop = () => {
+    const wasActive = active;
     active = null;
     window.clearTimeout(delayTimer);
     window.clearInterval(repeatTimer);
     delayTimer = null;
     repeatTimer = null;
+    if (wasActive) onSettle?.();
   };
   const start = control => {
     if (active || !control || control.disabled) return;
@@ -4015,12 +4101,20 @@ function retainCue(index) {
     goToCue(index);
     const pinned = pinSessionCurrent(state.session, label);
     if (!pinned.changed) return setStatus("That Address already holds a Pin.");
-    state.session = pinned.session;
-    selectTimelineRetained({ kind: "pin", id: pinned.value.pin.id });
+    // Retention is an ordinary Guide transaction, so it goes through the one
+    // path that saves. Assigning the Session directly reported a retained Cue
+    // that no reload could find.
+    const pinId = pinned.value.pin.id;
+    if (!accept(pinned, {
+      effect: false,
+      renderGuide: true,
+      status: `Retained ${cueLabelFor(cue)} as a Pin.`
+    })) return;
+    selectTimelineRetained({ kind: "pin", id: pinId });
     selectGuideTab("pins");
     view.renderGuide();
     view.render();
-    return setStatus(`Retained ${cueLabelFor(cue)} as a Pin.`);
+    return;
   }
   const saved = saveExtentAsSection(state.session, cue, label, "cue");
   if (!saved.changed) {
@@ -4033,12 +4127,16 @@ function retainCue(index) {
     }
     return setStatus("That extent is already a retained Section.");
   }
-  state.session = saved.session;
-  selectTimelineRetained({ kind: "section", id: saved.value.section.id });
+  const sectionId = saved.value.section.id;
+  if (!accept(saved, {
+    effect: false,
+    renderGuide: true,
+    status: `Retained ${cueLabelFor(cue)} as a Section.`
+  })) return;
+  selectTimelineRetained({ kind: "section", id: sectionId });
   selectGuideTab("sections");
   view.renderGuide();
   view.render();
-  setStatus(`Retained ${cueLabelFor(cue)} as a Section.`);
 }
 
 const GUIDE_TABS = ["sections", "pins", "cues"];
@@ -4625,8 +4723,18 @@ elements["switch-endpoint"].addEventListener("click", event => {
 elements.release.addEventListener("click", releaseWorkingInterval);
 elements.deform.addEventListener("click", deformWorkingOrSelected);
 // Weight steppers repeat while held, like every other increment control.
-bindHoldRepeat(elements["deform-down"], null, () => stepDeformWeight(-1));
-bindHoldRepeat(elements["deform-up"], null, () => stepDeformWeight(1));
+bindHoldRepeat(
+  elements["deform-down"],
+  null,
+  () => stepDeformWeight(-1, { gesture: true }),
+  { onSettle: settleWeightGesture }
+);
+bindHoldRepeat(
+  elements["deform-up"],
+  null,
+  () => stepDeformWeight(1, { gesture: true }),
+  { onSettle: settleWeightGesture }
+);
 elements["focus-toggle"].addEventListener("click", focusOrUnfocus);
 elements["shift-layer-toggle"].addEventListener("click", () => {
   state.shiftLayer = !state.shiftLayer;
@@ -4780,7 +4888,7 @@ elements["guide-tab-cues"].addEventListener("click", () => selectGuideTab("cues"
 elements["sections-list"].addEventListener("change", event => {
   const move = event.target.closest?.("[data-section-group]");
   if (move) {
-    settleBeforeAction();
+    settleBeforeAction({ transport: false });
     const moved = assignGuideSectionGroup(
       state.session,
       move.dataset.sectionGroup,
@@ -4803,7 +4911,7 @@ elements["sections-list"].addEventListener("change", event => {
   if (!toggle) return;
   const key = toggle.dataset.groupState;
   if (key !== "visible" && key !== "active") return;
-  settleBeforeAction();
+  settleBeforeAction({ transport: false });
   const result = setGuideGroupState(state.session, toggle.dataset.groupToggle, {
     [key]: toggle.checked === true
   });
@@ -4832,8 +4940,10 @@ elements["sections-list"].addEventListener("click", event => {
   }
   if (!event.target.closest?.("[data-group-add]")) return;
   event.stopPropagation();
-  settleBeforeAction();
-  const created = createGuideGroup(state.session, `Group ${(guide().groups?.length || 1)}`);
+  settleBeforeAction({ transport: false });
+  // The Guide chooses the first free ordinal; passing a count could collide
+  // after a removal.
+  const created = createGuideGroup(state.session);
   if (!created.changed) return;
   accept(created, {
     effect: false,

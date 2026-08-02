@@ -92,6 +92,27 @@ function preferredVisibleGroup(guide, preferredId = null) {
 //
 // Keeping the visible Group first also makes the Guide's order state the same
 // relation it renders, rather than maintaining a second presentation-only rule.
+// A Group has no Address, so its name is the only thing that identifies it --
+// which makes uniqueness a model invariant rather than naming policy. Two rows
+// reading alike make the header ambiguous and the Section's Group control
+// unusable, and neither can be disambiguated by any other field.
+export function groupLabelTaken(guide, label, exceptId = null) {
+  const wanted = String(label || "").trim().toLowerCase();
+  if (!wanted) return false;
+  return (guide?.groups || []).some(group =>
+    group.id !== exceptId
+    && String(group.label || "").trim().toLowerCase() === wanted
+  );
+}
+
+export function nextGroupLabel(guide) {
+  for (let ordinal = 1; ordinal < 1000; ordinal += 1) {
+    const candidate = `Group ${ordinal}`;
+    if (!groupLabelTaken(guide, candidate)) return candidate;
+  }
+  return `Group ${Date.now()}`;
+}
+
 export function groupIsVisible(guide, group) {
   const id = typeof group === "string" ? group : group?.id;
   if (!id || !guide) return false;
@@ -296,11 +317,28 @@ export function findPinAt(guide, address, epsilon = EPSILON) {
   return guide.pins.find(pin => Math.abs(pin.t - address) <= epsilon) || null;
 }
 
+// Address equality is not identity equality. Unlink deliberately produces
+// independently owned Pins at one Address, so "the Pin at 0:30" can name more
+// than one object -- and picking the first in array order silently attached new
+// structure to whichever happened to be created earliest.
+export function pinsAt(guide, address, epsilon = EPSILON) {
+  return (guide?.pins || []).filter(pin => Math.abs(pin.t - address) <= epsilon);
+}
+
 export function ensurePin(guide, address, options = {}) {
   if (!guide || !Array.isArray(guide.pins)) throw new TypeError("A valid Guide is required.");
   if (!Number.isFinite(address)) throw new TypeError("A Pin requires a finite Address.");
 
-  const existing = findPinAt(guide, address, options.epsilon ?? EPSILON);
+  // Zero matches creates; exactly one reuses it; more than one is ambiguous and
+  // is never guessed. A caller that knows which identity it means says so with
+  // `preferPinId`; otherwise an independent coincident Pin is created, because
+  // inventing an attachment to one of several equals is the one outcome that
+  // cannot be undone by inspection.
+  const matches = pinsAt(guide, address, options.epsilon ?? EPSILON);
+  const preferred = options.preferPinId
+    ? matches.find(pin => pin.id === options.preferPinId)
+    : null;
+  const existing = preferred || (matches.length === 1 ? matches[0] : null);
   if (existing) {
     if (options.label?.trim()) existing.label = options.label.trim();
     if (options.kind === PIN_KIND.EXPLICIT) existing.kind = PIN_KIND.EXPLICIT;
@@ -1007,7 +1045,14 @@ export function normalizeGuide(parsed, videoId) {
   }
   for (const source of sourceGroups) {
     if (!source?.id || source.id === DEFAULT_GROUP_ID) continue;
-    const group = createGroup(guide, String(source.label || ""), {
+    // A Guide written before names were identities may carry blanks or repeats.
+    // Migration resolves them deterministically rather than importing rows that
+    // cannot be told apart.
+    const wanted = String(source.label || "").trim();
+    const label = wanted && !groupLabelTaken(guide, wanted)
+      ? wanted
+      : nextGroupLabel(guide);
+    const group = createGroup(guide, label, {
       id: source.id,
       visible: false,
       active: typeof source.active === "boolean" ? source.active : true
@@ -1134,6 +1179,10 @@ export function validateGuide(guide, duration) {
     || visibleGroups !== 1
     || guide.groups[0]?.id !== guide.visibleGroupId
   ) return false;
+  // Names are identities here, so they must be distinguishable.
+  const labels = guide.groups.map(group => String(group.label || "").trim().toLowerCase());
+  if (labels.some(label => !label)) return false;
+  if (new Set(labels).size !== labels.length) return false;
 
   for (const pin of guide.pins) {
     if (
