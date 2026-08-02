@@ -106,6 +106,13 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
 
 ## Testing map
 
+Every suite is listed. A suite that holds a law nobody can name from its
+filename is a suite nobody can audit, so the entry says what it holds rather
+than when it was written — six names still carry the release that motivated
+them, and the entry is the correction.
+
+### Kernel and semantics
+
 - `tests.mjs` — Range geometry and Session transactions
 - `timeline-projection-tests.mjs` — canonical factors, maps, inverses, overlap composition, Pin order, migration
 - `v7-deformation-tests.mjs` — Deform ownership, adaptive Step, Guide graph, nested weights
@@ -116,6 +123,17 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
 - `endpoint-transposition-tests.mjs` — endpoint frames and matrix ownership
 - `semantic-composition-tests.mjs` — cross-operator sequences
 - `semantic-audit-probes.mjs` — adversarial regressions
+- `semantic-state-space-tests.mjs` — extended state-space proof
+- `weight-invariance-tests.mjs` — what Weight may and may not reach: retained Addresses, duration, Nudge displacement, Context and Field geometry stay Weight-blind while Step, Refine and seeded Resolution are weighted
+- `focus-viewport-tests.mjs` — a focused extent fills the drawn timeline at every Weight, the drawing stays invertible edge to edge, and Unfocus restores the whole map
+
+### Guide graph, Groups and Cues
+
+- `group-tests.mjs` — one visible Timeline layer, an independent active deformation stack, hidden Guide navigation, endpoint visibility, multiplicative layering, non-destructive removal
+- `coherence-2-tests.mjs` — Section reachability, projected source midpoints, Cue extents, flat Group blocks, Focus boundary ownership, explicit Panorama activation
+- `coherence-3-tests.mjs` — canonical visible-Group identity that cannot express two or none, deterministic default and fallback, hidden-but-active layers, and the v8-to-v9 migration
+- `stabilization-tests.mjs` — Guide validation and repair: v8 round-trip of every retained dimension, corrupt membership repaired without invalidating a recoverable Guide, and source-impossible extents rejected at the Session boundary
+- `cue-tests.mjs` — timestamp forms, lenient description parsing, contiguous partition
 - `step-gesture-tests.mjs` — cadence, batching, one-Undo settlement
 - `step-field-tests.mjs` — pure Field geometry
 - `field-runtime-tests.mjs` — controller lifecycle
@@ -124,18 +142,35 @@ Do not add Section-coverage branches to an operator. Extend the shared positive 
 - `field-coherence-tests.mjs` — Step/Offset independence
 - `field-frame-tests.mjs` — Frame ownership, stable identity, transition descriptors
 - `field-breath-tests.mjs` — bounded breathing, barriers, Range clipping, Hold
-- `cue-tests.mjs` — timestamp forms, lenient description parsing, contiguous partition
-- `cue-smoke.mjs` — offering retains nothing; navigation, composition, and retention
 - `field-slideshow-tests.mjs` — directional transitions, coalescing, stale-event rejection
 - `nudge-tests.mjs` — Current drag, Shift-wheel/drag, keyboard nudging, one-Undo batching
-- `semantic-state-space-tests.mjs` — extended state-space proof
 
-Smoke tests cover startup, persistent Guide selection, Timeline Section
-endpoint/midpoint drag, Guide exact Address editing, spatial Pin unlink/link,
-operational Pin clusters, Context, gestures, transport wrapping, Section
-weighting, palette contracts, and metadata. Static palette,
-hit-region, and preview-layer ownership belongs to `project-audit.mjs`; live
-visual judgment belongs to `VALIDATION.md`.
+### Interaction, against a DOM-free application
+
+- `startup-smoke.mjs` — the module graph loads and binds against a minimal document
+- `interaction-smoke.mjs` — the broad interaction sweep: Pin creation, retained Section editing, spatial unlink/link, Timeline dragging, exact Address editing, clustered Pins, Refine preview, Switch involution, composable Step intervals, universal Space playback, focus release
+- `guide-composition-smoke.mjs` — a plain click replaces, Shift extends across Pins and Sections alike, extension is monotonic, and a composed span Deforms into a parent
+- `cue-smoke.mjs` — offering retains nothing; navigation, composition, and retention
+- `section-weight-smoke.mjs` — shared familiar scale, Guide-only tuning, compression, expansion, gradients, weighted Step, identity recovery
+- `context-smoke.mjs` — automatic post-traversal observation, held-key Step deferral, delayed placement, Field suspension, replacement traversal, and the reversed Step sequence's observation and naming
+- `step-gesture-smoke.mjs` — captured and fallback pointer release, keyboard hold, and rapid taps on control and hotkey alike retaining one-operation Undo
+- `transport-coherence-smoke.mjs` — live projection, exact settlement, Focus-owned proper-Range looping, one-pass Field rebasing, wrap history isolation, Unfocus restoration
+- `metadata-smoke.mjs` — delayed YouTube duration is retried without a false zero-length session
+
+### Whole-system properties
+
+- `transaction-integrity-smoke.mjs` — one physical gesture is at most one checkpoint, a reported save is a save, Group names cannot collide, coincident Pin identity is never guessed, and an unreadable saved map is reported and set aside rather than overwritten
+- `route-correspondence-tests.mjs` — routes claiming one operation reach one result; each route runs in its own process because `app.js` is a module singleton
+- `cross-interaction-stress.mjs` — Group visibility and activity govern drawing and deformation independently, Cues project while staying inert, and one history stack unwinds the whole construction
+- `journey-smoke.mjs` — one operator's path end to end: arrive, orient, Pin, retain, name, weight, offer chapters, compose, focus, leave, reopen, move on
+- `browser-smoke.mjs` — the only suite in a real browser: the app runs in Chromium without error, a press lands on the Address drawn under it, a focused control owns Space, nothing reachable is covered, and the page never scrolls sideways
+
+### Gauges over the source itself
+
+- `integration-check.mjs` — the composed product: DOM references, accessible controls, matrix ownership, weighted timeline, Guide graph, proper-Range playback
+- `project-audit.mjs` — module boundaries, retired artifacts, palette, hit regions, preview-layer ownership, and agreement between the canonical documents and the code
+
+Live visual judgment belongs to `VALIDATION.md`; nothing here replaces it.
 
 ## Release workflow
 

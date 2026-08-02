@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 
 const read = path => readFileSync(new URL(`./${path}`, import.meta.url), "utf8");
 const pkg = JSON.parse(read("package.json"));
@@ -112,6 +112,25 @@ for (const [name, text] of Object.entries(docs)) {
     `${name}: exact Address input rejects rather than clamps.`);
 }
 assert.match(docs["INTERFACE.md"], /reject anything outside Range/);
+
+// The testing map is a gauge like any other, and an incomplete one is worse than
+// none: twenty suites once held laws no document named, so the volume read as
+// accumulation instead of coverage. Adding a suite without saying what it holds
+// fails here, and so does naming a suite that no longer exists.
+{
+  const suites = readdirSync(new URL("./", import.meta.url))
+    .filter(name => name.endsWith(".mjs") && !name.endsWith("-harness.mjs"));
+  const listed = new Set(
+    (docs["DEVELOPMENT.md"].match(/`[a-z0-9.-]+\.mjs`/g) || [])
+      .map(entry => entry.slice(1, -1))
+  );
+  for (const suite of suites) {
+    assert.ok(listed.has(suite), `DEVELOPMENT.md must say what \`${suite}\` holds.`);
+  }
+  for (const entry of listed) {
+    assert.ok(suites.includes(entry), `DEVELOPMENT.md names a suite that does not exist: ${entry}`);
+  }
+}
 assert.match(docs["SPEC.md"], /reject anything outside\nRange/);
 assert.match(app, /function parseAddress[\s\S]*parts\.slice\(1\)\.some\(part => Number\(part\) >= 60\)/,
   "and refuses timecode parts that are not timecode.");
