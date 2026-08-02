@@ -247,10 +247,20 @@ assert.match(styles, /\.timeline-section-relation\s*\{[^}]*repeating-linear-grad
 assert.match(view, /const pinTop\s*=\s*17[\s\S]*const trackTop\s*=\s*44[\s\S]*const sectionTop\s*=\s*rulerTop\s*\+\s*38/);
 assert.match(view, /\["start",\s*projected\.start[\s\S]*\["midpoint",\s*midpointCoordinate[\s\S]*\["end",\s*projected\.end/);
 // Increment controls repeat while held; a click-only binding cannot.
-assert.match(app, /function bindHoldRepeat\(container, selector, act\)[\s\S]*HOLD_REPEAT_INTERVAL_MS/);
+assert.match(app, /function bindHoldRepeat\(container, selector, act, \{ onSettle[\s\S]*HOLD_REPEAT_INTERVAL_MS/);
+// One hold is one decision, so a held ladder control settles as one checkpoint
+// rather than one per repeat. Weight uses the same origin-and-settle shape as
+// Nudge instead of a second history mechanism of its own.
+assert.match(app, /function beginWeightGesture[\s\S]*function settleWeightGesture[\s\S]*checkpoint\(state\.session/);
+assert.match(app, /bindHoldRepeat\(\s*elements\["deform-up"\][\s\S]*onSettle: settleWeightGesture/);
+// Every deferred gesture settles before the next transaction begins.
+assert.match(app, /function settleBeforeAction[\s\S]*settleNudgeGesture\(\);\s*settleWeightGesture\(\);/);
+// Cue retention is an ordinary accepted Guide transaction, so it persists.
+assert.match(app, /function retainCue[\s\S]*accept\(pinned,[\s\S]*accept\(saved,/);
+assert.doesNotMatch(app, /function retainCue[\s\S]*state\.session = (pinned|saved)\.session/);
 assert.match(app, /bindGuideNudgeControls\(elements\["sections-list"\]\)/);
 assert.match(app, /bindGuideNudgeControls\(elements\["pins-list"\]\)/);
-assert.match(app, /bindHoldRepeat\(elements\["deform-up"\], null/);
+assert.match(app, /bindHoldRepeat\(\s*elements\["deform-up"\],\s*null/);
 // Nudge is a movement magnitude and sits with Step Reach, not with the Field's
 // physical observation settings.
 assert.match(html, /id="step-size-settings"[\s\S]*id="step-size-seconds"[\s\S]*id="nudge-seconds"[\s\S]*<\/details>/);
