@@ -58,8 +58,8 @@ export function breathRatePair(rate, centerRate = 1) {
   const center = Number.isFinite(centerRate) && centerRate > 0 ? centerRate : 1;
   return {
     center,
-    tailRate: Math.max(0.05, center - normalized),
-    leadRate: center + normalized
+    tailRate: center * (1 - normalized),
+    leadRate: center * (1 + normalized)
   };
 }
 
