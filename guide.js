@@ -119,7 +119,7 @@ export function groupIsVisible(guide, group) {
   return visibleGroup(guide)?.id === id;
 }
 
-export function enforceVisibleGroup(guide, preferredId = null) {
+function enforceVisibleGroup(guide, preferredId = null) {
   if (!guide || !Array.isArray(guide.groups) || !guide.groups.length) return null;
   const visible = preferredVisibleGroup(guide, preferredId);
   guide.visibleGroupId = visible.id;
@@ -164,7 +164,7 @@ export function resolveGroup(guide, groupId) {
     || null;
 }
 
-export function groupForSection(guide, section) {
+function groupForSection(guide, section) {
   return resolveGroup(guide, section?.groupId);
 }
 
