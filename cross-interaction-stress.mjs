@@ -94,6 +94,13 @@ await flush();
 assert.equal(sectionRows().length, 2);
 assert.equal(pinRows().length, 4);
 
+// Keep one empty layer available as the alternate Timeline owner. Visibility is
+// singular: showing this layer hides Map without deactivating or deleting it.
+await clickIn("sections-list", inSections("groupAdd")[0]);
+const emptyLayer = groupIds().find(id => id !== "group-default");
+assert.ok(emptyLayer);
+await setGroupState("group-default", "visible", true);
+
 // ==============================================================================
 // 1. A Group's two states are independent, and each governs exactly one thing.
 // ==============================================================================
@@ -116,21 +123,22 @@ assert.equal(deformed(), false, "and draw no gradient.");
 assert.equal(drawnBars(), 2, "while its Sections stay on the map.");
 assert.equal(drawnPins(), 4, "with their endpoint Pins.");
 
-// Hidden as well: nothing drawn, nothing deformed. Dormant.
-await setGroupState("group-default", "visible", false);
+// Showing another Group hides Map as a complete Timeline layer. Map remains
+// inactive, so nothing is drawn and nothing is deformed.
+await setGroupState(emptyLayer, "visible", true);
 assert.equal(drawnBars(), 0);
 assert.equal(drawnPins(), 0);
 assert.equal(deformed(), false);
 
-// Hidden and active is the baked map: terrain with no landmarks.
+// Hidden and active is the background terrain: Weight with no landmarks.
 await setGroupState("group-default", "active", true);
-assert.equal(drawnBars(), 0, "A baked Group draws no Section bar.");
+assert.equal(drawnBars(), 0, "A hidden active Group draws no Section bar.");
 assert.equal(drawnPins(), 0, "and no endpoint Pin.");
-assert.equal(deformed(), true, "while still deforming the map.");
+assert.equal(deformed(), true, "while still deforming the Timeline.");
 assert.equal(
   byId.get("duration-time").textContent,
   deformedDuration,
-  "Baking changes the drawing and never the projection."
+  "Hiding the active terrain changes the drawing and never the projection."
 );
 
 // The Guide is the inventory, not the drawing: hidden objects stay editable.
@@ -138,26 +146,45 @@ assert.equal(sectionRows().length, 2,
   "A hidden Section is still listed in the Guide, or it could never be brought back.");
 assert.equal(pinRows().length, 4,
   "and so are its Pins.");
+assert.equal(groupToggle(emptyLayer, "visible").type, "radio",
+  "Visibility has one Timeline owner, so Group visibility is a radio choice.");
+assert.equal(groupToggle(emptyLayer, "active").type, "checkbox",
+  "Activity remains an independent stackable choice.");
+assert.match(rowText(byId.get("pins-list")), /Hidden/,
+  "The Guide names hidden Pins instead of dropping them from inventory.");
+
+// Guide navigation reaches hidden structure without turning it into a Timeline
+// operand. The row remains available while the Timeline stays empty.
+const hiddenPinRow = pinRows()[0];
+await clickIn("pins-list", hiddenPinRow);
+assert.equal(drawnPins(), 0);
+assert.match(currentText(), /0:10/,
+  "The Guide moves Current to a hidden Address without revealing the Pin.");
 
 // ==============================================================================
 // 2. What the map does not draw, no operator can traverse to.
 // ==============================================================================
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 10 });
 await flush();
-const baked = currentText();
+const compressedTerrainCurrent = currentText();
 await press("ArrowRight", { shiftKey: true });
 assert.equal(
   currentText(),
   "Current 1:40",
   "Pin traversal skips hidden Pins, exactly as the map does."
 );
-assert.notEqual(currentText(), baked);
+assert.notEqual(currentText(), compressedTerrainCurrent);
 await press("ArrowRight", { shiftKey: true });
 assert.match(status(), /no Pin forward/,
   "and reports the absence rather than inventing a stop.");
 
-// Unhide and the same key reaches them all again. Nothing was destroyed.
+// Show Map and the same key reaches them all again. Nothing was destroyed.
 await setGroupState("group-default", "visible", true);
+assert.equal(
+  descendants(byId.get("pin-lane")).some(node => node.classList.contains("retained-selected")),
+  false,
+  "A Pin reached through the Guide does not become selected when its Group returns to the Timeline."
+);
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 10 });
 await flush();
 const visited = [];
@@ -180,8 +207,8 @@ assert.match(status(), /Focused/);
 const focusedBars = drawnBars();
 const focusedPins = drawnPins();
 
-// Hiding while focused withdraws the drawing and keeps the viewport.
-await setGroupState("group-default", "visible", false);
+// Showing another layer while focused withdraws the drawing and keeps the viewport.
+await setGroupState(emptyLayer, "visible", true);
 assert.equal(drawnBars(), 0);
 assert.equal(drawnPins(), 0);
 await setGroupState("group-default", "visible", true);
@@ -335,7 +362,7 @@ assert.ok(
 );
 
 const pinsBeforeUnlink = pinRows().length;
-await setGroupState("group-default", "visible", false);
+await setGroupState(emptyLayer, "visible", true);
 await clickIn("pins-list", descendants(byId.get("pins-list"))
   .find(node => node.dataset.unlinkSectionEndpoint));
 byId.get("guide-dialog-form").dispatch("submit");
@@ -362,14 +389,16 @@ await setGroupState("group-default", "visible", true);
 // 8. A Group is a retained object: named, renamable, removable, non-destructive.
 // ==============================================================================
 await clickIn("sections-list", inSections("groupAdd")[0]);
-const added = groupIds().find(id => id !== "group-default");
+const added = groupIds().find(id =>
+  id !== "group-default" && id !== emptyLayer
+);
 assert.ok(added, "New Group creates one.");
 assert.equal(
   inSections("renameGroup").length,
-  1,
+  2,
   "A created Group carries Rename, and the default Group does not."
 );
-assert.equal(inSections("deleteGroup").length, 1);
+assert.equal(inSections("deleteGroup").length, 2);
 
 const sectionCountBefore = sectionRows().length;
 await selectSection(0);
@@ -380,12 +409,13 @@ assert.match(status(), /Move “Section \d/,
   "A Section is named by its Address wherever it has no title.");
 
 // Its state governs the Section that moved, and only that one.
-await setGroupState(added, "visible", false);
+await setGroupState("group-default", "visible", true);
 assert.ok(drawnBars() < sectionCountBefore,
   "Hiding one Group hides only its own Sections.");
 assert.ok(drawnBars() > 0, "and leaves the rest drawn.");
 
-await clickIn("sections-list", inSections("renameGroup")[0]);
+await clickIn("sections-list", inSections("renameGroup")
+  .find(node => node.dataset.renameGroup === added));
 assert.equal(byId.get("guide-dialog-title").textContent, "Rename Group");
 byId.get("guide-dialog-input").value = "Baked terrain";
 byId.get("guide-dialog-form").dispatch("submit");
@@ -395,19 +425,21 @@ assert.ok(
   "A renamed Group is named the same way everywhere it is offered."
 );
 
-await clickIn("sections-list", inSections("deleteGroup")[0]);
+await clickIn("sections-list", inSections("deleteGroup")
+  .find(node => node.dataset.deleteGroup === added));
 assert.match(byId.get("guide-dialog-message").textContent, /returns to the map; nothing is deleted/);
 byId.get("guide-dialog-form").dispatch("submit");
 await flush();
 assert.equal(sectionRows().length, sectionCountBefore,
   "Removing a Group destroys none of its Sections.");
-assert.equal(groupIds().length, 1, "and leaves the map itself.");
+assert.equal(groupIds().length, 2,
+  "and leaves Map plus the retained empty alternate layer.");
 assert.equal(drawnBars(), sectionCountBefore,
   "Its Sections return to the map's own visibility, not the removed Group's.");
 
 byId.get("return-action").click();
 await flush();
-assert.equal(groupIds().length, 2, "One Undo restores the removed Group,");
+assert.equal(groupIds().length, 3, "One Undo restores the removed Group,");
 assert.ok(drawnBars() < sectionCountBefore, "with the state it was removed in.");
 
 // ==============================================================================
@@ -437,8 +469,8 @@ assert.ok(guard < 400, "Undo terminates rather than cycling.");
 assert.equal(byId.get("sections-list-count").textContent, "0",
   "Undoing everything empties the Guide.");
 assert.equal(byId.get("pins-list-count").textContent, "0");
-assert.equal(groupIds().length, 0,
-  "Group headers stand down with nothing to organize, rather than drawing an empty map.");
+assert.equal(groupIds().length, 1,
+  "The empty default Group remains reachable after every Section is undone.");
 assert.equal(byId.get("duration-time").textContent, "1:40",
   "and the map returns to the undeformed source.");
 assert.equal(byId.get("cues-list-count").textContent, "4",

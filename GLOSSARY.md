@@ -25,8 +25,8 @@
 - **Pin** — a retained source landmark with optional title.
 - **Section** — a retained edge between two Pins with optional title and one canonical Weight.
 - **Weight** — one Section's positive map-scale factor; never playback rate.
-- **Guide** — the persistent graph of Pins and Sections.
-- **Group** — a partition of Sections carrying two independent states: `visible` draws its Sections and their endpoint Pins; `active` lets its Weights deform the map. Hidden and active is the map baked; visible and inactive is topology without terrain. Renamed and removed like any other retained object; removing one returns its Sections to the map and destroys nothing.
+- **Guide** — the complete persistent graph of Groups, Pins, and Sections, including objects hidden from Timeline. Guide focus never by itself creates a Timeline operand.
+- **Group** — one layer in the Section partition. Exactly one Group is on the Timeline and supplies spatial Sections and section-bound Pins; any number may be active and contribute multiplicative Weight. Hidden active Groups retain terrain without landmarks. New Sections enter the on-Timeline Group by default. Removing a Group returns its Sections to Map unless that would collapse two layered identities into one Group, in which case removal is refused.
 - **Unlink** — take one Section off a shared endpoint Pin and give it its own Pin at the same Address. Reached from the Pin, which is the object it acts on.
 - **Refine** — choose a directional spatial midpoint at finer Resolution while retaining the established path when possible.
 - **Local Refine** — choose the same midpoint while recording only the immediate Current-to-midpoint traversal.

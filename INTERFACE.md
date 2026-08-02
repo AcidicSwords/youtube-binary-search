@@ -200,11 +200,13 @@ Nesting needs no operator of its own. Click one Section, `Shift`+click another, 
 
 The Guide reads left to right as the arc from potential to structure: **Chapters** are candidates a description offers, **Pins** are the Addresses you made objects, and **Sections** are compositions of Pins that persist and deform.
 
+Guide focus and Timeline selection are separate relations on the same retained objects. A Guide click and a Timeline click resolve the same canonical source Address or Section extent, but only the Timeline click acquires a spatial operand for Nudge, Carry, dragging, or highlighting. The Pins tab therefore separates **On Timeline** Pins from **Hidden** Pins while keeping both fully navigable and editable.
+
 The Pins tab separates the two jobs a Pin can do: **Section endpoints**, which hold Sections together, and **Standalone** Pins, which mark a place and are never hidden by a Group. **Unlink** lives here, on the shared Pin itself: a selected Pin holding more than one Section offers one Unlink per Section, each naming the Section it releases, so which Section is being taken off the Pin is stated rather than inferred from `Start`/`End`. Reading a Section to operate on a Pin left the Pin — the only object the operation is about — out of view.
 
-A Section's endpoints *are* Pins, so a selected Section names them: its `Start` and `End` labels are the route to those Pins, selecting each where Pins are edited. Nothing moves and nothing is recorded; selection is the whole mechanism, because a selected Guide row is an expanded one already.
+A Section's endpoints *are* Pins, so a Guide-focused Section names them: its `Start` and `End` labels route to those Pins where they are edited. Nothing moves and nothing is recorded. Guide focus expands the retained row; it is distinct from Timeline selection, so revealing a hidden endpoint never makes it a spatial operand.
 
-The Sections tab carries **Groups**. A Group is a set of Sections with two independent states — `Visible` draws its Sections and their endpoint Pins on the map; `Active` lets its Weights deform it. Hidden and active is the map baked, terrain without landmarks; visible and inactive is topology without terrain. The header names which of the four a Group is in, so the pair of checkboxes never has to be decoded. `New Group` starts one, Rename and Remove sit beside its name exactly as they do on a Pin or a Section — removing a Group returns its Sections to the map and destroys nothing — and a Section's Group sits beside its Weight — both say how that Section takes part in the map, and both are chosen from a fixed set.
+The Sections tab carries **Groups**. Exactly one Group is **On Timeline**: its Sections and section-bound Pins are the spatial objects available to Timeline hit-testing, Shift Step, dragging, linking, and selection. `Active` is independent and stackable: any number of Groups may contribute their Section Weights, including hidden Groups that establish broad terrain without adding landmarks to the working surface. The on-Timeline Group is rendered first, hidden Groups follow below it, and a newly created Group becomes the working layer. New Sections enter that visible Group unless another Group is explicitly chosen. Identical Sections may coexist in different Groups so their active Weights multiply, but not twice inside one Group. Rename and Remove sit beside the Group name; removal returns Sections to Map and is refused rather than merging two layered identities that would become duplicates.
 
 A third Guide tab holds **Cues** — candidate Addresses parsed from a pasted description. Chapters a creator wrote partition the video semantically, so a Cue owns an extent running to the next Cue's Address, and clicking one takes that extent exactly as clicking a Section does. `Shift`+click extends across Cues by the same rule. Cues render as dashed, quieter rows carrying one action, `Retain`, because there is nothing to edit in something that is not yet structure. Nothing about a Cue reaches the Guide, the map, traversal, or history until it is retained.
 
@@ -216,7 +218,7 @@ A Guide entry is a **name**, an **Address**, and only facts not derivable from t
 
 A Pin has one Address and no extent, so its row draws no positional track: one point plotted across the whole map is the Temporal Topography redrawn at useless scale. Position is read and moved on the map; the Guide holds the exact Address.
 
-A Guide row is expanded exactly when it is the selected retained object, and nothing else opens one. Participating in the Working Interval, being focused, and being a snap target are all worth showing and are shown as highlights on the collapsed row, because rows that open themselves make the selection unreadable. Focusing a Section selects it, so its row carries Unfocus.
+A Guide row is expanded exactly when it has Guide focus, and nothing else opens one. Participating in the Working Interval, being focused as Range, being selected on the Timeline, and being a snap target are separate conditions shown as highlights rather than alternate expansion rules. Focusing a Section through the Guide keeps that Guide row open so Unfocus remains reachable without manufacturing a Timeline selection.
 
 Titles are optional. Each Section row exposes selection, Focus, Weight, Group,
 and both endpoint Pins. Compact Rename and Delete controls sit beside the title.
@@ -345,9 +347,13 @@ Breath rate    one symmetric pair
 Field          Stretch / Hold
 ```
 
-The breathing rate pair is one control, not two: `0.75×/1.25×`, `0.5×/1.5×`, or
-`0.25×/1.75×` around Center's `1×`. The configured values are the outward rates;
-contraction exchanges them without rewriting the saved pair. A side that reaches
+The breathing spread is one control, not two. At Center `1×`, its canonical pairs
+are `0.75×/1.25×`, `0.5×/1.5×`, and `0.25×/1.75×`. At any other Center rate
+`c`, the requested pair scales proportionally as `c(1−d)` and `c(1+d)` so both
+sides remain equally distant through Center and reach equal offsets together.
+Contraction exchanges the pair without rewriting the saved spread. The runtime
+uses only rates the media adapter actually exposes and reports unsupported exact
+rates rather than pretending a clamped asymmetric pair is equivalent. A side that reaches
 a boundary first waits there at Center rate until every operational side arrives,
 then the whole Field reverses direction. A side without room for the Inner Offset
 cannot hold the required separation, so it stops breathing entirely and parks at

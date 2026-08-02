@@ -189,14 +189,17 @@ Hold, Stretch, and Section weight editing cannot write Step Reach.
 
 ### Pin traversal
 
-Pin traversal applies Step’s interval-anchor law to the next source-ordered retained Pin. All Pins remain visible operands. Range Start and Range End are synthetic stops and are deduplicated by real Pins at the same Address.
+Pin traversal applies Step’s interval-anchor law to the next source-ordered retained Pin that is currently drawn on the Timeline. Standalone Pins are always drawn; section-bound Pins are drawn while at least one referencing Section belongs to the one visible Group. Hidden Pins remain exact Guide targets but are not traversal stops. Range Start and Range End are synthetic stops and are deduplicated by visible real Pins at the same Address.
 
 ### Pin selection and Section ownership
 
-Pin selection is derived from the Working Interval. A Pin coincident with its
-Start or End is selected automatically; when both bounds coincide with Pins,
-both endpoints are selected. Clicking a Pin moves Current to its Address and
-does not create or alter the Working Interval. Selection changes no Pin identity.
+Visible endpoint indication is derived from the Working Interval. A visible Pin
+coincident with its Start or End is indicated automatically; hidden Pins are
+never promoted into Timeline operands by that derivation. Clicking a Timeline
+Pin moves Current to its Address and selects that spatial operand without
+creating or altering the Working Interval. Clicking the same Pin in the Guide
+moves Current to the same Address and focuses its Guide row, but does not create
+a Timeline selection. Neither route changes Pin identity.
 
 Sections move together at a bound only when they reference the same Pin ID.
 Unlinking one Section endpoint creates an independent coincident Pin and rewires
@@ -418,9 +421,15 @@ Lead = Center + leadOffset
 
 Neither side reaches or crosses Center during Stretch.
 
-Let Center playback rate be \(c\). The outward rates \(z\) and \(w\)
-satisfy \(z < c < w\) and, where available, \(c - z = w - c\). At Center rate
-`1×` the valid symmetric pairs are:
+Let Center playback rate be \(c\), and let the configured fractional spread be
+\(d\), with \(0 < d < 1\). The exact outward relation is:
+
+\[
+z=c(1-d), \qquad w=c(1+d)
+\]
+
+so \(z < c < w\) and \(c-z=w-c=cd\). At Center rate `1×`, the canonical
+spreads produce:
 
 ```text
 Tail 0.75× | Center 1× | Lead 1.25×
@@ -428,9 +437,11 @@ Tail 0.5×  | Center 1× | Lead 1.5×
 Tail 0.25× | Center 1× | Lead 1.75×
 ```
 
-The interface exposes one breathing-rate pair rather than two conceptually
-independent side rates. The configured values are the outward rates; the inward
-phase temporarily exchanges them without rewriting the saved pair.
+The interface exposes one spread rather than two independent side rates. The
+inward phase exchanges the side rates without rewriting the saved spread. The
+relation is requested only through rates actually exposed by the media adapter;
+when an exact side rate is unavailable, the runtime reports that limitation and
+uses positional correction rather than claiming a false asymmetric relation.
 
 #### Bounds and synchronization
 
@@ -844,15 +855,21 @@ a plain Guide click replaces the Working Interval; Shift extends it
 a Cue is never persisted, projected, or traversable until it is retained
 a drawn Cue carries no attribute a pointer handler dispatches on
 Groups partition the Sections; a Section is never half-hidden
-a Section deforms the map only while its Group is active
-an endpoint Pin is drawn while any Section referencing it is visible
+exactly one Group supplies Timeline Sections and section-bound Pins
+any number of Groups may be active and their Weights multiply
+new Sections belong to the visible Group unless another Group is explicit
+identical Sections may coexist across Groups but not within one Group
+a Section deforms the Timeline only while its Group is active
+an endpoint Pin is drawn while any Section referencing it is in the visible Group
 a Pin referencing no Section is never hidden by a Group
+Guide focus and Timeline operand selection are independent
+Guide navigation reaches hidden objects without making them Timeline operands
 retaining a Cue is the ordinary save and carries the offered title
 an operation acting on a Pin is reached from that Pin
 one name identifies an unnamed Section everywhere it is named
-a Group is renamed and removed like any other retained object, destroying nothing
+a Group is renamed and removed like any other retained object, destroying nothing; removal is refused when returning its Sections to Map would collapse layered identities
 composition yields an extent, never a set, so every operator consumes it unchanged
-a Guide row is expanded exactly when it is the selected retained object
+a Guide row is expanded exactly when it has Guide focus; Timeline selection is reserved for drawn spatial operands
 preview, breathing, Context, and semantic state cannot overwrite one another
 ```
 
