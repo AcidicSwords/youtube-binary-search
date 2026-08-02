@@ -1888,3 +1888,19 @@ export function checkpoint(session, label, returnModel) {
     }
   };
 }
+
+// A gesture that commits its first move and amends the rest cannot know what it
+// was until it ends. Step names itself "Step Forward" on the first press, then
+// the operator may reverse; only the settled sequence knows its net direction.
+// Renaming the open transaction keeps one entry per gesture while letting that
+// entry tell the truth about what it will restore.
+export function relabelLastAction(session, label) {
+  const history = session?.history || [];
+  if (!history.length || !label) return session;
+  const last = history[history.length - 1];
+  if (last.label === label) return session;
+  return {
+    ...session,
+    history: [...history.slice(0, -1), { ...last, label }]
+  };
+}

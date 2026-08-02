@@ -246,4 +246,62 @@ dispatchDocument("keydown", { key: " ", code: "Space" });
 await flush();
 assert.equal(center.state, 2, "A second Space pauses that playback.");
 
-console.log("Context smoke passed: automatic post-traversal observation, held-key Step deferral, delayed placement, Field suspension, replacement traversal, Step during Context, Off, and Undo isolation.");
+// A coalesced Step sequence is one transaction whatever its net displacement,
+// and it ends at an Address that owes the operator an observation. Stepping
+// forward and then back inside the tap window used to discard the transaction
+// and return early, leaving Center paused under a Context frame that never
+// played.
+async function pressStep(direction) {
+  const control = byId.get(direction === "forward" ? "step-forward" : "step-backward");
+  control.dispatch("pointerdown", { button: 0, pointerId: 1, target: control });
+  await flush(2);
+  control.dispatch("pointerup", { button: 0, pointerId: 1, target: control });
+  await flush(2);
+}
+
+byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 400 });
+await env.delay(400);
+await flush(4);
+const originAfterClick = currentText();
+const playsBeforeReversal = center.commands.filter(command => command[0] === "play").length;
+
+await pressStep("forward");
+await pressStep("backward");
+await env.delay(400);
+await flush(4);
+
+assert.equal(currentText(), originAfterClick,
+  "A reversed Step sequence returns Current to its origin.");
+assert.ok(
+  center.commands.filter(command => command[0] === "play").length > playsBeforeReversal,
+  "A reversed Step sequence must still observe the Address it arrived at."
+);
+assert.equal(center.state, 1,
+  "A reversed sequence must not leave Center paused under a Context frame.");
+assert.equal(byId.get("return-meta").textContent, "Step Reversal",
+  "A sequence with no net displacement is named for what it did, not for the key that opened it.");
+
+// Undoing it is one operation, because performing it by hand would not be: the
+// counter-movement is as many presses as the sequence was.
+byId.get("return-action").click();
+await env.delay(300);
+await flush(4);
+assert.equal(byId.get("return-meta").textContent, "Timeline Click",
+  "One Undo unwinds the whole Step sequence, whatever its net displacement.");
+
+// The same rule names a mixed sequence by where it ended up. Forward once and
+// backward twice is a Step Backward however it started.
+await pressStep("forward");
+await pressStep("backward");
+await pressStep("backward");
+await env.delay(400);
+await flush(4);
+assert.equal(byId.get("return-meta").textContent, "Step Backward",
+  "A coalesced sequence is named by its net displacement, not by its first press.");
+byId.get("return-action").click();
+await env.delay(300);
+await flush(4);
+assert.equal(currentText(), originAfterClick,
+  "Undo returns to the state the whole sequence departed from.");
+
+console.log("Context smoke passed: automatic post-traversal observation, held-key Step deferral, delayed placement, Field suspension, replacement traversal, Step during Context, reversed-sequence observation and naming, Off, and Undo isolation.");

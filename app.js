@@ -59,6 +59,7 @@ import {
   setRange as setSessionRange,
   previewRange,
   checkpoint,
+  relabelLastAction,
   focusSection as focusSessionSection,
   focusWorkingSection as focusSessionWorkingSection,
   leaveSection as leaveSessionSection,
@@ -118,6 +119,9 @@ import { sectionDisplayName } from "./format.js";
 import { createView } from "./view.js";
 
 const STORAGE_V9_PREFIX = "binary-youtube-reader:v9:";
+// Where a stored Guide that could not be read is kept, so a save cannot be the
+// thing that destroys it. One key per video, overwritten by the next failure.
+const STORAGE_UNREADABLE_PREFIX = "binary-youtube-reader:unreadable:";
 const STORAGE_V8_PREFIX = "binary-youtube-reader:v8:";
 const STORAGE_V7_PREFIX = "binary-youtube-reader:v7:";
 const STORAGE_V6_PREFIX = "binary-youtube-reader:v6:";
@@ -129,6 +133,12 @@ const STORAGE_V1_PREFIX = "binary-youtube-reader:v1:";
 const PREFERENCES_KEY = "binary-youtube-reader:preferences:v1";
 const POLL_MS = 100;
 const STEP_TAP_SETTLE_MS = DEFAULT_STEP_GESTURE_TIMING.tapSettleMs;
+// What one settled Step sequence is called in history, by its net displacement.
+const STEP_SEQUENCE_LABEL = {
+  forward: "Step Forward",
+  backward: "Step Backward",
+  none: "Step Reversal"
+};
 const STEP_PRESETS = [0.25, 0.5, 1, 2, 3, 5, 10, 15, 30, 60, 120, 300];
 const STEP_FRACTIONS = [1 / 32, 1 / 16, 1 / 8];
 const NATIVE_GO_SETTLE_MS = 220;
@@ -223,6 +233,7 @@ const state = {
   playerReady: false,
   videoLoaded: false,
   videoId: null,
+  unreadableGuidePrefix: null,
   playerState: YOUTUBE_STATE.UNSTARTED,
   availableRates: [1],
   transport: idleTransport(),
@@ -675,6 +686,7 @@ function readStoredGuide(duration) {
     [STORAGE_V1_PREFIX, raw => migrateSavedRegions(raw, state.videoId)]
   ];
 
+  let unreadable = null;
   for (const [prefix, convert] of candidates) {
     try {
       const stored = localStorage.getItem(storageKey(prefix));
@@ -682,11 +694,27 @@ function readStoredGuide(duration) {
       const converted = convert(JSON.parse(stored));
       const recovered = sanitizeGuide(converted, state.videoId, duration);
       if (validateGuide(recovered, duration)) return recovered;
+      unreadable = unreadable || { prefix, stored };
     } catch (error) {
       console.warn(`Could not read Guide from ${prefix}`, error);
+      unreadable = unreadable || { prefix, stored: localStorage.getItem(storageKey(prefix)) };
     }
   }
+  // A record that exists but cannot be read is not the same thing as no record,
+  // and the operator has to be told which happened: an empty map and a lost map
+  // look identical. The damaged text is moved aside before an empty Guide is
+  // returned, because the next save would otherwise write over the only copy.
+  if (unreadable) preserveUnreadableGuide(unreadable);
   return createGuide(state.videoId);
+}
+
+function preserveUnreadableGuide({ prefix, stored }) {
+  try {
+    if (stored) localStorage.setItem(storageKey(STORAGE_UNREADABLE_PREFIX), stored);
+  } catch (error) {
+    console.warn("Could not set aside the unreadable Guide", error);
+  }
+  state.unreadableGuidePrefix = prefix;
 }
 
 function transportIs(kind) {
@@ -1080,45 +1108,26 @@ function settlePausedTransport() {
   return true;
 }
 
-function sameSpatialModel(first, second) {
-  if (!first || !second) return false;
-  const sameRange = Math.abs(first.range.start - second.range.start) <= EPSILON
-    && Math.abs(first.range.end - second.range.end) <= EPSILON;
-  const sameResolution = Math.abs(first.resolution.L - second.resolution.L) <= EPSILON
-    && Math.abs(first.resolution.C - second.resolution.C) <= EPSILON
-    && Math.abs(first.resolution.R - second.resolution.R) <= EPSILON
-    && (first.resolution.level ?? 0) === (second.resolution.level ?? 0)
-    && (first.resolutionBasis || "range") === (second.resolutionBasis || "range");
-  const firstFocus = first.focus;
-  const secondFocus = second.focus;
-  const sameFocus = (!firstFocus && !secondFocus) || Boolean(
-    firstFocus
-    && secondFocus
-    && (firstFocus.kind || "saved-section") === (secondFocus.kind || "saved-section")
-    && firstFocus.sectionId === secondFocus.sectionId
-    && Math.abs((firstFocus.extent?.start ?? 0) - (secondFocus.extent?.start ?? 0)) <= EPSILON
-    && Math.abs((firstFocus.extent?.end ?? 0) - (secondFocus.extent?.end ?? 0)) <= EPSILON
-    && Math.abs(firstFocus.returnRange.start - secondFocus.returnRange.start) <= EPSILON
-    && Math.abs(firstFocus.returnRange.end - secondFocus.returnRange.end) <= EPSILON
-  );
-  return sameRange && sameResolution && sameFocus;
-}
-
+// A coalesced Step sequence commits one transaction whatever its net
+// displacement. Undo is not withheld because this particular inverse happens to
+// be cheap: it exists for the movements whose inverse is awkward, imprecise, or
+// several operations long, and the rule that earns it has to be uniform. A
+// sequence that returns to its origin still traversed a path and still leaves a
+// Working Interval behind it, so it is a state worth returning from.
 function flushPendingStep(options = {}) {
   const pending = state.pendingStep;
-  if (!pending) return { flushed: false, cancelled: false, direction: null };
+  if (!pending) return { flushed: false, direction: null };
   clearTimeout(pending.timer);
   state.pendingStep = null;
 
-  if (pending.started && sameSpatialModel(model(), pending.originModel)) {
-    state.session = {
-      model: pending.originModel,
-      history: pending.originHistory,
-      future: pending.originFuture
-    };
-    syncIntervalPinSelection();
-    view.render();
-    return { flushed: true, cancelled: true, direction: pending.lastDirection };
+  // The sequence is named by where it ended up, not by the key that opened it.
+  // Stepping forward once and back twice is a Step Backward however it started.
+  const displacement = currentResolution().C - pending.departure;
+  const direction = Math.abs(displacement) <= EPSILON
+    ? null
+    : displacement > 0 ? "forward" : "backward";
+  if (pending.started) {
+    state.session = relabelLastAction(state.session, STEP_SEQUENCE_LABEL[direction ?? "none"]);
   }
 
   let guidePersisted = true;
@@ -1140,8 +1149,7 @@ function flushPendingStep(options = {}) {
   }
   return {
     flushed: true,
-    cancelled: false,
-    direction: pending.lastDirection,
+    direction,
     guidePersisted,
     carriedRetained: pending.carriedRetained,
     carryClamped: pending.carryClamped,
@@ -1160,10 +1168,12 @@ function completePendingStep(options = {}) {
     ? formatRange(interval)
     : `cleared at ${formatTime(currentResolution().C)}`;
   if (outcome.guidePersisted !== false) {
+    const arrival = formatTime(currentResolution().C);
     setStatus(
-      outcome.cancelled
-        ? `Step sequence returned to ${formatTime(currentResolution().C)}; no state was recorded.`
-        : `Stepped ${outcome.direction === "backward" ? "Backward" : "Forward"} to ${formatTime(currentResolution().C)}; Interval ${intervalStatus}.${retainedCarryStatus(outcome)}`
+      `${outcome.direction
+        ? `Stepped ${outcome.direction === "backward" ? "Backward" : "Forward"} to ${arrival}`
+        : `Step sequence returned to ${arrival}`
+      }; Interval ${intervalStatus}.${retainedCarryStatus(outcome)}`
     );
   }
   view.render();
@@ -1638,8 +1648,6 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
       departure,
       intervalDeparture,
       originModel,
-      originHistory: state.session.history,
-      originFuture: state.session.future || [],
       timer: null,
       started: false,
       lastDirection: direction,
@@ -2589,6 +2597,7 @@ function initializeVideo() {
 
   const requestedStart = clamp(pendingLoad?.startSeconds || 0, 0, duration);
   state.videoId = pendingLoad.videoId;
+  state.unreadableGuidePrefix = null;
   state.session = createSession({
     duration,
     current: requestedStart,
@@ -2619,7 +2628,13 @@ function initializeVideo() {
   stepField?.tick();
   const guidePersisted = persistGuide();
   view.renderGuide();
-  if (guidePersisted) setStatus(`Loaded ${formatTime(duration)} video.`);
+  if (state.unreadableGuidePrefix) {
+    setStatus(
+      `Loaded ${formatTime(duration)} video, but a saved map for it could not be read. `
+      + "This session starts empty; the damaged record was kept rather than replaced.",
+      true
+    );
+  } else if (guidePersisted) setStatus(`Loaded ${formatTime(duration)} video.`);
   view.render();
 }
 
@@ -5596,7 +5611,10 @@ document.addEventListener("keyup", event => {
   const gestureId = `keyboard:${event.key}`;
   if (!stepGesture.isActive(gestureId)) return;
   event.preventDefault();
-  stepGesture.end(gestureId, { observe: true });
+  // Deferred like every other Step release. Without this a keyboard tap settled
+  // on the spot, so three quick presses of `d` became three transactions while
+  // the same three clicks — and a single held `d` — were one.
+  stepGesture.end(gestureId, { observe: true, defer: true });
 });
 
 document.addEventListener("visibilitychange", () => {

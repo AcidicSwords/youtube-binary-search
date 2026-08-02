@@ -187,6 +187,23 @@ Step Reach is:
 
 Hold, Stretch, and Section weight editing cannot write Step Reach.
 
+Movements that arrive inside the tap-settle window coalesce into one sequence
+however the Step is engaged — hotkey, control press, or Enter on a focused
+control. A route may differ in how it acquires the movement; it may not decide
+how much history the movement leaves behind. One such sequence commits exactly
+one transaction once it has moved at all. Net
+displacement does not decide whether the transaction exists. Undo is owed to the
+movements whose counter-movement is awkward, imprecise, or several operations
+long, and a sequence of presses is undone by as many presses as it took however
+it happened to end up; withholding history because one particular inverse was
+cheap would make the rule depend on the path rather than on the operation. A
+sequence that returns to its origin therefore still records, still leaves its
+Working Interval, and still observes its arrival Address like any other Step.
+
+One settled sequence is named by its net displacement rather than by the press
+that opened it: `Step Forward`, `Step Backward`, or `Step Reversal` when the net
+displacement is zero. Forward once and backward twice is a `Step Backward`.
+
 ### Pin traversal
 
 Pin traversal applies Step’s interval-anchor law to the next source-ordered retained Pin that is currently drawn on the Timeline. Standalone Pins are always drawn; section-bound Pins are drawn while at least one referencing Section belongs to the one visible Group. Hidden Pins remain exact Guide targets but are not traversal stops. Range Start and Range End are synthetic stops and are deduplicated by visible real Pins at the same Address.

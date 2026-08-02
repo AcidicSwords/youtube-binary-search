@@ -37,6 +37,8 @@ clone current model
 
 Held Step, drag, cascade deletion, Deform, direct weight editing, Focus, and Unfocus amend one origin snapshot and settle as one Undo transaction. Session owns bounded `history` and `future`; a new commit clears `future`.
 
+Step is the one gesture that commits before it settles, because its first press must move Current immediately; the rest of the sequence amends that transaction. It therefore names itself twice: `step()` labels the opening press, and `flushPendingStep()` calls `relabelLastAction()` with the settled sequence's net direction. Coalescing never removes the transaction — a sequence that returns to its origin is relabelled `Step Reversal`, not discarded — so a Step sequence and the same movements performed slowly are the same one history entry.
+
 `stepReach` stores `{ mode, backward, forward, fraction }`. Field offsets are separate preferences. `effectiveStepReach()` is the sole adaptive conversion boundary and receives the current timeline projection.
 
 ## Positive spatial projection
@@ -356,6 +358,8 @@ Reach, the configured Field Breath `{ inner, outer, rate }`, the Nudge quantum,
 Field visibility, and pane visibility.
 
 Guide schema v9 names the one visible Group on the Guide as `visibleGroupId`; a Group itself persists only its label and its `active` flag. v8 wrote a `visible` boolean on every Group, which let a save record two visible Groups or none, so reading one is where that ambiguity is resolved: the first Group the save marked visible becomes the named Group, falling back to `Map`. A v9 Guide naming a Group that no longer exists resolves the same way. Activity, labels, memberships, Weights, Pin Addresses and every retained identity cross the migration unchanged, and re-reading a v9 Guide changes nothing.
+
+A stored Guide that exists but cannot be read is not treated as no Guide. `readStoredGuide()` copies the unreadable text to `binary-youtube-reader:unreadable:<videoId>` before returning an empty Guide, and the load reports what happened, because an empty map and a lost map are otherwise indistinguishable and the next save would write over the only copy.
 
 Guide schema v7 persists Section `weight`; it never persists Timeline Space, segment density, lanes, gradients, or projected positions. Legacy v6 `collapsed: true` migrates once to `0.25×`, the closest positive replacement, while open Sections migrate to `1×`. The legacy flag is discarded.
 

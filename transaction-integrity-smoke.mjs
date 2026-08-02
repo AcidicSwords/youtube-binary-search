@@ -288,4 +288,34 @@ assert.match(byId.get("status").textContent, /already called/,
     "It creates its own endpoint instead.");
 }
 
-console.log("Transaction integrity smoke passed: a retained Cue is written to storage in the transaction that reports it and survives reopening; a pending Nudge settles before the next operator commits, so Undo unwinds in the order actions happened; one held Weight gesture walks the ladder as one checkpoint while a single press stays its own; the relationship band stays bounded under heavy overlap while every Section keeps its control; Group names cannot collide; and Address equality never silently chooses among coincident Pin identities.");
+// ==============================================================================
+// 7. A saved map that cannot be read is reported, and is not overwritten
+// ==============================================================================
+//
+// An empty map and a lost map look identical on screen. A record damaged by a
+// partial write used to warn to a console nobody reads, start the session empty,
+// and then be destroyed by the first save — the one failure in the project that
+// could not be undone.
+{
+  const key = [...env.localStorage.values.keys()].find(name => name.includes(":v9:"));
+  const intact = env.localStorage.values.get(key);
+  assert.ok(intact && intact.length > 40, "There is a saved map to damage.");
+  env.localStorage.values.set(key, intact.slice(0, Math.floor(intact.length * 0.6)));
+
+  await loadVideo("https://youtu.be/dQw4w9WgXcQ");
+
+  assert.match(byId.get("status").textContent, /could not be read/i,
+    "A record that exists but cannot be read is reported, not silently treated as absent.");
+  assert.equal(byId.get("pins-list-count").textContent, "0",
+    "The session starts empty because nothing could be recovered.");
+
+  const preserved = env.localStorage.values.get(
+    "binary-youtube-reader:unreadable:dQw4w9WgXcQ"
+  );
+  assert.equal(preserved, intact.slice(0, Math.floor(intact.length * 0.6)),
+    "The damaged record is set aside before an empty Guide can be saved over it.");
+  assert.notEqual(env.localStorage.values.get(key), preserved,
+    "and the ordinary key carries on as usual.");
+}
+
+console.log("Transaction integrity smoke passed: a retained Cue is written to storage in the transaction that reports it and survives reopening; a pending Nudge settles before the next operator commits, so Undo unwinds in the order actions happened; one held Weight gesture walks the ladder as one checkpoint while a single press stays its own; the relationship band stays bounded under heavy overlap while every Section keeps its control; Group names cannot collide; and Address equality never silently chooses among coincident Pin identities; and an unreadable saved map is reported and set aside rather than overwritten.");

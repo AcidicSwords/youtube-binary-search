@@ -131,4 +131,25 @@ assert.equal(
   "Undo must also revert a rapid sequence of repeated Step taps."
 );
 
-console.log("Step gesture smoke passed: captured and fallback pointer release, keyboard hold, and human-cadence rapid taps each retain one-operation Undo.");
+// The same cadence on the Step hotkey is the same operation and owes the same
+// one transaction. Releasing a keyboard tap used to settle on the spot, so three
+// quick presses of `d` became three entries while three clicks were one -- the
+// route decided the history depth, which is not something a route may decide.
+for (let index = 0; index < 3; index += 1) {
+  dispatchDocument("keydown", { key: "d", code: "KeyD" });
+  await flush(2);
+  dispatchDocument("keyup", { key: "d", code: "KeyD" });
+  await flush(2);
+}
+assert.equal(currentText(), "Current 1:20", "Three hotkey taps Step three times.");
+await env.delay(300);
+await flush();
+byId.get("return-action").click();
+await flush();
+assert.equal(
+  currentText(),
+  "Current 0:50",
+  "A rapid hotkey sequence is one transaction, exactly as the same taps on the control are."
+);
+
+console.log("Step gesture smoke passed: captured and fallback pointer release, keyboard hold, and human-cadence rapid taps on control and hotkey alike each retain one-operation Undo.");
