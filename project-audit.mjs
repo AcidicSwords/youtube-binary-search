@@ -408,8 +408,19 @@ assert.match(view, /timelinePinClusterGap/);
 assert.match(view, /COARSE_TIMELINE_PIN_HIT_SIZE\s*=\s*56/);
 assert.match(view, /TIMELINE_PIN_HIT_SIZE\s*=\s*52/);
 assert.match(view, /TIMELINE_SECTION_HIT_WIDTH\s*=\s*28/);
-assert.doesNotMatch(view, /TIMELINE_SECTION_MAX_LANES|lane %/);
-assert.match(view, /packedSections\.laneCount \* sectionLaneHeight/);
+// The relationship band is bounded, as the canonical documents say. Overlap
+// creates lanes without limit, so an unbounded band moved the whole workspace
+// down by a lane per overlap. The band stops at MAX_LANES and deeper structure
+// scrolls inside it -- lanes are never reused by modulo, which would overlap two
+// Sections into one control.
+assert.match(view, /TIMELINE_SECTION_MAX_LANES\s*=\s*5/);
+assert.match(view, /Math\.min\(laneCount, TIMELINE_SECTION_MAX_LANES\)/);
+assert.match(view, /classList\.toggle\("is-overflowing"/);
+assert.match(styles, /\.section-lane\.is-overflowing[\s\S]*overflow-y:\s*auto/);
+assert.doesNotMatch(view, /lane % TIMELINE_SECTION_MAX_LANES/);
+assert.match(view, /bandLanes \* sectionLaneHeight/);
+assert.match(view, /laneCount \* sectionLaneHeight/,
+  "and the true depth is still measured, so the band can scroll to it.");
 assert.match(view, /--pin-hit-size/);
 assert.match(styles, /\.timeline-pin:active:not\(:disabled\)[\s\S]*transform:\s*translate\(-50%, -50%\)/);
 assert.doesNotMatch(view, /dataset\.(references|pinKind)/);

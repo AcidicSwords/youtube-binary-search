@@ -1259,7 +1259,7 @@ function settleBeforeAction(options = {}) {
       issuePause: !handoffTransport,
       handoffField: handoffTransport
     });
-  } else {
+  } else if (options.transport !== false) {
     settleTransport({
       issuePause: !handoffTransport,
       handoffField: handoffTransport
@@ -2239,6 +2239,14 @@ function restoreGuideMutationFocus(action) {
     ?.focus?.({ preventScroll: true });
 }
 
+// Dialog actions that change only a name. Everything else in the dialog can
+// dissolve topology or move Focus, and those do settle observation.
+const METADATA_ONLY_DIALOGS = new Set([
+  "rename-pin",
+  "rename-section",
+  "rename-group"
+]);
+
 function submitGuideDialog(event) {
   event.preventDefault();
   const action = state.guideDialog;
@@ -2247,7 +2255,11 @@ function submitGuideDialog(event) {
   let result = null;
   let status = "";
 
-  settleBeforeAction();
+  // A rename, a Group's name, a Group's layer or activity: none of these move
+  // Current, change Range, or touch the source position. Settling transport for
+  // them stopped playback for an edit that had nothing to do with it. Pending
+  // gestures still settle -- those are unwritten transactions either way.
+  settleBeforeAction({ transport: !METADATA_ONLY_DIALOGS.has(action.action) });
   if (action.action === "rename-pin") {
     result = renameGuidePin(state.session, action.id, value);
     status = result.changed ? "Renamed Pin." : "Pin title is unchanged.";
@@ -2286,7 +2298,9 @@ function submitGuideDialog(event) {
       ? "Renamed Group."
       : result.reason === "empty-group-label"
         ? "A Group needs a name: unlike a Section, it has no Address to be known by."
-        : "Group title is unchanged.";
+        : result.reason === "duplicate-group-label"
+          ? `Another Group is already called “${value}”. A Group has no Address, so its name has to tell it apart.`
+          : "Group title is unchanged.";
   } else if (action.action === "delete-group") {
     result = deleteGuideGroup(state.session, action.id);
     status = result.changed
@@ -2311,7 +2325,13 @@ function submitGuideDialog(event) {
         : `The ${action.role} endpoint could not be unlinked.`;
   }
 
-  if (result?.changed) accept(result, { renderGuide: true, status });
+  // A name change has no player consequence, so it issues none. Everything else
+  // in this dialog can dissolve topology or move Focus and keeps the effect.
+  if (result?.changed) accept(result, {
+    renderGuide: true,
+    status,
+    effect: !METADATA_ONLY_DIALOGS.has(action.action)
+  });
   else setStatus(status, !result);
   closeGuideDialog({ restoreFocus: false });
   restoreGuideMutationFocus(action);
@@ -4868,7 +4888,7 @@ elements["guide-tab-cues"].addEventListener("click", () => selectGuideTab("cues"
 elements["sections-list"].addEventListener("change", event => {
   const move = event.target.closest?.("[data-section-group]");
   if (move) {
-    settleBeforeAction();
+    settleBeforeAction({ transport: false });
     const moved = assignGuideSectionGroup(
       state.session,
       move.dataset.sectionGroup,
@@ -4891,7 +4911,7 @@ elements["sections-list"].addEventListener("change", event => {
   if (!toggle) return;
   const key = toggle.dataset.groupState;
   if (key !== "visible" && key !== "active") return;
-  settleBeforeAction();
+  settleBeforeAction({ transport: false });
   const result = setGuideGroupState(state.session, toggle.dataset.groupToggle, {
     [key]: toggle.checked === true
   });
@@ -4920,8 +4940,10 @@ elements["sections-list"].addEventListener("click", event => {
   }
   if (!event.target.closest?.("[data-group-add]")) return;
   event.stopPropagation();
-  settleBeforeAction();
-  const created = createGuideGroup(state.session, `Group ${(guide().groups?.length || 1)}`);
+  settleBeforeAction({ transport: false });
+  // The Guide chooses the first free ordinal; passing a count could collide
+  // after a removal.
+  const created = createGuideGroup(state.session);
   if (!created.changed) return;
   accept(created, {
     effect: false,

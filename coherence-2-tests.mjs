@@ -168,7 +168,13 @@ const close = (actual, expected, tolerance = 1e-9) => {
   assert.match(index, /Go to Timeline Midpoint/);
   assert.doesNotMatch(index, /Step Field|Temporal map/);
   assert.match(styles, /left: var\(--section-midpoint, 50%\)/);
-  assert.doesNotMatch(view, /TIMELINE_SECTION_MAX_LANES|lane %/);
+  // The lane bound was removed here while INTERFACE and IMPLEMENTATION both
+  // still specified a bounded five-lane band, and this assertion froze that
+  // contradiction. The bound is restored -- with scrolling rather than modulo
+  // reuse, so no two Sections share one control -- and project-audit.mjs owns
+  // the law now. Only the part coherence-2 actually decided is kept: lanes are
+  // never reused by modulo.
+  assert.doesNotMatch(view, /lane % TIMELINE_SECTION_MAX_LANES/);
   assert.match(app, /elements\["full-video-range"\]\.addEventListener\("click", \(\) => \{\n  if \(rejectFocusedRangeBoundaryEdit\(\)\) return;/);
   assert.match(view, /elements\["full-video-range"\]\.disabled = interactionLocked\n      \|\| focusOwnsBoundaries/);
   assert.match(styles, /\.guide-group-block/);

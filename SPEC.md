@@ -873,6 +873,9 @@ retaining a Cue is the ordinary save and carries the offered title
 an operation acting on a Pin is reached from that Pin
 one name identifies an unnamed Section everywhere it is named
 a Group always has a name, because it has no Address to be known by
+no two Groups read alike, in any letter case
+the relationship band is bounded; deeper structure scrolls rather than growing it
+an edit that moves nothing settles no observation
 any operator that changes the drawn scope says so
 a Group is renamed and removed like any other retained object, destroying nothing; removal is refused when returning its Sections to Map would collapse layered identities
 composition yields an extent, never a set, so every operator consumes it unchanged

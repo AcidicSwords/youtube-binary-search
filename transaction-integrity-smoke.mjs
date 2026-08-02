@@ -207,4 +207,54 @@ await flush();
 assert.equal(weightValue(), single,
   "and Undo reverses exactly that press, not both.");
 
-console.log("Transaction integrity smoke passed: a retained Cue is written to storage in the transaction that reports it and survives reopening; a pending Nudge settles before the next operator commits, so Undo unwinds in the order actions happened; and one held Weight gesture walks the ladder as one checkpoint while a single press stays its own.");
+// ==============================================================================
+// 4. The relationship band is bounded, and observation survives a rename
+// ==============================================================================
+// Overlap creates lanes without limit. An unbounded band moved the whole
+// workspace down by a lane per overlap, so building structure gradually
+// destabilised the instrument. And settling transport for a rename stopped
+// playback for an edit that moves nothing.
+for (let index = 0; index < 12; index += 1) {
+  byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 100 + index * 3 });
+  await flush();
+  byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 700 - index * 3 });
+  await flush();
+  byId.get("section-capture").dispatch("submit");
+  await flush();
+  byId.get("release").click();
+  await flush();
+}
+const drawnControls = descendants(byId.get("section-lane"))
+  .filter(node => node.dataset.sectionGo).length;
+assert.ok(drawnControls >= 12,
+  "Every overlapping Section keeps its own control.");
+assert.equal(byId.get("section-lane").classList.contains("is-overflowing"), true,
+  "Past the bound the band scrolls,");
+const boundedHeight = Number.parseInt(byId.get("timeline").style["--timeline-height"], 10);
+assert.ok(boundedHeight < 320,
+  `and the Timeline stops growing (${boundedHeight}px) instead of moving the page.`);
+
+// Names are identities, so no two Groups may read alike.
+const groupAdd = () => descendants(byId.get("sections-list"))
+  .filter(node => node.dataset.groupAdd !== undefined)[0];
+byId.get("sections-list").dispatch("click", { target: groupAdd() });
+await flush();
+byId.get("sections-list").dispatch("click", { target: groupAdd() });
+await flush();
+const names = descendants(byId.get("sections-list"))
+  .filter(node => String(node.className).includes("guide-group-name"))
+  .map(node => node.textContent);
+assert.equal(new Set(names).size, names.length,
+  "Automatic Group names never collide.");
+
+const renameButtons = descendants(byId.get("sections-list"))
+  .filter(node => node.dataset.renameGroup !== undefined);
+byId.get("sections-list").dispatch("click", { target: renameButtons[1] });
+await flush();
+byId.get("guide-dialog-input").value = names[0].toLowerCase();
+byId.get("guide-dialog-form").dispatch("submit");
+await flush();
+assert.match(byId.get("status").textContent, /already called/,
+  "and taking another Group's name is refused, in any letter case.");
+
+console.log("Transaction integrity smoke passed: a retained Cue is written to storage in the transaction that reports it and survives reopening; a pending Nudge settles before the next operator commits, so Undo unwinds in the order actions happened; one held Weight gesture walks the ladder as one checkpoint while a single press stays its own; the relationship band stays bounded under heavy overlap while every Section keeps its control; and Group names cannot collide.");

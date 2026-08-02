@@ -778,6 +778,23 @@ kbd {
   pointer-events: none;
 }
 
+/* Past the bounded band the relationships scroll in place. The band keeps its
+   height so the rest of the instrument does not move, and every Section keeps
+   its own control rather than being overlapped or dropped. */
+.section-lane.is-overflowing {
+  inset: var(--section-top, 155px) 0 auto;
+  height: calc(var(--timeline-height, 224px) - var(--section-top, 155px) - 4px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+}
+
+.section-lane.is-overflowing::after {
+  content: "";
+  display: block;
+  height: var(--section-content-height, 0);
+}
+
 /* Cues are drawn, never operated. Their full offered extents are visible, but
    nothing in this lane takes a pointer, so an offer cannot become an operand
    until the user retains it. */
