@@ -621,8 +621,9 @@ A Section row contains a Title, Start and End Address inputs, a Duration readout
 Weight, Focus, Unlink, Rename, and Delete. The full-map profile remains a
 read-only positional representation and acquisition link to the Timeline.
 
-Address inputs accept canonical timecode or seconds, clamp against Range and
-structural partners, reject Section collapse or reversal, preview the candidate
+Address inputs accept canonical timecode or seconds, reject anything outside
+Range or outside its structural partners, reject Section collapse or reversal,
+reject a timecode part that is not one, preview the candidate
 Field Frame before commit, commit on Enter or explicit Apply, cancel on Escape,
 and create one Undo transaction. Increment buttons use the same Nudge operation
 as Timeline Shift-wheel and keyboard nudging.
