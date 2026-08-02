@@ -1,11 +1,6 @@
 name: Apply coherence 3 final
 
 on:
-  push:
-    branches:
-      - tmp/coherence-3-work
-    paths:
-      - .github/workflows/apply-coherence-3-final.yml
   pull_request:
     branches:
       - tmp/coherence-3-squash-base
@@ -26,6 +21,10 @@ jobs:
           node-version: 20
       - name: Reconstruct and apply reviewed patch
         run: |
+          wc -c coherence.patch.gz.b64.00 coherence.patch.gz.b64.01 coherence.patch.gz.b64.02
+          echo "f9b971ecec24be7b97f11d359c9bcf901ec587bcd0102bd35041e5071c79a9b9  coherence.patch.gz.b64.00" | sha256sum -c -
+          echo "2379a67394ae933d2d3662774fccbef2bebf6d40b6ab56c984437578532dd61d  coherence.patch.gz.b64.01" | sha256sum -c -
+          echo "2074c3b99b48c5bb485e4f0c8cccf27f2ed169622fc52ea83f6c2d71a2c1ceca  coherence.patch.gz.b64.02" | sha256sum -c -
           cat coherence.patch.gz.b64.00 coherence.patch.gz.b64.01 coherence.patch.gz.b64.02 \
             | base64 -d | gunzip > /tmp/coherence-3-final.patch
           echo "9f732582b869887023aed29ac5a58a5bc7a62bf5528ead196362fd437eae7cc4  /tmp/coherence-3-final.patch" | sha256sum -c -
