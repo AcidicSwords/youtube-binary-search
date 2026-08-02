@@ -871,6 +871,7 @@ Guide focus and Timeline operand selection are independent
 Guide navigation reaches hidden objects without making them Timeline operands
 retaining a Cue is the ordinary save and carries the offered title
 an operation acting on a Pin is reached from that Pin
+Address equality is not identity equality; coincident Pins are never chosen by order
 one name identifies an unnamed Section everywhere it is named
 a Group always has a name, because it has no Address to be known by
 no two Groups read alike, in any letter case

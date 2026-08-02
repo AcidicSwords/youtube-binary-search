@@ -257,4 +257,35 @@ await flush();
 assert.match(byId.get("status").textContent, /already called/,
   "and taking another Group's name is refused, in any letter case.");
 
-console.log("Transaction integrity smoke passed: a retained Cue is written to storage in the transaction that reports it and survives reopening; a pending Nudge settles before the next operator commits, so Undo unwinds in the order actions happened; one held Weight gesture walks the ladder as one checkpoint while a single press stays its own; the relationship band stays bounded under heavy overlap while every Section keeps its control; and Group names cannot collide.");
+// ==============================================================================
+// 5. Address equality is not identity equality
+// ==============================================================================
+// Unlink deliberately produces independently owned Pins at one Address. Every
+// creation path resolved "the Pin at 0:30" with .find(), so new structure
+// silently attached to whichever identity happened to be created earliest --
+// an attachment no inspection could tell apart from the one the user meant.
+{
+  const { createGuide, createSectionFromTimes, unlinkSectionEndpoint, pinsAt } =
+    await import("./guide.js");
+  const guide = createGuide("identity");
+  const first = createSectionFromTimes(guide, 30, 60, {}).section;
+  const second = createSectionFromTimes(guide, 30, 80, {}).section;
+  assert.equal(first.startPinId, second.startPinId,
+    "One Pin at an Address is still shared: exactly one match reuses it.");
+
+  unlinkSectionEndpoint(guide, second.id, "start");
+  const coincident = pinsAt(guide, 30);
+  assert.equal(coincident.length, 2,
+    "Unlink leaves two independent identities at the same Address.");
+
+  const third = createSectionFromTimes(guide, 30, 90, {}).section;
+  assert.equal(
+    coincident.some(pin => pin.id === third.startPinId),
+    false,
+    "A new Section at that Address takes neither of them: ambiguity is never guessed."
+  );
+  assert.equal(pinsAt(guide, 30).length, 3,
+    "It creates its own endpoint instead.");
+}
+
+console.log("Transaction integrity smoke passed: a retained Cue is written to storage in the transaction that reports it and survives reopening; a pending Nudge settles before the next operator commits, so Undo unwinds in the order actions happened; one held Weight gesture walks the ladder as one checkpoint while a single press stays its own; the relationship band stays bounded under heavy overlap while every Section keeps its control; Group names cannot collide; and Address equality never silently chooses among coincident Pin identities.");

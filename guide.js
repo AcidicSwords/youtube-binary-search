@@ -317,11 +317,28 @@ export function findPinAt(guide, address, epsilon = EPSILON) {
   return guide.pins.find(pin => Math.abs(pin.t - address) <= epsilon) || null;
 }
 
+// Address equality is not identity equality. Unlink deliberately produces
+// independently owned Pins at one Address, so "the Pin at 0:30" can name more
+// than one object -- and picking the first in array order silently attached new
+// structure to whichever happened to be created earliest.
+export function pinsAt(guide, address, epsilon = EPSILON) {
+  return (guide?.pins || []).filter(pin => Math.abs(pin.t - address) <= epsilon);
+}
+
 export function ensurePin(guide, address, options = {}) {
   if (!guide || !Array.isArray(guide.pins)) throw new TypeError("A valid Guide is required.");
   if (!Number.isFinite(address)) throw new TypeError("A Pin requires a finite Address.");
 
-  const existing = findPinAt(guide, address, options.epsilon ?? EPSILON);
+  // Zero matches creates; exactly one reuses it; more than one is ambiguous and
+  // is never guessed. A caller that knows which identity it means says so with
+  // `preferPinId`; otherwise an independent coincident Pin is created, because
+  // inventing an attachment to one of several equals is the one outcome that
+  // cannot be undone by inspection.
+  const matches = pinsAt(guide, address, options.epsilon ?? EPSILON);
+  const preferred = options.preferPinId
+    ? matches.find(pin => pin.id === options.preferPinId)
+    : null;
+  const existing = preferred || (matches.length === 1 ? matches[0] : null);
   if (existing) {
     if (options.label?.trim()) existing.label = options.label.trim();
     if (options.kind === PIN_KIND.EXPLICIT) existing.kind = PIN_KIND.EXPLICIT;

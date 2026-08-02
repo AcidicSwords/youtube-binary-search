@@ -35,6 +35,7 @@
 - Build twenty overlapping Sections. Confirm the Timeline stops growing at five lanes, that the band scrolls to reach the rest, that no two Sections share one control, and that the rest of the page does not move.
 - Rename a Section, rename a Group, and change a Group's layer or activity while playing. Confirm observation continues through each.
 - Confirm a second Group cannot take an existing Group's name, in any letter case, and that automatic names never collide after a removal.
+- Unlink a shared endpoint so two Pins sit at one Address, then build a Section starting there. Confirm it takes neither existing identity and creates its own endpoint rather than attaching to one silently.
 - Confirm a Group is renamed and removed from its own row, that removing one returns its Sections to the map, and that Undo restores it in the state it was removed in.
 - Confirm two unnamed Sections sharing one Pin offer two distinguishable Unlink buttons, and that Undo labels name the same object the status named.
 - Confirm Group visibility is a single `On Timeline` radio choice while `Active` remains an independent checkbox: switching the visible Group atomically replaces all Timeline Sections and section-bound Pins without changing deformation; hidden active Groups continue multiplying Weight; visible inactive Groups remain editable with no deformation gradient.

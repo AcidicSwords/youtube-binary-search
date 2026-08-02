@@ -183,6 +183,11 @@ assert.doesNotMatch(view, /Unlink \$\{role === "start" \? "Start" : "End"\}/);
 // And the Section states which Pin each endpoint is, rather than leaving it to
 // be found by Address in a list ordered by Address.
 assert.match(view, /dataset\.revealPin = revealPinId/);
+// Address equality is not identity equality: Unlink deliberately makes
+// coincident Pins, so a creation path may reuse exactly one match and must
+// never pick among several.
+assert.match(guide, /export function pinsAt/);
+assert.match(guide, /matches\.length === 1 \? matches\[0\] : null/);
 assert.match(app, /function revealPin[\s\S]*selectGuideTab\("pins"\)[\s\S]*kind: "pin"/);
 assert.doesNotMatch(view, /Relink|data\.linkSectionEndpoint/);
 assert.doesNotMatch(view, /guide-item-more|guide-secondary-actions|More actions for/);
