@@ -93,6 +93,24 @@ for (const name of ["PROJECT.md", "GLOSSARY.md", "SPEC.md", "IMPLEMENTATION.md",
   assert.ok(docs["README.md"].includes(`\`${name}\``), `README must link ${name}`);
 }
 
+// Drawings, mechanism and gauges must state one law. Each of these was a live
+// contradiction: a ladder the code does not use, a claim that no Pin is ever
+// hidden after Group visibility made that routine, a Current drag described as
+// Go where the law is Step, and an Address input described as clamping where
+// Validation requires rejection.
+assert.doesNotMatch(docs["IMPLEMENTATION.md"], /0\.25×–2×/,
+  "The canonical Weight ladder is 0.125x-4x.");
+assert.match(docs["IMPLEMENTATION.md"], /0\.125×–4×/);
+assert.doesNotMatch(docs["README.md"], /hidden Pins,/,
+  "Group visibility makes Timeline-hidden, Guide-reachable Pins ordinary.");
+assert.doesNotMatch(docs["IMPLEMENTATION.md"], /Current marker: acquired on pointer-down, then exact Go/,
+  "Releasing a Current drag commits a Step, not a Go.");
+assert.doesNotMatch(docs["INTERFACE.md"], /clamp against Range/,
+  "Exact Address input rejects rather than clamps.");
+assert.match(docs["INTERFACE.md"], /reject anything outside Range/);
+assert.match(app, /function parseAddress[\s\S]*parts\.slice\(1\)\.some\(part => Number\(part\) >= 60\)/,
+  "and refuses timecode parts that are not timecode.");
+
 const canonicalText = [html, ...Object.values(docs)].join("\n");
 assert.doesNotMatch(canonicalText, /\bApplication Continue\b|\bSkim\b|Fold Point proxy/i);
 assert.doesNotMatch(canonicalText, /Pin Forward\/Backward replaces Interval/i);
@@ -162,8 +180,13 @@ assert.doesNotMatch(view, /pin-cluster-drag/,
   "The cluster menu must not carry a separate drag handle.");
 assert.match(view, /button\.dataset\.pinGo = pin\.id[\s\S]*button\.dataset\.pinDrag = pin\.id/);
 assert.match(app, /"pin-lane"\]\.addEventListener\("pointerdown"[\s\S]*beginGuideDrag\("pin"/);
-assert.match(app, /function syncIntervalPinSelection[\s\S]*orderedPins\(guide\(\)\)\.find\(pin => Math\.abs\(pin\.t - interval\.start\)[\s\S]*orderedPins\(guide\(\)\)\.find\(pin => Math\.abs\(pin\.t - interval\.end\)/,
+// Alignment is geometric and may be shared; identity is not. Indication derives
+// only from Pins currently on Timeline, and every Pin standing at a boundary is
+// indicated rather than one chosen by array order.
+assert.match(app, /function syncIntervalPinSelection[\s\S]*const alignedAt = address => orderedPins\(guide\(\)\)\s*\.filter\(pin => Math\.abs\(pin\.t - address\) <= EPSILON\)/,
   "Working-Interval endpoint indication may derive only from Pins currently on Timeline.");
+assert.doesNotMatch(app, /function syncIntervalPinSelection[\s\S]*orderedPins\(guide\(\)\)\.find\(/,
+  "and must not choose one coincident identity by array order.");
 assert.match(app, /guideRetained:\s*null/);
 assert.match(app, /function retainedIsOnTimeline[\s\S]*pinIsVisible[\s\S]*sectionIsVisible/);
 assert.match(view, /state\(\)\.guideRetained\?\.kind === "section"/);

@@ -879,6 +879,10 @@ the relationship band is bounded; deeper structure scrolls rather than growing i
 an edit that moves nothing settles no observation
 any operator that changes the drawn scope says so
 a focused interactive element owns Space; the reader background observes
+a typed Address is honoured exactly or refused; clamping belongs to dragging
+alignment is geometric and shared; identity is not, and is never inferred from it
+a breakpoint changes the form of a panel, never whether the reader wanted it open
+routes claiming one operation reach one canonical consequence
 Guide editing restores focus by identity, because the node it rebuilds is gone
 a Group is renamed and removed like any other retained object, destroying nothing; removal is refused when returning its Sections to Map would collapse layered identities
 composition yields an extent, never a set, so every operator consumes it unchanged

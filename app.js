@@ -559,12 +559,16 @@ function syncIntervalPinSelection() {
   const retainedMatches = retainedSection
     && Math.abs(retainedSection.start - interval.start) <= EPSILON
     && Math.abs(retainedSection.end - interval.end) <= EPSILON;
+  // Alignment is a geometric relation, and geometry may coincide without
+  // identity collapsing. Every visible Pin standing at a boundary is indicated
+  // as aligned; choosing one by array order named an identity the reader never
+  // picked. An exact retained Section still supplies its own two endpoints,
+  // because there the identities are known rather than inferred.
+  const alignedAt = address => orderedPins(guide())
+    .filter(pin => Math.abs(pin.t - address) <= EPSILON);
   const pins = retainedMatches
     ? [retainedSection.startPin, retainedSection.endPin]
-    : [
-        orderedPins(guide()).find(pin => Math.abs(pin.t - interval.start) <= EPSILON),
-        orderedPins(guide()).find(pin => Math.abs(pin.t - interval.end) <= EPSILON)
-      ];
+    : [...alignedAt(interval.start), ...alignedAt(interval.end)];
   state.selectedPinIds = [...new Set(
     pins.filter(Boolean).map(pin => pin.id)
   )];
@@ -4210,10 +4214,14 @@ function applyGuideState({ focus = false } = {}) {
   }
 }
 
+// A breakpoint changes the physical form of the rail. It does not decide what
+// the reader wanted open: rotating a device or resizing a window used to open
+// or close the Guide on their behalf, so a deliberate close could be undone by
+// a width change alone. The first layout still chooses a sensible default,
+// because there is no intent to preserve yet.
 function syncGuideLayout() {
   const compact = compactGuideLayout();
   if (state.compactGuide === null) state.guideOpen = !compact;
-  else if (state.compactGuide !== compact) state.guideOpen = !compact;
   state.compactGuide = compact;
   applyGuideState();
 }
@@ -5021,15 +5029,20 @@ function trapCompactGuideFocus(event) {
 // Guide is the exact editor. Address inputs accept canonical timecode or plain
 // seconds, clamp against Range and structural partners, and commit as one
 // transaction. There is no second drag geometry here.
+// Guide is the exact editor, so a typed Address is honoured exactly or refused.
+// Clamping belongs to dragging, where the boundary is physically encountered and
+// felt; silently turning 2:00 into 1:30 makes the one surface that promises
+// exactness the one that quietly disagrees with what was typed. Timecode parts
+// are bounded too -- 1:75 is not a way of writing 2:15, it is a typing error.
 function parseAddress(value) {
   const text = String(value ?? "").trim();
   if (!text) return null;
-  if (/^-?\d+(\.\d+)?$/.test(text)) return Number(text);
-  const parts = text.split(":");
-  if (parts.length > 3 || parts.some(part => !/^\d+(\.\d+)?$/.test(part.trim()))) {
-    return null;
-  }
-  return parts.reduce((total, part) => total * 60 + Number(part.trim()), 0);
+  if (/^\d+(\.\d+)?$/.test(text)) return Number(text);
+  const parts = text.split(":").map(part => part.trim());
+  if (parts.length < 2 || parts.length > 3) return null;
+  if (parts.some(part => !/^\d+(\.\d+)?$/.test(part))) return null;
+  if (parts.slice(1).some(part => Number(part) >= 60)) return null;
+  return parts.reduce((total, part) => total * 60 + Number(part), 0);
 }
 
 function guideAddressTarget(input) {
@@ -5060,7 +5073,19 @@ function applyGuideAddressInput(input) {
     view.renderGuide();
     return false;
   }
-  const address = clamp(parsed, activeRange().start, activeRange().end);
+  // Outside the active Range is refused, not folded to the boundary: the value
+  // that comes back is the one still committed, so the field never disagrees
+  // with the object it edits.
+  const range = activeRange();
+  if (parsed < range.start - EPSILON || parsed > range.end + EPSILON) {
+    setStatus(
+      `${formatTime(parsed)} is outside the active Range ${formatRange(range)}.`,
+      true
+    );
+    view.renderGuide();
+    return false;
+  }
+  const address = parsed;
   const origin = snapshotModel(model(), { cloneGuide: true });
   const result = target.kind === "pin"
     ? moveGuidePin(state.session, target.id, address, { amend: true })
@@ -5104,7 +5129,11 @@ function previewGuideAddressInput(input) {
   if (!target || parsed === null || !Number.isFinite(parsed) || !state.videoLoaded) {
     return false;
   }
-  const address = clamp(parsed, activeRange().start, activeRange().end);
+  const previewRange = activeRange();
+  if (parsed < previewRange.start - EPSILON || parsed > previewRange.end + EPSILON) {
+    return false;
+  }
+  const address = parsed;
   const section = target.sectionId
     ? resolveSection(guide(), target.sectionId)
     : input.dataset.addressInput === "section"
@@ -5485,12 +5514,14 @@ document.addEventListener("keydown", event => {
     && (
       plain
       || (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey)
-      || (!event.shiftKey && !event.metaKey && event.altKey !== event.ctrlKey)
+      // Alt+T lowers Weight. Ctrl+T belongs to the browser, and a control path
+      // the declared grammar does not contain is a path nobody can reason about.
+      || (!event.shiftKey && !event.metaKey && !event.ctrlKey && event.altKey)
     )
   ) {
     event.preventDefault();
     if (event.shiftKey) stepDeformWeight(1);
-    else if (event.ctrlKey || event.altKey) stepDeformWeight(-1);
+    else if (event.altKey) stepDeformWeight(-1);
     else deformWorkingOrSelected();
   }
   else if (plain && key === "f") {

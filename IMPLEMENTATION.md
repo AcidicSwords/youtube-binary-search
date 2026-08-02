@@ -52,7 +52,7 @@ non-neutral Section endpoint boundaries
 → projected Pins, Sections, Range and operator geometry
 ```
 
-Every stored factor belongs to the canonical `0.25×–2×` ladder. Overlap composition is multiplication. Since every product is positive, the projection is strictly increasing and `timelineToSource()` needs no direction, affinity, face, visibility, or materialization option.
+Every stored factor belongs to the canonical `0.125×–4×` ladder. Overlap composition is multiplication. Since every product is positive, the projection is strictly increasing and `timelineToSource()` needs no direction, affinity, face, visibility, or materialization option.
 
 The projection persists nothing. Models store source Addresses and Section factors only. All spatial operator distance and midpoint arithmetic routes through this module; operators do not inspect Section coverage.
 
@@ -299,7 +299,7 @@ remain unchanged while interactive regions cannot overlap ambiguously.
 Timeline input stays in `app.js`:
 
 - Section body click: make its full extent the Working Interval and center Current;
-- Current marker: acquired on pointer-down, then exact Go on release after the
+- Current marker: acquired on pointer-down, then one Step on release after the
   movement threshold; a stationary press moves nothing;
 - Section Start/End node: move that endpoint Pin;
 - Section midpoint node: translate the complete Section;

@@ -38,6 +38,9 @@
 - Unlink a shared endpoint so two Pins sit at one Address, then build a Section starting there. Confirm it takes neither existing identity and creates its own endpoint rather than attaching to one silently.
 - Focus a control and press Space. Confirm it activates and observation does not start behind it; with focus on the reader background, confirm Space observes.
 - Hold a Guide increment while it repeats. Confirm the control keeps keyboard focus through the rebuild its own edit causes.
+- Type an Address outside the active Range, and one such as `1:75`. Confirm each is refused with the committed value restored, rather than becoming a different Address.
+- Close the Guide on a wide layout, cross to compact and back. Confirm it is still closed.
+- Confirm `Ctrl+T` opens a browser tab and does not lower Weight; `Alt+T` lowers it.
 - Confirm a Group is renamed and removed from its own row, that removing one returns its Sections to the map, and that Undo restores it in the state it was removed in.
 - Confirm two unnamed Sections sharing one Pin offer two distinguishable Unlink buttons, and that Undo labels name the same object the status named.
 - Confirm Group visibility is a single `On Timeline` radio choice while `Active` remains an independent checkbox: switching the visible Group atomically replaces all Timeline Sections and section-bound Pins without changing deformation; hidden active Groups continue multiplying Weight; visible inactive Groups remain editable with no deformation gradient.
