@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createStepFieldController, FIELD_SIDE_MODE } from "./step-field.js";
 import { YOUTUBE_STATE } from "./youtube.js";
+import { FIELD_FRAME_ACTIVATION } from "./field-frame.js";
 
 function element(tagName = "DIV") {
   const listeners = new Map();
@@ -189,7 +190,7 @@ function makeHarness({
     h.controller.tick();
     assert.equal(h.tail().rate, 0.5, "Expansion applies the outward Tail rate z < c.");
     assert.equal(h.lead().rate, 1.5, "Expansion applies the outward Lead rate w > c.");
-    // Center moved 50 -> 52 at the configured 0.5 rate difference, so each side
+    // Center moved 50 -> 52 with a 0.5 fractional spread, so each side
     // has grown from the 2 s inner boundary to 3 s.
     assert.equal(h.controller.breath().sides.tail.offset, 3);
     assert.equal(h.controller.breath().sides.lead.offset, 3);
@@ -221,6 +222,47 @@ function makeHarness({
     assert.equal(h.tail().time, 60 - heldTail, "Whole-Field translation must preserve Tail's attained offset.");
     assert.equal(h.lead().time, 60 + heldLead, "Whole-Field translation must preserve Lead's attained offset.");
     assert.equal(h.controller.getStepSelection("tail").distance, heldTail);
+  } finally {
+    h.restore();
+  }
+}
+
+// The Panorama relation scales around the actual Center rate. The same
+// fractional spread must remain symmetric rather than being re-centered on 1×.
+{
+  const h = makeHarness({ rates: [0.5, 1, 1.5, 2, 3] });
+  try {
+    h.snapshot = {
+      ...h.snapshot,
+      center: { ...h.snapshot.center, rate: 2 }
+    };
+    h.controller.tick();
+    h.controller.playFromGesture({ center: 50 });
+    h.snapshot = {
+      ...h.snapshot,
+      transportKind: "playback",
+      center: {
+        ...h.snapshot.center,
+        time: 52,
+        rate: 2,
+        state: YOUTUBE_STATE.PLAYING
+      }
+    };
+    h.controller.tick();
+    assert.equal(h.tail().rate, 1,
+      "At Center 2×, a 0.5 spread makes Tail 1×.");
+    assert.equal(h.lead().rate, 3,
+      "At Center 2×, the same spread makes Lead 3×.");
+    assert.equal(h.controller.breath().sides.tail.offset, 3);
+    assert.equal(h.controller.breath().sides.lead.offset, 3,
+      "Equal rate distance through Center must produce equal offsets.");
+    assert.match(h.elements.get("field-rate-state").textContent, /Center 2×/,
+      "The Panorama readout reports the observed Center rate, not a fixed 1×.");
+
+    h.controller.hold("both");
+    assert.equal(h.tail().rate, 2);
+    assert.equal(h.lead().rate, 2,
+      "Held sides follow Center exactly so the attained offsets remain fixed.");
   } finally {
     h.restore();
   }
@@ -343,6 +385,7 @@ function makeHarness({
       fieldBreath: { inner: 1, outer: 2.5, rate: 0.5 },
       fieldFrame: {
         kind: "step",
+        activation: { kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS },
         start: 35,
         center: 50,
         end: 72,
@@ -363,6 +406,22 @@ function makeHarness({
     assert.equal(h.elements.get("lead-player-surface").getAttribute("aria-disabled"), "false");
     assert.equal(h.elements.get("field-both-toggle").disabled, true,
       "A Field Frame makes the combined Stretch/Hold control non-actionable.");
+
+    h.snapshot = {
+      ...h.snapshot,
+      fieldFrame: {
+        kind: "step",
+        start: 35,
+        center: 50,
+        end: 72,
+        backwardDistance: 15,
+        forwardDistance: 22
+      }
+    };
+    h.controller.tick();
+    assert.equal(h.controller.getStepSelection("tail"), null,
+      "Step-shaped geometry without an activation contract remains observation-only.");
+    assert.equal(h.elements.get("tail-player-surface").getAttribute("aria-disabled"), "true");
 
     h.snapshot = {
       ...h.snapshot,
@@ -444,6 +503,7 @@ function makeHarness({
       ...h.snapshot,
       fieldFrame: {
         kind: "step",
+        activation: { kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS },
         start: 40,
         center: 50,
         end: 60,
@@ -685,4 +745,4 @@ function makeHarness({
   }
 }
 
-console.log("Field runtime tests passed: decoded paused frames, Field Frame placement, breathing entry and rates, Hold isolation, Field-level Offset reconciliation, dormant hidden/off panes, stale-event rejection, exact pause, whole-Field Step geometry, direct-manipulation Frames, unsupported-rate fallback, and boundary recovery.");
+console.log("Field runtime tests passed: decoded paused frames, Field Frame placement, proportional Center-rate breathing, Hold isolation, Field-level Offset reconciliation, dormant hidden/off panes, stale-event rejection, exact pause, whole-Field Step geometry, direct-manipulation Frames, unsupported-rate fallback, and boundary recovery.");

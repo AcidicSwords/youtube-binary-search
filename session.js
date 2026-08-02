@@ -31,10 +31,13 @@ import {
   normalizeSectionWeight,
   setSectionWeight,
   DEFAULT_GROUP_ID,
+  visibleGroup,
+  sectionIsVisible,
   createGroup,
   setGroupState,
   assignSectionGroup,
   deleteGroup,
+  groupDeletionBlockReason,
   movePin,
   translateSection,
   createSection,
@@ -62,6 +65,14 @@ export const FOCUS_KIND = Object.freeze({
   SAVED: "saved-section",
   WORKING: "working-section"
 });
+
+// Focus makes its extent the active world. Spatial Range boundary controls must
+// therefore stand down until Focus is left; exact retained-object editing may
+// still rebase that world through the Guide. One shared predicate keeps every
+// surface from inventing its own exception.
+export function focusOwnsRangeBoundaries(model) {
+  return Boolean(model?.focus);
+}
 
 const DEFAULT_STEP_REACH = Object.freeze({
   backward: 10,
@@ -1004,7 +1015,10 @@ export function deformSection(
   const exactMatches = interval
     ? session.model.guide.sections
       .map(section => resolveSection(session.model.guide, section))
-      .filter(section => sameExtent(section, interval))
+      .filter(section =>
+        sectionIsVisible(session.model.guide, section)
+        && sameExtent(section, interval)
+      )
     : [];
   if (!sectionId && exactMatches.length > 1) {
     return unchanged(session, "ambiguous-deform-target", {
@@ -1340,12 +1354,15 @@ export function saveExtentAsSection(session, extent, label, provenance = "extent
   const selectedEndPin = getPin(session.model.guide, extent.endPinId);
   const startPin = selectedStartPin || findPinAt(session.model.guide, extent.start);
   const endPin = selectedEndPin || findPinAt(session.model.guide, extent.end);
+  const targetGroupId = visibleGroup(session.model.guide)?.id || DEFAULT_GROUP_ID;
   const duplicate = startPin && endPin
     ? findDuplicateSection(
       session.model.guide,
       startPin.id,
       endPin.id,
-      text
+      text,
+      null,
+      targetGroupId
     )
     : null;
   if (duplicate) {
@@ -1360,14 +1377,17 @@ export function saveExtentAsSection(session, extent, label, provenance = "extent
           draft.guide,
           selectedStartPin.id,
           selectedEndPin.id,
-          { label: text, provenance }
+          { label: text, provenance, groupId: targetGroupId }
         )
       : createSectionFromTimes(
           draft.guide,
           extent.start,
           extent.end,
-          { label: text, provenance }
+          { label: text, provenance, groupId: targetGroupId }
         );
+    if (!value.created) {
+      return { changed: false, reason: "duplicate-section", value };
+    }
     return { changed: true, guideChanged: true, value };
   }, { guideEdit: true });
 }
@@ -1429,7 +1449,8 @@ export function renameGuideSection(session, sectionId, label) {
     section.startPinId,
     section.endPinId,
     text,
-    section.id
+    section.id,
+    section.groupId
   )) return unchanged(session, "duplicate-section", { value: section });
   return commit(session, "Rename Section", draft => ({
     changed: true,
@@ -1545,10 +1566,9 @@ export function assignGuideSectionGroup(session, sectionId, groupId) {
   if (section.groupId === groupId) return unchanged(session, "unchanged-group");
   const name = group.label?.trim() || "Group";
   return commit(session, `Move “${sectionDisplayName(section)}” to “${name}”`, draft => {
-    if (!assignSectionGroup(draft.guide, sectionId, groupId)) {
-      return { changed: false, reason: "missing-group" };
-    }
-    return { changed: true, guideChanged: true };
+    const moved = assignSectionGroup(draft.guide, sectionId, groupId);
+    if (!moved.changed) return moved;
+    return { changed: true, guideChanged: true, value: moved.section };
   }, { guideEdit: true });
 }
 
@@ -1557,10 +1577,13 @@ export function assignGuideSectionGroup(session, sectionId, groupId) {
 export function deleteGuideGroup(session, groupId) {
   const group = session.model.guide.groups?.find(entry => entry.id === groupId);
   if (!group || groupId === DEFAULT_GROUP_ID) return unchanged(session, "undeletable-group");
+  const blocked = groupDeletionBlockReason(session.model.guide, groupId);
+  if (blocked) return unchanged(session, blocked);
   const name = group.label?.trim() || "Group";
   return commit(session, `Remove Group “${name}”`, draft => {
-    if (!deleteGroup(draft.guide, groupId)) {
-      return { changed: false, reason: "missing-group" };
+    const reason = groupDeletionBlockReason(draft.guide, groupId);
+    if (reason || !deleteGroup(draft.guide, groupId)) {
+      return { changed: false, reason: reason || "missing-group" };
     }
     return { changed: true, guideChanged: true };
   }, { guideEdit: true });

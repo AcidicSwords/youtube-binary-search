@@ -51,15 +51,16 @@ export function normalizeFieldBreath(value = DEFAULT_FIELD_BREATH) {
   return { inner, outer, rate };
 }
 
-// The configured values are the outward rates. The inward phase temporarily
-// exchanges them without rewriting the saved pair.
+// The configured value is the symmetric fractional spread around Center. The
+// inward phase temporarily exchanges the two side multipliers without
+// rewriting the saved relation.
 export function breathRatePair(rate, centerRate = 1) {
   const normalized = normalizeFieldBreath({ rate }).rate;
   const center = Number.isFinite(centerRate) && centerRate > 0 ? centerRate : 1;
   return {
     center,
-    tailRate: Math.max(0.05, center - normalized),
-    leadRate: center + normalized
+    tailRate: center * (1 - normalized),
+    leadRate: center * (1 + normalized)
   };
 }
 
@@ -155,7 +156,7 @@ function advanceSide(side, { phase, bounds, delta, operational }) {
 }
 
 // One breathing step. `centerDelta` is elapsed Center source time; the offset
-// changes by the configured rate difference over that interval.
+// changes by the configured fractional spread over that source interval.
 export function advanceBreath(runtime, {
   breath,
   centerDelta = 0,

@@ -140,6 +140,10 @@ byId.get("cue-lane-toggle").click();
 await flush();
 assert.equal(byId.get("cue-lane-toggle")["aria-pressed"], "true");
 assert.equal(cueMarks().length, 3, "Show draws every offered Cue at once.");
+for (const mark of cueMarks()) {
+  assert.ok(Number.parseFloat(mark.style.width) > 0,
+    "Every offered chapter is drawn as its complete extent, not reduced to a tick.");
+}
 assert.equal(timelinePins(), 0,
   "Drawing a Cue creates no Pin, so nothing new is clusterable or traversable.");
 for (const mark of descendants(byId.get("cue-lane"))) {
