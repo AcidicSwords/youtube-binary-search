@@ -117,6 +117,7 @@ import { parseCueList, cueName } from "./cues.js";
 import { sectionDisplayName } from "./format.js";
 import { createView } from "./view.js";
 
+const STORAGE_V9_PREFIX = "binary-youtube-reader:v9:";
 const STORAGE_V8_PREFIX = "binary-youtube-reader:v8:";
 const STORAGE_V7_PREFIX = "binary-youtube-reader:v7:";
 const STORAGE_V6_PREFIX = "binary-youtube-reader:v6:";
@@ -609,7 +610,7 @@ const { elements, formatTime, formatRange, setStatus } = view;
 // Undo names is the object the status named when it happened.
 const sectionName = sectionDisplayName;
 
-function storageKey(prefix = STORAGE_V8_PREFIX) {
+function storageKey(prefix = STORAGE_V9_PREFIX) {
   return `${prefix}${state.videoId}`;
 }
 
@@ -655,6 +656,10 @@ function persistPreferences() {
 function readStoredGuide(duration) {
   if (!state.videoId) return createGuide();
   const candidates = [
+    // v9 names the visible Group once on the Guide; v8 flagged it on each
+    // Group. normalizeGuide reads either, so an older Guide is migrated on
+    // read and rewritten under the v9 key on the next save.
+    [STORAGE_V9_PREFIX, raw => normalizeGuide(raw, state.videoId)],
     [STORAGE_V8_PREFIX, raw => normalizeGuide(raw, state.videoId)],
     [STORAGE_V7_PREFIX, raw => normalizeGuide(raw, state.videoId)],
     [STORAGE_V6_PREFIX, raw => normalizeGuide(raw, state.videoId)],

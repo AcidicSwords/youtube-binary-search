@@ -74,27 +74,44 @@ function moveVisibleGroupFirst(guide, groupId) {
 
 function preferredVisibleGroup(guide, preferredId = null) {
   return guide.groups.find(group => group.id === preferredId)
-    || guide.groups.find(group => group.visible === true)
+    || guide.groups.find(group => group.id === guide.visibleGroupId)
     || guide.groups.find(group => group.id === DEFAULT_GROUP_ID)
     || guide.groups[0]
     || null;
 }
 
-// Visibility has one spatial owner. Exactly one Group supplies Sections and
-// endpoint Pins to the Timeline; activity remains independent and may belong to
-// any number of Groups. Keeping the visible Group first also makes the Guide's
-// order state the same relation it renders rather than maintaining a second
-// presentation-only ordering rule.
+// Visibility has one spatial owner, and the Guide names it once.
+//
+// It was carried as a boolean on every Group, which made "exactly one Group is
+// visible" a rule about N fields that any mutation could break: two true, or
+// none, are both expressible, and the model was only correct because a repair
+// pass ran after every write. One identity cannot express either fault, so the
+// invariant stops being maintained and starts being structural. Activity stays
+// per-Group, because any number of Groups may be active at once -- that is a
+// genuine set, and a set is what a per-Group field is for.
+//
+// Keeping the visible Group first also makes the Guide's order state the same
+// relation it renders, rather than maintaining a second presentation-only rule.
+export function groupIsVisible(guide, group) {
+  const id = typeof group === "string" ? group : group?.id;
+  if (!id || !guide) return false;
+  return visibleGroup(guide)?.id === id;
+}
+
 export function enforceVisibleGroup(guide, preferredId = null) {
   if (!guide || !Array.isArray(guide.groups) || !guide.groups.length) return null;
   const visible = preferredVisibleGroup(guide, preferredId);
-  for (const group of guide.groups) group.visible = group.id === visible.id;
+  guide.visibleGroupId = visible.id;
   moveVisibleGroupFirst(guide, visible.id);
   return visible;
 }
 
 export function visibleGroup(guide) {
-  return preferredVisibleGroup(guide);
+  if (!guide || !Array.isArray(guide.groups) || !guide.groups.length) return null;
+  return guide.groups.find(group => group.id === guide.visibleGroupId)
+    || guide.groups.find(group => group.id === DEFAULT_GROUP_ID)
+    || guide.groups[0]
+    || null;
 }
 
 export function createGroup(
@@ -106,7 +123,6 @@ export function createGroup(
   const group = {
     id: id || makeId("group"),
     label: String(label || "").trim(),
-    visible: Boolean(visible),
     active: active !== false,
     createdAt: changedAt,
     updatedAt: changedAt
@@ -115,7 +131,7 @@ export function createGroup(
   // A newly authored Group is the layer being worked on. Recovery paths may
   // create hidden Groups explicitly and choose the persisted visible Group once
   // the complete set has been read.
-  enforceVisibleGroup(guide, group.visible ? group.id : visibleGroup(guide)?.id);
+  enforceVisibleGroup(guide, visible ? group.id : visibleGroup(guide)?.id);
   guide.updatedAt = changedAt;
   return group;
 }
@@ -136,7 +152,7 @@ export function sectionIsActive(guide, section) {
 }
 
 export function sectionIsVisible(guide, section) {
-  return groupForSection(guide, section)?.visible !== false;
+  return groupIsVisible(guide, groupForSection(guide, section));
 }
 
 export function setGroupState(guide, groupId, changes = {}) {
@@ -144,15 +160,15 @@ export function setGroupState(guide, groupId, changes = {}) {
   if (!group) return null;
   const before = guide.groups.map(entry => ({
     id: entry.id,
-    visible: entry.visible,
     active: entry.active,
     label: entry.label
   }));
+  const visibleBefore = visibleGroup(guide)?.id || null;
 
   if (typeof changes.visible === "boolean") {
     if (changes.visible) {
       enforceVisibleGroup(guide, group.id);
-    } else if (group.visible) {
+    } else if (groupIsVisible(guide, group)) {
       // Hiding the current layer means showing another retained layer. With no
       // alternative, the sole Group remains visible because zero visible Groups
       // would make Timeline topology ownerless.
@@ -168,14 +184,16 @@ export function setGroupState(guide, groupId, changes = {}) {
   for (const entry of guide.groups) {
     const previous = before.find(item => item.id === entry.id);
     if (!previous) continue;
-    if (
-      previous.visible !== entry.visible
-      || previous.active !== entry.active
-      || previous.label !== entry.label
-    ) {
+    if (previous.active !== entry.active || previous.label !== entry.label) {
       entry.updatedAt = changedAt;
       changed = true;
     }
+  }
+  // Which Group is visible is one fact about the Guide, not a field of any
+  // Group, so a change of layer is detected once rather than per Group.
+  if (visibleGroup(guide)?.id !== visibleBefore) {
+    group.updatedAt = changedAt;
+    changed = true;
   }
   if (!changed) return null;
   guide.updatedAt = changedAt;
@@ -233,7 +251,6 @@ export function groupDeletionBlockReason(guide, groupId) {
 export function deleteGroup(guide, groupId) {
   if (groupDeletionBlockReason(guide, groupId)) return false;
   const index = guide.groups.findIndex(group => group.id === groupId);
-  const removedWasVisible = guide.groups[index].visible === true;
   const changedAt = now();
   guide.groups.splice(index, 1);
   for (const section of guide.sections) {
@@ -241,22 +258,26 @@ export function deleteGroup(guide, groupId) {
     section.groupId = DEFAULT_GROUP_ID;
     section.updatedAt = changedAt;
   }
-  if (removedWasVisible || !guide.groups.some(group => group.visible)) {
-    enforceVisibleGroup(guide, DEFAULT_GROUP_ID);
-  } else {
-    enforceVisibleGroup(guide, visibleGroup(guide)?.id);
-  }
+  // Removing any Group re-resolves the named layer. When the removed Group was
+  // the drawn one its id no longer resolves and the chain lands on Map; when it
+  // was not, the id still resolves and the drawn layer does not move. One call
+  // covers both, because the fallback lives in the resolution rather than here.
+  enforceVisibleGroup(guide, guide.visibleGroupId);
   guide.updatedAt = changedAt;
   return true;
 }
 
 export function createGuide(videoId = null) {
   const guide = {
-    version: 8,
+    version: 9,
     videoId,
     pins: [],
     sections: [],
     groups: [],
+    // The one Group the Timeline draws. Named here rather than flagged on each
+    // Group, so "exactly one is visible" is a shape the Guide has instead of a
+    // rule something has to keep restoring.
+    visibleGroupId: DEFAULT_GROUP_ID,
     updatedAt: now()
   };
   createGroup(guide, "Map", { id: DEFAULT_GROUP_ID });
@@ -961,12 +982,19 @@ export function normalizeGuide(parsed, videoId) {
     : (Array.isArray(parsed?.marks) ? parsed.marks : []);
   const sections = Array.isArray(parsed?.sections) ? parsed.sections : [];
 
-  // Groups arrived in v8. Older Guides keep every Section in Map. A v8 Guide
-  // that previously exposed several Groups is repaired deterministically: the
-  // first persisted visible Group remains visible and every other Group becomes
-  // a hidden layer without changing activity or membership.
+  // Groups arrived in v8 carrying a visible flag each; v9 names the visible
+  // Group once on the Guide. Both are read here, and a v8 Guide that recorded
+  // several visible Groups -- or none -- resolves deterministically to the
+  // first it marked visible, then to Map. Activity, membership, labels, and
+  // every retained identity cross unchanged: only where visibility is written
+  // down has changed.
   const sourceGroups = Array.isArray(parsed?.groups) ? parsed.groups : [];
-  const persistedVisibleId = sourceGroups.find(source => source?.visible === true)?.id;
+  const persistedVisibleId = (
+    typeof parsed?.visibleGroupId === "string"
+      && sourceGroups.some(source => source?.id === parsed.visibleGroupId)
+      ? parsed.visibleGroupId
+      : sourceGroups.find(source => source?.visible === true)?.id
+  );
   const defaultSource = sourceGroups.find(source => source?.id === DEFAULT_GROUP_ID);
   const defaultGroup = guide.groups.find(group => group.id === DEFAULT_GROUP_ID);
   if (defaultSource && defaultGroup) {
@@ -1073,7 +1101,7 @@ export function migrateSavedRegions(parsed, videoId) {
 export function validateGuide(guide, duration) {
   if (
     !guide
-    || Number(guide.version) !== 8
+    || Number(guide.version) !== 9
     || !Array.isArray(guide.groups)
     || !Array.isArray(guide.pins)
     || !Array.isArray(guide.sections)
@@ -1090,17 +1118,22 @@ export function validateGuide(guide, duration) {
       !group?.id
       || ids.has(group.id)
       || typeof group.label !== "string"
-      || typeof group.visible !== "boolean"
       || typeof group.active !== "boolean"
       || !Number.isFinite(group.createdAt)
       || !Number.isFinite(group.updatedAt)
     ) return false;
     if (group.id === DEFAULT_GROUP_ID) defaultGroups += 1;
-    if (group.visible) visibleGroups += 1;
+    if (group.id === guide.visibleGroupId) visibleGroups += 1;
     ids.add(group.id);
     groupIds.add(group.id);
   }
-  if (defaultGroups !== 1 || visibleGroups !== 1 || guide.groups[0]?.visible !== true) return false;
+  // Exactly one Map, exactly one named visible Group, and that Group drawn
+  // first so the Guide's order states the relation it renders.
+  if (
+    defaultGroups !== 1
+    || visibleGroups !== 1
+    || guide.groups[0]?.id !== guide.visibleGroupId
+  ) return false;
 
   for (const pin of guide.pins) {
     if (
@@ -1162,9 +1195,6 @@ export function sanitizeGuide(input, videoId, duration) {
         sourceGroup?.label
         || (id === DEFAULT_GROUP_ID ? "Map" : "")
       ).trim(),
-      visible: typeof sourceGroup?.visible === "boolean"
-        ? sourceGroup.visible
-        : true,
       active: typeof sourceGroup?.active === "boolean"
         ? sourceGroup.active
         : true,
@@ -1178,7 +1208,12 @@ export function sanitizeGuide(input, videoId, duration) {
   };
 
   const sourceGroups = Array.isArray(source.groups) ? source.groups : [];
-  const persistedVisibleId = sourceGroups.find(group => group?.visible === true)?.id;
+  const persistedVisibleId = (
+    typeof source.visibleGroupId === "string"
+      && sourceGroups.some(group => group?.id === source.visibleGroupId)
+      ? source.visibleGroupId
+      : sourceGroups.find(group => group?.visible === true)?.id
+  );
   recoverGroup(
     sourceGroups.find(group => group?.id === DEFAULT_GROUP_ID),
     DEFAULT_GROUP_ID

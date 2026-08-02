@@ -35,6 +35,7 @@ import {
   sectionIsVisible,
   createGroup,
   setGroupState,
+  groupIsVisible,
   assignSectionGroup,
   deleteGroup,
   groupDeletionBlockReason,
@@ -1520,15 +1521,19 @@ function rebaseWorkingIntervalBounds(model, movements) {
 export function setGuideGroupState(session, groupId, changes) {
   const group = session.model.guide.groups?.find(entry => entry.id === groupId);
   if (!group) return unchanged(session, "missing-group");
+  // Visibility is read from the Guide's one visible-Group identity rather than
+  // from a field on this Group, so there is nothing here that can disagree with
+  // the model about which layer the Timeline is drawing.
+  const wasVisible = groupIsVisible(session.model.guide, group);
   const next = {
-    visible: typeof changes?.visible === "boolean" ? changes.visible : group.visible,
+    visible: typeof changes?.visible === "boolean" ? changes.visible : wasVisible,
     active: typeof changes?.active === "boolean" ? changes.active : group.active
   };
-  if (next.visible === group.visible && next.active === group.active) {
+  if (next.visible === wasVisible && next.active === group.active) {
     return unchanged(session, "unchanged-group");
   }
   const name = group.label?.trim() || "Group";
-  const changed = next.visible !== group.visible ? "visible" : "active";
+  const changed = next.visible !== wasVisible ? "visible" : "active";
   const label = changed === "visible"
     ? `${next.visible ? "Show" : "Hide"} “${name}”`
     : `${next.active ? "Activate" : "Deactivate"} “${name}”`;

@@ -216,6 +216,7 @@ const clone = value => structuredClone(value);
   const view = fs.readFileSync(new URL("./view.js", import.meta.url), "utf8");
   const html = fs.readFileSync(new URL("./index.html", import.meta.url), "utf8");
 
+  assert.ok(app.includes('const STORAGE_V9_PREFIX = "binary-youtube-reader:v9:";'));
   assert.ok(app.includes('const STORAGE_V8_PREFIX = "binary-youtube-reader:v8:";'));
   assert.ok(
     app.indexOf("[STORAGE_V8_PREFIX") < app.indexOf("[STORAGE_V7_PREFIX")

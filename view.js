@@ -22,6 +22,7 @@ import {
   getPin,
   orderedPins,
   partitionGuidePins,
+  groupIsVisible,
   sectionIsActive,
   sectionIsVisible,
   sectionsForPin,
@@ -176,7 +177,7 @@ export function projectCueExtent(cue, projection) {
 export function partitionGuideSections(groups, sections) {
   const sourceGroups = Array.isArray(groups) && groups.length
     ? groups
-    : [{ id: DEFAULT_GROUP_ID, label: "Map", visible: true, active: true }];
+    : [{ id: DEFAULT_GROUP_ID, label: "Map", active: true }];
   const blocks = sourceGroups.map(group => ({ group, sections: [] }));
   const byId = new Map(blocks.map(block => [block.group.id, block]));
   const fallback = byId.get(DEFAULT_GROUP_ID) || blocks[0];
@@ -1233,7 +1234,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       const block = document.createElement("section");
       block.className = "guide-group-block";
       block.dataset.groupId = group.id;
-      block.classList.toggle("is-hidden", !group.visible);
+      const visible = groupIsVisible(guide(), group);
+      block.classList.toggle("is-hidden", !visible);
       block.classList.toggle("is-inactive", !group.active);
 
       const row = document.createElement("div");
@@ -1255,7 +1257,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         const box = document.createElement("input");
         box.type = key === "visible" ? "radio" : "checkbox";
         if (key === "visible") box.name = "visible-guide-group";
-        box.checked = group[key] !== false;
+        box.checked = key === "visible" ? visible : group[key] !== false;
         box.dataset.groupToggle = group.id;
         box.dataset.groupState = key;
         box.title = title;

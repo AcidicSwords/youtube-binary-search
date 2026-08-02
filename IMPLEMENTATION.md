@@ -355,6 +355,8 @@ Guide data is video-specific. Preferences store Context duration, semantic Step
 Reach, the configured Field Breath `{ inner, outer, rate }`, the Nudge quantum,
 Field visibility, and pane visibility.
 
+Guide schema v9 names the one visible Group on the Guide as `visibleGroupId`; a Group itself persists only its label and its `active` flag. v8 wrote a `visible` boolean on every Group, which let a save record two visible Groups or none, so reading one is where that ambiguity is resolved: the first Group the save marked visible becomes the named Group, falling back to `Map`. A v9 Guide naming a Group that no longer exists resolves the same way. Activity, labels, memberships, Weights, Pin Addresses and every retained identity cross the migration unchanged, and re-reading a v9 Guide changes nothing.
+
 Guide schema v7 persists Section `weight`; it never persists Timeline Space, segment density, lanes, gradients, or projected positions. Legacy v6 `collapsed: true` migrates once to `0.25×`, the closest positive replacement, while open Sections migrate to `1×`. The legacy flag is discarded.
 
 Legacy scalar Step values migrate to fixed mode. Legacy independent side Offsets
