@@ -6,6 +6,9 @@ on:
       - tmp/coherence-3-work
     paths:
       - .github/workflows/apply-coherence-3-final.yml
+  pull_request:
+    branches:
+      - tmp/coherence-3-squash-base
 
 permissions:
   contents: write
