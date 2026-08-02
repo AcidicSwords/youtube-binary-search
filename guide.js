@@ -54,29 +54,68 @@ function now() {
   return Date.now();
 }
 
-// A Group is a set of Sections carrying two independent states.
+// A Group carries two independent relations over its Sections.
 //
-//   visible  -- are its Sections and their endpoint Pins on the map?
-//   active   -- does its deformation apply?
+//   visible  -- exactly one Group supplies Sections and endpoint Pins to Timeline
+//   active   -- any number of Groups may contribute deformation
 //
-// Nothing is frozen, so nothing can go stale: a Group either contributes to the
-// density product or it does not, and editing a Weight inside an active Group
-// updates the map immediately. "Baked" is not a feature here, it is the state
-// hidden + active -- terrain without landmarks. Groups partition the Sections:
-// every Section belongs to exactly one, so a Section can never be half-hidden.
+// Nothing is frozen, so nothing can go stale: an active Group contributes to the
+// density product whether or not its landmarks are drawn, and editing a Weight
+// updates that product immediately. Groups partition the Sections: every
+// Section belongs to exactly one Group, so a Section can never be half-hidden.
 export const DEFAULT_GROUP_ID = "group-default";
 
-export function createGroup(guide, label = "", { id = null } = {}) {
+function moveVisibleGroupFirst(guide, groupId) {
+  const index = guide.groups.findIndex(group => group.id === groupId);
+  if (index <= 0) return;
+  const [group] = guide.groups.splice(index, 1);
+  guide.groups.unshift(group);
+}
+
+function preferredVisibleGroup(guide, preferredId = null) {
+  return guide.groups.find(group => group.id === preferredId)
+    || guide.groups.find(group => group.visible === true)
+    || guide.groups.find(group => group.id === DEFAULT_GROUP_ID)
+    || guide.groups[0]
+    || null;
+}
+
+// Visibility has one spatial owner. Exactly one Group supplies Sections and
+// endpoint Pins to the Timeline; activity remains independent and may belong to
+// any number of Groups. Keeping the visible Group first also makes the Guide's
+// order state the same relation it renders rather than maintaining a second
+// presentation-only ordering rule.
+export function enforceVisibleGroup(guide, preferredId = null) {
+  if (!guide || !Array.isArray(guide.groups) || !guide.groups.length) return null;
+  const visible = preferredVisibleGroup(guide, preferredId);
+  for (const group of guide.groups) group.visible = group.id === visible.id;
+  moveVisibleGroupFirst(guide, visible.id);
+  return visible;
+}
+
+export function visibleGroup(guide) {
+  return preferredVisibleGroup(guide);
+}
+
+export function createGroup(
+  guide,
+  label = "",
+  { id = null, visible = true, active = true } = {}
+) {
   const changedAt = now();
   const group = {
     id: id || makeId("group"),
     label: String(label || "").trim(),
-    visible: true,
-    active: true,
+    visible: Boolean(visible),
+    active: active !== false,
     createdAt: changedAt,
     updatedAt: changedAt
   };
   guide.groups.push(group);
+  // A newly authored Group is the layer being worked on. Recovery paths may
+  // create hidden Groups explicitly and choose the persisted visible Group once
+  // the complete set has been read.
+  enforceVisibleGroup(guide, group.visible ? group.id : visibleGroup(guide)?.id);
   guide.updatedAt = changedAt;
   return group;
 }
@@ -103,11 +142,42 @@ export function sectionIsVisible(guide, section) {
 export function setGroupState(guide, groupId, changes = {}) {
   const group = guide.groups.find(entry => entry.id === groupId);
   if (!group) return null;
-  if (typeof changes.visible === "boolean") group.visible = changes.visible;
+  const before = guide.groups.map(entry => ({
+    id: entry.id,
+    visible: entry.visible,
+    active: entry.active,
+    label: entry.label
+  }));
+
+  if (typeof changes.visible === "boolean") {
+    if (changes.visible) {
+      enforceVisibleGroup(guide, group.id);
+    } else if (group.visible) {
+      // Hiding the current layer means showing another retained layer. With no
+      // alternative, the sole Group remains visible because zero visible Groups
+      // would make Timeline topology ownerless.
+      const fallback = guide.groups.find(entry => entry.id !== group.id) || group;
+      enforceVisibleGroup(guide, fallback.id);
+    }
+  }
   if (typeof changes.active === "boolean") group.active = changes.active;
   if (typeof changes.label === "string") group.label = changes.label.trim();
+
   const changedAt = now();
-  group.updatedAt = changedAt;
+  let changed = false;
+  for (const entry of guide.groups) {
+    const previous = before.find(item => item.id === entry.id);
+    if (!previous) continue;
+    if (
+      previous.visible !== entry.visible
+      || previous.active !== entry.active
+      || previous.label !== entry.label
+    ) {
+      entry.updatedAt = changedAt;
+      changed = true;
+    }
+  }
+  if (!changed) return null;
   guide.updatedAt = changedAt;
   return group;
 }
@@ -115,26 +185,66 @@ export function setGroupState(guide, groupId, changes = {}) {
 export function assignSectionGroup(guide, sectionId, groupId) {
   const section = guide.sections.find(entry => entry.id === sectionId);
   const group = guide.groups.find(entry => entry.id === groupId);
-  if (!section || !group) return false;
+  if (!section || !group) {
+    return { changed: false, reason: section ? "missing-group" : "missing-section" };
+  }
+  if (section.groupId === group.id) {
+    return { changed: false, reason: "unchanged-group", section };
+  }
+  if (findDuplicateSection(
+    guide,
+    section.startPinId,
+    section.endPinId,
+    section.label,
+    section.id,
+    group.id
+  )) {
+    return { changed: false, reason: "duplicate-section" };
+  }
   const changedAt = now();
   section.groupId = group.id;
   section.updatedAt = changedAt;
   guide.updatedAt = changedAt;
-  return true;
+  return { changed: true, section };
 }
 
 // Deleting a Group returns its Sections to the default rather than destroying
-// them: a Group is an organizing choice, not an owner.
+// them: a Group is an organizing choice, not an owner. The move is refused when
+// it would collapse two distinct layered Sections into one Group identity;
+// silently merging them would destroy a layer, while keeping both would make
+// selection and exact editing ambiguous again.
+export function groupDeletionBlockReason(guide, groupId) {
+  if (groupId === DEFAULT_GROUP_ID) return "default-group";
+  const group = guide.groups.find(entry => entry.id === groupId);
+  if (!group) return "missing-group";
+  for (const section of guide.sections.filter(entry => entry.groupId === groupId)) {
+    if (findDuplicateSection(
+      guide,
+      section.startPinId,
+      section.endPinId,
+      section.label,
+      section.id,
+      DEFAULT_GROUP_ID
+    )) return "duplicate-section";
+  }
+  return null;
+}
+
 export function deleteGroup(guide, groupId) {
-  if (groupId === DEFAULT_GROUP_ID) return false;
+  if (groupDeletionBlockReason(guide, groupId)) return false;
   const index = guide.groups.findIndex(group => group.id === groupId);
-  if (index < 0) return false;
+  const removedWasVisible = guide.groups[index].visible === true;
   const changedAt = now();
   guide.groups.splice(index, 1);
   for (const section of guide.sections) {
     if (section.groupId !== groupId) continue;
     section.groupId = DEFAULT_GROUP_ID;
     section.updatedAt = changedAt;
+  }
+  if (removedWasVisible || !guide.groups.some(group => group.visible)) {
+    enforceVisibleGroup(guide, DEFAULT_GROUP_ID);
+  } else {
+    enforceVisibleGroup(guide, visibleGroup(guide)?.id);
   }
   guide.updatedAt = changedAt;
   return true;
@@ -295,7 +405,8 @@ export function canLinkPins(guide, sourcePinId, targetPinId) {
       startPinId,
       endPinId,
       section.label,
-      section.id
+      section.id,
+      section.groupId
     )) {
       return { allowed: false, reason: "duplicate-section" };
     }
@@ -360,10 +471,21 @@ export function pinIsVisible(guide, pin) {
   return owners.some(section => sectionIsVisible(guide, section));
 }
 
-// Every Pin, whatever its Group hides. Editing and organization operate on the
-// whole retained set; only the map and traversal respect visibility.
+// Every Pin remains in the Guide. Visible Pins are ordered before hidden Pins
+// so the Guide preserves the same above/below distinction as the Timeline while
+// retaining exact access to both sets.
+export function partitionGuidePins(guide) {
+  const visible = [];
+  const hidden = [];
+  for (const pin of sortPins(guide.pins)) {
+    (pinIsVisible(guide, pin) ? visible : hidden).push(pin);
+  }
+  return { visible, hidden };
+}
+
 export function allPins(guide) {
-  return sortPins(guide.pins);
+  const pins = partitionGuidePins(guide);
+  return [...pins.visible, ...pins.hidden];
 }
 
 export function deletePin(guide, pinId) {
@@ -396,16 +518,44 @@ export function resolveSection(guide, sectionOrId) {
   };
 }
 
-function sectionIdentityKey(startPinId, endPinId, label) {
-  return `${startPinId}|${endPinId}|${String(label || "").trim().toLocaleLowerCase()}`;
+function sectionIdentityKey(startPinId, endPinId, label, groupId) {
+  return [
+    groupId || DEFAULT_GROUP_ID,
+    startPinId,
+    endPinId,
+    String(label || "").trim().toLocaleLowerCase()
+  ].join("|");
 }
 
-export function findDuplicateSection(guide, startPinId, endPinId, label, excludeId = null) {
-  const key = sectionIdentityKey(startPinId, endPinId, label);
+export function findDuplicateSection(
+  guide,
+  startPinId,
+  endPinId,
+  label,
+  excludeId = null,
+  groupId = DEFAULT_GROUP_ID
+) {
+  const key = sectionIdentityKey(startPinId, endPinId, label, groupId);
   return guide.sections.find(section =>
     section.id !== excludeId
-    && sectionIdentityKey(section.startPinId, section.endPinId, section.label) === key
+    && sectionIdentityKey(
+      section.startPinId,
+      section.endPinId,
+      section.label,
+      section.groupId
+    ) === key
   ) || null;
+}
+
+function sectionGroupForCreation(guide, requestedGroupId) {
+  if (requestedGroupId) {
+    const requested = guide.groups.find(group => group.id === requestedGroupId);
+    if (requested) return requested;
+  }
+  return visibleGroup(guide)
+    || guide.groups.find(group => group.id === DEFAULT_GROUP_ID)
+    || guide.groups[0]
+    || null;
 }
 
 export function createSection(guide, startPinId, endPinId, options = {}) {
@@ -421,7 +571,16 @@ export function createSection(guide, startPinId, endPinId, options = {}) {
     throw new RangeError("A Section requires a canonical timeline weight.");
   }
   const label = String(options.label || options.title || "").trim();
-  const duplicate = findDuplicateSection(guide, start.id, end.id, label);
+  const group = sectionGroupForCreation(guide, options.groupId);
+  if (!group) throw new RangeError("A Section requires a Guide Group.");
+  const duplicate = findDuplicateSection(
+    guide,
+    start.id,
+    end.id,
+    label,
+    null,
+    group.id
+  );
   if (duplicate) return { section: duplicate, created: false };
 
   const createdAt = Number(options.createdAt) || now();
@@ -432,7 +591,7 @@ export function createSection(guide, startPinId, endPinId, options = {}) {
     endPinId: end.id,
     label,
     weight: normalizeSectionWeight(requestedWeight),
-    groupId: resolveGroup(guide, options.groupId)?.id || DEFAULT_GROUP_ID,
+    groupId: group.id,
     provenance: options.provenance || null,
     createdAt,
     updatedAt: Number(options.updatedAt) || createdAt
@@ -473,7 +632,8 @@ export function renameSection(guide, sectionId, label) {
     section.startPinId,
     section.endPinId,
     text,
-    section.id
+    section.id,
+    section.groupId
   )) {
     throw new RangeError("A Section with this title and Extent already exists.");
   }
@@ -643,7 +803,8 @@ export function replaceSectionExtent(guide, sectionId, start, end, options = {})
       existingStart.id,
       existingEnd.id,
       label,
-      section.id
+      section.id,
+      section.groupId
     )
   ) {
     throw new RangeError("A Section with this title and Extent already exists.");
@@ -800,27 +961,33 @@ export function normalizeGuide(parsed, videoId) {
     : (Array.isArray(parsed?.marks) ? parsed.marks : []);
   const sections = Array.isArray(parsed?.sections) ? parsed.sections : [];
 
-  // Groups arrived in v8. A guide written before them keeps every Section in
-  // the default Group, which is precisely the behaviour it already had.
-  for (const source of (Array.isArray(parsed?.groups) ? parsed.groups : [])) {
-    if (!source?.id || source.id === DEFAULT_GROUP_ID) {
-      if (source?.id === DEFAULT_GROUP_ID) {
-        const group = setGroupState(guide, DEFAULT_GROUP_ID, {
-          visible: typeof source.visible === "boolean" ? source.visible : true,
-          active: typeof source.active === "boolean" ? source.active : true,
-          label: String(source.label || "Map")
-        });
-        group.createdAt = Number(source.createdAt) || group.createdAt;
-        group.updatedAt = Number(source.updatedAt) || group.createdAt;
-      }
-      continue;
-    }
-    const group = createGroup(guide, String(source.label || ""), { id: source.id });
-    group.visible = typeof source.visible === "boolean" ? source.visible : true;
-    group.active = typeof source.active === "boolean" ? source.active : true;
+  // Groups arrived in v8. Older Guides keep every Section in Map. A v8 Guide
+  // that previously exposed several Groups is repaired deterministically: the
+  // first persisted visible Group remains visible and every other Group becomes
+  // a hidden layer without changing activity or membership.
+  const sourceGroups = Array.isArray(parsed?.groups) ? parsed.groups : [];
+  const persistedVisibleId = sourceGroups.find(source => source?.visible === true)?.id;
+  const defaultSource = sourceGroups.find(source => source?.id === DEFAULT_GROUP_ID);
+  const defaultGroup = guide.groups.find(group => group.id === DEFAULT_GROUP_ID);
+  if (defaultSource && defaultGroup) {
+    defaultGroup.label = String(defaultSource.label || "Map").trim();
+    defaultGroup.active = typeof defaultSource.active === "boolean"
+      ? defaultSource.active
+      : true;
+    defaultGroup.createdAt = Number(defaultSource.createdAt) || defaultGroup.createdAt;
+    defaultGroup.updatedAt = Number(defaultSource.updatedAt) || defaultGroup.createdAt;
+  }
+  for (const source of sourceGroups) {
+    if (!source?.id || source.id === DEFAULT_GROUP_ID) continue;
+    const group = createGroup(guide, String(source.label || ""), {
+      id: source.id,
+      visible: false,
+      active: typeof source.active === "boolean" ? source.active : true
+    });
     group.createdAt = Number(source.createdAt) || group.createdAt;
     group.updatedAt = Number(source.updatedAt) || group.createdAt;
   }
+  enforceVisibleGroup(guide, persistedVisibleId || DEFAULT_GROUP_ID);
 
   const idMap = new Map();
   for (const source of sourcePins) {
@@ -916,6 +1083,7 @@ export function validateGuide(guide, duration) {
   const ids = new Set();
   const groupIds = new Set();
   let defaultGroups = 0;
+  let visibleGroups = 0;
 
   for (const group of guide.groups) {
     if (
@@ -928,10 +1096,11 @@ export function validateGuide(guide, duration) {
       || !Number.isFinite(group.updatedAt)
     ) return false;
     if (group.id === DEFAULT_GROUP_ID) defaultGroups += 1;
+    if (group.visible) visibleGroups += 1;
     ids.add(group.id);
     groupIds.add(group.id);
   }
-  if (defaultGroups !== 1) return false;
+  if (defaultGroups !== 1 || visibleGroups !== 1 || guide.groups[0]?.visible !== true) return false;
 
   for (const pin of guide.pins) {
     if (
@@ -1009,6 +1178,7 @@ export function sanitizeGuide(input, videoId, duration) {
   };
 
   const sourceGroups = Array.isArray(source.groups) ? source.groups : [];
+  const persistedVisibleId = sourceGroups.find(group => group?.visible === true)?.id;
   recoverGroup(
     sourceGroups.find(group => group?.id === DEFAULT_GROUP_ID),
     DEFAULT_GROUP_ID
@@ -1017,6 +1187,7 @@ export function sanitizeGuide(input, videoId, duration) {
     if (!sourceGroup?.id || sourceGroup.id === DEFAULT_GROUP_ID) continue;
     recoverGroup(sourceGroup);
   }
+  enforceVisibleGroup(guide, persistedVisibleId || DEFAULT_GROUP_ID);
 
   for (const sourcePin of sortPins(source.pins || [])) {
     const address = Number(sourcePin?.t);
@@ -1076,7 +1247,15 @@ export function sanitizeGuide(input, videoId, duration) {
     const [startPinId, endPinId] = firstPin.t < secondPin.t
       ? [firstPinId, secondPinId]
       : [secondPinId, firstPinId];
-    const duplicateKey = sectionIdentityKey(startPinId, endPinId, label);
+    const groupId = validGroupIds.has(sourceSection.groupId)
+      ? sourceSection.groupId
+      : DEFAULT_GROUP_ID;
+    const duplicateKey = sectionIdentityKey(
+      startPinId,
+      endPinId,
+      label,
+      groupId
+    );
     if (sectionKeys.has(duplicateKey)) continue;
 
     const createdAt = Number(sourceSection.createdAt) || now();
@@ -1090,9 +1269,7 @@ export function sanitizeGuide(input, videoId, duration) {
         sourceSection.weight,
         sourceSection.collapsed === true ? 0.25 : DEFAULT_SECTION_WEIGHT
       ),
-      groupId: validGroupIds.has(sourceSection.groupId)
-        ? sourceSection.groupId
-        : DEFAULT_GROUP_ID,
+      groupId,
       provenance: sourceSection.provenance || null,
       createdAt,
       updatedAt: Number(sourceSection.updatedAt) || createdAt

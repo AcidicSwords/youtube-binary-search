@@ -53,6 +53,13 @@ function run(runtime, steps, options = {}) {
     );
   }
   assert.deepEqual(breathRatePair(0.25), { center: 1, tailRate: 0.75, leadRate: 1.25 });
+  assert.deepEqual(breathRatePair(0.5, 2), { center: 2, tailRate: 1, leadRate: 3 },
+    "Changing Center rate scales the complete relation rather than changing its shape.");
+  const scaled = breathRatePair(0.75, 0.5);
+  assert.ok(Math.abs((scaled.center - scaled.tailRate)
+    - (scaled.leadRate - scaled.center)) < 1e-9);
+  assert.ok(Math.abs(scaled.tailRate / scaled.center - 0.25) < 1e-9);
+  assert.ok(Math.abs(scaled.leadRate / scaled.center - 1.75) < 1e-9);
   assert.equal(breathRateFromResponse({ tailRate: 0.5, leadRate: 2 }), 0.75);
   assert.equal(breathRateFromResponse({ tailRate: 0.75, leadRate: 1.25 }), 0.25);
 }
@@ -101,7 +108,7 @@ function run(runtime, steps, options = {}) {
   assert.equal(state.sides.tail.offset, 2, "Breathing starts at the inner boundary.");
   const expanded = run(state, 4);
   state = expanded.state;
-  assert.equal(state.sides.tail.offset, 4, "Offset grows by the configured rate difference.");
+  assert.equal(state.sides.tail.offset, 4, "Offset grows by the configured fractional spread.");
   assert.equal(state.phase, BREATH_PHASE.EXPANDING);
 
   const phases = [];

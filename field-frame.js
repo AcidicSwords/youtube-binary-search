@@ -22,6 +22,10 @@ export const FIELD_FRAME_DIRECTION = Object.freeze({
   FORWARD: "forward"
 });
 
+export const FIELD_FRAME_ACTIVATION = Object.freeze({
+  STEP_TO_ADDRESS: "step-to-address"
+});
+
 const OPERATOR_FRAME_KINDS = Object.freeze([
   "step",
   "refine",
@@ -45,6 +49,12 @@ function finite(value) {
   return Number.isFinite(Number(value)) ? Number(value) : null;
 }
 
+function normalizeActivation(activation) {
+  return activation?.kind === FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS
+    ? Object.freeze({ kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS })
+    : null;
+}
+
 function normalizeRange(range) {
   const start = finite(range?.start);
   const end = finite(range?.end);
@@ -63,7 +73,7 @@ export function classifyDirection(from, to, tolerance = FRAME_TOLERANCE) {
 
 // Every Frame is ordered Tail ≤ Center ≤ Lead inside Range. Ordering here is a
 // presentation guarantee; it never rewrites the semantic addresses it received.
-function orderFrame({ owner, kind, tail, center, lead, range }) {
+function orderFrame({ owner, kind, tail, center, lead, range, activation = null }) {
   const bounds = normalizeRange(range);
   const middle = finite(center);
   if (!bounds || middle === null) return null;
@@ -83,7 +93,8 @@ function orderFrame({ owner, kind, tail, center, lead, range }) {
       rawLead === null ? clampedCenter : Math.max(rawLead, clampedCenter),
       clampedCenter,
       bounds.end
-    )
+    ),
+    activation: normalizeActivation(activation)
   };
 }
 
@@ -116,14 +127,22 @@ export function contextFrame({ start, end, current, cursor, range }) {
   return { ...frame, edges: { start: frame.tail, end: frame.lead } };
 }
 
-export function operatorFrame({ kind = "step", center, backward, forward, range }) {
+export function operatorFrame({
+  kind = "step",
+  center,
+  backward,
+  forward,
+  range,
+  activation = null
+}) {
   return orderFrame({
     owner: FIELD_FRAME_OWNER.OPERATOR,
     kind: OPERATOR_FRAME_KINDS.includes(kind) ? kind : "step",
     tail: backward,
     center,
     lead: forward,
-    range
+    range,
+    activation
   });
 }
 
@@ -152,14 +171,16 @@ export function resolveFieldFrame(request) {
 }
 
 // Frame identity deliberately excludes Center. A Context Cursor crossing its
-// own window keeps one Frame; only a change of side ownership is a new Frame.
+// own window keeps one Frame. Edge ownership or activation changing creates a
+// new Frame, so an observational presentation cannot retain stale actionability.
 export function frameIdentity(frame) {
   if (!frame) return "none";
   return [
     frame.owner,
     frame.kind,
     frame.tail.toFixed(3),
-    frame.lead.toFixed(3)
+    frame.lead.toFixed(3),
+    frame.activation?.kind || "observe"
   ].join("|");
 }
 
@@ -168,7 +189,8 @@ export function framesEqual(first, second, tolerance = FRAME_TOLERANCE) {
   return first.owner === second.owner
     && first.kind === second.kind
     && Math.abs(first.tail - second.tail) <= tolerance
-    && Math.abs(first.lead - second.lead) <= tolerance;
+    && Math.abs(first.lead - second.lead) <= tolerance
+    && (first.activation?.kind || null) === (second.activation?.kind || null);
 }
 
 export function frameTransition(previous, next, options = {}) {
@@ -232,6 +254,7 @@ export function createFieldFrameSequencer(options = {}) {
       tail: settled.tail,
       center: settled.center,
       lead: settled.lead,
+      activation: settled.activation ? { ...settled.activation } : null,
       direction: direction ?? FIELD_FRAME_DIRECTION.NONE,
       revision,
       reframed,

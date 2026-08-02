@@ -16,6 +16,8 @@ import {
   findPinAt,
   getPin,
   sectionsForPin,
+  sectionIsVisible,
+  pinIsVisible,
   canLinkPins,
   resolveSection,
   orderedPins,
@@ -30,6 +32,7 @@ import {
 import {
   MIN_RANGE_SECONDS,
   STEP_REACH_MODE,
+  focusOwnsRangeBoundaries,
   createSession,
   copy,
   snapshotModel,
@@ -102,6 +105,7 @@ import {
 } from "./step-field-geometry.js";
 import {
   FIELD_FRAME_OWNER,
+  FIELD_FRAME_ACTIVATION,
   createFieldFrameSequencer
 } from "./field-frame.js";
 import {
@@ -245,7 +249,11 @@ const state = {
   nativeGo: null,
   programmaticPlacement: null,
   guideDialog: null,
+  // Timeline operand selection is spatial: only currently drawn retained
+  // objects may occupy it. Guide focus is independent so hidden structure can
+  // remain inspectable and navigable without becoming a Timeline operand.
   selectedRetained: null,
+  guideRetained: null,
   selectedPinIds: [],
   deformWeightMemory: new Map(),
   guideDrag: null,
@@ -278,6 +286,16 @@ let centerPauseRequest = null;
 
 function model() {
   return state.session.model;
+}
+
+function rangeBoundaryEditingLocked() {
+  return focusOwnsRangeBoundaries(model());
+}
+
+function rejectFocusedRangeBoundaryEdit() {
+  if (!rangeBoundaryEditingLocked()) return false;
+  setStatus("Unfocus to adjust the Range boundaries.");
+  return true;
 }
 
 function currentResolution() {
@@ -398,6 +416,7 @@ function operatorFrameRequest() {
     forward: step.end,
     backwardDistance: step.backwardDistance,
     forwardDistance: step.forwardDistance,
+    activation: { kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS },
     range
   };
 }
@@ -482,6 +501,46 @@ function guide() {
   return model().guide;
 }
 
+function retainedExists(selection) {
+  if (!selection) return false;
+  if (selection.kind === "pin") return Boolean(getPin(guide(), selection.id));
+  if (selection.kind === "section") return Boolean(resolveSection(guide(), selection.id));
+  return false;
+}
+
+function retainedIsOnTimeline(selection) {
+  if (!selection) return false;
+  const projection = projectionForModel(model());
+  if (selection.kind === "pin") {
+    const pin = getPin(guide(), selection.id);
+    return Boolean(
+      pin
+      && pinIsVisible(guide(), pin)
+      && projection.withinView(pin.t)
+    );
+  }
+  if (selection.kind === "section") {
+    const section = resolveSection(guide(), selection.id);
+    if (!section || !sectionIsVisible(guide(), section)) return false;
+    const extent = projection.projectExtent(section);
+    return Boolean(
+      extent
+      && extent.end > projection.viewStart - EPSILON
+      && extent.start < projection.viewEnd + EPSILON
+    );
+  }
+  return false;
+}
+
+function focusGuideRetained(selection) {
+  state.guideRetained = selection ? { ...selection } : null;
+}
+
+function selectTimelineRetained(selection) {
+  state.selectedRetained = selection ? { ...selection } : null;
+  if (selection) focusGuideRetained(selection);
+}
+
 function currentInterval() {
   return model().interval;
 }
@@ -501,8 +560,8 @@ function syncIntervalPinSelection() {
   const pins = retainedMatches
     ? [retainedSection.startPin, retainedSection.endPin]
     : [
-        findPinAt(guide(), interval.start),
-        findPinAt(guide(), interval.end)
+        orderedPins(guide()).find(pin => Math.abs(pin.t - interval.start) <= EPSILON),
+        orderedPins(guide()).find(pin => Math.abs(pin.t - interval.end) <= EPSILON)
       ];
   state.selectedPinIds = [...new Set(
     pins.filter(Boolean).map(pin => pin.id)
@@ -806,13 +865,10 @@ function accept(result, options = {}) {
   if (!result?.changed) return false;
   const previousModel = model();
   state.session = result.session;
-  if (
-    state.selectedRetained?.kind === "pin"
-      ? !getPin(guide(), state.selectedRetained.id)
-      : state.selectedRetained?.kind === "section"
-        ? !resolveSection(guide(), state.selectedRetained.id)
-        : false
-  ) {
+  if (!retainedExists(state.guideRetained)) state.guideRetained = null;
+  // A hidden retained object still exists in the Guide, but it cannot remain a
+  // Timeline operand after its Group leaves the spatial surface.
+  if (!retainedIsOnTimeline(state.selectedRetained)) {
     state.selectedRetained = null;
   }
   syncIntervalPinSelection();
@@ -1210,12 +1266,9 @@ function moveToAddress(destination, options = {}) {
   if (!result.changed) {
     locateAddress(departure);
     setStatus(options.unchangedStatus || `Already at ${formatTime(departure)}.`);
-    // Selection is a fact the Guide shows, and it is not the same fact as
-    // Current's Address. Selecting a Section whose midpoint Current already
-    // occupies moves nothing and still changes which row is selected, so an
-    // operator that declares it touches the Guide gets its Guide render even
-    // on the unchanged path -- otherwise the Guide keeps showing whatever was
-    // selected before.
+    // Guide focus is not Current and is not Timeline operand selection. A
+    // Guide navigation whose Address is already Current still needs its Guide
+    // render so the requested retained row remains inspectable.
     if (options.renderGuide === true) view.renderGuide();
     view.render();
     return false;
@@ -1342,6 +1395,7 @@ function deformTarget() {
       .map(section => resolveSection(guide(), section))
       .filter(section =>
         section
+        && sectionIsVisible(guide(), section)
         && Math.abs(section.start - working.start) <= EPSILON
         && Math.abs(section.end - working.end) <= EPSILON
       )
@@ -1389,10 +1443,10 @@ function applyDeformWeight(weight) {
     setStatus("Establish a Working Interval or select a Section to deform.");
     return false;
   }
-  state.selectedRetained = {
+  selectTimelineRetained({
     kind: "section",
     id: result.section.id
-  };
+  });
   rememberDeformWeight(result.section.id, result.weight);
   state.deformWeightMemory.delete("working");
   view.invalidateTimelinePins();
@@ -1764,10 +1818,9 @@ function focusSection(sectionId) {
     setStatus(`“${sectionName(section)}” is already the active Range.`);
     return;
   }
-  // Focusing a Section is the strongest way of choosing it, so it selects it.
-  // A Guide row is expanded exactly when it is the selected object, and that
-  // one rule is what keeps Unfocus reachable from the row it belongs to.
-  state.selectedRetained = { kind: "section", id: sectionId };
+  // Focus is requested through the Guide. Keep its row available without
+  // manufacturing a Timeline operand, especially when the Section is hidden.
+  focusGuideRetained({ kind: "section", id: sectionId });
   acceptRangeTransition(result, {
     status: `Focused “${sectionName(section)}” as Range.`,
     closeGuide: true
@@ -1818,7 +1871,7 @@ function changeSectionWeight(sectionId, weight) {
     }
     return false;
   }
-  state.selectedRetained = { kind: "section", id: sectionId };
+  focusGuideRetained({ kind: "section", id: sectionId });
   view.invalidateTimelinePins();
   const next = result.value;
   rememberDeformWeight(sectionId, next.weight);
@@ -1871,7 +1924,7 @@ function pinCurrent(event = null, options = {}) {
   if (!result.changed) {
     const pin = result.value?.pin;
     if (pin) {
-      state.selectedRetained = { kind: "pin", id: pin.id };
+      selectTimelineRetained({ kind: "pin", id: pin.id });
       selectGuideTab("pins");
       view.renderGuide();
       view.render();
@@ -1880,7 +1933,7 @@ function pinCurrent(event = null, options = {}) {
     return;
   }
   const { pin } = result.value;
-  state.selectedRetained = { kind: "pin", id: pin.id };
+  selectTimelineRetained({ kind: "pin", id: pin.id });
   accept(result, {
     renderGuide: true,
     status: `Pinned Current at ${formatTime(pin.t)}.`
@@ -1922,7 +1975,7 @@ function saveCurrentIntervalAsSection(event = null, options = {}) {
   if (!result.changed) {
     const existing = result.value?.section;
     if (result.reason === "duplicate-section" && existing) {
-      state.selectedRetained = { kind: "section", id: existing.id };
+      selectTimelineRetained({ kind: "section", id: existing.id });
       syncIntervalPinSelection();
       selectGuideTab("sections");
       view.renderGuide();
@@ -1937,10 +1990,10 @@ function saveCurrentIntervalAsSection(event = null, options = {}) {
     return;
   }
   if (kind === "selected-pins") state.selectedPinIds = [];
-  state.selectedRetained = {
+  selectTimelineRetained({
     kind: "section",
     id: result.value.section.id
-  };
+  });
   accept(result, {
     renderGuide: true,
     status: label
@@ -2096,7 +2149,7 @@ function revealPin(pinId) {
   const pin = getPin(guide(), pinId);
   if (!pin) return;
   selectGuideTab("pins");
-  state.selectedRetained = { kind: "pin", id: pin.id };
+  focusGuideRetained({ kind: "pin", id: pin.id });
   view.renderGuide();
   view.render();
   elements["pins-list"]
@@ -2185,8 +2238,10 @@ function submitGuideDialog(event) {
   } else if (action.action === "delete-group") {
     result = deleteGuideGroup(state.session, action.id);
     status = result.changed
-      ? "Removed the Group. Its Sections returned to the map."
-      : "Group could not be removed.";
+      ? "Removed the Group. Its Sections returned to Map."
+      : result.reason === "duplicate-section"
+        ? "Move, rename, or remove the matching Section in Map before removing this Group."
+        : "Group could not be removed.";
   } else if (action.action === "unlink-section-endpoint") {
     result = unlinkGuideSectionEndpoint(
       state.session,
@@ -2194,7 +2249,7 @@ function submitGuideDialog(event) {
       action.role
     );
     if (result.changed) {
-      state.selectedRetained = { kind: "section", id: action.id };
+      focusGuideRetained({ kind: "section", id: action.id });
       view.invalidateTimelinePins();
     }
     status = result.changed
@@ -2214,9 +2269,11 @@ function goToPin(pin, operator = "pin", options = {}) {
   if (!pin) return;
   const carry = options.carryRetained === true || state.carryModifier;
   const hasCarrySelection = carry && Boolean(state.selectedRetained);
+  const spatial = options.surface !== "guide";
   const destinationSelection = options.selectionAfter
     || { kind: "pin", id: pin.id };
-  if (!carry) state.selectedRetained = destinationSelection;
+  focusGuideRetained(destinationSelection);
+  if (!carry && spatial) selectTimelineRetained(destinationSelection);
   moveToAddress(pin.t, {
     operator,
     label: operator === "pin" ? "Go to Pin" : operator,
@@ -2228,8 +2285,8 @@ function goToPin(pin, operator = "pin", options = {}) {
     renderGuide: true,
     carryRetained: carry
   });
-  if (!hasCarrySelection && carry) {
-    state.selectedRetained = destinationSelection;
+  if (!hasCarrySelection && carry && spatial) {
+    selectTimelineRetained(destinationSelection);
     view.renderGuide();
     view.render();
   }
@@ -2252,7 +2309,7 @@ function goToAdjacentPin(direction, options = {}) {
       : { kind: "pin", id: pin.id };
   const carry = options.carryRetained === true || state.carryModifier;
   const hasCarrySelection = carry && Boolean(state.selectedRetained);
-  if (!carry && destinationSelection) state.selectedRetained = destinationSelection;
+  if (!carry && destinationSelection) selectTimelineRetained(destinationSelection);
   settleBeforeAction({ replacingContext: true });
   const originModel = snapshotModel(model(), { cloneGuide: carry });
   let result = stepToPinSession(state.session, pin.t, direction, {
@@ -2275,7 +2332,7 @@ function goToAdjacentPin(direction, options = {}) {
       : `Pin ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(pin.t)}.${retainedCarryStatus(result)}`
   });
   if (!hasCarrySelection && carry && destinationSelection) {
-    state.selectedRetained = destinationSelection;
+    selectTimelineRetained(destinationSelection);
     view.renderGuide();
     view.render();
   }
@@ -2349,7 +2406,7 @@ function extendIntervalToExtent(extent, name, selection = null) {
   };
   if (span.end - span.start <= EPSILON) return false;
   const label = `Extend to ${name}`;
-  if (selection) state.selectedRetained = { ...selection };
+  if (selection) focusGuideRetained(selection);
   moveToAddress((span.start + span.end) / 2, {
     operator: "section",
     label,
@@ -2372,7 +2429,10 @@ function selectSectionAsWorkingInterval(sectionId, options = {}) {
   if (!section) return;
   const carry = options.carryRetained === true || state.carryModifier;
   const hasCarrySelection = carry && Boolean(state.selectedRetained);
-  if (!carry) state.selectedRetained = { kind: "section", id: sectionId };
+  const spatial = options.surface !== "guide";
+  const destinationSelection = { kind: "section", id: sectionId };
+  focusGuideRetained(destinationSelection);
+  if (!carry && spatial) selectTimelineRetained(destinationSelection);
   moveToAddress(section.midpoint, {
     operator: "section",
     label: `Select Section “${sectionName(section)}”`,
@@ -2389,8 +2449,8 @@ function selectSectionAsWorkingInterval(sectionId, options = {}) {
     unchangedStatus: `“${sectionName(section)}” is already the Working Interval.`,
     status: destination => `“${sectionName(section)}” is the Working Interval; Current is centered at ${formatTime(destination)}.`
   });
-  if (!hasCarrySelection && carry) {
-    state.selectedRetained = { kind: "section", id: sectionId };
+  if (!hasCarrySelection && carry && spatial) {
+    selectTimelineRetained(destinationSelection);
     view.renderGuide();
     view.render();
   }
@@ -2411,6 +2471,7 @@ function resetSourceScopedState() {
   state.cuesOnTimeline = false;
   if (elements["cue-source"]) elements["cue-source"].value = "";
   state.selectedRetained = null;
+  state.guideRetained = null;
   state.selectedPinIds = [];
   state.deformWeightMemory.clear();
   state.shiftLayer = false;
@@ -2466,6 +2527,7 @@ function initializeVideo() {
   state.rangeDragOrigin = null;
   state.rangeDragProjection = null;
   state.selectedRetained = null;
+  state.guideRetained = null;
   state.selectedPinIds = [];
   state.guideDrag = null;
   state.field = null;
@@ -2503,6 +2565,7 @@ function cuePendingVideo() {
   state.rangeDragOrigin = null;
   state.rangeDragProjection = null;
   state.selectedRetained = null;
+  state.guideRetained = null;
   state.selectedPinIds = [];
   state.guideDrag = null;
   stepField?.resetSources?.();
@@ -3001,9 +3064,11 @@ function updateGuideDrag(event) {
   } else {
     drag.blockedReason = result.reason || "unavailable";
   }
-  state.selectedRetained = drag.sectionId
+  const dragSelection = drag.sectionId
     ? { kind: "section", id: drag.sectionId }
     : { kind: drag.kind, id: drag.id };
+  focusGuideRetained(dragSelection);
+  if (drag.origin === "timeline") selectTimelineRetained(dragSelection);
   syncIntervalPinSelection();
   previewGuideDrag(drag);
   view.invalidateTimelinePins();
@@ -3113,7 +3178,9 @@ function finishGuideDrag(event, options = {}) {
     state.session = linked.session;
     linkedTargetPinId = drag.snapTargetPinId;
     if (!drag.sectionId) {
-      state.selectedRetained = { kind: "pin", id: linkedTargetPinId };
+      const linkedSelection = { kind: "pin", id: linkedTargetPinId };
+      focusGuideRetained(linkedSelection);
+      if (drag.origin === "timeline") selectTimelineRetained(linkedSelection);
     }
   }
 
@@ -3326,6 +3393,7 @@ function beginRangeDrag(kind, event) {
   if (!state.videoLoaded) return;
   event.preventDefault();
   event.stopPropagation();
+  if (rejectFocusedRangeBoundaryEdit()) return;
   state.dragHandle = kind;
   state.rangeDragProjection = projectionForModel(model());
   // Range owns the semantic projection visible at pointer-down.
@@ -3424,7 +3492,7 @@ function adjustRangeHandle(kind, event) {
   if (!backward && !forward && !["Home", "End"].includes(event.key)) return;
   event.preventDefault();
   event.stopPropagation();
-  if (!state.videoLoaded) return;
+  if (!state.videoLoaded || rejectFocusedRangeBoundaryEdit()) return;
 
   const range = activeRange();
   const amount = reachFor(forward ? "forward" : "backward") * (event.shiftKey ? 5 : 1);
@@ -3477,8 +3545,8 @@ function commitStepReach(nextReach, label, options = {}) {
   const effective = currentStepReach();
   setStatus(
     result.stepReach.mode === STEP_REACH_MODE.ADAPTIVE
-      ? `${label}: 1/${Math.round(1 / result.stepReach.fraction)} of active Range (${effective.forward.toFixed(2)} map units).`
-      : `${label}: ${result.stepReach.forward} map units.`
+      ? `${label}: 1/${Math.round(1 / result.stepReach.fraction)} of active Range (${effective.forward.toFixed(2)} Timeline units).`
+      : `${label}: ${result.stepReach.forward} Timeline units.`
   );
   view.render();
   return true;
@@ -3554,7 +3622,7 @@ function prefersReducedMotion() {
 function changeFieldBoundary(boundary, value) {
   const parsed = Number(value);
   if (!String(value).trim() || !Number.isFinite(parsed) || parsed <= 0) {
-    setStatus("Field Offset must be a positive number.", true);
+    setStatus("Panorama offset must be a positive number.", true);
     view.render();
     return false;
   }
@@ -3567,7 +3635,7 @@ function changeFieldBoundary(boundary, value) {
   persistPreferences();
   stepField?.reconfigureOffset?.();
   setStatus(
-    `${boundary === "inner" ? "Inner" : "Outer"} Field offset set to ${
+    `${boundary === "inner" ? "Inner" : "Outer"} Panorama offset set to ${
       boundary === "inner" ? state.fieldBreath.inner : state.fieldBreath.outer
     }s.`
   );
@@ -3927,7 +3995,7 @@ function retainCue(index) {
     const pinned = pinSessionCurrent(state.session, label);
     if (!pinned.changed) return setStatus("That Address already holds a Pin.");
     state.session = pinned.session;
-    state.selectedRetained = { kind: "pin", id: pinned.value.pin.id };
+    selectTimelineRetained({ kind: "pin", id: pinned.value.pin.id });
     selectGuideTab("pins");
     view.renderGuide();
     view.render();
@@ -3937,7 +4005,7 @@ function retainCue(index) {
   if (!saved.changed) {
     const existing = saved.value?.section;
     if (existing) {
-      state.selectedRetained = { kind: "section", id: existing.id };
+      selectTimelineRetained({ kind: "section", id: existing.id });
       selectGuideTab("sections");
       view.renderGuide();
       view.render();
@@ -3945,7 +4013,7 @@ function retainCue(index) {
     return setStatus("That extent is already a retained Section.");
   }
   state.session = saved.session;
-  state.selectedRetained = { kind: "section", id: saved.value.section.id };
+  selectTimelineRetained({ kind: "section", id: saved.value.section.id });
   selectGuideTab("sections");
   view.renderGuide();
   view.render();
@@ -4451,6 +4519,7 @@ document.addEventListener("pointerdown", event => {
 });
 
 elements["range-start-here"].addEventListener("click", () => {
+  if (rejectFocusedRangeBoundaryEdit()) return;
   setRange(
     currentResolution().C,
     activeRange().end,
@@ -4460,6 +4529,7 @@ elements["range-start-here"].addEventListener("click", () => {
   );
 });
 elements["range-end-here"].addEventListener("click", () => {
+  if (rejectFocusedRangeBoundaryEdit()) return;
   setRange(
     activeRange().start,
     currentResolution().C,
@@ -4483,9 +4553,9 @@ elements["range-midpoint"].addEventListener("click", event => {
   );
   moveToAddress(middle, {
     operator: "rangeMidpoint",
-    label: "Go to Range Midpoint",
+    label: "Go to Timeline Midpoint",
     carryRetained: event.altKey === true,
-    status: destination => `Moved to Range midpoint at ${formatTime(destination)}.`
+    status: destination => `Moved to Timeline midpoint at ${formatTime(destination)}.`
   });
 });
 elements["go-range-end"].addEventListener("click", event => {
@@ -4497,6 +4567,7 @@ elements["go-range-end"].addEventListener("click", event => {
   });
 });
 elements["full-video-range"].addEventListener("click", () => {
+  if (rejectFocusedRangeBoundaryEdit()) return;
   setRange(0, model().duration, currentResolution().C, "Full Video Range", "Restored Full Video Range.");
 });
 
@@ -4694,7 +4765,13 @@ elements["sections-list"].addEventListener("change", event => {
       move.dataset.sectionGroup,
       move.value
     );
-    if (!moved.changed) return view.renderGuide();
+    if (!moved.changed) {
+      view.renderGuide();
+      if (moved.reason === "duplicate-section") {
+        setStatus("That Group already contains the same Section.");
+      }
+      return;
+    }
     return accept(moved, {
       effect: false,
       renderGuide: true,
@@ -4991,6 +5068,7 @@ function handleGuideClick(event) {
       "pin",
       {
         carryRetained: event.altKey === true,
+        surface: "guide",
         selectionAfter: sectionId
           ? { kind: "section", id: sectionId }
           : undefined
@@ -5007,7 +5085,7 @@ function handleGuideClick(event) {
     )) return;
     return selectSectionAsWorkingInterval(
       id,
-      { carryRetained: event.altKey === true }
+      { carryRetained: event.altKey === true, surface: "guide" }
     );
   }
   // Increment controls run through the shared hold-repeat binding, so a click
@@ -5018,7 +5096,7 @@ function handleGuideClick(event) {
     return goToPin(
       getPin(guide(), addressGo.dataset.addressGo),
       "pin",
-      { carryRetained: event.altKey === true }
+      { carryRetained: event.altKey === true, surface: "guide" }
     );
   }
   const reveal = event.target.closest("[data-reveal-pin]");
