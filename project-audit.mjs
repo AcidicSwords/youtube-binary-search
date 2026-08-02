@@ -105,9 +105,14 @@ assert.doesNotMatch(docs["README.md"], /hidden Pins,/,
   "Group visibility makes Timeline-hidden, Guide-reachable Pins ordinary.");
 assert.doesNotMatch(docs["IMPLEMENTATION.md"], /Current marker: acquired on pointer-down, then exact Go/,
   "Releasing a Current drag commits a Step, not a Go.");
-assert.doesNotMatch(docs["INTERFACE.md"], /clamp against Range/,
-  "Exact Address input rejects rather than clamps.");
+// Checked across every canonical document, not one: the contradiction this
+// replaced survived in SPEC.md because the assertion named only INTERFACE.md.
+for (const [name, text] of Object.entries(docs)) {
+  assert.doesNotMatch(text, /clamp against Range/,
+    `${name}: exact Address input rejects rather than clamps.`);
+}
 assert.match(docs["INTERFACE.md"], /reject anything outside Range/);
+assert.match(docs["SPEC.md"], /reject anything outside\nRange/);
 assert.match(app, /function parseAddress[\s\S]*parts\.slice\(1\)\.some\(part => Number\(part\) >= 60\)/,
   "and refuses timecode parts that are not timecode.");
 
