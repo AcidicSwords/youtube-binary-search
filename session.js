@@ -1555,9 +1555,13 @@ export function renameGuideGroup(session, groupId, label) {
   const group = session.model.guide.groups?.find(entry => entry.id === groupId);
   if (!group || groupId === DEFAULT_GROUP_ID) return unchanged(session, "missing-group");
   const next = typeof label === "string" ? label.trim() : "";
+  // A Section's title is optional because its Address identifies it. A Group has
+  // no Address, so its name is the only thing that does -- an unnamed one would
+  // fall back to a shared word and become indistinguishable from every other
+  // unnamed Group in the header and in the Section's Group control alike.
+  if (!next) return unchanged(session, "empty-group-label");
   if (next === (group.label?.trim() || "")) return unchanged(session, "unchanged-group");
-  const name = next || group.label?.trim() || "Group";
-  return commit(session, `Rename Group “${name}”`, draft => {
+  return commit(session, `Rename Group “${next}”`, draft => {
     const target = setGroupState(draft.guide, groupId, { label: next });
     if (!target) return { changed: false, reason: "missing-group" };
     return { changed: true, guideChanged: true, value: target };

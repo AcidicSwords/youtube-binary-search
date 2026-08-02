@@ -32,6 +32,7 @@ import { createTimelineProjection } from "./timeline-projection.js";
 import {
   createSession,
   createGuideGroup,
+  renameGuideGroup,
   setGuideGroupState,
   deleteGuideGroup,
   goToGuidePin,
@@ -514,6 +515,34 @@ function build() {
     "An inactive Group still draws its Section bar.");
   assert.equal(gradientSources().some(section => section.groupId === terrain.id), false,
     "while contributing no deformation, so no gradient.");
+}
+
+// A Group has no Address, so its name is the only thing that identifies it. A
+// Section's title is optional for exactly the opposite reason. Allowing an empty
+// Group name put two rows under one word and made the Section's Group control
+// unable to say which layer either option meant.
+{
+  const { guide, terrain } = build();
+  const session = createSession({ duration: 100, guide });
+
+  const cleared = renameGuideGroup(session, terrain.id, "   ");
+  assert.equal(cleared.changed, false, "A Group name cannot be cleared.");
+  assert.equal(cleared.reason, "empty-group-label");
+  assert.equal(
+    cleared.session.model.guide.groups.find(group => group.id === terrain.id).label,
+    guide.groups.find(group => group.id === terrain.id).label,
+    "and the name it had is kept."
+  );
+
+  const renamed = renameGuideGroup(cleared.session, terrain.id, "  Baked  ");
+  assert.equal(renamed.changed, true);
+  assert.equal(
+    renamed.session.model.guide.groups.find(group => group.id === terrain.id).label,
+    "Baked",
+    "A real name is trimmed and taken."
+  );
+  assert.match(renamed.session.history.at(-1).label, /Rename Group “Baked”/,
+    "and the transaction names the Group it renamed.");
 }
 
 console.log("Group tests passed: one visible Timeline layer, independent active deformation stack, hidden Guide navigation, endpoint visibility, multiplicative layering, non-destructive deletion, and deterministic persistence repair.");

@@ -26,6 +26,9 @@
 - Confirm `Show on timeline` draws a mark per Cue and that no mark can be clicked, dragged, or joined to a Pin cluster; that Undo is unchanged by drawing; and that `Clear` removes both the offer and the drawing.
 - Confirm a selected Section's `Start` and `End` labels select the corresponding Pin in the Pins tab without moving Current, and that a Pin holding two Sections offers one Unlink per Section, each naming it.
 - Confirm a Guide saved under v8 with several Groups reopens with exactly one on the Timeline, the first it had marked visible, with every Group's activity, label, membership and Weight unchanged.
+- Confirm New Group says the map is blank because the new empty layer took the Timeline, rather than leaving a blank map to be discovered.
+- Confirm a Group cannot be left without a name, and that no two rows or Group options read alike.
+- Confirm deleting the focused Section says its containing Range was restored, and that an unnamed Pin is called `the Pin at 0:10` rather than quoted as a title.
 - Confirm a Group is renamed and removed from its own row, that removing one returns its Sections to the map, and that Undo restores it in the state it was removed in.
 - Confirm two unnamed Sections sharing one Pin offer two distinguishable Unlink buttons, and that Undo labels name the same object the status named.
 - Confirm Group visibility is a single `On Timeline` radio choice while `Active` remains an independent checkbox: switching the visible Group atomically replaces all Timeline Sections and section-bound Pins without changing deformation; hidden active Groups continue multiplying Weight; visible inactive Groups remain editable with no deformation gradient.
