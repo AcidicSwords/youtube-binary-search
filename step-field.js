@@ -109,11 +109,18 @@ function structuralKey(snapshot) {
 
 export function fieldShouldSuspend(snapshot) {
   const transportKind = snapshot?.transport?.kind ?? snapshot?.transportKind;
+  const transportRate = snapshot?.transport?.rate ?? snapshot?.transportRate ?? 1;
   return Boolean(
     snapshot?.rangeDragging
     || snapshot?.dragging
     || snapshot?.pendingStep
     || transportKind === "context"
+    // Tail and Lead hold a fixed offset from Center by playing the same
+    // material at the same rate. No side rate preserves that relation once
+    // Center's rate changes, so the Field suspends for the duration rather than
+    // drifting. Stated here so it stays suspended for as long as the condition
+    // holds, instead of being paused once and resuming on the next tick.
+    || (transportKind === "playback" && transportRate !== 1)
   );
 }
 

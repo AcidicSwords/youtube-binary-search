@@ -300,6 +300,14 @@ Playback actualizes source continuity. Cursor moves physically while Current rem
 
 Context is bounded observation around Current, and it is transient without exception: it commits nothing. It ends by completing its window, by being superseded by the next traversal, by being turned off, or by yielding to the play command — and in every case Current is exactly where it was. Placing Current exactly is what dragging it, nudging it, and editing its Address are for.
 
+Play carries a rate. The plain command plays Center at `1×` with the Panorama; the Shift command plays Center at the configured Shift rate with the Panorama suspended. It is one command with a modifier, not two commands: either engagement pauses a running playback, and either may be issued from the key or from the Center transport surface.
+
+The rate belongs to the playback, not to the player. A proper-Range wrap continues the same playback and so keeps its rate; settling any playback returns Center to `1×`. Choosing a different rate while a Shift playback runs retunes that playback rather than beginning another.
+
+Tail and Lead hold a fixed offset from Center by playing the same material at the same rate, so no side rate preserves that relation once Center's rate changes. The Panorama therefore suspends for the duration of a playback whose rate is not `1×`. This is stated as a condition on the Field rather than as a command issued once, so it holds for as long as the rate does. Variable-speed playback is a capability an ordinary video player has; the Panorama is an experiment, and an experiment does not get to cost the reader an established capability. If all else fails, this system is still a video player.
+
+The offered rates are exactly the rates the player reports it can play. No ladder is assumed, and the offer is re-read rather than trusted once: a player commonly reports only `1×` until it has actually entered playback, and unknown is not the same as unsupported. The stored rate is a wish, snapped to the nearest offered rate at the moment it is used, so it returns to what it asked for as soon as that rate is genuinely available.
+
 ### Field Frame
 
 The Field Frame is the stable Tail–Center–Lead presentation used outside

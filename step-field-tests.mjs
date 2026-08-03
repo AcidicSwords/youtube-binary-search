@@ -120,9 +120,20 @@ assert.equal(resolveFieldPhase({
   );
   assert.match(app, /bindStepPress\(control/);
   assert.match(app, /performStep\(selection\.direction, selection\.distance/);
-  assert.match(app, /function startFieldPlaybackFromGesture\(\)/);
+  assert.match(app, /function startFieldPlaybackFromGesture\(options = \{\}\)/);
   assert.match(app, /stepField\?\.playFromGesture\?\.\(\{ center: destination, reason: "playback" \}\);[\s\S]*player\.play\(\);/,
     "Parent-owned playback must refold/start both side players and Center in one synchronous gesture stack.");
+  // Tail and Lead hold their offset by playing the same material at the same
+  // rate, so no side rate preserves the relation once Center's rate changes.
+  // Ordinary variable-speed playback is a capability the Panorama may cost the
+  // reader nothing: it suspends instead.
+  assert.match(
+    app,
+    /if \(rate === 1\) \{[\s\S]*stepField\?\.playFromGesture[\s\S]*\} else \{\s*stepField\?\.pause\(\{ center: destination, freeze: false \}\);/,
+    "A Center rate other than 1x suspends the Panorama rather than letting it drift."
+  );
+  assert.match(app, /player\.setRate\(rate\);\s*player\.play\(\);/,
+    "and the rate is established before the play command that uses it.");
   assert.match(app, /center-transport-surface/);
   assert.match(fieldSource, /function playFromGesture\(options = \{\}\)/);
   assert.doesNotMatch(app, /onHoldOffsets:/);

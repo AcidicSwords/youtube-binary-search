@@ -39,6 +39,8 @@ Held Step, drag, cascade deletion, Deform, direct weight editing, Focus, and Unf
 
 Step is the one gesture that commits before it settles, because its first press must move Current immediately; the rest of the sequence amends that transaction. It therefore names itself twice: `step()` labels the opening press, and `flushPendingStep()` calls `relabelLastAction()` with the settled sequence's net direction. Coalescing never removes the transaction — a sequence that returns to its origin is relabelled `Step Reversal`, not discarded — so a Step sequence and the same movements performed slowly are the same one history entry.
 
+The playback transport carries the rate it owns, so a Range wrap continues at that rate while settling returns Center to `1×`. `fieldShouldSuspend()` names the Panorama's condition — a playback whose rate is not `1×` suspends it — rather than app code pausing the sides once and hoping no later tick restarts them. `effectivePlaybackRate()` snaps the stored wish to the nearest rate `getAvailablePlaybackRates()` reports, and `pollPlayer()` re-reads that offer because a player commonly reports only `1×` until it has entered playback.
+
 `stepReach` stores `{ mode, backward, forward, fraction }`. Field offsets are separate preferences. `effectiveStepReach()` is the sole adaptive conversion boundary and receives the current timeline projection.
 
 ## Positive spatial projection

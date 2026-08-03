@@ -408,6 +408,10 @@ travelling transition.
 - Space is the play command everywhere outside text editing and modal Guide
   work: it starts or stops ordinary playback, and running Context yields to it
   rather than reinterpreting the key. Enter activates a focused Step control.
+- Shift is the rate modifier on that command, not a second command. `Shift` +
+  `Space`, and Shift-clicking the Center transport surface, play Center at the
+  Shift rate set in Parameters with the Panorama suspended; either engagement
+  pauses a running playback exactly as the plain command does.
 - Pointer release clears pointer-acquired control focus, and Center playback
   state changes release iframe focus back to the reader.
 - Narrow Timeline preserves vertical page scrolling; wide desktop keeps the application frame fixed and scrolls only the active right-rail surface.

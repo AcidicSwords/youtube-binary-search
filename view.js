@@ -1923,7 +1923,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "go-range-start", "range-start-here", "range-midpoint",
       "go-range-end", "range-end-here", "full-video-range",
       "field-inner-offset", "field-outer-offset", "field-breath-rate",
-      "nudge-seconds", "context-seconds",
+      "nudge-seconds", "context-seconds", "playback-rate",
       "section-source", "section-label", "pin-label",
       "cue-source", "cue-parse", "cue-clear"
     ]) {

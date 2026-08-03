@@ -115,7 +115,7 @@ import {
   createStepGestureController
 } from "./step-gesture.js";
 import { parseCueList, cueName } from "./cues.js";
-import { sectionDisplayName } from "./format.js";
+import { sectionDisplayName, formatRate } from "./format.js";
 import { createView } from "./view.js";
 
 const STORAGE_V9_PREFIX = "binary-youtube-reader:v9:";
@@ -148,6 +148,11 @@ const METADATA_RETRY_MS = 150;
 const PROGRAMMATIC_PLACEMENT_GRACE_MS = 2000;
 const NATIVE_POSITION_TOLERANCE_SECONDS = 0.25;
 const MAX_CONTEXT_SECONDS = 300;
+// Bounds for the stored Shift rate. They bound the wish, not the offer: what is
+// actually played is always a rate the player reported.
+const MIN_PLAYBACK_RATE = 0.25;
+const MAX_PLAYBACK_RATE = 4;
+const DEFAULT_PLAYBACK_RATE = 2;
 const PIN_SNAP_DISTANCE_PX = 16;
 const PIN_SNAP_ARM_MS = 450;
 // Nudge is a configured source-time quantum. It is only ever called a frame
@@ -193,6 +198,28 @@ function normalizeContextSeconds(value, fallback = 5) {
   return clamp(numeric, 0, MAX_CONTEXT_SECONDS);
 }
 
+// The rate Shift+Space plays Center at. Stored as a wish, not as a command: the
+// player is the authority on what it can actually play, so the stored value is
+// snapped to the nearest offered rate at the moment it is used. Nothing here
+// hardcodes a ladder — a player that offers finer steps simply offers them.
+function normalizePlaybackRate(value, fallback = DEFAULT_PLAYBACK_RATE) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return fallback;
+  return clamp(numeric, MIN_PLAYBACK_RATE, MAX_PLAYBACK_RATE);
+}
+
+function offeredRates() {
+  const rates = (state.availableRates || []).filter(rate => Number.isFinite(rate) && rate > 0);
+  return rates.length ? [...rates].sort((a, b) => a - b) : [1];
+}
+
+function effectivePlaybackRate() {
+  const wish = state.playbackRate;
+  return offeredRates().reduce(
+    (best, rate) => Math.abs(rate - wish) < Math.abs(best - wish) ? rate : best
+  );
+}
+
 function readPreferences() {
   try {
     const value = JSON.parse(localStorage.getItem(PREFERENCES_KEY) || "null");
@@ -209,6 +236,7 @@ function readPreferences() {
         value?.fieldBreath ?? legacyFieldBreath(value)
       ),
       nudgeSeconds: normalizeNudgeSeconds(value?.nudgeSeconds),
+      playbackRate: normalizePlaybackRate(value?.playbackRate),
       stepFieldEnabled: value?.stepFieldEnabled !== false,
       tailVisible: value?.tailVisible !== false,
       leadVisible: value?.leadVisible !== false
@@ -219,6 +247,7 @@ function readPreferences() {
       stepReach: normalizeStepReach(10),
       fieldBreath: { ...DEFAULT_FIELD_BREATH },
       nudgeSeconds: DEFAULT_NUDGE_SECONDS,
+      playbackRate: DEFAULT_PLAYBACK_RATE,
       stepFieldEnabled: true,
       tailVisible: true,
       leadVisible: true
@@ -241,6 +270,7 @@ const state = {
   fieldBreath: normalizeFieldBreath(preferences.fieldBreath),
   nudgeSeconds: normalizeNudgeSeconds(preferences.nudgeSeconds),
   contextSeconds: preferences.contextSeconds,
+  playbackRate: preferences.playbackRate,
   stepFieldEnabled: preferences.stepFieldEnabled,
   tailVisible: preferences.tailVisible,
   leadVisible: preferences.leadVisible,
@@ -651,6 +681,7 @@ function persistPreferences() {
     preferences.fieldBreath = normalizeFieldBreath(state.fieldBreath);
     preferences.nudgeSeconds = normalizeNudgeSeconds(state.nudgeSeconds);
     preferences.contextSeconds = state.contextSeconds;
+    preferences.playbackRate = normalizePlaybackRate(state.playbackRate);
     preferences.stepFieldEnabled = state.stepFieldEnabled;
     preferences.tailVisible = state.tailVisible;
     preferences.leadVisible = state.leadVisible;
@@ -660,6 +691,7 @@ function persistPreferences() {
       stepReach: preferences.stepReach,
       fieldBreath: preferences.fieldBreath,
       nudgeSeconds: preferences.nudgeSeconds,
+      playbackRate: preferences.playbackRate,
       stepFieldEnabled: preferences.stepFieldEnabled,
       tailVisible: preferences.tailVisible,
       leadVisible: preferences.leadVisible
@@ -1745,7 +1777,7 @@ function startNativePlaybackSession() {
   view.render();
 }
 
-function startFieldPlaybackFromGesture() {
+function startFieldPlaybackFromGesture(options = {}) {
   if (!state.videoLoaded) return false;
   settleBeforeAction({ handoffTransport: true });
   clearNativeGo();
@@ -1755,19 +1787,30 @@ function startFieldPlaybackFromGesture() {
   if (Math.abs(safeCurrentTime() - destination) > NATIVE_POSITION_TOLERANCE_SECONDS) {
     placePlayer(destination);
   }
+  const rate = options.rate === undefined ? 1 : normalizePlaybackRate(options.rate, 1);
   state.transport = createPlaybackTransport({
     departure: destination,
     parentNeighborhood: copy(currentResolution()),
     parentResolutionBasis: model().resolutionBasis,
     returnModel: snapshotModel(model()),
-    label: "Playback",
-    operator: "playback"
+    label: rate === 1 ? "Playback" : `Playback ${formatRate(rate)}`,
+    operator: "playback",
+    rate
   });
-  // This function is called directly from a trusted parent-page click or Space
-  // key event. Ask every muted side and Center to play in the same synchronous
-  // activation stack; delayed Center state events are too late to transfer that
-  // activation to sibling YouTube iframes reliably.
-  stepField?.playFromGesture?.({ center: destination, reason: "playback" });
+  // Tail and Lead hold a fixed offset from Center by playing the same material
+  // at the same rate. A changed Center rate has no side rate that preserves the
+  // relation, so the Panorama suspends rather than drifting: ordinary playback
+  // is a capability this system keeps, not one the Field is allowed to cost it.
+  if (rate === 1) {
+    // This function is called directly from a trusted parent-page click or Space
+    // key event. Ask every muted side and Center to play in the same synchronous
+    // activation stack; delayed Center state events are too late to transfer that
+    // activation to sibling YouTube iframes reliably.
+    stepField?.playFromGesture?.({ center: destination, reason: "playback" });
+  } else {
+    stepField?.pause({ center: destination, freeze: false });
+  }
+  player.setRate(rate);
   player.play();
   return true;
 }
@@ -1784,14 +1827,18 @@ function requestCenterPause() {
   return true;
 }
 
-function toggleNativePlayback() {
+// Play is one command carrying one rate. Plain issues it at 1x with the
+// Panorama; Shift issues it at the configured rate with Center alone. Either way
+// a running playback pauses, so each engagement stays a toggle.
+function toggleNativePlayback(options = {}) {
   if (!state.videoLoaded) return;
+  const rate = options.fast ? effectivePlaybackRate() : 1;
   if (transportIs(TRANSPORT_KIND.CONTEXT)) {
     // Context is transient observation around Current. The play command means
     // ordinary playback wherever it is issued, so Context yields to it rather
     // than reinterpreting the key as "commit what I was peeking at". Current is
     // placed exactly by dragging it, nudging it, or editing its Address.
-    startFieldPlaybackFromGesture();
+    startFieldPlaybackFromGesture({ rate });
     return;
   }
   if (transportIs(TRANSPORT_KIND.PLAYBACK)) {
@@ -1806,7 +1853,7 @@ function toggleNativePlayback() {
     startNativePlaybackSession();
     requestCenterPause();
   } else {
-    startFieldPlaybackFromGesture();
+    startFieldPlaybackFromGesture({ rate });
   }
 }
 
@@ -1820,10 +1867,14 @@ function wrapPlaybackRange(transport = state.transport) {
     || !rangeLoops()
   ) return false;
   const range = activeRange();
+  const rate = normalizePlaybackRate(transport.rate, 1);
   state.transport = rebasePlaybackTransport(transport, range.start);
   placePlayer(range.start);
-  player.setRate(1);
-  stepField?.resumeAt?.({ center: range.start, reason: "range-wrap" });
+  player.setRate(rate);
+  // A wrap continues one playback, so it continues that playback's relation to
+  // the Panorama: suspended for a changed rate, resumed at 1x.
+  if (rate === 1) stepField?.resumeAt?.({ center: range.start, reason: "range-wrap" });
+  else stepField?.pause({ center: range.start, freeze: false });
   player.play();
   view.renderTransport();
   return true;
@@ -2617,6 +2668,7 @@ function initializeVideo() {
   state.guideDrag = null;
   state.field = null;
   state.availableRates = snapshot.availableRates;
+  renderPlaybackRateChoices();
   state.playerState = snapshot.state;
   view.invalidateTimelinePins();
   pendingLoad = null;
@@ -2779,6 +2831,14 @@ function pollPlayer() {
   if (!state.videoLoaded || !player || !state.playerReady) {
     stepField?.tick();
     return;
+  }
+  // YouTube commonly reports only 1x until the iframe has actually entered
+  // playback, so the offer is re-read rather than trusted once at load. Unknown
+  // is not the same as unsupported -- the same rule the Field already follows.
+  const offered = playerSnapshot().availableRates;
+  if (offered.join(",") !== (state.availableRates || []).join(",")) {
+    state.availableRates = offered;
+    renderPlaybackRateChoices();
   }
   const now = safeCurrentTime();
   const transport = state.transport;
@@ -4027,6 +4087,7 @@ function handleTimelineWheel(event) {
 
 function syncContextControl() {
   elements["context-seconds"].value = String(state.contextSeconds);
+  renderPlaybackRateChoices();
 }
 
 // Cues: a creator's chapters offered as candidates.
@@ -4386,6 +4447,7 @@ function initializePlayerApi() {
       // projection, operator arithmetic, or Context math.
       fieldFrame: fieldOperatorPreview(),
       transportKind: state.transport.kind,
+      transportRate: state.transport.rate ?? 1,
       pendingStep: Boolean(state.pendingStep),
       dragging: Boolean(
         state.dragHandle || state.guideDrag?.moved || state.currentDrag?.moved
@@ -4765,7 +4827,9 @@ elements["shift-layer-toggle"].addEventListener("click", () => {
 });
 elements["return-action"].addEventListener("click", undoLastAction);
 elements["redo-action"].addEventListener("click", redoLastAction);
-elements["center-transport-surface"].addEventListener("click", toggleNativePlayback);
+elements["center-transport-surface"].addEventListener("click", event => {
+  toggleNativePlayback({ fast: event.shiftKey === true || state.shiftLayer });
+});
 
 const tapStep = selection => {
   if (!selection) return false;
@@ -4842,6 +4906,41 @@ elements["context-seconds"].addEventListener("change", event => {
       setStatus(`Automatic Context updated to ${state.contextSeconds}s.`);
     }
   }
+  view.render();
+});
+
+// The offer is the player's to make. Rebuild the list whenever the player tells
+// us what it can play, and keep the operator's wish pointed at the nearest one.
+function renderPlaybackRateChoices() {
+  const select = elements["playback-rate"];
+  if (!select) return;
+  const rates = offeredRates();
+  const signature = rates.join(",");
+  if (select.dataset.rates !== signature) {
+    select.dataset.rates = signature;
+    select.replaceChildren(...rates.map(rate => {
+      const option = document.createElement("option");
+      option.value = String(rate);
+      option.textContent = rate === 1 ? "1× (Center alone)" : formatRate(rate);
+      return option;
+    }));
+  }
+  select.value = String(effectivePlaybackRate());
+  elements["playback-rate-value"].textContent = `${formatRate(effectivePlaybackRate())} on Shift`;
+}
+
+elements["playback-rate"].addEventListener("change", event => {
+  state.playbackRate = normalizePlaybackRate(event.target.value, state.playbackRate);
+  persistPreferences();
+  renderPlaybackRateChoices();
+  if (transportIs(TRANSPORT_KIND.PLAYBACK) && (state.transport.rate ?? 1) !== 1) {
+    // A rate change during a Shift playback is that playback's rate changing,
+    // not a new transport: Center keeps its departure and the Panorama stays
+    // suspended for the same reason it already was.
+    state.transport = { ...state.transport, rate: effectivePlaybackRate() };
+    player.setRate(effectivePlaybackRate());
+  }
+  setStatus(`Shift plays Center at ${formatRate(effectivePlaybackRate())}.`);
   view.render();
 });
 
@@ -5383,13 +5482,13 @@ document.addEventListener("keydown", event => {
       || activeElement.getAttribute?.("role") === "slider"
       || activeElement.getAttribute?.("role") === "menuitem"
     );
-  const plainSpace = (event.key === " " || event.code === "Space")
+  // Shift is the rate modifier on the play command, not a different command.
+  const playSpace = (event.key === " " || event.code === "Space")
     && !event.ctrlKey
     && !event.metaKey
-    && !event.altKey
-    && !event.shiftKey;
+    && !event.altKey;
   if (
-    !plainSpace
+    !playSpace
     || event.repeat
     || editing
     || focusedControl
@@ -5400,7 +5499,7 @@ document.addEventListener("keydown", event => {
   event.preventDefault();
   event.stopPropagation();
   event.stopImmediatePropagation?.();
-  toggleNativePlayback();
+  toggleNativePlayback({ fast: event.shiftKey === true });
 }, true);
 
 // Keyboard: spatial cluster W/A/S/D, directional arrows, and observation keys.

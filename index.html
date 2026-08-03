@@ -261,6 +261,17 @@
               </div>
             </details>
 
+            <details id="playback-settings" class="tool-disclosure playback-settings">
+              <summary><span>Playback rate</span><span id="playback-rate-value">2× on Shift</span></summary>
+              <div class="compact-settings">
+                <label class="compact-setting" for="playback-rate">
+                  <span>Shift rate for Center</span>
+                  <select id="playback-rate" disabled></select>
+                </label>
+                <p class="setting-note"><kbd>Space</kbd> plays Center at <span class="unit-mark">1×</span> with the Panorama breathing. <kbd>Shift</kbd> + <kbd>Space</kbd> plays Center alone at this rate: the Panorama cannot hold its ratio at a changed rate, so Tail and Lead suspend for the duration. The list offers exactly the rates this player reports it can play.</p>
+              </div>
+            </details>
+
             <details id="shortcut-help" class="tool-disclosure shortcut-help">
               <summary id="shortcut-help-summary"><span>Keyboard</span><kbd>?</kbd></summary>
               <div class="shortcut-grid">
@@ -277,6 +288,7 @@
                 <span><kbd>Alt</kbd> Carry selected retained object</span>
                 <span><kbd>P</kbd> Pin Current</span>
                 <span><kbd>Space</kbd> Native play/pause</span>
+                <span><kbd>Shift</kbd>+<kbd>Space</kbd> Play at the Shift rate, Panorama suspended</span>
                 <span><kbd>⇧P</kbd> Save Working Section</span>
                 <span><kbd>G</kbd> Guide</span>
                 <span><kbd>[</kbd>/<kbd>]</kbd> Step size</span>

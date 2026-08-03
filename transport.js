@@ -73,7 +73,8 @@ export function createPlaybackTransport({
   parentResolutionBasis,
   returnModel,
   label = "Playback",
-  operator = "playback"
+  operator = "playback",
+  rate = 1
 }) {
   return {
     kind: TRANSPORT_KIND.PLAYBACK,
@@ -85,6 +86,9 @@ export function createPlaybackTransport({
     returnModel,
     label,
     operator,
+    // The rate this playback owns. A Range wrap continues the same playback and
+    // so keeps it; settling ends the playback and returns Center to 1x.
+    rate,
     enteredPath: false,
     cycles: 0,
     startedAt: Date.now()

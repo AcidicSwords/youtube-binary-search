@@ -146,4 +146,95 @@ await flush();
 assert.equal(center.currentTime, 100);
 assert.equal(currentText(), "Current 1:40");
 
-console.log("Transport coherence smoke passed: live projection, exact settlement, Focus-owned proper-Range looping, one-pass Field rebasing, wrap history isolation, Unfocus restoration, and full-video completion.");
+// Video Cartography is a video player before it is anything else. Variable-speed
+// playback is an established capability, and the Panorama -- experimental, and
+// arguably a better way to see ahead and behind -- may not cost the reader that
+// capability. Shift carries a rate on the play command; the sides suspend
+// because no side rate holds their offset once Center's rate changes.
+const sidePlays = () => tail.commands.filter(command => command[0] === "play").length
+  + lead.commands.filter(command => command[0] === "play").length;
+
+// The suite arrives here at the very end of the video, where a play command has
+// nothing to play. Return to somewhere playable first.
+byId.get("full-video-range").click();
+await flush(3);
+byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 300 });
+await flush(3);
+await poll();
+
+const rateSelect = byId.get("playback-rate");
+assert.deepEqual(
+  rateSelect.options.map(option => Number(option.value)),
+  center.getAvailablePlaybackRates(),
+  "The offered rates are exactly what this player reports it can play: no ladder is assumed."
+);
+assert.equal(rateSelect.value, "2", "It defaults to the nearest offered rate to 2x.");
+
+const settle = async () => {
+  await flush(4);
+  await poll();
+  await flush(4);
+  await poll();
+};
+
+dispatchDocument("keydown", { key: " ", code: "Space" });
+await settle();
+assert.equal(center.rate, 1, "Plain Space plays Center at 1x.");
+dispatchDocument("keydown", { key: " ", code: "Space" });
+await settle();
+
+const sidePlaysBeforeShift = sidePlays();
+dispatchDocument("keydown", { key: " ", code: "Space", shiftKey: true });
+await settle();
+assert.equal(center.rate, 2, "Shift+Space plays Center at the configured rate.");
+assert.equal(center.state, 1, "Center is running.");
+assert.equal(sidePlays(), sidePlaysBeforeShift,
+  "and the Panorama suspends rather than drifting: no side is asked to play.");
+
+// Suspension is a condition, not a single command. Later ticks must not find
+// Center running and start the sides breathing behind it.
+await settle();
+await settle();
+assert.equal(sidePlays(), sidePlaysBeforeShift,
+  "The Panorama stays suspended for as long as Center's rate is not 1x.");
+
+dispatchDocument("keydown", { key: " ", code: "Space", shiftKey: true });
+await settle();
+assert.equal(center.rate, 1,
+  "Ending the playback returns Center to 1x: the rate belongs to the transport, not to the player.");
+
+// The rate is a stored preference, and changing it during a Shift playback
+// retunes that playback rather than starting another.
+dispatchDocument("keydown", { key: " ", code: "Space", shiftKey: true });
+await flush(4);
+rateSelect.value = "1.5";
+rateSelect.dispatch("change", { target: rateSelect });
+await flush(3);
+assert.equal(center.rate, 1.5, "Choosing a rate mid-playback retunes that playback.");
+assert.equal(
+  JSON.parse(env.localStorage.values.get("binary-youtube-reader:preferences:v1")).playbackRate,
+  1.5,
+  "The chosen rate is remembered."
+);
+
+// YouTube commonly reports only 1x until the iframe has entered playback, so an
+// offer read once at load would strand the control at 1x for the session.
+// Unknown is not unsupported: the offer is re-read, and the stored wish returns
+// to the rate it asked for as soon as that rate is actually offered.
+rateSelect.value = "2";
+rateSelect.dispatch("change", { target: rateSelect });
+await flush(3);
+center.getAvailablePlaybackRates = () => [1];
+await poll();
+await flush(3);
+assert.deepEqual(rateSelect.options.map(option => option.value), ["1"],
+  "A player that reports only 1x offers only 1x.");
+center.getAvailablePlaybackRates = () => [0.25, 0.5, 1, 2];
+await poll();
+await flush(3);
+assert.deepEqual(rateSelect.options.map(option => Number(option.value)), [0.25, 0.5, 1, 2],
+  "A later, fuller offer replaces it.");
+assert.equal(rateSelect.value, "2",
+  "and the remembered wish returns to the rate it asked for.");
+
+console.log("Transport coherence smoke passed: live projection, exact settlement, Focus-owned proper-Range looping, one-pass Field rebasing, wrap history isolation, Unfocus restoration, full-video completion, and Shift-rate playback that suspends the Panorama instead of losing variable speed.");

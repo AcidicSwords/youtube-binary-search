@@ -30,3 +30,10 @@ export function formatRange(extent) {
 export function sectionDisplayName(section) {
   return section?.label?.trim() || `Section ${formatRange(section)}`;
 }
+
+// One way to name a rate, wherever a rate is shown. Trailing zeros are noise on
+// a value the player may report at any granularity: 1.5, not 1.50.
+export function formatRate(rate) {
+  if (!Number.isFinite(rate) || rate <= 0) return "1×";
+  return `${Number(rate.toFixed(2))}×`;
+}
