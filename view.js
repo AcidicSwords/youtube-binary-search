@@ -239,13 +239,25 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     // A derived name says what this Pin is, never when it is. The Address is a
     // field of its own, and a title that carries the range repeats it and then
     // truncates -- the one thing a Pin exists to save you from remembering.
-    if (references.length === 1) {
-      const section = references[0];
+    // Say which ends these are, and of what. "Shared endpoint - 2 Sections"
+    // named the arity of the relation instead of the relation: every such Pin
+    // read identically, so the list could not be scanned. A Pin holding the end
+    // of one Section and the start of the next is the ordinary case, and saying
+    // so is what makes the seam legible.
+    // The Address is a field of its own, so an unnamed Section contributes its
+    // role alone rather than the range `sectionDisplayName` would fall back to.
+    const roleOf = section => {
       const role = section.startPinId === pin.id ? "Start" : "End";
       const named = section.label?.trim();
       return named ? `${role} of ${named}` : `Section ${role}`;
+    };
+    if (references.length === 1) return roleOf(references[0]);
+    if (references.length > 1) {
+      const named = references.map(roleOf);
+      return named.length <= 2
+        ? named.join(" · ")
+        : `${named.slice(0, 2).join(" · ")} · +${named.length - 2} more`;
     }
-    if (references.length > 1) return `Shared endpoint · ${references.length} Sections`;
     return pin.kind === PIN_KIND.ENDPOINT ? "Section endpoint" : "Pin";
   }
 
@@ -1279,7 +1291,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       }
     }
 
-    const composing = state().shiftLayer === true;
+    const composing = state().shiftLayer === "guide";
     elements["guide-compose-toggle"].setAttribute("aria-pressed", String(composing));
     elements["guide-compose-toggle"].classList.toggle("active", composing);
     renderCues();
@@ -1648,7 +1660,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
   function render() {
     const currentState = state();
     const loaded = currentState.videoLoaded;
-    const shiftLayer = currentState.shiftLayer || currentState.shiftKeyHeld;
+    // The matrix shows its own armed layer, and the physical modifier, which
+    // is global by nature. A layer armed in the Guide is the Guide's.
+    const shiftLayer = currentState.shiftLayer === "matrix" || currentState.shiftKeyHeld;
     const activeRange = range();
     const currentResolution = resolution();
     const currentInterval = interval();

@@ -320,7 +320,12 @@ const state = {
   guideDrag: null,
   guideClickSuppressed: false,
   carryModifier: false,
-  shiftLayer: false,
+  // Which surface armed the one-shot Shift layer, or null. Scoped rather than
+  // boolean: arming Shift in the Guide is a claim about the next Guide click,
+  // and it used to reach the operator matrix and the play command as well --
+  // pressing Shift to extend a Section and then pressing Space started a
+  // Shift-rate playback nobody asked for.
+  shiftLayer: null,
   shiftKeyHeld: false,
   field: null,
   // Direct manipulation of Current on the Temporal Topography. It commits a
@@ -2505,7 +2510,7 @@ function goToAdjacentPin(direction, options = {}) {
 function traverseToAdjacentPin(direction, carryRetained = false) {
   const changed = goToAdjacentPin(direction, { carryRetained });
   if (state.shiftLayer) {
-    state.shiftLayer = false;
+    state.shiftLayer = null;
     view.render();
   }
   return changed;
@@ -2537,12 +2542,12 @@ function retainedExtentOf(kind, id) {
 }
 
 function composingGuideClick(event) {
-  return event?.shiftKey === true || state.shiftLayer;
+  return event?.shiftKey === true || state.shiftLayer === "guide";
 }
 
 function consumeShiftLayer() {
   if (!state.shiftLayer) return;
-  state.shiftLayer = false;
+  state.shiftLayer = null;
   // Both controls that surface this one-shot state have to release together,
   // or the Guide keeps claiming a layer the operator matrix has already spent.
   view.renderGuide();
@@ -2633,7 +2638,7 @@ function resetSourceScopedState() {
   state.guideRetained = null;
   state.selectedPinIds = [];
   state.deformWeightMemory.clear();
-  state.shiftLayer = false;
+  state.shiftLayer = null;
   state.shiftKeyHeld = false;
   state.guideDrag = null;
   state.guideClickSuppressed = false;
@@ -4815,24 +4820,24 @@ elements["full-video-range"].addEventListener("click", () => {
 // Navigation and observation
 
 elements["refine-backward"].addEventListener("click", event => {
-  const local = event.shiftKey === true || state.shiftLayer;
+  const local = event.shiftKey === true || state.shiftLayer === "matrix";
   refine("backward", {
     local,
     carryRetained: event.altKey === true
   });
   if (state.shiftLayer) {
-    state.shiftLayer = false;
+    state.shiftLayer = null;
     view.render();
   }
 });
 elements["refine-forward"].addEventListener("click", event => {
-  const local = event.shiftKey === true || state.shiftLayer;
+  const local = event.shiftKey === true || state.shiftLayer === "matrix";
   refine("forward", {
     local,
     carryRetained: event.altKey === true
   });
   if (state.shiftLayer) {
-    state.shiftLayer = false;
+    state.shiftLayer = null;
     view.render();
   }
 });
@@ -4859,13 +4864,16 @@ bindHoldRepeat(
 );
 elements["focus-toggle"].addEventListener("click", focusOrUnfocus);
 elements["shift-layer-toggle"].addEventListener("click", () => {
-  state.shiftLayer = !state.shiftLayer;
+  state.shiftLayer = state.shiftLayer === "matrix" ? null : "matrix";
+  view.renderGuide();
   view.render();
 });
 elements["return-action"].addEventListener("click", undoLastAction);
 elements["redo-action"].addEventListener("click", redoLastAction);
 elements["center-transport-surface"].addEventListener("click", event => {
-  toggleNativePlayback({ fast: event.shiftKey === true || state.shiftLayer });
+  // Only the physical modifier reaches the play command. An armed Guide or
+  // matrix layer is a claim about that surface's next click, not about transport.
+  toggleNativePlayback({ fast: event.shiftKey === true });
 });
 
 const tapStep = selection => {
@@ -4881,7 +4889,7 @@ const tapStep = selection => {
   });
 };
 const directionalStep = direction => event => {
-  const pinTraversal = event?.shiftKey === true || state.shiftLayer;
+  const pinTraversal = event?.shiftKey === true || state.shiftLayer === "matrix";
   return {
     direction,
     pinTraversal,
@@ -5134,7 +5142,7 @@ elements["sections-list"].addEventListener("click", event => {
 });
 
 elements["guide-compose-toggle"].addEventListener("click", () => {
-  state.shiftLayer = !state.shiftLayer;
+  state.shiftLayer = state.shiftLayer === "guide" ? null : "guide";
   view.renderGuide();
   view.render();
 });

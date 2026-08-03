@@ -95,34 +95,39 @@ await flush();
 assert.match(workingWindow(), /0:10–1:20/,
   "Shift+click on a Pin extends the same Working Interval by the same rule.");
 
-// --- The Shift layer composes exactly as the Shift key does -------------------
-// Pointer-only use must reach every meaning the keyboard reaches.
+// --- A Shift layer belongs to the surface that armed it -----------------------
+// Both surfaces surface a one-shot Shift, and each one means "the next click
+// *here*". Arming Shift in the operator matrix to take a local Refine, and then
+// clicking a row in the Guide, used to compose that row: one global boolean
+// spoke for two places. Pressing Shift to extend a Section and then pressing
+// Space was the same fault reaching transport.
 await clickSection("0:10–0:20");
 byId.get("shift-layer-toggle").click();
 await flush();
 assert.equal(byId.get("shift-layer-state").textContent, "On");
 await clickSection("1:00–1:20");
-assert.match(workingWindow(), /0:10–1:20/,
-  "The Shift layer composes as the Shift key does.");
-assert.equal(byId.get("shift-layer-state").textContent, "Off",
-  "Composing consumes the one-shot Shift layer.");
+assert.match(workingWindow(), /1:00–1:20/,
+  "The matrix layer does not compose a Guide click; the plain click replaces.");
+assert.equal(byId.get("shift-layer-state").textContent, "On",
+  "and the matrix layer is still armed, because nothing in the matrix spent it.");
+byId.get("shift-layer-toggle").click();
+await flush();
+assert.equal(byId.get("shift-layer-state").textContent, "Off");
 
 // --- Composition is reachable from the Guide itself ---------------------------
-// The operator matrix's Shift layer is inert while the compact Guide is open,
-// so on a phone the Guide had no route to composition at all. Its own control
-// mirrors the same one-shot state rather than owning a second one.
+// The operator matrix's Shift layer is inert while the compact Guide is open, so
+// on a phone the Guide had no route to composition at all. It owns its own.
 await clickSection("0:10–0:20");
 byId.get("guide-compose-toggle").click();
 await flush();
 assert.equal(byId.get("guide-compose-toggle")["aria-pressed"], "true");
-assert.equal(byId.get("shift-layer-state").textContent, "On",
-  "The Guide control and the operator matrix surface one state, never two.");
+assert.equal(byId.get("shift-layer-state").textContent, "Off",
+  "and arming the Guide's layer says nothing about the operator matrix.");
 await clickSection("1:00–1:20");
 assert.match(workingWindow(), /0:10–1:20/,
   "Composing from the Guide extends exactly as Shift does.");
 assert.equal(byId.get("guide-compose-toggle")["aria-pressed"], "false",
-  "and both controls release the one-shot layer together.");
-assert.equal(byId.get("shift-layer-state").textContent, "Off");
+  "and the Guide releases its one-shot layer.");
 await clickSection("0:10–0:20");
 assert.match(workingWindow(), /0:10–0:20/,
   "so the next plain click starts over.");

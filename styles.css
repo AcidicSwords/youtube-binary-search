@@ -1679,7 +1679,10 @@ kbd {
 
 .guide-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* One line, whatever the count. Two fixed columns left a third tab stranded
+     on a row of its own, which read as a second group of tabs. */
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: 5px;
   padding: 8px;
   border-bottom: 1px solid var(--line);
@@ -2054,10 +2057,16 @@ kbd {
   .reader-column {
     height: 100%;
     grid-template-columns: minmax(0, 1fr) minmax(370px, 26vw);
-    grid-template-rows: auto minmax(0, auto);
+    /* The controls rail spans the viewer and the timeline, so any min-height it
+       carries is distributed across the rows it spans -- which pushed the
+       timeline 310px away from the viewer on short windows, with the viewer row
+       holding the slack. A third row, empty and flexible, gives that slack
+       somewhere to go that is not between them. */
+    grid-template-rows: auto auto minmax(0, 1fr);
     grid-template-areas:
       "viewer controls"
-      "timeline controls";
+      "timeline controls"
+      ".        controls";
     align-content: start;
     transition: grid-template-columns 180ms ease;
   }
@@ -2087,6 +2096,17 @@ kbd {
     opacity: 1;
     transform: translateX(0);
     transition: opacity 120ms ease, transform 180ms ease;
+  }
+
+  /* The rail hides overflow so it can slide, but expanding several disclosures
+     makes the controls taller than it. Without a scroll of their own the ones
+     at the bottom were simply unreachable -- measured at 1062px past the edge
+     with every Parameters disclosure open. */
+  .command-workspace.mode-controls {
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
   }
 
   .command-workspace.is-collapsed {

@@ -234,7 +234,46 @@ try {
   assert.deepEqual(failures, [],
     "The whole session runs without a page error or console error.");
 
-  console.log("Browser smoke passed: the app runs in Chromium without error; a press lands on the Address drawn under it; a focused control owns Space while the reader background still observes; no reachable control is covered by another; the page never scrolls sideways from 380px to 1440px; crossing the compact breakpoint does not open or close the Guide; ten overlapping Sections do not displace the workspace; and an increment control keeps focus through the rebuild its own edit causes.");
+  // Layout faults that only exist at a real viewport, each measured before it was
+// fixed: a third Guide tab stranded on its own row; the controls rail hiding
+// 1062px of expanded Parameters with no way to scroll to them; and the rail's
+// min-height, distributed across the two rows it spans, pushing the Timeline
+// 310px away from the viewer on a short window.
+for (const [width, height] of [[1920, 1080], [1600, 720]]) {
+  await page.setViewportSize({ width, height });
+  await page.waitForTimeout(250);
+
+  const tabRows = await page.evaluate(() => new Set(
+    [...document.querySelector(".guide-tabs").children]
+      .map(tab => Math.round(tab.getBoundingClientRect().top))
+  ).size);
+  assert.equal(tabRows, 1, `Every Guide tab shares one row at ${width}x${height}.`);
+
+  const gap = await page.evaluate(() => {
+    const status = document.getElementById("status").getBoundingClientRect();
+    const timeline = document.getElementById("timeline-panel").getBoundingClientRect();
+    return Math.round(timeline.top - status.bottom);
+  });
+  assert.ok(gap >= 0 && gap <= 40,
+    `The Timeline sits directly under the viewer at ${width}x${height}, not ${gap}px away.`);
+
+  await page.click("#operator-toggle");
+  await page.waitForTimeout(200);
+  const reachable = await page.evaluate(() => {
+    document.querySelectorAll("#parameter-panel details").forEach(entry => { entry.open = true; });
+    const rail = document.getElementById("command-workspace");
+    const overflows = rail.scrollHeight > rail.clientHeight;
+    const scrolls = ["auto", "scroll"].includes(getComputedStyle(rail).overflowY);
+    const pageScrolls = document.documentElement.scrollHeight > window.innerHeight;
+    return !overflows || scrolls || pageScrolls;
+  });
+  assert.ok(reachable,
+    `Expanded Parameters must be reachable at ${width}x${height}, by the rail scrolling or the page.`);
+  await page.click("#guide-toggle");
+  await page.waitForTimeout(200);
+}
+
+console.log("Browser smoke passed: the app runs in Chromium without error; a press lands on the Address drawn under it; a focused control owns Space while the reader background still observes; no reachable control is covered by another; the page never scrolls sideways from 380px to 1440px; crossing the compact breakpoint does not open or close the Guide; ten overlapping Sections do not displace the workspace; an increment control keeps focus through the rebuild its own edit causes; every Guide tab shares one row; the Timeline sits directly under the viewer; and expanded Parameters stay reachable.");
 } finally {
   await close();
 }

@@ -316,22 +316,24 @@ assert.ok(
 );
 
 // An armed Shift layer survives a reveal: revealing is not composing, so it
-// must neither consume the arm nor compose with it.
+// must neither consume the arm nor compose with it. The layer under test is the
+// Guide's own, because these are Guide clicks -- the operator matrix's layer
+// speaks for the operator matrix.
 await selectSection(0);
-byId.get("shift-layer-toggle").click();
+byId.get("guide-compose-toggle").click();
 await flush();
-assert.equal(byId.get("shift-layer-state").textContent, "On");
+assert.equal(byId.get("guide-compose-toggle")["aria-pressed"], "true");
 const armedInterval = workingWindow();
 await clickIn(
   "sections-list",
   inSections("revealPin").find(node => node.textContent === "End")
 );
-assert.equal(byId.get("shift-layer-state").textContent, "On",
+assert.equal(byId.get("guide-compose-toggle")["aria-pressed"], "true",
   "A reveal leaves the one-shot Shift layer armed for the click that composes.");
 assert.equal(workingWindow(), armedInterval,
   "and composes nothing itself.");
 await clickIn("pins-list", pinRows()[3]);
-assert.equal(byId.get("shift-layer-state").textContent, "Off",
+assert.equal(byId.get("guide-compose-toggle")["aria-pressed"], "false",
   "The next click in the tab it landed on consumes the arm.");
 
 // ==============================================================================
