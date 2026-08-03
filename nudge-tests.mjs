@@ -406,4 +406,30 @@ assert.equal(committedPinAddress(), addressBeforePreview);
   await flush(2);
 }
 
+// Nudge is not a thing you do to the map, it is a thing you do to what you have
+// acquired. Bound to the Timeline alone, Shift+wheel demanded the pointer be
+// hovering the map to adjust an already-acquired object -- a demand the keyboard
+// route never made.
+const offMap = dispatchDocument("wheel", {
+  target: byId.get("status"), deltaY: -120, deltaX: 0, shiftKey: true
+});
+await flush(3);
+assert.equal(offMap.defaultPrevented, true,
+  "Shift+wheel away from the map is Nudge, acting on whatever is acquired.");
+
+// A form control the pointer is over keeps its own wheel, and a plain wheel is
+// never claimed anywhere.
+const overField = dispatchDocument("wheel", {
+  target: byId.get("context-seconds"), deltaY: -120, deltaX: 0, shiftKey: true
+});
+await flush(2);
+assert.ok(!overField.defaultPrevented,
+  "and a form control under the pointer keeps its own wheel.");
+const plainOffMap = dispatchDocument("wheel", {
+  target: byId.get("status"), deltaY: -120, deltaX: 0
+});
+await flush(2);
+assert.ok(!plainOffMap.defaultPrevented,
+  "A wheel without Shift is not a Nudge anywhere.");
+
 console.log("Nudge tests passed: source-time quantum, Current drag commit and cancel, Shift-drag precision, Shift-wheel accumulation and targeting, keyboard nudging, one Undo per gesture, Guide increments sharing the same operation, Guide Address preview and cancellation, and drag/edit Frame parity.");

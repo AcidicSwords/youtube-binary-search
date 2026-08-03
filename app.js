@@ -4109,6 +4109,13 @@ function selectedNudgeTarget() {
 
 // High-resolution trackpad deltas accumulate until one discrete quantum is
 // crossed. The browser default is prevented only for an acquired target.
+function withinTimeline(node) {
+  for (let current = node; current; current = current.parentElement) {
+    if (current === elements.timeline) return true;
+  }
+  return false;
+}
+
 function handleTimelineWheel(event) {
   if (!event.shiftKey || !state.videoLoaded || !currentResolution()) return;
   const target = nudgeTargetFromElement(event.target);
@@ -4574,6 +4581,17 @@ elements.timeline.addEventListener("pointercancel", event => {
 elements["current-marker"].addEventListener("pointerdown", beginCurrentDrag);
 // Shift + wheel nudges the exact manipulable object under the pointer.
 elements.timeline.addEventListener("wheel", handleTimelineWheel, { passive: false });
+// Shift+wheel is Nudge wherever the pointer happens to be. Bound to the Timeline
+// alone it required hovering the map to adjust something already acquired, which
+// is a demand the keyboard route never made. Over the map the element under the
+// pointer names the target; anywhere else the acquired object does.
+document.addEventListener("wheel", event => {
+  if (!event.shiftKey || !state.videoLoaded || !currentResolution()) return;
+  if (withinTimeline(event.target)) return;
+  if (["INPUT", "SELECT", "TEXTAREA"].includes(event.target?.tagName)) return;
+  event.preventDefault?.();
+  nudgeTarget(selectedNudgeTarget(), event.deltaY < 0 ? 1 : -1);
+}, { passive: false });
 document.addEventListener("pointerup", finishGuideDrag);
 document.addEventListener("pointerup", finishCurrentDrag);
 document.addEventListener("pointercancel", event => {
@@ -5609,6 +5627,14 @@ document.addEventListener("keydown", event => {
   if (plain && key === "g") {
     event.preventDefault();
     toggleGuide();
+    return;
+  }
+  // The rail holds two surfaces and G reaches one of them. O reaches the other,
+  // Parameters included -- P is already Pin, so the operators keep the letter of
+  // their own name.
+  if (plain && key === "o") {
+    event.preventDefault();
+    toggleControls();
     return;
   }
   if (event.key === "Escape") {
