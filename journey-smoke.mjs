@@ -105,8 +105,8 @@ const surveyed = byId.get("section-window").textContent;
 // ==============================================================================
 // 4. Mark the place. A Pin is the first retained object.
 // ==============================================================================
-await press("p");
-assert.equal(pinRows().length, 1, "P retains exactly one Pin.");
+await press("t");
+assert.equal(pinRows().length, 1, "T tags exactly one Pin.");
 assert.equal(byId.get("sections-list-count").textContent, "0",
   "and nothing else.");
 const pinnedAt = pinRows()[0];
@@ -116,9 +116,9 @@ assert.match(rowText(pinnedAt), /\d:\d\d/,
 // ==============================================================================
 // 5. Build a Section from the traversal that was just made.
 // ==============================================================================
-await press("P", { shiftKey: true });
+await press("T", { shiftKey: true });
 assert.equal(sectionRows().length, 1,
-  "Shift+P retains the Working Interval as a Section.");
+  "Shift+T tags the Working Interval as a Section.");
 assert.match(byId.get("section-window").textContent, new RegExp(
   surveyed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").slice(0, 12)
 ), "Retaining does not disturb the extent it retained.");

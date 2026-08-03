@@ -296,15 +296,15 @@
                 <span><kbd>⇧Q</kbd>/<kbd>⇧E</kbd> Local Refine</span>
                 <span><kbd>⇧A</kbd>/<kbd>⇧D</kbd> Pins</span>
                 <span><kbd>R</kbd> Release Interval</span>
-                <span><kbd>T</kbd> Deform / Normalize</span>
-                <span><kbd>⇧T</kbd>/<kbd>Alt T</kbd> Weight up / down</span>
+                <span><kbd>X</kbd> Deform / Normalize</span>
+                <span><kbd>⇧X</kbd>/<kbd>Alt X</kbd> Weight up / down</span>
                 <span><kbd>F</kbd> Focus / Unfocus</span>
                 <span><kbd>Alt</kbd> Carry selected retained object</span>
-                <span><kbd>P</kbd> Pin Current</span>
+                <span><kbd>T</kbd> Tag as Pin</span>
                 <span><kbd>Space</kbd> Native play/pause</span>
                 <span><kbd>Shift</kbd>+<kbd>Space</kbd> Play at the Shift rate, Panorama suspended</span>
                 <span><kbd>O</kbd> Operators and Parameters</span>
-                <span><kbd>⇧P</kbd> Save Working Section</span>
+                <span><kbd>⇧T</kbd> Tag as Section</span>
                 <span><kbd>G</kbd> Guide</span>
                 <span><kbd>[</kbd>/<kbd>]</kbd> Step size</span>
                 <span><kbd>,</kbd>/<kbd>.</kbd> Nudge</span>
@@ -363,13 +363,13 @@
                 <span id="release-meta" class="action-meta">No Interval</span>
               </button>
               <div class="deform-control">
-                <button id="deform" class="nav-action lifecycle-action deform-action" type="button" data-preview-action="deform" aria-keyshortcuts="T" disabled>
-                  <span class="action-name"><kbd>T</kbd> <span id="deform-label" class="action-label">Deform</span></span>
+                <button id="deform" class="nav-action lifecycle-action deform-action" type="button" data-preview-action="deform" aria-keyshortcuts="X" disabled>
+                  <span class="action-name"><kbd>X</kbd> <span id="deform-label" class="action-label">Deform</span></span>
                   <span id="deform-meta" class="action-meta">No target</span>
                 </button>
                 <div class="deform-steps" aria-label="Deformation weight">
-                  <button id="deform-down" class="deform-step" type="button" aria-keyshortcuts="Alt+T" title="Move deformation one weight step down (Alt+T)" disabled>−</button>
-                  <button id="deform-up" class="deform-step" type="button" aria-keyshortcuts="Shift+T" title="Move deformation one weight step up (Shift+T)" disabled>+</button>
+                  <button id="deform-down" class="deform-step" type="button" aria-keyshortcuts="Alt+X" title="Move deformation one weight step down (Alt+X)" disabled>−</button>
+                  <button id="deform-up" class="deform-step" type="button" aria-keyshortcuts="Shift+X" title="Move deformation one weight step up (Shift+X)" disabled>+</button>
                 </div>
               </div>
               <button id="focus-toggle" class="nav-action lifecycle-action focus-action" type="button" data-preview-action="focus" aria-keyshortcuts="F" disabled>
@@ -437,7 +437,7 @@
                 </label>
                 <div class="section-create-actions">
                   <button id="focus-working-section" type="button" disabled>Focus Working</button>
-                  <button id="save-section" class="primary" type="submit" aria-keyshortcuts="Shift+P" disabled>Save Section</button>
+                  <button id="save-section" class="primary" type="submit" aria-keyshortcuts="Shift+T" disabled>Tag as Section</button>
                 </div>
                 </form>
               </details>
@@ -449,13 +449,13 @@
                 <summary><span>Save a Pin</span><kbd>P</kbd></summary>
                 <form id="pin-capture" class="guide-create-form pin-create-form">
                 <div class="guide-create-heading">
-                  <span class="eyebrow">Create Pin</span>
+                  <span class="eyebrow">Tag as Pin</span>
                   <strong id="pin-current-position">Current —</strong>
                 </div>
                 <label for="pin-label">Title
                   <input id="pin-label" type="text" maxlength="100" placeholder="Optional Pin title" disabled>
                 </label>
-                <button id="pin-current" class="primary" type="submit" aria-keyshortcuts="P" disabled>Pin Current</button>
+                <button id="pin-current" class="primary" type="submit" aria-keyshortcuts="T" disabled>Tag as Pin</button>
                 </form>
               </details>
               <div id="pins-list" class="guide-list"><p class="empty-state">No Pins for this video.</p></div>

@@ -261,11 +261,11 @@ Changing weight from the operator matrix or Guide uses the same Session transact
 
 The input grammar separates normalization from tuning:
 
-- plain `T` toggles a weighted Section to `1×` and restores its remembered
+- plain `X` toggles a weighted Section to `1×` and restores its remembered
   non-neutral factor when pressed again;
-- `Shift+T` moves one step up the canonical ladder;
-- `Alt+T` moves one step down the canonical ladder. The browser-reserved
-  `Ctrl+T` chord is not part of the web interface grammar.
+- `Shift+X` moves one step up the canonical ladder;
+- `Alt+X` moves one step down the canonical ladder. Browser-reserved chords are
+  not part of the web interface grammar.
 
 Timeline presentation renders all active Section factors as one continuous
 field. The atmosphere expresses sign, log magnitude, midpoint, and softly
@@ -716,7 +716,7 @@ The keyboard matrix expresses the three central transformation rows:
 ```text
 Q Refine Backward     W Reopen           E Refine Forward
 A Step Backward       S Switch Endpoint  D Step Forward
-R Release             T Deform           F Focus / Unfocus
+R Release             X Deform           F Focus / Unfocus
 ```
 
 Their meanings are:

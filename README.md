@@ -43,17 +43,17 @@ Shift changes the two directional families and raises Deform by one canonical we
 - Plain `Q/E` Refine retains the Working Interval’s departure while increasing logarithmic resolution. If a reversal reaches or passes that departure, the complete Current-to-target movement becomes the new Working Interval.
 - `Shift+Q/E` invokes Local Refine. Midpoint membership decides whether it shortens the existing traversal or replaces it with the new local traversal.
 - `Shift+A/D` or `Shift+←/→` traverses Pins. Consecutive Pin hops use Step’s retained-anchor law.
-- `Shift+T` raises Section weight one step; `Alt+T` lowers it one step.
+- `Shift+X` raises Section weight one step; `Alt+X` lowers it one step.
 
 The remaining operators each own one small intent:
 
 - Reopen restores Resolution to the active Range without discarding coverage.
 - Switch Endpoint chooses the other boundary of the same Working Interval.
 - Release clears only the Working Interval.
-- Deform creates or reuses a Section for the Working Interval. Plain `T` toggles `1×` against that Section’s remembered non-neutral weight; `Shift+T` and `Alt+T` tune the canonical ladder directly. `Alt+T` avoids the browser-reserved new-tab chord.
+- Deform creates or reuses a Section for the Working Interval. Plain `X` toggles `1×` against that Section’s remembered non-neutral weight; `Shift+X` and `Alt+X` tune the canonical ladder directly. `T` is Tag, so Deform holds `X`.
 - Focus makes a Working Interval or saved Section the active Range; Unfocus restores its containing Range.
 - Plain `Z` is Undo and plain `C` is Redo.
-- `P` immediately Pins Current; `Shift+P` immediately saves the Working
+- `T` immediately Tags Current as a Pin; `Shift+X` immediately Tags the Working
   Interval as an untitled Section. Guide forms add optional titles explicitly.
 
 ## Timeline weighting

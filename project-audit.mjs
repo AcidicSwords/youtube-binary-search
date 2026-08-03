@@ -190,9 +190,17 @@ assert.match(html, /Manual distance/);
 // number only equals source seconds at neutral Weight.
 assert.match(html, /Step distance is measured across the Timeline/);
 assert.match(html, /active Range’s weighted Timeline width/);
-assert.match(html, /id="deform"[^>]*aria-keyshortcuts="T"/);
-assert.match(html, /id="deform-down"[^>]*aria-keyshortcuts="Alt\+T"/);
-assert.match(html, /id="deform-up"[^>]*aria-keyshortcuts="Shift\+T"/);
+// T is Tag: retaining what you are looking at is the thing reached for most, so
+// it holds the key nearest the hand. Deform holds X. The pair T/Shift+T used to
+// be P/Shift+P, far enough from the rest that Deform became the habitual way to
+// make a Section -- which is how Deform acquired a creation job it never wanted.
+assert.match(html, /id="pin-current"[^>]*aria-keyshortcuts="T"[^>]*>Tag as Pin</);
+assert.match(html, /id="save-section"[^>]*aria-keyshortcuts="Shift\+T"[^>]*>Tag as Section</);
+assert.doesNotMatch(html, /aria-keyshortcuts="P"|aria-keyshortcuts="Shift\+P"/,
+  "P is unbound; nothing claims it.");
+assert.match(html, /id="deform"[^>]*aria-keyshortcuts="X"/);
+assert.match(html, /id="deform-down"[^>]*aria-keyshortcuts="Alt\+X"/);
+assert.match(html, /id="deform-up"[^>]*aria-keyshortcuts="Shift\+X"/);
 assert.doesNotMatch(html, /id="deform-weight-select"/);
 
 assert.match(
@@ -236,9 +244,10 @@ assert.match(view, /state\(\)\.guideRetained\?\.kind === "pin"/);
 assert.match(app, /surface:\s*"guide"/,
   "Guide navigation must be distinguishable from Timeline operand acquisition.");
 assert.doesNotMatch(app, /togglePinSelection|selectTimelinePin|data-select-pin/);
-assert.match(app, /key === "p"[\s\S]*saveCurrentIntervalAsSection\(event,[\s\S]*source:\s*"interval"[\s\S]*useFormLabel:\s*false/);
-assert.match(app, /plain && key === "p"[\s\S]*pinCurrent\(event,\s*\{\s*useFormLabel:\s*false\s*\}\)/);
-assert.doesNotMatch(app, /key === "p"[\s\S]{0,180}openGuide\("(?:pins|sections)"\)/);
+assert.match(app, /key === "t"[\s\S]*saveCurrentIntervalAsSection\(event,[\s\S]*source:\s*"interval"[\s\S]*useFormLabel:\s*false/);
+assert.match(app, /plain && key === "t"[\s\S]*pinCurrent\(event,\s*\{\s*useFormLabel:\s*false\s*\}\)/);
+assert.doesNotMatch(app, /key === "t"[\s\S]{0,180}openGuide\("(?:pins|sections)"\)/);
+assert.doesNotMatch(app, /key === "p"/, "P is unbound.");
 assert.match(view, /guideTitleActions[\s\S]*guide-title-rename[\s\S]*guide-title-delete/);
 // Unlink acts on a shared Pin, so it lives with Pins and names the Section it
 // releases. Reading a Section to operate on a Pin put the one object the

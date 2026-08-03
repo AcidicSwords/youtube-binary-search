@@ -179,12 +179,12 @@ converge(
 
 // --- Weight: keyboard versus Guide selector -----------------------------------
 converge(
-  "Shift+T and Guide selector",
+  "Shift+X and Guide selector",
   async ({ byId, flush, makeSection, sectionRows, press }) => {
     await makeSection(100, 300);
     byId.get("sections-list").dispatch("click", { target: sectionRows()[0] });
     await flush();
-    await press("T", { shiftKey: true });
+    await press("X", { shiftKey: true });
   },
   async ({ byId, flush, makeSection, sectionRows, inSections }) => {
     await makeSection(100, 300);
@@ -366,5 +366,5 @@ if (indexArg !== undefined) {
       `${pair.name}: two routes to one operation must agree on ${pair.form}.`
     );
   }
-  console.log("Route correspondence tests passed: the Deform control, Shift+T and the Guide selector reach one Weight; an exact Address edit and twelve Nudges reach one Address; Timeline and Guide Section selection reach one Working Interval; a retained Cue is an ordinary Section; Focus from the operator and from a Guide row install one scope; and Group membership is the same partition however it is reached.");
+  console.log("Route correspondence tests passed: the Deform control, Shift+X and the Guide selector reach one Weight; an exact Address edit and twelve Nudges reach one Address; Timeline and Guide Section selection reach one Working Interval; a retained Cue is an ordinary Section; Focus from the operator and from a Guide row install one scope; and Group membership is the same partition however it is reached.");
 }

@@ -927,7 +927,7 @@ byId.get("timeline").dispatch("click", {
 await flush();
 const pinsBeforeHotkey = Number(byId.get("pins-list-count").textContent);
 byId.get("pin-label").value = "Stale Pin Title";
-dispatchDocument("keydown", { key: "p", code: "KeyP" });
+dispatchDocument("keydown", { key: "t", code: "KeyT" });
 await flush();
 assert.equal(Number(byId.get("pins-list-count").textContent), pinsBeforeHotkey + 1);
 assert.match(byId.get("status").textContent, /Pinned Current/);
@@ -937,7 +937,7 @@ assert.notEqual(
   byId.get("pin-label"),
   "P must not move focus into the Pin title field."
 );
-dispatchDocument("keydown", { key: "p", code: "KeyP" });
+dispatchDocument("keydown", { key: "t", code: "KeyT" });
 await flush();
 assert.equal(Number(byId.get("pins-list-count").textContent), pinsBeforeHotkey + 1);
 assert.match(byId.get("status").textContent, /already pinned/);
@@ -1023,8 +1023,8 @@ const sectionsBeforeHotkey = Number(byId.get("sections-list-count").textContent)
 byId.get("section-source").value = "field-span";
 byId.get("section-label").value = "Stale Section Title";
 dispatchDocument("keydown", {
-  key: "P",
-  code: "KeyP",
+  key: "T",
+  code: "KeyT",
   shiftKey: true
 });
 dispatchDocument("keyup", { key: "Shift", code: "ShiftLeft" });
@@ -1038,11 +1038,11 @@ assert.equal(byId.get("section-label").value, "Stale Section Title");
 assert.notEqual(
   env.document.activeElement,
   byId.get("section-label"),
-  "Shift+P must not move focus into the Section title field."
+  "Shift+T must not move focus into the Section title field."
 );
 dispatchDocument("keydown", {
-  key: "P",
-  code: "KeyP",
+  key: "T",
+  code: "KeyT",
   shiftKey: true
 });
 dispatchDocument("keyup", { key: "Shift", code: "ShiftLeft" });
@@ -1174,4 +1174,4 @@ assert.equal(env.document.activeElement, null, "Pointer activation must not leav
   );
 }
 
-console.log("Interaction smoke passed: direct P/Shift+P creation, retained Section editing, spatial Pin unlink/link, Timeline Section node dragging, Guide exact Address editing, operational clustered Pins, Shift Pin traversal, local Refine preview, unsaved Working Focus, Switch involution, Undo/Redo ownership, composable Step intervals, shared activation, bounded Field breathing, immutable configured offsets, whole-Field side Step, universal Space playback, and coherent focus release.");
+console.log("Interaction smoke passed: direct T/Shift+T tagging, retained Section editing, spatial Pin unlink/link, Timeline Section node dragging, Guide exact Address editing, operational clustered Pins, Shift Pin traversal, local Refine preview, unsaved Working Focus, Switch involution, Undo/Redo ownership, composable Step intervals, shared activation, bounded Field breathing, immutable configured offsets, whole-Field side Step, universal Space playback, and coherent focus release.");

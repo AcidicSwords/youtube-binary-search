@@ -303,7 +303,7 @@ assert.match(byId.get("range-label").textContent, /0:30–0:50/);
 assert.equal(byId.get("sections-list-count").textContent, "1");
 byId.get("focus-toggle").click();
 await flush();
-dispatchDocument("keydown", { key: "t", code: "KeyT", altKey: true });
+dispatchDocument("keydown", { key: "x", code: "KeyX", altKey: true });
 await flush();
 assert.equal(byId.get("sections-list-count").textContent, "1");
 await setSectionWeight("1");
@@ -320,7 +320,7 @@ for (const clientX of [600, 700]) {
   await flush();
 }
 commandsBeforeWeight = playerCommandCounts();
-dispatchDocument("keydown", { key: "t", code: "KeyT", altKey: true });
+dispatchDocument("keydown", { key: "x", code: "KeyX", altKey: true });
 await flush();
 assert.deepEqual(
   playerCommandCounts(),
@@ -335,19 +335,19 @@ assert.equal(
 
 // Plain T is a reversible normalize/restore toggle; Shift and Alt move
 // one step up or down the same canonical ladder.
-dispatchDocument("keydown", { key: "t", code: "KeyT" });
+dispatchDocument("keydown", { key: "x", code: "KeyX" });
 await flush();
 assert.equal(byId.get("duration-time").textContent, "1:40");
-dispatchDocument("keydown", { key: "t", code: "KeyT" });
+dispatchDocument("keydown", { key: "x", code: "KeyX" });
 await flush();
 assert.equal(
   byId.get("duration-time").textContent,
   "1:40 · 0.975× spatial"
 );
-dispatchDocument("keydown", { key: "t", code: "KeyT", shiftKey: true });
+dispatchDocument("keydown", { key: "x", code: "KeyX", shiftKey: true });
 await flush();
 assert.equal(byId.get("duration-time").textContent, "1:40");
-dispatchDocument("keydown", { key: "t", code: "KeyT", altKey: true });
+dispatchDocument("keydown", { key: "x", code: "KeyX", altKey: true });
 await flush();
 assert.equal(
   byId.get("duration-time").textContent,

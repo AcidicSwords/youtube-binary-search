@@ -5721,13 +5721,29 @@ document.addEventListener("keydown", event => {
     event.preventDefault();
     releaseWorkingInterval();
   }
+  // Tag is T. Retaining what you are looking at is the thing you reach for most,
+  // so it takes the key nearest the hand -- and the P/Shift+P pair it replaces
+  // sat far enough away that Deform became the habitual way to make a Section,
+  // which is how Deform acquired a creation job it should never have had.
+  else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && key === "t") {
+    event.preventDefault();
+    saveCurrentIntervalAsSection(event, {
+      source: "interval",
+      useFormLabel: false
+    });
+  }
+  else if (plain && key === "t") {
+    event.preventDefault();
+    pinCurrent(event, { useFormLabel: false });
+  }
+  // Deform moves to X, keeping its present behaviour until the weight-toggle
+  // rework replaces it. Moving the key once now means the rework changes what X
+  // does without moving it again.
   else if (
-    key === "t"
+    key === "x"
     && (
       plain
       || (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey)
-      // Alt+T lowers Weight. Ctrl+T belongs to the browser, and a control path
-      // the declared grammar does not contain is a path nobody can reason about.
       || (!event.shiftKey && !event.metaKey && !event.ctrlKey && event.altKey)
     )
   ) {
@@ -5739,17 +5755,6 @@ document.addEventListener("keydown", event => {
   else if (plain && key === "f") {
     event.preventDefault();
     focusOrUnfocus();
-  }
-  else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && key === "p") {
-    event.preventDefault();
-    saveCurrentIntervalAsSection(event, {
-      source: "interval",
-      useFormLabel: false
-    });
-  }
-  else if (plain && key === "p") {
-    event.preventDefault();
-    pinCurrent(event, { useFormLabel: false });
   }
   else if (shiftedSpatialKey("a") || (
     event.shiftKey
