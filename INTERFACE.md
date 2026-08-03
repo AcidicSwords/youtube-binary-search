@@ -283,13 +283,14 @@ Weight remains editable during playback; the map changes around the moving Curso
 Tail and Lead form one panoramic surface around Center. Center is subtly larger;
 the smaller side projections are vertically centered with equal separation so
 their scale reads as temporal distance and curvature rather than three separate
-top-aligned players. Identity and address live in each top bar, the Field's one
-Tune disclosure sits in the Center bar, and one combined Stretch/Hold control
-sits beneath Center:
+top-aligned players. Identity and address live in each top bar, and one
+combined Stretch/Hold control sits beneath Center. The Panorama's remembered
+tuning is not here: it is in Parameters with every other remembered setting,
+and what stays on the surface is what acts on what you are looking at.
 
 ```text
 Tail:   identity · address | collapse
-Center: identity · address | Field state · Tune · Field
+Center: identity · address | Field state · Field
 Lead:   identity · address | collapse
 Bottom:            Stretch / Hold
 ```

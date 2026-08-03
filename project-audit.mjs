@@ -136,7 +136,13 @@ assert.match(app, /function parseAddress[\s\S]*parts\.slice\(1\)\.some\(part => 
   "and refuses timecode parts that are not timecode.");
 
 const canonicalText = [html, ...Object.values(docs)].join("\n");
+// Names of things this project no longer has. Every entry was once described in
+// a canonical document after the thing itself was gone: the Tune popover
+// survived in three of them because moving the controls into Parameters changed
+// no assertion. A retired interface element is a retired name.
 assert.doesNotMatch(canonicalText, /\bApplication Continue\b|\bSkim\b|Fold Point proxy/i);
+assert.doesNotMatch(canonicalText, /Tune popover|Tune disclosure|field-settings-popover/i,
+  "The Panorama's Tune popover is gone: its controls are Parameters.");
 assert.doesNotMatch(canonicalText, /Pin Forward\/Backward replaces Interval/i);
 assert.doesNotMatch(html, /id="loop"|id="pin-backward"|id="pin-forward"/);
 

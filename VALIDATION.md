@@ -162,8 +162,10 @@
 
 - Press the Current marker and release without moving. Confirm nothing moves and
   no history entry appears.
-- Confirm the fine Nudge distance sits inside Movement distance beside Step
-  Reach, and that the Field Tune popover holds only Inner, Outer and rate.
+- Confirm every remembered setting is in Parameters — Step distance, fine Nudge,
+  Automatic Context, Shift playback, and the Panorama's Inner, Outer and rate —
+  and that the Panorama surface keeps only what acts on it now: show/hide,
+  collapse a side, Stretch/Hold.
 - With no video loaded, confirm every Parameters and Field input is disabled.
 - Narrow the Guide rail until it wraps. Confirm no Address field, Weight select,
   or action button is clipped by the card, and that every row shares one gutter.
@@ -176,8 +178,13 @@
 - Drag Current forward, then back past its own departure. Confirm the Working
   Interval extends and then shortens from the same anchor, and that neither drag
   draws a new interval around the landing point.
-- Open the Field Tune popover while Center is paused and edit each value.
-  Confirm no click reaches the play/pause surface underneath.
+- Edit the Panorama's Inner, Outer and rate in Parameters while Center is
+  paused. Confirm each takes effect on the visible Panorama without disturbing
+  Center's transport.
+- Turn on Shift playback's "Follow Section weight", then Shift+Space across a
+  weighted Section. Confirm the rate falls where the map expands and returns to
+  1× on ground you never deformed, that the fixed-rate control reads as
+  unavailable while it is on, and that Tail and Lead stay suspended throughout.
 - Press and hold every increment control in Guide and on Deform. Confirm it
   repeats and that the whole hold is one Undo entry.
 - Confirm no Section node chrome is drawn over the map, and that pressing a
