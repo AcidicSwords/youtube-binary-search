@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import {
   TRANSPORT_KIND,
   dynamicRateForWeight,
-  DYNAMIC_RATE_LADDER,
+  MIN_DYNAMIC_RATE,
+  MAX_DYNAMIC_RATE,
   idleTransport,
   deriveContextWindow,
   createContextTransport,
@@ -63,37 +64,45 @@ assert.deepEqual(
   { start: 40, end: 80 }
 );
 
-// Dynamic playback rate: weight says how much attention ground is owed, so rate
-// runs opposite to it. The two ladders share their values, which is what makes
-// the correspondence a reflection rather than a fitted curve.
+// Dynamic playback rate is the exact inverse of cumulative weight: double the
+// map a Section receives and it plays at half the rate. Neutral is its own
+// inverse. The bounds belong to the player, not to the law.
 {
-  // The stated ends are clamps, not nearest buckets.
-  assert.equal(dynamicRateForWeight(0.25), 2);
-  assert.equal(dynamicRateForWeight(0.125), 2, "Everything at or below the low end shares its rate.");
-  assert.equal(dynamicRateForWeight(2), 0.25);
-  assert.equal(dynamicRateForWeight(4), 0.25, "and everything at or above the high end shares its.");
+  assert.equal(dynamicRateForWeight(1), 1, "Neutral is its own inverse.");
+  assert.equal(dynamicRateForWeight(2), 0.5, "Double the map, half the rate.");
+  assert.equal(dynamicRateForWeight(0.5), 2, "Half the map, double the rate.");
+  assert.equal(dynamicRateForWeight(4), 0.25);
 
-  // Ground nobody deformed plays at the speed it always did.
-  assert.equal(dynamicRateForWeight(1), 1);
+  // weight x rate = 1 wherever the player can follow it.
+  for (const weight of [0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4]) {
+    const rate = dynamicRateForWeight(weight);
+    assert.ok(Math.abs(weight * rate - 1) < 1e-9,
+      `weight x rate must be 1 inside the player's range (${weight}).`);
+  }
+
+  // Past the bounds the relation still holds on the map; the rate stops.
+  assert.equal(dynamicRateForWeight(0.25), MAX_DYNAMIC_RATE);
+  assert.equal(dynamicRateForWeight(0.125), MAX_DYNAMIC_RATE);
+  assert.equal(dynamicRateForWeight(8), MIN_DYNAMIC_RATE);
+  assert.equal(MIN_DYNAMIC_RATE, 0.25);
+  assert.equal(MAX_DYNAMIC_RATE, 2);
+
+  // Reciprocal weights give reciprocal rates, which is what makes it symmetric.
+  for (const weight of [0.5, 0.75, 1, 1.5, 2]) {
+    assert.ok(
+      Math.abs(dynamicRateForWeight(weight) * dynamicRateForWeight(1 / weight) - 1) < 1e-9,
+      `A weight and its reciprocal give reciprocal rates (${weight}).`
+    );
+  }
 
   // Monotone: more map always means more time on it, never less.
-  const weights = [0.2, 0.25, 0.4, 0.5, 0.75, 1, 1.25, 1.5, 1.9, 2, 5];
+  const weights = [0.2, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4, 9];
   const rates = weights.map(dynamicRateForWeight);
   for (let index = 1; index < rates.length; index += 1) {
     assert.ok(rates[index] <= rates[index - 1],
       `Rate must not rise with weight (${weights[index - 1]} -> ${weights[index]}).`);
   }
 
-  // Buckets are compared multiplicatively, because weights compose that way:
-  // 0.5 is as far from neutral as 2 is, and lands the same distance down.
-  assert.equal(dynamicRateForWeight(0.5), 1.5);
-  assert.equal(dynamicRateForWeight(1.5), 0.5);
-
-  // Every rate the ladder can produce is one a player can be asked for.
-  for (const entry of DYNAMIC_RATE_LADDER) {
-    assert.ok(entry.rate >= 0.25 && entry.rate <= 2,
-      "The ladder never asks for a rate outside the range players offer.");
-  }
   assert.equal(dynamicRateForWeight(0), 1, "A nonsense weight changes nothing.");
   assert.equal(dynamicRateForWeight(Number.NaN), 1);
 }
@@ -111,4 +120,4 @@ assert.deepEqual(
     "and a fixed one keeps its rate across the wrap.");
 }
 
-console.log("Transport tests passed: source Context, playback ownership, projection-stable Range transport, and the inverse weight-to-rate ladder.");
+console.log("Transport tests passed: source Context, playback ownership, projection-stable Range transport, and a playback rate that is the exact inverse of cumulative weight.");

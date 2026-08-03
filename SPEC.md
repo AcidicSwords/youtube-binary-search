@@ -309,18 +309,22 @@ The rate belongs to the playback, not to the player. A proper-Range wrap continu
 
 Tail and Lead hold a fixed offset from Center by playing the same material at the same rate, so no side rate preserves that relation once Center's rate changes. The Panorama therefore suspends for the duration of a playback whose rate is not `1×`. This is stated as a condition on the Field rather than as a command issued once, so it holds for as long as the rate does. Variable-speed playback is a capability an ordinary video player has; the Panorama is an experiment, and an experiment does not get to cost the reader an established capability. If all else fails, this system is still a video player.
 
-Shift plays at one of two things: a fixed rate, or a rate that follows the map. Following weight runs the rate opposite to cumulative weight `ρ`, because weight says how much map a Section receives and that is a statement about how much attention its ground is owed. Expanded ground is ground to dwell on; compressed ground is ground to cross quickly.
-
-The correspondence is a reflection of one ladder onto itself rather than a curve fitted to it: the weight scale and the playback-rate scale share the values `0.25` through `2`.
+Shift plays at one of two things: a fixed rate, or a rate that follows the map. Following weight makes rate the exact inverse of cumulative weight `ρ`:
 
 ```text
-ρ   ≤0.25   0.5    0.75    1     1.25    1.5    ≥2
-r     2×    1.5×   1.25×   1×    0.75×   0.5×   0.25×
+ρ × r = 1
 ```
 
-The ends are clamps, not nearest buckets: everything at or past them shares their rate however far past it goes. Neutral weight is the fixed point — ground nobody deformed plays at the speed it always did, so following weight never makes an unweighted video behave strangely. Buckets are compared in log space, because weights compose by multiplication and `0.5` is as far from neutral as `2` is.
+Double the map a Section receives and it plays at half the rate; halve the map and it plays at double. Neutral is its own inverse, so ground nobody deformed plays at the speed it always did, and following weight never makes an unweighted video behave strangely. Equivalently: Timeline Space is crossed at a constant speed. The map already claims expanded ground is bigger; playing it this way carries that claim into time rather than inventing a second scale beside it.
 
-A dynamic playback re-derives its rate at the Address being watched, so it changes as playback crosses Section boundaries; only a bucket change reaches the player. It suspends the Panorama for its whole duration, including over neutral ground, because the rate is going to change at the next boundary and a Panorama that folded and unfolded around it would be worse than one that stays out of the way.
+```text
+ρ     0.5    0.75    1     1.5     2      4
+r      2×    1.33×   1×    0.67×   0.5×   0.25×
+```
+
+The bounds are the player's, not the law's. Outside `0.25×`–`2×` the relation still holds on the map and the rate simply stops following, so very small and very large weights share the extreme rates. Between them the exact inverse is snapped to the nearest rate the player offers, which is what supplies the buckets: they are the player's rungs rather than a scale of this system's own invention.
+
+A dynamic playback re-derives its rate at the Address being watched, so it changes as playback crosses Section boundaries; only a change of offered rate reaches the player. It suspends the Panorama for its whole duration, including over neutral ground, because the rate is going to change at the next boundary and a Panorama that folded and unfolded around it would be worse than one that stays out of the way.
 
 The offered rates are exactly the rates the player reports it can play. No ladder is assumed, and the offer is re-read rather than trusted once: a player commonly reports only `1×` until it has actually entered playback, and unknown is not the same as unsupported. The stored rate is a wish, snapped to the nearest offered rate at the moment it is used, so it returns to what it asked for as soon as that rate is genuinely available.
 

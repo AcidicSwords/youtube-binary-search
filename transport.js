@@ -121,40 +121,25 @@ export function withTransportPhase(transport, phase) {
     : { ...transport, phase };
 }
 
-// Dynamic playback rate: the inverse of cumulative weight, bucketed.
+// Dynamic playback rate: the exact inverse of cumulative weight.
 //
-// Weight says how much map a Section receives, which is a statement about how
-// much attention it is owed. Expanded ground is ground to dwell on; compressed
-// ground is ground to cross quickly. So rate runs opposite to weight, and on the
-// same ladder: the weight scale and the playback-rate scale share the values
-// 0.25 through 2, so the correspondence is a reflection of one ladder onto
-// itself rather than a curve fitted to it. Neutral weight is the fixed point --
-// ground you never deformed plays at the speed it always did.
+// Double the map a Section receives and it plays at half the rate; halve the map
+// and it plays at double. Neutral is its own inverse, so ground nobody deformed
+// plays at the speed it always did. Stated once:
 //
-// Buckets are compared in log space because weights compose by multiplication:
-// 0.5 is as far from 1 as 2 is, and the ladder should agree.
-export const DYNAMIC_RATE_LADDER = Object.freeze([
-  Object.freeze({ weight: 0.25, rate: 2 }),
-  Object.freeze({ weight: 0.5, rate: 1.5 }),
-  Object.freeze({ weight: 0.75, rate: 1.25 }),
-  Object.freeze({ weight: 1, rate: 1 }),
-  Object.freeze({ weight: 1.25, rate: 0.75 }),
-  Object.freeze({ weight: 1.5, rate: 0.5 }),
-  Object.freeze({ weight: 2, rate: 0.25 })
-]);
+//   weight x rate = 1
+//
+// which is the same as saying Timeline Space is crossed at a constant speed. The
+// map already claims that expanded ground is bigger; playing it this way is that
+// claim carried into time rather than a second scale invented to sit beside it.
+//
+// The bounds are the player's, not the law's. Past them the relation still holds
+// on the map; the rate simply cannot follow any further, so it stops.
+export const MIN_DYNAMIC_RATE = 0.25;
+export const MAX_DYNAMIC_RATE = 2;
 
 export function dynamicRateForWeight(weight) {
   const value = Number(weight);
   if (!Number.isFinite(value) || value <= 0) return 1;
-  // The ends are stated as clamps, not as the nearest bucket: everything at or
-  // beyond them shares their rate however far past it goes.
-  if (value <= DYNAMIC_RATE_LADDER[0].weight) return DYNAMIC_RATE_LADDER[0].rate;
-  const last = DYNAMIC_RATE_LADDER.at(-1);
-  if (value >= last.weight) return last.rate;
-  const target = Math.log(value);
-  return DYNAMIC_RATE_LADDER.reduce((best, entry) =>
-    Math.abs(Math.log(entry.weight) - target) < Math.abs(Math.log(best.weight) - target)
-      ? entry
-      : best
-  ).rate;
+  return Math.min(MAX_DYNAMIC_RATE, Math.max(MIN_DYNAMIC_RATE, 1 / value));
 }
