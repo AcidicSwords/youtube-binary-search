@@ -84,6 +84,18 @@ assert.equal(pkg.scripts["test:browser"], "node browser-smoke.mjs");
 assert.equal(pkg.scripts.verify, "npm run check && npm run test:browser");
 assert.ok(pkg.devDependencies?.["playwright-core"],
   "The browser gate declares its dependency.");
+// The browsers the runner downloads must match the library that will drive
+// them. Naming a version in the workflow made it a second place to state one
+// fact: the caret range drifted to 1.62 while the workflow stayed at 1.49, the
+// runner fetched browsers the library never looked for, and the browser gate
+// could not pass on any commit. One place states it.
+{
+  const workflow = read(".github/workflows/verify.yml");
+  assert.match(workflow, /playwright@"\$\(node -p 'require\("playwright-core\/package\.json"\)\.version'\)"/,
+    "The workflow installs browsers for the playwright-core version it resolved.");
+  assert.doesNotMatch(workflow, /playwright@\d/,
+    "and never names a Playwright version of its own.");
+}
 assert.equal(pkg.version, "8.0.0");
 assert.ok(pkg.description, "The package must carry the project description.");
 assert.match(docs["SPEC.md"], /^# Video Cartography — Canonical Specification\r?\n/);

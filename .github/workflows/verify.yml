@@ -28,5 +28,10 @@ jobs:
         with:
           node-version: "22"
       - run: npm install --no-audit --no-fund
-      - run: npx --yes playwright@1.49.0 install --with-deps chromium
+      # The browser download must match the playwright-core that will drive it.
+      # Naming a version here made it a second place to state one fact, and the
+      # caret range drifted: playwright-core reached 1.62 while this line stayed
+      # at 1.49, so the runner fetched browsers the library would not look for
+      # and the gate could never pass. Ask the installed library instead.
+      - run: npx --yes playwright@"$(node -p 'require("playwright-core/package.json").version')" install --with-deps chromium
       - run: npm run test:browser
