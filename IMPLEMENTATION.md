@@ -60,7 +60,7 @@ Every stored factor belongs to the canonical `0.125×–4×` ladder. Overlap com
 
 The projection persists nothing. Models store source Addresses and Section factors only. All spatial operator distance and midpoint arithmetic routes through this module; operators do not inspect Section coverage.
 
-The canonical scale copies the familiar Tail/Lead rate values for perceptual correspondence. There is intentionally no runtime dependency between the controls: player rate availability cannot alter persisted Section weights, and Section edits cannot issue player commands.
+The canonical scale copies the familiar Tail/Lead rate values for perceptual correspondence. The dependency between weight and rate runs one way and only on request: player rate availability cannot alter persisted Section weights, Section edits issue no player command, and `dynamicRateForWeight()` in `transport.js` reads a weight to produce a rate without the projection knowing that playback exists.
 
 ## Refine and interval composition
 

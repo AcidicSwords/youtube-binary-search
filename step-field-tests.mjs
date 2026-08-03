@@ -129,7 +129,7 @@ assert.equal(resolveFieldPhase({
   // reader nothing: it suspends instead.
   assert.match(
     app,
-    /if \(rate === 1\) \{[\s\S]*stepField\?\.playFromGesture[\s\S]*\} else \{\s*stepField\?\.pause\(\{ center: destination, freeze: false \}\);/,
+    /if \(rate === 1 && !options\.dynamic\) \{[\s\S]*stepField\?\.playFromGesture[\s\S]*\} else \{\s*stepField\?\.pause\(\{ center: destination, freeze: false \}\);/,
     "A Center rate other than 1x suspends the Panorama rather than letting it drift."
   );
   assert.match(app, /player\.setRate\(rate\);\s*player\.play\(\);/,
@@ -175,8 +175,22 @@ assert.equal(resolveFieldPhase({
     "YouTube side iframes must not be covered by a transparent action element.");
   assert.match(html, /id="tail-player-surface"[\s\S]*role="button"[\s\S]*id="player-tail"/);
   assert.match(html, /id="lead-player-surface"[\s\S]*role="button"[\s\S]*id="player-lead"/);
-  assert.match(html, /id="field-inner-offset"[\s\S]*id="field-outer-offset"[\s\S]*id="field-breath-rate"[\s\S]*id="field-both-toggle"/,
-    "Inner Offset, Outer Offset and the breathing rate pair sit with the one combined Stretch/Hold control.");
+  // Settings have one home: Parameters owns what is remembered, and the surface
+  // owns what is momentary. The Panorama's offsets and breathing pair persist,
+  // so they are Parameters; showing the Panorama, collapsing a side and holding
+  // a span act on what you are looking at, so they stay on it.
+  assert.match(
+    html,
+    /id="parameter-panel"[\s\S]*id="field-inner-offset"[\s\S]*id="field-outer-offset"[\s\S]*id="field-breath-rate"/,
+    "Persisted Panorama tuning belongs to Parameters."
+  );
+  assert.match(
+    html,
+    /id="player-panel"[\s\S]*id="step-field-toggle"[\s\S]*id="field-both-toggle"[\s\S]*id="parameter-panel"/,
+    "and the momentary Panorama controls stay on the Panorama."
+  );
+  assert.doesNotMatch(html, /class="field-settings-popover"/,
+    "The Tune popover is gone: its contents are Parameters now.");
   assert.doesNotMatch(html, /id="(?:tail|lead)-step-button"/,
     "The side video surfaces already own Step; duplicate footer buttons must not return.");
   assert.match(css, /\.side-player-surface iframe[\s\S]*pointer-events:\s*none/,

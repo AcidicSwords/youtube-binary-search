@@ -72,23 +72,6 @@
                     <strong id="field-transport-state">Off</strong>
                     <small id="field-rate-state">Tail — · Center 1× · Lead —</small>
                   </div>
-                  <details class="field-settings center-field-settings">
-                    <summary aria-label="Tune the Panorama">Tune</summary>
-                    <div class="field-settings-popover">
-                      <label class="field-control field-offset-control" for="field-inner-offset">
-                        <span>Inner offset</span>
-                        <span><input id="field-inner-offset" type="number" min="0.25" max="300" step="0.25" value="2.5" disabled> s</span>
-                      </label>
-                      <label class="field-control field-offset-control" for="field-outer-offset">
-                        <span>Outer offset</span>
-                        <span><input id="field-outer-offset" type="number" min="0.25" max="300" step="0.25" value="10" disabled> s</span>
-                      </label>
-                      <label class="field-control field-rate-control" for="field-breath-rate">
-                        <span>Breath rate</span>
-                        <select id="field-breath-rate" aria-label="Panorama breathing rate pair" disabled><option value="0.5">0.5× / 1.5×</option></select>
-                      </label>
-                    </div>
-                  </details>
                   <button id="step-field-toggle" class="field-toggle" type="button" aria-pressed="true" aria-label="Hide Panorama">
                     <span>Panorama</span><span id="step-field-meta">Ready</span>
                   </button>
@@ -262,13 +245,43 @@
             </details>
 
             <details id="playback-settings" class="tool-disclosure playback-settings">
-              <summary><span>Playback rate</span><span id="playback-rate-value">2× on Shift</span></summary>
+              <summary><span>Shift playback</span><span id="playback-rate-value">2× on Shift</span></summary>
               <div class="compact-settings">
                 <label class="compact-setting" for="playback-rate">
-                  <span>Shift rate for Center</span>
+                  <span>Fixed rate</span>
                   <select id="playback-rate" disabled></select>
                 </label>
-                <p class="setting-note"><kbd>Space</kbd> plays Center at <span class="unit-mark">1×</span> with the Panorama breathing. <kbd>Shift</kbd> + <kbd>Space</kbd> plays Center alone at this rate: the Panorama cannot hold its ratio at a changed rate, so Tail and Lead suspend for the duration. The list offers exactly the rates this player reports it can play.</p>
+                <label class="compact-setting compact-check" for="playback-dynamic">
+                  <span>Follow Section weight</span>
+                  <input id="playback-dynamic" type="checkbox" disabled>
+                </label>
+                <p class="setting-note"><kbd>Space</kbd> plays Center at <span class="unit-mark">1×</span> with the Panorama breathing. <kbd>Shift</kbd> + <kbd>Space</kbd> plays Center alone at the Shift rate: the Panorama cannot hold its ratio at a changed rate, so Tail and Lead suspend for the duration. The fixed list offers exactly the rates this player reports it can play.</p>
+                <p class="setting-note">Following weight runs the rate opposite to the map: compressed ground is ground to cross quickly, expanded ground is ground to dwell on. Weight <span class="unit-mark">0.25×</span> and under plays at <span class="unit-mark">2×</span>, weight <span class="unit-mark">2×</span> and over plays at <span class="unit-mark">0.25×</span>, and ground you never deformed plays at <span class="unit-mark">1×</span>. The rate changes as playback crosses Section boundaries.</p>
+              </div>
+            </details>
+
+            <details id="panorama-settings" class="tool-disclosure panorama-settings">
+              <summary><span>Panorama</span><span id="panorama-setting-value">2.5–10 s · 0.5× / 1.5×</span></summary>
+              <div class="compact-settings">
+                <label class="compact-setting" for="field-inner-offset">
+                  <span>Inner offset</span>
+                  <span class="number-with-unit">
+                    <input id="field-inner-offset" type="number" min="0.25" max="300" step="0.25" value="2.5" inputmode="decimal" disabled>
+                    <span>s</span>
+                  </span>
+                </label>
+                <label class="compact-setting" for="field-outer-offset">
+                  <span>Outer offset</span>
+                  <span class="number-with-unit">
+                    <input id="field-outer-offset" type="number" min="0.25" max="300" step="0.25" value="10" inputmode="decimal" disabled>
+                    <span>s</span>
+                  </span>
+                </label>
+                <label class="compact-setting" for="field-breath-rate">
+                  <span>Breath rate</span>
+                  <select id="field-breath-rate" aria-label="Panorama breathing rate pair" disabled><option value="0.5">0.5× / 1.5×</option></select>
+                </label>
+                <p class="setting-note">Tail and Lead breathe between these offsets around Current. Showing or hiding the Panorama, collapsing a side, and holding a span stay on the Panorama itself, because those act on what you are looking at rather than being remembered settings.</p>
               </div>
             </details>
 

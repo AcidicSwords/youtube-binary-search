@@ -210,11 +210,17 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
     fieldCss,
     /\.pane-field-controls\s*\{[\s\S]*display:\s*flex[\s\S]*justify-content:\s*center/
   );
+  // The Nudge quantum and the Panorama's offsets are both remembered settings,
+  // so both are Parameters. They used to be split across a Tune popover on the
+  // Panorama and the Parameters panel, which meant the answer to "where is the
+  // setting?" depended on which setting.
   assert.match(
     html,
-    /center-field-settings[\s\S]*field-settings-popover[\s\S]*field-inner-offset[\s\S]*field-outer-offset[\s\S]*field-breath-rate[\s\S]*nudge-seconds/,
-    "Inner Offset, Outer Offset, breathing rate, and the Nudge quantum share one compact Tune disclosure."
+    /id="parameter-panel"[\s\S]*id="nudge-seconds"[\s\S]*id="field-inner-offset"[\s\S]*id="field-outer-offset"[\s\S]*id="field-breath-rate"/,
+    "Every remembered setting lives in Parameters."
   );
+  assert.doesNotMatch(html, /center-field-settings/,
+    "The Panorama keeps no settings popover of its own.");
   assert.doesNotMatch(field, /bindSideStepSurface/,
     "Step Field must expose geometry while the application owns the shared Step gesture.");
   assert.match(app, /tail-player-surface[\s\S]*bindStepPress\(control/);

@@ -169,62 +169,6 @@
   background: #0b1119;
 }
 
-.field-settings {
-  position: relative;
-  flex: 0 0 auto;
-  min-width: 0;
-}
-
-.field-settings > summary {
-  display: grid;
-  min-height: var(--compact-control-height);
-  place-items: center;
-  padding: 5px;
-  border: 1px solid rgba(116, 134, 157, 0.46);
-  border-radius: 7px;
-  color: var(--muted);
-  background: #101722;
-  font-size: 0.62rem;
-  font-weight: 720;
-  cursor: pointer;
-  list-style: none;
-}
-
-.field-settings > summary::-webkit-details-marker { display: none; }
-.field-settings > summary::after {
-  color: var(--faint);
-  content: "⋯";
-  font-size: 0.72rem;
-  line-height: 0.6;
-}
-
-.field-settings[open] > summary,
-.field-settings > summary:hover,
-.field-settings > summary:focus-visible {
-  border-color: rgba(121, 168, 255, 0.62);
-  color: var(--text);
-}
-
-.field-settings-popover {
-  position: absolute;
-  top: calc(100% + 7px);
-  bottom: auto;
-  z-index: 12;
-  display: grid;
-  width: min(210px, calc(100vw - 24px));
-  grid-template-columns: minmax(0, 1fr);
-  gap: 6px;
-  padding: 7px;
-  border: 1px solid var(--line-strong);
-  border-radius: 9px;
-  background: #0b1119;
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.42);
-}
-
-.tail-field-settings .field-settings-popover { right: 0; }
-.lead-field-settings .field-settings-popover { left: 0; }
-
-.field-control,
 .field-state-readout {
   display: grid;
   min-width: 0;
@@ -236,23 +180,6 @@
   color: var(--muted);
   background: #101722;
   font-size: 0.62rem;
-}
-
-.field-control select,
-.field-control input {
-  width: 100%;
-  min-width: 0;
-  height: var(--compact-control-height);
-  min-height: var(--compact-control-height);
-  padding-block: 0;
-  font-size: 0.76rem;
-}
-
-.field-offset-control > span:last-child {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 4px;
-  align-items: center;
 }
 
 .field-mode-toggle {
@@ -431,13 +358,9 @@
 @media (pointer: coarse) {
   .pane-collapse,
   .field-toggle,
-  .field-control select,
-  .field-control input,
   .field-mode-toggle {
     min-height: var(--touch);
   }
-  .field-control select,
-  .field-control input { font-size: 16px; }
   .pane-collapse { width: var(--touch); }
 }
 
@@ -522,7 +445,6 @@
   white-space: nowrap;
 }
 
-.center-field-settings .field-settings-popover { right: 0; }
 
 /* Reduced motion settles directly on the resulting Frame. The controller also
    stops emitting the directional classes, so this is a second guarantee. */

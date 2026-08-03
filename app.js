@@ -90,7 +90,8 @@ import {
   createContextTransport,
   createPlaybackTransport,
   rebasePlaybackTransport,
-  withTransportPhase
+  withTransportPhase,
+  dynamicRateForWeight
 } from "./transport.js";
 import {
   YOUTUBE_STATE,
@@ -213,11 +214,25 @@ function offeredRates() {
   return rates.length ? [...rates].sort((a, b) => a - b) : [1];
 }
 
-function effectivePlaybackRate() {
-  const wish = state.playbackRate;
+function nearestOfferedRate(wish) {
   return offeredRates().reduce(
     (best, rate) => Math.abs(rate - wish) < Math.abs(best - wish) ? rate : best
   );
+}
+
+function effectivePlaybackRate() {
+  return nearestOfferedRate(state.playbackRate);
+}
+
+// In dynamic mode the Shift rate is read off the map at the Address being
+// watched, so it changes as playback crosses Section boundaries.
+function dynamicRateAt(address) {
+  const weight = timelineProjection().weightAtSource(address);
+  return nearestOfferedRate(dynamicRateForWeight(weight));
+}
+
+function shiftPlaybackRate(address = currentResolution()?.C ?? 0) {
+  return state.dynamicPlaybackRate ? dynamicRateAt(address) : effectivePlaybackRate();
 }
 
 function readPreferences() {
@@ -237,6 +252,7 @@ function readPreferences() {
       ),
       nudgeSeconds: normalizeNudgeSeconds(value?.nudgeSeconds),
       playbackRate: normalizePlaybackRate(value?.playbackRate),
+      dynamicPlaybackRate: value?.dynamicPlaybackRate === true,
       stepFieldEnabled: value?.stepFieldEnabled !== false,
       tailVisible: value?.tailVisible !== false,
       leadVisible: value?.leadVisible !== false
@@ -248,6 +264,7 @@ function readPreferences() {
       fieldBreath: { ...DEFAULT_FIELD_BREATH },
       nudgeSeconds: DEFAULT_NUDGE_SECONDS,
       playbackRate: DEFAULT_PLAYBACK_RATE,
+      dynamicPlaybackRate: false,
       stepFieldEnabled: true,
       tailVisible: true,
       leadVisible: true
@@ -271,6 +288,7 @@ const state = {
   nudgeSeconds: normalizeNudgeSeconds(preferences.nudgeSeconds),
   contextSeconds: preferences.contextSeconds,
   playbackRate: preferences.playbackRate,
+  dynamicPlaybackRate: preferences.dynamicPlaybackRate,
   stepFieldEnabled: preferences.stepFieldEnabled,
   tailVisible: preferences.tailVisible,
   leadVisible: preferences.leadVisible,
@@ -682,6 +700,7 @@ function persistPreferences() {
     preferences.nudgeSeconds = normalizeNudgeSeconds(state.nudgeSeconds);
     preferences.contextSeconds = state.contextSeconds;
     preferences.playbackRate = normalizePlaybackRate(state.playbackRate);
+    preferences.dynamicPlaybackRate = state.dynamicPlaybackRate === true;
     preferences.stepFieldEnabled = state.stepFieldEnabled;
     preferences.tailVisible = state.tailVisible;
     preferences.leadVisible = state.leadVisible;
@@ -692,6 +711,7 @@ function persistPreferences() {
       fieldBreath: preferences.fieldBreath,
       nudgeSeconds: preferences.nudgeSeconds,
       playbackRate: preferences.playbackRate,
+      dynamicPlaybackRate: preferences.dynamicPlaybackRate,
       stepFieldEnabled: preferences.stepFieldEnabled,
       tailVisible: preferences.tailVisible,
       leadVisible: preferences.leadVisible
@@ -1793,15 +1813,18 @@ function startFieldPlaybackFromGesture(options = {}) {
     parentNeighborhood: copy(currentResolution()),
     parentResolutionBasis: model().resolutionBasis,
     returnModel: snapshotModel(model()),
-    label: rate === 1 ? "Playback" : `Playback ${formatRate(rate)}`,
+    label: options.dynamic
+      ? "Playback by weight"
+      : rate === 1 ? "Playback" : `Playback ${formatRate(rate)}`,
     operator: "playback",
-    rate
+    rate,
+    dynamic: options.dynamic === true
   });
   // Tail and Lead hold a fixed offset from Center by playing the same material
   // at the same rate. A changed Center rate has no side rate that preserves the
   // relation, so the Panorama suspends rather than drifting: ordinary playback
   // is a capability this system keeps, not one the Field is allowed to cost it.
-  if (rate === 1) {
+  if (rate === 1 && !options.dynamic) {
     // This function is called directly from a trusted parent-page click or Space
     // key event. Ask every muted side and Center to play in the same synchronous
     // activation stack; delayed Center state events are too late to transfer that
@@ -1832,13 +1855,14 @@ function requestCenterPause() {
 // a running playback pauses, so each engagement stays a toggle.
 function toggleNativePlayback(options = {}) {
   if (!state.videoLoaded) return;
-  const rate = options.fast ? effectivePlaybackRate() : 1;
+  const rate = options.fast ? shiftPlaybackRate() : 1;
+  const dynamic = Boolean(options.fast && state.dynamicPlaybackRate);
   if (transportIs(TRANSPORT_KIND.CONTEXT)) {
     // Context is transient observation around Current. The play command means
     // ordinary playback wherever it is issued, so Context yields to it rather
     // than reinterpreting the key as "commit what I was peeking at". Current is
     // placed exactly by dragging it, nudging it, or editing its Address.
-    startFieldPlaybackFromGesture({ rate });
+    startFieldPlaybackFromGesture({ rate, dynamic });
     return;
   }
   if (transportIs(TRANSPORT_KIND.PLAYBACK)) {
@@ -1853,7 +1877,7 @@ function toggleNativePlayback(options = {}) {
     startNativePlaybackSession();
     requestCenterPause();
   } else {
-    startFieldPlaybackFromGesture({ rate });
+    startFieldPlaybackFromGesture({ rate, dynamic });
   }
 }
 
@@ -2843,6 +2867,18 @@ function pollPlayer() {
   const now = safeCurrentTime();
   const transport = state.transport;
   const programmaticPlacementActive = programmaticPlacementOwns(now);
+
+  // A dynamic playback reads its rate off the map it is crossing, so the rate
+  // is re-derived from the Address actually being watched. Only a bucket change
+  // reaches the player: the ladder is coarse on purpose, and asking for a rate
+  // it already has would be a command per poll.
+  if (transport.kind === TRANSPORT_KIND.PLAYBACK && transport.dynamic) {
+    const desired = dynamicRateAt(now);
+    if (desired !== transport.rate) {
+      state.transport = { ...transport, rate: desired };
+      player.setRate(desired);
+    }
+  }
 
   if (
     isTransportActive(transport)
@@ -4448,6 +4484,7 @@ function initializePlayerApi() {
       fieldFrame: fieldOperatorPreview(),
       transportKind: state.transport.kind,
       transportRate: state.transport.rate ?? 1,
+      transportDynamic: state.transport.dynamic === true,
       pendingStep: Boolean(state.pendingStep),
       dragging: Boolean(
         state.dragHandle || state.guideDrag?.moved || state.currentDrag?.moved
@@ -4926,8 +4963,26 @@ function renderPlaybackRateChoices() {
     }));
   }
   select.value = String(effectivePlaybackRate());
-  elements["playback-rate-value"].textContent = `${formatRate(effectivePlaybackRate())} on Shift`;
+  const dynamic = state.dynamicPlaybackRate === true;
+  const check = elements["playback-dynamic"];
+  if (check) check.checked = dynamic;
+  elements["playback-rate-value"].textContent = dynamic
+    ? "by Section weight"
+    : `${formatRate(effectivePlaybackRate())} on Shift`;
 }
+
+elements["playback-dynamic"].addEventListener("change", event => {
+  state.dynamicPlaybackRate = event.target.checked === true;
+  persistPreferences();
+  renderPlaybackRateChoices();
+  if (transportIs(TRANSPORT_KIND.PLAYBACK) && (state.transport.rate ?? 1) !== 1) {
+    settleTransport();
+  }
+  setStatus(state.dynamicPlaybackRate
+    ? "Shift plays Center at a rate that follows Section weight."
+    : `Shift plays Center at ${formatRate(effectivePlaybackRate())}.`);
+  view.render();
+});
 
 elements["playback-rate"].addEventListener("change", event => {
   state.playbackRate = normalizePlaybackRate(event.target.value, state.playbackRate);

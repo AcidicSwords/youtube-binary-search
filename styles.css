@@ -1279,6 +1279,21 @@ kbd {
   padding: 9px;
 }
 
+/* A remembered on/off setting reads as a row like every other Parameter: the
+   name on the left, the control on the right. */
+.compact-check {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.compact-check input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent, #79a8ff);
+  cursor: pointer;
+}
+
 .compact-setting {
   display: grid;
   gap: 5px;

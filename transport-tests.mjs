@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import {
   TRANSPORT_KIND,
+  dynamicRateForWeight,
+  DYNAMIC_RATE_LADDER,
   idleTransport,
   deriveContextWindow,
   createContextTransport,
@@ -61,4 +63,52 @@ assert.deepEqual(
   { start: 40, end: 80 }
 );
 
-console.log("Transport tests passed: source Context, playback ownership, and projection-stable Range transport.");
+// Dynamic playback rate: weight says how much attention ground is owed, so rate
+// runs opposite to it. The two ladders share their values, which is what makes
+// the correspondence a reflection rather than a fitted curve.
+{
+  // The stated ends are clamps, not nearest buckets.
+  assert.equal(dynamicRateForWeight(0.25), 2);
+  assert.equal(dynamicRateForWeight(0.125), 2, "Everything at or below the low end shares its rate.");
+  assert.equal(dynamicRateForWeight(2), 0.25);
+  assert.equal(dynamicRateForWeight(4), 0.25, "and everything at or above the high end shares its.");
+
+  // Ground nobody deformed plays at the speed it always did.
+  assert.equal(dynamicRateForWeight(1), 1);
+
+  // Monotone: more map always means more time on it, never less.
+  const weights = [0.2, 0.25, 0.4, 0.5, 0.75, 1, 1.25, 1.5, 1.9, 2, 5];
+  const rates = weights.map(dynamicRateForWeight);
+  for (let index = 1; index < rates.length; index += 1) {
+    assert.ok(rates[index] <= rates[index - 1],
+      `Rate must not rise with weight (${weights[index - 1]} -> ${weights[index]}).`);
+  }
+
+  // Buckets are compared multiplicatively, because weights compose that way:
+  // 0.5 is as far from neutral as 2 is, and lands the same distance down.
+  assert.equal(dynamicRateForWeight(0.5), 1.5);
+  assert.equal(dynamicRateForWeight(1.5), 0.5);
+
+  // Every rate the ladder can produce is one a player can be asked for.
+  for (const entry of DYNAMIC_RATE_LADDER) {
+    assert.ok(entry.rate >= 0.25 && entry.rate <= 2,
+      "The ladder never asks for a rate outside the range players offer.");
+  }
+  assert.equal(dynamicRateForWeight(0), 1, "A nonsense weight changes nothing.");
+  assert.equal(dynamicRateForWeight(Number.NaN), 1);
+}
+
+// A playback owns its rate and whether that rate follows the map.
+{
+  const fixed = createPlaybackTransport({ departure: 0, rate: 1.5 });
+  assert.equal(fixed.rate, 1.5);
+  assert.equal(fixed.dynamic, false, "A playback is fixed unless it says otherwise.");
+  const dynamic = createPlaybackTransport({ departure: 0, rate: 1, dynamic: true });
+  assert.equal(dynamic.dynamic, true);
+  assert.equal(rebasePlaybackTransport(dynamic, 0).dynamic, true,
+    "A Range wrap continues the same playback, so it stays dynamic.");
+  assert.equal(rebasePlaybackTransport(fixed, 0).rate, 1.5,
+    "and a fixed one keeps its rate across the wrap.");
+}
+
+console.log("Transport tests passed: source Context, playback ownership, projection-stable Range transport, and the inverse weight-to-rate ladder.");

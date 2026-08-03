@@ -1809,7 +1809,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["field-outer-offset"].value = String(fieldBreath.outer);
     elements["field-inner-offset"].max = String(fieldBreath.outer);
     elements["field-outer-offset"].min = String(fieldBreath.inner);
-    // The stored quantum stays exact; only its presentation is rounded.
+    if (elements["panorama-setting-value"]) {
+      const pair = elements["field-breath-rate"]?.selectedOptions?.[0]?.textContent
+        || `${fieldBreath.rate}× / ${2 - fieldBreath.rate}×`;
+      elements["panorama-setting-value"].textContent =
+        `${fieldBreath.inner}–${fieldBreath.outer} s · ${pair}`;
+    }
     // The stored quantum stays exact; only its presentation is rounded.
     elements["nudge-seconds"].value = String(
       Number((currentState.nudgeSeconds ?? 1 / 24).toFixed(3))
@@ -1923,11 +1928,19 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "go-range-start", "range-start-here", "range-midpoint",
       "go-range-end", "range-end-here", "full-video-range",
       "field-inner-offset", "field-outer-offset", "field-breath-rate",
-      "nudge-seconds", "context-seconds", "playback-rate",
+      "nudge-seconds", "context-seconds", "playback-rate", "playback-dynamic",
       "section-source", "section-label", "pin-label",
       "cue-source", "cue-parse", "cue-clear"
     ]) {
       if (elements[id]) elements[id].disabled = interactionLocked;
+    }
+    // The fixed Shift rate is not what Shift uses while the rate follows
+    // weight. Saying so by disabling it is more honest than leaving a live
+    // control nothing reads; the stored choice is untouched underneath and
+    // returns as soon as the box is cleared.
+    if (elements["playback-rate"]) {
+      elements["playback-rate"].disabled = interactionLocked
+        || state().dynamicPlaybackRate === true;
     }
 
     elements["save-section"].disabled = interactionLocked || !sectionExtent;

@@ -237,4 +237,79 @@ assert.deepEqual(rateSelect.options.map(option => Number(option.value)), [0.25, 
 assert.equal(rateSelect.value, "2",
   "and the remembered wish returns to the rate it asked for.");
 
-console.log("Transport coherence smoke passed: live projection, exact settlement, Focus-owned proper-Range looping, one-pass Field rebasing, wrap history isolation, Unfocus restoration, full-video completion, and Shift-rate playback that suspends the Panorama instead of losing variable speed.");
+// Following weight: the rate is read off the map at the Address being watched,
+// so it changes as playback crosses Section boundaries. Weight says how much
+// attention ground is owed; rate runs opposite to it.
+{
+  const { descendants } = await import("./smoke-harness.mjs");
+  byId.get("full-video-range").click();
+  await flush(3);
+  byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 200 });
+  await env.delay(350); await flush(3);
+  byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 400 });
+  await env.delay(350); await flush(3);
+  byId.get("section-capture").dispatch("submit");
+  await flush(3);
+  byId.get("release").click();
+  await flush(3);
+
+  const rows = descendants(byId.get("sections-list")).filter(node => node.dataset.sectionGo);
+  byId.get("sections-list").dispatch("click", { target: rows[0] });
+  await env.delay(350); await flush(3);
+  for (let index = 0; index < 4; index += 1) {
+    byId.get("deform-up").dispatch("pointerdown", { button: 0, pointerId: 60 + index, buttons: 1 });
+    await flush(2);
+    dispatchDocument("pointerup", { button: 0, pointerId: 60 + index, buttons: 0 });
+    await env.delay(500); await flush(3);
+  }
+
+  byId.get("playback-dynamic").checked = true;
+  byId.get("playback-dynamic").dispatch("change", { target: byId.get("playback-dynamic") });
+  await flush(3);
+  assert.equal(byId.get("playback-rate").disabled, true,
+    "The fixed rate is not what Shift uses while the rate follows weight, and says so.");
+
+  byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 50 });
+  await env.delay(350); await flush(3);
+  env.document.activeElement = null;
+  dispatchDocument("keydown", { key: " ", code: "Space", shiftKey: true });
+  await flush(4); await poll();
+  assert.equal(center.rate, 1,
+    "Ground nobody deformed plays at the speed it always did.");
+
+  center.currentTime = 25;
+  await poll(); await flush(2);
+  assert.ok(center.rate < 1,
+    "Crossing into expanded ground slows the playback without restarting it.");
+  const insideRate = center.rate;
+
+  center.currentTime = 60;
+  await poll(); await flush(2);
+  assert.equal(center.rate, 1, "and leaving it returns to neutral.");
+
+  // Only a bucket change reaches the player: the ladder is coarse on purpose.
+  const commandsBefore = center.commands.length;
+  center.currentTime = 61;
+  await poll(); await flush(2);
+  center.currentTime = 62;
+  await poll(); await flush(2);
+  assert.equal(center.commands.length, commandsBefore,
+    "Staying inside one bucket issues no player command at all.");
+
+  // A dynamic playback suspends the Panorama for its whole duration, including
+  // over neutral ground: the rate is going to change at the next boundary, and
+  // a Panorama that folded and unfolded around it would be worse than one that
+  // stays out of the way.
+  const sidePlaysAtNeutral = sidePlays();
+  center.currentTime = 25;
+  await poll(); await flush(2);
+  assert.equal(center.rate, insideRate);
+  assert.equal(sidePlays(), sidePlaysAtNeutral,
+    "The Panorama stays suspended across the whole dynamic playback.");
+
+  dispatchDocument("keydown", { key: " ", code: "Space", shiftKey: true });
+  await settle();
+  assert.equal(center.rate, 1, "Ending it returns Center to 1x like any other playback.");
+}
+
+console.log("Transport coherence smoke passed: live projection, exact settlement, Focus-owned proper-Range looping, one-pass Field rebasing, wrap history isolation, Unfocus restoration, full-video completion, Shift-rate playback that suspends the Panorama instead of losing variable speed, and a rate that follows Section weight across the map.");

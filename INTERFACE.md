@@ -408,6 +408,12 @@ travelling transition.
 - Space is the play command everywhere outside text editing and modal Guide
   work: it starts or stops ordinary playback, and running Context yields to it
   rather than reinterpreting the key. Enter activates a focused Step control.
+- Settings have one home. Parameters owns every remembered setting — Step
+  distance, Fine Nudge, Automatic Context, Shift playback, and the Panorama's
+  offsets and breathing pair. What acts on what you are looking at right now
+  stays where you are looking: showing the Panorama, collapsing a side, holding
+  a span. The answer to "where is that setting?" does not depend on which
+  setting it is.
 - Shift is the rate modifier on that command, not a second command. `Shift` +
   `Space`, and Shift-clicking the Center transport surface, play Center at the
   Shift rate set in Parameters with the Panorama suspended; either engagement

@@ -89,7 +89,9 @@ Each Section weight is selected from:
 W = {0.125, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 4}
 ```
 
-The interior of the ladder mirrors the familiar Tail/Lead rate scale, and the two ends extend past it: `0.125` folds a Section nearly out of the way, `4` opens one far past ordinary inspection. The values act on a different axis from playback rate. Section weights have no playback or Field effect.
+The interior of the ladder mirrors the familiar Tail/Lead rate scale, and the two ends extend past it: `0.125` folds a Section nearly out of the way, `4` opens one far past ordinary inspection. A weight is a property of the map and nothing else: setting one moves nothing, plays nothing, and reaches no player.
+
+One thing reads the map back as a rate, and only by being asked to. Shift playback set to follow weight derives its rate from `ρ` at the Address it is watching — the map is the input, not the output, and turning that mode off leaves weight with no playback consequence at all.
 
 At source Address \(u\), let the effective spatial density be the product of every Section weight covering that Address:
 
@@ -125,7 +127,8 @@ Changing a Section weight:
 
 - moves no Pin, Section endpoint, Range boundary, Current, Cursor, Resolution Address, or Working Interval Address;
 - changes only the derived Timeline Space positions and distances;
-- never changes source duration, playback rate, playback order, Context, or Field Offset;
+- never changes source duration, playback order, Context, or Field Offset;
+- issues no player command of its own, and changes no stored rate;
 - preserves ordinary source order and direct reachability;
 - becomes spatially neutral at `1×`.
 
@@ -305,6 +308,19 @@ Play carries a rate. The plain command plays Center at `1×` with the Panorama; 
 The rate belongs to the playback, not to the player. A proper-Range wrap continues the same playback and so keeps its rate; settling any playback returns Center to `1×`. Choosing a different rate while a Shift playback runs retunes that playback rather than beginning another.
 
 Tail and Lead hold a fixed offset from Center by playing the same material at the same rate, so no side rate preserves that relation once Center's rate changes. The Panorama therefore suspends for the duration of a playback whose rate is not `1×`. This is stated as a condition on the Field rather than as a command issued once, so it holds for as long as the rate does. Variable-speed playback is a capability an ordinary video player has; the Panorama is an experiment, and an experiment does not get to cost the reader an established capability. If all else fails, this system is still a video player.
+
+Shift plays at one of two things: a fixed rate, or a rate that follows the map. Following weight runs the rate opposite to cumulative weight `ρ`, because weight says how much map a Section receives and that is a statement about how much attention its ground is owed. Expanded ground is ground to dwell on; compressed ground is ground to cross quickly.
+
+The correspondence is a reflection of one ladder onto itself rather than a curve fitted to it: the weight scale and the playback-rate scale share the values `0.25` through `2`.
+
+```text
+ρ   ≤0.25   0.5    0.75    1     1.25    1.5    ≥2
+r     2×    1.5×   1.25×   1×    0.75×   0.5×   0.25×
+```
+
+The ends are clamps, not nearest buckets: everything at or past them shares their rate however far past it goes. Neutral weight is the fixed point — ground nobody deformed plays at the speed it always did, so following weight never makes an unweighted video behave strangely. Buckets are compared in log space, because weights compose by multiplication and `0.5` is as far from neutral as `2` is.
+
+A dynamic playback re-derives its rate at the Address being watched, so it changes as playback crosses Section boundaries; only a bucket change reaches the player. It suspends the Panorama for its whole duration, including over neutral ground, because the rate is going to change at the next boundary and a Panorama that folded and unfolded around it would be worse than one that stays out of the way.
 
 The offered rates are exactly the rates the player reports it can play. No ladder is assumed, and the offer is re-read rather than trusted once: a player commonly reports only `1×` until it has actually entered playback, and unknown is not the same as unsupported. The stored rate is a wish, snapped to the nearest offered rate at the moment it is used, so it returns to what it asked for as soon as that rate is genuinely available.
 

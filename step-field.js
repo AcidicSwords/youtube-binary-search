@@ -120,7 +120,12 @@ export function fieldShouldSuspend(snapshot) {
     // Center's rate changes, so the Field suspends for the duration rather than
     // drifting. Stated here so it stays suspended for as long as the condition
     // holds, instead of being paused once and resuming on the next tick.
-    || (transportKind === "playback" && transportRate !== 1)
+    // A dynamic playback suspends the Panorama for its whole duration, not only
+    // while its current rate differs: the rate is going to change at the next
+    // Section boundary, and a Panorama that folded and unfolded around neutral
+    // ground would be worse than one that stays out of the way.
+    || (transportKind === "playback"
+      && (transportRate !== 1 || snapshot?.transport?.dynamic || snapshot?.transportDynamic))
   );
 }
 
