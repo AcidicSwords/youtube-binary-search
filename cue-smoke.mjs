@@ -144,6 +144,25 @@ for (const mark of cueMarks()) {
   assert.ok(Number.parseFloat(mark.style.width) > 0,
     "Every offered chapter is drawn as its complete extent, not reduced to a tick.");
 }
+// A chapter title may only occupy the map up to where the next chapter begins.
+// A fixed cap let neighbours closer than that cap overlap into one unreadable
+// run of words, which is worse than showing fewer names.
+{
+  const names = descendants(byId.get("cue-lane"))
+    .filter(node => node.className === "timeline-cue-name")
+    .map(node => ({
+      left: Number.parseFloat(node.style.left),
+      room: Number.parseFloat(node.style.maxWidth)
+    }))
+    .sort((first, second) => first.left - second.left);
+  assert.equal(names.length, 3, "Every drawn Cue is named.");
+  for (const [index, name] of names.entries()) {
+    const nextLeft = names[index + 1]?.left ?? 100;
+    assert.ok(name.room <= nextLeft - name.left + 0.001,
+      "A name is bounded by the room before the next Cue, so names cannot collide.");
+  }
+}
+
 assert.equal(timelinePins(), 0,
   "Drawing a Cue creates no Pin, so nothing new is clusterable or traversable.");
 for (const mark of descendants(byId.get("cue-lane"))) {

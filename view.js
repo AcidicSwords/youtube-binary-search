@@ -650,18 +650,29 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     lane.replaceChildren();
     const cues = state().cuesOnTimeline ? state().cues || [] : [];
     if (!cues.length) return false;
-    for (const cue of cues) {
-      const projected = projectCueExtent(cue, projection);
-      if (!projected) continue;
+    // A chapter title may only occupy the map up to where the next one begins.
+    // Capping each at a fixed width let neighbours closer than that cap overlap
+    // into one unreadable run of words, which is worse than showing fewer names.
+    // The name is a child of the lane rather than of its own mark so that a
+    // percentage width measures the timeline, which is what the room is in.
+    const placed = cues
+      .map(cue => ({ cue, projected: projectCueExtent(cue, projection) }))
+      .filter(entry => entry.projected)
+      .sort((first, second) => first.projected.left - second.projected.left);
+    for (const [index, { cue, projected }] of placed.entries()) {
       const mark = document.createElement("span");
       mark.className = "timeline-cue";
       mark.style.left = `${projected.left * 100}%`;
       mark.style.width = `${projected.width * 100}%`;
+      lane.appendChild(mark);
+
+      const room = (placed[index + 1]?.projected.left ?? 1) - projected.left;
       const name = document.createElement("span");
       name.className = "timeline-cue-name";
       name.textContent = cueName(cue) || formatTime(cue.time);
-      mark.appendChild(name);
-      lane.appendChild(mark);
+      name.style.left = `${projected.left * 100}%`;
+      name.style.maxWidth = `${Math.max(0, room * 100)}%`;
+      lane.appendChild(name);
     }
     return lane.children.length > 0;
   }

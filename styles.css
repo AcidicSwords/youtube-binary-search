@@ -833,12 +833,12 @@ kbd {
 .timeline-cue-name {
   position: absolute;
   top: 7px;
-  left: 3px;
-  max-width: 96px;
+  padding-right: 6px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   opacity: 0.72;
+  pointer-events: none;
 }
 
 .timeline-ruler {
@@ -1779,20 +1779,44 @@ kbd {
   opacity: 0.72;
 }
 
+/* One colour, one meaning.
+ *
+ * Gold said four things at once: "this is a Pin", "this is an endpoint of the
+ * Working Interval", "this is a drag snap target", and "this is a snap source".
+ * Identity was being drawn in a state colour, so every row carried the mark
+ * that was supposed to distinguish one of them, and nothing read as selected.
+ *
+ *   identity  -- what kind of thing this is: a quiet left bar, never a border
+ *   acquired  -- what the operators act on: accent, and the only tinted row
+ *   relation  -- an endpoint of the Working Interval: gold bar, no border
+ *   transient -- a live drag's snap state: only while a drag is happening
+ */
 .pin-item::before {
   position: absolute;
   inset: 0 auto 0 0;
   width: calc(1px + var(--reference-weight, 0) * 1px);
-  background: var(--pin);
+  background: var(--muted);
   content: "";
-  opacity: calc(0.34 + var(--reference-weight, 0) * 0.18);
+  opacity: calc(0.16 + var(--reference-weight, 0) * 0.07);
 }
 
-.guide-item.focused { border-color: rgba(121, 168, 255, 0.6); }
-.guide-item.retained-selected {
-  border-color: rgba(121, 168, 255, 0.76);
-  box-shadow: inset 3px 0 0 var(--accent);
+.guide-item.focused { border-color: rgba(121, 168, 255, 0.45); }
+
+.guide-item.extent-selected {
+  box-shadow: inset 3px 0 0 rgb(var(--interval-rgb) / 0.85);
 }
+
+/* The acquired row is the only one with a filled background, because a fill is
+   the one signal nothing else in this list uses. */
+.guide-item.retained-selected {
+  border-color: rgb(121 168 255 / 0.9);
+  box-shadow: inset 3px 0 0 var(--accent), 0 0 0 1px rgb(121 168 255 / 0.5);
+  background: rgb(121 168 255 / 0.12);
+}
+.guide-item.retained-selected.extent-selected {
+  box-shadow: inset 3px 0 0 var(--accent), 0 0 0 1px rgb(121 168 255 / 0.5);
+}
+
 .guide-item.snap-target {
   border-color: rgba(246, 200, 110, 0.66);
   box-shadow: inset 3px 0 0 var(--pin), 0 0 10px rgba(246, 200, 110, 0.1);
@@ -1803,10 +1827,6 @@ kbd {
 }
 .guide-item.snap-source {
   border-color: rgba(246, 200, 110, 0.52);
-}
-.guide-item.extent-selected {
-  border-color: rgba(246, 200, 110, 0.72);
-  box-shadow: inset 3px 0 0 var(--pin);
 }
 .section-item.compressed {
   background:
