@@ -5510,6 +5510,15 @@ elements["pins-list"].addEventListener("input", event => {
 elements["pins-list"].addEventListener("focusout", event => {
   if (event.target.closest?.("[data-address-input]")) clearGuideAddressPreview();
 });
+for (const [type, on] of [["pointerover", true], ["pointerout", false], ["focusin", true], ["focusout", false]]) {
+  elements["pins-list"].addEventListener(type, event => {
+    const item = event.target.closest?.("[data-pin-preview-id]");
+    if (!item || item.contains?.(event.relatedTarget)) return;
+    view.setPreviewPin(on ? item.dataset.pinPreviewId : null);
+    view.render();
+  });
+}
+
 elements["sections-list"].addEventListener("pointerover", event => {
   const item = event.target.closest("[data-section-preview-id]");
   if (!item || item.contains(event.relatedTarget)) return;

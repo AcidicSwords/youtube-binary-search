@@ -252,10 +252,24 @@ export function assignSectionGroup(guide, sectionId, groupId) {
 // it would collapse two distinct layered Sections into one Group identity;
 // silently merging them would destroy a layer, while keeping both would make
 // selection and exact editing ambiguous again.
+// Where a removed Group's Sections go: any surviving Group, preferring the
+// default when it is one of them.
+export function groupDeletionHeir(guide, groupId) {
+  const survivors = (guide?.groups || []).filter(entry => entry.id !== groupId);
+  return survivors.find(entry => entry.id === DEFAULT_GROUP_ID)?.id
+    || survivors[0]?.id
+    || null;
+}
+
 export function groupDeletionBlockReason(guide, groupId) {
-  if (groupId === DEFAULT_GROUP_ID) return "default-group";
   const group = guide.groups.find(entry => entry.id === groupId);
   if (!group) return "missing-group";
+  // The default Group is an ordinary Group. Only the last one is undeletable,
+  // because Sections have to belong somewhere and a Guide with no Group could
+  // not say where. Removing any other -- default included -- rehomes its
+  // Sections rather than destroying them.
+  const heir = groupDeletionHeir(guide, groupId);
+  if (!heir) return "last-group";
   for (const section of guide.sections.filter(entry => entry.groupId === groupId)) {
     if (findDuplicateSection(
       guide,
@@ -263,7 +277,7 @@ export function groupDeletionBlockReason(guide, groupId) {
       section.endPinId,
       section.label,
       section.id,
-      DEFAULT_GROUP_ID
+      heir
     )) return "duplicate-section";
   }
   return null;
@@ -273,10 +287,11 @@ export function deleteGroup(guide, groupId) {
   if (groupDeletionBlockReason(guide, groupId)) return false;
   const index = guide.groups.findIndex(group => group.id === groupId);
   const changedAt = now();
+  const heir = groupDeletionHeir(guide, groupId);
   guide.groups.splice(index, 1);
   for (const section of guide.sections) {
     if (section.groupId !== groupId) continue;
-    section.groupId = DEFAULT_GROUP_ID;
+    section.groupId = heir;
     section.updatedAt = changedAt;
   }
   // Removing any Group re-resolves the named layer. When the removed Group was

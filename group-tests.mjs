@@ -385,14 +385,32 @@ function build() {
 {
   const { guide, terrain } = build();
   const before = sortedSections(guide).length;
-  assert.equal(deleteGroup(guide, DEFAULT_GROUP_ID), false,
-    "The default Group is where Sections come home to, so it cannot be deleted.");
   assert.equal(deleteGroup(guide, terrain.id), true);
   assert.equal(sortedSections(guide).length, before,
     "A Group is an organizing choice, not an owner.");
   assert.ok(guide.sections.every(section => section.groupId === DEFAULT_GROUP_ID));
   assert.equal(extentOf(guide), DURATION + 40 - 10,
     "and the deformation its Sections carry is unchanged.");
+}
+
+// --- The default Group is an ordinary Group -------------------------------------
+// Only the last one is undeletable: Sections have to belong somewhere, and a
+// Guide with no Group could not say where. Every other Group, the default
+// included, rehomes its Sections to a survivor.
+{
+  const { guide, terrain } = build();
+  const before = sortedSections(guide).length;
+  assert.equal(deleteGroup(guide, DEFAULT_GROUP_ID), true,
+    "The default Group can be removed while another Group survives it.");
+  assert.equal(sortedSections(guide).length, before,
+    "and its Sections come home to that survivor.");
+  assert.ok(guide.sections.every(section => section.groupId === terrain.id));
+  assert.equal(guide.groups.length, 1);
+  assert.equal(guide.visibleGroupId, terrain.id,
+    "The drawn layer resolves to a Group that still exists.");
+  assert.equal(deleteGroup(guide, terrain.id), false,
+    "The last Group cannot be removed, because Sections would have nowhere to be.");
+  assert.equal(guide.groups.length, 1);
 }
 
 // --- Guides written before Groups migrate into one ------------------------------

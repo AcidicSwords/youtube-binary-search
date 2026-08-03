@@ -197,6 +197,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
   let previewAction = null;
   let previewSectionId = null;
+  let previewPinId = null;
   let renderedPinKey = "";
   let renderedClusters = [];
   let pinClusterTrigger = null;
@@ -1181,6 +1182,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         const extentSelected = state().selectedPinIds?.includes(pin.id);
         const item = document.createElement("article");
         item.className = "guide-item pin-item";
+        // Hovering a Pin row shows where it is, exactly as hovering a Section
+        // row shows where that is. A Guide entry you cannot locate on the map
+        // without clicking it is a list, not a guide.
+        item.dataset.pinPreviewId = pin.id;
         setStyleProperty(item, "--reference-weight", String(Math.min(3, references)));
         if (extentSelected) item.classList.add("extent-selected");
         if (selected) item.classList.add("retained-selected");
@@ -1365,7 +1370,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         toggles.appendChild(label);
       }
 
-      if (group.id !== DEFAULT_GROUP_ID) {
+      // Every Group offers rename and remove, the default included. Only the
+      // last one refuses removal, and the Guide says so at the moment of asking
+      // rather than by hiding the control.
+      {
         const titleActions = document.createElement("span");
         titleActions.className = "guide-title-actions";
         const rename = document.createElement("button");
@@ -1381,13 +1389,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         remove.dataset.deleteGroup = group.id;
         remove.textContent = "×";
         remove.setAttribute("aria-label", `Remove ${group.label || "Group"}`);
-        remove.title = members.length
-          ? `Remove this Group; its ${members.length} Section${members.length === 1 ? " returns" : "s return"} to Map`
-          : "Remove this Group";
+        const heir = (guide().groups || []).find(entry => entry.id !== group.id);
+        remove.disabled = !heir;
+        remove.title = !heir
+          ? "The last Group cannot be removed: Sections have to belong somewhere"
+          : members.length
+            ? `Remove this Group; its ${members.length} Section${members.length === 1 ? " moves" : "s move"} to ${groupDisplayName(heir)}`
+            : "Remove this Group";
         titleActions.append(rename, remove);
         row.append(name, meta, toggles, titleActions);
-      } else {
-        row.append(name, meta, toggles);
       }
 
       const container = document.createElement("div");
@@ -1516,6 +1526,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const section = resolveSection(guide(), previewSectionId);
     elements["section-preview-fill"].hidden = !section;
     if (section) setSegment(elements["section-preview-fill"], section.start, section.end);
+    const marker = elements["pin-preview-marker"];
+    if (!marker) return;
+    const pin = previewPinId ? getPin(guide(), previewPinId) : null;
+    marker.hidden = !pin;
+    if (pin) setMarkerPosition(marker, pin.t);
   }
 
   function setActionMeta(buttonId, metaId, label, meta) {
@@ -2251,6 +2266,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     openPinClusterMenu,
     clusterAt,
     setPreviewAction(value) { previewAction = value; },
-    setPreviewSection(value) { previewSectionId = value; }
+    setPreviewSection(value) { previewSectionId = value; },
+    setPreviewPin(value) { previewPinId = value; }
   };
 }

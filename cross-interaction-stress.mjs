@@ -395,12 +395,16 @@ const added = groupIds().find(id =>
   id !== "group-default" && id !== emptyLayer
 );
 assert.ok(added, "New Group creates one.");
-assert.equal(
-  inSections("renameGroup").length,
-  2,
-  "A created Group carries Rename, and the default Group does not."
-);
-assert.equal(inSections("deleteGroup").length, 2);
+// Every Group is an ordinary Group: each carries Rename and Remove, the default
+// included. Only the last one refuses removal, and it says so at the moment of
+// asking rather than by hiding the control.
+const groupCount = groupIds().length;
+assert.equal(inSections("renameGroup").length, groupCount,
+  "Every Group carries Rename.");
+assert.equal(inSections("deleteGroup").length, groupCount,
+  "and every Group carries Remove.");
+assert.ok(inSections("deleteGroup").every(control => !control.disabled),
+  "None is refused while more than one Group exists.");
 
 const sectionCountBefore = sectionRows().length;
 await selectSection(0);
@@ -500,4 +504,21 @@ assert.deepEqual(
   "and the construction it returns is the one it walked back from."
 );
 
-console.log("Cross-interaction stress passed: Group visibility and activity govern drawing and deformation independently and are observed by traversal but never by the projection; Cues project through deformation and Focus while staying inert; composition crosses Cues, Sections and Pins by one law; reveal moves nothing and preserves an armed Shift layer; Unlink works from the Pin under a hidden Group; a Group renames and removes non-destructively; and one history stack Undoes and Redoes the whole construction.");
+// Hovering a Pin row shows where it is, exactly as hovering a Section row does.
+// A Guide entry you cannot locate on the map without clicking it is a list.
+{
+  const row = descendants(byId.get("pins-list"))
+    .find(node => node.dataset.pinPreviewId !== undefined);
+  assert.ok(row, "Pin rows carry a preview identity.");
+  assert.equal(byId.get("pin-preview-marker").hidden, true);
+  byId.get("pins-list").dispatch("pointerover", { target: row });
+  await flush(2);
+  assert.equal(byId.get("pin-preview-marker").hidden, false,
+    "Hovering a Pin marks its Address on the Timeline.");
+  byId.get("pins-list").dispatch("pointerout", { target: row });
+  await flush(2);
+  assert.equal(byId.get("pin-preview-marker").hidden, true,
+    "and leaving it clears the mark, having moved nothing.");
+}
+
+console.log("Cross-interaction stress passed: Group visibility and activity govern drawing and deformation independently and are observed by traversal but never by the projection; Cues project through deformation and Focus while staying inert; composition crosses Cues, Sections and Pins by one law; reveal moves nothing and preserves an armed Shift layer; Unlink works from the Pin under a hidden Group; a Group renames and removes non-destructively; one history stack Undoes and Redoes the whole construction; every Group offers rename and remove with only the last refused; and hovering a Pin row marks its Address on the map.");
