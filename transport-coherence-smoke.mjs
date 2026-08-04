@@ -256,12 +256,13 @@ assert.equal(rateSelect.value, "2",
   const rows = descendants(byId.get("sections-list")).filter(node => node.dataset.sectionGo);
   byId.get("sections-list").dispatch("click", { target: rows[0] });
   await env.delay(350); await flush(3);
-  for (let index = 0; index < 4; index += 1) {
-    byId.get("deform-up").dispatch("pointerdown", { button: 0, pointerId: 60 + index, buttons: 1 });
-    await flush(2);
-    dispatchDocument("pointerup", { button: 0, pointerId: 60 + index, buttons: 0 });
-    await env.delay(500); await flush(3);
-  }
+  // Weight is assigned in the Guide, where the value lives.
+  const weightSelect = descendants(byId.get("sections-list"))
+    .find(node => node.dataset.sectionWeight !== undefined);
+  weightSelect.value = "2";
+  byId.get("sections-list").dispatch("change", { target: weightSelect });
+  await env.delay(350);
+  await flush(3);
 
   byId.get("playback-dynamic").checked = true;
   byId.get("playback-dynamic").dispatch("change", { target: byId.get("playback-dynamic") });

@@ -136,13 +136,13 @@ await clickSection("1:00–1:20", { shiftKey: true });
 assert.match(workingWindow(), /0:10–1:20/);
 
 // --- The payoff: a span is an ordinary extent ---------------------------------
-// So Deform retains it as one parent Section containing the two it was composed
+// So Tag retains it as one parent Section containing the two it was composed
 // from. Nesting by construction, with no nesting feature.
 const before = sectionRows().length;
-byId.get("deform").dispatch("click", { detail: 1 });
+byId.get("tag").dispatch("click", { detail: 1, shiftKey: true });
 await flush();
 assert.equal(sectionRows().length, before + 1,
-  "Deforming a composed span retains it as a new Section.");
+  "Tagging a composed span retains it as a new Section.");
 const spans = sectionRows().map(rowText);
 assert.ok(spans.some(text => text.includes("0:10–1:20")),
   "The new Section spans both Sections it was composed from.");

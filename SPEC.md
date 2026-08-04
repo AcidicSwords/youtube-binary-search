@@ -261,6 +261,8 @@ Changing weight from the operator matrix or Guide uses the same Session transact
 
 The input grammar separates normalization from tuning:
 
+The operator matrix carries `T` Tag where Deform used to sit. Deform did three jobs — retain an extent, assign it a Weight, and cycle a ladder — which is why it was the only operator with an Alt chord, and why it became the habitual way to make a Section when the act you wanted was retention. Tagging is now its own operator, Weight is assigned in the Guide where the value lives, and `X` normalizes.
+
 ### Normalize
 
 Normalize is the inverse of Weight, and what makes Weight usable at all. Deformation is right almost all of the time and intolerable the rest, when you want to act on a straight line; without a way out you would stop deforming rather than fight it, so the way out is one key with no modifier.
@@ -271,9 +273,8 @@ It is a way of looking, not an edit. No Weight changes, nothing is stored, and i
 
 - plain `X` toggles a weighted Section to `1×` and restores its remembered
   non-neutral factor when pressed again;
-- `Shift+X` moves one step up the canonical ladder;
-- `Alt+X` moves one step down the canonical ladder. Browser-reserved chords are
-  not part of the web interface grammar.
+- Weight is assigned in the Guide, on the Section it belongs to. The operator
+  matrix carries no Weight control, so no operator needs a chord to escape one.
 
 Timeline presentation renders all active Section factors as one continuous
 field. The atmosphere expresses sign, log magnitude, midpoint, and softly
@@ -724,7 +725,7 @@ The keyboard matrix expresses the three central transformation rows:
 ```text
 Q Refine Backward     W Reopen           E Refine Forward
 A Step Backward       S Switch Endpoint  D Step Forward
-R Release             X Deform           F Focus / Unfocus
+R Release             T Tag              F Focus / Unfocus
 ```
 
 Their meanings are:

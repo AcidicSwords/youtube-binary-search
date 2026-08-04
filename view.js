@@ -1745,7 +1745,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         ? { start: switchFrame.L, end: switchFrame.R }
         : currentInterval,
       release: currentInterval,
-      deform: currentInterval || selectedForPreview,
+      tag: currentInterval || selectedForPreview,
       focus: currentInterval || selectedForPreview
     } : null;
     let resolvedPreviewAction = previewAction;
@@ -2026,18 +2026,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const selectedSection = currentState.selectedRetained?.kind === "section"
       ? resolveSection(guide(), currentState.selectedRetained.id)
       : null;
-    elements.deform.disabled = interactionLocked || !(
-      currentInterval
-      || selectedSection
-    );
-    elements["deform-down"].disabled = interactionLocked || !(
-      currentInterval
-      || selectedSection
-    );
-    elements["deform-up"].disabled = interactionLocked || !(
-      currentInterval
-      || selectedSection
-    );
+    // Tag always has something to tag: Current is always somewhere.
+    elements.tag.disabled = interactionLocked;
     elements["focus-toggle"].disabled = interactionLocked || !(
       focused
       || currentInterval
@@ -2181,16 +2171,13 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         && Math.abs(selectedSection.end - currentInterval.end) <= EPSILON
       )
     );
-    const deformSection = selectedMatchesInterval ? selectedSection : null;
-    const deformTarget = currentInterval || deformSection;
-    const deformIsWeighted = deformSection
-      && Math.abs(deformSection.weight - 1) > EPSILON;
-    elements["deform-label"].textContent = deformIsWeighted
-      ? "Normalize"
-      : "Deform";
-    elements["deform-meta"].textContent = deformTarget
-      ? `${deformIsWeighted ? "restore 1×" : "restore last"} · ${targetLabel(deformTarget)}`
-      : "No target";
+    // Tag says which of its two acts the plain press will perform, and on what.
+    elements["tag-label"].textContent = currentInterval ? "Tag Section" : "Tag Pin";
+    // The extent is already printed by the Working Section readout, and the
+    // Address by Current. This says which act the press performs, nothing else.
+    elements["tag-meta"].textContent = currentInterval
+      ? "⇧T · Working Interval"
+      : "Current";
     elements["focus-toggle-meta"].textContent = focused
       ? `restore ${formatRange(model().focus.returnRange)}`
       : currentInterval

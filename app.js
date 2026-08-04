@@ -302,7 +302,6 @@ const state = {
   // Whether the offered Cues are drawn on the map. A drawing only: it changes
   // what is visible and nothing about what any operator can reach.
   cuesOnTimeline: false,
-  weightGesture: null,
   guideOpen: false,
   railMode: "guide",
   compactGuide: null,
@@ -316,7 +315,6 @@ const state = {
   selectedRetained: null,
   guideRetained: null,
   selectedPinIds: [],
-  deformWeightMemory: new Map(),
   guideDrag: null,
   guideClickSuppressed: false,
   carryModifier: false,
@@ -1316,7 +1314,6 @@ function settleBeforeAction(options = {}) {
   clearNativeGo();
   stepGesture?.cancel({ finalize: false });
   settleNudgeGesture();
-  settleWeightGesture();
   view.closePinClusterMenu();
   view.setPreviewAction(null);
   const replacingContext = options.replacingContext === true;
@@ -1474,106 +1471,8 @@ function releaseWorkingInterval() {
   });
 }
 
-function deformTarget() {
-  const working = currentInterval();
-  const retainedSection = state.selectedRetained?.kind === "section"
-    ? resolveSection(guide(), state.selectedRetained.id)
-    : null;
-  const selected = retainedSection || sectionForSelectedPinExtent();
-  const selectedMatches = selected && (
-    !working
-    || (
-      Math.abs(selected.start - working.start) <= EPSILON
-      && Math.abs(selected.end - working.end) <= EPSILON
-    )
-  );
-  const exactMatches = working
-    ? guide().sections
-      .map(section => resolveSection(guide(), section))
-      .filter(section =>
-        section
-        && sectionIsVisible(guide(), section)
-        && Math.abs(section.start - working.start) <= EPSILON
-        && Math.abs(section.end - working.end) <= EPSILON
-      )
-    : [];
-  const section = selectedMatches
-    ? selected
-    : exactMatches.length === 1
-      ? exactMatches[0]
-      : null;
-  return {
-    extent: working || section,
-    section,
-    sectionId: section?.id || null
-  };
-}
 
-function rememberDeformWeight(sectionId, weight) {
-  if (Math.abs(weight - DEFAULT_SECTION_WEIGHT) <= EPSILON) return;
-  state.deformWeightMemory.set(sectionId || "working", weight);
-}
 
-function applyDeformWeight(weight, { gesture = false } = {}) {
-  if (!state.videoLoaded) return false;
-  const target = deformTarget();
-  if (!target.extent) {
-    setStatus("Establish a Working Interval or select a Section to deform.");
-    return false;
-  }
-  // Inside a hold, each repeat is applied against the gesture's own origin
-  // history, so the ladder walks without leaving a trail of Undo entries, and
-  // one checkpoint is written at release. Settling runs only when the gesture
-  // begins: a repeat must not settle the gesture it is extending, which is the
-  // same reason Nudge does its own boundary rather than calling this one.
-  const continuing = gesture && state.weightGesture?.sectionId === target.sectionId;
-  if (!continuing) settleBeforeAction();
-  const held = gesture ? beginWeightGesture(target.sectionId) : null;
-  const source = held
-    ? { model: model(), history: held.history, future: held.future }
-    : state.session;
-  const result = deformSessionSection(
-    source,
-    target.sectionId,
-    weight
-  );
-  if (!result.changed) {
-    if (result.reason === "ambiguous-deform-target") {
-      openGuide("sections");
-      setStatus(`${result.sectionIds?.length || "Several"} Sections share this extent. Select the intended Section, then apply ${weight}×.`);
-      return false;
-    }
-    if (result.reason === "unchanged-section-weight") {
-      setStatus(`That Section already has ${weight}× timeline weight.`);
-      return false;
-    }
-    setStatus("Establish a Working Interval or select a Section to deform.");
-    return false;
-  }
-  selectTimelineRetained({
-    kind: "section",
-    id: result.section.id
-  });
-  rememberDeformWeight(result.section.id, result.weight);
-  state.deformWeightMemory.delete("working");
-  view.invalidateTimelinePins();
-  const name = sectionName(result.section);
-  const status = `Set “${name}” to ${result.weight}× timeline weight.`;
-  if (held) {
-    held.changed = true;
-    held.label = status.replace(/\.$/, "");
-    state.session = result.session;
-    setStatus(status);
-    view.renderGuide();
-    view.render();
-    return true;
-  }
-  return accept(result, {
-    effect: false,
-    renderGuide: true,
-    status
-  });
-}
 
 // Normalize is the inverse of Weight, and what makes Weight usable: deformation
 // is right almost all of the time and intolerable the rest, when you want to act
@@ -1606,53 +1505,7 @@ function toggleNormalize() {
   return true;
 }
 
-function deformWorkingOrSelected() {
-  const target = deformTarget();
-  if (!target.extent) {
-    setStatus("Establish a Working Interval or select a Section to deform.");
-    return false;
-  }
-  const currentWeight = target.section?.weight ?? DEFAULT_SECTION_WEIGHT;
-  const memoryKey = target.sectionId || "working";
-  if (Math.abs(currentWeight - DEFAULT_SECTION_WEIGHT) > EPSILON) {
-    rememberDeformWeight(memoryKey, currentWeight);
-    return applyDeformWeight(DEFAULT_SECTION_WEIGHT);
-  }
-  return applyDeformWeight(
-    state.deformWeightMemory.get(memoryKey)
-    ?? state.deformWeightMemory.get("working")
-    ?? DEFAULT_DEFORM_WEIGHT
-  );
-}
 
-function stepDeformWeight(direction, options = {}) {
-  const target = deformTarget();
-  if (!target.extent) {
-    setStatus("Establish a Working Interval or select a Section to deform.");
-    return false;
-  }
-  const currentWeight = target.section?.weight ?? DEFAULT_SECTION_WEIGHT;
-  const currentIndex = SECTION_WEIGHT_VALUES.findIndex(
-    weight => Math.abs(weight - currentWeight) <= EPSILON
-  );
-  const neutralIndex = SECTION_WEIGHT_VALUES.indexOf(DEFAULT_SECTION_WEIGHT);
-  const nextIndex = clamp(
-    (currentIndex >= 0 ? currentIndex : neutralIndex) + direction,
-    0,
-    SECTION_WEIGHT_VALUES.length - 1
-  );
-  const nextWeight = SECTION_WEIGHT_VALUES[nextIndex];
-  if (Math.abs(nextWeight - currentWeight) <= EPSILON) {
-    setStatus(
-      direction < 0
-        ? "That Section is already at the lowest deformation weight."
-        : "That Section is already at the highest deformation weight."
-    );
-    return false;
-  }
-  rememberDeformWeight(target.sectionId, currentWeight);
-  return applyDeformWeight(nextWeight, options);
-}
 
 function focusOrUnfocus() {
   if (!state.videoLoaded) return false;
@@ -2025,7 +1878,6 @@ function leaveSection() {
 function changeSectionWeight(sectionId, weight) {
   const section = resolveSection(guide(), sectionId);
   if (!section) return false;
-  rememberDeformWeight(sectionId, section.weight);
   const name = sectionName(section);
   const result = setGuideSectionWeight(
     state.session,
@@ -2043,7 +1895,6 @@ function changeSectionWeight(sectionId, weight) {
   focusGuideRetained({ kind: "section", id: sectionId });
   view.invalidateTimelinePins();
   const next = result.value;
-  rememberDeformWeight(sectionId, next.weight);
   accept(result, {
     effect: false,
     renderGuide: true,
@@ -2678,7 +2529,6 @@ function resetSourceScopedState() {
   state.selectedRetained = null;
   state.guideRetained = null;
   state.selectedPinIds = [];
-  state.deformWeightMemory.clear();
   state.shiftLayer = null;
   state.shiftKeyHeld = false;
   state.guideDrag = null;
@@ -3927,38 +3777,7 @@ function beginNudgeGesture(target) {
   return state.nudgeGesture;
 }
 
-// A held Weight control repeats the ladder step several times a second, and one
-// hold is one decision. It uses the same shape as Nudge: an origin snapshot
-// taken at press, every repeat amended against that origin's history so no
-// intermediate entry accumulates, and one checkpoint at release.
-function beginWeightGesture(sectionId) {
-  if (state.weightGesture?.sectionId !== sectionId) {
-    settleWeightGesture();
-    state.weightGesture = {
-      sectionId,
-      origin: snapshotModel(model(), { cloneGuide: true }),
-      history: state.session.history,
-      future: state.session.future || [],
-      label: null,
-      changed: false
-    };
-  }
-  return state.weightGesture;
-}
 
-function settleWeightGesture() {
-  const gesture = state.weightGesture;
-  if (!gesture) return false;
-  state.weightGesture = null;
-  if (!gesture.changed) return false;
-  const committed = checkpoint(state.session, gesture.label || "Deform", gesture.origin);
-  state.session = committed.session;
-  persistGuide();
-  view.invalidateTimelinePins();
-  view.renderGuide();
-  view.render();
-  return true;
-}
 
 // One continuous wheel series or held-key repetition settles as exactly one
 // Undo transaction.
@@ -4907,21 +4726,17 @@ elements["switch-endpoint"].addEventListener("click", event => {
   });
 });
 elements.release.addEventListener("click", releaseWorkingInterval);
-elements.deform.addEventListener("click", deformWorkingOrSelected);
+// Tag holds the matrix slot Deform used to. Shift tags the Working Interval as a
+// Section, plain tags Current as a Pin -- the same two acts the keyboard has.
+elements.tag.addEventListener("click", event => {
+  if (event.shiftKey || state.shiftLayer === "matrix") {
+    consumeShiftLayer();
+    saveCurrentIntervalAsSection(event, { source: "interval", useFormLabel: false });
+    return;
+  }
+  pinCurrent(event, { useFormLabel: false });
+});
 elements["normalize-toggle"].addEventListener("click", toggleNormalize);
-// Weight steppers repeat while held, like every other increment control.
-bindHoldRepeat(
-  elements["deform-down"],
-  null,
-  () => stepDeformWeight(-1, { gesture: true }),
-  { onSettle: settleWeightGesture }
-);
-bindHoldRepeat(
-  elements["deform-up"],
-  null,
-  () => stepDeformWeight(1, { gesture: true }),
-  { onSettle: settleWeightGesture }
-);
 elements["focus-toggle"].addEventListener("click", focusOrUnfocus);
 elements["shift-layer-toggle"].addEventListener("click", () => {
   state.shiftLayer = state.shiftLayer === "matrix" ? null : "matrix";

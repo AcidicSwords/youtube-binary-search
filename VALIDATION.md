@@ -40,7 +40,7 @@
 - Hold a Guide increment while it repeats. Confirm the control keeps keyboard focus through the rebuild its own edit causes.
 - Type an Address outside the active Range, and one such as `1:75`. Confirm each is refused with the committed value restored, rather than becoming a different Address.
 - Close the Guide on a wide layout, cross to compact and back. Confirm it is still closed.
-- Confirm `Alt+X` lowers Weight and that no browser-reserved chord is claimed for it.
+- Confirm the operator matrix carries no Weight control and no Alt chord.
 - Confirm a Group is renamed and removed from its own row, that removing one returns its Sections to the map, and that Undo restores it in the state it was removed in.
 - Confirm two unnamed Sections sharing one Pin offer two distinguishable Unlink buttons, and that Undo labels name the same object the status named.
 - Confirm Group visibility is a single `On Timeline` radio choice while `Active` remains an independent checkbox: switching the visible Group atomically replaces all Timeline Sections and section-bound Pins without changing deformation; hidden active Groups continue multiplying Weight; visible inactive Groups remain editable with no deformation gradient.
@@ -50,9 +50,8 @@
 - Confirm Guide’s Section selector contains, in order: `0.125×`, `0.25×`, `0.5×`, `0.75×`, `1×`, `1.25×`, `1.5×`, `1.75×`, `2×`, `4×`.
 - Confirm every spatial figure is shown as a factor, never as a duration: with all weights at `1×` no factor appears anywhere; adding one 15 s `2×` Section to a one-minute source shows `1:00 · 1.25× spatial`; adding a second 15 s Section at `0.5×` removes the factor again.
 - Confirm Focus draws the map across the focused extent: focus a `0.5×` Section and a `2×` Section in turn and check each spans the full timeline, that no unfocused Section or Pin is drawn against either edge, and that pressing anywhere on the timeline lands on the Address drawn there. Unfocus must restore the whole map.
-- Confirm plain `X` toggles `1×` against the last non-neutral weight, `Shift+X`
-  moves one step up, and `Alt+X` moves one step down without issuing a player
-  or Field command.
+- Confirm plain `X` toggles `1×` against the last non-neutral weight, the Guide selector
+  assigns a Weight without issuing a player or Field command.
 - For one isolated ten-second Section, confirm projected extent is `2.5`, `5`, `7.5`, `10`, `12.5`, `15`, `17.5`, and `20` respectively.
 - Confirm `1×` restores identity geometry without deleting the Section.
 - Confirm every allowed factor has a unique inverse at dense source samples.
@@ -264,7 +263,7 @@
   disclosure is present.
 - From Viewer, Timeline, Operators, and Guide lists, press `P` and confirm
   Current is pinned immediately without moving focus into the title field.
-- Press `Shift+X` and confirm the Working Interval is saved immediately as an
+- Press `Shift+T` and confirm the Working Interval is saved immediately as an
   untitled Section; stale Guide title/source fields must not alter the command.
 - Rename, select, Go, Focus, set Weight, and delete.
 - Delete a referenced Pin; warning count and dissolved Section count must agree.

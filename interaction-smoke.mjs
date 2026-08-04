@@ -1058,7 +1058,7 @@ assert.equal(byId.has("context-action"), false);
 assert.equal(byId.has("skim"), false);
 assert.equal(byId.has("loop"), false);
 assert.equal(byId.get("release").classList.contains("lifecycle-action"), true);
-assert.equal(byId.get("deform").classList.contains("lifecycle-action"), true);
+assert.equal(byId.get("tag").classList.contains("lifecycle-action"), true);
 assert.equal(byId.get("focus-toggle").classList.contains("lifecycle-action"), true);
 
 byId.get("focus-toggle").focus();
@@ -1133,7 +1133,7 @@ assert.equal(env.document.activeElement, null, "Pointer activation must not leav
   const workingExtent = byId.get("section-window").textContent;
   assert.match(workingExtent, /\d:\d\d–\d:\d\d/);
   const extent = workingExtent.match(/(\d+:\d\d–\d+:\d\d)/)[1];
-  for (const id of ["release-meta", "deform-meta", "focus-toggle-meta"]) {
+  for (const id of ["release-meta", "tag-meta", "focus-toggle-meta"]) {
     assert.ok(
       !byId.get(id).textContent.includes(extent),
       `${id} must not reprint the extent section-window already shows.`

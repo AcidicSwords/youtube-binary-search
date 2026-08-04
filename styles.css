@@ -1434,7 +1434,7 @@ kbd {
   grid-template-areas:
     "refine-backward reopen refine-forward"
     "step-backward switch-endpoint step-forward"
-    "release deform focus";
+    "release tag focus";
   gap: 8px;
   align-items: stretch;
   align-self: center;
@@ -1448,7 +1448,7 @@ kbd {
 #switch-endpoint { grid-area: switch-endpoint; }
 #step-forward { grid-area: step-forward; }
 #release { grid-area: release; }
-.deform-control { grid-area: deform; }
+#tag { grid-area: deform; }
 #focus-toggle { grid-area: focus; }
 
 .nav-action {
@@ -1499,63 +1499,15 @@ kbd {
   background: rgba(159, 217, 184, 0.055);
 }
 
-.deform-control {
-  position: relative;
-  min-width: 0;
-}
-
-.deform-action {
-  width: 100%;
-  height: 100%;
+.tag-action {
   border-color: rgba(188, 154, 255, 0.52);
   background: rgba(188, 154, 255, 0.075);
-  transition: padding 110ms ease;
 }
 
-.deform-steps {
-  position: absolute;
-  right: 8px;
-  bottom: 6px;
-  left: 8px;
-  z-index: 2;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5px;
-  visibility: hidden;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 90ms ease;
-}
 
-.deform-step {
-  min-height: 22px;
-  padding: 0 5px;
-  border-color: rgba(188, 154, 255, 0.35);
-  background: #111724;
-  color: #d9c9ff;
-  font: 750 0.8rem ui-monospace, SFMono-Regular, Menlo, monospace;
-  text-align: center;
-}
-
-.deform-control:hover .deform-action,
-.deform-control:focus-within .deform-action {
-  padding-bottom: 29px;
-}
-
-.deform-control:hover .deform-steps,
-.deform-control:focus-within .deform-steps {
-  visibility: visible;
-  opacity: 1;
-  pointer-events: auto;
-}
 
 @media (pointer: coarse) {
-  .deform-action { padding-bottom: 29px; }
-  .deform-steps {
-    visibility: visible;
-    opacity: 1;
-    pointer-events: auto;
-  }
+
 }
 
 .focus-action {

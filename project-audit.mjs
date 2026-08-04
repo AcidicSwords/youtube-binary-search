@@ -207,19 +207,21 @@ assert.match(html, /id="normalize-toggle"[^>]*aria-keyshortcuts="X"/,
   "Normalize sits with the Timeline it straightens.");
 assert.doesNotMatch(html, /aria-keyshortcuts="(?:Shift|Alt)\+X"/,
   "and carries no modifier, because it has one meaning.");
-assert.doesNotMatch(html, /id="deform"[^>]*aria-keyshortcuts=/,
-  "Deform no longer claims a key: it creates and weights, which the Guide does.");
+assert.doesNotMatch(html, /id="deform"/,
+  "Deform is gone from the matrix: Tag holds that slot, and Weight is assigned in the Guide.");
+assert.match(html, /id="tag"[^>]*aria-keyshortcuts="T Shift\+T"/,
+  "Tag is the matrix operator for retaining what you are looking at.");
 assert.doesNotMatch(html, /id="deform-weight-select"/);
 
 assert.match(
   styles,
-  /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward switch-endpoint step-forward"[\s\S]*"release deform focus"/
+  /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward switch-endpoint step-forward"[\s\S]*"release tag focus"/
 );
 for (const area of [
   "#refine-backward { grid-area: refine-backward; }",
   "#switch-endpoint { grid-area: switch-endpoint; }",
   "#release { grid-area: release; }",
-  ".deform-control { grid-area: deform; }",
+  "#tag { grid-area: deform; }",
   "#focus-toggle { grid-area: focus; }"
 ]) assert.ok(styles.includes(area), `Missing matrix area: ${area}`);
 
@@ -341,19 +343,20 @@ assert.match(view, /const pinTop\s*=\s*17[\s\S]*const trackTop\s*=\s*44[\s\S]*co
 assert.match(view, /\["start",\s*projected\.start[\s\S]*\["midpoint",\s*midpointCoordinate[\s\S]*\["end",\s*projected\.end/);
 // Increment controls repeat while held; a click-only binding cannot.
 assert.match(app, /function bindHoldRepeat\(container, selector, act, \{ onSettle[\s\S]*HOLD_REPEAT_INTERVAL_MS/);
-// One hold is one decision, so a held ladder control settles as one checkpoint
-// rather than one per repeat. Weight uses the same origin-and-settle shape as
-// Nudge instead of a second history mechanism of its own.
-assert.match(app, /function beginWeightGesture[\s\S]*function settleWeightGesture[\s\S]*checkpoint\(state\.session/);
-assert.match(app, /bindHoldRepeat\(\s*elements\["deform-up"\][\s\S]*onSettle: settleWeightGesture/);
+// Weight is assigned in the Guide, where the value lives. The operator matrix
+// held a Deform button and a pair of ladder steppers, which is how Deform became
+// the habitual way to make a Section and why it needed an Alt chord to escape
+// its own overload. Tag holds that slot now, and no held-ladder gesture remains
+// to batch.
+assert.doesNotMatch(app, /beginWeightGesture|settleWeightGesture|applyDeformWeight/,
+  "The held Weight ladder is gone with the controls that drove it.");
 // Every deferred gesture settles before the next transaction begins.
-assert.match(app, /function settleBeforeAction[\s\S]*settleNudgeGesture\(\);\s*settleWeightGesture\(\);/);
+assert.match(app, /function settleBeforeAction[\s\S]*settleNudgeGesture\(\);/);
 // Cue retention is an ordinary accepted Guide transaction, so it persists.
 assert.match(app, /function retainCue[\s\S]*accept\(pinned,[\s\S]*accept\(saved,/);
 assert.doesNotMatch(app, /function retainCue[\s\S]*state\.session = (pinned|saved)\.session/);
 assert.match(app, /bindGuideNudgeControls\(elements\["sections-list"\]\)/);
 assert.match(app, /bindGuideNudgeControls\(elements\["pins-list"\]\)/);
-assert.match(app, /bindHoldRepeat\(\s*elements\["deform-up"\],\s*null/);
 // Nudge is a movement magnitude and sits with Step Reach, not with the Field's
 // physical observation settings.
 assert.match(html, /id="step-size-settings"[\s\S]*id="step-size-seconds"[\s\S]*id="nudge-seconds"[\s\S]*<\/details>/);
@@ -483,7 +486,7 @@ assert.match(app, /function setStepFraction/);
 assert.match(app, /function wrapPlaybackRange/);
 assert.match(app, /rebasePlaybackTransport\(transport,\s*range\.start\)/);
 assert.match(app, /function releaseWorkingInterval/);
-assert.match(app, /function deformWorkingOrSelected/);
+assert.match(app, /function toggleNormalize/);
 assert.match(app, /function changeSectionWeight/);
 assert.match(app, /function focusOrUnfocus/);
 

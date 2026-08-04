@@ -150,56 +150,11 @@ function converge(name, first, second, form = "canonical") {
   PAIRS.push({ name, first, second, form });
 }
 
-converge(
-  "Deform control and Guide selector",
-  async ({ byId, flush, makeSection, sectionRows }) => {
-    await makeSection(100, 300);
-    byId.get("sections-list").dispatch("click", { target: sectionRows()[0] });
-    await flush();
-    // Two presses up the ladder: 1 -> 1.25 -> 1.5.
-    byId.get("deform-up").dispatch("pointerdown", { button: 0, pointerId: 1, buttons: 1 });
-    await flush();
-    byId.get("deform-up").dispatch("pointerup", { button: 0, pointerId: 1, buttons: 0 });
-    await flush();
-    byId.get("deform-up").dispatch("pointerdown", { button: 0, pointerId: 2, buttons: 1 });
-    await flush();
-    byId.get("deform-up").dispatch("pointerup", { button: 0, pointerId: 2, buttons: 0 });
-    await flush();
-  },
-  async ({ byId, flush, makeSection, sectionRows, inSections }) => {
-    await makeSection(100, 300);
-    byId.get("sections-list").dispatch("click", { target: sectionRows()[0] });
-    await flush();
-    const selector = inSections("sectionWeight")[0];
-    selector.value = "1.5";
-    byId.get("sections-list").dispatch("change", { target: selector });
-    await flush();
-  }
-);
-
-// --- Weight: keyboard versus Guide selector -----------------------------------
-converge(
-  "Deform step control and Guide selector",
-  async ({ env, byId, flush, makeSection, sectionRows }) => {
-    await makeSection(100, 300);
-    byId.get("sections-list").dispatch("click", { target: sectionRows()[0] });
-    await flush();
-    byId.get("deform-up").dispatch("pointerdown", { button: 0, pointerId: 77, buttons: 1 });
-    await flush();
-    env.dispatchDocument("pointerup", { button: 0, pointerId: 77, buttons: 0 });
-    await env.delay(500);
-    await flush(2);
-  },
-  async ({ byId, flush, makeSection, sectionRows, inSections }) => {
-    await makeSection(100, 300);
-    byId.get("sections-list").dispatch("click", { target: sectionRows()[0] });
-    await flush();
-    const selector = inSections("sectionWeight")[0];
-    selector.value = "1.25";
-    byId.get("sections-list").dispatch("change", { target: selector });
-    await flush();
-  }
-);
+// Weight has one route now, so it has no pair. The operator matrix carried a
+// Deform button and a ladder stepper alongside the Guide selector, and keeping
+// three engagements in agreement was work that existed only because Weight was
+// reachable from a place it did not belong. It is assigned in the Guide, where
+// the value lives.
 
 // --- Pin movement: exact Address edit versus repeated Nudge -------------------
 // One quantum is 1/24 s, so twelve increments move exactly half a second. The
@@ -370,5 +325,5 @@ if (indexArg !== undefined) {
       `${pair.name}: two routes to one operation must agree on ${pair.form}.`
     );
   }
-  console.log("Route correspondence tests passed: the Deform control and the Guide selector reach one Weight; an exact Address edit and twelve Nudges reach one Address; Timeline and Guide Section selection reach one Working Interval; a retained Cue is an ordinary Section; Focus from the operator and from a Guide row install one scope; and Group membership is the same partition however it is reached.");
+  console.log("Route correspondence tests passed: an exact Address edit and twelve Nudges reach one Address; Timeline and Guide Section selection reach one Working Interval; a retained Cue is an ordinary Section; Focus from the operator and from a Guide row install one scope; and Group membership is the same partition however it is reached.");
 }

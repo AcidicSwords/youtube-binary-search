@@ -286,9 +286,9 @@ await clickIn("pins-list", pinRows()[0], { shiftKey: true });
 assert.match(workingWindow(), /0:00–1:20/,
   "Extension is monotonic across every family at once.");
 
-// The composed span is an ordinary extent, so Deform retains it.
+// The composed span is an ordinary extent, so Tag retains it.
 const beforeCompose = sectionRows().length;
-byId.get("deform").dispatch("click", { detail: 1 });
+byId.get("tag").dispatch("click", { detail: 1, shiftKey: true });
 await flush();
 assert.equal(sectionRows().length, beforeCompose + 1,
   "A span composed from a Cue and a Section retains like any other.");

@@ -82,7 +82,7 @@ for (const id of [
   "field-transport-state", "field-both-toggle", "field-span-fill",
   "field-inner-offset", "field-outer-offset", "field-breath-rate",
   "section-capture", "section-source", "pin-capture", "pin-current",
-  "release", "deform", "deform-down", "deform-up", "focus-toggle", "shift-layer-toggle",
+  "release", "tag", "focus-toggle", "shift-layer-toggle",
   "step-size-seconds", "step-mode-fixed", "step-mode-adaptive"
 ]) assert.match(html, new RegExp(`id=["']${id}["']`), `Missing v5.8 Field/Guide control: ${id}`);
 

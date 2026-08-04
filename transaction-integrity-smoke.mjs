@@ -135,11 +135,13 @@ assert.equal(currentText(), anchor,
   "and the second reverses the Nudge, returning to where it began.");
 
 // ==============================================================================
-// 3. One held Weight gesture is one Undo checkpoint
+// 3. Weight is assigned in one place
 // ==============================================================================
-// A hold repeats the ladder step several times a second. Each repeat committed
-// a full transaction, so walking 1x to 4x left an Undo entry per rung -- a
-// physical gesture the user experiences as one decision, recorded as five.
+// A held ladder in the operator matrix repeated several times a second, and each
+// repeat committed a full transaction -- a gesture experienced as one decision,
+// recorded as five. It was batched into one checkpoint, then the controls that
+// needed the batching were removed: Weight is assigned in the Guide, where the
+// value lives, and one selection is one decision with nothing to coalesce.
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 100 });
 await flush();
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 300 });
@@ -152,60 +154,18 @@ byId.get("sections-list").dispatch("click", { target: sectionRows()[0] });
 await flush();
 assert.equal(weightValue(), "1", "The Section starts at neutral Weight.");
 
-const registeredBefore = intervalCallbacks.length;
-byId.get("deform-up").dispatch("pointerdown", { button: 0, pointerId: 21, buttons: 1 });
-await flush();
-assert.equal(weightValue(), "1.25", "Pressing steps one rung immediately.");
-await delay(420);
-await flush();
-assert.ok(intervalCallbacks.length > registeredBefore,
-  "and holding past the delay starts the repeat.");
-
-const repeat = intervalCallbacks[intervalCallbacks.length - 1];
-for (let index = 0; index < 4; index += 1) {
-  repeat();
+{
+  const selector = inSections("sectionWeight")[0];
+  selector.value = "4";
+  byId.get("sections-list").dispatch("change", { target: selector });
+  await delay(350);
+  await flush(3);
+  assert.equal(weightValue(), "4", "The Guide selector assigns it.");
+  byId.get("return-action").click();
   await flush();
+  assert.equal(weightValue(), "1",
+    "and one Undo returns it, because one selection is one decision.");
 }
-assert.equal(weightValue(), "4",
-  "The hold walks the ladder to its top.");
-
-dispatchDocument("pointerup", { button: 0, pointerId: 21, buttons: 0 });
-await flush();
-
-// Five rungs were crossed. One decision was made.
-byId.get("return-action").click();
-await flush();
-assert.equal(weightValue(), "1",
-  "One Undo returns the whole hold to where it started.");
-byId.get("return-action").click();
-await flush();
-assert.doesNotMatch(byId.get("status").textContent, /timeline weight/,
-  "and there is no second Weight entry behind it.");
-
-// A single press is still its own decision, not swallowed into a neighbour.
-// Reset to neutral explicitly so this block does not depend on where the
-// previous one left the ladder.
-byId.get("sections-list").dispatch("click", { target: sectionRows()[0] });
-await flush();
-const reset = inSections("sectionWeight")[0];
-reset.value = "1";
-byId.get("sections-list").dispatch("change", { target: reset });
-await flush();
-assert.equal(weightValue(), "1");
-byId.get("deform-up").dispatch("pointerdown", { button: 0, pointerId: 22, buttons: 1 });
-await flush();
-dispatchDocument("pointerup", { button: 0, pointerId: 22, buttons: 0 });
-await flush();
-const single = weightValue();
-byId.get("deform-up").dispatch("pointerdown", { button: 0, pointerId: 23, buttons: 1 });
-await flush();
-dispatchDocument("pointerup", { button: 0, pointerId: 23, buttons: 0 });
-await flush();
-assert.notEqual(weightValue(), single, "A second press steps again,");
-byId.get("return-action").click();
-await flush();
-assert.equal(weightValue(), single,
-  "and Undo reverses exactly that press, not both.");
 
 // ==============================================================================
 // 4. The relationship band is bounded, and observation survives a rename
@@ -318,4 +278,4 @@ assert.match(byId.get("status").textContent, /already called/,
     "and the ordinary key carries on as usual.");
 }
 
-console.log("Transaction integrity smoke passed: a retained Cue is written to storage in the transaction that reports it and survives reopening; a pending Nudge settles before the next operator commits, so Undo unwinds in the order actions happened; one held Weight gesture walks the ladder as one checkpoint while a single press stays its own; the relationship band stays bounded under heavy overlap while every Section keeps its control; Group names cannot collide; and Address equality never silently chooses among coincident Pin identities; and an unreadable saved map is reported and set aside rather than overwritten.");
+console.log("Transaction integrity smoke passed: a retained Cue is written to storage in the transaction that reports it and survives reopening; a pending Nudge settles before the next operator commits, so Undo unwinds in the order actions happened; Weight is assigned in one place and one selection is one decision; the relationship band stays bounded under heavy overlap while every Section keeps its control; Group names cannot collide; and Address equality never silently chooses among coincident Pin identities; and an unreadable saved map is reported and set aside rather than overwritten.");

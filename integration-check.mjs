@@ -85,9 +85,7 @@ for (const required of [
   "switch-endpoint",
   "step-forward",
   "release",
-  "deform",
-  "deform-down",
-  "deform-up",
+  "tag",
   "focus-toggle",
   "return-action",
   "step-size-settings",
@@ -111,11 +109,11 @@ for (const required of [
 
 assert.match(
   html,
-  /id="refine-backward"[\s\S]*id="reopen"[\s\S]*id="refine-forward"[\s\S]*id="step-backward"[\s\S]*id="switch-endpoint"[\s\S]*id="step-forward"[\s\S]*id="release"[\s\S]*id="deform"[\s\S]*id="focus-toggle"[\s\S]*id="return-action"/
+  /id="refine-backward"[\s\S]*id="reopen"[\s\S]*id="refine-forward"[\s\S]*id="step-backward"[\s\S]*id="switch-endpoint"[\s\S]*id="step-forward"[\s\S]*id="release"[\s\S]*id="tag"[\s\S]*id="focus-toggle"[\s\S]*id="return-action"/
 );
 assert.match(
   styles,
-  /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward switch-endpoint step-forward"[\s\S]*"release deform focus"/
+  /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward switch-endpoint step-forward"[\s\S]*"release tag focus"/
 );
 assert.match(html, /id="return-action"[^>]*aria-keyshortcuts="Z"/);
 assert.match(html, /id="redo-action"[^>]*aria-keyshortcuts="C"/);
@@ -183,7 +181,10 @@ assert.match(app, /function wrapPlaybackRange[\s\S]*rebasePlaybackTransport\(tra
 assert.match(app, /createStepGestureController[\s\S]*bindStepPress/);
 assert.match(app, /function goToAdjacentPin[\s\S]*stepToPinSession/);
 assert.match(app, /function releaseWorkingInterval[\s\S]*releaseSessionInterval/);
-assert.match(app, /function applyDeformWeight[\s\S]*deformSessionSection/);
+// Weight is assigned in the Guide, through the one Session transaction that owns
+// it. The matrix no longer carries a Deform operator, so nothing else applies a
+// Weight and there is no second path to keep in step with this one.
+assert.match(app, /function changeSectionWeight[\s\S]*setGuideSectionWeight/);
 assert.match(app, /function changeSectionWeight[\s\S]*setGuideSectionWeight/);
 assert.match(app, /function focusOrUnfocus[\s\S]*focusWorkingSection/);
 assert.match(

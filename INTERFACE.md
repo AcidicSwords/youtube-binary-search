@@ -154,11 +154,11 @@ placement equally legible; no axis is visually privileged.
 ```text
 Q Refine Backward     W Reopen           E Refine Forward
 A Step Backward       S Switch Endpoint  D Step Forward
-R Release             X Deform           F Focus / Unfocus
+R Release             T Tag              F Focus / Unfocus
 ```
 
 Plain `T` normalizes a weighted Section to `1×` or restores its remembered
-non-neutral value. `Shift+X` raises weight one canonical step and `Alt+X`
+non-neutral value. Weight is assigned in the Guide, and `X`
 lowers it one step. The small `−/+` controls appear when Deform is hovered or
 focused; Guide retains the exact canonical selector.
 
@@ -180,7 +180,7 @@ and reserves two compact lines below for destination or consequence. The key,
 identity, and current effect therefore remain distinct when labels change under
 Shift or Focus. Disabled controls state a concrete reason.
 
-`T` immediately Tags Current as a Pin. `Shift+X` immediately Tags the Working Interval
+`T` immediately Tags Current as a Pin. `Shift+T` immediately Tags the Working Interval
 as an untitled Section. These are creation commands, not shortcuts into the
 optional title fields; Guide supplies the named-creation and later Rename paths.
 

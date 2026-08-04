@@ -320,15 +320,21 @@ for (const clientX of [600, 700]) {
   await flush();
 }
 commandsBeforeWeight = playerCommandCounts();
-byId.get("deform-down").dispatch("pointerdown", { button: 0, pointerId: 91, buttons: 1 });
-await flush(2);
-dispatchDocument("pointerup", { button: 0, pointerId: 91, buttons: 0 });
-await env.delay(500);
+// Weight is assigned in the Guide, where the value lives.
+byId.get("section-capture").dispatch("submit");
 await flush(3);
+{
+  const select = descendants(byId.get("sections-list"))
+    .find(node => node.dataset.sectionWeight !== undefined);
+  select.value = "0.75";
+  byId.get("sections-list").dispatch("change", { target: select });
+  await env.delay(350);
+  await flush(3);
+}
 assert.deepEqual(
   playerCommandCounts(),
   commandsBeforeWeight,
-  "The Deform operator must create weighted geometry without a player or Field command."
+  "Assigning a Weight must not issue a player or Field command."
 );
 assert.equal(byId.get("sections-list-count").textContent, "2");
 assert.equal(
@@ -393,27 +399,24 @@ assert.deepEqual(
   "Editing Guide weight during playback must leave all media runtime untouched."
 );
 
-// The Deform steppers use the same hold-repeat binding as every other increment
-// control, so they fire on press rather than on click.
+// Weight is assigned in the Guide, and only there. The operator matrix used to
+// carry a Deform button and a pair of ladder steppers, which is how Deform
+// became the habitual way to make a Section and why it needed an Alt chord to
+// escape its own overload. Tag holds that slot now.
 {
-  const weightBefore = descendants(byId.get("sections-list"))
-    .find(node => node.dataset.sectionWeight)?.value;
-  byId.get("deform-up").dispatch("pointerdown", { button: 0, pointerId: 95 });
-  byId.get("deform-up").dispatch("pointerup", { pointerId: 95 });
-  await flush(2);
-  const weightAfter = descendants(byId.get("sections-list"))
-    .find(node => node.dataset.sectionWeight)?.value;
-  assert.notEqual(weightAfter, weightBefore,
-    "Pressing the Deform stepper must raise the Section weight one step.");
-  byId.get("deform-down").dispatch("pointerdown", { button: 0, pointerId: 96 });
-  byId.get("deform-down").dispatch("pointerup", { pointerId: 96 });
-  await flush(2);
-  assert.equal(
-    descendants(byId.get("sections-list")).find(node => node.dataset.sectionWeight)?.value,
-    weightBefore,
-    "The paired stepper must return it."
-  );
+  const select = () => descendants(byId.get("sections-list"))
+    .find(node => node.dataset.sectionWeight !== undefined);
+  const before = select().value;
+  const control = select();
+  control.value = "1.5";
+  byId.get("sections-list").dispatch("change", { target: control });
+  await env.delay(350);
+  await flush(3);
+  assert.equal(select().value, "1.5",
+    "The Guide selector assigns the Weight.");
+  assert.notEqual(select().value, before);
 }
+
 
 // Presentation law: Step Reach is a distance on the map, so inside a weighted
 // Section a given map distance covers a different amount of source time. Every

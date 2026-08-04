@@ -103,7 +103,7 @@ The Temporal Topography owns spatial dragging. The Guide owns exact addresses, t
 ```text
 Q  Refine Backward    W  Reopen            E  Refine Forward
 A  Step Backward      S  Switch Endpoint   D  Step Forward
-R  Release            X  Deform            F  Focus / Unfocus
+R  Release            T  Tag               F  Focus / Unfocus
 ```
 
 The first row changes discrimination. The second changes traversal or viewpoint. The third determines the fate of the Working Interval:
