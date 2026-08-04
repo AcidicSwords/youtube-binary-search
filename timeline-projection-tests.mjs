@@ -294,4 +294,62 @@ assert.equal(migrated.sections[1].weight, 1);
 assert.equal("collapsed" in migrated.sections[0], false);
 assert.equal("collapsed" in migrated.sections[1], false);
 
-console.log("Timeline weight projection tests passed.");
+// The map is invertible, and nothing may be tolerant about which segment a
+// coordinate lies in.
+//
+// Both lookups widened the segment by EPSILON before testing it. EPSILON is the
+// tolerance between two Addresses — 40 ms of source — so the source lookup
+// swallowed any segment shorter than that, and the Timeline lookup was not even
+// a source quantity: 0.04 Timeline units, which under compression spans several
+// whole segments. The two then disagreed, which is worse than either being
+// wrong alone: a distance measured with the right segment was inverted with an
+// earlier segment's weight, so x(σ) stopped being invertible and every Step and
+// Nudge built on that round trip landed short. Deep inside nested compression a
+// one-quantum Nudge advanced a fiftieth of a quantum, which read as nothing at
+// all.
+{
+  const duration = 296;
+  const range = { start: 0, end: duration };
+  const nested = createGuide("round-trip");
+  // Two compressions composing to 1/64, against an expansion of 16, so segments
+  // on both sides are far shorter than the tolerance that used to be added.
+  createSectionFromTimes(nested, 3.2, 102.56, { weight: 0.125 });
+  createSectionFromTimes(nested, 83.98, 102.56, { weight: 0.125 });
+  createSectionFromTimes(nested, 102.56, 126.8, { weight: 4 });
+  createSectionFromTimes(nested, 103.37, 123.23, { weight: 4 });
+  const projection = projectionForModel({
+    duration, guide: nested, range, resolution: { C: 0 }, stepReach: null
+  });
+
+  let worstIdentity = 0;
+  for (let sample = 0; sample <= 20000; sample += 1) {
+    const source = (sample / 20000) * duration;
+    worstIdentity = Math.max(
+      worstIdentity,
+      Math.abs(projection.timelineToSource(projection.sourceToTimeline(source)) - source)
+    );
+  }
+  assert.ok(worstIdentity < 1e-6,
+    `Timeline Space is invertible everywhere (worst error ${worstIdentity}).`);
+
+  // The property every Step and Nudge actually rests on: a source displacement
+  // converted to a Timeline distance and stepped must arrive where it asked.
+  let worstStep = 0;
+  for (const displacement of [1 / 24, 0.25, 0.5, 1, 5]) {
+    for (let sample = 0; sample <= 2000; sample += 1) {
+      const source = (sample / 2000) * (duration - displacement);
+      const wanted = source + displacement;
+      const distance = Math.abs(
+        projection.sourceToTimeline(wanted) - projection.sourceToTimeline(source)
+      );
+      worstStep = Math.max(
+        worstStep,
+        Math.abs(projection.stepTarget(source, distance, "forward", range) - wanted)
+      );
+    }
+  }
+  assert.ok(worstStep < 1e-6,
+    `A Step of a converted source displacement lands on it, at every composed Weight (worst error ${worstStep}).`);
+}
+
+console.log("Timeline weight projection tests passed: including an exactly invertible map whose Step round trip closes at every composed Weight.");

@@ -111,10 +111,30 @@ function buildSegments(duration, guide, deformationBypass = null) {
   };
 }
 
+// Which segment a coordinate falls in is a question with an exact answer, and
+// it is asked in whichever space the coordinate is expressed in.
+//
+// Both of these used to widen the segment by EPSILON before testing it. EPSILON
+// is the semantic tolerance between two Addresses — 40 ms of source time — so in
+// the source lookup it swallowed any segment shorter than 40 ms, and in the
+// Timeline lookup it was not even a source quantity: 0.04 Timeline units, which
+// under compression is longer than several whole segments.
+//
+// The two lookups then disagreed, and that is worse than either being wrong on
+// its own: `sourceToTimeline` would measure a distance using the correct
+// segment while `timelineToSource` inverted it with an earlier segment's weight,
+// so the round trip that every Step and Nudge depends on stopped closing. Inside
+// a doubly-compressed Section a Nudge asked to advance one quantum and came back
+// having advanced a fiftieth of one, which then read as no movement at all.
+//
+// Segments tile the source exactly and share their boundaries, so the interval
+// is half-open: a coordinate on a boundary belongs to the segment starting
+// there, and both neighbours map it to the same place. The final segment owns
+// the closing edge.
 function findSourceSegment(segments, source) {
   if (!segments.length) return null;
   for (const segment of segments) {
-    if (source <= segment.end + EPSILON) return segment;
+    if (source < segment.end) return segment;
   }
   return segments.at(-1);
 }
@@ -122,7 +142,7 @@ function findSourceSegment(segments, source) {
 function findTimelineSegment(segments, coordinate) {
   if (!segments.length) return null;
   for (const segment of segments) {
-    if (coordinate <= segment.timelineEnd + EPSILON) return segment;
+    if (coordinate < segment.timelineEnd) return segment;
   }
   return segments.at(-1);
 }

@@ -37,6 +37,7 @@ const app = read("app.js");
 const view = read("view.js");
 const styles = read("styles.css");
 const session = read("session.js");
+const projection = read("timeline-projection.js");
 const workflow = read(".github/workflows/verify.yml");
 const deployWorkflow = existsSync(new URL("./.github/workflows/deploy-pages.yml", import.meta.url))
   ? read(".github/workflows/deploy-pages.yml")
@@ -347,6 +348,12 @@ lacks(session, /timelineDistance\([^)]*\)\s*<=?\s*EPSILON/,
   "No Timeline length is measured against the Address tolerance.");
 lacks(view, /timelineDistance\([^)]*\)\s*<=?\s*EPSILON/,
   "and the presentation layer does not confuse the two spaces either.");
+// Which segment a coordinate lies in has an exact answer. Widening a segment by
+// the Address tolerance swallowed segments shorter than it and, in Timeline
+// space, was not a source quantity at all -- so the forward map and its inverse
+// chose different segments and x(s) stopped being invertible.
+lacks(projection, /segment\.(?:end|timelineEnd)\s*\+\s*EPSILON/,
+  "Segment lookup is exact in both spaces, so the projection stays invertible.");
 
 has(app, /function ownsKeyboard\(element\)/,
   "Keyboard ownership is asked as one question in one place.");
