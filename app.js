@@ -1885,7 +1885,17 @@ function startFieldPlaybackFromGesture(options = {}) {
         ? `Playback ${formatRate(resolveOfferedRate(state.playbackRate, offeredRates()))}`
         : "Playback",
     operator: "playback",
-    observationPolicy: shifted
+    // Following Weight is a Panorama observation. The sides sit one rate rung
+    // either side of Center, so they hold their relation at any Center the
+    // ladder can surround -- which is the whole point of reading Weight as one
+    // step per octave rather than as an inverse. Declaring Center-only here
+    // suspended the Field before the triplet was ever consulted, so choosing to
+    // follow Weight still meant choosing to lose the Panorama.
+    //
+    // A fixed Shift rate stays Center-only: it is a deliberate request for one
+    // speed, not a reading of the map, and it can name a rate at either end of
+    // the ladder where no triplet exists.
+    observationPolicy: shifted && !dynamic
       ? OBSERVATION_POLICY.CENTER_ONLY
       : OBSERVATION_POLICY.PANORAMA,
     ratePolicy,
@@ -1893,10 +1903,11 @@ function startFieldPlaybackFromGesture(options = {}) {
     weight: timelineProjection().weightAtSource(destination),
     actualRate: snapshot.rate
   });
-  // Tail and Lead hold a fixed offset from Center by playing the same material
-  // at the same rate. A changed Center rate has no side rate that preserves the
-  // relation, so the Panorama suspends rather than drifting: ordinary playback
-  // is a capability this system keeps, not one the Field is allowed to cost it.
+  // Tail and Lead hold their offset from Center by sitting one rate rung either
+  // side of it, so the Panorama accompanies any Center rate the adapter can
+  // surround. Where it cannot -- the ends of the ladder, or a ladder missing a
+  // neighbour -- Center plays alone rather than drifting: ordinary playback is a
+  // capability this system keeps, not one the Field is allowed to cost it.
   if (playbackAllowsPanorama(state.transport, { offeredRates: offeredRates() })) {
     // This function is called directly from a trusted parent-page click or Space
     // key event. Ask every muted side and Center to play in the same synchronous
@@ -4862,6 +4873,11 @@ function initializePlayerApi() {
       // projection, operator arithmetic, or Context math.
       fieldFrame: fieldOperatorPreview(),
       transport: state.transport,
+      // The Field decides whether a complete Panorama triplet exists, so it
+      // needs the ladder the adapter actually offers. Without it every Center
+      // rate but 1x reads as uncertain and the Panorama suspends -- which is
+      // exactly what following Weight was supposed to stop doing.
+      availableRates: offeredRates(),
       pendingStep: Boolean(state.pendingStep),
       dragging: Boolean(
         state.dragHandle || state.guideDrag?.moved || state.currentDrag?.moved

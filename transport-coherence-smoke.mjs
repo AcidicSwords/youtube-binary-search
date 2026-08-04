@@ -289,6 +289,20 @@ assert.equal(rateSelect.value, "2",
   // constant Timeline velocity.
   assert.equal(center.rate, 0.75,
     "Crossing into expanded ground slows the playback by one step without restarting it.");
+
+  // Following Weight is a Panorama observation, not a Center-only one.
+  //
+  // The sides sit one rate rung either side of Center, so they hold their
+  // relation at any Center the ladder can surround -- which is the whole reason
+  // the texture is one step per octave rather than an inverse. This used to
+  // declare Center-only, so choosing to follow Weight meant choosing to lose the
+  // Field, and the two could never be used together.
+  await flush(2);
+  assert.notEqual(byId.get("field-transport-state").textContent, "Panorama suspended",
+    "A weighted playback keeps its Panorama.");
+  assert.match(byId.get("field-rate-state").textContent,
+    /Tail 0\.5× · Center 0\.75× · Lead 1×/,
+    "and the sides sit exactly one rung either side of the weighted Center.");
   const insideRate = center.rate;
 
   center.currentTime = 60;
@@ -304,16 +318,19 @@ assert.equal(rateSelect.value, "2",
   assert.equal(center.commands.length, commandsBefore,
     "Staying inside one bucket issues no player command at all.");
 
-  // A dynamic playback suspends the Panorama for its whole duration, including
-  // over neutral ground: the rate is going to change at the next boundary, and
-  // a Panorama that folded and unfolded around it would be worse than one that
-  // stays out of the way.
+  // Following Weight is a Panorama observation, not a Center-only one.
+  //
+  // The sides sit one rate rung either side of Center, so they hold their
+  // relation at any Center the ladder can surround -- which is the whole reason
+  // the texture is one step per octave rather than an inverse. This used to
+  // declare Center-only, so choosing to follow Weight meant choosing to lose the
+  // Field, and the two features could never be used together.
   const sidePlaysAtNeutral = sidePlays();
   center.currentTime = 25;
   await poll(); await flush(2);
   assert.equal(center.rate, insideRate);
-  assert.equal(sidePlays(), sidePlaysAtNeutral,
-    "The Panorama stays suspended across the whole dynamic playback.");
+  assert.ok(sidePlays() >= sidePlaysAtNeutral,
+    "The Panorama continues across the whole dynamic playback rather than folding at boundaries.");
 
   dispatchDocument("keydown", { key: " ", code: "Space", shiftKey: true });
   await settle();
@@ -322,4 +339,4 @@ assert.equal(rateSelect.value, "2",
   assert.equal(center.state, 2, "Ending dynamic playback still pauses Center exactly.");
 }
 
-console.log("Transport coherence smoke passed: live projection, exact settlement, Focus-owned proper-Range looping, one-pass Field rebasing, wrap history isolation, Unfocus restoration, full-video completion, Shift-rate playback that suspends the Panorama instead of losing variable speed, and a rate that follows Section weight across the map.");
+console.log("Transport coherence smoke passed: live projection, exact settlement, Focus-owned proper-Range looping, one-pass Field rebasing, wrap history isolation, Unfocus restoration, full-video completion, a fixed Shift rate that stays Center-only, and a rate that follows Section weight across the map while the Panorama breathes one rung either side of it.");
