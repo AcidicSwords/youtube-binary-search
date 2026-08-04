@@ -38,20 +38,14 @@ const clone = value => structuredClone(value);
   const recovered = sanitizeGuide(clone(source), "video-a", 60);
   assert.equal(validateGuide(recovered, 60), true);
   assert.equal(recovered.groups.length, 2);
-  assert.deepEqual(
-    recovered.groups.map(group => ({
-      id: group.id,
-      label: group.label,
-      visible: group.visible,
-      active: group.active
-    })),
-    source.groups.map(group => ({
-      id: group.id,
-      label: group.label,
-      visible: group.visible,
-      active: group.active
-    }))
-  );
+  // Compared by identity rather than by position: "the drawn Group is first" is
+  // the ordering law, and with nothing drawn it makes no claim about order.
+  const shape = groups => groups
+    .map(group => ({ id: group.id, label: group.label, active: group.active }))
+    .sort((first, second) => first.id.localeCompare(second.id));
+  assert.deepEqual(shape(recovered.groups), shape(source.groups));
+  assert.equal(recovered.visibleGroupId, source.visibleGroupId,
+    "and an explicitly drawn-nothing Guide survives the round trip as such.");
   assert.equal(
     recovered.sections.find(item => item.id === section.id)?.groupId,
     terrain.id

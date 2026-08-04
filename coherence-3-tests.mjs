@@ -102,11 +102,19 @@ const visibleIds = guide => guide.groups
     "A Guide with one Group draws it.");
   assert.equal(visibleGroup(fresh).id, DEFAULT_GROUP_ID);
 
-  // Hiding the only layer would leave the Timeline without one, so it does not
-  // happen. This is requirement 15 read from the other side.
+  // At most one, not exactly one. Hiding the only layer draws nothing, which is
+  // how you look at the map undeformed and unmarked -- a state that was
+  // unreachable while the law demanded a drawn Group at all times, and the one
+  // Group state a single-Group Guide could not express.
   setGroupState(fresh, DEFAULT_GROUP_ID, { visible: false });
+  assert.deepEqual(visibleIds(fresh), [],
+    "The only Group can be hidden, and then nothing is drawn.");
+  assert.equal(fresh.visibleGroupId, null);
+  assert.equal(visibleGroup(fresh), null);
+
+  setGroupState(fresh, DEFAULT_GROUP_ID, { visible: true });
   assert.deepEqual(visibleIds(fresh), [DEFAULT_GROUP_ID],
-    "A Group cannot become hidden unless another becomes visible.");
+    "and naming it again draws it, with no other Group needed to trade places.");
 }
 
 // --- 3. Switching the visible Group does not alter activity -------------------

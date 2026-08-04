@@ -127,8 +127,13 @@ function enforceVisibleGroup(guide, preferredId = null) {
   return visible;
 }
 
+// At most one Group is drawn, and none is a state the Guide can hold: hiding the
+// only Group is how you look at the map undeformed and unmarked. A null
+// visibleGroupId means exactly that, and is distinct from a stale id, which
+// still resolves to a real Group so a damaged save never blanks the map.
 export function visibleGroup(guide) {
   if (!guide || !Array.isArray(guide.groups) || !guide.groups.length) return null;
+  if (guide.visibleGroupId === null) return null;
   return guide.groups.find(group => group.id === guide.visibleGroupId)
     || guide.groups.find(group => group.id === DEFAULT_GROUP_ID)
     || guide.groups[0]
@@ -190,11 +195,10 @@ export function setGroupState(guide, groupId, changes = {}) {
     if (changes.visible) {
       enforceVisibleGroup(guide, group.id);
     } else if (groupIsVisible(guide, group)) {
-      // Hiding the current layer means showing another retained layer. With no
-      // alternative, the sole Group remains visible because zero visible Groups
-      // would make Timeline topology ownerless.
-      const fallback = guide.groups.find(entry => entry.id !== group.id) || group;
-      enforceVisibleGroup(guide, fallback.id);
+      // Hiding the drawn layer draws nothing. It does not promote a different
+      // Group: which layer you want is a choice, and guessing one on your behalf
+      // is how "hide this" became unreachable when only one Group existed.
+      guide.visibleGroupId = null;
     }
   }
   if (typeof changes.active === "boolean") group.active = changes.active;
@@ -1075,7 +1079,11 @@ export function normalizeGuide(parsed, videoId) {
     group.createdAt = Number(source.createdAt) || group.createdAt;
     group.updatedAt = Number(source.updatedAt) || group.createdAt;
   }
-  enforceVisibleGroup(guide, persistedVisibleId || DEFAULT_GROUP_ID);
+  // An explicit null is a choice ("draw nothing"), so it survives the round
+  // trip. Anything else that fails to resolve is damage, and damage falls back
+  // to a real Group rather than blanking the map.
+  if (parsed?.visibleGroupId === null) guide.visibleGroupId = null;
+  else enforceVisibleGroup(guide, persistedVisibleId || DEFAULT_GROUP_ID);
 
   const idMap = new Map();
   for (const source of sourcePins) {
@@ -1187,12 +1195,14 @@ export function validateGuide(guide, duration) {
     ids.add(group.id);
     groupIds.add(group.id);
   }
-  // Exactly one Map, exactly one named visible Group, and that Group drawn
-  // first so the Guide's order states the relation it renders.
+  // Exactly one Map, and at most one named drawn Group -- null is the ordinary
+  // way to say "draw nothing". When a Group is named it is drawn first, so the
+  // Guide's order states the relation it renders.
+  const drawsNothing = guide.visibleGroupId === null;
   if (
     defaultGroups !== 1
-    || visibleGroups !== 1
-    || guide.groups[0]?.id !== guide.visibleGroupId
+    || (drawsNothing ? visibleGroups !== 0 : visibleGroups !== 1)
+    || (!drawsNothing && guide.groups[0]?.id !== guide.visibleGroupId)
   ) return false;
   // Names are identities here, so they must be distinguishable.
   const labels = guide.groups.map(group => String(group.label || "").trim().toLowerCase());
@@ -1286,7 +1296,11 @@ export function sanitizeGuide(input, videoId, duration) {
     if (!sourceGroup?.id || sourceGroup.id === DEFAULT_GROUP_ID) continue;
     recoverGroup(sourceGroup);
   }
-  enforceVisibleGroup(guide, persistedVisibleId || DEFAULT_GROUP_ID);
+  // An explicit null is a choice ("draw nothing"), so it survives the round
+  // trip. Anything else that fails to resolve is damage, and damage falls back
+  // to a real Group rather than blanking the map.
+  if (source.visibleGroupId === null) guide.visibleGroupId = null;
+  else enforceVisibleGroup(guide, persistedVisibleId || DEFAULT_GROUP_ID);
 
   for (const sourcePin of sortPins(source.pins || [])) {
     const address = Number(sourcePin?.t);

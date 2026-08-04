@@ -209,7 +209,7 @@ displacement is zero. Forward once and backward twice is a `Step Backward`.
 
 ### Pin traversal
 
-Pin traversal applies Step’s interval-anchor law to the next source-ordered retained Pin that is currently drawn on the Timeline. Standalone Pins are always drawn; section-bound Pins are drawn while at least one referencing Section belongs to the one visible Group. Hidden Pins remain exact Guide targets but are not traversal stops. Range Start and Range End are synthetic stops and are deduplicated by visible real Pins at the same Address.
+Pin traversal applies Step’s interval-anchor law to the next source-ordered retained Pin that is currently drawn on the Timeline. Standalone Pins are always drawn; section-bound Pins are drawn while at least one referencing Section belongs to the drawn Group; with no Group drawn, none is. Hidden Pins remain exact Guide targets but are not traversal stops. Range Start and Range End are synthetic stops and are deduplicated by visible real Pins at the same Address.
 
 ### Pin selection and Section ownership
 

@@ -181,8 +181,13 @@ function build() {
   setGroupState(guide, terrain.id, { visible: false });
   assert.equal(extentOf(guide), bothActive,
     "Changing the visible layer must not change the deformation stack.");
+  assert.deepEqual(orderedPins(guide).map(pin => pin.t), [],
+    "Hiding the drawn layer draws nothing rather than promoting another: which layer you want is a choice.");
+  assert.equal(guide.visibleGroupId, null);
+
+  setGroupState(guide, DEFAULT_GROUP_ID, { visible: true });
   assert.deepEqual(orderedPins(guide).map(pin => pin.t), [20, 60],
-    "The fallback visible layer replaces Timeline topology atomically.");
+    "and naming one draws exactly that one.");
 
   setGroupState(guide, terrain.id, { visible: true, active: false });
   assert.equal(extentOf(guide), undeformed + 40,
@@ -192,7 +197,7 @@ function build() {
 
   setGroupState(guide, terrain.id, { visible: false });
   assert.equal(extentOf(guide), undeformed + 40);
-  assert.deepEqual(orderedPins(guide).map(pin => pin.t), [20, 60]);
+  assert.deepEqual(orderedPins(guide).map(pin => pin.t), []);
   assert.equal(allPins(guide).length, 4,
     "Nothing is destroyed: every Pin remains retained and editable in Guide.");
   assert.equal(sortedSections(guide).length, 2,
@@ -224,11 +229,19 @@ function build() {
   assert.equal(session.model.guide.groups.find(group => group.id === detail.id).active, true,
     "Showing another layer does not deactivate hidden terrain.");
 
+  // Hiding the only Group is not impossible, it is how you look at the map
+  // undeformed and unmarked. It was unreachable while the law demanded exactly
+  // one drawn layer, which made "hide this" the one Group state you could not
+  // reach with a single Group.
   const sole = createSession({ duration: DURATION, guide: createGuide("sole") });
-  const blocked = setGuideGroupState(sole, DEFAULT_GROUP_ID, { visible: false });
-  assert.equal(blocked.changed, false);
-  assert.equal(blocked.session.history.length, 0,
-    "An impossible ownerless Timeline creates no phantom history transaction.");
+  const hidden = setGuideGroupState(sole, DEFAULT_GROUP_ID, { visible: false });
+  assert.equal(hidden.changed, true);
+  assert.equal(hidden.session.model.guide.visibleGroupId, null,
+    "The sole Group can be hidden, and nothing is drawn.");
+  assert.equal(orderedPins(hidden.session.model.guide).length, 0);
+  const shownAgain = setGuideGroupState(hidden.session, DEFAULT_GROUP_ID, { visible: true });
+  assert.equal(shownAgain.session.model.guide.visibleGroupId, DEFAULT_GROUP_ID,
+    "and showing it again names it back.");
 
   const restored = undo(session);
   assert.equal(restored.changed, true);
@@ -325,11 +338,19 @@ function build() {
 // --- Visible and hidden Pins form a complete disjoint Guide partition ------------
 {
   const { guide, terrain } = build();
-  setGroupState(guide, terrain.id, { visible: false });
+  setGroupState(guide, DEFAULT_GROUP_ID, { visible: true });
   const partition = partitionGuidePins(guide);
   assert.equal(partition.visible.length, 2);
   assert.equal(partition.hidden.length, 2);
   assert.equal(new Set([...partition.visible, ...partition.hidden].map(pin => pin.id)).size, 4);
+
+  // With nothing drawn the partition is still complete: every Pin is reachable
+  // in the Guide, none is on the map.
+  setGroupState(guide, DEFAULT_GROUP_ID, { visible: false });
+  const blank = partitionGuidePins(guide);
+  assert.equal(blank.visible.length, 0);
+  assert.equal(blank.hidden.length, 4,
+    "Hiding everything hides every Pin from the map and loses none from the Guide.");
 }
 
 // --- Editing a Weight inside an active Group updates the map at once ------------
@@ -351,6 +372,7 @@ function build() {
   const landmark = { id: "pin-standalone", t: 80, label: "Worth reaching", createdAt: 1 };
   guide.pins.push(landmark);
   setGroupState(guide, terrain.id, { visible: false, active: true });
+  setGroupState(guide, DEFAULT_GROUP_ID, { visible: true });
 
   const visible = orderedPins(guide).map(pin => pin.id);
   assert.ok(visible.includes("pin-standalone"),

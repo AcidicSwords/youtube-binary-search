@@ -1369,8 +1369,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         const label = document.createElement("label");
         label.className = "guide-group-toggle";
         const box = document.createElement("input");
-        box.type = key === "visible" ? "radio" : "checkbox";
-        if (key === "visible") box.name = "visible-guide-group";
+        // Both are checkboxes: a radio cannot be cleared, so "draw nothing"
+        // had no gesture. Exactly-one is kept by the transaction, not by the
+        // widget refusing to let go.
+        box.type = "checkbox";
         box.checked = key === "visible" ? visible : group[key] !== false;
         box.dataset.groupToggle = group.id;
         box.dataset.groupState = key;

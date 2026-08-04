@@ -146,8 +146,11 @@ assert.equal(sectionRows().length, 2,
   "A hidden Section is still listed in the Guide, or it could never be brought back.");
 assert.equal(pinRows().length, 4,
   "and so are its Pins.");
-assert.equal(groupToggle(emptyLayer, "visible").type, "radio",
-  "Visibility has one Timeline owner, so Group visibility is a radio choice.");
+// At most one Group is drawn, and none is a state worth reaching. A radio has no
+// gesture for clearing itself, so "draw nothing" was unreachable -- exactly-one
+// was being kept by the widget rather than by the transaction.
+assert.equal(groupToggle(emptyLayer, "visible").type, "checkbox",
+  "Visibility is a checkbox, because drawing nothing is a state the Guide can hold.");
 assert.equal(groupToggle(emptyLayer, "active").type, "checkbox",
   "Activity remains an independent stackable choice.");
 assert.match(rowText(byId.get("pins-list")), /Hidden/,
