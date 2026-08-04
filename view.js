@@ -479,20 +479,46 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     renderedPinKey = "";
   }
 
-  function sectionColor(sectionId) {
-    let hash = 0;
-    for (const character of String(sectionId || "")) {
-      hash = ((hash << 5) - hash + character.charCodeAt(0)) | 0;
-    }
-    const palette = [
-      "#ff8a70",
-      "#f7b267",
-      "#e76f51",
-      "#c9d77e",
-      "#ff6f91",
-      "#c7d0dd"
-    ];
-    return palette[Math.abs(hash) % palette.length];
+  // One colour, one meaning — the rule the Guide rows already follow, applied
+  // to the map.
+  //
+  // A Section used to be coloured by hashing its id into six hues. That put
+  // identity into the channel the map spends on deformation, and identity is
+  // already carried by the name; six hues collide by the seventh Section
+  // anyway. Worse, the same hue also drew the compressed and expanded row
+  // tints, so one colour said both "this Section" and "this Section's Weight",
+  // and the atmosphere band drew compression in violet behind a wire drawn in
+  // salmon. The gauge and the thing it measures disagreed.
+  //
+  // A Section's colour states its Weight, because Weight is the only thing
+  // about a Section that colour can say. These three are the whole vocabulary,
+  // and the atmosphere is built from the same table, so the two cannot drift.
+  const WEIGHT_COLORS = {
+    neutral: [143, 163, 189],
+    compressed: [172, 112, 225],
+    expanded: [65, 189, 174]
+  };
+
+  const rgba = ([red, green, blue], alpha) =>
+    `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+
+  function sectionColor(weight) {
+    const value = Number(weight);
+    if (!Number.isFinite(value) || value <= 0) return rgba(WEIGHT_COLORS.neutral, 1);
+    if (Math.abs(value - 1) <= EPSILON) return rgba(WEIGHT_COLORS.neutral, 1);
+    // Measured in octaves, not in ratio: halving and doubling are the same size
+    // of decision on the ladder, so they read at the same strength.
+    const strength = clamp(Math.abs(Math.log2(value)) / 2, 0, 1);
+    const toward = value < 1 ? WEIGHT_COLORS.compressed : WEIGHT_COLORS.expanded;
+    // Even one rung off neutral is a deliberate act, so it never reads as
+    // neutral-with-a-tint; the rest of the range is spent on how far.
+    const amount = 0.3 + strength * 0.7;
+    return rgba(
+      WEIGHT_COLORS.neutral.map((channel, index) =>
+        Math.round(channel + (toward[index] - channel) * amount)
+      ),
+      1
+    );
   }
 
   function formatRulerTime(seconds) {
@@ -612,10 +638,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           ? clamp(signedDensity, 0, 1)
           : 0;
       const color = compressed
-        ? `rgba(172, 112, 225, ${0.02 + strength * 0.28})`
+        ? rgba(WEIGHT_COLORS.compressed, 0.02 + strength * 0.28)
         : expanded
-          ? `rgba(65, 189, 174, ${0.018 + strength * 0.26})`
-          : "rgba(92, 111, 137, 0)";
+          ? rgba(WEIGHT_COLORS.expanded, 0.018 + strength * 0.26)
+          : rgba(WEIGHT_COLORS.neutral, 0);
       stops.push(`${color} ${ratio * 100}%`);
     }
     if (compression) atmosphere.classList.add("has-compression");
@@ -754,7 +780,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
     for (const entry of packedSections.entries) {
       const { section, projected, lane } = entry;
-      const color = sectionColor(section.id);
+      const color = sectionColor(section.weight);
       const selected = state().selectedRetained?.kind === "section"
         && state().selectedRetained.id === section.id;
       const leftFraction = clamp(projection.coordinateToFraction(projected.start), 0, 1);
@@ -894,11 +920,16 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         setStyleProperty(button, "--pin-weight", String(Math.min(3, references)));
         if (endpointSections.length) {
           button.classList.add("section-endpoint-pin");
-          setStyleProperty(
-            button,
-            "--endpoint-color",
-            sectionColor(endpointSections[0].id)
+          // A Pin can end more than one Section, and the Weights on either side
+          // of it need not agree. It takes the strongest statement at that
+          // Address rather than whichever Section was found first, because an
+          // average of two Weights describes neither of them.
+          const strongest = endpointSections.reduce((best, candidate) =>
+            Math.abs(Math.log2(candidate.weight)) > Math.abs(Math.log2(best.weight))
+              ? candidate
+              : best
           );
+          setStyleProperty(button, "--endpoint-color", sectionColor(strongest.weight));
         }
         if (state().selectedPinIds?.includes(pin.id)) {
           button.classList.add("extent-selected");
@@ -1065,7 +1096,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         else if (section.weight > 1 + EPSILON) item.classList.add("expanded");
         if (selected) item.classList.add("retained-selected");
         if (endpointSelected && !selected) item.classList.add("extent-selected");
-        setStyleProperty(item, "--section-color", sectionColor(section.id));
+        setStyleProperty(item, "--section-color", sectionColor(section.weight));
 
         const main = document.createElement("button");
         main.type = "button";

@@ -389,8 +389,11 @@ kbd {
   background: #52637a;
 }
 
+/* The key shows the scale the wires are drawn on: compressed, neutral,
+   expanded. It used to show three of the six identity hues, which named nothing
+   a reader could look for. */
 .timeline-key.key-sections i {
-  background: linear-gradient(90deg, #ff8a70, #f7b267, #c9d77e);
+  background: linear-gradient(90deg, #ac70e1, #8fa3bd, #41bdae);
 }
 
 .timeline-key.key-range i {

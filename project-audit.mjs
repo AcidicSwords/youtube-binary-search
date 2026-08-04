@@ -358,6 +358,20 @@ has(styles, /\.timeline-pin\.section-endpoint-pin\.extent-selected::before\s*\{[
 has(styles, /\.timeline-pin\.snap-target\.snap-armed::before\s*\{[^}]*outline:/,
   "Transient armed snap state has a separate outline/glow channel.");
 
+// One colour, one meaning, on the map as well as in the Guide. A Section's
+// colour states its Weight; identity is carried by the name and the Address.
+// Hashing an identifier into a hue spent the deformation channel to say
+// nothing, and collided by the seventh Section.
+has(view, /function sectionColor\(weight\)/,
+  "A Section is coloured by its Weight, not by its identity.");
+lacks(view, /charCodeAt/, "No colour is derived from an identifier.");
+check(count(view, /const WEIGHT_COLORS = \{/) === 1,
+  "Exactly one Weight colour table exists.");
+has(view, /rgba\(WEIGHT_COLORS\.compressed[\s\S]*rgba\(WEIGHT_COLORS\.expanded/,
+  "The atmosphere is built from that same table, so the gauge cannot drift from the wires it measures.");
+has(styles, /\.timeline-key\.key-sections i \{[^}]*linear-gradient\(90deg, #ac70e1, #8fa3bd, #41bdae\)/,
+  "The Section key shows the Weight scale rather than a sample of hues.");
+
 if (failures.length) {
   console.error(`Project audit failed (${failures.length}):`);
   failures.forEach((failure, index) => console.error(`${index + 1}. ${failure}`));

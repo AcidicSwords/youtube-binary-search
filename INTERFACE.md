@@ -109,9 +109,12 @@ Equal source intervals are not necessarily equal Timeline distances. Exact
 source-time contours reveal that difference: closer contours indicate
 compression, wider contours expansion. A continuous violet/teal atmosphere is
 centered on each effective Section, strengthens with signed Weight magnitude,
-diffuses over broader extents, and fades past Section bounds. Section identity
-uses a separate quiet palette, so an object's identity is not confused with the
-deformation it contributes. Neutral `1×` contributes no atmosphere.
+diffuses over broader extents, and fades past Section bounds. A Section wire is
+drawn in its own Weight on that same violet/neutral/teal scale, because the wire
+is what produces the atmosphere behind it. Identity is carried by the name and
+the Address, never by a hue: a Section's colour states what it does to the map
+and nothing else, so the reader is not asked to remember which hue was whose.
+Neutral `1×` is quiet slate and contributes no atmosphere.
 
 The main layers remain distinct without relying on colour alone:
 
