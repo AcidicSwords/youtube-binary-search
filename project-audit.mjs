@@ -338,6 +338,16 @@ lacks(html, /<kbd>\s*P\s*<\/kbd>|Shift\s*\+\s*P|Shift\s*\+\s*X|Alt\s*\+\s*X|>\s*
 // Keyboard ownership is a question about the keystroke, not about the tag. The
 // tag test made a checkbox swallow every operator and let a selector keep them
 // for as long as it held focus, so working in a side panel disarmed the map.
+// EPSILON is the semantic tolerance between two Addresses, so only source-time
+// quantities may be measured against it. A Timeline length compared to it
+// silently acquires a Weight threshold: under compression a real movement is a
+// short Timeline distance, and every Nudge inside a compressed Section was
+// refused at ρ > EPSILON / reach.
+lacks(session, /timelineDistance\([^)]*\)\s*<=?\s*EPSILON/,
+  "No Timeline length is measured against the Address tolerance.");
+lacks(view, /timelineDistance\([^)]*\)\s*<=?\s*EPSILON/,
+  "and the presentation layer does not confuse the two spaces either.");
+
 has(app, /function ownsKeyboard\(element\)/,
   "Keyboard ownership is asked as one question in one place.");
 check(count(app, /const editing = ownsKeyboard\(activeElement\)/) === 2,

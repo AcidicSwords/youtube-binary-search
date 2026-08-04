@@ -198,6 +198,53 @@ function addresses(model) {
     "One Nudge must cover the same source time at every Weight."
   );
 
+  // The operator, not merely the geometry it is built from.
+  //
+  // The displacement above is read straight off the projection, which never
+  // refused anything — so this suite proved the arithmetic while the operator
+  // was dead. `step` asked whether the movement had landed anywhere by
+  // measuring a Timeline length against EPSILON, which is the tolerance between
+  // two Addresses. Under compression a real movement is a short Timeline
+  // distance; that is what compression means. So Nudge stopped working inside
+  // every compressed Section, at a threshold of ρ > EPSILON / quantum that no
+  // reader could have guessed, while the identical Nudge worked with the
+  // Timeline straightened.
+  const nestedAt = (outer, inner) => {
+    let session = createSession({ duration: DURATION });
+    session = saveExtentAsSection(session, { start: 20, end: 60 }, { label: "outer" }).session;
+    session = setGuideSectionWeight(
+      session, session.model.guide.sections.at(-1).id, outer
+    ).session;
+    session = saveExtentAsSection(session, { start: 40, end: 56 }, { label: "inner" }).session;
+    session = setGuideSectionWeight(
+      session, session.model.guide.sections.at(-1).id, inner
+    ).session;
+    return goTo(session, 48, { operator: "timeline" }).session;
+  };
+
+  for (const [outer, inner] of [
+    [0.125, 0.125], [0.125, 0.25], [0.125, 0.5], [0.25, 0.25],
+    [0.5, 0.5], [1, 1], [2, 2], [4, 4], [0.125, 4]
+  ]) {
+    for (const configured of [1 / 24, 0.25, 0.5, 1]) {
+      const session = nestedAt(outer, inner);
+      const projection = projectionForModel(session.model);
+      const current = session.model.resolution.C;
+      const distance = Math.abs(
+        projection.sourceToTimeline(current + configured)
+        - projection.sourceToTimeline(current)
+      );
+      const result = step(session, "forward", distance, { projection });
+      const composed = (outer * inner).toFixed(6);
+      assert.equal(result.changed, true,
+        `A ${configured}s Nudge must move Current at composed Weight ${composed}.`);
+      assert.ok(
+        Math.abs(result.session.model.resolution.C - (current + configured)) < 1e-6,
+        `and must land exactly one quantum later at composed Weight ${composed}.`
+      );
+    }
+  }
+
   // Context is a bounded source window. It takes Current, Range and a duration
   // in seconds — no projection is reachable from its signature, so no Weight
   // can enter it.

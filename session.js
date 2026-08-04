@@ -856,8 +856,16 @@ export function step(session, direction, seconds = null, options = {}) {
     direction,
     session.model.range
   );
+  // "Did this land somewhere else?" is a question about Addresses, so it is
+  // asked in source time. EPSILON is the semantic tolerance between two
+  // Addresses; measuring a Timeline distance against it compares a length in one
+  // space to a tolerance from the other, and the two only agree where the map is
+  // undeformed. Under compression a real movement is a short Timeline distance —
+  // that is what compression means — so this refused every Nudge inside a
+  // compressed Section while the identical Nudge worked on a normalized map.
+  // The threshold was ρ > EPSILON / reach, which no reader could have guessed.
   if (
-    projection.timelineDistance(target, session.model.resolution.C) <= EPSILON
+    Math.abs(target - session.model.resolution.C) <= EPSILON
   ) return unchanged(session, "range-edge");
   const backward = direction === "backward";
   const intervalDeparture = Number.isFinite(options.intervalDeparture)
