@@ -9,7 +9,7 @@ import {
   setStepReach,
   step,
   redo,
-  returnState,
+  undo,
   normalizeStepReach,
   MIN_STEP_REACH_SECONDS,
   MAX_STEP_REACH_SECONDS
@@ -65,7 +65,7 @@ assert.equal(breathRateFromResponse({ tailRate: 0.5, leadRate: 2 }), 0.75);
   assert.deepEqual(result.session.model.stepReach, {
     backward: 10, forward: 10, linked: true, mode: "fixed", fraction: 1 / 16
   });
-  const restored = returnState(result.session);
+  const restored = undo(result.session);
   assert.deepEqual(restored.session.model.stepReach, {
     backward: 5, forward: 15, linked: false, mode: "fixed", fraction: 1 / 16
   });
@@ -93,7 +93,7 @@ assert.equal(breathRateFromResponse({ tailRate: 0.5, leadRate: 2 }), 0.75);
 
   result = step(session, "backward");
   assert.equal(result.session.model.lastOperator, "stepBackward");
-  const undone = returnState(result.session);
+  const undone = undo(result.session);
   assert.equal(
     undone.session.model.lastOperator,
     "section",
@@ -294,7 +294,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   assert.match(app, /preferences\.stepReach = normalizeStepReach/);
   assert.match(implementation, /^# Video Cartography — Canonical Implementation/m);
   assert.doesNotMatch(readme, /Application Continue/);
-  assert.match(readme, /Step size|Step Size/);
+  assert.match(readme, /Step Reach/);
 }
 
-console.log("Field coherence tests passed: semantic Step size and physical Field offsets remain independent.");
+console.log("Field coherence tests passed: semantic Step Reach and physical Field offsets remain independent.");

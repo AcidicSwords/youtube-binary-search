@@ -31,6 +31,141 @@ try {
     "The application initialises against a real document.");
   assert.equal(await text("#duration-time"), "1:40");
 
+  // The operator grammar is physical, not merely a DOM naming convention.
+  // Measure the rendered square and every row/column before any journey uses
+  // the matrix indirectly through keyboard routes.
+  await page.click("#operator-toggle");
+  await settle(180);
+  const matrix = await page.evaluate(() => {
+    const ids = [
+      ["refine-backward", "reopen", "refine-forward"],
+      ["step-backward", "switch-endpoint", "step-forward"],
+      ["release", "tag", "focus-toggle"]
+    ];
+    const deck = document.querySelector(".navigation-deck").getBoundingClientRect();
+    const cells = ids.map(row => row.map(id => {
+      const rect = document.getElementById(id).getBoundingClientRect();
+      return {
+        id,
+        left: rect.left,
+        top: rect.top,
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+        width: rect.width,
+        height: rect.height
+      };
+    }));
+    return {
+      deck: { width: deck.width, height: deck.height },
+      childCount: document.querySelector(".navigation-deck").children.length,
+      cells
+    };
+  });
+  assert.ok(Math.abs(matrix.deck.width - matrix.deck.height) <= 1,
+    `The rendered operator matrix is square (${matrix.deck.width}×${matrix.deck.height}).`);
+  assert.equal(matrix.childCount, 9, "The matrix has no auto-placed tenth cell.");
+  const flatCells = matrix.cells.flat();
+  const groupByPixel = key => flatCells.reduce((groups, cell) => {
+    const coordinate = Math.round(cell[key]);
+    groups.set(coordinate, [...(groups.get(coordinate) || []), cell]);
+    return groups;
+  }, new Map());
+  const rows = groupByPixel("top");
+  const columns = groupByPixel("left");
+  assert.equal(rows.size, 3, "The matrix has exactly three rendered row tops.");
+  assert.equal(columns.size, 3, "The matrix has exactly three rendered column lefts.");
+  assert.ok([...rows.values()].every(row => row.length === 3));
+  assert.ok([...columns.values()].every(column => column.length === 3));
+  assert.ok(Math.max(...flatCells.map(cell => cell.width))
+    - Math.min(...flatCells.map(cell => cell.width)) <= 1,
+  "Every matrix cell has the same rendered width.");
+  assert.ok(Math.max(...flatCells.map(cell => cell.height))
+    - Math.min(...flatCells.map(cell => cell.height)) <= 1,
+  "Every matrix cell has the same rendered height.");
+  for (let row = 0; row < 3; row += 1) {
+    assert.ok(matrix.cells[row][0].x < matrix.cells[row][1].x
+      && matrix.cells[row][1].x < matrix.cells[row][2].x,
+    `Matrix row ${row + 1} follows QWE / ASD / RTF physical order.`);
+  }
+  for (let column = 0; column < 3; column += 1) {
+    assert.ok(matrix.cells[0][column].y < matrix.cells[1][column].y
+      && matrix.cells[1][column].y < matrix.cells[2][column].y,
+    `Matrix column ${column + 1} follows QAR / WST / EDF physical order.`);
+  }
+  assert.equal(matrix.cells[2][1].id, "tag",
+    "Tag physically occupies row 3, column 2.");
+  assert.equal(await text("#tag-label"), "Tag as Pin");
+  assert.match(await text("#tag-meta"), /^Current .* → Pin$/);
+  assert.equal(await page.$eval("#tag", element => element.disabled), false,
+    "Plain Tag is available without a Working Interval.");
+  await page.hover("#tag");
+  await settle(80);
+  const pinTagPreview = await page.evaluate(() => ({
+    pointHidden: document.getElementById("preview-current-marker").hidden,
+    pointLeft: document.getElementById("preview-current-marker").style.left,
+    currentLeft: document.getElementById("current-marker").style.left,
+    intervalHidden: document.getElementById("action-preview-fill").hidden
+  }));
+  assert.deepEqual(pinTagPreview, {
+    pointHidden: false,
+    pointLeft: pinTagPreview.currentLeft,
+    currentLeft: pinTagPreview.currentLeft,
+    intervalHidden: true
+  }, "Plain Tag previews Current as a point, never the Working Interval.");
+  await page.mouse.move(0, 0);
+
+  await page.click("#shift-layer-toggle");
+  await settle(120);
+  assert.equal(await text("#refine-backward-label"), "Local Refine Backward");
+  assert.equal(await text("#refine-forward-label"), "Local Refine Forward");
+  assert.equal(await text("#step-backward-label"), "Previous Pin");
+  assert.equal(await text("#step-forward-label"), "Next Pin");
+  assert.equal(await text("#tag-label"), "Tag as Section");
+  assert.equal(await text("#tag-meta"), "No Working Interval");
+  assert.equal(await page.$eval("#tag", element => element.disabled), true,
+    "Shifted Tag refuses a missing Working Interval.");
+  const shiftedMatrix = await page.evaluate(() => {
+    const deck = document.querySelector(".navigation-deck").getBoundingClientRect();
+    const cells = [...document.querySelector(".navigation-deck").children].map(element => {
+      const rect = element.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    });
+    return { width: deck.width, height: deck.height, cells };
+  });
+  assert.ok(Math.abs(shiftedMatrix.width - matrix.deck.width) <= 1
+    && Math.abs(shiftedMatrix.height - matrix.deck.height) <= 1,
+  "Shifted operator labels preserve the square matrix dimensions.");
+  assert.ok(shiftedMatrix.cells.every((cell, index) =>
+    Math.abs(cell.width - flatCells[index].width) <= 1
+      && Math.abs(cell.height - flatCells[index].height) <= 1
+  ), "Shifted labels do not resize a matrix cell.");
+  await page.click("#shift-layer-toggle");
+  await settle(80);
+  await page.click("#guide-toggle");
+  await settle(180);
+
+  const centerAccess = await page.evaluate(() => {
+    const player = document.querySelector(".center-player-wrap").getBoundingClientRect();
+    const control = document.getElementById("center-transport-surface").getBoundingClientRect();
+    const overlay = document.querySelector(".center-transport-overlay");
+    const nativePoint = document.elementFromPoint(
+      player.left + player.width * 0.18,
+      player.bottom - Math.min(18, player.height * 0.08)
+    );
+    return {
+      overlayPointerEvents: getComputedStyle(overlay).pointerEvents,
+      controlFraction: (control.width * control.height) / (player.width * player.height),
+      nativePointIsOverlay: nativePoint === overlay
+        || nativePoint === document.getElementById("center-transport-surface")
+        || document.getElementById("center-transport-surface").contains(nativePoint)
+    };
+  });
+  assert.equal(centerAccess.overlayPointerEvents, "none");
+  assert.ok(centerAccess.controlFraction < 0.08,
+    "The parent Play control owns only its compact centered hit target.");
+  assert.equal(centerAccess.nativePointIsOverlay, false,
+    "The native control bar remains pointer-accessible while paused.");
+
   // ============================================================================
   // 2. A press lands on the Address drawn under it
   // ============================================================================
@@ -57,6 +192,25 @@ try {
     `A press at one quarter of the drawn map lands near 0:25 (got ${quarter}).`);
   assert.ok(Math.abs(seconds(threeQuarters) - 75) < 3,
     `and at three quarters near 1:15 (got ${threeQuarters}).`);
+
+  await page.click("#operator-toggle");
+  await settle(120);
+  assert.equal(await text("#tag-label"), "Tag as Pin",
+    "An Interval never changes the plain Tag grammar.");
+  await page.click("#shift-layer-toggle");
+  await settle(80);
+  assert.equal(await text("#tag-label"), "Tag as Section");
+  assert.match(await text("#tag-meta"), /→ Section$/);
+  assert.equal(await page.$eval("#tag", element => element.disabled), false,
+    "Shifted Tag becomes available for a positive Working Interval.");
+  await page.hover("#tag");
+  await settle(80);
+  assert.equal(await page.$eval("#action-preview-fill", element => element.hidden), false,
+    "Shifted Tag previews the Working Interval extent.");
+  await page.mouse.move(0, 0);
+  await page.click("#shift-layer-toggle");
+  await page.click("#guide-toggle");
+  await settle(120);
 
   // ============================================================================
   // 3. A focused control owns Space
@@ -273,7 +427,7 @@ for (const [width, height] of [[1920, 1080], [1600, 720]]) {
   await page.waitForTimeout(200);
 }
 
-console.log("Browser smoke passed: the app runs in Chromium without error; a press lands on the Address drawn under it; a focused control owns Space while the reader background still observes; no reachable control is covered by another; the page never scrolls sideways from 380px to 1440px; crossing the compact breakpoint does not open or close the Guide; ten overlapping Sections do not displace the workspace; an increment control keeps focus through the rebuild its own edit causes; every Guide tab shares one row; the Timeline sits directly under the viewer; and expanded Parameters stay reachable.");
+console.log("Browser smoke passed: the physical QWE / ASD / RTF matrix is square with Tag at row 3 column 2 and remains stable under Shift; the centered parent Play control leaves native controls reachable; the app runs without error; a press lands on the Address drawn under it; focus and Space ownership remain exact; no reachable control is covered; responsive layouts do not overflow or change panel intent; dense structure stays bounded; Guide edits retain focus; and compact controls remain reachable.");
 } finally {
   await close();
 }

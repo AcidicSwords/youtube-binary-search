@@ -77,7 +77,7 @@ finding(
 
 // Section endpoints are stored as Pins, but the matrix Pin operators consume
 // visible Pins only. A Section with implicit endpoints therefore contributes
-// no targets to Pin Backward / Pin Forward.
+// no targets to Previous Pin / Next Pin.
 const guide = createGuide("audit-video");
 createSectionFromTimes(guide, 10, 20, { label: "Implicit endpoints" });
 finding(
@@ -165,7 +165,7 @@ finding(
   }
 );
 
-// Establish and activate a 10-second Field at Current 50.
+// Establish and activate the configured Field at Current 50.
 environment.byId.get("context-seconds").value = "0";
 environment.byId.get("context-seconds").dispatch("change");
 environment.byId.get("timeline").dispatch("click", { clientX: 500 });
@@ -181,11 +181,13 @@ await environment.poll();
 environment.center().pauseVideo();
 await environment.flush(8);
 await environment.poll();
+const configuredInnerOffset = environment.byId.get("field-inner-offset").value;
+const configuredOuterOffset = environment.byId.get("field-outer-offset").value;
 
 // Start Context at 60 and advance only the Center Cursor. The visible side
 // geometry must remain the exact 2.5-second Context preview while its source
-// window is active, without rewriting the configured 10-second live Field
-// offset underneath it.
+// window is active, without rewriting the independently configured live Field
+// offsets underneath it.
 environment.byId.get("context-seconds").value = "5";
 environment.byId.get("context-seconds").dispatch("change");
 environment.byId.get("timeline").dispatch("click", { clientX: 600 });
@@ -202,8 +204,8 @@ finding(
   "context-mutates-configured-field-offset",
   firstSuspendedTail !== secondSuspendedTail
     || firstSuspendedLead !== secondSuspendedLead
-    || environment.byId.get("field-outer-offset").value !== "10"
-    || environment.byId.get("field-inner-offset").value !== "2.5",
+    || environment.byId.get("field-outer-offset").value !== configuredOuterOffset
+    || environment.byId.get("field-inner-offset").value !== configuredInnerOffset,
   {
     afterFirstContextTick: firstSuspendedTail,
     afterSecondContextTick: secondSuspendedTail,
@@ -215,4 +217,4 @@ finding(
 );
 
 assert.deepEqual(findings, [], "Every audited semantic discrepancy must remain repaired.");
-console.log("Semantic repair probes passed: all seven audited discrepancies remain resolved.");
+console.log("Semantic boundary tests passed: adversarial operator consequences remain canonical.");

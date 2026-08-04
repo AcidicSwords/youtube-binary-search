@@ -118,33 +118,6 @@ export function getTargets(neighborhood, metric = null) {
   };
 }
 
-export function classifyRefineRelation(interval, current, target) {
-  if (
-    !interval
-    || !Number.isFinite(current)
-    || !Number.isFinite(target)
-    || !Number.isFinite(interval.departure)
-    || !Number.isFinite(interval.arrival)
-    || Math.abs(interval.arrival - current) > EPSILON
-    || Math.abs(interval.departure - current) <= EPSILON
-  ) return "replace";
-
-  const start = Number.isFinite(interval.start)
-    ? interval.start
-    : Math.min(interval.departure, interval.arrival);
-  const end = Number.isFinite(interval.end)
-    ? interval.end
-    : Math.max(interval.departure, interval.arrival);
-
-  // Membership is the complete rule. A midpoint anywhere in the active
-  // Working Interval, including its opposite endpoint, shortens that Interval.
-  // An endpoint landing collapses it. Only a midpoint beyond the ordered
-  // extent starts a new traversal from Current and discards the old Interval.
-  return target >= start - EPSILON && target <= end + EPSILON
-    ? "shorten"
-    : "replace";
-}
-
 /**
  * Plain Refine composes around the retained departure only while that
  * departure remains outside the newly traversed Current-to-target path.
@@ -511,20 +484,6 @@ export function translateNeighborhood(neighborhood, destination, range, metric =
   }
 
   return assertNeighborhood(next);
-}
-
-export function settleContinuous(neighborhood, departure, current, range = null) {
-  if (!Number.isFinite(departure) || !Number.isFinite(current)) {
-    throw new TypeError("Continuous positions must be finite numbers.");
-  }
-  if (Math.abs(departure - neighborhood.C) > EPSILON) {
-    throw new RangeError("Continuous departure must equal the parent Neighborhood Current.");
-  }
-  return translateNeighborhood(
-    neighborhood,
-    current,
-    range || { start: neighborhood.L, end: neighborhood.R }
-  );
 }
 
 export function getActionRanges(

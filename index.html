@@ -54,7 +54,7 @@
               </div>
               <div id="tail-player-surface" class="player-wrap side-player-surface" role="button" tabindex="0" aria-label="Step Backward"><div id="player-tail"></div></div>
               <div class="pane-field-controls tail-field-controls" aria-label="Tail panorama state">
-                <p class="field-side-state"><span>Tail</span><small id="tail-offset-state">0 s in 2.5–10 s</small></p>
+                <p class="field-side-state"><span>Tail</span><small id="tail-offset-state">0 s in 0.25–2.5 s</small></p>
               </div>
               <button id="tail-restore" class="step-pane-restore" type="button" aria-label="Show Tail" hidden>
                 <span aria-hidden="true">←</span><span>Tail</span>
@@ -79,10 +79,12 @@
               </div>
               <div class="player-wrap center-player-wrap">
                 <div id="player"></div>
-                <button id="center-transport-surface" class="center-transport-surface" type="button" aria-label="Play Panorama" aria-pressed="false" disabled>
-                  <span id="center-transport-icon" class="center-transport-icon" aria-hidden="true">▶</span>
-                  <span id="center-transport-label" class="sr-only">Play Panorama</span>
-                </button>
+                <div class="center-transport-overlay">
+                  <button id="center-transport-surface" class="center-transport-surface" type="button" aria-label="Play Panorama" aria-pressed="false" disabled>
+                    <span id="center-transport-icon" class="center-transport-icon" aria-hidden="true">▶</span>
+                    <span id="center-transport-label" class="sr-only">Play Panorama</span>
+                  </button>
+                </div>
               </div>
               <div class="pane-field-controls center-field-controls" aria-label="Panorama controls">
                 <button id="field-both-toggle" class="field-mode-toggle field-both-toggle" type="button" aria-pressed="false" disabled>
@@ -103,7 +105,7 @@
               </div>
               <div id="lead-player-surface" class="player-wrap side-player-surface" role="button" tabindex="0" aria-label="Step Forward"><div id="player-lead"></div></div>
               <div class="pane-field-controls" aria-label="Lead panorama state">
-                <p class="field-side-state"><span>Lead</span><small id="lead-offset-state">0 s in 2.5–10 s</small></p>
+                <p class="field-side-state"><span>Lead</span><small id="lead-offset-state">0 s in 0.25–2.5 s</small></p>
               </div>
               <button id="lead-restore" class="step-pane-restore" type="button" aria-label="Show Lead" hidden>
                 <span>Lead</span><span aria-hidden="true">→</span>
@@ -120,9 +122,6 @@
               <span class="eyebrow">Range</span>
               <h2>Timeline</h2>
             </div>
-            <button id="normalize-toggle" class="timeline-normalize" type="button" aria-pressed="false" aria-keyshortcuts="X" disabled>
-              <span id="normalize-toggle-label">Normalize</span><kbd>X</kbd>
-            </button>
             <div class="timeline-legend" aria-label="Timeline layers">
               <span id="timeline-key-sections" class="timeline-key key-sections" title="Sections: retained weighted extents"><i aria-hidden="true"></i>Sections</span>
               <span id="timeline-key-range" class="timeline-key key-range" title="Range: navigable boundary"><i aria-hidden="true"></i>Range</span>
@@ -265,25 +264,25 @@
             </details>
 
             <details id="panorama-settings" class="tool-disclosure panorama-settings">
-              <summary><span>Panorama</span><span id="panorama-setting-value">2.5–10 s · 0.5× / 1.5×</span></summary>
+              <summary><span>Panorama</span><span id="panorama-setting-value">0.25–2.5 s · 0.75× / 1.25×</span></summary>
               <div class="compact-settings">
                 <label class="compact-setting" for="field-inner-offset">
                   <span>Inner offset</span>
                   <span class="number-with-unit">
-                    <input id="field-inner-offset" type="number" min="0.25" max="300" step="0.25" value="2.5" inputmode="decimal" disabled>
+                    <input id="field-inner-offset" type="number" min="0.25" max="300" step="0.25" value="0.25" inputmode="decimal" disabled>
                     <span>s</span>
                   </span>
                 </label>
                 <label class="compact-setting" for="field-outer-offset">
                   <span>Outer offset</span>
                   <span class="number-with-unit">
-                    <input id="field-outer-offset" type="number" min="0.25" max="300" step="0.25" value="10" inputmode="decimal" disabled>
+                    <input id="field-outer-offset" type="number" min="0.25" max="300" step="0.25" value="2.5" inputmode="decimal" disabled>
                     <span>s</span>
                   </span>
                 </label>
                 <label class="compact-setting" for="field-breath-rate">
                   <span>Breath rate</span>
-                  <select id="field-breath-rate" aria-label="Panorama breathing rate pair" disabled><option value="0.5">0.5× / 1.5×</option></select>
+                  <select id="field-breath-rate" aria-label="Panorama breathing rate pair" disabled><option value="0.25">0.75× / 1.25×</option></select>
                 </label>
                 <p class="setting-note">Tail and Lead breathe between these offsets around Current. Showing or hiding the Panorama, collapsing a side, and holding a span stay on the Panorama itself, because those act on what you are looking at rather than being remembered settings.</p>
               </div>
@@ -298,8 +297,8 @@
                 <span><kbd>S</kbd> Switch Endpoint</span>
                 <span><kbd>⇧Q</kbd>/<kbd>⇧E</kbd> Local Refine</span>
                 <span><kbd>⇧A</kbd>/<kbd>⇧D</kbd> Pins</span>
-                <span><kbd>R</kbd> Release Interval</span>
-                <span><kbd>X</kbd> Normalize the map, or one selected Section</span>
+                <span><kbd>R</kbd> Release relation and Timeline operand</span>
+                <span><kbd>X</kbd> Toggle deformation for the selected Section; otherwise the whole Timeline</span>
                 <span>Weights are edited in the Guide</span>
                 <span><kbd>F</kbd> Focus / Unfocus</span>
                 <span><kbd>Alt</kbd> Carry selected retained object</span>
@@ -324,7 +323,7 @@
             <div class="panel-heading navigation-heading">
               <div>
                 <span class="eyebrow">Operator matrix</span>
-                <h2 id="navigation-heading">Navigate</h2>
+                <h2 id="navigation-heading">Operators</h2>
               </div>
               <div class="navigation-heading-tools">
                 <p>Operators share one Working Interval and traverse the weighted timeline; every source Address remains ordered and reachable.</p>
@@ -366,12 +365,19 @@
                 <span id="release-meta" class="action-meta">No Interval</span>
               </button>
               <button id="tag" class="nav-action lifecycle-action tag-action" type="button" data-preview-action="tag" aria-keyshortcuts="T Shift+T" disabled>
-                <span class="action-name"><kbd>T</kbd> <span id="tag-label" class="action-label">Tag Pin</span></span>
-                <span id="tag-meta" class="action-meta">Current</span>
+                <span class="action-name"><kbd>T</kbd> <span id="tag-label" class="action-label">Tag as Pin</span></span>
+                <span id="tag-meta" class="action-meta">Current → Pin</span>
               </button>
               <button id="focus-toggle" class="nav-action lifecycle-action focus-action" type="button" data-preview-action="focus" aria-keyshortcuts="F" disabled>
                 <span class="action-name"><kbd>F</kbd> <span id="focus-toggle-label" class="action-label">Focus</span></span>
                 <span id="focus-toggle-meta" class="action-meta">No target</span>
+              </button>
+            </div>
+
+            <div class="operator-auxiliary-actions">
+              <button id="deformation-toggle" class="deformation-action" type="button" aria-pressed="false" aria-keyshortcuts="X" disabled>
+                <span class="action-name"><kbd>X</kbd> <span id="deformation-toggle-label" class="action-label">Straighten Timeline</span></span>
+                <span id="deformation-toggle-meta" class="action-meta">Complete map</span>
               </button>
             </div>
 
@@ -416,7 +422,7 @@
 
             <section id="guide-sections-panel" class="guide-tab-panel" role="tabpanel" aria-labelledby="guide-tab-sections">
               <details class="guide-create-disclosure">
-                <summary><span>Save a Section</span><kbd>⇧P</kbd></summary>
+                <summary><span>Tag as Section</span><kbd>⇧T</kbd></summary>
                 <form id="section-capture" class="guide-create-form section-create-form">
                 <div class="guide-create-heading">
                   <span class="eyebrow">Create Section</span>
@@ -424,7 +430,7 @@
                 </div>
                 <label for="section-source">Source
                   <select id="section-source" disabled>
-                    <option value="interval">Working Section</option>
+                    <option value="interval">Working Interval</option>
                     <option value="field-span">Held Panorama span</option>
                     <option value="selected-pins">Two selected Pins</option>
                   </select>
@@ -443,7 +449,7 @@
 
             <section id="guide-pins-panel" class="guide-tab-panel" role="tabpanel" aria-labelledby="guide-tab-pins" hidden>
               <details class="guide-create-disclosure">
-                <summary><span>Save a Pin</span><kbd>P</kbd></summary>
+                <summary><span>Tag as Pin</span><kbd>T</kbd></summary>
                 <form id="pin-capture" class="guide-create-form pin-create-form">
                 <div class="guide-create-heading">
                   <span class="eyebrow">Tag as Pin</span>

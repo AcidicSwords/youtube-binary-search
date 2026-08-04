@@ -10,7 +10,6 @@ import {
   framesEqual,
   frameIdentity,
   frameTransition,
-  frameSideAvailable,
   createFieldFrameSequencer
 } from "./field-frame.js";
 
@@ -72,13 +71,6 @@ const range = { start: 0, end: 100 };
   assert.equal(directFrame({ kind: "pin", center: 2, end: 3, range }), null,
     "An incomplete direct request cannot acquire Frame ownership.");
   assert.equal(resolveFieldFrame(null), null);
-}
-
-// Side availability
-{
-  const collapsed = operatorFrame({ center: 0, backward: 0, forward: 10, range });
-  assert.equal(frameSideAvailable(collapsed, "tail"), false);
-  assert.equal(frameSideAvailable(collapsed, "lead"), true);
 }
 
 // Transitions

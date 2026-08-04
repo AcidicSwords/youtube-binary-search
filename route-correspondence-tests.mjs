@@ -150,11 +150,8 @@ function converge(name, first, second, form = "canonical") {
   PAIRS.push({ name, first, second, form });
 }
 
-// Weight has one route now, so it has no pair. The operator matrix carried a
-// Deform button and a ladder stepper alongside the Guide selector, and keeping
-// three engagements in agreement was work that existed only because Weight was
-// reachable from a place it did not belong. It is assigned in the Guide, where
-// the value lives.
+// Weight has one route, so it has no correspondence pair. It is assigned in the
+// Guide, where the retained value lives.
 
 // --- Pin movement: exact Address edit versus repeated Nudge -------------------
 // One quantum is 1/24 s, so twelve increments move exactly half a second. The

@@ -172,7 +172,7 @@ for (let run = 0; run < RUNS; run += 1) {
       assert.equal(result.refineRelation, expectedRefine.relation);
       const resultingInterval = result.session.model.interval;
       if (Math.abs(expectedRefine.departure - expectedRefine.target) <= EPSILON) {
-        assert.equal(resultingInterval, null, "Endpoint coincidence must collapse the Working Section.");
+        assert.equal(resultingInterval, null, "Endpoint coincidence must collapse the Working Interval.");
       } else {
         assert.ok(resultingInterval);
         assert.ok(Math.abs(resultingInterval.departure - expectedRefine.departure) <= EPSILON);

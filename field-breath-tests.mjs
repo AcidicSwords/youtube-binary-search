@@ -36,6 +36,15 @@ function run(runtime, steps, options = {}) {
 
 // Configuration
 {
+  assert.deepEqual(
+    DEFAULT_FIELD_BREATH,
+    { inner: 0.25, outer: 2.5, rate: 0.25 },
+    "The shipped Field is a conservative local horizon."
+  );
+  assert.deepEqual(
+    breathRatePair(DEFAULT_FIELD_BREATH.rate),
+    { center: 1, tailRate: 0.75, leadRate: 1.25 }
+  );
   assert.deepEqual(normalizeFieldBreath({ inner: 3, outer: 12, rate: 0.25 }),
     { inner: 3, outer: 12, rate: 0.25 });
   assert.ok(normalizeFieldBreath({ inner: 30, outer: 12 }).inner < 12,

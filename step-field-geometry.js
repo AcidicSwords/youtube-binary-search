@@ -25,9 +25,9 @@ export const BREATH_PHASE = Object.freeze({
 
 export const BREATH_RATE_STEPS = Object.freeze([0.25, 0.5, 0.75]);
 export const DEFAULT_FIELD_BREATH = Object.freeze({
-  inner: 2.5,
-  outer: 10,
-  rate: 0.5
+  inner: 0.25,
+  outer: 2.5,
+  rate: 0.25
 });
 const BREATH_BOUND_TOLERANCE = 0.02;
 

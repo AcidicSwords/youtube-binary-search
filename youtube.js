@@ -102,6 +102,14 @@ function currentOrigin() {
   return typeof origin === "string" && /^https?:\/\//.test(origin) ? origin : null;
 }
 
+function loadedVideoId(rawPlayer) {
+  const data = rawPlayer?.getVideoData?.();
+  const value = data?.video_id ?? data?.videoId;
+  return /^[A-Za-z0-9_-]{11}$/.test(String(value || ""))
+    ? String(value)
+    : null;
+}
+
 export function isYouTubeApiReady() {
   return typeof globalThis.YT?.Player === "function";
 }
@@ -175,6 +183,9 @@ export function createYouTubePlayer(elementId, options = {}) {
       const rawState = rawPlayer?.getPlayerState?.();
       const rates = rawPlayer?.getAvailablePlaybackRates?.();
       return {
+        // This is the iframe's loaded source identity, not the application's
+        // most recent request. Source-generation ownership compares the two.
+        videoId: loadedVideoId(rawPlayer),
         time: Number.isFinite(time) ? time : 0,
         duration: Number.isFinite(duration) ? duration : 0,
         rate: Number.isFinite(rate) ? rate : 1,

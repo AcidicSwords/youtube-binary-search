@@ -1,192 +1,228 @@
 # Development
 
-## Gates
+Video Cartography is a static ES-module application. It has no build step and no
+framework runtime. Node 20 or newer runs the deterministic gates; Chromium is
+used only for behavior that requires a real layout and event system.
 
-`npm run check` is the fast gate: it runs every semantic, randomized, smoke and
-audit suite against a DOM-free harness, and it is the one that must pass for any
-change.
+## Setup and release gate
 
-`npm run test:browser` runs the page in Chromium with a deterministic media
-adapter substituted for YouTube. It exists because the DOM-free harness returns
-fixed geometry and has no stylesheet: it cannot see whether a control is where
-it is drawn, whether one element covers another, whether focus survives a
-rebuild, or which handler a key reaches. Those are not gaps in its coverage —
-they are outside what it can represent. Keep this suite small; anything provable
-without a browser belongs in `check`.
+Install exactly what the lockfile resolves:
 
-`npm run verify` is both, and is what a release should pass.
+```bash
+npm ci
+```
 
+Serve the repository over HTTP for local use, for example:
 
-## Principles
+```bash
+python -m http.server 8000
+```
 
-1. Source time is canonical.
-2. Timeline Space is derived, positive, and pure.
-3. Section weight changes map geometry only.
-4. Playback, Context, and live Field geometry remain source-time systems;
-   paused operator previews may supply addresses derived from Timeline Space.
-5. A gesture creates at most one Undo checkpoint.
-6. Current and Cursor remain distinct.
-7. Step Reach, Field Offset, and Section weight have separate ownership.
-8. Shared Pins form a graph; do not invent a stored Section hierarchy.
-9. Pin linking is visible spatial acquisition; do not persist a hidden return target.
-10. Ambient Field state is a stable Frame, not a temporary transport result.
-11. The Temporal Topography owns spatial direct manipulation; Guide owns exact editing.
-12. The minimum Field offset is a law; Range clipping may remove a side, never shrink `x`.
-13. Any fine-adjustment quantum must exceed the kernel's semantic equality tolerance.
-14. Current is displaced by Step law; only an exact Go draws a new neighbourhood.
+Then open `http://127.0.0.1:8000/`. A local server is required for reliable
+YouTube embed identity and referrer behavior.
+
+The complete release gate is:
+
+```bash
+npm run verify
+```
+
+`npm run check` is necessary but not complete proof. It performs syntax checks,
+pure and semantic tests, DOM-free application journeys, and source/document
+audits. `npm run test:browser` runs the rendered page in Chromium with a
+deterministic media adapter, measuring actual geometry, pointer ownership,
+focus, and responsive behavior. `verify` runs both.
+
+Both Verify jobs and the Pages predeployment job use `npm ci`. Browser
+installation is derived from the lockfile-resolved `playwright-core` version so
+dependency code and the installed browser cannot drift independently. Pages
+runs the same complete `npm run verify` gate before publishing.
+
+## Design discipline
+
+1. Source time is authoritative. Never store a Timeline coordinate.
+2. Timeline Space is derived, positive, continuous, and singly invertible.
+3. Compile one effective projection and pass it to every spatial consumer.
+4. A semantic consequence has one implementation even when several routes
+   acquire its operands differently.
+5. An operation changes only the state dimension named by that operation.
+6. Working Interval is the contiguous residue of excluded alternatives; do not
+   add a persistent Path.
+7. One gesture creates at most one Undo checkpoint.
+8. Current, Cursor, and media position are different authorities.
+9. Pin identity is graph identity. Coincident Address does not imply identity.
+10. Guide owns exact structure editing; Timeline owns spatial manipulation.
+11. Step Reach, Nudge, Context, Field offsets, Section Weight, Playback policy,
+    and deformation bypass have separate owners.
+12. Ordinary player controls and simple Center-only use must remain complete
+    when Guide, Field, Weight, or Focus is ignored.
+13. Presentation may preview or reshape the map; it may not invent semantic state.
+14. Repair a false test or document when a law changes; do not preserve an
+    obsolete generation merely to keep a gauge green.
 
 ## Change routing
 
-- Session/operator law: `session.js`, with pure geometry in `range-geometry.js`
-- Field Frame derivation, direction, and transitions: `field-frame.js`
-- Section density, mapping, and Pin positions: `timeline-projection.js`
-- Pin/Section lifecycle, weight validation, and migration: `guide.js`
-- Context/playback runtime: `transport.js`
-- Timeline and Guide projection: `view.js`
-- Timeline input, shortcuts, persistence, adapters: `app.js`
-- Held Step ownership: `step-gesture.js`
-- Field geometry/runtime: `step-field-geometry.js`, `step-field.js`
-- YouTube construction and placement: `youtube.js`
+| Change | Primary owner | Required neighboring proof |
+|---|---|---|
+| Range, Resolution, Refine, Step geometry | `range-geometry.js` | `session.js` transaction and pure tests |
+| Working Interval, operator consequence, Focus, history | `session.js` | route preview and application smoke |
+| Pin/Section/Group graph, Weight ladder, migration | `guide.js` | Guide validation, persistence, and group tests |
+| Operator identity, key, and shifted label | `operator-grammar.js` | DOM order, runtime branch, CSS area, browser geometry, canonical docs |
+| Effective density, inverse map, spatial midpoint | `timeline-projection.js` | every spatial consumer and atmosphere |
+| Context/Playback policy, offer resolution, wrap | `transport.js` | adapter actual-rate and application playback tests |
+| YouTube source identity or actual media state | `youtube.js` | source-generation and stale-event tests |
+| Field Frame identity or transition | `field-frame.js` | application owner selection and Field runtime |
+| Field bounds or breathing policy | `step-field-geometry.js` | controller lifecycle and browser presentation |
+| Tail/Lead player behavior | `step-field.js` | stale events, dormant panes, user activation, native-player isolation |
+| DOM projection and visual state | `view.js` | source audit plus Chromium proof |
+| Interaction acquisition, persistence, source boundary | `app.js` | route convergence and whole-system journeys |
+| Physical layout and accessibility | `index.html`, `styles.css`, `step-field.css`, `field-grammar.css` | integration audit and Chromium proof |
 
-Do not add Section-coverage branches to an operator. Extend the shared positive projection and prove its mapping first.
+Do not branch inside an operator on Section coverage. Extend or consume the
+shared projection. Do not make a view-only fix by adding another semantic state
+owner. Do not reach through the media adapter from application or Field code.
 
-## Required semantic discipline
+## Boundary requirements
 
-- Keep Range, Current, Cursor, Working Interval, Pins, and Section endpoints in source seconds.
-- Persist only a canonical Section factor, never Timeline Space, segment products, lane placement, or gradient state.
-- Keep every effective density strictly positive.
-- Compose overlapping Section factors deterministically and without priority.
-- Never make playback, Context, YouTube adapters, or live Field geometry consult
-  Section weights. Only the semantic operator owner may project preview
-  addresses through Timeline Space.
-- Preserve arbitrary overlap, asymmetric nesting, shared endpoints, and coincident extents.
-- Unlink must preserve Address and require confirmation. Link must start from
-  one independent endpoint, visibly arm after deliberate dwell on a valid
-  target, and merge Pin identity only on release.
-- Recompute adaptive Step from active weighted Range width, never from source duration or Field Offset.
-- Keep fixed Step Reach unchanged when Section geometry changes.
-- Hold and Stretch may update neither `fieldBreath`, `stepReach`, nor Guide.
-- Keep configured Field Offset separate from attained breathing relation.
-  Hidden/off panes must remain dormant, reject stale player events, and stay
-  outside the breathing synchronization barrier.
-- Guide precision editing and Deform stepping must call the same Session transactions.
-- Ambient Field state is a stable Frame, not a temporary transport result.
-  Resolve the next Frame once per semantic movement, never once per publish.
-- Context ending cannot trigger reframing. Context transport may move Center
-  only; its Tail and Lead edges are frozen for the window's whole lifetime.
-- No second drag implementation may exist in Guide. Spatial gestures belong to
-  the Timeline; Guide edits Addresses, metadata, and topology exactly.
-- No control may claim exact frame stepping without an adapter-provided frame
-  duration. Without one, the operation is Nudge and its quantum is seconds.
-- Never reduce the configured inner offset to fit the room a side has. If the
-  room is smaller than `x`, the side is non-operational and leaves the barrier.
-- Never introduce a movement quantum at or below `EPSILON`; Session treats such a
-  destination as the Address it started from, so the control becomes inert.
-- Resume breathing with the rate of the phase actually preserved, never with a
-  fixed outward pair.
-- Dragging or nudging Current must go through Step, never Go, so the retained
-  traversal extends or shortens instead of being redrawn.
-- Every increment control must repeat while held and settle as one transaction.
-- A pane bar that creates a stacking context must out-rank the transport surface,
-  or its popovers become unclickable.
-- Settings live with the question they answer. Movement magnitudes belong to
-  Movement distance; physical observation belongs to the Field.
-- One gutter and one control height per card. A row that measures itself
-  independently will not align with the rows above it.
-- A gesture and its exact numeric equivalent must present the same Field Frame.
-  If dragging an object centres the Viewer somewhere, editing its Address must
-  centre it in the same place.
-- Escape cancels the live direct manipulation before it closes anything behind
-  it, so one key never both abandons a drag and dismisses its surface.
-- Do not keep a guard that cannot fire. `parkSide` records the newest desired
-  address before any early return, so coalescing needs no second token.
-- Rapid visual transitions cannot block semantic commits. A transition is
-  attached to a commit that has already happened; discard superseded player
-  callbacks with the transition generation token rather than serializing them.
+### Projection
 
-## Testing map
+- Every effective factor is positive.
+- Active overlapping Section factors compose by multiplication without
+  priority.
+- `projection.weightedSections` is the authority for atmosphere as well as
+  geometry.
+- Deformation bypass is passed into projection construction and is never
+  written into Guide or history.
+- A focused viewport changes drawing only; operator metrics cannot observe it.
+- Dynamic Playback may read effective Weight only when its explicit rate policy
+  requests that relation.
 
-Every suite is listed. A suite that holds a law nobody can name from its
-filename is a suite nobody can audit, so the entry says what it holds rather
-than when it was written — six names still carry the release that motivated
-them, and the entry is the correction.
+### Transactions and interaction
 
-### Kernel and semantics
+- Direct manipulation snapshots one origin, amends it, and checkpoints once.
+- A pending Step stores only a transient visited envelope for reversal
+  settlement.
+- Timeline and off-map Shift-wheel share dominant-axis interpretation,
+  accumulation threshold, target key, direction, and settlement timer.
+- Browser scroll is prevented only after a valid Nudge target is acquired.
+- Matrix and Guide one-shot Shift latches can consume only themselves; physical
+  Shift consumes neither.
+- Exact Address input rejects malformed, out-of-Range, or structurally invalid
+  values instead of silently clamping.
+- Release, bare Timeline Go, Guide focus, and Timeline acquisition must preserve
+  their distinct selection consequences.
 
-- `tests.mjs` — Range geometry and Session transactions
-- `timeline-projection-tests.mjs` — canonical factors, maps, inverses, overlap composition, Pin order, migration
-- `v7-deformation-tests.mjs` — Deform ownership, adaptive Step, Guide graph, nested weights
-- `v7-coherence-tests.mjs` — guarded Step, Refine roles, source Field behavior, monotonic playback, Redo, exact previews, lane packing
-- `transport-tests.mjs` — source Context and proper-Range looping
-- `fuzz-tests.mjs` — deterministic semantic operations
-- `v5.8-regression-tests.mjs` — preserved interaction-kernel guarantees
-- `endpoint-transposition-tests.mjs` — endpoint frames and matrix ownership
-- `semantic-composition-tests.mjs` — cross-operator sequences
-- `semantic-audit-probes.mjs` — adversarial regressions
-- `semantic-state-space-tests.mjs` — extended state-space proof
-- `weight-invariance-tests.mjs` — what Weight may and may not reach: retained Addresses, duration, Nudge displacement, Context and Field geometry stay Weight-blind while Step, Refine and seeded Resolution are weighted
-- `focus-viewport-tests.mjs` — a focused extent fills the drawn timeline at every Weight, the drawing stays invertible edge to edge, and Unfocus restores the whole map
+### Playback and Field
 
-### Guide graph, Groups and Cues
+- Observation policy and rate policy are explicit and independent.
+- Stored wish, offered resolution, requested command, and confirmed actual rate
+  are never conflated.
+- Only the adapter's playback-rate event updates actual rate.
+- Retry and proper-Range wrap preserve the transport and reapply its policy.
+- A fixed Shift wish of `1×` remains Center-only.
+- The parent Play control may not cover native YouTube controls.
+- Field suspension derives from observation policy and confirmed compatibility,
+  not a numeric shortcut.
+- Field Breath defaults to `0.25–2.5 s` and `0.75× / 1× / 1.25×`, while saved
+  valid preferences and wider available settings remain valid.
+- Hold/Stretch changes neither preferences, Guide, Step Reach, nor history.
 
-- `group-tests.mjs` — one visible Timeline layer, an independent active deformation stack, hidden Guide navigation, endpoint visibility, multiplicative layering, non-destructive removal
-- `coherence-2-tests.mjs` — Section reachability, projected source midpoints, Cue extents, flat Group blocks, Focus boundary ownership, explicit Panorama activation
-- `coherence-3-tests.mjs` — canonical visible-Group identity that cannot express two or none, deterministic default and fallback, hidden-but-active layers, and the v8-to-v9 migration
-- `stabilization-tests.mjs` — Guide validation and repair: v8 round-trip of every retained dimension, corrupt membership repaired without invalidating a recoverable Guide, and source-impossible extents rejected at the Session boundary
-- `cue-tests.mjs` — timestamp forms, lenient description parsing, contiguous partition
-- `step-gesture-tests.mjs` — cadence, batching, one-Undo settlement
-- `step-field-tests.mjs` — pure Field geometry
-- `field-runtime-tests.mjs` — controller lifecycle
-- `field-grammar-tests.mjs` — UI ownership
-- `field-bounds-tests.mjs` — hard Range boundaries
-- `field-coherence-tests.mjs` — Step/Offset independence
-- `field-frame-tests.mjs` — Frame ownership, stable identity, transition descriptors
-- `field-breath-tests.mjs` — bounded breathing, barriers, Range clipping, Hold
-- `field-slideshow-tests.mjs` — directional transitions, coalescing, stale-event rejection
-- `nudge-tests.mjs` — Current drag, Shift-wheel/drag, keyboard nudging, one-Undo batching
+### Source and persistence
 
-### Interaction, against a DOM-free application
+- A load request is immutable and generation-owned.
+- Initialization requires the current generation and matching adapter `videoId`.
+- Every source replacement runs the one transition boundary before cueing.
+- No old-source drag, timer, selection, Field owner, transport, or checkpoint may
+  reach the fresh Session.
+- Version-9 Guide evidence is inspected before older fallbacks.
+- An unreadable higher-priority record must be quarantined before a fallback may
+  overwrite its current key. A failed quarantine disables that rewrite.
+- Empty because nothing existed and empty because recovery failed must produce
+  different status.
 
-- `startup-smoke.mjs` — the module graph loads and binds against a minimal document
-- `interaction-smoke.mjs` — the broad interaction sweep: Pin creation, retained Section editing, spatial unlink/link, Timeline dragging, exact Address editing, clustered Pins, Refine preview, Switch involution, composable Step intervals, universal Space playback, focus release
-- `guide-composition-smoke.mjs` — a plain click replaces, Shift extends across Pins and Sections alike, extension is monotonic, and a composed span Deforms into a parent
-- `cue-smoke.mjs` — offering retains nothing; navigation, composition, and retention
-- `section-weight-smoke.mjs` — shared familiar scale, Guide-only tuning, compression, expansion, gradients, weighted Step, identity recovery
-- `context-smoke.mjs` — automatic post-traversal observation, held-key Step deferral, delayed placement, Field suspension, replacement traversal, and the reversed Step sequence's observation and naming
-- `step-gesture-smoke.mjs` — captured and fallback pointer release, keyboard hold, and rapid taps on control and hotkey alike retaining one-operation Undo
-- `transport-coherence-smoke.mjs` — live projection, exact settlement, Focus-owned proper-Range looping, one-pass Field rebasing, wrap history isolation, Unfocus restoration
-- `metadata-smoke.mjs` — delayed YouTube duration is retried without a false zero-length session
+## Test suite map
 
-### Whole-system properties
+Every executable suite is listed here by the current behavior it protects.
 
-- `transaction-integrity-smoke.mjs` — one physical gesture is at most one checkpoint, a reported save is a save, Group names cannot collide, coincident Pin identity is never guessed, and an unreadable saved map is reported and set aside rather than overwritten
-- `route-correspondence-tests.mjs` — routes claiming one operation reach one result; each route runs in its own process because `app.js` is a module singleton
-- `cross-interaction-stress.mjs` — Group visibility and activity govern drawing and deformation independently, Cues project while staying inert, and one history stack unwinds the whole construction
-- `journey-smoke.mjs` — one operator's path end to end: arrive, orient, Pin, retain, name, weight, offer chapters, compose, focus, leave, reopen, move on
-- `browser-smoke.mjs` — the only suite in a real browser: the app runs in Chromium without error, a press lands on the Address drawn under it, a focused control owns Space, nothing reachable is covered, and the page never scrolls sideways
+### Pure kernel, projection, and semantic state
 
-### Gauges over the source itself
+- `tests.mjs` — Range geometry, Guide primitives, Session transactions, URL parsing, and base invariants.
+- `timeline-projection-tests.mjs` — positive factors, overlap products, forward/inverse round trips, effective contributors, bypass scope, Pin order, and migration.
+- `section-deformation-tests.mjs` — Section Weight, nested/overlapping Guide geometry, Pin movement, and spatial traversal consequences.
+- `operator-coherence-tests.mjs` — guarded Step, Refine roles, exact previews, weighted navigation, monotonic Playback residue, history, and lane packing.
+- `core-regression-tests.mjs` — kernel guarantees for scale, endpoint frames, Range, Focus, Guide, Playback, and Undo.
+- `endpoint-transposition-tests.mjs` — endpoint-frame involution, Local Refine, Step composition, collapse, and matrix consequence.
+- `semantic-composition-tests.mjs` — cross-operator interval containment, Local Refine complements, and truthful limits.
+- `semantic-boundary-tests.mjs` — adversarial operator boundaries and semantic-equivalence regressions.
+- `semantic-state-space-tests.mjs` — extended randomized state-space proof across operators, Focus, Guide, and bounds.
+- `fuzz-tests.mjs` — deterministic long sequences preserving Session and Guide invariants.
+- `weight-invariance-tests.mjs` — exact boundary between Weight-aware Timeline operations and Weight-blind source-time dimensions.
+- `focus-viewport-tests.mjs` — focused drawing fills the map while operator geometry remains independent of viewport.
+- `guide-session-completion-tests.mjs` — shared Group-deletion plan and sparse Step Reversal settlement.
 
-- `integration-check.mjs` — the composed product: DOM references, accessible controls, matrix ownership, weighted timeline, Guide graph, proper-Range playback
-- `project-audit.mjs` — module boundaries, retired artifacts, palette, hit regions, preview-layer ownership, and agreement between the canonical documents and the code
+### Transport, media, and Field
 
-Live visual judgment belongs to `VALIDATION.md`; nothing here replaces it.
+- `transport-tests.mjs` — explicit observation/rate policies, actual-rate authority, policy-preserving retry/rebase, log-space offers, and unbounded inverse Weight.
+- `youtube-tests.mjs` — URL/time parsing, loaded-source identity in snapshots, and actual playback-rate event delivery.
+- `step-gesture-tests.mjs` — repeat cadence, release batching, boundary stop, cancellation, and takeover.
+- `step-field-tests.mjs` — Field geometry, suspension, Hold/Stretch, side activation, user activation, and panoramic layout contracts.
+- `field-bounds-tests.mjs` — Range-contained side geometry, unavailable sides, Context suspension, and side Step.
+- `field-breath-tests.mjs` — conservative defaults, symmetric rates, expansion/contraction, Range clipping, synchronization, Hold, and resume.
+- `field-coherence-tests.mjs` — semantic Step Reach and physical Field offsets remain independent.
+- `field-frame-tests.mjs` — Frame ownership priority, stable identity, direction, Context edges, and direct-frame validation.
+- `field-grammar-tests.mjs` — Field UI ownership and the separation of Context, Hold/Stretch, Range loop, side Step, and Guide retention.
+- `field-runtime-tests.mjs` — real controller placement, proportional breathing, dormant panes, stale events, rate fallback, direct previews, and boundary recovery.
+- `field-slideshow-tests.mjs` — directional opacity transitions, rapid coalescing, reversal, stale callback rejection, and reduced motion.
 
-## Release workflow
+### Guide, Groups, Cues, modifiers, and routes
+
+- `group-tests.mjs` — zero-or-one visible Group, independent Active stack, hidden Guide navigation, Pin visibility, multiplicative layering, and planned deletion.
+- `system-coherence-tests.mjs` — Section reachability, projected midpoints, Cue extents, flat Group blocks, Focus ownership, and explicit Panorama activation.
+- `group-coherence-tests.mjs` — nullable visible-Group identity, independent activity, hidden-but-active deformation, Group removal, and version-9 migration.
+- `state-integrity-tests.mjs` — Guide validation, repair, round-trip completeness, membership recovery, and impossible source extents.
+- `cue-tests.mjs` — timestamp parsing and contiguous transient candidate extents without retained side effects.
+- `nudge-tests.mjs` — one wheel route, dominant axis, accumulation, target acquisition, keyboard and Guide convergence, one Undo, and preview parity.
+- `operator-grammar-tests.mjs` — the pure `QWE / ASD / RTF` fixture matches DOM order, keys, runtime branches, CSS areas, shifted meanings, and canonical docs.
+- `route-correspondence-tests.mjs` — distinct interaction routes claiming one operation reach the same canonical consequence.
+
+### DOM-free application behavior
+
+- `startup-smoke.mjs` — the module graph loads and binds against the minimal document contract.
+- `interaction-smoke.mjs` — matrix Tag routes, retained editing, unlink/link, Timeline manipulation, clusters, Shift traversal, Frame previews, Undo/Redo, and playback focus.
+- `guide-composition-smoke.mjs` — plain Guide selection replaces, Shift/Extend composes monotonically, and the result can be tagged as one parent Section.
+- `cue-smoke.mjs` — offering and drawing Cues is inert; navigation, composition, and Retain use canonical routes.
+- `section-weight-smoke.mjs` — Guide-only Weight editing, effective geometry and atmosphere, scoped/whole-map bypass, weighted Step, and exact restoration.
+- `context-smoke.mjs` — post-traversal Context, Step deferral, replacement, Field suspension, reversal naming, Off, and Undo isolation.
+- `step-gesture-smoke.mjs` — captured/fallback release, keyboard hold, and rapid taps settle as one action.
+- `transport-coherence-smoke.mjs` — actual-rate observation, effective dynamic projection, settlement, proper-Range wrap, retry, Field rebasing, and history isolation.
+- `metadata-smoke.mjs` — delayed valid metadata is retried without creating a zero-duration Session.
+- `source-boundary-smoke.mjs` — stale load generations plus Nudge, Step, Context, Playback, every drag owner, Guide identity, and bypass cleanup at source replacement.
+- `guide-recovery-smoke.mjs` — older fallback preservation, read/quarantine failures, truthful status, and unsafe current records remaining read-only.
+- `transaction-integrity-smoke.mjs` — one checkpoint per gesture, persistence honesty, source recovery evidence, Group identity, dense lanes, and coincident Pin identity.
+- `cross-interaction-stress.mjs` — Groups, Cues, Focus, Weight, traversal, Shift layers, Pin topology, and one history stack do not leak meanings into one another.
+- `journey-smoke.mjs` — the complete use order from load through traversal, Tag, Guide, Weight, Cues, composition, Focus, persistence, and source replacement.
+
+### Composition, source audits, and browser proof
+
+- `integration-check.mjs` — DOM references, accessibility names, exact matrix, module seams, source boundary, projection use, and route wiring.
+- `project-audit.mjs` — lockfile/release coherence, retired-language exclusions, canonical document agreement, CSS and module boundaries, and suite completeness.
+- `browser-smoke.mjs` — real Chromium geometry, equal square matrix cells, stable shifted labels, native-control hit access, exact Timeline pointer mapping, focus, responsive rails, dense structure, and compact reachability.
+
+## Change completion
+
+Before considering a change complete:
+
+1. add the smallest pure proof at the owner boundary;
+2. add a route-level proof when application acquisition or effects change;
+3. add Chromium coverage only for layout, hit testing, focus, native-control
+   access, or real browser event behavior;
+4. update all canonical documents and source audits from final behavior;
+5. run from a lockfile-controlled install:
 
 ```bash
-npm run check
+npm ci
+npm run verify
 ```
 
-Also inspect wide, narrow, and coarse-pointer layouts with:
-
-- all eight Section weights;
-- overlapping, nested, crossing, and coincident Sections;
-- dense Section lanes and Pin clusters;
-- compressed and expanded gradients;
-- a focused weighted Section;
-- a proper Range during playback wrap;
-- a full breathing cycle at each rate pair, including a Range-clipped side;
-- rapid same-direction and reversing traversal, with reduced motion enabled.
-
-No release is complete while canonical documents, audits, visible labels, or file names describe retired behavior.
+A clean release has no untracked generated dependency state, no retired control
+or key claims, and no parallel implementation of the same law.

@@ -112,8 +112,18 @@ for (
 // Overlapping Sections are ordinary composed scale transforms. Multiplication
 // is commutative, and reciprocal weights cancel in their shared span.
 const overlapGuide = createGuide("overlap");
-createSectionFromTimes(overlapGuide, 20, 60, { weight: 0.5 });
-createSectionFromTimes(overlapGuide, 40, 80, { weight: 2 });
+const compressedOverlap = createSectionFromTimes(
+  overlapGuide,
+  20,
+  60,
+  { weight: 0.5 }
+).section;
+const expandedOverlap = createSectionFromTimes(
+  overlapGuide,
+  40,
+  80,
+  { weight: 2 }
+).section;
 const overlap = createTimelineProjection({ duration: 100, guide: overlapGuide });
 assert.deepEqual(
   overlap.segments.map(segment => [
@@ -130,6 +140,71 @@ assert.deepEqual(
   ]
 );
 assert.equal(overlap.timelineExtent, 110);
+assert.deepEqual(
+  [...new Set(overlap.segments.flatMap(segment => segment.sectionIds))].sort(),
+  overlap.weightedSections.map(section => section.id).sort(),
+  "The projection exposes the exact effective contributors used by its segments."
+);
+
+// A source-scoped bypass removes only its target contribution. Stored Weight
+// remains canonical, overlapping contributors continue to act, and restoring
+// the bypass reconstructs the exact original map.
+const sectionBypass = createTimelineProjection({
+  duration: 100,
+  guide: overlapGuide,
+  deformationBypass: {
+    kind: "section",
+    sectionId: compressedOverlap.id
+  }
+});
+assert.deepEqual(
+  sectionBypass.weightedSections.map(section => section.id),
+  [expandedOverlap.id]
+);
+assert.deepEqual(
+  sectionBypass.segments.map(segment => [
+    segment.start,
+    segment.end,
+    segment.weight
+  ]),
+  [
+    [0, 40, 1],
+    [40, 80, 2],
+    [80, 100, 1]
+  ]
+);
+assert.equal(resolveSection(overlapGuide, compressedOverlap.id).weight, 0.5);
+assert.equal(resolveSection(overlapGuide, expandedOverlap.id).weight, 2);
+
+const wholeBypass = createTimelineProjection({
+  duration: 100,
+  guide: overlapGuide,
+  deformationBypass: { kind: "all" }
+});
+assert.deepEqual(wholeBypass.weightedSections, []);
+assert.deepEqual(
+  wholeBypass.segments.map(segment => [
+    segment.start,
+    segment.end,
+    segment.weight
+  ]),
+  [[0, 100, 1]],
+  "A complete bypass is a fully neutral, positive identity projection."
+);
+assert.equal(wholeBypass.timelineExtent, 100);
+assert.deepEqual(
+  createTimelineProjection({ duration: 100, guide: overlapGuide }).segments,
+  overlap.segments,
+  "Restoring deformation reproduces the original projection exactly."
+);
+
+const staleBypass = createTimelineProjection({
+  duration: 100,
+  guide: overlapGuide,
+  deformationBypass: { kind: "section", sectionId: "missing-section" }
+});
+assert.equal(staleBypass.deformationBypass, null);
+assert.deepEqual(staleBypass.segments, overlap.segments);
 
 const coextensiveGuide = createGuide("coextensive");
 createSectionFromTimes(coextensiveGuide, 20, 60, { weight: 0.5 });

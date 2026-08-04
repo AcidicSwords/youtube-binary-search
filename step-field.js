@@ -4,6 +4,7 @@
 // synchronization, Hold, and stale-event rejection. It imports neither operator arithmetic nor
 // Guide topology.
 import { EPSILON, clamp } from "./range-geometry.js";
+import { playbackAllowsPanorama } from "./transport.js";
 import { YOUTUBE_STATE, createYouTubePlayer, isYouTubeApiReady } from "./youtube.js";
 import {
   FIELD_FRAME_OWNER,
@@ -109,7 +110,6 @@ function structuralKey(snapshot) {
 
 export function fieldShouldSuspend(snapshot) {
   const transportKind = snapshot?.transport?.kind ?? snapshot?.transportKind;
-  const transportRate = snapshot?.transport?.rate ?? snapshot?.transportRate ?? 1;
   return Boolean(
     snapshot?.rangeDragging
     || snapshot?.dragging
@@ -120,12 +120,10 @@ export function fieldShouldSuspend(snapshot) {
     // Center's rate changes, so the Field suspends for the duration rather than
     // drifting. Stated here so it stays suspended for as long as the condition
     // holds, instead of being paused once and resuming on the next tick.
-    // A dynamic playback suspends the Panorama for its whole duration, not only
-    // while its current rate differs: the rate is going to change at the next
-    // Section boundary, and a Panorama that folded and unfolded around neutral
-    // ground would be worse than one that stays out of the way.
     || (transportKind === "playback"
-      && (transportRate !== 1 || snapshot?.transport?.dynamic || snapshot?.transportDynamic))
+      && (snapshot?.transport
+        ? !playbackAllowsPanorama(snapshot.transport)
+        : (snapshot?.transportRate ?? 1) !== 1 || snapshot?.transportDynamic === true))
   );
 }
 
@@ -679,7 +677,14 @@ export function createStepFieldController({
   function populateBreathRateControl(prefs) {
     const select = elements["field-breath-rate"];
     if (!select) return;
-    const steps = BREATH_RATE_STEPS;
+    const current = normalizeFieldBreath({ rate: prefs.breathRate }).rate;
+    // A valid saved spread remains an available choice even when it predates or
+    // falls between the provided presets. Otherwise assigning `select.value`
+    // would leave a real HTML select with no selected option while the Field
+    // continued to use the preserved value.
+    const steps = BREATH_RATE_STEPS.some(rate => Math.abs(rate - current) <= EPSILON)
+      ? [...BREATH_RATE_STEPS]
+      : [...BREATH_RATE_STEPS, current].sort((first, second) => first - second);
     const key = steps.join("|");
     if (select.dataset.rates !== key) {
       select.replaceChildren();
@@ -692,7 +697,7 @@ export function createStepFieldController({
       }
       select.dataset.rates = key;
     }
-    select.value = String(normalizeFieldBreath({ rate: prefs.breathRate }).rate);
+    select.value = String(current);
   }
 
   function establishSide(side, center, snapshot) {

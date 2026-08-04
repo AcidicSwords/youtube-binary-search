@@ -1,31 +1,52 @@
-import assert from "node:assert/strict";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 
-const read = path => readFileSync(new URL(`./${path}`, import.meta.url), "utf8");
+const read = path => readFileSync(new URL(`./${path}`, import.meta.url), "utf8")
+  .replace(/\r\n?/g, "\n");
+const failures = [];
+const check = (condition, message) => {
+  if (!condition) failures.push(message);
+};
+const has = (source, pattern, message) => {
+  pattern.lastIndex = 0;
+  check(pattern.test(source), message);
+};
+const lacks = (source, pattern, message) => {
+  pattern.lastIndex = 0;
+  check(!pattern.test(source), message);
+};
+const count = (source, pattern) => {
+  const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+  return [...source.matchAll(new RegExp(pattern.source, flags))].length;
+};
+const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const canonicalNames = [
+  "README.md",
+  "PROJECT.md",
+  "GLOSSARY.md",
+  "SPEC.md",
+  "IMPLEMENTATION.md",
+  "INTERFACE.md",
+  "DEVELOPMENT.md",
+  "VALIDATION.md"
+];
+const docs = Object.fromEntries(canonicalNames.map(name => [name, read(name)]));
 const pkg = JSON.parse(read("package.json"));
 const html = read("index.html");
-const styles = read("styles.css");
-const fieldCss = read("step-field.css");
-const grammarCss = read("field-grammar.css");
 const app = read("app.js");
-const format = read("format.js");
 const view = read("view.js");
+const styles = read("styles.css");
 const session = read("session.js");
-const guide = read("guide.js");
-const projection = read("timeline-projection.js");
-const transport = read("transport.js");
-const field = read("step-field.js");
-const fieldGeometry = read("step-field-geometry.js");
-const fieldFrame = read("field-frame.js");
-const rangeGeometry = read("range-geometry.js");
-const stepGesture = read("step-gesture.js");
-const youtube = read("youtube.js");
+const workflow = read(".github/workflows/verify.yml");
+const deployWorkflow = existsSync(new URL("./.github/workflows/deploy-pages.yml", import.meta.url))
+  ? read(".github/workflows/deploy-pages.yml")
+  : "";
+const canonicalText = canonicalNames.map(name => docs[name]).join("\n");
+const productText = [html, app, view, styles, session].join("\n");
 
-// Artifacts of a finished patch or migration. Each one described a state the
-// project has since left, so keeping it means shipping a document that
-// contradicts the code -- STABILIZATION_NOTES.md still said Guides persist
-// under a v8 key after v9 replaced it.
-for (const retiredArtifact of [
+// A completion release contains current law, not patch-delivery debris or a
+// second retired implementation waiting to be rediscovered.
+for (const retired of [
   ".v5.2-patch-backup",
   "BRANCH_INSTALL.md",
   "DELETE_FILES.txt",
@@ -42,575 +63,307 @@ for (const retiredArtifact of [
   "structure.js",
   "traversal.js",
   "v5.2-regression-tests.mjs"
+]) check(!existsSync(new URL(`./${retired}`, import.meta.url)), `Retired artifact remains: ${retired}.`);
+
+check(pkg.name === "video-cartography", "package.json retains the canonical package name.");
+check(pkg.version === "8.0.0", "Completion release is package version 8.0.0.");
+check(pkg.private === true && pkg.type === "module", "The static private ES-module package boundary is explicit.");
+check(pkg.scripts?.verify === "npm run check && npm run test:browser",
+  "verify composes the DOM-free and Chromium gates.");
+check(pkg.scripts?.audit === "node integration-check.mjs && node project-audit.mjs",
+  "Both final-law gauges are part of check.");
+check(pkg.scripts?.["test:browser"] === "node browser-smoke.mjs",
+  "The browser proof has one package route.");
+has(pkg.scripts?.check || "", /npm run test:semantic/, "The extended semantic state-space proof runs in check.");
+has(pkg.scripts?.check || "", /npm run audit/, "The validation gauges run in check.");
+
+// Reproducibility is a release law. Dependency selection happens once in the
+// lockfile, both verification jobs install it exactly, and Chromium follows the
+// resolved playwright-core version rather than another hand-written number.
+const lockUrl = new URL("./package-lock.json", import.meta.url);
+check(existsSync(lockUrl), "package-lock.json is committed.");
+let lock = null;
+if (existsSync(lockUrl)) {
+  try {
+    lock = JSON.parse(read("package-lock.json"));
+  } catch {
+    failures.push("package-lock.json is valid JSON.");
+  }
+}
+if (lock) {
+  check(lock.lockfileVersion === 3, "The lockfile uses the current npm lock format.");
+  check(lock.name === pkg.name && lock.version === pkg.version,
+    "Lockfile package identity/version matches package.json.");
+  check(lock.packages?.[""]?.version === pkg.version,
+    "Lockfile root package version matches package.json.");
+  const declared = pkg.devDependencies?.["playwright-core"];
+  const lockedRoot = lock.packages?.[""]?.devDependencies?.["playwright-core"];
+  const resolved = lock.packages?.["node_modules/playwright-core"]?.version;
+  check(Boolean(declared && resolved), "playwright-core is declared and resolved in the lockfile.");
+  check(declared === lockedRoot, "Lockfile records the exact top-level Playwright declaration.");
+  check(!/^[~^]/.test(declared || ""), "Top-level playwright-core is exact rather than a drifting range.");
+  check(declared === resolved, "Top-level playwright-core matches the locked installed version.");
+}
+check(count(workflow, /^\s*- run:\s*npm ci(?:\s|$)/gm) === 2,
+  "Both Verify jobs install with npm ci.");
+lacks(`${workflow}\n${deployWorkflow}`, /\bnpm install\b/,
+  "No CI workflow bypasses the lockfile with npm install.");
+has(workflow, /playwright@"\$\(node -p 'require\("playwright-core\/package\.json"\)\.version'\)"/,
+  "Chromium install follows the lock-resolved playwright-core version.");
+lacks(workflow, /playwright@\d/, "CI carries no second hand-written Playwright version.");
+if (deployWorkflow) {
+  has(deployWorkflow, /\bnpm ci\b/, "The Pages verification job also uses the committed lockfile.");
+  has(deployWorkflow, /\bnpm run verify\b/,
+    "Pages deployment is gated by the complete browser-backed release command.");
+  lacks(deployWorkflow, /^\s*- master\s*$/m,
+    "Pages no longer advertises a nonexistent legacy branch.");
+}
+
+// Package gates execute every executable suite. A file that is not reachable
+// from a script is not release evidence; a removed file cannot remain in docs.
+const suiteNames = readdirSync(new URL("./", import.meta.url))
+  .filter(name => name.endsWith(".mjs"))
+  .filter(name => !name.endsWith("-harness.mjs"))
+  .sort();
+const packageScripts = Object.values(pkg.scripts || {}).join(" && ");
+for (const suite of suiteNames) {
+  check(packageScripts.includes(suite), `${suite} is reachable from a package gate.`);
+}
+const mappedSuites = [...docs["DEVELOPMENT.md"].matchAll(/^\s*-\s+`([^`]+\.mjs)`\s+[—-]/gm)]
+  .map(match => match[1]);
+for (const suite of suiteNames) {
+  check(mappedSuites.filter(name => name === suite).length === 1,
+    `DEVELOPMENT.md maps ${suite} exactly once.`);
+}
+for (const mapped of new Set(mappedSuites)) {
+  check(suiteNames.includes(mapped), `DEVELOPMENT.md maps only existing suites (${mapped}).`);
+}
+
+// The grammar proof is data shared by tests, not a second UI implementation.
+for (const fixture of ["operator-grammar.js", "operator-grammar-tests.mjs"]) {
+  check(existsSync(new URL(`./${fixture}`, import.meta.url)), `${fixture} exists.`);
+}
+if (existsSync(new URL("./operator-grammar.js", import.meta.url))) {
+  const grammar = read("operator-grammar.js");
+  has(grammar, /\[\s*Object\.freeze\(\{ id: "refine-backward"[\s\S]*?id: "reopen"[\s\S]*?id: "refine-forward"/,
+    "Grammar fixture states the QWE row.");
+  has(grammar, /id: "step-backward"[\s\S]*?id: "switch-endpoint"[\s\S]*?id: "step-forward"/,
+    "Grammar fixture states the ASD row.");
+  has(grammar, /id: "release"[\s\S]*?id: "tag"[\s\S]*?id: "focus-toggle"/,
+    "Grammar fixture states the RTF row.");
+}
+has(read("operator-grammar-tests.mjs"), /from "\.\/operator-grammar\.js"/,
+  "The grammar proof imports the fixture.");
+
+// Document identity and release authority.
+has(docs["README.md"], /^# Video Cartography\s*$/m, "README has the product heading.");
+has(docs["PROJECT.md"], /^# Video Cartography\s*$/m, "PROJECT has the stable product heading.");
+has(docs["GLOSSARY.md"], /^# Video Cartography\s+—\s+Canonical Glossary\s*$/m,
+  "GLOSSARY identifies itself as canonical.");
+has(docs["SPEC.md"], /^# Video Cartography\s+—\s+Canonical Specification\s*$/m,
+  "SPEC identifies itself as canonical.");
+has(docs["IMPLEMENTATION.md"], /^# Video Cartography\s+—\s+Canonical Implementation\s*$/m,
+  "IMPLEMENTATION identifies itself as canonical.");
+has(docs["INTERFACE.md"], /^# Video Cartography\s+—\s+Interface Grammar\s*$/m,
+  "INTERFACE identifies the UI grammar.");
+for (const name of canonicalNames.slice(1)) {
+  check(docs["README.md"].includes(`\`${name}\``), `README links ${name}.`);
+}
+has(docs["SPEC.md"], new RegExp(`package release \\*\\*${escapeRegExp(pkg.version)}\\*\\*`, "i"),
+  "SPEC authority exactly matches the package release version.");
+lacks(docs["SPEC.md"], /normative for v(?!8\.0\.0\b)\d/i,
+  "SPEC contains no stale normative release version.");
+
+// Each canonical document has a distinct job and states the final behavior at
+// that altitude. These checks bind to law-bearing terms, not patch history.
+for (const section of [
+  /## Load and play/,
+  /## Panoramic Phase Field/,
+  /## Temporal Topography/,
+  /## Working Interval and operators/,
+  /## Guide and direct manipulation/,
+  /## Shortcuts/,
+  /## Run locally/
+]) has(docs["README.md"], section, `README includes user orientation ${section}.`);
+has(docs["README.md"], /ordinary YouTube player[\s\S]*?(?:captions|settings)[\s\S]*?fullscreen/i,
+  "README preserves ordinary player capability.");
+has(docs["README.md"], /npm ci[\s\S]*?npm run verify/,
+  "README gives reproducible setup and the complete release gate.");
+check(docs["README.md"].split("\n").length <= 240,
+  "README remains a concise user orientation rather than a second specification.");
+
+for (const law of [
+  /source time is authoritative/i,
+  /Timeline Space is positive[\s\S]*invertible/i,
+  /contiguous Working Interval residue/i,
+  /one semantic consequence has one implementation/i,
+  /ordinary video-player capability/i,
+  /advanced mechanism.*optional/i
+]) has(docs["PROJECT.md"], law, `PROJECT states design law ${law}.`);
+has(docs["PROJECT.md"], /Q\s+Refine Backward[\s\S]*W\s+Reopen[\s\S]*E\s+Refine Forward[\s\S]*R\s+Release[\s\S]*T\s+Tag[\s\S]*F\s+Focus/,
+  "PROJECT states exact QWE / ASD / RTF.");
+has(docs["PROJECT.md"], /Toggle Deformation[\s\S]*transient[\s\S]*source-scoped/i,
+  "PROJECT explains optional deformation comparison without editing Weight.");
+
+for (const entry of [
+  "Tag",
+  "Deformation Bypass / Toggle Deformation",
+  "Drawn Group",
+  "Release",
+  "Dynamic Playback",
+  "Load Generation",
+  "Source-transition boundary",
+  "Guide Recovery"
 ]) {
-  assert.equal(existsSync(retiredArtifact), false, `Retired artifact remains: ${retiredArtifact}`);
+  has(docs["GLOSSARY.md"], new RegExp(`^\\s*- \\*\\*${escapeRegExp(entry)}\\*\\*\\s+—`, "mi"),
+    `GLOSSARY defines ${entry}.`);
+}
+has(docs["GLOSSARY.md"], /Drawn Group[\s\S]{0,240}?At most one Group is drawn[\s\S]{0,100}?no Group/i,
+  "Glossary defines zero-or-one drawn Group.");
+has(docs["GLOSSARY.md"], /Release[\s\S]{0,300}?Working Interval[\s\S]{0,120}?acquired Timeline operand[\s\S]{0,220}?preserves Current/i,
+  "Glossary defines Release's exact cleared and preserved dimensions.");
+has(docs["GLOSSARY.md"], /Dynamic Playback[\s\S]{0,260}?effective Weight/i,
+  "Glossary qualifies the optional dynamic Weight read-through.");
+lacks(docs["GLOSSARY.md"], /^\s*- \*\*Cue\*\*[^\n]*not[^\n]*projected/im,
+  "Glossary does not contradict the projection used to draw optional Cues.");
+
+for (const law of [
+  /### 3\.3 Subtractive Working Interval/,
+  /### 4\.3 One effective projection/,
+  /### 4\.4 Deformation-bypass law/,
+  /### 5\.1 Exact matrix/,
+  /### 5\.7 Release/,
+  /### 5\.8 Tag/,
+  /### 8\.2 Explicit Playback ownership/,
+  /### 9\.3 Recovery result/,
+  /### 10\.1 Generation-owned loading/,
+  /### 10\.2 One source-transition boundary/
+]) has(docs["SPEC.md"], law, `SPEC contains final law ${law}.`);
+has(docs["SPEC.md"], /density at source Address[^\n]*product of weights[\s\S]*?Timeline\(t\)\s*=\s*integral/i,
+  "SPEC defines positive compositional Timeline density.");
+has(docs["SPEC.md"], /observationPolicy:\s*"panorama" \| "center-only"[\s\S]*ratePolicy:[\s\S]*actualRate:/,
+  "SPEC separates observation, rate policy, and confirmed actual rate.");
+has(docs["SPEC.md"], /unreadableHigherPriorityRecords[\s\S]*quarantineSucceeded[\s\S]*safeToRewriteCurrent/,
+  "SPEC defines the complete non-destructive Guide recovery result.");
+
+for (const implementationLaw of [
+  /## Ownership/,
+  /## Operator routes/,
+  /## One effective projection/,
+  /### Deformation bypass/,
+  /## Persistence and recovery/,
+  /## Source-generation boundary/,
+  /## Nudge and direct manipulation/,
+  /## Playback and media authority/,
+  /## Field Frame and Field Breath/
+]) has(docs["IMPLEMENTATION.md"], implementationLaw,
+  `IMPLEMENTATION describes ${implementationLaw}.`);
+has(docs["IMPLEMENTATION.md"], /projection\.weightedSections|effective contributors/i,
+  "IMPLEMENTATION says atmosphere consumes effective projection contributors.");
+has(docs["IMPLEMENTATION.md"], /Guide persistence is source-keyed under version 9/i,
+  "IMPLEMENTATION names the exact current Guide persistence version.");
+has(docs["IMPLEMENTATION.md"], /rejects?[^\n]*outside[^\n]*Range/i,
+  "IMPLEMENTATION says exact Address input rejects rather than clamps.");
+has(docs["IMPLEMENTATION.md"], /One wheel handler/i,
+  "IMPLEMENTATION states one shared wheel accumulator route.");
+
+for (const interfaceLaw of [
+  /## Panorama/,
+  /## Temporal Topography/,
+  /## Operators/,
+  /### Tag/,
+  /### Toggle Deformation/,
+  /## Guide/,
+  /### Sections/,
+  /### Pins/,
+  /### Cues/,
+  /## Parameters/,
+  /## Keyboard and modifier reference/
+]) has(docs["INTERFACE.md"], interfaceLaw, `INTERFACE describes ${interfaceLaw}.`);
+has(docs["INTERFACE.md"], /physical square[\s\S]{0,100}?QWE \/ ASD \/ RTF/i,
+  "INTERFACE states the physical matrix geometry.");
+has(docs["INTERFACE.md"], /Toggle Deformation[\s\S]{0,420}?(?:outside|below) the square|(?:outside|below) the square[\s\S]{0,420}?Toggle Deformation/i,
+  "INTERFACE places X as an Operators auxiliary action.");
+has(docs["INTERFACE.md"], /At most one Group[\s\S]{0,180}?(?:none|no\s+Group)/i,
+  "INTERFACE states zero-or-one drawn Group.");
+has(docs["INTERFACE.md"], /actual surviving Group|real (?:destination|heir)|destination Group/i,
+  "INTERFACE reports the real Group deletion destination.");
+
+has(docs["DEVELOPMENT.md"], /npm ci[\s\S]*?complete release gate[\s\S]*?npm run verify/i,
+  "DEVELOPMENT gives locked setup and the complete release gate.");
+has(docs["DEVELOPMENT.md"], /npm run check[^\n]*(?:not complete|necessary but not complete)/i,
+  "DEVELOPMENT explicitly limits the fast gate.");
+for (const heading of [
+  /### Matrix and Tag/,
+  /### Effective projection and deformation bypass/,
+  /### Playback and ordinary-player integrity/,
+  /### Source and Guide integrity/,
+  /### Groups, modifiers, Nudge, and Step reversal/,
+  /### Field/,
+  /### Documentation and gauges/
+]) has(docs["VALIDATION.md"], heading, `VALIDATION includes ${heading}.`);
+has(docs["VALIDATION.md"], /npm ci[\s\S]*?npm run verify/,
+  "VALIDATION starts from the reproducible complete release gate.");
+for (const journey of ["ordinary player", "operator comprehension", "retain and compose", "deformation comparison", "Field", "source and recovery integrity"]) {
+  has(docs["VALIDATION.md"], new RegExp(`### Journey [A-F] — ${escapeRegExp(journey)}`, "i"),
+    `VALIDATION retains manual journey ${journey}.`);
 }
 
-const docs = Object.fromEntries([
-  "README.md",
-  "PROJECT.md",
-  "GLOSSARY.md",
-  "SPEC.md",
-  "IMPLEMENTATION.md",
-  "INTERFACE.md",
-  "DEVELOPMENT.md",
-  "VALIDATION.md"
-].map(path => [path, read(path)]));
+// Retired language is a build failure because it advertises a parallel law.
+// Technical helpers such as normalizeGuide remain valid; only product operation
+// grammar is excluded here.
+const retiredLanguage = [
+  [/\bShift\s*\+\s*P\b|\bShift\+P\b|<kbd>\s*P\s*<\/kbd>|`P`\s+(?:Tag|Pin|save|retain)/i,
+    "P/Shift+P is advertised as a product binding."],
+  [/\b(?:Shift|Alt)\s*\+\s*X\b|\b(?:Shift|Alt)\+X\b/i,
+    "A retired X modifier is advertised."],
+  [/^#{1,6}\s+Normalize\b|\bNormalize\s+(?:button|control|operator|action|operation)\b|\bX\s+normalizes?\b/im,
+    "Normalize remains a product-facing operation."],
+  [/\bWorking Section\b/i, "Pre-retention UI still says Working Section."],
+  [/\bRelease\s*[\/-]\s*Deform\s*[\/-]\s*Focus\b|\bRelease, Deform, and Focus\b/i,
+    "The obsolete bottom-row trichotomy remains."],
+  [/\bexactly one (?:visible|drawn|on[- ]Timeline) Group\b/i,
+    "A canonical document forbids the valid no-Group-drawn state."],
+  [/\bDeform\b/i, "Deform remains named as a current operator."],
+  [/\bShift\+X\b|\bAlt\+X\b/i, "An obsolete Weight chord remains."],
+  [/Timeline (?:header )?(?:Normalize|normalization) (?:button|control|action)/i,
+    "A Timeline Normalize control remains documented."]
+];
+for (const [pattern, message] of retiredLanguage) lacks(canonicalText, pattern, message);
+lacks(productText, /\bWorking Section\b|toggleNormalize\b|state\.normalize\b|timeline-normalize|#tag\s*\{\s*grid-area:\s*deform/i,
+  "Product source contains no retired Normalize/Working Section/matrix seam.");
+lacks(html, /<kbd>\s*P\s*<\/kbd>|Shift\s*\+\s*P|Shift\s*\+\s*X|Alt\s*\+\s*X|>\s*Normalize\s*</i,
+  "Visible controls advertise no retired binding or Normalize label.");
 
-function cssHex(name) {
-  const match = styles.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, "i"));
-  assert.ok(match, `Missing CSS color token --${name}.`);
-  return match[1];
-}
-
-function relativeLuminance(hex) {
-  const channels = hex.slice(1).match(/../g).map(value => parseInt(value, 16) / 255);
-  const linear = channels.map(value =>
-    value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
-  );
-  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
-}
-
-function contrastRatio(first, second) {
-  const a = relativeLuminance(first);
-  const b = relativeLuminance(second);
-  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-}
-
-assert.equal(pkg.name, "video-cartography");
-// The DOM-free gate stays the fast one; the browser gate is separate because it
-// needs Chromium and answers different questions. `verify` is both.
-assert.equal(pkg.scripts["test:browser"], "node browser-smoke.mjs");
-assert.equal(pkg.scripts.verify, "npm run check && npm run test:browser");
-assert.ok(pkg.devDependencies?.["playwright-core"],
-  "The browser gate declares its dependency.");
-// The browsers the runner downloads must match the library that will drive
-// them. Naming a version in the workflow made it a second place to state one
-// fact: the caret range drifted to 1.62 while the workflow stayed at 1.49, the
-// runner fetched browsers the library never looked for, and the browser gate
-// could not pass on any commit. One place states it.
-{
-  const workflow = read(".github/workflows/verify.yml");
-  assert.match(workflow, /playwright@"\$\(node -p 'require\("playwright-core\/package\.json"\)\.version'\)"/,
-    "The workflow installs browsers for the playwright-core version it resolved.");
-  assert.doesNotMatch(workflow, /playwright@\d/,
-    "and never names a Playwright version of its own.");
-}
-assert.equal(pkg.version, "8.0.0");
-assert.ok(pkg.description, "The package must carry the project description.");
-assert.match(docs["SPEC.md"], /^# Video Cartography — Canonical Specification\r?\n/);
-assert.match(docs["IMPLEMENTATION.md"], /^# Video Cartography — Canonical Implementation\r?\n/);
-assert.match(docs["INTERFACE.md"], /^# Video Cartography — Interface Grammar\r?\n/);
-for (const name of ["PROJECT.md", "GLOSSARY.md", "SPEC.md", "IMPLEMENTATION.md", "INTERFACE.md", "DEVELOPMENT.md", "VALIDATION.md"]) {
-  assert.ok(docs["README.md"].includes(`\`${name}\``), `README must link ${name}`);
-}
-
-// Drawings, mechanism and gauges must state one law. Each of these was a live
-// contradiction: a ladder the code does not use, a claim that no Pin is ever
-// hidden after Group visibility made that routine, a Current drag described as
-// Go where the law is Step, and an Address input described as clamping where
-// Validation requires rejection.
-assert.doesNotMatch(docs["IMPLEMENTATION.md"], /0\.25×–2×/,
-  "The canonical Weight ladder is 0.125x-4x.");
-assert.match(docs["IMPLEMENTATION.md"], /0\.125×–4×/);
-assert.doesNotMatch(docs["README.md"], /hidden Pins,/,
-  "Group visibility makes Timeline-hidden, Guide-reachable Pins ordinary.");
-assert.doesNotMatch(docs["IMPLEMENTATION.md"], /Current marker: acquired on pointer-down, then exact Go/,
-  "Releasing a Current drag commits a Step, not a Go.");
-// Checked across every canonical document, not one: the contradiction this
-// replaced survived in SPEC.md because the assertion named only INTERFACE.md.
 for (const [name, text] of Object.entries(docs)) {
-  assert.doesNotMatch(text, /clamp against Range/,
-    `${name}: exact Address input rejects rather than clamps.`);
-}
-assert.match(docs["INTERFACE.md"], /reject anything outside Range/);
-
-// The testing map is a gauge like any other, and an incomplete one is worse than
-// none: twenty suites once held laws no document named, so the volume read as
-// accumulation instead of coverage. Adding a suite without saying what it holds
-// fails here, and so does naming a suite that no longer exists.
-{
-  const suites = readdirSync(new URL("./", import.meta.url))
-    .filter(name => name.endsWith(".mjs") && !name.endsWith("-harness.mjs"));
-  const listed = new Set(
-    (docs["DEVELOPMENT.md"].match(/`[a-z0-9.-]+\.mjs`/g) || [])
-      .map(entry => entry.slice(1, -1))
-  );
-  for (const suite of suites) {
-    assert.ok(listed.has(suite), `DEVELOPMENT.md must say what \`${suite}\` holds.`);
-  }
-  for (const entry of listed) {
-    assert.ok(suites.includes(entry), `DEVELOPMENT.md names a suite that does not exist: ${entry}`);
+  for (const line of text.split("\n")) {
+    if (!line.includes("npm run check")) continue;
+    check(
+      !/(?:required|complete|release)\s+(?:automated\s+)?(?:gate|proof)/i.test(line)
+        || /not complete|alone does not|necessary but not complete/i.test(line),
+      `${name} must not present npm run check as complete release proof.`
+    );
   }
 }
-assert.match(docs["SPEC.md"], /reject anything outside\nRange/);
-assert.match(app, /function parseAddress[\s\S]*parts\.slice\(1\)\.some\(part => Number\(part\) >= 60\)/,
-  "and refuses timecode parts that are not timecode.");
 
-const canonicalText = [html, ...Object.values(docs)].join("\n");
-// Names of things this project no longer has. Every entry was once described in
-// a canonical document after the thing itself was gone: the Tune popover
-// survived in three of them because moving the controls into Parameters changed
-// no assertion. A retired interface element is a retired name.
-assert.doesNotMatch(canonicalText, /\bApplication Continue\b|\bSkim\b|Fold Point proxy/i);
-assert.doesNotMatch(canonicalText, /Tune popover|Tune disclosure|field-settings-popover/i,
-  "The Panorama's Tune popover is gone: its controls are Parameters.");
-assert.doesNotMatch(canonicalText, /Pin Forward\/Backward replaces Interval/i);
-assert.doesNotMatch(html, /id="loop"|id="pin-backward"|id="pin-forward"/);
+// Visual and CSS debris checks belong in the repository audit because empty or
+// dead rules are not runtime behavior and should be deleted, not tested around.
+lacks(styles, /@media[^\{]*\{\s*\}/, "No empty media query remains.");
+lacks(styles, /\.timeline-normalize\b|grid-area:\s*deform\b|\.deform-action\b/,
+  "No dead Normalize/Deform control CSS remains.");
+has(styles, /\.timeline-pin\.retained-selected::before\s*\{[^}]*outline:/,
+  "Acquired Pin identity uses its own outline channel.");
+has(styles, /\.timeline-pin\.section-endpoint-pin\.extent-selected::before\s*\{[^}]*box-shadow:/,
+  "Working-Interval endpoint relation remains visible beside acquisition.");
+has(styles, /\.timeline-pin\.snap-target\.snap-armed::before\s*\{[^}]*outline:/,
+  "Transient armed snap state has a separate outline/glow channel.");
 
-assert.match(html, /player-panel[\s\S]*timeline-panel[\s\S]*command-workspace/);
-assert.match(app, /"player-panel",[\s\S]*"timeline-panel",[\s\S]*"parameter-panel",[\s\S]*"navigation-panel"[\s\S]*\.inert = compact && guideVisible/);
-assert.doesNotMatch(app, /elements\["reader-column"\]\.inert/,
-  "Compact Guide must not inert the Guide nested inside reader-column.");
-assert.match(html, /command-workspace[\s\S]*parameter-panel[\s\S]*navigation-panel[\s\S]*guide-panel/);
-assert.match(html, /id="guide-toggle"[^>]*aria-controls="command-workspace"/);
-assert.match(html, /id="operator-toggle"[^>]*aria-controls="command-workspace"/);
-assert.match(styles, /\.reader-column\.rail-collapsed[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*0/);
-assert.match(styles, /\.command-workspace\.is-collapsed[\s\S]*visibility:\s*hidden/);
-assert.match(styles, /\.navigation-panel\s*\{[\s\S]*?order:\s*2/);
-assert.match(styles, /\.parameter-panel\s*\{[\s\S]*?order:\s*3/);
-assert.match(styles, /\.guide-panel\s*\{[\s\S]*?order:\s*1/);
-assert.match(app, /rail\.classList\.toggle\("is-collapsed",\s*!compact && !open\)/);
-assert.match(app, /rail\.classList\.toggle\("mode-guide"[\s\S]*rail\.classList\.toggle\("mode-controls"/);
-assert.match(app, /elements\[id\]\.hidden = !controlsVisible/);
-assert.match(app, /"reader-column"\]\.classList\.toggle\("rail-collapsed",\s*!compact && !open\)/);
-assert.match(html, /id="timeline-ruler"[\s\S]*id="section-lane"[\s\S]*id="pin-lane"/);
-assert.match(html, /timeline-legend[\s\S]*timeline-key-sections[\s\S]*timeline-key-interval[\s\S]*timeline-key-pins/);
-// Current reads its own Address on the map, under its marker. The header keeps
-// only what the map does not already answer.
-assert.doesNotMatch(html, /id="timeline-current-time"/,
-  "Current must not be reprinted in the timeline header.");
-assert.match(html, /id="cursor-time"[\s\S]*id="duration-time"/);
-assert.match(view, /current-marker-time[\s\S]*currentMarkerTime\.textContent = formatTime\(candidate\)/);
-assert.doesNotMatch(html, /id="fold-lane"/);
-assert.match(html, /id="step-size-settings"[\s\S]*id="step-mode-fixed"[\s\S]*id="step-mode-adaptive"/);
-assert.match(html, /data-step-fraction="0\.03125"[\s\S]*data-step-fraction="0\.0625"[\s\S]*data-step-fraction="0\.125"/);
-assert.match(html, /Manual distance/);
-// Step distance is a Timeline distance. The setting must say so, because the
-// number only equals source seconds at neutral Weight.
-assert.match(html, /Step distance is measured across the Timeline/);
-assert.match(html, /active Range’s weighted Timeline width/);
-// T is Tag: retaining what you are looking at is the thing reached for most, so
-// it holds the key nearest the hand. Deform holds X. The pair T/Shift+T used to
-// be P/Shift+P, far enough from the rest that Deform became the habitual way to
-// make a Section -- which is how Deform acquired a creation job it never wanted.
-assert.match(html, /id="pin-current"[^>]*aria-keyshortcuts="T"[^>]*>Tag as Pin</);
-assert.match(html, /id="save-section"[^>]*aria-keyshortcuts="Shift\+T"[^>]*>Tag as Section</);
-assert.doesNotMatch(html, /aria-keyshortcuts="P"|aria-keyshortcuts="Shift\+P"/,
-  "P is unbound; nothing claims it.");
-// X is Normalize: the inverse of Weight, and the reason Weight is usable at all.
-// Deformation is right almost always and intolerable when you want to act on a
-// straight line, so the way out is one key with no modifier. Weights themselves
-// are edited in the Guide, where the value lives, which is why the Deform
-// controls carry no chord of their own any more.
-assert.match(html, /id="normalize-toggle"[^>]*aria-keyshortcuts="X"/,
-  "Normalize sits with the Timeline it straightens.");
-assert.doesNotMatch(html, /aria-keyshortcuts="(?:Shift|Alt)\+X"/,
-  "and carries no modifier, because it has one meaning.");
-assert.doesNotMatch(html, /id="deform"/,
-  "Deform is gone from the matrix: Tag holds that slot, and Weight is assigned in the Guide.");
-assert.match(html, /id="tag"[^>]*aria-keyshortcuts="T Shift\+T"/,
-  "Tag is the matrix operator for retaining what you are looking at.");
-assert.doesNotMatch(html, /id="deform-weight-select"/);
-
-assert.match(
-  styles,
-  /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward switch-endpoint step-forward"[\s\S]*"release tag focus"/
-);
-for (const area of [
-  "#refine-backward { grid-area: refine-backward; }",
-  "#switch-endpoint { grid-area: switch-endpoint; }",
-  "#release { grid-area: release; }",
-  "#tag { grid-area: deform; }",
-  "#focus-toggle { grid-area: focus; }"
-]) assert.ok(styles.includes(area), `Missing matrix area: ${area}`);
-
-assert.match(styles, /\.deformation-atmosphere[\s\S]*linear-gradient/);
-assert.match(styles, /\.deformation-contours i[\s\S]*linear-gradient/);
-assert.match(view, /function sectionColor[\s\S]*#ff8a70[\s\S]*#c7d0dd/);
-assert.match(
-  styles,
-  /\.pin-cluster-menu\s*\{[^}]*display:\s*grid[^}]*width:\s*min\(276px,[^}]*max-height:\s*184px[^}]*overflow-y:\s*auto/
-);
-assert.match(app, /pin-cluster-menu"\]\.addEventListener\("pointerdown"[\s\S]*beginGuideDrag\("pin"[\s\S]*origin:\s*"cluster-menu"/);
-assert.match(app, /pin-cluster-menu"\]\.addEventListener\("click"[\s\S]*activatePinClusterChoice/);
-// A Pin in the cluster menu is one control obeying the map's rule: click Goes,
-// drag moves. A separate drag handle is a grammar used nowhere else.
-assert.doesNotMatch(view, /pin-cluster-drag/,
-  "The cluster menu must not carry a separate drag handle.");
-assert.match(view, /button\.dataset\.pinGo = pin\.id[\s\S]*button\.dataset\.pinDrag = pin\.id/);
-assert.match(app, /"pin-lane"\]\.addEventListener\("pointerdown"[\s\S]*beginGuideDrag\("pin"/);
-// Alignment is geometric and may be shared; identity is not. Indication derives
-// only from Pins currently on Timeline, and every Pin standing at a boundary is
-// indicated rather than one chosen by array order.
-assert.match(app, /function syncIntervalPinSelection[\s\S]*const alignedAt = address => orderedPins\(guide\(\)\)\s*\.filter\(pin => Math\.abs\(pin\.t - address\) <= EPSILON\)/,
-  "Working-Interval endpoint indication may derive only from Pins currently on Timeline.");
-assert.doesNotMatch(app, /function syncIntervalPinSelection[\s\S]*orderedPins\(guide\(\)\)\.find\(/,
-  "and must not choose one coincident identity by array order.");
-assert.match(app, /guideRetained:\s*null/);
-assert.match(app, /function retainedIsOnTimeline[\s\S]*pinIsVisible[\s\S]*sectionIsVisible/);
-assert.match(view, /state\(\)\.guideRetained\?\.kind === "section"/);
-assert.match(view, /state\(\)\.guideRetained\?\.kind === "pin"/);
-assert.match(app, /surface:\s*"guide"/,
-  "Guide navigation must be distinguishable from Timeline operand acquisition.");
-assert.doesNotMatch(app, /togglePinSelection|selectTimelinePin|data-select-pin/);
-assert.match(app, /key === "t"[\s\S]*saveCurrentIntervalAsSection\(event,[\s\S]*source:\s*"interval"[\s\S]*useFormLabel:\s*false/);
-assert.match(app, /plain && key === "t"[\s\S]*pinCurrent\(event,\s*\{\s*useFormLabel:\s*false\s*\}\)/);
-assert.doesNotMatch(app, /key === "t"[\s\S]{0,180}openGuide\("(?:pins|sections)"\)/);
-assert.doesNotMatch(app, /key === "p"/, "P is unbound.");
-assert.match(view, /guideTitleActions[\s\S]*guide-title-rename[\s\S]*guide-title-delete/);
-// Unlink acts on a shared Pin, so it lives with Pins and names the Section it
-// releases. Reading a Section to operate on a Pin put the one object the
-// operation is about out of view.
-assert.match(view, /pin-unlink-actions[\s\S]*Unlink \$\{sectionDisplayName\(section\)\}/);
-// One definition of an unnamed Section's name, shared by the kernel's
-// transaction labels and every context with no Address field of its own.
-assert.match(format, /export function sectionDisplayName[\s\S]*Section \$\{formatRange\(section\)\}/);
-assert.match(session, /import \{ sectionDisplayName \} from "\.\/format\.js"/);
-assert.doesNotMatch(session, /"Untitled Section"/);
-assert.match(app, /const sectionName = sectionDisplayName/);
-assert.doesNotMatch(view, /Unlink \$\{role === "start" \? "Start" : "End"\}/);
-// And the Section states which Pin each endpoint is, rather than leaving it to
-// be found by Address in a list ordered by Address.
-assert.match(view, /dataset\.revealPin = revealPinId/);
-// Address equality is not identity equality: Unlink deliberately makes
-// coincident Pins, so a creation path may reuse exactly one match and must
-// never pick among several.
-assert.match(guide, /export function pinsAt/);
-assert.match(guide, /matches\.length === 1 \? matches\[0\] : null/);
-assert.match(app, /function revealPin[\s\S]*selectGuideTab\("pins"\)[\s\S]*kind: "pin"/);
-assert.doesNotMatch(view, /Relink|data\.linkSectionEndpoint/);
-assert.doesNotMatch(view, /guide-item-more|guide-secondary-actions|More actions for/);
-assert.doesNotMatch(styles, /\.guide-item-more|\.guide-secondary-actions/);
-assert.match(view, /dataset\.pinDrag\s*=\s*pin\.id/);
-// The Temporal Topography owns spatial direct manipulation. Guide must not
-// contain a second drag implementation.
-assert.doesNotMatch(app, /"sections-list"\]\.addEventListener\("pointerdown"/,
-  "Guide Section rows must not own a drag gesture.");
-assert.doesNotMatch(app, /"pins-list"\]\.addEventListener\("pointerdown"/,
-  "Guide Pin rows must not own a drag gesture.");
-assert.match(app, /function sectionWireRole[\s\S]*SECTION_END_GRIP[\s\S]*return "midpoint"/,
-  "The Section wire resolves its own roles from where it was pressed.");
-assert.match(app, /"section-lane"\]\.addEventListener\("pointerdown"[\s\S]*?sectionWireRole\(body, event\)[\s\S]*?beginGuideDrag\("section"[\s\S]*?beginGuideDrag\(\s*"pin"/,
-  "Pressing the wire acquires an endpoint Pin or the whole Section.");
-assert.doesNotMatch(view, /timeline-section-node/,
-  "No separate Section node chrome may be drawn over the map.");
-assert.doesNotMatch(styles, /\.timeline-section-node/);
-// Relative dragging converts pixels through the drawn span, so a focused map
-// drags at the scale it is actually drawn at.
-assert.match(app, /function sourceFromRelativeDragDelta[\s\S]*surfaceWidth[\s\S]*fractionToDistance[\s\S]*originClientX[\s\S]*viewStart[\s\S]*viewEnd/);
-// A Pin has one Address and no extent, so a miniature track of that single
-// point is the map redrawn at useless scale. Position is read and moved on the
-// Temporal Topography; the Guide holds the exact Address.
-assert.doesNotMatch(view, /pinPositionButton|pin-position-track/,
-  "A Pin row must not redraw the map to place one point.");
-assert.doesNotMatch(styles, /\.pin-position-track|\.endpoint-button/);
-assert.doesNotMatch(view, /dataset\.sectionDrag/,
-  "Guide's full-map profile is a read-only positional representation.");
-// Guide is the exact editor: Address inputs plus the shared Nudge increments.
-assert.match(view, /function addressControl\([\s\S]*dataset\.addressInput/);
-assert.match(view, /function nudgeButton\([\s\S]*dataset\.nudgeTarget/);
-assert.doesNotMatch(view, /className = "section-endpoints"/,
-  "Guide shows one compact Address line, not a second positional track.");
-assert.match(app, /function applyGuideAddressInput[\s\S]*moveGuidePin[\s\S]*moveGuideSection[\s\S]*checkpoint\(/,
-  "Guide numeric editing and Timeline manipulation must call the same operation.");
-assert.match(app, /function nudgeTarget\(target, direction, options = \{\}\)/);
-assert.match(app, /function handleTimelineWheel[\s\S]*event\.shiftKey[\s\S]*event\.preventDefault\(\)[\s\S]*NUDGE_WHEEL_THRESHOLD/,
-  "Shift-wheel nudging prevents the browser default only for an acquired target.");
-assert.match(app, /function settleNudgeGesture[\s\S]*checkpoint\(state\.session, gesture\.label/,
-  "One wheel series or held-key repetition settles as one Undo transaction.");
-assert.match(app, /function beginCurrentDrag[\s\S]*state\.currentDrag = \{/,
-  "Current is its own gesture owner on the Temporal Topography.");
-assert.match(app, /function finishCurrentDrag[\s\S]*completePendingStep\(\)/,
-  "Dragging Current settles as one Step transaction.");
-assert.match(app, /function cancelActiveManipulation[\s\S]*currentDrag[\s\S]*guideDrag[\s\S]*dragHandle/,
-  "Escape must cancel the live gesture before it closes anything behind it.");
-assert.match(app, /if \(!cancelActiveManipulation\(\)\) stopOrClose\(\)/);
-assert.match(app, /previewGuideAddressInput[\s\S]*placePlayer\(frame\.center\)/,
-  "An exact edit must present the Frame its drag presents.");
-assert.doesNotMatch(view, /guide-action-move/);
-assert.match(app, /function previewGuideDrag[\s\S]*kind:\s*"section"[\s\S]*start:[\s\S]*center:[\s\S]*end:/);
-assert.match(field, /function previewExtent[\s\S]*renderPreview/);
-assert.match(field, /function clearPreview[\s\S]*restore/);
-assert.match(app, /function sectionForSelectedPinExtent[\s\S]*startPinId[\s\S]*endPinId/);
-assert.match(app, /function handleTimelineClick[\s\S]*closest\("\[data-section-go\]"\)/);
-assert.doesNotMatch(styles, /\.timeline-section-control/);
-assert.match(styles, /\.guide-section-weight/);
-assert.match(styles, /\.guide-section-profile/);
-assert.match(styles, /\.timeline-section-midpoint\s*\{/);
-assert.match(styles, /\.timeline-section-relation\s*\{[^}]*repeating-linear-gradient\(/);
-assert.match(view, /const pinTop\s*=\s*17[\s\S]*const trackTop\s*=\s*44[\s\S]*const sectionTop\s*=\s*rulerTop\s*\+\s*38/);
-assert.match(view, /\["start",\s*projected\.start[\s\S]*\["midpoint",\s*midpointCoordinate[\s\S]*\["end",\s*projected\.end/);
-// Increment controls repeat while held; a click-only binding cannot.
-assert.match(app, /function bindHoldRepeat\(container, selector, act, \{ onSettle[\s\S]*HOLD_REPEAT_INTERVAL_MS/);
-// Weight is assigned in the Guide, where the value lives. The operator matrix
-// held a Deform button and a pair of ladder steppers, which is how Deform became
-// the habitual way to make a Section and why it needed an Alt chord to escape
-// its own overload. Tag holds that slot now, and no held-ladder gesture remains
-// to batch.
-assert.doesNotMatch(app, /beginWeightGesture|settleWeightGesture|applyDeformWeight/,
-  "The held Weight ladder is gone with the controls that drove it.");
-// Every deferred gesture settles before the next transaction begins.
-assert.match(app, /function settleBeforeAction[\s\S]*settleNudgeGesture\(\);/);
-// Cue retention is an ordinary accepted Guide transaction, so it persists.
-assert.match(app, /function retainCue[\s\S]*accept\(pinned,[\s\S]*accept\(saved,/);
-assert.doesNotMatch(app, /function retainCue[\s\S]*state\.session = (pinned|saved)\.session/);
-assert.match(app, /bindGuideNudgeControls\(elements\["sections-list"\]\)/);
-assert.match(app, /bindGuideNudgeControls\(elements\["pins-list"\]\)/);
-// Nudge is a movement magnitude and sits with Step Reach, not with the Field's
-// physical observation settings.
-assert.match(html, /id="step-size-settings"[\s\S]*id="step-size-seconds"[\s\S]*id="nudge-seconds"[\s\S]*<\/details>/);
-assert.doesNotMatch(html, /field-settings-popover[\s\S]{0,400}nudge-seconds/);
-// One gutter and one control height across a Guide card.
-assert.match(styles, /\.guide-item \{[\s\S]*--guide-gutter:[\s\S]*--guide-control:/);
-for (const rule of ["guide-item-main", "guide-item-actions", "guide-addresses"]) {
-  assert.match(
-    styles,
-    new RegExp(`\\.${rule} \\{[^}]*var\\(--guide-gutter\\)`),
-    `${rule} must share the Guide gutter.`
+if (failures.length) {
+  console.error(`Project audit failed (${failures.length}):`);
+  failures.forEach((failure, index) => console.error(`${index + 1}. ${failure}`));
+  process.exitCode = 1;
+} else {
+  console.log(
+    "Project audit passed: lockfile and npm-ci CI, package/spec authority, exact suite map, final operator and projection language, playback/source/Guide laws, Field defaults, and canonical documents form one release contract."
   );
 }
-assert.match(styles, /\.section-item \.guide-item-actions \{[^}]*minmax\(0, 1fr\)/,
-  "Guide action columns must be able to shrink inside the clipped card.");
-// Current moves by Step law, never by Go, so a drag or Nudge extends or
-// shortens the retained traversal instead of redrawing it.
-assert.match(app, /function stepCurrentBySourceDelta[\s\S]*stepSession\(/);
-assert.doesNotMatch(app, /function finishCurrentDrag[\s\S]*moveToAddress\(drag\.candidate/,
-  "Dragging Current must not commit a Go.");
-assert.match(app, /function finishCurrentDrag[\s\S]*performStep\(/);
-assert.match(
-  styles,
-  /@media \(pointer: coarse\)[\s\S]*\.timeline-section-body[\s\S]*var\(--touch\)/
-);
-assert.match(styles, /\.timeline-pin[\s\S]*width:\s*var\(--pin-hit-size\)/);
-assert.match(styles, /\.timeline-pin\.snap-target::before[\s\S]*var\(--success\)/);
-assert.doesNotMatch(styles, /\.timeline-fold-/);
-assert.match(styles, /--control-height:\s*40px/);
-assert.match(styles, /--touch:\s*48px/);
-assert.match(styles, /\.navigation-deck\s*\{[\s\S]*aspect-ratio:\s*1[\s\S]*grid-template-rows:\s*repeat\(3/);
-assert.match(styles, /\.tool-disclosure > summary\s*\{[\s\S]*font-size:\s*0\.72rem[\s\S]*font-weight:\s*650/);
-assert.match(styles, /\.tool-disclosure > summary span \+ span[\s\S]*font:\s*600 0\.7rem/);
-assert.doesNotMatch(styles, /\.tool-disclosure > summary span:last-child/);
-assert.match(styles, /@media \(min-width: 1240px\)[\s\S]*\.parameter-panel\s*\{[\s\S]*grid-template-columns:\s*1fr/);
-assert.equal((styles.match(/@media \(min-width: 1240px\)/g) || []).length, 2);
-assert.equal((fieldCss.match(/@media \(min-width: 1240px\)/g) || []).length, 1);
-assert.match(fieldCss, /@container \(max-width: 860px\)/);
-assert.doesNotMatch(grammarCss, /field-transport-bar|transport-actions|transport-readouts/);
-
-assert.match(session, /STEP_REACH_MODE[\s\S]*FIXED:\s*"fixed"[\s\S]*ADAPTIVE:\s*"adaptive"/);
-assert.match(session, /DEFAULT_STEP_FRACTION\s*=\s*1\s*\/\s*16/);
-assert.match(session, /export function effectiveStepReach/);
-assert.match(session, /export function localRefine/);
-assert.match(session, /export function refine/);
-assert.match(session, /export function stepToPin/);
-assert.match(session, /export function releaseInterval/);
-assert.match(session, /export function deformSection/);
-assert.match(session, /export function setGuideSectionWeight/);
-assert.match(session, /export function goToGuidePin/);
-assert.match(session, /export function goToGuideSection/);
-assert.match(session, /export function workFromExtent/);
-assert.match(session, /export function unlinkGuideSectionEndpoint/);
-assert.match(session, /export function linkGuidePins/);
-assert.match(session, /export function switchEndpoint[\s\S]*nextSide[\s\S]*departure:\s*retainedDeparture[\s\S]*arrival:\s*departure/);
-
-assert.match(guide, /SECTION_WEIGHT_VALUES[\s\S]*0\.25[\s\S]*2/);
-assert.match(guide, /export function setSectionWeight/);
-assert.match(guide, /export function sectionsForPin/);
-assert.match(guide, /export function unlinkSectionEndpoint/);
-assert.match(guide, /export function canLinkPins/);
-assert.match(guide, /export function linkPins/);
-assert.doesNotMatch(guide, /provenance:\s*`unlink:/);
-assert.match(app, /PIN_SNAP_DISTANCE_PX\s*=\s*16/);
-assert.match(app, /function pinSnapCandidate[\s\S]*canLinkPins[\s\S]*snapTargetPinId/);
-assert.match(app, /linkGuidePins\([\s\S]*drag\.snapTargetPinId[\s\S]*"Link Pins"/);
-assert.match(guide, /function translatedPinIds[\s\S]*section\.startPinId[\s\S]*section\.endPinId/);
-assert.doesNotMatch(guide, /fold-topology-conflict|collapsedFrontier/);
-
-assert.match(projection, /export function createTimelineProjection/);
-assert.match(projection, /buildSegments/);
-assert.match(projection, /contributors\.reduce[\s\S]*product \* activeWeight/);
-assert.match(projection, /orderedPinStops/);
-assert.match(projection, /weightAtSource/);
-assert.doesNotMatch(projection, /affinity|materializ|collapse|fold/i);
-assert.doesNotMatch(projection, /player|document|window/);
-
-assert.match(transport, /PLAYBACK:\s*"playback"/);
-assert.match(transport, /CONTEXT:\s*"context"/);
-assert.match(transport, /export function isProperRange/);
-assert.match(transport, /export function rebasePlaybackTransport/);
-assert.doesNotMatch(transport, /\bLOOP\s*:|CONTINUE|SKIM/);
-
-assert.match(app, /preferences\.fieldBreath/);
-assert.doesNotMatch(app, /onHoldOffsets:/);
-assert.doesNotMatch(field, /onHoldOffsets/);
-assert.match(app, /function changeFieldBoundary[\s\S]*state\.fieldBreath\s*=/);
-// Field Frame resolution is pure and owns no transport, breathing, or Session.
-assert.match(fieldFrame, /export function createFieldFrameSequencer/);
-assert.match(fieldFrame, /export function contextFrame/);
-assert.match(fieldFrame, /export function operatorFrame/);
-assert.match(fieldFrame, /export function directFrame/);
-assert.doesNotMatch(fieldFrame, /document\.(?:getElementById|createElement|querySelector)|window\.(?:set|add|match)|createYouTubePlayer|addEventListener/);
-assert.doesNotMatch(fieldFrame, /import .*session\.js|import .*guide\.js|import .*transport\.js|import .*timeline-projection\.js/);
-// The breathing state machine is pure geometry; the controller owns its runtime.
-assert.match(fieldGeometry, /export function advanceBreath/);
-assert.match(fieldGeometry, /export function holdBreath/);
-assert.match(fieldGeometry, /export function effectiveBreathBounds/);
-assert.match(field, /runtime\.frameGeneration/);
-// The Field transition is an opacity cue only. Translating the panes reads as a
-// shake: nothing can actually travel between roles, because three iframes cannot
-// be reparented.
-assert.doesNotMatch(
-  fieldCss,
-  /@keyframes field-[a-z-]+\s*\{[^}]*translateX/,
-  "Field transitions must not translate the panes."
-);
-assert.match(fieldCss, /@keyframes field-role-settled/);
-assert.match(fieldCss, /@keyframes field-role-arriving/);
-// The pane bar creates a stacking context, so it must out-rank the full-bleed
-// transport surface or its Tune popover cannot be clicked.
-const barZ = Number(fieldCss.match(/\.step-pane-bar\s*\{[\s\S]*?z-index:\s*(\d+)/)?.[1]);
-const surfaceZ = Number(styles.match(/\.center-transport-surface\s*\{[\s\S]*?z-index:\s*(\d+)/)?.[1]);
-assert.ok(Number.isFinite(barZ) && Number.isFinite(surfaceZ));
-assert.ok(
-  barZ > surfaceZ,
-  "The pane bar must paint above the play/pause surface so Tune inputs stay clickable."
-);
-// Coalescing comes from parkSide recording the newest desired address before
-// any early return, so a late callback decodes the current Frame by itself.
-assert.match(field, /side\.desiredAddress = target;[\s\S]{0,800}?if \(!force && \(alreadyThere \|\| recentlyPlaced\)\)/,
-  "parkSide must record the newest desired address before it may return early.");
-assert.doesNotMatch(field, /placementGeneration/,
-  "An inert stale-frame token must not survive as decoration.");
-assert.match(app, /function setStepMode/);
-assert.match(app, /function setStepFraction/);
-assert.match(app, /function wrapPlaybackRange/);
-assert.match(app, /rebasePlaybackTransport\(transport,\s*range\.start\)/);
-assert.match(app, /function releaseWorkingInterval/);
-assert.match(app, /function toggleNormalize/);
-assert.match(app, /function changeSectionWeight/);
-assert.match(app, /function focusOrUnfocus/);
-
-assert.doesNotMatch(app, /createSkimTransport|startLoop|wrapLoopTransport/);
-assert.doesNotMatch(view, /dataset\.loopSection/);
-assert.match(view, /dataset\.sectionWeight/);
-assert.match(view, /timeline-section-span/);
-assert.match(view, /function deformationInfluence[\s\S]*Math\.log2\(section\.weight\)[\s\S]*deformation-contours/);
-assert.match(view, /function deformationInfluence[\s\S]*spanRatio[\s\S]*Math\.sqrt[\s\S]*dilution/);
-assert.match(view, /SECTION_WEIGHT_VALUES/);
-assert.doesNotMatch(view, /timeline-fold|foldContributors|sectionCollapse|sectionExpand/);
-assert.match(view, /timeline-ruler-tick/);
-assert.match(view, /packTimelineSectionLanes/);
-assert.match(view, /timelinePinClusterGap/);
-assert.match(view, /COARSE_TIMELINE_PIN_HIT_SIZE\s*=\s*56/);
-assert.match(view, /TIMELINE_PIN_HIT_SIZE\s*=\s*52/);
-assert.match(view, /TIMELINE_SECTION_HIT_WIDTH\s*=\s*28/);
-// The relationship band is bounded, as the canonical documents say. Overlap
-// creates lanes without limit, so an unbounded band moved the whole workspace
-// down by a lane per overlap. The band stops at MAX_LANES and deeper structure
-// scrolls inside it -- lanes are never reused by modulo, which would overlap two
-// Sections into one control.
-assert.match(view, /TIMELINE_SECTION_MAX_LANES\s*=\s*5/);
-assert.match(view, /Math\.min\(laneCount, TIMELINE_SECTION_MAX_LANES\)/);
-assert.match(view, /classList\.toggle\("is-overflowing"/);
-assert.match(styles, /\.section-lane\.is-overflowing[\s\S]*overflow-y:\s*auto/);
-assert.doesNotMatch(view, /lane % TIMELINE_SECTION_MAX_LANES/);
-assert.match(view, /bandLanes \* sectionLaneHeight/);
-assert.match(view, /laneCount \* sectionLaneHeight/,
-  "and the true depth is still measured, so the band can scroll to it.");
-assert.match(view, /--pin-hit-size/);
-assert.match(styles, /\.timeline-pin:active:not\(:disabled\)[\s\S]*transform:\s*translate\(-50%, -50%\)/);
-assert.doesNotMatch(view, /dataset\.(references|pinKind)/);
-assert.doesNotMatch(view, /--section-lane|--section-band-height/);
-assert.doesNotMatch(app, /else if \(plain && event\.key === " "\)/);
-
-assert.match(stepGesture, /createStepGestureController/);
-assert.match(stepGesture, /bindStepPress/);
-assert.doesNotMatch(field, /bindSideStepSurface/);
-assert.match(fieldGeometry, /DEFAULT_FIELD_RESPONSE/);
-assert.doesNotMatch(fieldGeometry, /stepSeconds|sideActivationMode/);
-assert.doesNotMatch(field, /globalThis\.YT/);
-assert.doesNotMatch(app, /globalThis\.YT/);
-assert.match(fieldCss, /\.lead-pane \.step-pane-bar,[\s\S]*flex-direction:\s*row-reverse/);
-assert.match(fieldCss, /\.step-field\.is-preview \.step-pane-side \.player-wrap/);
-assert.match(styles, /--range-rgb:[\s\S]*--resolution-rgb:[\s\S]*--interval-rgb:[\s\S]*--field-rgb:[\s\S]*--preview-rgb:/);
-for (const token of ["text", "muted", "faint"]) {
-  assert.ok(
-    contrastRatio(cssHex(token), cssHex("surface")) >= 4.5,
-    `--${token} must retain text contrast against --surface.`
-  );
-}
-assert.doesNotMatch(`${app}\n${field}`, /\.raw\?\.\(|\.raw\(\)/,
-  "Composition and Field code must not reach through the YouTube adapter.");
-assert.match(youtube, /export function isYouTubeApiReady/);
-assert.match(youtube, /releaseKeyboardFocus\(activeElement\)/);
-assert.equal((youtube.match(/new\s+globalThis\.YT\.Player/g) || []).length, 1);
-assert.doesNotMatch(rangeGeometry, /\bskim\b|logSpeed|chooseSupportedRate/i);
-
-for (const required of [
-  "v5.8-regression-tests.mjs",
-  "timeline-projection-tests.mjs",
-  "v7-deformation-tests.mjs",
-  "v7-coherence-tests.mjs",
-  "transport-tests.mjs",
-  "endpoint-transposition-tests.mjs",
-  "semantic-composition-tests.mjs",
-  "semantic-audit-probes.mjs",
-  "step-gesture-tests.mjs",
-  "field-coherence-tests.mjs"
-]) assert.ok(pkg.scripts.test.includes(required), `Missing test gate: ${required}`);
-assert.match(pkg.scripts["test:semantic"], /semantic-state-space-tests\.mjs/);
-assert.match(pkg.scripts.check, /npm run test:semantic/);
-assert.match(pkg.scripts.audit, /integration-check\.mjs/);
-assert.match(pkg.scripts.audit, /project-audit\.mjs/);
-
-assert.match(docs["SPEC.md"], /Timeline Space/);
-assert.match(docs["SPEC.md"], /source-contiguous/);
-assert.match(docs["SPEC.md"], /one Undo transaction/);
-assert.match(docs["IMPLEMENTATION.md"], /step-gesture\.js/);
-assert.match(docs["IMPLEMENTATION.md"], /timeline-projection\.js/);
-assert.match(docs["IMPLEMENTATION.md"], /positive spatial/);
-assert.match(docs["VALIDATION.md"], /each wrap rebases each available side at most once/);
-assert.match(docs["VALIDATION.md"], /1\/32[\s\S]*1\/16[\s\S]*1\/8/);
-assert.match(docs["INTERFACE.md"], /bounded five-lane visual band/);
-assert.match(docs["INTERFACE.md"], /complete extent the Working Interval/);
-assert.match(docs["INTERFACE.md"], /free and shared Pins[\s\S]*main Range \/ Resolution track[\s\S]*source ruler[\s\S]*Section relationship tree/);
-assert.match(docs["INTERFACE.md"], /A Pin drag centers that Pin[\s\S]*Tail at Start,\s*\n?Center at midpoint, and Lead at End/);
-assert.match(docs["INTERFACE.md"], /Field Frame/);
-assert.match(docs["INTERFACE.md"], /Field Breath/);
-assert.match(docs["INTERFACE.md"], /Inner offset\s+x/);
-assert.match(docs["INTERFACE.md"], /Outer offset\s+y/);
-assert.match(docs["INTERFACE.md"], /Stretch \/ Hold/);
-assert.match(docs["README.md"], /stable directional slideshow\s*\n?around Current/);
-assert.match(docs["README.md"], /breathes continuously between inner\s*\n?and outer offsets until Hold preserves the attained relation/);
-assert.match(docs["PROJECT.md"], /Field Frame/);
-assert.match(docs["PROJECT.md"], /^# Video Cartography\r?\n/);
-assert.match(docs["GLOSSARY.md"], /^# Video Cartography — Canonical Glossary\r?\n/);
-for (const term of [
-  "Panoramic Phase Field", "Field Frame", "Field Breath", "Inner Offset",
-  "Outer Offset", "Temporal Topography", "Nudge"
-]) {
-  assert.match(
-    docs["GLOSSARY.md"],
-    new RegExp(`\\*\\*[^*]*${term}[^*]*\\*\\* —`),
-    `Glossary must define ${term}`
-  );
-}
-assert.match(docs["PROJECT.md"], /minimum offset is a law rather than a preference/);
-assert.match(docs["PROJECT.md"], /Field Breath/);
-assert.match(docs["SPEC.md"], /### Field Frame/);
-assert.match(docs["SPEC.md"], /#### Slideshow transitions/);
-assert.match(docs["SPEC.md"], /#### Persistent Context framing/);
-assert.match(docs["SPEC.md"], /### Current drag and Nudge as Step/);
-assert.doesNotMatch(docs["SPEC.md"], /Current drag as Go/);
-assert.match(docs["SPEC.md"], /### Nudge/);
-assert.match(docs["SPEC.md"], /### Exact Guide editing/);
-assert.doesNotMatch(docs["SPEC.md"], /maximum Stretch[\s\S]{0,80}becomes Hold/i,
-  "Reaching the outer offset begins contraction; it is not an automatic Hold.");
-assert.match(docs["IMPLEMENTATION.md"], /field-frame\.js/);
-assert.match(docs["IMPLEMENTATION.md"], /Transition revision ownership/);
-assert.match(docs["IMPLEMENTATION.md"], /Breathing state machine/);
-assert.match(docs["IMPLEMENTATION.md"], /Nudge transaction batching/);
-assert.match(docs["IMPLEMENTATION.md"], /Exact Guide input routing/);
-assert.match(docs["VALIDATION.md"], /lists choices vertically, scrolls by wheel/);
-
-console.log("Project audit passed: v7 matrix, independent Step sizing, weighted Section graph, source-contiguous Range playback, timeline presentation, module boundaries, and canonical documents agree.");

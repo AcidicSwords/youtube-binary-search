@@ -27,6 +27,7 @@ import {
   sectionIsVisible,
   sectionsForPin,
   resolveSection,
+  groupDeletionPlan,
   previousPin,
   nextPin,
   sortedSections,
@@ -45,6 +46,7 @@ import {
   previewTransition
 } from "./session.js";
 import { YOUTUBE_STATE } from "./youtube.js";
+import { breathRatePair } from "./step-field-geometry.js";
 
 const TIMELINE_SECTION_HIT_WIDTH = 28;
 const TIMELINE_SECTION_LANE_HEIGHT = 20;
@@ -218,7 +220,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     if (!focus) return null;
     if (focus.kind === "working-section") {
       return {
-        label: "Working Section",
+        label: "Working Interval",
         start: focus.extent?.start ?? model().range.start,
         end: focus.extent?.end ?? model().range.end
       };
@@ -288,10 +290,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     if (state().guideDrag?.moved && state().guideDrag.projection) {
       return state().guideDrag.projection;
     }
-    // The view measures with the same projection the operators do, Normalize
-    // included: a map drawn straight while Step still counted the deformation
+    // The view measures with the same effective projection the operators do.
+    // A bypassed map drawn straight while Step still counted stored Weight
     // would put every landing point somewhere other than where it was drawn.
-    return projectionForModel(model(), { normalize: state().normalize ?? null });
+    return projectionForModel(model(), {
+      deformationBypass: state().deformationBypass ?? null
+    });
   }
 
   function setStatus(message, isError = false) {
@@ -578,9 +582,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const field = elements["deformation-field"];
     if (!field) return;
     field.replaceChildren();
-    const sections = sortedSections(guide())
-      .filter(section => sectionIsActive(guide(), section))
-      .filter(section => Math.abs(section.weight - 1) > EPSILON);
+    // Atmosphere and geometry consume the same compiled contributors. Reading
+    // raw Guide weights here would leave colour behind after geometry had been
+    // straightened and would make the map contradict itself.
+    const sections = projection.weightedSections;
     const atmosphere = document.createElement("span");
     atmosphere.className = "deformation-atmosphere";
     const samples = 80;
@@ -1310,7 +1315,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       }
     }
 
-    const composing = state().shiftLayer === "guide";
+    const composing = state().shiftLayers?.guide === true;
     elements["guide-compose-toggle"].setAttribute("aria-pressed", String(composing));
     elements["guide-compose-toggle"].classList.toggle("active", composing);
     renderCues();
@@ -1405,12 +1410,17 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         remove.dataset.deleteGroup = group.id;
         remove.textContent = "×";
         remove.setAttribute("aria-label", `Remove ${group.label || "Group"}`);
-        const heir = (guide().groups || []).find(entry => entry.id !== group.id);
-        remove.disabled = !heir;
-        remove.title = !heir
-          ? "The last Group cannot be removed: Sections have to belong somewhere"
-          : members.length
-            ? `Remove this Group; its ${members.length} Section${members.length === 1 ? " moves" : "s move"} to ${groupDisplayName(heir)}`
+        const deletion = groupDeletionPlan(guide(), group.id);
+        const heir = (guide().groups || [])
+          .find(entry => entry.id === deletion.heirGroupId);
+        const moved = deletion.movedSectionIds.length;
+        remove.disabled = !deletion.allowed;
+        remove.title = !deletion.allowed
+          ? deletion.reason === "last-group"
+            ? "The last Group cannot be removed: Sections have to belong somewhere"
+            : "This Group cannot be removed"
+          : moved
+            ? `Remove this Group; its ${moved} Section${moved === 1 ? " moves" : "s move"} to ${groupDisplayName(heir)}`
             : "Remove this Group";
         titleActions.append(rename, remove);
         row.append(name, meta, toggles, titleActions);
@@ -1511,16 +1521,21 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const removedInterval = kind === "release" ? interval() : null;
     const structuralExtent = structural?.[kind] || null;
     const previewInterval = predicted?.interval || removedInterval || structuralExtent;
+    const structuralPoint = structuralExtent
+      && Math.abs(structuralExtent.end - structuralExtent.start) <= EPSILON
+      ? structuralExtent.start
+      : null;
+    const previewExtent = structuralPoint === null ? previewInterval : null;
 
-    elements["action-preview-fill"].hidden = !previewInterval;
-    if (previewInterval) {
+    elements["action-preview-fill"].hidden = !previewExtent;
+    if (previewExtent) {
       elements["action-preview-fill"].dataset.kind = kind;
       if (removedInterval) elements["action-preview-fill"].dataset.effect = "remove";
       else elements["action-preview-fill"].removeAttribute("data-effect");
       setSegment(
         elements["action-preview-fill"],
-        previewInterval.start,
-        previewInterval.end
+        previewExtent.start,
+        previewExtent.end
       );
     } else {
       elements["action-preview-fill"].removeAttribute("data-kind");
@@ -1533,9 +1548,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     // operators that push a midpoint show it in the destination anyway. The
     // extent and the destination are all that remain; the rest was noise the
     // moment the movement was invoked, so it is gone rather than hidden.
-    elements["preview-current-marker"].hidden = !previewResolution;
-    if (!previewResolution) return;
-    setMarkerPosition(elements["preview-current-marker"], previewResolution.C);
+    const previewCurrent = previewResolution?.C ?? structuralPoint;
+    elements["preview-current-marker"].hidden = previewCurrent === null;
+    if (previewCurrent === null) return;
+    setMarkerPosition(elements["preview-current-marker"], previewCurrent);
   }
 
   function renderSectionPreview() {
@@ -1649,9 +1665,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       const contextObservation = transportKind === TRANSPORT_KIND.CONTEXT;
       const ordinaryPlayback = transportKind === TRANSPORT_KIND.PLAYBACK;
       const centerRunning = [YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(currentState.playerState);
-      // Ordinary playback exposes YouTube's native controls after the trusted
-      // parent-page start gesture. Paused/idle Center and composite transports
-      // keep the parent surface so the next action remains synchronously shared.
+      // The parent owns one centered control, never the iframe-sized surface.
+      // YouTube's controls therefore remain pointer-accessible in every state.
       const surfaceOwnsPointer = currentState.videoLoaded && (!ordinaryPlayback || !centerRunning);
       surface.hidden = !surfaceOwnsPointer;
       const activation = currentState.field?.activation || null;
@@ -1693,7 +1708,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const loaded = currentState.videoLoaded;
     // The matrix shows its own armed layer, and the physical modifier, which
     // is global by nature. A layer armed in the Guide is the Guide's.
-    const shiftLayer = currentState.shiftLayer === "matrix" || currentState.shiftKeyHeld;
+    const shiftLayer = currentState.shiftLayers?.matrix === true
+      || currentState.shiftKeyHeld;
     const activeRange = range();
     const currentResolution = resolution();
     const currentInterval = interval();
@@ -1732,6 +1748,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const selectedForPreview = currentState.selectedRetained?.kind === "section"
       ? resolveSection(guide(), currentState.selectedRetained.id)
       : null;
+    const positiveWorkingInterval = currentInterval
+      && currentInterval.end - currentInterval.start > EPSILON
+      ? currentInterval
+      : null;
     const structuralPresentation = currentResolution ? {
       previousPin: previous ? { start: previous.t, end: semanticCurrent } : null,
       nextPin: next ? { start: semanticCurrent, end: next.t } : null,
@@ -1745,7 +1765,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         ? { start: switchFrame.L, end: switchFrame.R }
         : currentInterval,
       release: currentInterval,
-      tag: currentInterval || selectedForPreview,
+      tag: shiftLayer
+        ? positiveWorkingInterval
+        : { start: semanticCurrent, end: semanticCurrent },
       focus: currentInterval || selectedForPreview
     } : null;
     let resolvedPreviewAction = previewAction;
@@ -1794,12 +1816,14 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const armedPreviewAction = performingStepGesture ? null : resolvedPreviewAction;
     const previewResult = dragAction
       ? previewTransition(currentState.session, dragAction, {
-          seconds: dragDistance
+          seconds: dragDistance,
+          projection: dragProjection
         })
       : armedPreviewAction
         ? previewTransition(currentState.session, armedPreviewAction, {
             seconds: effectiveReach[previewDirection],
-            destination: previewPin?.t
+            destination: previewPin?.t,
+            projection
           })
         : null;
     const previewKind = dragAction
@@ -1849,14 +1873,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : "Off";
 
     // One bounded breathing relation: 0 < inner < outer.
-    const fieldBreath = currentState.fieldBreath || { inner: 2.5, outer: 10, rate: 0.5 };
+    const fieldBreath = currentState.fieldBreath || { inner: 0.25, outer: 2.5, rate: 0.25 };
     elements["field-inner-offset"].value = String(fieldBreath.inner);
     elements["field-outer-offset"].value = String(fieldBreath.outer);
     elements["field-inner-offset"].max = String(fieldBreath.outer);
     elements["field-outer-offset"].min = String(fieldBreath.inner);
     if (elements["panorama-setting-value"]) {
+      const configuredPair = breathRatePair(fieldBreath.rate);
       const pair = elements["field-breath-rate"]?.selectedOptions?.[0]?.textContent
-        || `${fieldBreath.rate}× / ${2 - fieldBreath.rate}×`;
+        || `${configuredPair.tailRate}× / ${configuredPair.leadRate}×`;
       elements["panorama-setting-value"].textContent =
         `${fieldBreath.inner}–${fieldBreath.outer} s · ${pair}`;
     }
@@ -1895,14 +1920,31 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       control.disabled = false;
     }
 
-    if (elements["normalize-toggle"]) {
-      const normalize = currentState.normalize;
-      elements["normalize-toggle"].setAttribute("aria-pressed", String(Boolean(normalize)));
-      elements["normalize-toggle"].classList.toggle("active", Boolean(normalize));
-      if (elements["normalize-toggle-label"]) {
-        elements["normalize-toggle-label"].textContent =
-          normalize && normalize !== "all" ? "Section normalized" : "Normalize";
-      }
+    const bypass = projection.deformationBypass;
+    const deformationTarget = selectedForPreview;
+    const deformationScopeKind = deformationTarget ? "section" : "all";
+    const deformationScopeActive = deformationTarget
+      ? bypass?.kind === "section" && bypass.sectionId === deformationTarget.id
+      : bypass?.kind === "all";
+    const deformationLabel = deformationScopeActive
+      ? deformationTarget ? "Restore Section" : "Restore Timeline"
+      : deformationTarget ? "Straighten Section" : "Straighten Timeline";
+    const deformationMeta = deformationTarget
+      ? sectionDisplayName(deformationTarget)
+      : "Complete map";
+    if (elements["deformation-toggle"]) {
+      elements["deformation-toggle"].setAttribute(
+        "aria-pressed",
+        String(deformationScopeActive)
+      );
+      elements["deformation-toggle"].setAttribute(
+        "aria-label",
+        `${deformationLabel}: ${deformationMeta}`
+      );
+      elements["deformation-toggle"].dataset.scope = deformationScopeKind;
+      elements["deformation-toggle"].dataset.activeScope = bypass?.kind || "none";
+      elements["deformation-toggle-label"].textContent = deformationLabel;
+      elements["deformation-toggle-meta"].textContent = deformationMeta;
     }
     elements["shift-layer-toggle"].setAttribute("aria-pressed", String(shiftLayer));
     elements["shift-layer-state"].textContent = shiftLayer ? "On" : "Off";
@@ -1913,10 +1955,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? "Local Refine Forward"
       : "Refine Forward";
     elements["step-backward-label"].textContent = shiftLayer
-      ? "Pin Backward"
+      ? "Previous Pin"
       : "Step Backward";
     elements["step-forward-label"].textContent = shiftLayer
-      ? "Pin Forward"
+      ? "Next Pin"
       : "Step Forward";
     elements["refine-backward"].classList.toggle("shifted-action", shiftLayer);
     elements["refine-forward"].classList.toggle("shifted-action", shiftLayer);
@@ -1957,20 +1999,20 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
             ? "Panorama"
             : sectionKind === "selected-pins"
               ? "Selected Pins"
-              : "Working Section"
+              : "Working Interval"
         } ${formatRange(sectionExtent)}`
       : `No ${
           sectionKind === "field-span"
             ? "Held Panorama span"
             : sectionKind === "selected-pins"
               ? "two selected Pins"
-              : "Working Section"
+              : "Working Interval"
         }`;
 
     elements["focused-section"].hidden = !focused;
     if (focused) {
       elements["focused-section-title"].textContent = focused.label?.trim()
-        || (focusedSectionId() ? sectionLabel(focused) : "Working Section");
+        || (focusedSectionId() ? sectionLabel(focused) : "Working Interval");
       elements["focused-section-range"].textContent = formatRange(focused);
     } else {
       elements["focused-section-title"].textContent = "—";
@@ -1983,7 +2025,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "go-range-end", "range-end-here", "full-video-range",
       "field-inner-offset", "field-outer-offset", "field-breath-rate",
       "nudge-seconds", "context-seconds", "playback-rate", "playback-dynamic",
-      "normalize-toggle",
+      "deformation-toggle",
       "section-source", "section-label", "pin-label",
       "cue-source", "cue-parse", "cue-clear"
     ]) {
@@ -2026,8 +2068,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const selectedSection = currentState.selectedRetained?.kind === "section"
       ? resolveSection(guide(), currentState.selectedRetained.id)
       : null;
-    // Tag always has something to tag: Current is always somewhere.
-    elements.tag.disabled = interactionLocked;
+    // Plain Tag always has Current. Shifted Tag requires the positive Working
+    // Interval it retains; the label and availability follow Shift, not the
+    // incidental existence of an Interval.
+    elements.tag.disabled = interactionLocked
+      || (shiftLayer && !positiveWorkingInterval);
     elements["focus-toggle"].disabled = interactionLocked || !(
       focused
       || currentInterval
@@ -2149,35 +2194,18 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : shiftLayer && next
         ? `${formatTime(next.t)} · ${pinLabel(next)}`
         : "Range end";
-    // The Working Interval is already named and printed by section-window. An
-    // operator meta earns its line by saying what that operator will do, and
-    // reprints an extent only when the extent is not the one already shown.
-    const isWorkingInterval = extent => Boolean(
-      currentInterval
-      && extent
-      && Math.abs(extent.start - currentInterval.start) <= EPSILON
-      && Math.abs(extent.end - currentInterval.end) <= EPSILON
-    );
-    const targetLabel = extent => isWorkingInterval(extent)
-      ? "Working Interval"
-      : formatRange(extent);
     elements["release-meta"].textContent = currentInterval
       ? "Working Interval"
       : "No Interval";
-    const selectedMatchesInterval = selectedSection && (
-      !currentInterval
-      || (
-        Math.abs(selectedSection.start - currentInterval.start) <= EPSILON
-        && Math.abs(selectedSection.end - currentInterval.end) <= EPSILON
-      )
-    );
-    // Tag says which of its two acts the plain press will perform, and on what.
-    elements["tag-label"].textContent = currentInterval ? "Tag Section" : "Tag Pin";
-    // The extent is already printed by the Working Section readout, and the
-    // Address by Current. This says which act the press performs, nothing else.
-    elements["tag-meta"].textContent = currentInterval
-      ? "⇧T · Working Interval"
-      : "Current";
+    const tagLabel = shiftLayer ? "Tag as Section" : "Tag as Pin";
+    const tagMeta = shiftLayer
+      ? positiveWorkingInterval
+        ? `${formatRange(positiveWorkingInterval)} → Section`
+        : "No Working Interval"
+      : `Current ${formatTime(semanticCurrent)} → Pin`;
+    elements["tag-label"].textContent = tagLabel;
+    elements["tag-meta"].textContent = tagMeta;
+    elements.tag.setAttribute("aria-label", `${tagLabel}: ${tagMeta}`);
     elements["focus-toggle-meta"].textContent = focused
       ? `restore ${formatRange(model().focus.returnRange)}`
       : currentInterval

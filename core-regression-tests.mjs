@@ -28,7 +28,7 @@ import {
   leaveSection,
   deleteGuideSection,
   renameGuidePin,
-  returnState,
+  undo,
   projectPlayback,
   completePlayback
 } from "./session.js";
@@ -56,7 +56,7 @@ const beforeRefine = snapshotModel(session.model);
 session = refine(session, "backward").session;
 assert.equal(session.model.resolution.C, 90);
 assert.equal(session.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
-session = returnState(session).session;
+session = undo(session).session;
 assert.deepEqual(session.model.resolution, beforeRefine.resolution);
 assert.equal(session.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
 
@@ -81,7 +81,7 @@ assert.deepEqual(
   }
 );
 assert.deepEqual(session.model.interval.arrivalFrame.resolution, session.model.resolution);
-session = returnState(session).session;
+session = undo(session).session;
 assert.deepEqual(session.model.resolution, { L: 0, C: 180, R: 300, level: 0 });
 
 // Same-address Go is a true no-op; it never substitutes for Reopen.
@@ -186,7 +186,7 @@ assert.deepEqual(
   { start: 50, end: 70 },
   "Step must trim a Refine-established Interval without replacing its anchor."
 );
-refinedDraw = returnState(refinedDraw).session;
+refinedDraw = undo(refinedDraw).session;
 assert.deepEqual(refinedDraw.model.interval, refinedBeforeStep.interval, "Undo restores the preceding resized-Interval checkpoint exactly.");
 
 // A coalesced Step result depends on origin plus final destination, not the path.
@@ -311,7 +311,7 @@ assert.equal(deleted.changed, true);
 assert.equal(deleted.session.model.focus, null);
 assert.deepEqual(deleted.session.model.range, { start: 0, end: 480 });
 assert.equal(resolveSection(deleted.session.model.guide, retained.id), null);
-const restored = returnState(deleted.session).session;
+const restored = undo(deleted.session).session;
 assert.equal(restored.model.focus.sectionId, retained.id);
 assert.ok(resolveSection(restored.model.guide, retained.id));
 assert.deepEqual(restored.model.range, { start: 100, end: 200 });
@@ -387,7 +387,7 @@ assert.match(sessionSource, /stepIntervalAnchor[\s\S]*intervalDeparture/, "Sessi
 assert.match(sessionSource, /export function localRefine[\s\S]*intervalDeparture:\s*current[\s\S]*refineRelation:\s*"draw"/,
   "Local Refine must draw the Current-to-midpoint traversal instead of retaining the previous anchor.");
 assert.match(sessionSource, /export function focusWorkingSection[\s\S]*FOCUS_KIND\.WORKING/,
-  "The Working Section must be focusable without a Guide record.");
+  "The Working Interval must be focusable without a Guide record.");
 assert.match(appSource, /Left the focused Section and opened Full Video/, "Composite direct Go must disclose its Range escape.");
 assert.match(appSource, /createPlaybackTransport/, "Native playback must own continuous settlement.");
 assert.doesNotMatch(appSource, /startSkim|createSkimTransport|desiredSkimRate/, "Skim must be removed from the runtime.");
@@ -396,4 +396,4 @@ assert.doesNotMatch(viewSource, /skim/i, "The projection layer must not expose r
 assert.match(viewSource, /focused-section-title"\]\.textContent = "—"/, "View must clear stale focused Section text.");
 assert.match(cssSource, /\[hidden\]\s*\{\s*display:\s*none\s*!important;/, "Hidden state must override component display rules.");
 
-console.log("v5.8.6 comprehensive regression tests passed: direct scale, Refine, endpoint frames, composable Step intervals, native playback, Range, Focus, Guide, Interval boundaries, and Undo.");
+console.log("Core regression tests passed: direct scale, Refine, endpoint frames, composable Step intervals, native playback, Range, Focus, Guide, Interval boundaries, and Undo.");

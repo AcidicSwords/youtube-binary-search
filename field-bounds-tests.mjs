@@ -240,4 +240,4 @@ function makeControllerHarness() {
   assert.doesNotMatch(fieldSource, /snapshot\.resolution/, "Field bounds must not depend on Resolution.");
 }
 
-console.log("Field bounds v5.8 tests passed: Range containment, Context suspension, native playback, Hold, and side Step.");
+console.log("Field bounds tests passed: Range containment, Context suspension, native playback, Hold, and side Step.");

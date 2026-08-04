@@ -257,10 +257,16 @@ assert.match(byId.get("status").textContent, /already called/,
 // and then be destroyed by the first save — the one failure in the project that
 // could not be undone.
 {
-  const key = [...env.localStorage.values.keys()].find(name => name.includes(":v9:"));
+  const key = "binary-youtube-reader:v9:dQw4w9WgXcQ";
   const intact = env.localStorage.values.get(key);
   assert.ok(intact && intact.length > 40, "There is a saved map to damage.");
-  env.localStorage.values.set(key, intact.slice(0, Math.floor(intact.length * 0.6)));
+  const damaged = intact.slice(0, Math.floor(intact.length * 0.6));
+
+  // Leave the source before damaging its stored record. A same-source reload
+  // must first persist the authoritative in-memory Guide and would correctly
+  // repair storage before there was anything unreadable to recover.
+  await loadVideo("https://youtu.be/M7lc1UVf-VE");
+  env.localStorage.values.set(key, damaged);
 
   await loadVideo("https://youtu.be/dQw4w9WgXcQ");
 
@@ -269,13 +275,17 @@ assert.match(byId.get("status").textContent, /already called/,
   assert.equal(byId.get("pins-list-count").textContent, "0",
     "The session starts empty because nothing could be recovered.");
 
-  const preserved = env.localStorage.values.get(
-    "binary-youtube-reader:unreadable:dQw4w9WgXcQ"
-  );
-  assert.equal(preserved, intact.slice(0, Math.floor(intact.length * 0.6)),
-    "The damaged record is set aside before an empty Guide can be saved over it.");
-  assert.notEqual(env.localStorage.values.get(key), preserved,
-    "and the ordinary key carries on as usual.");
+  const quarantineKey = [...env.localStorage.values.keys()]
+    .find(name => name.startsWith(
+      "binary-youtube-reader:unreadable:dQw4w9WgXcQ:"
+    ));
+  assert.ok(quarantineKey, "Unreadable evidence receives a unique quarantine identity.");
+  const preserved = JSON.parse(env.localStorage.values.get(quarantineKey));
+  assert.equal(preserved[0].stored, damaged,
+    "The damaged record is set aside before the current key can be rewritten.");
+  assert.equal(preserved[0].sourcePrefix, "binary-youtube-reader:v9:");
+  assert.equal(env.localStorage.values.get(key), damaged,
+    "Loading alone does not manufacture an empty save over the damaged record.");
 }
 
 console.log("Transaction integrity smoke passed: a retained Cue is written to storage in the transaction that reports it and survives reopening; a pending Nudge settles before the next operator commits, so Undo unwinds in the order actions happened; Weight is assigned in one place and one selection is one decision; the relationship band stays bounded under heavy overlap while every Section keeps its control; Group names cannot collide; and Address equality never silently chooses among coincident Pin identities; and an unreadable saved map is reported and set aside rather than overwritten.");

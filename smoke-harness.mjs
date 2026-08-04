@@ -213,9 +213,9 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
 
   byId.get("context-seconds").value = "5";
   byId.get("section-source").value = "interval";
-  addOption(byId.get("section-source"), "interval", "Working Section");
+  addOption(byId.get("section-source"), "interval", "Working Interval");
   addOption(byId.get("section-source"), "field-span", "Held Field span");
-  addOption(byId.get("field-breath-rate"), "0.5", "0.5\u00d7 / 1.5\u00d7");
+  addOption(byId.get("field-breath-rate"), "0.25", "0.75\u00d7 / 1.25\u00d7");
 
   const documentListeners = new Map();
   const body = new FakeElement("body", "BODY");
@@ -246,8 +246,12 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
   const intervalCallbacks = [];
   const localStorage = {
     values: new Map(),
+    throwOnGet: false,
     throwOnSet: false,
-    getItem(key) { return this.values.get(key) ?? null; },
+    getItem(key) {
+      if (this.throwOnGet) throw new Error("storage unavailable");
+      return this.values.get(key) ?? null;
+    },
     setItem(key, value) {
       if (this.throwOnSet) throw new Error("storage unavailable");
       this.values.set(key, value);
@@ -277,6 +281,7 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
       this.events = config.events;
       this.playerVars = config.playerVars;
       this.duration = duration;
+      this.videoId = null;
       this.currentTime = 0;
       this.rate = 1;
       this.state = -1;
@@ -292,8 +297,9 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
     }
     emitState(data) { queueMicrotask(() => this.events.onStateChange?.({ data })); }
     emitRate(rate) { queueMicrotask(() => this.events.onPlaybackRateChange?.({ data: rate })); }
-    cueVideoById({ startSeconds = 0 }) {
+    cueVideoById({ videoId = null, startSeconds = 0 }) {
       this.commands.push(["cue", startSeconds]);
+      this.videoId = videoId;
       this.currentTime = startSeconds;
       this.state = 5;
       this.emitState(5);
@@ -303,6 +309,7 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
     getAvailablePlaybackRates() { return [0.5, 1, 1.5, 2]; }
     getPlayerState() { return this.state; }
     getPlaybackRate() { return this.rate; }
+    getVideoData() { return { video_id: this.videoId }; }
     getIframe() { return this.iframe; }
     setPlaybackRate(rate) {
       this.commands.push(["rate", rate]);
@@ -370,6 +377,9 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
       shiftKey: Boolean(init.shiftKey),
       repeat: Boolean(init.repeat),
       target: init.target || documentStub,
+      defaultPrevented: false,
+      propagationStopped: false,
+      immediatePropagationStopped: false,
       preventDefault() { this.defaultPrevented = true; },
       stopPropagation() { this.propagationStopped = true; },
       stopImmediatePropagation() {

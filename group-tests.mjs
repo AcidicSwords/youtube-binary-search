@@ -1,10 +1,10 @@
 // Groups partition retained Sections while carrying two independent relations.
 //
-//   visible  — exactly one Group supplies Sections and endpoint Pins to Timeline
+//   visible  — at most one Group supplies Sections and endpoint Pins to Timeline
 //   active   — any number of Groups may contribute multiplicative Weight
 //
 // Guide access remains complete regardless of visibility. These tests hold the
-// singular Timeline owner, independent deformation stack, Pin visibility law,
+// singular-or-empty Timeline owner, independent deformation stack, Pin visibility law,
 // hidden-object navigation, and persistence repair.
 import assert from "node:assert/strict";
 import {
@@ -21,7 +21,6 @@ import {
   sectionIsVisible,
   groupIsVisible,
   orderedPins,
-  allPins,
   partitionGuidePins,
   normalizeGuide,
   sanitizeGuide,
@@ -38,9 +37,14 @@ import {
   goToGuidePin,
   workFromExtent,
   saveExtentAsSection,
-  deformSection,
+  setGuideSectionWeight,
   undo
 } from "./session.js";
+
+const everyPin = guide => {
+  const { visible, hidden } = partitionGuidePins(guide);
+  return [...visible, ...hidden];
+};
 
 const DURATION = 100;
 const extentOf = guide =>
@@ -135,7 +139,7 @@ function build() {
     label: "Same",
     groupId: layer.id
   });
-  assert.equal(deleteGroup(guide, layer.id), false,
+  assert.equal(deleteGroup(guide, layer.id).allowed, false,
     "Removing a Group cannot silently merge a distinct layered Section into Map.");
   const blocked = deleteGuideGroup(
     createSession({ duration: DURATION, guide }),
@@ -198,7 +202,7 @@ function build() {
   setGroupState(guide, terrain.id, { visible: false });
   assert.equal(extentOf(guide), undeformed + 40);
   assert.deepEqual(orderedPins(guide).map(pin => pin.t), []);
-  assert.equal(allPins(guide).length, 4,
+  assert.equal(everyPin(guide).length, 4,
     "Nothing is destroyed: every Pin remains retained and editable in Guide.");
   assert.equal(sortedSections(guide).length, 2,
     "and every Section remains retained.");
@@ -259,24 +263,27 @@ function build() {
     weight: 0.5
   });
   const detail = createGroup(guide, "Detail");
-  let session = createSession({ duration: DURATION, current: 20, guide });
+  const session = createSession({ duration: DURATION, current: 20, guide });
 
-  const selected = workFromExtent(session, { start: 10, end: 30 });
-  assert.equal(selected.changed, true);
-  session = selected.session;
-  const deformed = deformSection(session, null, 2);
-  assert.equal(deformed.changed, true);
-  assert.equal(deformed.section.groupId, detail.id,
-    "Implicit Deform creates or edits only the visible layer, never an identical hidden layer.");
-  const hidden = deformed.session.model.guide.sections.find(section =>
+  const tagged = saveExtentAsSection(session, { start: 10, end: 30 }, "Same");
+  assert.equal(tagged.changed, true);
+  assert.equal(tagged.value.section.groupId, detail.id,
+    "Tag authors in the visible layer without conflating an identical hidden layer.");
+  const weighted = setGuideSectionWeight(
+    tagged.session,
+    tagged.value.section.id,
+    2
+  );
+  assert.equal(weighted.changed, true);
+  const hidden = weighted.session.model.guide.sections.find(section =>
     section.groupId === terrain.id
   );
   assert.equal(hidden.weight, 0.5);
   assert.equal(
-    createTimelineProjection({ duration: DURATION, guide: deformed.session.model.guide })
+    createTimelineProjection({ duration: DURATION, guide: weighted.session.model.guide })
       .weightAtSource(20),
     1,
-    "The new visible 2× detail multiplies with the hidden 0.5× terrain."
+    "Guide Weight on the visible detail multiplies with hidden 0.5× terrain."
   );
 
   const saved = saveExtentAsSection(
@@ -407,7 +414,7 @@ function build() {
 {
   const { guide, terrain } = build();
   const before = sortedSections(guide).length;
-  assert.equal(deleteGroup(guide, terrain.id), true);
+  assert.equal(deleteGroup(guide, terrain.id).allowed, true);
   assert.equal(sortedSections(guide).length, before,
     "A Group is an organizing choice, not an owner.");
   assert.ok(guide.sections.every(section => section.groupId === DEFAULT_GROUP_ID));
@@ -422,7 +429,7 @@ function build() {
 {
   const { guide, terrain } = build();
   const before = sortedSections(guide).length;
-  assert.equal(deleteGroup(guide, DEFAULT_GROUP_ID), true,
+  assert.equal(deleteGroup(guide, DEFAULT_GROUP_ID).allowed, true,
     "The default Group can be removed while another Group survives it.");
   assert.equal(sortedSections(guide).length, before,
     "and its Sections come home to that survivor.");
@@ -430,7 +437,7 @@ function build() {
   assert.equal(guide.groups.length, 1);
   assert.equal(guide.visibleGroupId, terrain.id,
     "The drawn layer resolves to a Group that still exists.");
-  assert.equal(deleteGroup(guide, terrain.id), false,
+  assert.equal(deleteGroup(guide, terrain.id).allowed, false,
     "The last Group cannot be removed, because Sections would have nowhere to be.");
   assert.equal(guide.groups.length, 1);
 }
@@ -585,4 +592,4 @@ function build() {
     "and the transaction names the Group it renamed.");
 }
 
-console.log("Group tests passed: one visible Timeline layer, independent active deformation stack, hidden Guide navigation, endpoint visibility, multiplicative layering, non-destructive deletion, and deterministic persistence repair.");
+console.log("Group tests passed: at most one visible Timeline layer, independent active deformation stack, hidden Guide navigation, endpoint visibility, multiplicative layering, non-destructive deletion, and deterministic persistence repair.");

@@ -8,7 +8,7 @@
 // This module is DOM-free and I/O-free. It never mutates Session, never seeks a
 // player, never derives semantic operator targets of its own, and owns neither
 // Context transport nor breathing.
-import { EPSILON, clamp } from "./range-geometry.js";
+import { clamp } from "./range-geometry.js";
 
 export const FIELD_FRAME_OWNER = Object.freeze({
   CONTEXT: "context",
@@ -274,13 +274,4 @@ export function createFieldFrameSequencer(options = {}) {
       revision = 0;
     }
   };
-}
-
-// A Frame edge that has collapsed onto Center carries no perceptual
-// information. Callers use this to decide whether a side is worth displaying.
-export function frameSideAvailable(frame, role) {
-  if (!frame) return false;
-  return role === "tail"
-    ? frame.center - frame.tail > EPSILON
-    : frame.lead - frame.center > EPSILON;
 }

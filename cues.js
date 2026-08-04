@@ -77,21 +77,6 @@ export function parseCueList(text, { duration = 0 } = {}) {
   });
 }
 
-// YouTube only renders chapters when the description opens at 0:00 and offers
-// at least three of them. A reader pasting a description is better served by
-// whatever Cues exist, so parsing stays lenient and this reports separately
-// whether the list is what YouTube itself would have treated as chapters.
-export function looksLikeChapters(cues) {
-  return Array.isArray(cues)
-    && cues.length >= 3
-    && cues[0]?.time === 0;
-}
-
-export function cueExtent(cue) {
-  if (!cue || !Number.isFinite(cue.start) || !Number.isFinite(cue.end)) return null;
-  return { start: cue.start, end: cue.end };
-}
-
 // A Cue's own name if the creator gave it one, and its Address otherwise. Cues
 // carry no derived titles: an unnamed Cue is a bare Address, and inventing a
 // name for it would make a candidate look like something retained.

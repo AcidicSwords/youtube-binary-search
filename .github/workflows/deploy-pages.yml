@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - master
   workflow_dispatch:
 
 permissions:
@@ -26,8 +25,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Check JavaScript and run tests
-        run: npm run check
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install lock-matched Chromium
+        run: npx --yes playwright@"$(node -p 'require("playwright-core/package.json").version')" install --with-deps chromium
+      - name: Run the complete release gate
+        run: npm run verify
 
   deploy:
     needs: test

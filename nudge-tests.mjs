@@ -51,6 +51,26 @@ byId.get("nudge-seconds").dispatch("change");
 await flush();
 assert.match(byId.get("status").textContent, /Nudge set to 0\.5s/);
 
+// Nudge Current is Step law at a source-time quantum. Returning to departure
+// within one gesture therefore retains the same sparse positive reversal
+// residue as a matrix Step sequence, in one Undo transaction.
+byId.get("timeline").dispatch("click", {
+  target: byId.get("timeline"),
+  clientX: 450
+});
+await flush(3);
+dispatchDocument("keydown", { key: ".", code: "Period" });
+await flush();
+dispatchDocument("keydown", { key: ",", code: "Comma" });
+await flush();
+assert.equal(currentText(), "Current 0:45");
+await env.delay(600);
+await flush();
+assert.match(byId.get("section-window").textContent, /0:45.+0:45\.5/,
+  "A Current Nudge reversal retains its visited contiguous extent.");
+assert.equal(byId.get("return-meta").textContent, "Step Reversal",
+  "and settles through the same one-transaction Step reversal consequence.");
+
 // Current drag is an exact Go gesture, not a Pin move. A stationary press
 // performs no movement at all.
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 500 });
@@ -222,10 +242,14 @@ assert.equal(currentText(), "Current 1:07");
 
 // Shift + wheel over empty Timeline nudges Current, and one continuous wheel
 // series settles as one Undo transaction.
-const wheel = (deltaY, target = byId.get("timeline")) => byId.get("timeline")
-  .dispatch("wheel", { target, deltaY, deltaX: 0, shiftKey: true });
-const plainWheel = byId.get("timeline")
-  .dispatch("wheel", { target: byId.get("timeline"), deltaY: -120, deltaX: 0 });
+const wheel = (deltaY, target = byId.get("timeline")) => dispatchDocument(
+  "wheel",
+  { target, deltaY, deltaX: 0, shiftKey: true }
+);
+const plainWheel = dispatchDocument(
+  "wheel",
+  { target: byId.get("timeline"), deltaY: -120, deltaX: 0 }
+);
 await flush();
 assert.equal(plainWheel.defaultPrevented, false,
   "The browser default is prevented only for an acquired Timeline nudge target.");
@@ -292,6 +316,45 @@ const pinAddress = () => descendants(byId.get("pins-list"))
 assert.equal(pinAddress(), "1:07", "Shift-wheel over a Pin nudges that Pin.");
 await env.delay(600);
 await flush();
+
+// Opposite movement of one retained target inside the same gesture has no
+// canonical residue. It returns exactly to origin and manufactures no Undo.
+const pinId = pinMarker.dataset.pinGo;
+const livePinMarker = () => descendants(byId.get("pin-lane"))
+  .find(node => node.dataset.pinGo === pinId);
+const pinBeforeRoundTrip = pinAddress();
+wheel(-24, livePinMarker());
+await flush();
+wheel(24, livePinMarker());
+await flush();
+assert.equal(pinAddress(), pinBeforeRoundTrip);
+await env.delay(600);
+await flush();
+dispatchDocument("keydown", { key: "z", code: "KeyZ" });
+await flush();
+assert.equal(pinAddress(), "1:06.5",
+  "Undo crosses a Pin round trip and reaches the prior real Nudge immediately.");
+dispatchDocument("keydown", { key: "c", code: "KeyC" });
+await flush();
+assert.equal(pinAddress(), "1:07");
+
+// A Guide row is off-map inspection, not a spatial wheel acquisition surface.
+// With no acquired Timeline operand it must leave that row's Pin untouched and
+// fall back to Current.
+const guidePinRow = descendants(byId.get("pins-list"))
+  .find(node => node.dataset.pinGo === pinId);
+const guideWheel = wheel(-24, guidePinRow);
+await flush();
+assert.equal(guideWheel.defaultPrevented, true);
+assert.equal(currentText(), "Current 0:30.5",
+  "Off-map Shift-wheel without an acquired operand nudges Current.");
+assert.equal(pinAddress(), "1:07",
+  "A Guide row under the pointer does not replace the off-map target.");
+await env.delay(600);
+await flush();
+dispatchDocument("keydown", { key: "z", code: "KeyZ" });
+await flush();
+assert.equal(currentText(), "Current 0:30");
 
 // The Guide increment controls call the same Nudge operation.
 const guideNudgeForward = descendants(byId.get("pins-list"))
@@ -374,6 +437,25 @@ assert.equal(committedPinAddress(), addressBeforePreview);
   await flush(3);
   await poll();
 
+  const sectionId = row.dataset.sectionGo;
+  const sectionWire = () => descendants(byId.get("section-lane"))
+    .find(node => node.dataset.sectionGo === sectionId);
+  const sectionBounds = () => ["section-start", "section-end"].map(kind =>
+    descendants(byId.get("sections-list"))
+      .find(node => node.dataset.addressInput === kind)?.value
+  );
+  const boundsBeforeRoundTrip = sectionBounds();
+  const historyBeforeRoundTrip = byId.get("return-meta").textContent;
+  wheel(-24, sectionWire());
+  await flush();
+  wheel(24, sectionWire());
+  await flush();
+  assert.deepEqual(sectionBounds(), boundsBeforeRoundTrip);
+  await env.delay(600);
+  await flush();
+  assert.equal(byId.get("return-meta").textContent, historyBeforeRoundTrip,
+    "A Section Nudge round trip creates no no-op history entry.");
+
   const wire = descendants(byId.get("section-lane"))
     .find(node => node.dataset.sectionGo);
   wire.rect = { left: 200, width: 200 };
@@ -432,4 +514,4 @@ await flush(2);
 assert.ok(!plainOffMap.defaultPrevented,
   "A wheel without Shift is not a Nudge anywhere.");
 
-console.log("Nudge tests passed: source-time quantum, Current drag commit and cancel, Shift-drag precision, Shift-wheel accumulation and targeting, keyboard nudging, one Undo per gesture, Guide increments sharing the same operation, Guide Address preview and cancellation, and drag/edit Frame parity.");
+console.log("Nudge tests passed: source-time quantum, Current Step reversal settlement, Current drag commit and cancel, Shift-drag precision, Shift-wheel accumulation and Timeline/off-map targeting, keyboard nudging, at most one Undo per gesture, no-op retained-object round trips, Guide increments sharing the same operation, Guide Address preview and cancellation, and drag/edit Frame parity.");

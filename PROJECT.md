@@ -1,104 +1,113 @@
 # Video Cartography
+
 ## Canonical Project Establishment
 
-**Category:** A spatial comprehension workspace for video  
-**Primary surfaces:** Panoramic Phase Field · Temporal Topography · Guide · Operator Matrix  
-**Tagline:** See the phases. Map the whole.
+- **Category:** spatial comprehension workspace for video
+- **Primary surfaces:** Panoramic Phase Field · Temporal Topography · Guide · Operator Matrix
+- **Tagline:** See the phases. Map the whole.
 
 Video Cartography turns a linear audiovisual source into a perceptually panoramic and spatially navigable environment without changing the source itself.
 
-Ordinary video is globally present but locally actualized: the complete source exists, while only one source moment ordinarily occupies the audiovisual present. Video Cartography preserves chronological order and source continuity while creating three complementary forms of availability:
+Ordinary video is globally present but locally actualized: the complete sequence exists, while one source phase ordinarily occupies the audiovisual present. The project creates three complementary forms of availability:
 
-- the **Panoramic Phase Field** makes a bounded neighbourhood of source phases perceptually co-present;
-- the **Temporal Topography** makes the complete ordered source available as one navigable, positively deformable map;
-- the **Guide** makes discovered places and relations persist as Pins and Sections.
+- the **Panoramic Phase Field** makes a bounded neighborhood of source phases perceptually co-present;
+- the **Temporal Topography** makes the complete ordered source available as a navigable, positively deformable map;
+- the **Guide** makes discovered locations and relations persist as Pins and Sections.
 
-The **Operator Matrix** governs how the viewer discriminates, traverses, resolves, retains, and revisits that environment.
+The **Operator Matrix** provides a small compositional grammar for discriminating, traversing, resolving, retaining, and revisiting this environment.
 
 ```text
 linear temporal exclusivity
 → bounded perceptual and spatial availability
-→ retained and deformable map
+→ retained, navigable structure
 ```
 
-## The source and the environment
+## Design laws
 
-Source time is the only durable temporal truth. Playback, Range, Current, Cursor, Working Intervals, Pins, Sections, and Field addresses remain source Addresses.
+The project is complete only while these laws remain true:
 
-Timeline Space is a derived coordinate. It may allocate more or less visible distance to fixed source material, but it never changes source order, duration, playback, or reachability. Every effective spatial density remains positive, so the map is continuous, strictly increasing, and ordinarily invertible.
+- source time is authoritative;
+- Timeline Space is positive, continuous, ordered, and singly invertible;
+- depth comes from composing small primitives, not from bundled modes;
+- direct manipulation accepts perceptual intuition and resolves to exact canonical state;
+- ordinary video-player capability remains intact;
+- advanced mechanisms remain optional;
+- an operator excludes alternatives and leaves one contiguous Working Interval residue;
+- an operation does not mutate an unrelated state dimension;
+- one semantic consequence has one implementation even when several routes reach it.
 
-The project therefore changes neither the video nor the truth of its sequence. It changes the environment through which that sequence can be perceived, traversed, structured, and understood.
+The source is never edited. The application changes the environment through which the source can be perceived, traversed, structured, and understood.
+
+## Source, Range, and the Working Interval
+
+Every meaningful temporal value is a source Address. Duration, Range, Current, Cursor, Resolution, Working Interval bounds, Pins, Sections, Context, and Field positions all remain in source time.
+
+**Range** is the admissible source universe. A chain of navigation or search operations excludes alternatives from the current admissible relation. The **Working Interval** is the positive, contiguous residue that survives those exclusions. It carries two source bounds, orientation, and endpoint viewpoints; it is not a persistent record of the traversed path.
+
+**Reopen** restores Range-level discrimination without discarding the residue. **Undo** restores prior semantic state. **Release** clears the active residue and the acquired Timeline operand while preserving Current, retained topology, Guide focus, Focus, Weight, and the current deformation-bypass comparison.
 
 ## Panoramic Phase Field
 
-The Panoramic Phase Field is the local perceptual surface formed by Tail, Center, and Lead.
+The Panoramic Phase Field is the local perceptual surface formed by:
 
 ```text
 Tail | Center | Lead
 ```
 
-Center is the audible and actualized source phase. Tail remains behind Center. Lead remains ahead. Their presentations are spatially co-present without making the represented source events simultaneous.
-
-The Field has two regimes.
+Center is the audible, actualized phase. Tail remains at or behind Center; Lead remains at or ahead. Their co-presence is a representation of temporal relation, not a claim that the source events are simultaneous.
 
 ### Field Frame
 
-Outside ordinary playback, the Field presents one stable three-frame interpretation of the current state.
+Outside ordinary playback, the Field presents one stable interpretation of the active state. Step exposes its next backward and forward destinations. Refine and Reopen expose directional midpoint candidates. A Section exposes Start, its spatial midpoint, and End. Pin and ordinary Go use the Step neighborhood. Direct manipulation temporarily supplies its exact candidate extent.
 
-When Context is enabled, Tail and Lead remain the bounded Context edges before, during, and after Context transport. Center is Current while idle and Cursor while Context is running. Context ending does not reassign the side panes.
+When Context is enabled, its bounded source window owns the Field Frame. Tail and Lead remain at the Context edges while Center is Current at rest and Cursor during Context transport. Beginning, pausing, or settling Context does not reassign those edges.
 
-When Context is disabled, the Field falls back to the active operator geometry: Step destinations, Refine midpoints, Reopen alternatives, or an exact retained extent.
-
-Committed movement creates one brief directional transition from the preceding Frame to the resulting Frame. Semantic state commits immediately; the transition is presentation, not a second transition model. It is an opacity cue rather than motion, because three media surfaces cannot be reparented and translating them reads as a shake rather than as travel.
-
-Direct Current, Pin, or Section manipulation temporarily supplies exact source frames for perceptual verification and then restores the ambient Frame.
+Each committed movement produces at most one directional presentation transition. The semantic operation commits first; the transition merely makes its direction legible.
 
 ### Field Breath
 
-During ordinary playback, Stretch becomes a continuous bounded breath.
+During ordinary Panorama playback, Tail and Lead travel between an Inner Offset `x` and Outer Offset `y`, where `0 < x < y`. Their outward rates are symmetric around Center’s rate. At a boundary, a side follows Center while preserving its attained offset until every operational side arrives; the cycle then reverses.
 
-Each operational side moves between an inner offset `x` and outer offset `y`, where `0 < x < y`. Tail never becomes less than `x` behind Center; Lead never becomes less than `x` ahead. Outward rates are symmetric around Center's rate where the adapter supports them. At the outer boundary the rates exchange and the Field contracts. At the inner boundary the original rates return and expansion resumes.
+The minimum offset is a law rather than a preference. A side without enough Range room to preserve `x` is excluded from the breathing barrier instead of silently weakening the relation. Hidden, collapsed, unavailable, and Range-clipped sides are likewise excluded.
 
-If one side reaches a boundary first, it follows Center at Center's rate while preserving that exact offset until the other operational side arrives. Hidden, collapsed, unavailable, or Range-clipped sides are excluded from the synchronization barrier.
+Hold preserves the attained relation at Center rate and keeps the breath direction for later resumption. Reaching the outer boundary starts contraction; it does not choose Hold.
 
-The minimum offset is a law rather than a preference. A side with less room than `x` cannot preserve it, so it does not breathe at all: it is excluded from the barrier and parked at whatever room remains. `x` is never silently reduced to fit.
-
-Hold alone stops the breath and preserves the attained relation. Reaching a boundary never chooses Hold on the viewer's behalf.
+The conservative shipped relation is `0.25–2.5 s` with `Tail 0.75× | Center 1× | Lead 1.25×`. It favors local coherence without limiting the settings a reader may choose or replacing previously saved preferences.
 
 ## Temporal Topography
 
-The Timeline is the Temporal Topography: the complete source projected into lateral Timeline Space.
+Timeline Space is a derived spatial coordinate over the source. For every source segment:
 
-- **Range** is admissible territory.
-- **Resolution** is the active neighbourhood and discrimination grain.
-- **Current** is committed semantic location.
-- **Cursor** is transient physical observation.
-- **Working Interval** is the active continuous crossing.
-- **Pins** are retained source landmarks.
-- **Sections** are retained relations between Pins.
-- **Weight** controls how much map distance a Section contributes.
+```text
+density = product of effective covering Section weights
+Timeline Space = integral of density
+```
 
-Section factors compose multiplicatively. Their signed logarithms compose visually as one continuous compression/expansion atmosphere, while projected source-time contours retain exact metric meaning.
+Every effective factor is positive. Consequently the projection is continuous, strictly increasing, and invertible: no source span collapses, reverses, or becomes unreachable.
 
-Spatial extent is reported as a factor on source, never as a duration, because a map distance only means something against the source it stretches. At `1×` the two correspond and no factor is shown. Sections whose factors cancel leave the whole traversal unchanged while the interior still warps.
+Weight changes the map allocation of fixed source material. It does not change source duration, identity, or order. Overlapping active Sections compose multiplicatively, so no priority or stored hierarchy is required. `1×` is spatially neutral.
 
-Focus draws the map across the focused extent alone, so a focused Section or Working Interval spans the whole timeline at every Weight. That viewport is presentation: it changes what is drawn, never what is computed.
+One effective projection compiles Group activity, stored Weight, and the transient deformation bypass. Geometry, Step, Refine, adaptive Reach, drag conversion, hit testing, spatial readouts, atmosphere, contours, and explicitly dynamic playback read that same object. Fixed playback does not read Section Weight.
 
-Current, Pins, Section endpoints, whole Sections, and Range boundaries are manipulated spatially on the Temporal Topography. Section wires carry their own roles: pressing near an end acquires that endpoint Pin, pressing the middle translates the Section. Guide objects remain source topology rather than generic interface selections.
+The Timeline’s violet/teal atmosphere shows the sign and perceptual strength of compression or expansion. Projected source-time contours show the exact metric consequence. Focus changes only the viewport through which this map is drawn; it does not define a second map.
 
-Dragging or nudging Current is a Step, not a Go. It extends or shortens the traversal already established rather than drawing a new Working Interval around wherever it lands. Drawing a new neighbourhood is what an exact Go is for.
-
-Fine adjustment is **Nudge**. Shift-drag enters quantized precision mode. Shift-wheel and comma/period move the acquired object by one source-time quantum and batch a continuous sequence into one Undo checkpoint. The interface calls this a frame only when a media adapter can prove an exact frame duration.
+**Toggle Deformation** is a comparison, not an edit. `X` bypasses the acquired Timeline Section’s contribution or, with no Section acquired, all deformation. The retained Weight remains visible and exact. The bypass is transient and source-scoped; it creates no history and no persisted setting.
 
 ## Guide
 
 The Guide is the retained cartographic graph.
 
-A Pin owns one source Address. A Section owns an edge between two Pin IDs. Coincident Pins may remain distinct; shared identity, not visual coincidence, determines whether connected Sections move together.
+A **Pin** owns one source Address. A **Section** owns an edge between two Pin identities, an optional title, a Group, and one positive Weight. Shared endpoint identity makes connected Sections move together; merely coincident Pins remain independent. Unlink creates a separate Pin at the same Address, while an explicitly armed snap can link Pin identities again.
 
-The Temporal Topography owns spatial dragging. The Guide owns exact addresses, titles, weights, topology, Focus, Unlink, Rename, and Delete. Address fields and increment controls invoke the same Session operations used by Timeline gestures.
+Every Section belongs to exactly one ordinary Group. At most one Group is drawn on the Timeline, and no Group drawn is valid. Group activity is independent: any number of active Groups may contribute Weight while hidden. The last Group cannot be deleted, and a Group deletion reports the actual surviving Group that receives its Sections.
+
+Guide focus is inspection. An acquired Timeline operand is spatial selection. The distinction matters: focusing a hidden Guide row does not silently scope `X`; acquiring a visible Timeline Section does.
+
+Cues are offered source Addresses or extents, such as parsed creator chapters. They remain transient candidates until the reader explicitly navigates, composes, or Tags them into ordinary retained structure.
 
 ## Operator Matrix
+
+The visible and physical grammar is exactly:
 
 ```text
 Q  Refine Backward    W  Reopen            E  Refine Forward
@@ -106,66 +115,56 @@ A  Step Backward      S  Switch Endpoint   D  Step Forward
 R  Release            T  Tag               F  Focus / Unfocus
 ```
 
-The first row changes discrimination. The second changes traversal or viewpoint. The third determines the fate of the Working Interval:
+Its semantic rows are:
+
+1. **discriminate** — Refine Backward, Reopen, Refine Forward;
+2. **traverse or change viewpoint** — Step Backward, Switch Endpoint, Step Forward;
+3. **resolve the active relation** — Release it, Tag what is known, or Focus it as the active world.
+
+Tag has two exact forms:
 
 ```text
-Release → return the relation to absence
-Deform  → make the relation modify the world
-Focus   → make the relation become the world
+T         Tag as Pin      — Current becomes retained location
+Shift+T   Tag as Section  — the Working Interval becomes retained relation
 ```
 
-Every operator must produce the smallest state transformation sufficient for its goal and preserve every unrelated state dimension. An operator is defined equally by what it changes and what it cannot change.
+Weight remains an attribute of the retained Section in Guide. `X` remains an auxiliary comparison action inside Operators but outside the square matrix. The bottom row therefore has one coherent progression:
 
-## Codebase as executable theory
+```text
+Release → return the active relation to absence
+Tag     → retain a location or relation as structure
+Focus   → make the relation the active world
+```
 
-Module boundaries instantiate the conceptual distinctions:
+Shift modifies Refine into Local Refine, Step into Pin traversal, and Tag as Pin into Tag as Section. The Matrix latch and Guide Extend latch are independent owners; holding physical Shift consumes neither.
 
-- `session.js` owns canonical state, semantic transactions, and history;
-- `range-geometry.js` owns pure Range, Resolution, and interval arithmetic;
-- `timeline-projection.js` owns the positive source↔Timeline Space map;
-- `guide.js` owns persistent Pin/Section topology and Weight;
-- `transport.js` owns Context and playback runtime;
-- `cues.js` owns pure candidate Addresses parsed from offered text;
-- `field-frame.js` owns pure Frame derivation, stable Frame identity, traversal
-  direction, transition descriptors, and the revisioned Frame sequencer;
-- `step-field-geometry.js` owns pure Field and breathing arithmetic;
-- `step-field.js` owns physical side players, Frame placement, the transition
-  lifecycle, the Breath runtime, boundary synchronization, and Hold;
-- `app.js` composes owners, routes gestures, and establishes one transaction boundary;
-- `view.js` projects state into the accessible interface;
-- `youtube.js` is a media adapter, not the identity of the project.
+## Playback as observation
 
-Durable state stores source Addresses and canonical factors. It never stores Timeline positions, lanes, gradients, slideshow animation state, or physical iframe drift.
+Playback extends watched Working Interval coverage without shortening prior coverage. A focused proper Range wraps without history; the full-video Range stops at its source end.
+
+Observation and rate are separate dimensions. Plain `Space` requests a `1×` Panorama. `Shift+Space` requests Center-only playback at a configured fixed wish or at the optional dynamic inverse of effective Weight. The media adapter’s offered and confirmed actual rates remain authoritative. A Center-only request stays Center only even when its actual rate is `1×`.
+
+The Field never confiscates ordinary player controls. If the confirmed actual Center rate cannot preserve Panorama, the side views suspend rather than drift.
 
 ## Operational cycle
 
 ```text
-load source
-→ perceive a Field Frame
-→ traverse or discriminate
-→ establish a Working Interval
-→ verify through the Field
-→ retain Pins or Sections
-→ Deform or Focus
-→ re-enter the changed map
+load a source and use ordinary playback
+→ perceive the local Field
+→ Refine, Step, or Go
+→ leave a contiguous Working Interval
+→ verify through Context and the Field Frame
+→ Tag Current as a Pin or the Interval as a Section
+→ assign Section Weight in Guide
+→ optionally compare with Toggle Deformation
+→ optionally Focus the relation
+→ re-enter the resulting map
 ```
 
-The map becomes more useful through use while the source remains unchanged.
+The instrument becomes more useful through use while the source remains unchanged.
 
-## Natural extensions
+## Optionality and non-goals
 
-Chapters, transcript cues and search results are **Cues**: exact Addresses offered as candidates. A creator's chapter list is a partition someone who understood the video already drew, so it is worth navigating immediately — but it is not the reader's map, and it is never placed. A Cue enters no Guide, deforms nothing, and stops no traversal until the reader retains it, at which point it becomes an ordinary Pin or Section carrying the creator's title. Ordinary player conveniences such as Center playback rate, captions, volume, quality, fullscreen, and verified frame stepping remain media-runtime controls and cannot acquire the meanings of Field rate, Step Reach, Resolution, or Section Weight.
+The same application must remain complete as an ordinary YouTube player, a keyboard-driven Center player, a player plus Operator Matrix, a player plus Guide, or the full Field/Topography/Guide instrument.
 
-## Non-goals
-
-Video Cartography is not a non-linear editor, automatic summarizer, uniform annotation timeline, transcript reader with a player attached, or claim that the retained map is objectively inherent in the source. It is an instrument for constructing and navigating a defensible representation while preserving the source as authority.
-
-## Canonical documents
-
-- `GLOSSARY.md` — the normative lexicon
-- `README.md` — orientation and vocabulary
-- `SPEC.md` — normative state, geometry, and operator laws
-- `IMPLEMENTATION.md` — module ownership and transaction architecture
-- `INTERFACE.md` — visible grammar and direct manipulation
-- `DEVELOPMENT.md` — contribution constraints and test map
-- `VALIDATION.md` — automated and manual release gates
+Video Cartography is not a non-linear editor, an automatic summary, a transcript reader with a player attached, or a claim that the reader’s retained map is objectively inherent in the source. It is an instrument for constructing and navigating a defensible representation while preserving the source as authority.

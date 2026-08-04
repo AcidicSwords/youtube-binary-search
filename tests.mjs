@@ -7,7 +7,6 @@ import {
   midpoint,
   createRoot,
   getTargets,
-  classifyRefineRelation,
   classifyRetainedRefineRelation,
   descend,
   refineNeighborhood,
@@ -18,7 +17,6 @@ import {
   stepTarget,
   stepNeighborhood,
   translateNeighborhood,
-  settleContinuous,
   getActionRanges
 } from "./range-geometry.js";
 import {
@@ -38,7 +36,6 @@ import {
   unlinkSectionEndpoint,
   linkPins,
   renameSection,
-  replaceSectionExtent,
   deleteSection,
   previousPin,
   nextPin,
@@ -78,7 +75,7 @@ import {
   unlinkGuideSectionEndpoint,
   linkGuidePins,
   switchEndpoint,
-  returnState
+  undo
 } from "./session.js";
 import { parseTimeValue, parseYouTubeUrl } from "./youtube.js";
 import { formatTime, formatDuration } from "./view.js";
@@ -87,33 +84,6 @@ import { formatTime, formatDuration } from "./view.js";
 const root = createRoot(0, 60, 180);
 assert.deepEqual(root, { L: 0, C: 60, R: 180, level: 0 });
 assert.deepEqual(getTargets(root), { backward: 30, forward: 120 });
-assert.equal(
-  classifyRefineRelation(
-    { start: 50, end: 70, departure: 70, arrival: 50 },
-    50,
-    60
-  ),
-  "shorten"
-);
-assert.equal(
-  classifyRefineRelation(
-    { start: 50, end: 70, departure: 70, arrival: 50 },
-    50,
-    75
-  ),
-  "replace",
-  "A target beyond the old Interval endpoint must start a new Interval."
-);
-assert.equal(
-  classifyRefineRelation(
-    { start: 50, end: 70, departure: 70, arrival: 50 },
-    50,
-    70
-  ),
-  "shorten",
-  "The Interval-membership rule includes an endpoint landing, which collapses the Interval."
-);
-
 const retainedRefineInterval = {
   start: 25,
   end: 50,
@@ -207,17 +177,6 @@ assert.deepEqual(
   { L: 0, C: 350, R: 650, level: 0 },
   "Forward playback must preserve the receding endpoint and translate only the approached endpoint."
 );
-assert.deepEqual(
-  settleContinuous(
-    { L: 0, C: 300, R: 600, level: 2 },
-    300,
-    250,
-    { start: 0, end: 900 }
-  ),
-  { L: 0, C: 250, R: 600, level: 2 },
-  "A hard Range boundary clips only the approached side of continuous movement."
-);
-
 const actionRanges = getActionRanges(
   { L: 60, C: 120, R: 180, level: 1 },
   { start: 0, end: 240 },
@@ -256,7 +215,7 @@ assert.equal(deletePin(guide, pinA.id).deleted, false);
 assert.equal(deletePin(guide, pinA.id).references, 1);
 
 const generated = createSectionFromTimes(guide, 30, 40, { label: "Generated", provenance: "test" });
-let generatedSection = resolveSection(guide, generated.section.id);
+const generatedSection = resolveSection(guide, generated.section.id);
 assert.equal(generatedSection.start, 30);
 assert.equal(generatedSection.end, 40);
 assert.equal(
@@ -264,15 +223,6 @@ assert.equal(
   true,
   "Section endpoint Pins must remain visible and traversable."
 );
-const replacedEndPinId = generatedSection.endPinId;
-generatedSection = replaceSectionExtent(guide, generatedSection.id, 30, 45, {
-  provenance: "working:test"
-});
-assert.equal(generatedSection.start, 30);
-assert.equal(generatedSection.end, 45);
-assert.equal(generatedSection.id, generated.section.id);
-assert.equal(generatedSection.label, "Generated");
-assert.equal(getPin(guide, replacedEndPinId), null, "Replacing an extent must remove an unshared retired endpoint.");
 assert.equal(deleteSection(guide, generatedSection.id), true);
 assert.equal(getPin(guide, generatedSection.startPinId), null);
 assert.equal(getPin(guide, generatedSection.endPinId), null);
@@ -422,7 +372,7 @@ assert.equal(migratedV1.sections.length, 2);
 assert.equal(migratedV1.pins.length, 3);
 assert.equal(validateGuide(migratedV1, 20), true);
 
-// Session kernel: operators deform one returnStateable model.
+// Session kernel: every operator transforms one canonical, recoverable model.
 let session = createSession({ duration: 100, current: 50, guide: createGuide("video") });
 const pinExtentResult = workFromExtent(
   session,
@@ -524,11 +474,11 @@ assert.deepEqual(
 );
 assert.equal(session.history.length, 2);
 
-result = returnState(session);
+result = undo(session);
 session = result.session;
 assert.equal(session.model.resolution.level, 1);
 assert.equal(session.model.resolution.C, 75);
-result = returnState(session);
+result = undo(session);
 session = result.session;
 assert.equal(session.model.resolution.C, 50);
 assert.equal(session.model.interval, null);
@@ -762,7 +712,7 @@ assert.deepEqual(
   { start: stepped.model.interval.start, end: stepped.model.interval.end },
   { start: 50, end: 70 }
 );
-stepped = returnState(stepped).session;
+stepped = undo(stepped).session;
 assert.equal(stepped.model.resolution.C, 50);
 
 // Step pushes an approached binary endpoint only once its midpoint has reached
@@ -851,7 +801,7 @@ assert.deepEqual(
 );
 assert.deepEqual(focusedAgain.model.interval.arrivalFrame.resolution, focusedAgain.model.resolution);
 
-// The active Interval is a semi-persistent Working Section. Focus projects it into
+// The active Interval is a semi-persistent Working Interval. Focus projects it into
 // Range without retaining it in Guide; Leave preserves the deformed working
 // value, while Save is the explicit persistence boundary.
 let working = createSession({ duration: 100, current: 50, guide: createGuide("video") });
@@ -875,7 +825,7 @@ assert.deepEqual(
     arrival: workingBeforeFocus.arrival
   }
 );
-assert.equal(working.model.guide.sections.length, 0, "Focus must not save the Working Section.");
+assert.equal(working.model.guide.sections.length, 0, "Focus must not save the Working Interval.");
 
 working = refine(working, "backward").session;
 assert.deepEqual(
@@ -892,7 +842,7 @@ assert.deepEqual(working.model.range, { start: 0, end: 100 });
 assert.deepEqual(
   { start: working.model.interval.start, end: working.model.interval.end },
   { start: 50, end: 60 },
-  "Leave must preserve the unsaved Working Section."
+  "Leave must preserve the unsaved Working Interval."
 );
 assert.equal(working.model.guide.sections.length, 0);
 
@@ -917,7 +867,7 @@ assert.equal(edited.model.guide.pins.length, 1);
 edited = goTo(edited, 60, { operator: "timeline", label: "Timeline Click" }).session;
 edited = saveIntervalAsSection(edited, "Forty to sixty").session;
 assert.equal(edited.model.guide.sections.length, 1);
-edited = returnState(edited).session;
+edited = undo(edited).session;
 assert.equal(edited.model.guide.sections.length, 0);
 assert.equal(edited.model.resolution.C, 60);
 
@@ -993,15 +943,15 @@ const fullCycleResult = completePlayback(fullCycle, {
 });
 assert.equal(fullCycleResult.changed, true);
 assert.equal(fullCycleResult.session.history.length, 2);
-assert.equal(returnState(fullCycleResult.session).session.model.resolution.level, fullCycleReturn.resolution.level);
+assert.equal(undo(fullCycleResult.session).session.model.resolution.level, fullCycleReturn.resolution.level);
 
-// Drag preview is committed as one returnStateable Range action.
+// Drag preview is committed as one undoable Range action.
 let dragged = createSession({ duration: 100, current: 50 });
 const dragOrigin = snapshotModel(dragged.model);
 dragged = previewRange(dragged, 20, 80, 50).session;
 dragged = checkpoint(dragged, "Adjust Range", dragOrigin).session;
 assert.equal(dragged.history.length, 1);
-dragged = returnState(dragged).session;
+dragged = undo(dragged).session;
 assert.deepEqual(dragged.model.range, { start: 0, end: 100 });
 
 // Range normalization rejects invalid extents and keeps no-op history clean.

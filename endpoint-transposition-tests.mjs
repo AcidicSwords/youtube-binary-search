@@ -11,7 +11,7 @@ import {
   step,
   completePlayback,
   switchEndpoint,
-  returnState
+  undo
 } from "./session.js";
 
 function frameOf(model) {
@@ -65,7 +65,7 @@ assert.deepEqual(switched.session.model.interval, originalInterval);
 
 // Refine after transposition may pass the preserved opposite endpoint. Because
 // that target is outside the current Interval, the old Interval is discarded and the
-// complete Current-to-midpoint traversal becomes the Working Section.
+// complete Current-to-midpoint traversal becomes the Working Interval.
 let overrun = createSession({ duration: 100, current: 50 });
 overrun = goTo(overrun, 70, { operator: "timeline" }).session;
 overrun = switchEndpoint(overrun).session;
@@ -229,7 +229,7 @@ assert.equal(noSwitch.session.history.length, collapsedHistoryLength);
 // Undo remains a separate history operation and restores the pre-switch state.
 const beforeSwitch = snapshotModel(session.model);
 const afterSwitch = switchEndpoint(session).session;
-const undone = returnState(afterSwitch);
+const undone = undo(afterSwitch);
 assert.equal(undone.changed, true);
 assert.deepEqual(undone.session.model, beforeSwitch);
 
@@ -268,4 +268,4 @@ assert.match(styles, /"refine-backward reopen refine-forward"/);
 assert.match(styles, /"step-backward switch-endpoint step-forward"/);
 assert.match(styles, /"release tag focus"/);
 
-console.log("Endpoint Transposition tests passed: endpoint frames, involution, Local Refine drawing, Step composition, collapse, Undo separation, and v7 matrix wiring.");
+console.log("Endpoint Transposition tests passed: endpoint frames, involution, Local Refine drawing, Step composition, collapse, Undo separation, and matrix wiring.");

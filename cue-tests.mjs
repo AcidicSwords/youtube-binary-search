@@ -7,8 +7,6 @@ import assert from "node:assert/strict";
 import {
   parseTimestamp,
   parseCueList,
-  looksLikeChapters,
-  cueExtent,
   cueName
 } from "./cues.js";
 
@@ -48,8 +46,6 @@ import {
     [[0, "Intro"], [83, "The setup"], [150, "Middle bit"], [600, "Long section"]],
     "Every separator convention resolves to the same Address and title."
   );
-  assert.ok(looksLikeChapters(cues),
-    "Opening at 0:00 with at least three entries is what YouTube itself treats as chapters.");
 }
 
 // --- A chapter list is a contiguous partition ---------------------------------
@@ -67,7 +63,6 @@ import {
     assert.equal(cues[index - 1].end, cues[index].start,
       "No Cue may leave a gap before the next.");
   }
-  assert.deepEqual(cueExtent(cues[1]), { start: 30, end: 60 });
 }
 
 // --- Order, duplicates, and bounds --------------------------------------------
@@ -95,10 +90,6 @@ import {
     assert.deepEqual(parseCueList(input, { duration: 100 }), [],
       "Text carrying no Address produces no Cues and no failure.");
   }
-  assert.equal(looksLikeChapters([]), false);
-  assert.equal(looksLikeChapters(parseCueList("1:00 Late start", { duration: 120 })), false,
-    "A list that does not open at 0:00 is Cues, but not what YouTube calls chapters.");
-  assert.equal(cueExtent(null), null);
 }
 
 // --- A candidate never wears a name it was not given ---------------------------

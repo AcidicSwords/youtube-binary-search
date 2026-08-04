@@ -178,7 +178,7 @@ assert.equal(
 );
 assert.notEqual(currentText(), compressedTerrainCurrent);
 await press("ArrowRight", { shiftKey: true });
-assert.match(status(), /no Pin forward/,
+assert.match(status(), /no next Pin/,
   "and reports the absence rather than inventing a stop.");
 
 // Show Map and the same key reaches them all again. Nothing was destroyed.
@@ -436,7 +436,7 @@ assert.ok(
 
 await clickIn("sections-list", inSections("deleteGroup")
   .find(node => node.dataset.deleteGroup === added));
-assert.match(byId.get("guide-dialog-message").textContent, /returns to Map; nothing is deleted/);
+assert.match(byId.get("guide-dialog-message").textContent, /moves to “Map”; nothing is deleted/);
 byId.get("guide-dialog-form").dispatch("submit");
 await flush();
 assert.equal(sectionRows().length, sectionCountBefore,

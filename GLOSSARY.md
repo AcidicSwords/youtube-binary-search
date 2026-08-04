@@ -1,42 +1,66 @@
 # Video Cartography — Canonical Glossary
 
-- **Source** — the authoritative linear audiovisual sequence.
-- **Address** — one exact source-time position.
+- **Source** — the authoritative linear audiovisual sequence identified by its loaded video identity.
+- **Source Time** — the coordinate system in which all durable temporal facts are stored. Presentation may be spatially reshaped; source identity, order, and duration do not.
+- **Address** — one finite position in Source Time.
+- **Range** — the contiguous source extent currently admissible to navigation and observation.
+- **Resolution** — the ordered left/Current/right neighborhood that defines the present discrimination scale and its basis.
+- **Current** — the committed semantic Address.
+- **Cursor** — the transient physical Address reported while media is being observed.
+- **Working Interval** — the positive contiguous residue left after alternatives have been excluded from Range. It stores bounds, orientation, and endpoint frames, not a persistent path.
+- **Endpoint Frame** — the Resolution and basis associated with one side of a Working Interval, restored by Switch Endpoint.
+- **Timeline Space** — the positive, continuous, strictly increasing spatial coordinate derived from Source Time and effective Section factors.
+- **Temporal Topography** — the source projected into navigable Timeline Space, including its contours, retained landmarks, and relation wires.
+- **Density** — the product of effective covering Section weights at a source segment; integrating it produces Timeline Space.
+- **Effective Projection** — the single immutable source↔Timeline mapping for one render or operation after Group activity, Weight, and the current deformation bypass have been resolved.
+- **Spatial midpoint** — the source Address halfway between two endpoints in Timeline Space. It need not equal their arithmetic source-time midpoint.
+- **Stretch factor** — a Timeline extent reported relative to the source span it allocates. At `1×`, Timeline and source extent correspond.
+- **Viewport** — the source extent drawn across the Timeline. Focus changes the viewport; operators still consume the same effective projection.
+- **Weight** — one Section’s positive map-scale factor. It changes Timeline density, not source duration. Fixed playback ignores it; optional Dynamic Playback explicitly reads its effective composite.
+- **Deformation Atmosphere** — the perceptual violet/teal field derived from effective contributors. It communicates compression or expansion while contours communicate exact metric density.
+- **Deformation Bypass / Toggle Deformation** — one transient, source-scoped comparison selected with `X`. It bypasses the acquired Timeline Section or, without one, the complete map; it changes no stored Weight and creates no history.
+- **Acquired Timeline Operand** — the exact visible Pin or Section selected from the Timeline for spatial actions. Bare Timeline ground and Release clear it.
+- **Guide Focus** — the Pin or Section being inspected in Guide. It remains distinct from an acquired Timeline operand and does not by itself scope Toggle Deformation.
+- **Pin** — a retained source landmark with one Address, one identity, and an optional title.
+- **Section** — a retained positive edge between two Pin identities, with an optional title, one Group, and one Weight.
+- **Tag** — the matrix retention operator. `T` is Tag as Pin from Current; `Shift+T` is Tag as Section from a positive Working Interval.
+- **Guide** — the persistent source-scoped graph of Groups, Pins, and Sections, including objects not currently drawn on the Timeline.
+- **Cue** — a transient Address or extent offered from chapter-like text. It is not persisted, weighted, or traversable as a Pin until explicitly retained. When optionally drawn on the Timeline, its inert presentation is positioned through the effective projection without entering the Guide or traversal.
+- **Group** — one ordinary partition of Sections. Every Section belongs to one Group; the last Group cannot be removed.
+- **Drawn Group** — the optional Group whose Sections and endpoint Pins appear on the Timeline. At most one Group is drawn, and drawing no Group is valid.
+- **Active Group** — a Group whose Section weights contribute to the effective projection. Activity is independent of whether the Group is drawn.
+- **Unlink** — give one Section endpoint a new independent Pin identity at the same Address.
+- **Link** — replace one Pin identity with another compatible Pin after an explicit snap has armed, making all references share that endpoint.
+- **Refine Backward / Refine Forward** — select the corresponding spatial midpoint at finer Resolution while retaining the established Working Interval anchor when possible.
+- **Local Refine** — the shifted Refine law that retains only the immediate Current-to-midpoint traversal.
+- **Reopen** — restore Resolution to the active Range without changing Current or clearing the Working Interval.
+- **Step Backward / Step Forward** — traverse a configured distance in Timeline Space while retaining a contiguous residue.
+- **Step Reversal** — one coalesced Step sequence whose final Address is its departure but whose transient visited envelope has positive extent; that envelope becomes the Working Interval.
+- **Pin traversal** — shifted Step to the previous or next retained landmark or synthetic Range boundary, using Step’s interval law.
+- **Switch Endpoint** — make the opposite Working Interval side Current and restore that side’s Endpoint Frame.
+- **Release** — clear the Working Interval and acquired Timeline operand. It preserves Current, Resolution, Range and Focus, Guide focus, retained topology, Weight, deformation bypass, and playback preferences.
+- **Focus / Unfocus** — install an acquired Section or Working Interval as Range and viewport / restore its containing Range.
+- **Go** — move to an exact known Address, seed a movement-scale Resolution, and establish the corresponding contiguous residue.
+- **Nudge** — precise source-time movement of Current or retained topology through one shared operation. It is called a frame only when the media adapter proves an exact frame duration.
+- **Carry** — translate the acquired Timeline Pin or Section through the same Timeline-space displacement as a navigation action, within its structural boundary.
 - **Panoramic Phase Field / Field** — Tail, Center, and Lead presented as one local perceptual surface.
-- **Field Frame** — the stable idle, Context, operator, or direct-manipulation three-frame presentation.
-- **Field Breath** — the bounded live expansion and contraction of Tail and Lead during playback.
-- **Tail** — the source phase behind Center.
-- **Center** — the audible actualized source phase; Current when idle, Cursor during observation.
-- **Lead** — the source phase ahead of Center.
-- **Stretch** — begin or resume Field Breath.
-- **Hold** — preserve the attained Field relation at Center rate.
-- **Inner Offset** — the minimum Tail/Lead separation from Center during Breath.
-- **Outer Offset** — the maximum Tail/Lead separation from Center during Breath.
-- **Temporal Topography** — the complete source projected into navigable Timeline Space.
-- **Timeline Space** — the derived positive spatial coordinate used for map layout and navigation.
-- **Cue** — an Address offered as a candidate, parsed from a creator's chapters or any pasted text. Never persisted, never projected, never traversed; it becomes structure only when retained.
-- **Stretch factor** — a spatial extent expressed as the factor it applies to its own source span. Spatial extent is always reported this way and never as a duration; at `1×` it is omitted.
-- **Viewport** — the source extent the map is drawn across. Presentation only: Focus takes it so the focused extent fills the timeline, and no operator can observe it.
-- **Range** — admissible source territory.
-- **Resolution** — the active neighbourhood and discrimination grain.
-- **Current** — committed semantic Address.
-- **Cursor** — transient physically observed Address.
-- **Working Interval** — one retained continuous traversal with directed departure and arrival.
-- **Pin** — a retained source landmark with optional title.
-- **Section** — a retained edge between two Pins with optional title and one canonical Weight.
-- **Weight** — one Section's positive map-scale factor; never playback rate.
-- **Guide** — the complete persistent graph of Groups, Pins, and Sections, including objects hidden from Timeline. Guide focus never by itself creates a Timeline operand.
-- **Group** — one layer in the Section partition. Exactly one Group is on the Timeline and supplies spatial Sections and section-bound Pins; any number may be active and contribute multiplicative Weight. Hidden active Groups retain terrain without landmarks. New Sections enter the on-Timeline Group by default. Removing a Group returns its Sections to Map unless that would collapse two layered identities into one Group, in which case removal is refused.
-- **Unlink** — take one Section off a shared endpoint Pin and give it its own Pin at the same Address. Reached from the Pin, which is the object it acts on.
-- **Refine** — choose a directional spatial midpoint at finer Resolution while retaining the established path when possible.
-- **Local Refine** — choose the same midpoint while recording only the immediate Current-to-midpoint traversal.
-- **Step** — traverse a known distance in Timeline Space.
-- **Pin traversal** — traverse to the next retained landmark using Step's interval law.
-- **Go** — commit to an exact known Address.
-- **Reopen** — restore Range-level Resolution without changing Current or retained coverage.
-- **Switch Endpoint** — continue from the opposite side of the same Working Interval.
-- **Release** — clear only the Working Interval.
-- **Deform** — create/reuse a Section and change its Weight.
-- **Focus / Unfocus** — install an extent as Range and draw the map across it alone / restore its containing Range and the whole map.
-- **Context** — bounded source-contiguous observation around Current before or during acceptance.
-- **Nudge** — precise source-time movement of Current or retained topology; an exact frame only when proven by the media adapter.
+- **Field Frame** — the stable Context, operator, or direct-manipulation Tail–Center–Lead presentation used outside ordinary Panorama playback.
+- **Field Breath** — bounded expansion and contraction of operational Tail and Lead offsets during Panorama playback.
+- **Tail** — the optional muted source phase at or behind Center.
+- **Center** — the audible primary player; Current while settled and Cursor during active observation.
+- **Lead** — the optional muted source phase at or ahead of Center.
+- **Inner Offset** — the minimum Tail/Lead separation from Center during Field Breath.
+- **Outer Offset** — the maximum Tail/Lead separation from Center during Field Breath.
+- **Stretch** — begin or resume Field Breath from its current relation.
+- **Hold** — preserve the attained Field offsets and direction while every held side follows Center at Center rate.
+- **Context** — bounded source-contiguous Center observation around Current. While enabled, its stable edges own the Field Frame.
+- **Playback** — source-contiguous observation that settles watched coverage into the Working Interval without shortening existing coverage.
+- **Observation Policy** — explicit playback ownership of either `panorama` or `center-only`, independent from rate.
+- **Rate Policy** — either a fixed stored wish or a dynamic request. It is resolved against the media adapter’s offered rates.
+- **Requested Rate** — the offered rate selected for the current Rate Policy; it is a command candidate, not proof of acceptance.
+- **Actual Rate** — the playback rate confirmed by the media adapter’s rate event and used to decide whether Panorama can remain coherent.
+- **Dynamic Playback** — the optional Center-only Shift playback policy that requests the unconstrained inverse of effective Weight and therefore may retune as Current or deformation bypass changes.
+- **Load Generation** — the monotonically increasing identity on an immutable source request, used with the adapter’s loaded video identity to reject stale metadata and state events.
+- **Source-transition boundary** — the single operation that settles or cancels all old-source transient owners, persists safe Guide changes, clears source-scoped presentation, and only then cues the new source.
+- **Guide Recovery** — versioned loading that distinguishes an absent Guide from unreadable data, quarantines damaged higher-priority evidence before fallback, and refuses destructive rewrite when preservation fails.
+- **Undo / Redo** — traversal of semantic Session transactions. Transient presentation such as deformation bypass, open panels, Cues, and Field animation phase is outside this history.
