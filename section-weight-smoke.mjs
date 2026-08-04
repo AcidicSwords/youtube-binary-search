@@ -320,8 +320,11 @@ for (const clientX of [600, 700]) {
   await flush();
 }
 commandsBeforeWeight = playerCommandCounts();
-dispatchDocument("keydown", { key: "x", code: "KeyX", altKey: true });
-await flush();
+byId.get("deform-down").dispatch("pointerdown", { button: 0, pointerId: 91, buttons: 1 });
+await flush(2);
+dispatchDocument("pointerup", { button: 0, pointerId: 91, buttons: 0 });
+await env.delay(500);
+await flush(3);
 assert.deepEqual(
   playerCommandCounts(),
   commandsBeforeWeight,
@@ -333,30 +336,41 @@ assert.equal(
   "1:40 · 0.975× spatial"
 );
 
-// Plain T is a reversible normalize/restore toggle; Shift and Alt move
-// one step up or down the same canonical ladder.
+// X normalizes: the map is drawn and measured as if the Weights were neutral,
+// while the Weights themselves are untouched. It is the inverse of Weight and
+// the reason Weight is usable -- deformation is right almost always and
+// intolerable when you want to act on a straight line, and without a way out
+// you would stop deforming rather than fight it.
+const weightsBeforeNormalize = descendants(byId.get("sections-list"))
+  .filter(node => node.dataset.sectionWeight !== undefined)
+  .map(node => node.value);
+const historyBeforeNormalize = byId.get("return-meta").textContent;
+
 dispatchDocument("keydown", { key: "x", code: "KeyX" });
 await flush();
-assert.equal(byId.get("duration-time").textContent, "1:40");
+assert.equal(byId.get("duration-time").textContent, "1:40",
+  "Normalize draws the map straight.");
+assert.deepEqual(
+  descendants(byId.get("sections-list"))
+    .filter(node => node.dataset.sectionWeight !== undefined)
+    .map(node => node.value),
+  weightsBeforeNormalize,
+  "and changes no Weight, because it is a way of looking rather than an edit.");
+assert.equal(byId.get("return-meta").textContent, historyBeforeNormalize,
+  "and records no transaction, so it costs nothing to use before a drag.");
+
 dispatchDocument("keydown", { key: "x", code: "KeyX" });
 await flush();
 assert.equal(
   byId.get("duration-time").textContent,
-  "1:40 · 0.975× spatial"
+  "1:40 · 0.975× spatial",
+  "Pressing it again restores every Weight exactly."
 );
-dispatchDocument("keydown", { key: "x", code: "KeyX", shiftKey: true });
-await flush();
-assert.equal(byId.get("duration-time").textContent, "1:40");
-dispatchDocument("keydown", { key: "x", code: "KeyX", altKey: true });
-await flush();
-assert.equal(
-  byId.get("duration-time").textContent,
-  "1:40 · 0.975× spatial"
-);
+
 assert.deepEqual(
   playerCommandCounts(),
   commandsBeforeWeight,
-  "Every Deform chord must remain a timeline-only edit."
+  "Normalizing and restoring issue no player or Field command."
 );
 
 // Existing Section weights remain editable during source playback without
@@ -456,5 +470,21 @@ assert.deepEqual(
   // in the source time it equals at neutral Weight.
   assert.equal(readout("step-size-summary"), "10 units · manual");
 }
+
+// Scope follows what is acquired, and "nothing acquired" has to be reachable or
+// whole-map Normalize is unreachable after the first Section you ever touch.
+byId.get("release").click();
+await flush(3);
+const weightedSpan = byId.get("duration-time").textContent;
+dispatchDocument("keydown", { key: "x", code: "KeyX" });
+await flush();
+assert.equal(byId.get("duration-time").textContent, "1:40",
+  "With nothing acquired, Normalize straightens the whole Timeline.");
+assert.equal(byId.get("normalize-toggle")["aria-pressed"], "true",
+  "and the control near the Timeline says so.");
+dispatchDocument("keydown", { key: "x", code: "KeyX" });
+await flush();
+assert.equal(byId.get("duration-time").textContent, weightedSpan,
+  "and pressing it again restores every Weight exactly as it was.");
 
 console.log("Section weight smoke passed: shared familiar scale, Guide-only tuning, positive compression, expansion, gradients, ordinary Pins, weighted Step, and identity recovery.");

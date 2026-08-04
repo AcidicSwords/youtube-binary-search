@@ -23,12 +23,18 @@ function sectionActsOnSegment(section, start, end) {
     && section.end > start + EPSILON;
 }
 
-function buildSegments(duration, guide) {
+function buildSegments(duration, guide, normalize = null) {
   // A Section deforms the map only while its Group is active. Nothing is
   // frozen: an inactive Group simply stops contributing to the density product,
   // so toggling it is exact and instantaneous in both directions.
   const source = guide || { sections: [], pins: [], groups: [] };
+  // Normalize is the inverse of Weight, and the reason Weight is usable at all.
+  // Deformation is right almost all of the time and intolerable the rest, when
+  // you are trying to act on a straight line; without a way out you would stop
+  // deforming rather than fight it. Nothing is stored and no weight changes --
+  // the map is simply drawn and measured as if the named Sections were neutral.
   const sections = sortedSections(source)
+    .filter(section => normalize !== "all" && section.id !== normalize)
     .filter(section => sectionIsActive(source, section))
     .filter(section => Math.abs(activeWeight(section) - 1) > EPSILON);
   const boundaries = [...new Set([
@@ -106,14 +112,17 @@ function findTimelineSegment(segments, coordinate) {
 export function createTimelineProjection({
   duration = 0,
   guide = null,
-  view = null
+  view = null,
+  // null draws every active Weight; "all" draws none; a Section id draws every
+  // Weight except that one.
+  normalize = null
 } = {}) {
   const end = Math.max(0, Number(duration) || 0);
   const {
     segments,
     timelineExtent,
     weightedSections
-  } = buildSegments(end, guide);
+  } = buildSegments(end, guide, normalize);
 
   function sourceToTimeline(value) {
     const source = clamp(Number(value) || 0, 0, end);
@@ -283,10 +292,11 @@ export function createTimelineProjection({
 // focused extent occupies the whole timeline. An ordinary Range is admissible
 // territory inside a world that is still visible around it, so it does not
 // take the viewport.
-export function projectionForModel(model) {
+export function projectionForModel(model, options = {}) {
   return createTimelineProjection({
     duration: model?.duration,
     guide: model?.guide,
-    view: model?.focus ? model.range : null
+    view: model?.focus ? model.range : null,
+    normalize: options.normalize ?? null
   });
 }

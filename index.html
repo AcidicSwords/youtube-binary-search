@@ -120,6 +120,9 @@
               <span class="eyebrow">Range</span>
               <h2>Timeline</h2>
             </div>
+            <button id="normalize-toggle" class="timeline-normalize" type="button" aria-pressed="false" aria-keyshortcuts="X" disabled>
+              <span id="normalize-toggle-label">Normalize</span><kbd>X</kbd>
+            </button>
             <div class="timeline-legend" aria-label="Timeline layers">
               <span id="timeline-key-sections" class="timeline-key key-sections" title="Sections: retained weighted extents"><i aria-hidden="true"></i>Sections</span>
               <span id="timeline-key-range" class="timeline-key key-range" title="Range: navigable boundary"><i aria-hidden="true"></i>Range</span>
@@ -296,8 +299,8 @@
                 <span><kbd>⇧Q</kbd>/<kbd>⇧E</kbd> Local Refine</span>
                 <span><kbd>⇧A</kbd>/<kbd>⇧D</kbd> Pins</span>
                 <span><kbd>R</kbd> Release Interval</span>
-                <span><kbd>X</kbd> Deform / Normalize</span>
-                <span><kbd>⇧X</kbd>/<kbd>Alt X</kbd> Weight up / down</span>
+                <span><kbd>X</kbd> Normalize the map, or one selected Section</span>
+                <span>Weights are edited in the Guide</span>
                 <span><kbd>F</kbd> Focus / Unfocus</span>
                 <span><kbd>Alt</kbd> Carry selected retained object</span>
                 <span><kbd>T</kbd> Tag as Pin</span>
@@ -363,13 +366,13 @@
                 <span id="release-meta" class="action-meta">No Interval</span>
               </button>
               <div class="deform-control">
-                <button id="deform" class="nav-action lifecycle-action deform-action" type="button" data-preview-action="deform" aria-keyshortcuts="X" disabled>
-                  <span class="action-name"><kbd>X</kbd> <span id="deform-label" class="action-label">Deform</span></span>
+                <button id="deform" class="nav-action lifecycle-action deform-action" type="button" data-preview-action="deform" disabled>
+                  <span class="action-name"><span id="deform-label" class="action-label">Deform</span></span>
                   <span id="deform-meta" class="action-meta">No target</span>
                 </button>
                 <div class="deform-steps" aria-label="Deformation weight">
-                  <button id="deform-down" class="deform-step" type="button" aria-keyshortcuts="Alt+X" title="Move deformation one weight step down (Alt+X)" disabled>−</button>
-                  <button id="deform-up" class="deform-step" type="button" aria-keyshortcuts="Shift+X" title="Move deformation one weight step up (Shift+X)" disabled>+</button>
+                  <button id="deform-down" class="deform-step" type="button" title="Move deformation one weight step down" disabled>−</button>
+                  <button id="deform-up" class="deform-step" type="button" title="Move deformation one weight step up" disabled>+</button>
                 </div>
               </div>
               <button id="focus-toggle" class="nav-action lifecycle-action focus-action" type="button" data-preview-action="focus" aria-keyshortcuts="F" disabled>

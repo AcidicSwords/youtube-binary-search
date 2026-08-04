@@ -1689,6 +1689,37 @@ kbd {
   font-size: 1.25rem;
 }
 
+/* Normalize sits with the Timeline it straightens, not in the operator matrix:
+   it is a way of looking, and the thing it acts on is right there. */
+.timeline-normalize {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 28px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--muted);
+  background: #101722;
+  font-size: 0.66rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.timeline-normalize:hover:not(:disabled),
+.timeline-normalize:focus-visible {
+  border-color: rgb(121 168 255 / 0.55);
+  color: var(--text);
+}
+
+.timeline-normalize.active {
+  border-color: rgb(121 168 255 / 0.85);
+  color: var(--text);
+  background: rgb(121 168 255 / 0.14);
+}
+
+.timeline-normalize:disabled { opacity: 0.5; cursor: default; }
+
 .guide-tabs {
   display: grid;
   /* One line, whatever the count. Two fixed columns left a third tab stranded

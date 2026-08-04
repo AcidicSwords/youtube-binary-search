@@ -209,12 +209,16 @@ assert.match(
   app,
   /function applyGuideState[\s\S]*?command-workspace[\s\S]*?rail-collapsed/
 );
-assert.match(
-  app,
-  // Alt+T lowers Weight; Ctrl+T stays the browser's. A control path the
-  // declared grammar does not contain is one nobody can reason about.
-  /key === "t"[\s\S]*?!event\.ctrlKey && event\.altKey[\s\S]*?event\.altKey\) stepDeformWeight\(-1\)/
-);
+// X normalizes, and carries no modifier because it has one meaning. The ladder
+// is edited in the Guide, where the Weight actually lives, so the keyboard no
+// longer needs a chord for stepping it -- which is what the Alt chord was for,
+// and why Deform was the only operator with one.
+assert.match(app, /else if \(plain && key === "x"\) \{[\s\S]{0,80}toggleNormalize\(\)/);
+assert.doesNotMatch(app, /event\.altKey\) stepDeformWeight\(-1\)/,
+  "No operator carries an Alt chord.");
+assert.match(app, /function toggleNormalize\(\)[\s\S]*?state\.normalize = wasNormalized \? null : scope/);
+assert.match(app, /function timelineProjection\(\)[\s\S]*?normalize: state\.normalize/,
+  "Normalize reaches the map through the one projection every operator measures with.");
 
 assert.match(youtube, /place\(address, allowSeekAhead = true\)/);
 assert.match(youtube, /isYouTubeApiReady/);

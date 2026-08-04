@@ -179,12 +179,16 @@ converge(
 
 // --- Weight: keyboard versus Guide selector -----------------------------------
 converge(
-  "Shift+X and Guide selector",
-  async ({ byId, flush, makeSection, sectionRows, press }) => {
+  "Deform step control and Guide selector",
+  async ({ env, byId, flush, makeSection, sectionRows }) => {
     await makeSection(100, 300);
     byId.get("sections-list").dispatch("click", { target: sectionRows()[0] });
     await flush();
-    await press("X", { shiftKey: true });
+    byId.get("deform-up").dispatch("pointerdown", { button: 0, pointerId: 77, buttons: 1 });
+    await flush();
+    env.dispatchDocument("pointerup", { button: 0, pointerId: 77, buttons: 0 });
+    await env.delay(500);
+    await flush(2);
   },
   async ({ byId, flush, makeSection, sectionRows, inSections }) => {
     await makeSection(100, 300);
@@ -366,5 +370,5 @@ if (indexArg !== undefined) {
       `${pair.name}: two routes to one operation must agree on ${pair.form}.`
     );
   }
-  console.log("Route correspondence tests passed: the Deform control, Shift+X and the Guide selector reach one Weight; an exact Address edit and twelve Nudges reach one Address; Timeline and Guide Section selection reach one Working Interval; a retained Cue is an ordinary Section; Focus from the operator and from a Guide row install one scope; and Group membership is the same partition however it is reached.");
+  console.log("Route correspondence tests passed: the Deform control and the Guide selector reach one Weight; an exact Address edit and twelve Nudges reach one Address; Timeline and Guide Section selection reach one Working Interval; a retained Cue is an ordinary Section; Focus from the operator and from a Guide row install one scope; and Group membership is the same partition however it is reached.");
 }

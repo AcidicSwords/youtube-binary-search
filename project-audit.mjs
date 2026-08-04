@@ -198,9 +198,17 @@ assert.match(html, /id="pin-current"[^>]*aria-keyshortcuts="T"[^>]*>Tag as Pin</
 assert.match(html, /id="save-section"[^>]*aria-keyshortcuts="Shift\+T"[^>]*>Tag as Section</);
 assert.doesNotMatch(html, /aria-keyshortcuts="P"|aria-keyshortcuts="Shift\+P"/,
   "P is unbound; nothing claims it.");
-assert.match(html, /id="deform"[^>]*aria-keyshortcuts="X"/);
-assert.match(html, /id="deform-down"[^>]*aria-keyshortcuts="Alt\+X"/);
-assert.match(html, /id="deform-up"[^>]*aria-keyshortcuts="Shift\+X"/);
+// X is Normalize: the inverse of Weight, and the reason Weight is usable at all.
+// Deformation is right almost always and intolerable when you want to act on a
+// straight line, so the way out is one key with no modifier. Weights themselves
+// are edited in the Guide, where the value lives, which is why the Deform
+// controls carry no chord of their own any more.
+assert.match(html, /id="normalize-toggle"[^>]*aria-keyshortcuts="X"/,
+  "Normalize sits with the Timeline it straightens.");
+assert.doesNotMatch(html, /aria-keyshortcuts="(?:Shift|Alt)\+X"/,
+  "and carries no modifier, because it has one meaning.");
+assert.doesNotMatch(html, /id="deform"[^>]*aria-keyshortcuts=/,
+  "Deform no longer claims a key: it creates and weights, which the Guide does.");
 assert.doesNotMatch(html, /id="deform-weight-select"/);
 
 assert.match(

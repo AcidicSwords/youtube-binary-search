@@ -325,6 +325,10 @@ const state = {
   // and it used to reach the operator matrix and the play command as well --
   // pressing Shift to extend a Section and then pressing Space started a
   // Shift-rate playback nobody asked for.
+  // Normalize is a way of looking, not a change to the map: nothing is stored,
+  // no Weight moves, and it records no transaction. null draws every Weight,
+  // "all" draws none, a Section id spares that one.
+  normalize: null,
   shiftLayer: null,
   shiftKeyHeld: false,
   field: null,
@@ -639,7 +643,7 @@ function syncIntervalPinSelection() {
 }
 
 function timelineProjection() {
-  return projectionForModel(model());
+  return projectionForModel(model(), { normalize: state.normalize });
 }
 
 function timelineGeometryKey(sourceModel) {
@@ -1458,6 +1462,12 @@ function releaseWorkingInterval() {
     setStatus("There is no Working Interval to release.");
     return false;
   }
+  // Releasing the Working Interval releases the retained operand with it.
+  // Nothing else cleared it, so "nothing is selected" was reachable only on a
+  // fresh load -- which made every scoped operator permanently scoped to
+  // whatever you last touched.
+  state.selectedRetained = null;
+  state.selectedPinIds = [];
   return accept(result, {
     effect: false,
     status: `Released the Working Interval; Current remains ${formatTime(currentResolution().C)}.`
@@ -1563,6 +1573,37 @@ function applyDeformWeight(weight, { gesture = false } = {}) {
     renderGuide: true,
     status
   });
+}
+
+// Normalize is the inverse of Weight, and what makes Weight usable: deformation
+// is right almost all of the time and intolerable the rest, when you want to act
+// on a straight line. Without a way out you would stop deforming rather than
+// fight it, so the way out is one key and no modifier.
+function normalizeScope() {
+  const selected = state.selectedRetained;
+  return selected?.kind === "section" && resolveSection(guide(), selected.id)
+    ? selected.id
+    : "all";
+}
+
+function toggleNormalize() {
+  if (!state.videoLoaded) return false;
+  const scope = normalizeScope();
+  const wasNormalized = state.normalize === scope;
+  // Changing scope re-aims rather than requiring the previous one be cleared.
+  state.normalize = wasNormalized ? null : scope;
+  // Nothing semantic moved, so nothing settles and nothing is recorded. The
+  // Field and the player keep whatever they were doing.
+  view.invalidateTimelinePins();
+  view.renderGuide();
+  view.render();
+  const section = scope === "all" ? null : resolveSection(guide(), scope);
+  setStatus(state.normalize === null
+    ? (scope === "all" ? "Weights restored." : `Weight restored on ${sectionName(section)}.`)
+    : (scope === "all"
+      ? "Timeline normalized. Weights are unchanged; press X to restore them."
+      : `Normalized ${sectionName(section)}. Its Weight is unchanged; press X to restore it.`));
+  return true;
 }
 
 function deformWorkingOrSelected() {
@@ -4867,6 +4908,7 @@ elements["switch-endpoint"].addEventListener("click", event => {
 });
 elements.release.addEventListener("click", releaseWorkingInterval);
 elements.deform.addEventListener("click", deformWorkingOrSelected);
+elements["normalize-toggle"].addEventListener("click", toggleNormalize);
 // Weight steppers repeat while held, like every other increment control.
 bindHoldRepeat(
   elements["deform-down"],
@@ -5736,21 +5778,13 @@ document.addEventListener("keydown", event => {
     event.preventDefault();
     pinCurrent(event, { useFormLabel: false });
   }
-  // Deform moves to X, keeping its present behaviour until the weight-toggle
-  // rework replaces it. Moving the key once now means the rework changes what X
-  // does without moving it again.
-  else if (
-    key === "x"
-    && (
-      plain
-      || (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey)
-      || (!event.shiftKey && !event.metaKey && !event.ctrlKey && event.altKey)
-    )
-  ) {
+  // X normalizes. Scope follows what is acquired: a selected Section flattens
+  // alone, and with nothing selected the whole Timeline does. It carries no
+  // modifier because it has one meaning -- the ladder is edited in the Guide,
+  // where the weight actually lives.
+  else if (plain && key === "x") {
     event.preventDefault();
-    if (event.shiftKey) stepDeformWeight(1);
-    else if (event.altKey) stepDeformWeight(-1);
-    else deformWorkingOrSelected();
+    toggleNormalize();
   }
   else if (plain && key === "f") {
     event.preventDefault();

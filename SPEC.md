@@ -261,6 +261,14 @@ Changing weight from the operator matrix or Guide uses the same Session transact
 
 The input grammar separates normalization from tuning:
 
+### Normalize
+
+Normalize is the inverse of Weight, and what makes Weight usable at all. Deformation is right almost all of the time and intolerable the rest, when you want to act on a straight line; without a way out you would stop deforming rather than fight it, so the way out is one key with no modifier.
+
+`X` normalizes. Scope follows what is acquired: a selected Section straightens alone, and with nothing acquired the whole Timeline does. Releasing the Working Interval releases the acquired operand with it, which is what makes "nothing acquired" reachable.
+
+It is a way of looking, not an edit. No Weight changes, nothing is stored, and it records no transaction — so it costs nothing to normalize before a drag and restore afterwards. It reaches the map through the one projection every operator measures with, so a Timeline drawn straight is also measured straight: a map drawn flat while Step still counted the deformation would land every movement somewhere other than where it was drawn.
+
 - plain `X` toggles a weighted Section to `1×` and restores its remembered
   non-neutral factor when pressed again;
 - `Shift+X` moves one step up the canonical ladder;

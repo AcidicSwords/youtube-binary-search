@@ -288,7 +288,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     if (state().guideDrag?.moved && state().guideDrag.projection) {
       return state().guideDrag.projection;
     }
-    return projectionForModel(model());
+    // The view measures with the same projection the operators do, Normalize
+    // included: a map drawn straight while Step still counted the deformation
+    // would put every landing point somewhere other than where it was drawn.
+    return projectionForModel(model(), { normalize: state().normalize ?? null });
   }
 
   function setStatus(message, isError = false) {
@@ -1892,6 +1895,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       control.disabled = false;
     }
 
+    if (elements["normalize-toggle"]) {
+      const normalize = currentState.normalize;
+      elements["normalize-toggle"].setAttribute("aria-pressed", String(Boolean(normalize)));
+      elements["normalize-toggle"].classList.toggle("active", Boolean(normalize));
+      if (elements["normalize-toggle-label"]) {
+        elements["normalize-toggle-label"].textContent =
+          normalize && normalize !== "all" ? "Section normalized" : "Normalize";
+      }
+    }
     elements["shift-layer-toggle"].setAttribute("aria-pressed", String(shiftLayer));
     elements["shift-layer-state"].textContent = shiftLayer ? "On" : "Off";
     elements["refine-backward-label"].textContent = shiftLayer
@@ -1971,6 +1983,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "go-range-end", "range-end-here", "full-video-range",
       "field-inner-offset", "field-outer-offset", "field-breath-rate",
       "nudge-seconds", "context-seconds", "playback-rate", "playback-dynamic",
+      "normalize-toggle",
       "section-source", "section-label", "pin-label",
       "cue-source", "cue-parse", "cue-clear"
     ]) {
