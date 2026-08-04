@@ -59,7 +59,7 @@
 - **Rate Policy** — either a fixed stored wish or a dynamic request. It is resolved against the media adapter’s offered rates.
 - **Requested Rate** — the offered rate selected for the current Rate Policy; it is a command candidate, not proof of acceptance.
 - **Actual Rate** — the playback rate confirmed by the media adapter’s rate event and used to decide whether Panorama can remain coherent.
-- **Dynamic Playback** — the optional Center-only Shift playback policy that requests the unconstrained inverse of effective Weight and therefore may retune as Current or deformation bypass changes.
+- **Dynamic Playback** — the optional Shift playback policy that reads cumulative active Section Weight as a playback texture: each doubling or halving of Weight shifts Center by one playback-rate step, so compressed ground plays faster and expanded ground plays slower. It is a log-compressed reading of the map, not a correction of it, and it retunes as Current or deformation bypass changes.
 - **Load Generation** — the monotonically increasing identity on an immutable source request, used with the adapter’s loaded video identity to reject stale metadata and state events.
 - **Source-transition boundary** — the single operation that settles or cancels all old-source transient owners, persists safe Guide changes, clears source-scoped presentation, and only then cues the new source.
 - **Guide Recovery** — versioned loading that distinguishes an absent Guide from unreadable data, quarantines damaged higher-priority evidence before fallback, and refuses destructive rewrite when preservation fails.

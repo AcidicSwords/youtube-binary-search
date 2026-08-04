@@ -780,10 +780,24 @@ for (let elapsed = 1; elapsed <= 8; elapsed += 1) {
 }
 // The Field breathes outward from its inner offset: Tail falls behind Center at
 // z < c while Lead advances at w > c, and both stay inside [x, y].
+//
+// The offset opens against the wall clock rather than against elapsed Center
+// source time, so that it takes the same nine seconds at every Center rate the
+// Panorama can hold. Advancing Center's position therefore proves the rates but
+// not the growth; real time has to pass for that. The exact schedule is proven
+// against an injected clock in field-breath-tests and field-runtime-tests.
 assert.equal(tail.rate, 0.5, "Expansion applies the outward Tail rate z < c.");
 assert.equal(lead.rate, 1.5, "Expansion applies the outward Lead rate w > c.");
-assert.equal(byId.get("tail-offset-state").textContent, "6s in 2.5s–10s");
-assert.equal(byId.get("lead-offset-state").textContent, "6s in 2.5s–10s");
+const offsetBeforeBreathing = byId.get("tail-offset-state").textContent;
+await env.delay(1100);
+await poll();
+await flush();
+const tailOffsetText = byId.get("tail-offset-state").textContent;
+assert.notEqual(tailOffsetText, offsetBeforeBreathing,
+  "A second of real time opens the Field.");
+assert.equal(tailOffsetText, byId.get("lead-offset-state").textContent,
+  "and both sides stay equally displaced from Center.");
+assert.match(tailOffsetText, /in 2\.5s–10s$/, "inside the configured bounds.");
 assert.equal(byId.get("field-transport-state").textContent, "Breathing out");
 assert.equal(byId.get("section-window").textContent, intervalBeforeStretch,
   "Breathing must never rewrite the semantic Interval.");

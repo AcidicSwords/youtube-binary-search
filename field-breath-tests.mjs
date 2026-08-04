@@ -11,7 +11,9 @@ import {
   breathSideRate,
   advanceBreath,
   holdBreath,
-  resumeBreath
+  resumeBreath,
+  rebaseBreath,
+  restartBreath
 } from "./step-field-geometry.js";
 
 const breath = { inner: 2, outer: 10, rate: 0.5 };
@@ -20,18 +22,27 @@ const bothOperational = {
   lead: { operational: true, available: 1000 }
 };
 
+// The breath opens against the wall clock, so a step here is one real second
+// rather than one second of elapsed Center source time. That is the whole point
+// of the change: at 1.5x, a source second is not a second.
+let clock = 0;
 function run(runtime, steps, options = {}) {
   let state = runtime;
   const seen = [];
   for (let index = 0; index < steps; index += 1) {
+    clock += (options.seconds ?? 1) * 1000;
     state = advanceBreath(state, {
       breath: options.breath || breath,
-      centerDelta: options.centerDelta ?? 1,
+      now: clock,
       sides: options.sides || bothOperational
     });
     seen.push(state);
   }
   return { state, seen };
+}
+function begin(configured = breath) {
+  const started = resumeBreath(createBreathRuntime(configured, clock), configured);
+  return { ...started, startedAt: clock, startingOffset: configured.inner, offset: configured.inner };
 }
 
 // Configuration
@@ -62,13 +73,31 @@ function run(runtime, steps, options = {}) {
     );
   }
   assert.deepEqual(breathRatePair(0.25), { center: 1, tailRate: 0.75, leadRate: 1.25 });
-  assert.deepEqual(breathRatePair(0.5, 2), { center: 2, tailRate: 1, leadRate: 3 },
-    "Changing Center rate scales the complete relation rather than changing its shape.");
-  const scaled = breathRatePair(0.75, 0.5);
-  assert.ok(Math.abs((scaled.center - scaled.tailRate)
-    - (scaled.leadRate - scaled.center)) < 1e-9);
-  assert.ok(Math.abs(scaled.tailRate / scaled.center - 0.25) < 1e-9);
-  assert.ok(Math.abs(scaled.leadRate / scaled.center - 1.75) < 1e-9);
+
+  // The step either side of Center is an interval on the rate ladder, not a
+  // fraction of Center. Scaling it -- tail = C(1-z), lead = C(1+z) -- is
+  // identical at 1x and wrong everywhere else: the gap between Center and a side
+  // would grow with Center, so the Field would open faster the faster you played
+  // and a breath would last a different number of seconds at every rate.
+  assert.deepEqual(breathRatePair(0.5, 2), { center: 2, tailRate: 1.5, leadRate: 2.5 },
+    "Changing Center rate moves the whole relation without changing its size.");
+  for (const centerRate of [0.5, 0.75, 1, 1.25, 1.5, 1.75]) {
+    const pair = breathRatePair(0.25, centerRate);
+    assert.ok(
+      Math.abs((pair.center - pair.tailRate) - 0.25) < 1e-9
+      && Math.abs((pair.leadRate - pair.center) - 0.25) < 1e-9,
+      `Both sides stay exactly one step from Center at ${centerRate}x.`
+    );
+  }
+  // Symmetry survives a Center rate too low to hold the step below it: Tail
+  // floors at 0 rather than going backwards, which is the one asymmetry the
+  // ladder can force and the reason such a Center has no Panorama triplet.
+  const narrow = breathRatePair(0.75, 0.5);
+  assert.equal(narrow.tailRate, 0, "A step wider than Center cannot reverse Tail.");
+  assert.equal(narrow.leadRate, 1.25);
+  const wide = breathRatePair(0.75, 2);
+  assert.ok(Math.abs((wide.center - wide.tailRate) - (wide.leadRate - wide.center)) < 1e-9,
+    "Wherever both sides fit, the relation stays symmetric about Center.");
   assert.equal(breathRateFromResponse({ tailRate: 0.5, leadRate: 2 }), 0.75);
   assert.equal(breathRateFromResponse({ tailRate: 0.75, leadRate: 1.25 }), 0.25);
 }
@@ -113,8 +142,9 @@ function run(runtime, steps, options = {}) {
 
 // Expansion, barrier, contraction, and the full cycle
 {
-  let state = resumeBreath(createBreathRuntime(breath), breath);
-  assert.equal(state.sides.tail.offset, 2, "Breathing starts at the inner boundary.");
+  let state = begin();
+  state = run(state, 0).state || state;
+  assert.equal(state.startingOffset, 2, "Breathing starts at the inner boundary.");
   const expanded = run(state, 4);
   state = expanded.state;
   assert.equal(state.sides.tail.offset, 4, "Offset grows by the configured fractional spread.");
@@ -123,7 +153,8 @@ function run(runtime, steps, options = {}) {
   const phases = [];
   for (let index = 0; index < 80; index += 1) {
     const previous = state.phase;
-    state = advanceBreath(state, { breath, centerDelta: 1, sides: bothOperational });
+    clock += 1000;
+    state = advanceBreath(state, { breath, now: clock, sides: bothOperational });
     if (state.phase !== previous) phases.push(state.phase);
   }
   assert.equal(phases[0], BREATH_PHASE.CONTRACTING,
@@ -134,9 +165,10 @@ function run(runtime, steps, options = {}) {
 
 // Offsets always remain inside the effective bounds and never cross Center
 {
-  let state = resumeBreath(createBreathRuntime(breath), breath);
+  let state = begin();
   for (let index = 0; index < 400; index += 1) {
-    state = advanceBreath(state, { breath, centerDelta: 0.7, sides: bothOperational });
+    clock += 700;
+    state = advanceBreath(state, { breath, now: clock, sides: bothOperational });
     for (const role of ["tail", "lead"]) {
       assert.ok(state.sides[role].offset >= breath.inner - 1e-9,
         "Breathing must never reach or cross Center.");
@@ -146,29 +178,33 @@ function run(runtime, steps, options = {}) {
   }
 }
 
-// Asynchronous boundary waiting
+// A clipped side lowers the shared bound; it does not desynchronize the pair
 {
-  // Tail has room for x but not for y: it breathes inside a clipped outer bound.
+  // Tail has room for x but not for y. The Field breathes as one relation, so
+  // the pair turns around at the room the more constrained side actually has.
+  // Letting the unclipped side run on to its own bound -- which is what a
+  // per-side barrier did -- would leave Tail and Lead unequally displaced from
+  // Center, which is the one relation the Panorama exists to hold.
   const asymmetric = {
     tail: { operational: true, available: 4 },
     lead: { operational: true, available: 1000 }
   };
-  let state = resumeBreath(createBreathRuntime(breath), breath);
-  state = run(state, 5, { sides: asymmetric }).state;
+  let state = begin();
+  state = run(state, 4, { sides: asymmetric }).state;
   assert.equal(state.sides.tail.offset, 4, "A clipped side clamps exactly to its effective outer bound.");
-  assert.equal(state.sides.tail.waiting, true, "It then waits at the boundary.");
-  assert.equal(state.sides.tail.rate, 1, "A waiting side follows Center at Center rate.");
-  assert.equal(state.phase, BREATH_PHASE.EXPANDING,
-    "Contraction waits for every operational side to arrive.");
-  assert.ok(state.sides.lead.offset < 10);
+  assert.equal(state.sides.lead.offset, 4,
+    "and the unclipped side turns with it, so the two stay symmetric.");
+  state = run(state, 1, { sides: asymmetric }).state;
+  assert.equal(state.phase, BREATH_PHASE.CONTRACTING,
+    "The shared bound is the clipped one, so contraction begins there.");
 
-  while (state.phase === BREATH_PHASE.EXPANDING) {
-    state = advanceBreath(state, { breath, centerDelta: 1, sides: asymmetric });
+  let contracted = state;
+  for (let index = 0; index < 12; index += 1) {
+    clock += 1000;
+    contracted = advanceBreath(contracted, { breath, now: clock, sides: asymmetric });
   }
-  assert.equal(state.phase, BREATH_PHASE.CONTRACTING);
-  assert.equal(state.sides.lead.offset, 10,
-    "Contraction begins only once the unclipped side has also arrived.");
-  assert.equal(state.sides.tail.waiting, false, "Contraction releases every boundary waiter at once.");
+  assert.equal(contracted.sides.tail.offset, contracted.sides.lead.offset,
+    "Both sides remain equally displaced from Center throughout.");
 }
 
 // Sides that cannot hold the minimum offset are excluded from the barrier
@@ -178,7 +214,7 @@ function run(runtime, steps, options = {}) {
     tail: { operational: true, available: 1 },
     lead: { operational: true, available: 1000 }
   };
-  let state = resumeBreath(createBreathRuntime(breath), breath);
+  let state = begin();
   state = run(state, 30, { sides: oneSided }).state;
   assert.equal(state.phase, BREATH_PHASE.CONTRACTING,
     "A dormant side must not stall the Field at its outer boundary.");
@@ -188,39 +224,41 @@ function run(runtime, steps, options = {}) {
 
 // Hold preserves the attained relation and the resumption direction
 {
-  let state = resumeBreath(createBreathRuntime(breath), breath);
+  let state = begin();
   state = run(state, 6).state;
   const attained = state.sides.lead.offset;
   assert.ok(attained > breath.inner && attained < breath.outer, "Hold is taken mid-breath.");
   const held = holdBreath(state, breath);
   assert.equal(held.held, true);
-  const stillHeld = advanceBreath(held, { breath, centerDelta: 5, sides: bothOperational });
+  clock += 5000;
+  const stillHeld = advanceBreath(held, { breath, now: clock, sides: bothOperational });
   assert.equal(stillHeld.sides.lead.offset, attained, "Hold preserves each attained offset.");
   assert.equal(stillHeld.sides.tail.rate, 1, "Every held side runs at Center rate.");
   assert.equal(stillHeld.phase, BREATH_PHASE.EXPANDING, "Hold preserves the breathing direction.");
 
-  const resumed = advanceBreath(resumeBreath(stillHeld, breath), {
-    breath,
-    centerDelta: 1,
-    sides: bothOperational
-  });
+  // Resuming rebases the leg onto the relation actually on screen, so the held
+  // seconds cost nothing: the breath continues from where it stopped.
+  const restarted = rebaseBreath(resumeBreath(stillHeld, breath), clock, attained);
+  clock += 1000;
+  const resumed = advanceBreath(restarted, { breath, now: clock, sides: bothOperational });
   assert.ok(resumed.sides.lead.offset > attained, "Stretch resumes from the attained relation.");
 }
 
 // Contraction direction is preserved across a Hold as well
 {
-  let state = resumeBreath(createBreathRuntime(breath), breath);
+  let state = begin();
   while (state.phase === BREATH_PHASE.EXPANDING) {
-    state = advanceBreath(state, { breath, centerDelta: 1, sides: bothOperational });
+    clock += 1000;
+    state = advanceBreath(state, { breath, now: clock, sides: bothOperational });
   }
   state = run(state, 2).state;
   assert.equal(state.phase, BREATH_PHASE.CONTRACTING);
   const held = holdBreath(state, breath);
-  const resumed = advanceBreath(resumeBreath(held, breath), {
-    breath,
-    centerDelta: 1,
-    sides: bothOperational
-  });
+  const restarted = rebaseBreath(
+    resumeBreath(held, breath), clock, state.sides.tail.offset
+  );
+  clock += 1000;
+  const resumed = advanceBreath(restarted, { breath, now: clock, sides: bothOperational });
   assert.equal(resumed.phase, BREATH_PHASE.CONTRACTING);
   assert.ok(resumed.sides.tail.offset < state.sides.tail.offset);
 }
@@ -228,9 +266,10 @@ function run(runtime, steps, options = {}) {
 // A resumption must command the rates of the phase it is actually in. Using the
 // outward pair unconditionally contradicts a preserved contracting phase.
 {
-  let state = resumeBreath(createBreathRuntime(breath), breath);
+  let state = begin();
   while (state.phase === BREATH_PHASE.EXPANDING) {
-    state = advanceBreath(state, { breath, centerDelta: 1, sides: bothOperational });
+    clock += 1000;
+    state = advanceBreath(state, { breath, now: clock, sides: bothOperational });
   }
   assert.equal(state.phase, BREATH_PHASE.CONTRACTING);
   for (const role of ["tail", "lead"]) {
@@ -256,4 +295,70 @@ function run(runtime, steps, options = {}) {
   );
 }
 
-console.log("Field Breath tests passed: symmetric rate pair, bounded expansion/contraction, Range clipping, asynchronous boundary waiting, exclusion, deliberate Hold, and phase-aware resumption.");
+// A Weight bucket change is not a discontinuity
+{
+  // Center crossing into another Weight bucket changes the triplet, and nothing
+  // else. The sides still differ from Center by one rung, so the offset still
+  // opens at the same speed and still reaches maximum at the moment it was
+  // always going to. Restarting here -- which a per-rate breath would have to do
+  // -- would make the Field twitch at every Section boundary.
+  clock = 0;
+  let state = begin();
+  state = run(state, 4).state;                       // four real seconds in
+  const midOffset = state.sides.tail.offset;
+  const deadline = state.startedAt + ((breath.outer - breath.inner) / breath.rate) * 1000;
+  assert.ok(midOffset > breath.inner && midOffset < breath.outer, "Taken mid-breath.");
+
+  // The bucket changes: Center moves 1x -> 0.75x -> 1.25x. Nothing touches the
+  // phase, so the same call with a different centerRate continues the same leg.
+  for (const centerRate of [0.75, 1.25]) {
+    clock += 1000;
+    const before = state;
+    state = advanceBreath(state, { breath, now: clock, centerRate, sides: bothOperational });
+    assert.equal(state.startedAt, before.startedAt, "The leg is not restarted.");
+    assert.equal(state.startingOffset, before.startingOffset, "nor rebased.");
+    assert.equal(state.phase, BREATH_PHASE.EXPANDING, "and it keeps its direction.");
+    assert.ok(state.sides.tail.offset > before.sides.tail.offset,
+      "The offset continues from where it was.");
+    assert.equal(state.sides.tail.offset, state.sides.lead.offset,
+      "Both sides remain symmetric across the change.");
+    // The sides still sit exactly one rung either side of the new Center.
+    assert.ok(Math.abs((centerRate - state.sides.tail.rate) - breath.rate) < 1e-9);
+    assert.ok(Math.abs((state.sides.lead.rate - centerRate) - breath.rate) < 1e-9);
+  }
+
+  // The originally scheduled arrival is unchanged by either crossing.
+  clock = deadline;
+  state = advanceBreath(state, { breath, now: clock, centerRate: 1.25, sides: bothOperational });
+  assert.equal(state.sides.tail.offset, breath.outer,
+    "Maximum arrives when it was always going to, whatever the buckets did.");
+}
+
+// Panorama returning after an extreme rate begins again at the inner offset
+{
+  // While Center plays alone the sides hold positions that stop describing
+  // anything. Restoring that stale relation would put Tail and Lead somewhere
+  // unrelated to Center; a fresh inner-offset leg keeps all three locally
+  // related. This is the only resumption that discards phase.
+  clock = 0;
+  let state = begin();
+  state = run(state, 6).state;
+  assert.ok(state.sides.tail.offset > breath.inner, "The Field was open when Panorama was lost.");
+  // The leg it was on genuinely started somewhere other than the inner offset,
+  // so a restart is something that can be observed rather than assumed.
+  state = rebaseBreath(state, clock, state.sides.tail.offset);
+  assert.ok(state.startingOffset > breath.inner);
+
+  clock += 30000;
+  const resumed = restartBreath(state, breath, clock);
+  assert.equal(resumed.startingOffset, breath.inner, "It resumes at the inner offset,");
+  assert.equal(resumed.startedAt, clock, "on a fresh leg,");
+  assert.equal(resumed.phase, BREATH_PHASE.EXPANDING, "expanding outward.");
+
+  clock += ((breath.outer - breath.inner) / breath.rate) * 1000;
+  const reopened = advanceBreath(resumed, { breath, now: clock, sides: bothOperational });
+  assert.equal(reopened.sides.tail.offset, breath.outer,
+    "and takes the full outward duration from there, exactly as any other leg.");
+}
+
+console.log("Field Breath tests passed: one-rung side steps that keep the breath the same length at every Center rate, a wall-clock phase, bounded expansion/contraction, Range clipping that lowers the shared bound rather than desynchronizing the pair, exclusion, deliberate Hold, phase-aware resumption, Weight-bucket crossings that keep both phase and deadline, and a fresh inner-offset leg when Panorama returns.");

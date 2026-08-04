@@ -142,7 +142,7 @@ Shift modifies Refine into Local Refine, Step into Pin traversal, and Tag as Pin
 
 Playback extends watched Working Interval coverage without shortening prior coverage. A focused proper Range wraps without history; the full-video Range stops at its source end.
 
-Observation and rate are separate dimensions. Plain `Space` requests a `1×` Panorama. `Shift+Space` requests Center-only playback at a configured fixed wish or at the optional dynamic inverse of effective Weight. The media adapter’s offered and confirmed actual rates remain authoritative. A Center-only request stays Center only even when its actual rate is `1×`.
+Observation and rate are separate dimensions. Plain `Space` requests a `1×` Panorama. `Shift+Space` requests playback at a configured fixed wish, or at the optional dynamic Weight texture: `c*(W) = 1 − 0.25·log₂W`, one playback-rate step per octave of cumulative active Weight. Panorama accompanies any Center rate with a complete adjacent triplet on the adapter's ladder and stands aside at the ends of it, without ending the Playback transaction. The media adapter’s offered and confirmed actual rates remain authoritative. A Center-only request stays Center only even when its actual rate is `1×`.
 
 The Field never confiscates ordinary player controls. If the confirmed actual Center rate cannot preserve Panorama, the side views suspend rather than drift.
 

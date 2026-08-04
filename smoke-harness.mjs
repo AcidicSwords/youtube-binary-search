@@ -306,7 +306,7 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
     }
     getDuration() { return this.duration; }
     getCurrentTime() { return this.currentTime; }
-    getAvailablePlaybackRates() { return [0.5, 1, 1.5, 2]; }
+    getAvailablePlaybackRates() { return [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]; }
     getPlayerState() { return this.state; }
     getPlaybackRate() { return this.rate; }
     getVideoData() { return { video_id: this.videoId }; }

@@ -71,7 +71,7 @@ The complete gate must prove all of the following.
 - Offer expansion re-resolves a stored fixed wish by log-space distance and
   retunes an active fixed Shift Playback when a closer rate appears. Ties favor
   the offer nearer `1×`.
-- Dynamic wish is the unconstrained inverse of effective Weight; the adapter
+- Dynamic wish is one playback-rate step per octave of effective Weight; the adapter
   offer supplies actual limits.
 - Retry preserves observation and rate policy. Proper-Range wrap rebases the
   same transport, resolves fixed wish or dynamic Weight at Range Start, applies

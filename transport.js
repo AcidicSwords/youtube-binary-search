@@ -14,8 +14,19 @@ export const OBSERVATION_POLICY = Object.freeze({
 
 export const RATE_POLICY_KIND = Object.freeze({
   FIXED: "fixed",
-  DYNAMIC: "dynamic"
+  // Cumulative Weight is read as a playback texture, not as a correction. It
+  // does not cancel the map's deformation and must not be named as though it
+  // did: compressed regions play faster and expanded regions play slower, by
+  // one rate step per octave, which is a fraction of exact inversion.
+  DYNAMIC: "dynamic-weight-texture"
 });
+
+// One playback-rate step per octave of Weight, and one step between adjacent
+// Panorama panes. Both are quarter steps, which is what makes the two compose:
+// a Center anywhere on the ladder still has neighbours one step away.
+export const CENTER_RATE_OCTAVE_STEP = 0.25;
+export const PANORAMA_SIDE_STEP = 0.25;
+const RATE_EPSILON = 1e-9;
 
 export function idleTransport() {
   return { kind: TRANSPORT_KIND.IDLE };
@@ -138,13 +149,69 @@ export function resolveOfferedRate(wish, rates) {
   });
 }
 
-// Dynamic playback rate is the exact inverse of cumulative effective Weight.
-// The projection owns Weight; the media adapter's current offer owns which rate
-// can actually be requested. Transport adds no second set of bounds.
-export function dynamicRateForWeight(weight) {
+// The desired Center rate for a cumulative Weight.
+//
+//   c*(W) = 1 − 0.25·log₂W
+//
+// Weights compose by multiplication, which is addition in octave space, so the
+// rate is linear in octaves: every doubling of Weight slows Center by one step
+// and every halving accelerates it by one. This deliberately falls far short of
+// inverting the map — W = 4 plays at 0.5×, not 0.25× — because the aim is a
+// readable texture over a continuous playback, not constant Timeline velocity.
+export function desiredCenterRate(weight) {
   const value = Number(weight);
   if (!Number.isFinite(value) || value <= 0) return 1;
-  return 1 / value;
+  return 1 - CENTER_RATE_OCTAVE_STEP * Math.log2(value);
+}
+
+// Snapping the desired Center rate onto whatever ladder the adapter offers.
+//
+// This is a different question from `resolveOfferedRate`, which resolves a
+// stored Shift-playback wish and reasons in log space because a wish of 2× is
+// as far from 1× as 0.5× is. Here the candidates are rungs of an evenly spaced
+// quarter-step ladder and the desired value is already expressed on it, so
+// nearest is measured linearly. An exact tie — which lands precisely on a
+// half-octave of Weight — resolves toward 1×, so the boundaries of the buckets
+// belong to the calmer of the two rates.
+export function resolveCenterRate(weight, rates) {
+  const target = desiredCenterRate(weight);
+  const offered = normalizedOfferedRates(rates);
+  return offered.reduce((best, candidate) => {
+    const distance = Math.abs(candidate - target);
+    const bestDistance = Math.abs(best - target);
+    if (distance < bestDistance - RATE_EPSILON) return candidate;
+    if (distance > bestDistance + RATE_EPSILON) return best;
+    const neutral = Math.abs(candidate - 1);
+    const bestNeutral = Math.abs(best - 1);
+    if (neutral < bestNeutral - RATE_EPSILON) return candidate;
+    if (neutral > bestNeutral + RATE_EPSILON) return best;
+    return Math.min(candidate, best);
+  });
+}
+
+// Panorama needs a complete symmetric triplet: one rate step below Center for
+// Tail and one above for Lead. Both must actually be offered. A missing
+// neighbour yields no triplet rather than an asymmetric substitute, because
+// unequal side steps would break the one relation the Field rests on — Tail and
+// Lead equally displaced from Center, breathing at one shared speed.
+export function panoramaTriplet(centerRate, rates) {
+  const center = positiveRate(centerRate);
+  const tail = center - PANORAMA_SIDE_STEP;
+  const lead = center + PANORAMA_SIDE_STEP;
+  if (!(tail > 0)) return null;
+  const offered = normalizedOfferedRates(rates);
+  const offers = rate => offered.some(value => Math.abs(value - rate) <= RATE_EPSILON);
+  if (!offers(center) || !offers(tail) || !offers(lead)) return null;
+  return { tail, center, lead };
+}
+
+// An adapter that has not yet reported its ladder has not reported a *missing*
+// ladder. YouTube commonly answers 1x until playback has actually begun, so an
+// unknown offer is treated as capable and re-evaluated when the real list
+// arrives — the rule the Field already follows everywhere else.
+export function offerIsKnown(rates) {
+  return Array.isArray(rates)
+    && rates.filter(rate => Number.isFinite(Number(rate)) && Number(rate) > 0).length > 1;
 }
 
 export function resolvePlaybackRate(
@@ -152,10 +219,9 @@ export function resolvePlaybackRate(
   { offeredRates = [1], weight = 1 } = {}
 ) {
   if (transport?.kind !== TRANSPORT_KIND.PLAYBACK) return 1;
-  const wish = transport.ratePolicy?.kind === RATE_POLICY_KIND.DYNAMIC
-    ? dynamicRateForWeight(weight)
-    : positiveRate(transport.ratePolicy?.wish);
-  return resolveOfferedRate(wish, offeredRates);
+  return transport.ratePolicy?.kind === RATE_POLICY_KIND.DYNAMIC
+    ? resolveCenterRate(weight, offeredRates)
+    : resolveOfferedRate(positiveRate(transport.ratePolicy?.wish), offeredRates);
 }
 
 export function createPlaybackTransport({
@@ -221,16 +287,20 @@ export function withPlaybackRatePolicy(transport, ratePolicy, options = {}) {
   return withPlaybackRequestedRate(next, resolvePlaybackRate(next, options));
 }
 
-// Panorama is an observation policy, not a synonym for 1x. The sides are
-// available only while that policy owns playback and the adapter confirms an
-// actual rate compatible with their fixed temporal relation.
-export function playbackAllowsPanorama(transport) {
-  const RATE_EPSILON = 1e-9;
-  return Boolean(
-    transport?.kind === TRANSPORT_KIND.PLAYBACK
-    && transport.observationPolicy === OBSERVATION_POLICY.PANORAMA
-    && Math.abs(positiveRate(transport.actualRate) - 1) <= RATE_EPSILON
-  );
+// Panorama is an observation policy, not a synonym for 1x. It runs wherever the
+// confirmed Center rate has a complete triplet on the adapter's ladder, which on
+// YouTube's quarter-step ladder is 0.5x to 1.75x. Outside that window Center
+// plays alone — a presentation consequence, never the end of the Playback
+// transaction. The adapter's confirmed rate is authoritative; a rate that was
+// merely requested has not yet moved anything.
+export function playbackAllowsPanorama(transport, { offeredRates = null } = {}) {
+  if (transport?.kind !== TRANSPORT_KIND.PLAYBACK) return false;
+  if (transport.observationPolicy !== OBSERVATION_POLICY.PANORAMA) return false;
+  const actual = positiveRate(transport.actualRate);
+  if (!offerIsKnown(offeredRates)) {
+    return Math.abs(actual - 1) <= RATE_EPSILON;
+  }
+  return panoramaTriplet(actual, offeredRates) !== null;
 }
 
 export function rebasePlaybackTransport(

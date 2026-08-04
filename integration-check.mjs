@@ -14,7 +14,9 @@ import {
 import {
   OBSERVATION_POLICY,
   createPlaybackTransport,
-  dynamicRateForWeight,
+  desiredCenterRate,
+  resolveCenterRate,
+  panoramaTriplet,
   dynamicRatePolicy,
   fixedRatePolicy,
   playbackAllowsPanorama,
@@ -354,14 +356,27 @@ lacks(release, /guideRetained\s*=\s*null|deformationBypass\s*=|focus\s*=|setRang
     offeredRates: [0.5, 1, 2],
     actualRate: 1
   });
-  check(playbackAllowsPanorama(panorama), "Plain fixed 1x playback owns Panorama.");
-  check(!playbackAllowsPanorama(shiftedOne), "Shift fixed 1x remains Center-only.");
-  check(!playbackAllowsPanorama(withPlaybackActualRate(panorama, 1.5)),
-    "Confirmed native rate incompatibility suspends Panorama.");
-  check(playbackAllowsPanorama(withPlaybackActualRate(panorama, 1)),
+  const LADDER = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+  const onLadder = { offeredRates: LADDER };
+  check(playbackAllowsPanorama(panorama, onLadder), "Plain fixed 1x playback owns Panorama.");
+  check(!playbackAllowsPanorama(shiftedOne, onLadder), "Shift fixed 1x remains Center-only.");
+  // Panorama follows Center wherever a complete triplet exists, which the
+  // quarter-step ladder provides from 0.5x to 1.75x. Only the ends of the
+  // ladder, where a neighbour is missing, leave Center playing alone.
+  check(playbackAllowsPanorama(withPlaybackActualRate(panorama, 1.5), onLadder),
+    "A confirmed 1.5x still has both neighbours, so Panorama continues.");
+  check(!playbackAllowsPanorama(withPlaybackActualRate(panorama, 2), onLadder),
+    "At the top of the ladder there is no Lead, so Center plays alone.");
+  check(!playbackAllowsPanorama(withPlaybackActualRate(panorama, 1), { offeredRates: [0.5, 1, 1.5, 2] }),
+    "A ladder without quarter steps cannot hold a triplet, and is not faked.");
+  check(playbackAllowsPanorama(withPlaybackActualRate(panorama, 1), onLadder),
     "Confirmed return to 1x restores only Panorama-owned observation.");
-  check(dynamicRateForWeight(8) === 0.125 && dynamicRateForWeight(0.125) === 8,
-    "Dynamic rate is the unconstrained inverse of effective Weight.");
+  check(desiredCenterRate(8) === 0.25 && desiredCenterRate(0.125) === 1.75,
+    "Weight is read as one rate step per octave, not as an inverse.");
+  check(resolveCenterRate(4, LADDER) === 0.5 && resolveCenterRate(0.25, LADDER) === 1.5,
+    "and resolved onto the ladder the adapter offers.");
+  same(panoramaTriplet(1.25, LADDER), { tail: 1, center: 1.25, lead: 1.5 },
+    "Every Panorama-capable Center has an exact adjacent triplet.");
   const tieWish = Math.sqrt(0.5);
   check(resolveOfferedRate(tieWish, [0.5, 1]) === 1,
     "Log-space offer ties resolve toward neutral 1x.");
@@ -386,7 +401,9 @@ for (const symbol of [
   "requestedRate",
   "actualRate",
   "resolveOfferedRate",
-  "dynamicRateForWeight"
+  "desiredCenterRate",
+  "resolveCenterRate",
+  "panoramaTriplet"
 ]) has(transportSource, new RegExp(`\\b${symbol}\\b`), `Transport exposes ${symbol}.`);
 has(appCode, /function handlePlaybackRateChange\(rate\)[\s\S]*?withPlaybackActualRate\(state\.transport, rate\)/,
   "Adapter rate events update transport actualRate.");

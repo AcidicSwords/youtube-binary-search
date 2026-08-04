@@ -1,5 +1,6 @@
 // Pure Step Field geometry, phase, and response-policy helpers.
 import { EPSILON, clamp } from "./range-geometry.js";
+import { PANORAMA_SIDE_STEP } from "./transport.js";
 
 export const STEP_FIELD_PHASE = Object.freeze({
   OFF: "off",
@@ -51,17 +52,69 @@ export function normalizeFieldBreath(value = DEFAULT_FIELD_BREATH) {
   return { inner, outer, rate };
 }
 
-// The configured value is the symmetric fractional spread around Center. The
-// inward phase temporarily exchanges the two side multipliers without
-// rewriting the saved relation.
+// The sides sit one playback-rate step either side of Center, and the step is
+// an interval on the ladder rather than a fraction of Center.
+//
+// This used to scale with Center — tail = C·(1−r), lead = C·(1+r) — which is
+// identical at 1x and wrong everywhere else: the gap between Center and a side
+// would grow with Center, so the breath would open faster the faster you
+// played, and the cycle would last a different number of seconds at every rate.
+// Because the ladder is evenly spaced, an additive step keeps the difference
+// fixed at exactly one rung, which is what makes the breath take the same nine
+// seconds at every Center rate the Panorama can hold.
 export function breathRatePair(rate, centerRate = 1) {
-  const normalized = normalizeFieldBreath({ rate }).rate;
+  const step = normalizeFieldBreath({ rate }).rate;
   const center = Number.isFinite(centerRate) && centerRate > 0 ? centerRate : 1;
   return {
     center,
-    tailRate: center * (1 - normalized),
-    leadRate: center * (1 + normalized)
+    tailRate: Math.max(0, center - step),
+    leadRate: center + step
   };
+}
+
+// Because a side differs from Center by exactly one rung, the offset between
+// them opens at that many source-seconds per real second — whatever Center is
+// doing. The breath is therefore measured against the wall clock, not against
+// elapsed Center source time.
+export const BREATH_DRIFT_RATE = PANORAMA_SIDE_STEP;
+
+// The phase is canonical state, not an accumulation.
+//
+// Three players free-running and a per-tick sum of their progress drifts apart:
+// iframe latency, a rate the adapter has not confirmed yet, and a browser that
+// stopped scheduling timers in a background tab all quietly change how far the
+// sum thinks the breath has travelled. Recording when the current leg began and
+// where it began means the intended offset can be recomputed exactly at any
+// later moment, and the players are corrected toward it rather than consulted
+// about it.
+//
+// It also gives the transitions their meaning for free. A Weight bucket change
+// touches nothing here, so the breath keeps its phase and still reaches maximum
+// at the moment it was always going to. Only a genuine discontinuity — Panorama
+// returning after an extreme rate, or a Range wrap — restarts the leg.
+export function breathTargetOffset({
+  direction = BREATH_PHASE.EXPANDING,
+  startedAt = 0,
+  startingOffset = 0,
+  inner = DEFAULT_FIELD_BREATH.inner,
+  outer = DEFAULT_FIELD_BREATH.outer,
+  now = startedAt,
+  driftRate = BREATH_DRIFT_RATE
+} = {}) {
+  const span = outer - inner;
+  if (!(span > 0)) {
+    return { offset: clamp(startingOffset, 0, Math.max(0, outer)), direction };
+  }
+  const elapsed = Math.max(0, (Number(now) - Number(startedAt)) || 0) / 1000;
+  const travelled = Math.max(0, Number(driftRate) || 0) * elapsed;
+  const from = clamp(startingOffset, inner, outer) - inner;
+  // Distance along one full out-and-back lap, measured from the inner turn.
+  const entered = direction === BREATH_PHASE.CONTRACTING ? (2 * span) - from : from;
+  const lap = 2 * span;
+  const position = ((entered + travelled) % lap + lap) % lap;
+  return position <= span
+    ? { offset: inner + position, direction: BREATH_PHASE.EXPANDING }
+    : { offset: inner + (lap - position), direction: BREATH_PHASE.CONTRACTING };
 }
 
 export function breathRateFromResponse(response = DEFAULT_FIELD_RESPONSE) {
@@ -95,16 +148,44 @@ export function effectiveBreathBounds(breath, available) {
   };
 }
 
-export function createBreathRuntime(breath = DEFAULT_FIELD_BREATH) {
+export function createBreathRuntime(breath = DEFAULT_FIELD_BREATH, startedAt = 0) {
   const { inner } = normalizeFieldBreath(breath);
   return {
     phase: BREATH_PHASE.EXPANDING,
     held: true,
+    startedAt,
+    startingOffset: inner,
+    offset: inner,
     sides: {
       tail: { offset: inner, waiting: false },
       lead: { offset: inner, waiting: false }
     }
   };
+}
+
+// A discontinuity: the source itself has jumped, or the Panorama is returning
+// after Center played alone at an extreme rate and the sides hold positions that
+// no longer relate to anything. Begin a fresh leg at the inner offset rather
+// than restoring a stale relation.
+export function restartBreath(runtime, breath = DEFAULT_FIELD_BREATH, startedAt = 0) {
+  const fresh = createBreathRuntime(breath, startedAt);
+  return { ...fresh, held: Boolean(runtime?.held) };
+}
+
+// Holding rebases the leg onto the offset actually attained, so resuming
+// continues from the relation on screen rather than from where an unheld breath
+// would have arrived.
+export function rebaseBreath(runtime, startedAt = 0, startingOffset = null) {
+  if (!runtime) return runtime;
+  // The relation on screen is the one to continue from. A caller that knows
+  // what the sides actually attained -- Hold and Stretch both do -- says so;
+  // otherwise the phase's own last derived offset stands.
+  const attained = Number.isFinite(startingOffset)
+    ? startingOffset
+    : Number.isFinite(runtime.offset)
+      ? runtime.offset
+      : runtime.startingOffset;
+  return { ...runtime, startedAt, startingOffset: attained, offset: attained };
 }
 
 // A held or boundary-waiting side runs at Center rate so it follows Center
@@ -124,47 +205,45 @@ export function breathSideRate({
   return outward ? pair.leadRate : pair.tailRate;
 }
 
-function advanceSide(side, { phase, bounds, delta, operational }) {
+// Both sides share one offset, so they arrive at the bounds together by
+// construction rather than by waiting for each other at a barrier. A side with
+// no room is parked at whatever it has and excluded; it does not hold the other
+// side back, and it does not stop the phase.
+function sideAtOffset(offset, bounds, operational) {
   if (!operational) {
-    // Unavailable, collapsed, hidden or Range-clipped sides are excluded from
-    // the synchronization barrier entirely.
-    return { offset: clamp(side.offset, 0, bounds.outer), waiting: false, excluded: true };
+    return { offset: clamp(offset, 0, bounds.outer), waiting: false, excluded: true };
   }
-  if (side.waiting) {
-    return {
-      offset: clamp(side.offset, bounds.inner, bounds.outer),
-      waiting: true,
-      excluded: false
-    };
-  }
-  if (phase === BREATH_PHASE.EXPANDING) {
-    const offset = Math.min(bounds.outer, side.offset + delta);
-    const reached = offset >= bounds.outer - BREATH_BOUND_TOLERANCE;
-    return {
-      offset: reached ? bounds.outer : offset,
-      waiting: reached,
-      excluded: false
-    };
-  }
-  const offset = Math.max(bounds.inner, side.offset - delta);
-  const reached = offset <= bounds.inner + BREATH_BOUND_TOLERANCE;
+  // A side "waits" only when it cannot follow the shared breath -- its own
+  // Range-clipped bound is nearer than the offset the phase is asking for. It
+  // then sits at that bound and runs at Center rate. Being at the inner offset
+  // is not waiting: that is simply where every leg begins.
+  const held = clamp(offset, bounds.inner, bounds.outer);
   return {
-    offset: reached ? bounds.inner : offset,
-    waiting: reached,
+    offset: held,
+    waiting: Math.abs(held - offset) > BREATH_BOUND_TOLERANCE,
     excluded: false
   };
 }
 
-// One breathing step. `centerDelta` is elapsed Center source time; the offset
-// changes by the configured fractional spread over that source interval.
+// One breathing step. The offset is derived from the shared phase against the
+// wall clock, then clamped into each side's own Range-clipped bounds.
+//
+// It used to be accumulated: each tick added `centerDelta × rate`, where
+// centerDelta is elapsed *Center source* time. That made the breath speed
+// proportional to the Center rate, so playing at 1.5x opened the Field half
+// again as fast and a cycle lasted a different number of seconds at every rate.
+// It also meant a tick that never ran — a background tab, a slow frame — was
+// simply lost. Deriving from the phase fixes both: the drift is per real
+// second, and a missed tick corrects itself on the next one.
 export function advanceBreath(runtime, {
   breath,
-  centerDelta = 0,
+  now = 0,
   centerRate = 1,
+  running = true,
   sides = {}
 } = {}) {
   const configured = normalizeFieldBreath(breath);
-  const state = runtime || createBreathRuntime(configured);
+  const state = runtime || createBreathRuntime(configured, now);
   const bounds = {
     tail: effectiveBreathBounds(configured, sides.tail?.available),
     lead: effectiveBreathBounds(configured, sides.lead?.available)
@@ -173,48 +252,67 @@ export function advanceBreath(runtime, {
     tail: Boolean(sides.tail?.operational) && bounds.tail.operational,
     lead: Boolean(sides.lead?.operational) && bounds.lead.operational
   };
-  const delta = state.held
-    ? 0
-    : Math.max(0, Number(centerDelta) || 0) * configured.rate;
+
+  // The pair breathes as one relation, so the shared bound is the room the more
+  // constrained operational side actually has.
+  const participating = ["tail", "lead"].filter(role => operational[role]);
+  const sharedOuter = participating.length
+    ? Math.min(...participating.map(role => bounds[role].outer))
+    : configured.outer;
+
+  const frozen = state.held || !running;
+  const derived = frozen
+    ? {
+      offset: clamp(
+        Number.isFinite(state.offset) ? state.offset : configured.inner,
+        0,
+        Math.max(configured.inner, sharedOuter)
+      ),
+      direction: state.phase
+    }
+    : breathTargetOffset({
+      direction: state.phase,
+      startedAt: state.startedAt,
+      startingOffset: state.startingOffset,
+      inner: configured.inner,
+      outer: sharedOuter,
+      // The offset opens at exactly the rate difference between Center and a
+      // side, which is the configured step. It is a constant only because the
+      // default step is; a reader who widens the step widens the drift with it.
+      driftRate: configured.rate,
+      now
+    });
 
   const next = {
-    phase: state.phase,
+    phase: derived.direction,
     held: Boolean(state.held),
+    startedAt: state.startedAt,
+    startingOffset: state.startingOffset,
+    offset: derived.offset,
     sides: {}
   };
   for (const role of ["tail", "lead"]) {
-    const advanced = state.held
+    // A frozen breath governs nothing: each side keeps whatever relation it was
+    // established or held at, which can be far wider than the breathing bounds
+    // because Step geometry placed it. Only a running breath shares one offset.
+    const target = frozen
+      ? (Number.isFinite(state.sides?.[role]?.offset)
+        ? state.sides[role].offset
+        : derived.offset)
+      : derived.offset;
+    const placed = frozen
       ? {
-        offset: clamp(
-          state.sides[role].offset,
-          0,
-          bounds[role].outer
-        ),
-        waiting: state.sides[role].waiting,
+        offset: clamp(target, 0, Math.max(bounds[role].outer, target)),
+        waiting: false,
         excluded: !operational[role]
       }
-      : advanceSide(state.sides[role], {
-        phase: state.phase,
-        bounds: bounds[role],
-        delta,
-        operational: operational[role]
-      });
-    next.sides[role] = { offset: advanced.offset, waiting: advanced.waiting };
-    next.sides[role].excluded = advanced.excluded;
-  }
-
-  const participating = ["tail", "lead"].filter(role => operational[role]);
-  const barrier = participating.length > 0
-    && participating.every(role => next.sides[role].waiting);
-  if (!state.held && barrier) {
-    next.phase = state.phase === BREATH_PHASE.EXPANDING
-      ? BREATH_PHASE.CONTRACTING
-      : BREATH_PHASE.EXPANDING;
-    for (const role of ["tail", "lead"]) next.sides[role].waiting = false;
-  }
-
-  for (const role of ["tail", "lead"]) {
-    next.sides[role].bounds = bounds[role];
+      : sideAtOffset(target, bounds[role], operational[role]);
+    next.sides[role] = {
+      offset: placed.offset,
+      waiting: frozen ? false : placed.waiting,
+      excluded: placed.excluded,
+      bounds: bounds[role]
+    };
     next.sides[role].rate = breathSideRate({
       role,
       phase: next.phase,
@@ -224,7 +322,9 @@ export function advanceBreath(runtime, {
       centerRate
     });
   }
-  next.barrier = barrier;
+  next.barrier = !frozen
+    && participating.length > 0
+    && participating.every(role => next.sides[role].waiting);
   return next;
 }
 

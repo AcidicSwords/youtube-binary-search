@@ -114,8 +114,12 @@ assert.match(
   /function stretch\(role = "both"\)[\s\S]*suspendedNow = suspensionRequired\(snapshot\)[\s\S]*resumeBreath\(runtime\.breath[\s\S]*beginStretch\(sides\[name\], center, snapshot, \{ play: centerRunning && !suspendedNow \}\)/,
   "Stretch must use live suspension state and resume the breathing cycle from its attained relation."
 );
-assert.match(fieldSource, /function startBreathCycle\(center, snapshot[\s\S]*BREATH_PHASE\.EXPANDING[\s\S]*Math\.min\(bounds\.inner, bounds\.outer\)/,
-  "A fresh playback gesture must begin the breath at the inner boundary and expand outward.");
+// A fresh leg is for discontinuities only: a scrub, a Range wrap, or Panorama
+// returning after Center played alone. It restarts the phase, which is what
+// makes an ordinary Weight-bucket change -- which never arrives here -- keep its
+// direction, its offset and its deadline.
+assert.match(fieldSource, /function startBreathCycle\(center, snapshot[\s\S]*restartBreath\(runtime\.breath, configured, now\(\)\)[\s\S]*Math\.min\(bounds\.inner, bounds\.outer\)/,
+  "A discontinuity must begin a fresh breath leg at the inner boundary and expand outward.");
 assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*(?:adapter\?\.place|adapter\?\.cue)[\s\S]*side\.adapter\?\.play/,
   "Every running breath must prime its side at 1× before directional-rate discovery.");
 assert.doesNotMatch(fieldSource, /onHoldOffsets/,

@@ -149,7 +149,7 @@ assert.equal(resolveFieldPhase({
   // on whether fixed offsets can still be maintained.
   assert.match(
     app,
-    /observationPolicy: shifted[\s\S]*OBSERVATION_POLICY\.CENTER_ONLY[\s\S]*OBSERVATION_POLICY\.PANORAMA[\s\S]*if \(playbackAllowsPanorama\(state\.transport\)\)/,
+    /observationPolicy: shifted[\s\S]*OBSERVATION_POLICY\.CENTER_ONLY[\s\S]*OBSERVATION_POLICY\.PANORAMA[\s\S]*if \(playbackAllowsPanorama\(state\.transport, \{ offeredRates/,
     "Playback must name its observation owner explicitly before deciding whether the Panorama participates."
   );
   assert.match(app, /player\.setRate\(state\.transport\.requestedRate\);\s*player\.play\(\);/,

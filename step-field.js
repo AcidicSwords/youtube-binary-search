@@ -27,6 +27,8 @@ import {
   advanceBreath,
   holdBreath,
   resumeBreath,
+  rebaseBreath,
+  restartBreath,
   deriveFieldBounds,
   deriveStepField,
   normalizeFieldReach,
@@ -115,14 +117,18 @@ export function fieldShouldSuspend(snapshot) {
     || snapshot?.dragging
     || snapshot?.pendingStep
     || transportKind === "context"
-    // Tail and Lead hold a fixed offset from Center by playing the same
-    // material at the same rate. No side rate preserves that relation once
-    // Center's rate changes, so the Field suspends for the duration rather than
-    // drifting. Stated here so it stays suspended for as long as the condition
-    // holds, instead of being paused once and resuming on the next tick.
+    // Tail and Lead hold their relation to Center by sitting one playback-rate
+    // rung either side of it, so the Panorama runs at any Center rate that has
+    // both neighbours on the adapter's ladder -- not only at 1x. Where a
+    // neighbour is missing, or Center is at an end of the ladder, there is no
+    // symmetric triplet and Center plays alone. Stated here so it stays
+    // suspended for as long as that holds rather than being paused once and
+    // resuming on the next tick.
     || (transportKind === "playback"
       && (snapshot?.transport
-        ? !playbackAllowsPanorama(snapshot.transport)
+        ? !playbackAllowsPanorama(snapshot.transport, {
+          offeredRates: snapshot?.availableRates
+        })
         : (snapshot?.transportRate ?? 1) !== 1 || snapshot?.transportDynamic === true))
   );
 }
@@ -140,7 +146,10 @@ export function createStepFieldController({
   setPreferences = () => {},
   onChange = () => {},
   formatTime = value => String(value),
-  createPlayer = createYouTubePlayer
+  createPlayer = createYouTubePlayer,
+  // The breath is measured against the wall clock, so the clock is a dependency
+  // like every other. A suite that needs a deterministic breath supplies its own.
+  now = () => Date.now()
 }) {
   const ids = [
     "step-field", "step-field-toggle", "step-field-meta",
@@ -723,7 +732,11 @@ export function createStepFieldController({
 
   function establish(snapshot, address = snapshot.current) {
     const center = clamp(address, snapshot.range.start, snapshot.range.end);
-    runtime.breath = holdBreath(runtime.breath, snapshotBreath(snapshot));
+    runtime.breath = rebaseBreath(
+      holdBreath(runtime.breath, snapshotBreath(snapshot)),
+      now(),
+      attainedBreathOffset()
+    );
     for (const side of Object.values(sides)) establishSide(side, center, snapshot);
     runtime.structuralKey = structuralKey(snapshot);
     runtime.semanticCurrent = center;
@@ -984,10 +997,30 @@ export function createStepFieldController({
   // A fresh playback gesture begins the cycle at the inner boundary: x → expand
   // → y → contract → x. The deliberate Stretch control instead resumes from the
   // attained relation and its preserved direction.
+  // A fresh leg from the inner offset. This is for genuine discontinuities only
+  // -- a native scrub, a Range wrap, or Panorama returning after Center played
+  // alone at an extreme rate -- where the sides hold positions that no longer
+  // relate to anything on screen. An ordinary Weight bucket change is not one of
+  // these and must never arrive here: it keeps its phase and its deadline.
+  // What the sides are actually showing, which is what a Hold or a Stretch must
+  // continue from. The two are symmetric, so either answers for the pair.
+  function attainedBreathOffset() {
+    // The side's own offset, not the breath's mirror of it. Establishing a Field
+    // places the sides from Step geometry, which can be much wider than the
+    // breath's inner bound; resuming from the mirror would snap them inward and
+    // read as the Field collapsing the moment Stretch was pressed.
+    for (const role of ["tail", "lead"]) {
+      const offset = sides[role]?.offset;
+      if (Number.isFinite(offset) && offset > 0) return offset;
+    }
+    return null;
+  }
+
   function startBreathCycle(center, snapshot = getSnapshot?.()) {
     const configured = snapshotBreath(snapshot);
+    const fresh = restartBreath(runtime.breath, configured, now());
     runtime.breath = {
-      phase: BREATH_PHASE.EXPANDING,
+      ...fresh,
       held: false,
       sides: Object.fromEntries(["tail", "lead"].map(role => {
         const bounds = sideBreathBounds(role, center, snapshot);
@@ -1107,6 +1140,13 @@ export function createStepFieldController({
     const started = { tail: false, lead: false };
     const centerRate = snapshotCenterRate(snapshot);
     runtime.centerWasRunning = true;
+    // Panorama is returning after being unavailable -- Center played alone at an
+    // extreme rate, or the adapter only just confirmed a rate the sides can sit
+    // either side of. The sides hold offsets from before or during that stretch
+    // which no longer describe anything, so the leg restarts at the inner offset
+    // rather than restoring a stale relation. This is the one resumption that
+    // discards phase; an ordinary Weight-bucket change never reaches here.
+    startBreathCycle(center, snapshot);
 
     for (const role of ["tail", "lead"]) {
       const side = sides[role];
@@ -1194,8 +1234,14 @@ export function createStepFieldController({
     const center = clamp(Number(snapshot.center?.time ?? snapshot.current), snapshot.range.start, snapshot.range.end);
     const centerRunning = [YOUTUBE_STATE.PLAYING, YOUTUBE_STATE.BUFFERING].includes(snapshot.center?.state);
     if (centerRunning) runtime.centerWasRunning = true;
-    // Stretch resumes from the attained relation and the preserved direction.
-    runtime.breath = resumeBreath(runtime.breath, snapshotBreath(snapshot));
+    // Stretch resumes from the attained relation and the preserved direction, so
+    // the leg is rebased onto the offset actually on screen rather than onto
+    // where an unheld breath would have arrived while it was held.
+    runtime.breath = rebaseBreath(
+      resumeBreath(runtime.breath, snapshotBreath(snapshot)),
+      now(),
+      attainedBreathOffset()
+    );
     for (const name of roles) {
       beginStretch(sides[name], center, snapshot, { play: centerRunning && !suspendedNow });
     }
@@ -1267,7 +1313,11 @@ export function createStepFieldController({
       }
       attained = attained === null ? offset : attained;
     }
-    runtime.breath = holdBreath(runtime.breath, snapshotBreath(snapshot));
+    runtime.breath = rebaseBreath(
+      holdBreath(runtime.breath, snapshotBreath(snapshot)),
+      now(),
+      attainedBreathOffset()
+    );
     for (const name of roles) sides[name].mode = FIELD_SIDE_MODE.HELD;
     publish(snapshot);
     return attained;
@@ -1375,15 +1425,22 @@ export function createStepFieldController({
         available
       }];
     }));
+    // The breath is measured against the wall clock, so it opens at the same
+    // speed whatever rate Center is playing at, and a tick that never ran costs
+    // nothing: the next one derives the offset the phase always intended.
     const advanced = advanceBreath(runtime.breath, {
       breath: configured,
-      centerDelta: centerRunning ? centerDelta : 0,
+      now: now(),
+      running: centerRunning,
       centerRate: snapshotCenterRate(snapshot),
       sides: participation
     });
     runtime.breath = {
       phase: advanced.phase,
       held: advanced.held,
+      startedAt: advanced.startedAt,
+      startingOffset: advanced.startingOffset,
+      offset: advanced.offset,
       sides: {
         tail: {
           offset: advanced.sides.tail.offset,

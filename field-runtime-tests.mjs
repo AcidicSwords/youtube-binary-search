@@ -119,7 +119,11 @@ function makeHarness({
 
   const previousYT = globalThis.YT;
   globalThis.YT = { Player: function Player() {} };
+  // The breath runs on the wall clock, so the suite supplies its own and moves
+  // it deliberately. Nothing here depends on how long the test took to run.
+  let clock = 0;
   const controller = createStepFieldController({
+    now: () => clock,
     document,
     getSnapshot: () => snapshot,
     getPreferences: () => preferences,
@@ -134,6 +138,8 @@ function makeHarness({
     elements,
     adapters,
     changes,
+    get clock() { return clock; },
+    set clock(value) { clock = value; },
     get snapshot() { return snapshot; },
     set snapshot(value) { snapshot = value; },
     get preferences() { return preferences; },
@@ -190,8 +196,11 @@ function makeHarness({
     h.controller.tick();
     assert.equal(h.tail().rate, 0.5, "Expansion applies the outward Tail rate z < c.");
     assert.equal(h.lead().rate, 1.5, "Expansion applies the outward Lead rate w > c.");
-    // Center moved 50 -> 52 with a 0.5 fractional spread, so each side
-    // has grown from the 2 s inner boundary to 3 s.
+    // The breath opens against the wall clock, not against elapsed Center source
+    // time, so it takes the same real seconds at every Center rate. With a 0.5
+    // step, one real second grows each side by 0.5 s.
+    h.clock += 2000;
+    h.controller.tick();
     assert.equal(h.controller.breath().sides.tail.offset, 3);
     assert.equal(h.controller.breath().sides.lead.offset, 3);
     assert.ok(h.tail().time < 52, "Tail must remain behind Center while it expands.");
@@ -244,24 +253,31 @@ function makeHarness({
       center: {
         ...h.snapshot.center,
         time: 52,
-        rate: 2,
+        rate: 1.5,
         state: YOUTUBE_STATE.PLAYING
       }
     };
     h.controller.tick();
+    // The step either side of Center is an interval, not a fraction of it.
+    // Scaling it with Center -- tail = C(1-z), lead = C(1+z) -- is identical at
+    // 1x and wrong everywhere else: the gap would open faster the faster you
+    // played, so a breath would last a different number of seconds at every
+    // rate. A fixed step keeps the difference at one rung wherever Center sits.
     assert.equal(h.tail().rate, 1,
-      "At Center 2×, a 0.5 spread makes Tail 1×.");
-    assert.equal(h.lead().rate, 3,
-      "At Center 2×, the same spread makes Lead 3×.");
+      "At Center 1.5×, a 0.5 step puts Tail one step below at 1×.");
+    assert.equal(h.lead().rate, 2,
+      "and Lead one step above at 2×.");
+    h.clock += 2000;
+    h.controller.tick();
     assert.equal(h.controller.breath().sides.tail.offset, 3);
     assert.equal(h.controller.breath().sides.lead.offset, 3,
       "Equal rate distance through Center must produce equal offsets.");
-    assert.match(h.elements.get("field-rate-state").textContent, /Center 2×/,
+    assert.match(h.elements.get("field-rate-state").textContent, /Center 1\.5×/,
       "The Panorama readout reports the observed Center rate, not a fixed 1×.");
 
     h.controller.hold("both");
-    assert.equal(h.tail().rate, 2);
-    assert.equal(h.lead().rate, 2,
+    assert.equal(h.tail().rate, 1.5);
+    assert.equal(h.lead().rate, 1.5,
       "Held sides follow Center exactly so the attained offsets remain fixed.");
   } finally {
     h.restore();
@@ -296,6 +312,8 @@ function makeHarness({
       transportKind: "playback",
       center: { ...h.snapshot.center, time: 52, state: YOUTUBE_STATE.PLAYING }
     };
+    h.controller.tick();
+    h.clock += 4000;
     h.controller.tick();
     h.controller.hold("both");
     const partial = h.controller.breath().sides.tail.offset;
@@ -585,6 +603,8 @@ function makeHarness({
     assert.equal(field.leadRuntime.rateAvailable, false);
     // The pure breathing state machine still owns the relation, so a source
     // without directional rates degrades to placement rather than getting stuck.
+    h.clock += 1000;
+    h.controller.tick();
     assert.equal(h.controller.breath().sides.tail.offset, 2.5);
     assert.equal(h.controller.breath().sides.lead.offset, 2.5);
     assert.ok(h.tail().time < 51, "Tail must remain behind Center.");
@@ -745,4 +765,4 @@ function makeHarness({
   }
 }
 
-console.log("Field runtime tests passed: decoded paused frames, Field Frame placement, proportional Center-rate breathing, Hold isolation, Field-level Offset reconciliation, dormant hidden/off panes, stale-event rejection, exact pause, whole-Field Step geometry, direct-manipulation Frames, unsupported-rate fallback, and boundary recovery.");
+console.log("Field runtime tests passed: decoded paused frames, Field Frame placement, one-rung side steps that keep the breath the same length at every Center rate, Hold isolation, Field-level Offset reconciliation, dormant hidden/off panes, stale-event rejection, exact pause, whole-Field Step geometry, direct-manipulation Frames, unsupported-rate fallback, and boundary recovery.");

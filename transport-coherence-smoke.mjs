@@ -232,10 +232,11 @@ assert.deepEqual(rateSelect.options.map(option => option.value), ["1", "2"],
   "The control distinguishes the only offered rate from the retained fixed wish.");
 assert.match(rateSelect.options[1].textContent, /wish/);
 assert.match(byId.get("playback-rate-value").textContent, /2.*wish.*1.*offered/);
-center.getAvailablePlaybackRates = () => [0.25, 0.5, 1, 2];
+center.getAvailablePlaybackRates = () => [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 await poll();
 await flush(3);
-assert.deepEqual(rateSelect.options.map(option => Number(option.value)), [0.25, 0.5, 1, 2],
+assert.deepEqual(rateSelect.options.map(option => Number(option.value)),
+  [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
   "A later, fuller offer replaces it.");
 assert.equal(rateSelect.value, "2",
   "and the remembered wish returns to the rate it asked for.");
@@ -283,8 +284,11 @@ assert.equal(rateSelect.value, "2",
 
   center.currentTime = 25;
   await poll(); await flush(2);
-  assert.ok(center.rate < 1,
-    "Crossing into expanded ground slows the playback without restarting it.");
+  // One rate step per octave of Weight: a 2x Section plays at 0.75x, not the
+  // 0.5x an exact inversion would ask for. The aim is a readable texture, not
+  // constant Timeline velocity.
+  assert.equal(center.rate, 0.75,
+    "Crossing into expanded ground slows the playback by one step without restarting it.");
   const insideRate = center.rate;
 
   center.currentTime = 60;

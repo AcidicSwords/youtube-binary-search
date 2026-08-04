@@ -223,8 +223,16 @@ has(docs["GLOSSARY.md"], /Drawn Group[\s\S]{0,240}?At most one Group is drawn[\s
   "Glossary defines zero-or-one drawn Group.");
 has(docs["GLOSSARY.md"], /Release[\s\S]{0,300}?Working Interval[\s\S]{0,120}?acquired Timeline operand[\s\S]{0,220}?preserves Current/i,
   "Glossary defines Release's exact cleared and preserved dimensions.");
-has(docs["GLOSSARY.md"], /Dynamic Playback[\s\S]{0,260}?effective Weight/i,
-  "Glossary qualifies the optional dynamic Weight read-through.");
+has(docs["GLOSSARY.md"], /Dynamic Playback[\s\S]{0,400}?Section Weight[\s\S]{0,200}?playback-rate step/i,
+  "Glossary qualifies the optional dynamic Weight read-through as one rate step per octave.");
+// The law is a log-compressed texture, not a correction of the map. Naming it as
+// an inverse would advertise a relation the implementation does not provide --
+// W = 4 plays at 0.5x, not 0.25x -- and would set the reader up to read the
+// Panorama as a cancellation of deformation rather than a reading of it.
+lacks(canonicalText, /\binverse of (?:the )?(?:effective |cumulative )?Weight\b|\binverse-Weight\b|\bnormalized playback\b|\bconstant Timeline velocity\b/i,
+  "No canonical document describes dynamic playback as inverting the map.");
+lacks(html, /rate the inverse of the map|inverse of (?:the )?weight/i,
+  "and no visible control does either.");
 lacks(docs["GLOSSARY.md"], /^\s*- \*\*Cue\*\*[^\n]*not[^\n]*projected/im,
   "Glossary does not contradict the projection used to draw optional Cues.");
 

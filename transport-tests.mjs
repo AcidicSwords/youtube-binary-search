@@ -3,7 +3,10 @@ import {
   OBSERVATION_POLICY,
   RATE_POLICY_KIND,
   TRANSPORT_KIND,
-  dynamicRateForWeight,
+  desiredCenterRate,
+  resolveCenterRate,
+  panoramaTriplet,
+  offerIsKnown,
   dynamicRatePolicy,
   fixedRatePolicy,
   idleTransport,
@@ -77,41 +80,101 @@ assert.deepEqual(
   { start: 40, end: 80 }
 );
 
-// Dynamic playback rate is the unconstrained inverse of cumulative effective
-// Weight. Only a concrete adapter offer resolves that wish to a playable rate.
+// Cumulative Weight is read as a playback texture, not as a correction.
+//
+//   c*(W) = 1 - 0.25*log2(W)
+//
+// One rate step per octave. This deliberately falls far short of inverting the
+// map -- the previous law made rate the exact reciprocal of Weight, so W = 4
+// played at 0.25x and W = 8 asked for 0.125x, a rate no player offers. The aim
+// is a readable texture over a continuous playback: compressed regions play
+// faster, expanded regions slower, and the useful middle of the ladder stays
+// inside what the Panorama can hold.
+const LADDER = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 {
-  assert.equal(dynamicRateForWeight(1), 1, "Neutral is its own inverse.");
-  assert.equal(dynamicRateForWeight(2), 0.5, "Double the map, half the rate.");
-  assert.equal(dynamicRateForWeight(0.5), 2, "Half the map, double the rate.");
-  assert.equal(dynamicRateForWeight(4), 0.25);
-  assert.equal(dynamicRateForWeight(0.125), 8, "Transport adds no player bounds.");
-  assert.equal(dynamicRateForWeight(8), 0.125);
+  assert.equal(desiredCenterRate(1), 1, "Neutral plays at 1x.");
+  assert.equal(desiredCenterRate(2), 0.75, "A doubling costs exactly one step.");
+  assert.equal(desiredCenterRate(0.5), 1.25, "A halving gains exactly one step.");
+  assert.equal(desiredCenterRate(4), 0.5, "Two octaves, two steps.");
+  assert.equal(desiredCenterRate(0.125), 1.75);
+  assert.equal(desiredCenterRate(8), 0.25);
+  assert.equal(desiredCenterRate(0), 1, "A nonsense weight changes nothing.");
+  assert.equal(desiredCenterRate(Number.NaN), 1);
 
-  // weight x rate = 1 independently of what a particular player can offer.
-  for (const weight of [0.125, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 8]) {
-    const rate = dynamicRateForWeight(weight);
-    assert.ok(Math.abs(weight * rate - 1) < 1e-9,
-      `weight x rate must be 1 (${weight}).`);
+  // Every canonical Weight, resolved onto the ladder a player actually offers.
+  for (const [weight, expected] of [
+    [0.125, 1.75], [0.25, 1.5], [0.5, 1.25], [0.75, 1], [1, 1],
+    [1.25, 1], [1.5, 0.75], [1.75, 0.75], [2, 0.75], [4, 0.5], [8, 0.25]
+  ]) {
+    assert.equal(resolveCenterRate(weight, LADDER), expected,
+      `Weight ${weight} plays Center at ${expected}x.`);
   }
 
-  // Reciprocal weights give reciprocal rates, which is what makes it symmetric.
-  for (const weight of [0.5, 0.75, 1, 1.5, 2]) {
-    assert.ok(
-      Math.abs(dynamicRateForWeight(weight) * dynamicRateForWeight(1 / weight) - 1) < 1e-9,
-      `A weight and its reciprocal give reciprocal rates (${weight}).`
+  // Weights compose by multiplication, which is addition in octave space.
+  for (const [factors, expected] of [
+    [[0.5, 2], 1], [[2, 2], 0.5], [[0.5, 0.5], 1.5],
+    [[0.25, 0.5], 1.75], [[2, 2, 2], 0.25]
+  ]) {
+    const composed = factors.reduce((product, factor) => product * factor, 1);
+    assert.equal(resolveCenterRate(composed, LADDER), expected,
+      `${factors.join(" x ")} composes to Center ${expected}x.`);
+  }
+
+  // Center changes at half-octave boundaries, and an exact tie -- which lands
+  // precisely on one -- resolves toward 1x, so a boundary belongs to the calmer
+  // of the two rates.
+  for (const octave of [-3, -2, -1, 0, 1, 2]) {
+    const boundary = Math.pow(2, octave + 0.5);
+    const desired = desiredCenterRate(boundary);
+    const lower = Math.round((desired - 0.125) * 4) / 4;
+    const upper = lower + 0.25;
+    const toward = Math.abs(lower - 1) < Math.abs(upper - 1) ? lower : upper;
+    assert.equal(resolveCenterRate(boundary, LADDER), toward,
+      `An exact tie at W = 2^${octave + 0.5} resolves toward 1x.`);
+    assert.notEqual(
+      resolveCenterRate(boundary * (1 - 1e-6), LADDER),
+      resolveCenterRate(boundary * (1 + 1e-6), LADDER),
+      `W = 2^${octave + 0.5} is a genuine bucket boundary.`
     );
   }
 
   // Monotone: more map always means more time on it, never less.
-  const weights = [0.2, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4, 9];
-  const rates = weights.map(dynamicRateForWeight);
+  const weights = [0.125, 0.2, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4, 8];
+  const rates = weights.map(weight => resolveCenterRate(weight, LADDER));
   for (let index = 1; index < rates.length; index += 1) {
     assert.ok(rates[index] <= rates[index - 1],
-      `Rate must not rise with weight (${weights[index - 1]} -> ${weights[index]}).`);
+      `Rate must not rise with Weight (${weights[index - 1]} -> ${weights[index]}).`);
   }
+}
 
-  assert.equal(dynamicRateForWeight(0), 1, "A nonsense weight changes nothing.");
-  assert.equal(dynamicRateForWeight(Number.NaN), 1);
+// Panorama needs a complete symmetric triplet, one rung either side of Center.
+{
+  for (const [center, expected] of [
+    [0.5, [0.25, 0.5, 0.75]], [0.75, [0.5, 0.75, 1]], [1, [0.75, 1, 1.25]],
+    [1.25, [1, 1.25, 1.5]], [1.5, [1.25, 1.5, 1.75]], [1.75, [1.5, 1.75, 2]]
+  ]) {
+    assert.deepEqual(
+      panoramaTriplet(center, LADDER),
+      { tail: expected[0], center: expected[1], lead: expected[2] },
+      `Center ${center}x has an exact adjacent triplet.`
+    );
+  }
+  assert.equal(panoramaTriplet(0.25, LADDER), null,
+    "At the bottom of the ladder there is no Tail, so Center plays alone.");
+  assert.equal(panoramaTriplet(2, LADDER), null,
+    "and at the top there is no Lead.");
+
+  // A missing neighbour suspends Panorama rather than substituting an
+  // asymmetric triplet, which would break the one relation the Field rests on.
+  assert.equal(panoramaTriplet(1, [0.5, 1, 1.25, 1.5]), null,
+    "A ladder without 0.75x cannot hold a triplet at 1x.");
+  assert.equal(panoramaTriplet(1, [0.5, 0.75, 1, 1.5]), null,
+    "Neither can one without 1.25x.");
+
+  // An adapter that has not reported its ladder has not reported a missing one.
+  assert.equal(offerIsKnown([]), false);
+  assert.equal(offerIsKnown([1]), false, "The default answer is not a ladder.");
+  assert.equal(offerIsKnown(LADDER), true);
 }
 
 // Offered-rate resolution uses multiplicative distance and prefers neutral at
@@ -206,12 +269,12 @@ assert.deepEqual(
     departure: 20,
     observationPolicy: OBSERVATION_POLICY.CENTER_ONLY,
     ratePolicy: dynamicRatePolicy(),
-    offeredRates: [0.5, 1, 2],
-    weight: 2,
+    offeredRates: LADDER,
+    weight: 4,
     actualRate: 0.5
   });
   assert.equal(dynamic.ratePolicy.kind, RATE_POLICY_KIND.DYNAMIC);
-  assert.equal(dynamic.requestedRate, 0.5);
+  assert.equal(dynamic.requestedRate, 0.5, "Two octaves of Weight cost two rate steps.");
 
   const wrapped = rebasePlaybackTransport(dynamic, 10, 1234);
   assert.equal(wrapped.cycles, 1);
@@ -220,9 +283,9 @@ assert.deepEqual(
   assert.equal(wrapped.ratePolicy.kind, RATE_POLICY_KIND.DYNAMIC);
   assert.equal(wrapped.actualRate, 0.5);
   assert.equal(resolvePlaybackRate(wrapped, {
-    offeredRates: [0.5, 1, 2],
-    weight: 0.5
-  }), 2, "Wrap rederives dynamic rate from Weight at Range Start.");
+    offeredRates: LADDER,
+    weight: 0.25
+  }), 1.5, "Wrap rederives dynamic rate from Weight at Range Start.");
 
   const retry = retryPlaybackTransport(wrapped, 2000);
   assert.equal(retry.retries, 1);
@@ -242,4 +305,4 @@ assert.deepEqual(
     "A log-space tie between 1x and 2x resolves toward neutral.");
 }
 
-console.log("Transport tests passed: source Context, explicit playback observation/rate policy, authoritative actual rate, policy-preserving retry/wrap, log-space offer resolution, and unconstrained inverse-Weight playback.");
+console.log("Transport tests passed: source Context, explicit playback observation/rate policy, authoritative actual rate, policy-preserving retry/wrap, log-space offer resolution, a log-compressed Weight texture of one rate step per octave, and Panorama triplets that suspend rather than turn asymmetric.");

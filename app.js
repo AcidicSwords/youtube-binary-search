@@ -1849,7 +1849,7 @@ function startNativePlaybackSession() {
   });
   state.transport.enteredPath = true;
   state.transport = withTransportPhase(state.transport, "playing");
-  if (playbackAllowsPanorama(state.transport)) {
+  if (playbackAllowsPanorama(state.transport, { offeredRates: offeredRates() })) {
     stepField?.resumeAt?.({ center: current, reason: "native-playback" });
   } else {
     stepField?.pause({ center: current, freeze: false });
@@ -1897,7 +1897,7 @@ function startFieldPlaybackFromGesture(options = {}) {
   // at the same rate. A changed Center rate has no side rate that preserves the
   // relation, so the Panorama suspends rather than drifting: ordinary playback
   // is a capability this system keeps, not one the Field is allowed to cost it.
-  if (playbackAllowsPanorama(state.transport)) {
+  if (playbackAllowsPanorama(state.transport, { offeredRates: offeredRates() })) {
     // This function is called directly from a trusted parent-page click or Space
     // key event. Ask every muted side and Center to play in the same synchronous
     // activation stack; delayed Center state events are too late to transfer that
@@ -1973,7 +1973,7 @@ function wrapPlaybackRange() {
   );
   placePlayer(range.start);
   player.setRate(state.transport.requestedRate);
-  if (playbackAllowsPanorama(state.transport)) {
+  if (playbackAllowsPanorama(state.transport, { offeredRates: offeredRates() })) {
     stepField?.resumeAt?.({ center: range.start, reason: "range-wrap" });
   }
   else stepField?.pause({ center: range.start, freeze: false });
@@ -3015,9 +3015,9 @@ function handlePlaybackRateChange(rate) {
     view.render();
     return;
   }
-  const panoramaWasAvailable = playbackAllowsPanorama(state.transport);
+  const panoramaWasAvailable = playbackAllowsPanorama(state.transport, { offeredRates: offeredRates() });
   state.transport = withPlaybackActualRate(state.transport, rate);
-  const panoramaIsAvailable = playbackAllowsPanorama(state.transport);
+  const panoramaIsAvailable = playbackAllowsPanorama(state.transport, { offeredRates: offeredRates() });
   const center = clamp(safeCurrentTime(), activeRange().start, activeRange().end);
   // Actual-rate events own the compatibility transition, but repeated
   // confirmations of the same compatibility state own no second Field command.
