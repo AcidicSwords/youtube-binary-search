@@ -366,19 +366,26 @@ has(styles, /\.timeline-pin\.section-endpoint-pin\.extent-selected::before\s*\{[
 has(styles, /\.timeline-pin\.snap-target\.snap-armed::before\s*\{[^}]*outline:/,
   "Transient armed snap state has a separate outline/glow channel.");
 
-// One colour, one meaning, on the map as well as in the Guide. A Section's
-// colour states its Weight; identity is carried by the name and the Address.
-// Hashing an identifier into a hue spent the deformation channel to say
-// nothing, and collided by the seventh Section.
-has(view, /function sectionColor\(weight\)/,
-  "A Section is coloured by its Weight, not by its identity.");
-lacks(view, /charCodeAt/, "No colour is derived from an identifier.");
+// One colour, one meaning. A Section's colour is its identity and nothing else;
+// deformation is drawn in the deformation colours. Two Sections may never look
+// alike, which a fixed palette of six could not promise — it repeated on the
+// seventh, and a repeat reads as a relationship.
+has(view, /function sectionColor\(sectionId\)/,
+  "A Section is coloured by its own identity.");
+// The angle only spreads when walked over a sequence. Applied to a hash it is
+// just an arbitrary hue, and arbitrary hues clump.
+has(view, /GOLDEN_ANGLE_DEGREES\s*=\s*137\.5[\s\S]*index \* GOLDEN_ANGLE_DEGREES\) % 360/,
+  "Hues are walked by the golden angle over the Guide's order, so no two Sections collide.");
+lacks(view, /charCodeAt/,
+  "and no colour is drawn from a hash, which would clump however it is mixed.");
 check(count(view, /const WEIGHT_COLORS = \{/) === 1,
-  "Exactly one Weight colour table exists.");
+  "Exactly one deformation colour table exists.");
 has(view, /rgba\(WEIGHT_COLORS\.compressed[\s\S]*rgba\(WEIGHT_COLORS\.expanded/,
-  "The atmosphere is built from that same table, so the gauge cannot drift from the wires it measures.");
-has(styles, /\.timeline-key\.key-sections i \{[^}]*linear-gradient\(90deg, #ac70e1, #8fa3bd, #41bdae\)/,
-  "The Section key shows the Weight scale rather than a sample of hues.");
+  "and the atmosphere is built from it.");
+lacks(styles, /\.section-item\.(?:compressed|expanded)\s*\{[^}]*--section-color/,
+  "Deformation tints never borrow the Section's identity colour.");
+has(styles, /\.timeline-key\.key-sections i \{[^}]*linear-gradient\([\s\S]*hsl\(/,
+  "The Section key samples the hue sequence rather than naming one Section's colour.");
 
 if (failures.length) {
   console.error(`Project audit failed (${failures.length}):`);

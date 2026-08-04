@@ -323,7 +323,11 @@ const state = {
   // The exact Frame supplied by whichever direct manipulation is active.
   directFrame: null,
   // One wheel series or held-key repetition settles as one Undo transaction.
-  nudgeGesture: null
+  nudgeGesture: null,
+  // The fraction of one Nudge a gentle scroll has accumulated so far. Separate
+  // from the gesture above because reaching a quantum and batching an Undo entry
+  // are different jobs with different lifetimes.
+  nudgeWheel: null
 };
 
 let player = null;
@@ -879,6 +883,25 @@ function clearProgrammaticPlacement() {
   state.programmaticPlacement = null;
 }
 
+// A direct manipulation in progress owns where the player sits.
+//
+// Dragging Current, a Pin, a Section, or a Range handle places the player to
+// preview the candidate frame. That placement is the application's own, never
+// the reader reaching for YouTube's scrubber, so it must not be read back as a
+// native seek. The only thing that said so was `programmaticPlacement`, a grace
+// period measured in milliseconds from the last placement — so a drag that
+// paused for longer than the grace stopped being recognised as a drag. Holding
+// still for a moment let the poll schedule a Native Go and commit it underneath
+// the gesture: Session Current moved, a traversal was retained, and the drag
+// carried on measuring from an anchor that no longer meant anything. Releasing
+// then drew a Working Interval nobody had asked for.
+//
+// A gesture is a state, not a duration. It lasts exactly as long as the pointer
+// is down, however long the reader pauses to think.
+function directManipulationActive() {
+  return Boolean(state.dragHandle || state.guideDrag || state.currentDrag);
+}
+
 function placePlayer(address) {
   if (!player || !Number.isFinite(address)) return false;
   const bounded = clamp(address, 0, model().duration);
@@ -917,7 +940,7 @@ function commitNativeGo(candidate) {
   if (
     !state.videoLoaded
     || isTransportActive(state.transport)
-    || state.dragHandle
+    || directManipulationActive()
     || ![YOUTUBE_STATE.PAUSED, YOUTUBE_STATE.CUED].includes(state.playerState)
   ) {
     clearNativeGo();
@@ -1591,7 +1614,7 @@ function validDeformationBypass() {
 
 function toggleDeformation() {
   if (!state.videoLoaded) return false;
-  if (state.dragHandle || state.guideDrag || state.currentDrag) {
+  if (directManipulationActive()) {
     setStatus("Finish or cancel the active Timeline manipulation before toggling deformation.");
     return false;
   }
@@ -2732,6 +2755,7 @@ function resetSourceScopedState() {
   state.guideRecovery = null;
   if (state.nudgeGesture?.timer) window.clearTimeout(state.nudgeGesture.timer);
   state.nudgeGesture = null;
+  state.nudgeWheel = null;
   state.field = null;
   view.setPreviewAction(null);
   view.setPreviewSection(null);
@@ -3143,6 +3167,7 @@ function pollPlayer() {
     !isTransportActive(transport)
     && [YOUTUBE_STATE.PAUSED, YOUTUBE_STATE.CUED].includes(state.playerState)
     && !programmaticPlacementActive
+    && !directManipulationActive()
     && Math.abs(now - currentResolution().C) > NATIVE_POSITION_TOLERANCE_SECONDS
   ) {
     scheduleNativeGo(now);
@@ -4087,7 +4112,7 @@ function beginNudgeGesture(target) {
         : departure,
       history: state.session.history,
       future: state.session.future || [],
-      accumulator: 0,
+
       changed: false,
       timer: null
     };
@@ -4372,6 +4397,21 @@ function withinTimeline(node) {
   ].some(surface => surface?.contains?.(node));
 }
 
+// Wheel deltas arrive in three units and only the first is pixels. Reading them
+// all as pixels made a line-reporting device advance by a hundredth of what it
+// asked for, which is indistinguishable from a Nudge that does not work.
+const WHEEL_LINE_PIXELS = 16;
+const WHEEL_PAGE_PIXELS = 400;
+
+function wheelPixels(event) {
+  const horizontal = Math.abs(event.deltaX) > Math.abs(event.deltaY);
+  const raw = horizontal ? event.deltaX : -event.deltaY;
+  if (!Number.isFinite(raw) || raw === 0) return 0;
+  if (event.deltaMode === 1) return raw * WHEEL_LINE_PIXELS;
+  if (event.deltaMode === 2) return raw * WHEEL_PAGE_PIXELS;
+  return raw;
+}
+
 function handleNudgeWheel(event) {
   if (!event.shiftKey || !state.videoLoaded || !currentResolution()) return;
   const overTimeline = withinTimeline(event.target);
@@ -4385,15 +4425,28 @@ function handleNudgeWheel(event) {
   const target = (overTimeline ? nudgeTargetFromElement(event.target) : null)
     || (overTimeline ? { kind: "current" } : selectedNudgeTarget());
   if (!target) return;
-  const horizontal = Math.abs(event.deltaX) > Math.abs(event.deltaY);
-  const raw = horizontal ? event.deltaX : -event.deltaY;
-  if (!Number.isFinite(raw) || raw === 0) return;
+  const raw = wheelPixels(event);
+  if (raw === 0) return;
   event.preventDefault?.();
-  const gesture = beginNudgeGesture(target);
-  gesture.accumulator += raw;
-  const steps = Math.trunc(gesture.accumulator / NUDGE_WHEEL_THRESHOLD);
+  // A partial turn is progress, not noise.
+  //
+  // This accumulator used to live on the Nudge gesture, whose job is to batch
+  // one continuous series into a single Undo entry and which is therefore
+  // discarded 420 ms after the last event. So every scroll gentler than one
+  // threshold per event — which is an ordinary trackpad — threw away everything
+  // it had accumulated on each pause, and the map never moved however long the
+  // reader kept scrolling. Nudge worked when hurried and was dead when not.
+  //
+  // Reaching a quantum and batching an Undo entry are different jobs, so they
+  // no longer share a lifetime. What is carried is a fraction of one Nudge, and
+  // it is dropped when the reader changes what they are nudging — not by a
+  // clock.
+  const key = nudgeTargetKey(target);
+  if (state.nudgeWheel?.key !== key) state.nudgeWheel = { key, accumulator: 0 };
+  state.nudgeWheel.accumulator += raw;
+  const steps = Math.trunc(state.nudgeWheel.accumulator / NUDGE_WHEEL_THRESHOLD);
   if (!steps) return;
-  gesture.accumulator -= steps * NUDGE_WHEEL_THRESHOLD;
+  state.nudgeWheel.accumulator -= steps * NUDGE_WHEEL_THRESHOLD;
   // Wheel-up and wheel-right are forward on either axis.
   nudgeTarget(target, steps > 0 ? 1 : -1, { steps: Math.abs(steps) });
 }

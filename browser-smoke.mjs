@@ -465,7 +465,55 @@ try {
   }
 
   // ============================================================================
-  // 10. Nothing logged an error along the way
+  // 10. A gesture lasts as long as the pointer is down, not as long as a timer
+  // ============================================================================
+  // Dragging Current places the player to preview the candidate frame. Only a
+  // grace period measured from the last placement said that placement was the
+  // application's own, so a drag that paused for longer than the grace stopped
+  // being recognised as one: the poll read the player's position as a native
+  // scrub and committed a Native Go underneath the held gesture. Session Current
+  // moved mid-drag, a traversal was retained, and the drag carried on measuring
+  // from an anchor that no longer meant anything.
+  //
+  // This needs real timers, a real pointer that stays down, and the real poll,
+  // so it can only be asked here.
+  await setGuide(false);
+  // The layout has changed since the box at the top of this suite was measured.
+  const dragTimeline = await boxOf(page, "#timeline");
+  await page.mouse.click(
+    dragTimeline.x + dragTimeline.width * 0.35,
+    dragTimeline.y + dragTimeline.height * 0.55
+  );
+  await settle(320);
+  const beforeDrag = await text("#return-meta");
+  const marker = await boxOf(page, "#current-marker");
+  const markerY = marker.y + marker.height / 2;
+  await page.mouse.move(marker.x + marker.width / 2, markerY);
+  await page.mouse.down();
+  for (let leg = 1; leg <= 8; leg += 1) {
+    await page.mouse.move(marker.x + marker.width / 2 + leg * 12, markerY);
+    await settle(20);
+  }
+  // The pause: still holding, pointer still, well past every settle in the app.
+  await settle(1000);
+  assert.equal(await text("#return-meta"), beforeDrag,
+    "A held drag that pauses commits nothing, however long the reader thinks.");
+  for (let leg = 1; leg <= 8; leg += 1) {
+    await page.mouse.move(marker.x + marker.width / 2 + 96 + leg * 12, markerY);
+    await settle(20);
+  }
+  await page.mouse.up();
+  await settle(420);
+  assert.notEqual(await text("#return-meta"), beforeDrag,
+    "and releasing commits the movement.");
+  // One held gesture is one decision, whatever it paused for.
+  await page.keyboard.press("z");
+  await settle(300);
+  assert.equal(await text("#return-meta"), beforeDrag,
+    "One Undo returns the whole drag: the pause left nothing of its own behind.");
+
+  // ============================================================================
+  // 11. Nothing logged an error along the way
   // ============================================================================
   assert.deepEqual(failures, [],
     "The whole session runs without a page error or console error.");
@@ -509,7 +557,7 @@ for (const [width, height] of [[1920, 1080], [1600, 720]]) {
   await page.waitForTimeout(200);
 }
 
-console.log("Browser smoke passed: the physical QWE / ASD / RTF matrix is square with Tag at row 3 column 2 and remains stable under Shift; the centered parent Play control leaves native controls reachable; the app runs without error; a press lands on the Address drawn under it; focus and Space ownership remain exact; no reachable control is covered; responsive layouts do not overflow or change panel intent; dense structure stays bounded; Guide edits retain focus; a side panel keeps only the keys its controls can receive and hands the rest to the map; and compact controls remain reachable.");
+console.log("Browser smoke passed: the physical QWE / ASD / RTF matrix is square with Tag at row 3 column 2 and remains stable under Shift; the centered parent Play control leaves native controls reachable; the app runs without error; a press lands on the Address drawn under it; focus and Space ownership remain exact; no reachable control is covered; responsive layouts do not overflow or change panel intent; dense structure stays bounded; Guide edits retain focus; a side panel keeps only the keys its controls can receive and hands the rest to the map; a held drag that pauses commits nothing until it is released; and compact controls remain reachable.");
 } finally {
   await close();
 }

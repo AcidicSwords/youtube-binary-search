@@ -479,20 +479,59 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     renderedPinKey = "";
   }
 
-  // One colour, one meaning — the rule the Guide rows already follow, applied
-  // to the map.
+  // One colour, one meaning. A Section's colour is its identity; deformation is
+  // drawn in the deformation colours below, and the two never borrow from each
+  // other.
   //
-  // A Section used to be coloured by hashing its id into six hues. That put
-  // identity into the channel the map spends on deformation, and identity is
-  // already carried by the name; six hues collide by the seventh Section
-  // anyway. Worse, the same hue also drew the compressed and expanded row
-  // tints, so one colour said both "this Section" and "this Section's Weight",
-  // and the atmosphere band drew compression in violet behind a wire drawn in
-  // salmon. The gauge and the thing it measures disagreed.
+  // Identity has one requirement, which a palette of six could not meet: two
+  // Sections must not look alike. The seventh Section repeated the first, and
+  // on a busy map that is worse than no colour at all, because a repeat reads
+  // as a relationship. Walking the colour circle by the golden angle puts any
+  // number of Sections as far apart as they can be — successive values never
+  // land near each other, and the sequence never revisits a hue it has used.
   //
-  // A Section's colour states its Weight, because Weight is the only thing
-  // about a Section that colour can say. These three are the whole vocabulary,
-  // and the atmosphere is built from the same table, so the two cannot drift.
+  // The hue comes from the Section's own identity and nothing else, so it never
+  // changes because a neighbour was added, deleted, reordered or reweighted.
+  // The angle is walked over the Guide's own order, not over a hash of the id.
+  // Hashing gives an arbitrary hue per Section, and arbitrary hues clump — seven
+  // Sections drew three separate oranges. The golden angle only guarantees
+  // spread when it is applied to a sequence, so the sequence is the position in
+  // `guide.sections`, which is creation order and is never re-sorted: moving a
+  // Section, reweighting it, renaming it or regrouping it all leave its colour
+  // alone. Deleting one is the single edit that reassigns later hues.
+  const GOLDEN_ANGLE_DEGREES = 137.507764;
+  const UNKNOWN_SECTION_COLOR = "hsl(210 12% 72%)";
+
+  let sectionHueKey = "";
+  let sectionHues = new Map();
+
+  function sectionHueMap() {
+    const entries = (guide()?.sections || [])
+      .map(entry => resolveSection(guide(), entry))
+      .filter(Boolean);
+    const key = entries.map(section => section.id).join("|");
+    if (key !== sectionHueKey) {
+      sectionHueKey = key;
+      sectionHues = new Map(entries.map((section, index) => [
+        section.id,
+        (index * GOLDEN_ANGLE_DEGREES) % 360
+      ]));
+    }
+    return sectionHues;
+  }
+
+  function sectionColor(sectionId) {
+    const hue = sectionHueMap().get(sectionId);
+    if (hue === undefined) return UNKNOWN_SECTION_COLOR;
+    // Fixed saturation and lightness keep every Section equally legible against
+    // the dark map, so hue is the only thing that varies and the only thing a
+    // reader has to tell apart.
+    return `hsl(${hue.toFixed(1)} 70% 66%)`;
+  }
+
+  // Deformation has its own two colours, and they are not identity's. The
+  // atmosphere band and the Guide row tints are built from this one table so a
+  // compressed Section reads the same wherever it is drawn.
   const WEIGHT_COLORS = {
     neutral: [143, 163, 189],
     compressed: [172, 112, 225],
@@ -501,25 +540,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
   const rgba = ([red, green, blue], alpha) =>
     `rgba(${red}, ${green}, ${blue}, ${alpha})`;
-
-  function sectionColor(weight) {
-    const value = Number(weight);
-    if (!Number.isFinite(value) || value <= 0) return rgba(WEIGHT_COLORS.neutral, 1);
-    if (Math.abs(value - 1) <= EPSILON) return rgba(WEIGHT_COLORS.neutral, 1);
-    // Measured in octaves, not in ratio: halving and doubling are the same size
-    // of decision on the ladder, so they read at the same strength.
-    const strength = clamp(Math.abs(Math.log2(value)) / 2, 0, 1);
-    const toward = value < 1 ? WEIGHT_COLORS.compressed : WEIGHT_COLORS.expanded;
-    // Even one rung off neutral is a deliberate act, so it never reads as
-    // neutral-with-a-tint; the rest of the range is spent on how far.
-    const amount = 0.3 + strength * 0.7;
-    return rgba(
-      WEIGHT_COLORS.neutral.map((channel, index) =>
-        Math.round(channel + (toward[index] - channel) * amount)
-      ),
-      1
-    );
-  }
 
   function formatRulerTime(seconds) {
     return formatTime(seconds).replace(/\.000$/, "");
@@ -780,7 +800,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
     for (const entry of packedSections.entries) {
       const { section, projected, lane } = entry;
-      const color = sectionColor(section.weight);
+      const color = sectionColor(section.id);
       const selected = state().selectedRetained?.kind === "section"
         && state().selectedRetained.id === section.id;
       const leftFraction = clamp(projection.coordinateToFraction(projected.start), 0, 1);
@@ -920,16 +940,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         setStyleProperty(button, "--pin-weight", String(Math.min(3, references)));
         if (endpointSections.length) {
           button.classList.add("section-endpoint-pin");
-          // A Pin can end more than one Section, and the Weights on either side
-          // of it need not agree. It takes the strongest statement at that
-          // Address rather than whichever Section was found first, because an
-          // average of two Weights describes neither of them.
-          const strongest = endpointSections.reduce((best, candidate) =>
-            Math.abs(Math.log2(candidate.weight)) > Math.abs(Math.log2(best.weight))
-              ? candidate
-              : best
+          // A Pin can end more than one Section, and only one colour fits on it.
+          // It takes the earliest-starting Section rather than whichever the
+          // lookup happened to return first, so a shared endpoint is drawn the
+          // same way from either side of the map and does not change colour when
+          // an unrelated Section is added.
+          const owner = endpointSections.reduce((first, candidate) =>
+            candidate.start < first.start ? candidate : first
           );
-          setStyleProperty(button, "--endpoint-color", sectionColor(strongest.weight));
+          setStyleProperty(button, "--endpoint-color", sectionColor(owner.id));
         }
         if (state().selectedPinIds?.includes(pin.id)) {
           button.classList.add("extent-selected");
@@ -1125,7 +1144,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         else if (section.weight > 1 + EPSILON) item.classList.add("expanded");
         if (selected) item.classList.add("retained-selected");
         if (endpointSelected && !selected) item.classList.add("extent-selected");
-        setStyleProperty(item, "--section-color", sectionColor(section.weight));
+        setStyleProperty(item, "--section-color", sectionColor(section.id));
 
         const main = document.createElement("button");
         main.type = "button";

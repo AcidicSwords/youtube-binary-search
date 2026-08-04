@@ -246,8 +246,15 @@ lacks(appCode, /state\.normalize\b|toggleNormalize\b/, "No parallel normalize st
 has(appCode, /plain && key === "x"[\s\S]{0,120}?toggleDeformation\(\)/,
   "Plain X reaches the same Toggle Deformation consequence as the button.");
 const toggleDeformation = topLevelFunction(appCode, "toggleDeformation");
-has(toggleDeformation, /state\.dragHandle \|\| state\.guideDrag \|\| state\.currentDrag/,
+has(toggleDeformation, /directManipulationActive\(\)/,
   "X refuses a projection change during direct manipulation.");
+// One predicate answers "is a gesture in progress", so no caller can name a
+// subset of the drags by hand and quietly omit one.
+const manipulation = topLevelFunction(appCode, "directManipulationActive");
+has(manipulation, /state\.dragHandle \|\| state\.guideDrag \|\| state\.currentDrag/,
+  "A gesture in progress is every drag, named once.");
+has(topLevelFunction(appCode, "commitNativeGo"), /directManipulationActive\(\)/,
+  "The player's own placement is never read back as a native seek mid-gesture.");
 has(toggleDeformation, /settleBeforeAction\(\{ transport: false \}\)/,
   "X settles pending spatial transactions without stopping playback.");
 has(toggleDeformation, /restoring \? null : scope/,
@@ -484,14 +491,23 @@ has(topLevelFunction(appCode, "resetSourceScopedState"), /state\.shiftLayers = \
 check((appCode.match(/addEventListener\("wheel",\s*handleNudgeWheel/g) || []).length === 1,
   "One document wheel handler owns Timeline and off-map Nudge.");
 const nudgeWheel = topLevelFunction(appCode, "handleNudgeWheel");
-has(nudgeWheel, /Math\.abs\(event\.deltaX\) > Math\.abs\(event\.deltaY\)/,
+has(topLevelFunction(appCode, "wheelPixels"), /Math\.abs\(event\.deltaX\) > Math\.abs\(event\.deltaY\)/,
   "Nudge selects the dominant wheel axis.");
+has(topLevelFunction(appCode, "wheelPixels"), /deltaMode === 1[\s\S]*deltaMode === 2/,
+  "and reads line and page deltas in their own units rather than as pixels.");
 has(nudgeWheel, /overTimeline \? \{ kind: "current" \} : selectedNudgeTarget\(\)/,
   "Only target resolution differs between Timeline and off-map wheel routes.");
 has(nudgeWheel, /if \(!target\) return;[\s\S]*?event\.preventDefault/,
   "Wheel default is prevented only after an operand is acquired.");
-has(nudgeWheel, /gesture\.accumulator \+= raw[\s\S]*?Math\.trunc\(gesture\.accumulator \/ NUDGE_WHEEL_THRESHOLD\)/,
-  "High-resolution wheel input shares one accumulator and quantum.");
+has(nudgeWheel, /state\.nudgeWheel\.accumulator \+= raw[\s\S]*?Math\.trunc\(state\.nudgeWheel\.accumulator \/ NUDGE_WHEEL_THRESHOLD\)/,
+  "High-resolution wheel input accumulates toward one shared quantum.");
+// Reaching a quantum and batching an Undo entry are different jobs. While they
+// shared the gesture's lifetime, a scroll gentler than one threshold per event
+// lost its progress every time the reader paused, and never nudged at all.
+lacks(nudgeWheel, /gesture\.accumulator/,
+  "The wheel accumulator does not live on the Undo-batching gesture.");
+has(topLevelFunction(appCode, "resetSourceScopedState"), /state\.nudgeWheel = null/,
+  "and a partial Nudge does not survive a change of source.");
 has(session, /export function settleStepSequence[\s\S]*?Step Reversal[\s\S]*?visitedMinimum[\s\S]*?visitedMaximum/,
   "Step settlement retains a sparse transient reversal envelope.");
 has(sources["guide-session-completion-tests.mjs"], /visitedMinimum[\s\S]*?visitedMaximum[\s\S]*?Step Reversal[\s\S]*?history\.length, 1/,

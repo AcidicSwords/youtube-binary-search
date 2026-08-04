@@ -392,8 +392,17 @@ kbd {
 /* The key shows the scale the wires are drawn on: compressed, neutral,
    expanded. It used to show three of the six identity hues, which named nothing
    a reader could look for. */
+/* Sections are told apart by hue, so the key shows that hue varies rather than
+   naming any one of them. These are four consecutive golden-angle steps: the
+   sample is the sequence the map actually walks. */
 .timeline-key.key-sections i {
-  background: linear-gradient(90deg, #ac70e1, #8fa3bd, #41bdae);
+  background: linear-gradient(
+    90deg,
+    hsl(20 70% 66%),
+    hsl(157 70% 66%),
+    hsl(295 70% 66%),
+    hsl(72 70% 66%)
+  );
 }
 
 .timeline-key.key-range i {
@@ -1823,23 +1832,23 @@ kbd {
 .guide-item.snap-source {
   border-color: rgba(246, 200, 110, 0.52);
 }
+/* Deformation is drawn in the deformation colours, never in the Section's own.
+   These tints were mixed from --section-color, so one hue said both "this
+   Section" and "this Section's Weight" and neither could be read off the other.
+   Direction carries the sign — compression gathers toward the middle, expansion
+   pushes to the edges — and the hue now agrees with the atmosphere on the map. */
 .section-item.compressed {
   background-image:
-    linear-gradient(
-      90deg,
-      transparent,
-      color-mix(in srgb, var(--section-color) 13%, transparent) 50%,
-      transparent
-    );
+    linear-gradient(90deg, transparent, rgb(172 112 225 / 0.17) 50%, transparent);
 }
 
 .section-item.expanded {
   background-image:
     linear-gradient(
       90deg,
-      color-mix(in srgb, var(--section-color) 12%, transparent),
+      rgb(65 189 174 / 0.16),
       transparent 50%,
-      color-mix(in srgb, var(--section-color) 12%, transparent)
+      rgb(65 189 174 / 0.16)
     );
 }
 

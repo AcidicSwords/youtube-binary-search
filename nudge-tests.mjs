@@ -514,4 +514,44 @@ await flush(2);
 assert.ok(!plainOffMap.defaultPrevented,
   "A wheel without Shift is not a Nudge anywhere.");
 
+// A partial turn is progress, not noise.
+//
+// The threshold accumulator used to live on that gesture, which is discarded
+// 420 ms after the last event. So a scroll gentler than one threshold per event
+// -- which is an ordinary trackpad -- threw away everything it had accumulated
+// on every pause, and the map never moved however long the reader kept
+// scrolling. Nudge worked when hurried and was dead when not. Reaching a
+// quantum and batching an Undo entry are different jobs and no longer share a
+// lifetime.
+{
+  const departure = currentText();
+  for (let turn = 0; turn < 3; turn += 1) {
+    wheel(-12);
+    await flush();
+    await env.delay(600);
+    await flush();
+  }
+  assert.notEqual(currentText(), departure,
+    "Unhurried scrolling accumulates across the settle and reaches a quantum.");
+}
+
+// Wheel deltas arrive in three units and only the first is pixels. Reading a
+// line-reporting device as pixels advanced it by a hundredth of what it asked
+// for, which is indistinguishable from a Nudge that does not work.
+{
+  const departure = currentText();
+  dispatchDocument("wheel", {
+    target: byId.get("timeline"),
+    deltaY: -2,
+    deltaX: 0,
+    deltaMode: 1,
+    shiftKey: true
+  });
+  await flush();
+  assert.notEqual(currentText(), departure,
+    "Two lines of scroll is more than one quantum, not a fraction of one.");
+  await env.delay(600);
+  await flush();
+}
+
 console.log("Nudge tests passed: source-time quantum, Current Step reversal settlement, Current drag commit and cancel, Shift-drag precision, Shift-wheel accumulation and Timeline/off-map targeting, keyboard nudging, at most one Undo per gesture, no-op retained-object round trips, Guide increments sharing the same operation, Guide Address preview and cancellation, and drag/edit Frame parity.");
