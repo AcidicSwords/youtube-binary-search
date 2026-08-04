@@ -4735,6 +4735,49 @@ function releasePointerControlFocus(event) {
   }
 }
 
+// Which keystrokes are the map's, decided by what a control does with a key
+// rather than by which tag it happens to be.
+//
+// This was a tagName test — INPUT, SELECT or TEXTAREA owned the keyboard —
+// which is not the same question. A checkbox swallowed every operator despite
+// being unable to receive a character, and a <select> kept them for as long as
+// it held focus, which is forever: it survives the rebuild its own edit causes.
+// So setting a Section's Weight, or ticking the Panorama's dynamic-rate box,
+// silently disarmed the whole map until the reader clicked the Timeline again,
+// with nothing on screen to say why. The tag was enforcing a rule that belongs
+// to the keystroke.
+//
+// Only text can be typed into. A <select> is not text: it is chosen from, and
+// while its list is open the page receives no keys at all — the browser's popup
+// takes them. So any key that reaches this document while a <select> is focused
+// is a key that <select> already declined, and it belongs to the map. Keyboard
+// reach is unharmed: Space still opens the list (below), the arrows inside it
+// are the popup's, and Enter still commits. What is gone is only the closed
+// select's silent arrow-and-type-ahead editing, which cost every hotkey on the
+// map to keep. Operators preventDefault the keys they claim, so no press both
+// acts on the map and moves a selection.
+const TEXTLESS_INPUT_TYPES = new Set([
+  "button", "checkbox", "color", "file", "image", "radio", "range", "reset", "submit"
+]);
+
+// Textless is not the same as inert: these answer Space, so Space stays theirs.
+const SPACE_ACTIVATED_INPUT_TYPES = new Set([
+  "button", "checkbox", "file", "image", "radio", "reset", "submit"
+]);
+
+function inputType(element) {
+  return String(element?.type || "text").toLowerCase();
+}
+
+function ownsKeyboard(element) {
+  if (!element) return false;
+  if (element.isContentEditable === true) return true;
+  const tag = element.tagName;
+  if (tag === "TEXTAREA") return true;
+  if (tag !== "INPUT") return false;
+  return !TEXTLESS_INPUT_TYPES.has(inputType(element));
+}
+
 function initializePlayerApi() {
   if (player || !isYouTubeApiReady()) return;
   player = createYouTubePlayer("player", {
@@ -5860,14 +5903,16 @@ document.addEventListener("keydown", event => {
     view.render();
   }
   const activeElement = document.activeElement;
-  const editing = ["INPUT", "SELECT", "TEXTAREA"].includes(activeElement?.tagName)
-    || activeElement?.isContentEditable === true;
+  const editing = ownsKeyboard(activeElement);
   // Anything that natively activates on Space, or that has been given keyboard
-  // activation of its own, keeps it.
+  // activation of its own, keeps it. A checkbox or radio is here rather than in
+  // `editing` because Space is the one key it answers to and letters are not.
   const focusedControl = Boolean(activeElement)
     && activeElement !== document.body
     && (
-      ["BUTTON", "SUMMARY", "A", "OPTION"].includes(activeElement.tagName)
+      ["BUTTON", "SUMMARY", "A", "OPTION", "SELECT"].includes(activeElement.tagName)
+      || (activeElement.tagName === "INPUT"
+        && SPACE_ACTIVATED_INPUT_TYPES.has(inputType(activeElement)))
       || activeElement.getAttribute?.("role") === "button"
       || activeElement.getAttribute?.("role") === "slider"
       || activeElement.getAttribute?.("role") === "menuitem"
@@ -5895,9 +5940,7 @@ document.addEventListener("keydown", event => {
 // Keyboard: spatial cluster W/A/S/D, directional arrows, and observation keys.
 document.addEventListener("keydown", event => {
   const activeElement = document.activeElement;
-  const tag = activeElement?.tagName;
-  const editing = ["INPUT", "SELECT", "TEXTAREA"].includes(tag)
-    || activeElement?.isContentEditable === true;
+  const editing = ownsKeyboard(activeElement);
   if (editing) {
     if (event.key === "Escape") {
       if (guideDialogOpen()) closeGuideDialog();

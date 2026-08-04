@@ -620,6 +620,8 @@ The container over Center is non-blocking. Only the centered parent-owned Play/P
 
 Keyboard focus on a button, form control, menu item, slider, or other native Space owner keeps its native activation. Reader-background `Space` remains the universal playback toggle.
 
+A focused control keeps only the keys it can act on, which is a question about the keystroke and not about the element's tag. Text entry — a text field, a number field, or an editable region — keeps every key while the caret is in it, and `Escape` returns them. Every other control keeps its own activation key and nothing further: a checkbox, a selector, or any other chosen-from control never absorbs an operator letter merely by holding focus. Working in a side panel therefore never disarms the map, and no hotkey requires clicking the Timeline first to revive it. A selector's open list is the browser's own surface and owns the keyboard until it closes.
+
 ## 9. Guide lifecycle and persistence
 
 ### 9.1 Creation, duplicates, and deletion

@@ -335,6 +335,14 @@ lacks(productText, /\bWorking Section\b|toggleNormalize\b|state\.normalize\b|tim
 lacks(html, /<kbd>\s*P\s*<\/kbd>|Shift\s*\+\s*P|Shift\s*\+\s*X|Alt\s*\+\s*X|>\s*Normalize\s*</i,
   "Visible controls advertise no retired binding or Normalize label.");
 
+// Keyboard ownership is a question about the keystroke, not about the tag. The
+// tag test made a checkbox swallow every operator and let a selector keep them
+// for as long as it held focus, so working in a side panel disarmed the map.
+has(app, /function ownsKeyboard\(element\)/,
+  "Keyboard ownership is asked as one question in one place.");
+check(count(app, /const editing = ownsKeyboard\(activeElement\)/) === 2,
+  "Both keyboard paths ask it: neither decides from the focused element's tag.");
+
 for (const [name, text] of Object.entries(docs)) {
   for (const line of text.split("\n")) {
     if (!line.includes("npm run check")) continue;

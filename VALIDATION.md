@@ -170,9 +170,14 @@ journey says otherwise.
    its native activation instead of starting playback behind it.
 6. Confirm no Guide, operator, Field side, Weight, or Focus setup is required to
    use the application as an ordinary player.
+7. Set a Section's Weight from the Guide, tick a Group's visibility box, then
+   press an operator hotkey without clicking anything else; it must act on the
+   map. Click into a Guide Address field and press the same key; it must type
+   there instead, and `Escape` must hand the keyboard back.
 
 Accept when native controls never require a click through an overlay and an app
-hotkey works after leaving the iframe without first clicking Timeline.
+hotkey works after leaving the iframe, or after working in a side panel, without
+first clicking Timeline.
 
 ### Journey B — operator comprehension
 

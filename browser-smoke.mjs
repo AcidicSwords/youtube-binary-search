@@ -383,7 +383,89 @@ try {
   }
 
   // ============================================================================
-  // 9. Nothing logged an error along the way
+  // 9. A side panel does not keep the map's keyboard
+  // ============================================================================
+  // Whether a key belongs to the map was decided by the focused element's tag,
+  // and INPUT, SELECT and TEXTAREA all counted. So a checkbox — which cannot
+  // receive a character — swallowed every operator, and a <select> kept them
+  // for as long as it held focus, which is until the reader clicks elsewhere:
+  // it survives the rebuild its own edit causes. Setting a Section's Weight
+  // silently disarmed the whole map, with nothing on screen to say why.
+  //
+  // The question is what the control does with the key, and only text can be
+  // typed into. This needs a real focus model and real controls, so it can only
+  // be asked here.
+  const bypassState = () => page.getAttribute("#deformation-toggle", "aria-pressed");
+  const weightSelect = await page.$("#sections-list [data-section-weight]");
+  if (weightSelect) {
+    const beforeCommit = await bypassState();
+    await weightSelect.selectOption("2");
+    await settle(500);
+    await page.keyboard.press("x");
+    await settle(250);
+    assert.notEqual(await bypassState(), beforeCommit,
+      "A committed Weight selection leaves the map's hotkeys alive.");
+    await page.keyboard.press("x");
+    await settle(250);
+
+    // Space still opens the list rather than starting playback behind it: a
+    // <select> gives up the letters it was hoarding, not the key it acts on.
+    await (await page.$("#sections-list [data-section-weight]")).focus();
+    const transportBeforeList = await text("#field-transport-state");
+    await page.keyboard.press("Space");
+    await settle(300);
+    assert.equal(await text("#field-transport-state"), transportBeforeList,
+      "Space on a focused selector belongs to the selector, not to playback.");
+    await page.keyboard.press("Escape");
+    await settle(250);
+  }
+
+  const visibility = await page.$("#sections-list input[type=checkbox]");
+  if (visibility) {
+    await visibility.focus();
+    const beforeBox = await bypassState();
+    await page.keyboard.press("x");
+    await settle(250);
+    assert.notEqual(await bypassState(), beforeBox,
+      "A focused checkbox does not take a letter it cannot receive.");
+    await page.keyboard.press("x");
+    await settle(250);
+
+    // It keeps Space, though: that is the one key it does answer to.
+    const drawnBefore = await page.getAttribute("#sections-list input[type=checkbox]", "checked");
+    const transportHeld = await text("#field-transport-state");
+    await page.keyboard.press("Space");
+    await settle(300);
+    assert.equal(await text("#field-transport-state"), transportHeld,
+      "and Space still belongs to the control, not to playback behind it.");
+    if (drawnBefore !== null) await page.keyboard.press("Space");
+    await settle(250);
+  }
+
+  const addressInput = await page.$("#sections-list [data-address-input]");
+  if (addressInput) {
+    await addressInput.focus();
+    const beforeTyping = await bypassState();
+    await page.keyboard.press("x");
+    await settle(250);
+    assert.equal(await bypassState(), beforeTyping,
+      "A field the reader is typing into does keep the key.");
+    // Escape hands the keyboard back without reaching for the pointer. This
+    // used to throw out of the rebuild: replacing the focused node fired
+    // `focusout` synchronously, and answering that with another render left the
+    // outer pass holding children the inner pass had already discarded.
+    await page.keyboard.press("Escape");
+    await settle(250);
+    await page.keyboard.press("x");
+    await settle(250);
+    assert.notEqual(await bypassState(), beforeTyping,
+      "and Escape gives it back.");
+    await page.keyboard.press("x");
+    await settle(250);
+  }
+
+  // ============================================================================
+  // 10. Nothing logged an error along the way
   // ============================================================================
   assert.deepEqual(failures, [],
     "The whole session runs without a page error or console error.");
@@ -427,7 +509,7 @@ for (const [width, height] of [[1920, 1080], [1600, 720]]) {
   await page.waitForTimeout(200);
 }
 
-console.log("Browser smoke passed: the physical QWE / ASD / RTF matrix is square with Tag at row 3 column 2 and remains stable under Shift; the centered parent Play control leaves native controls reachable; the app runs without error; a press lands on the Address drawn under it; focus and Space ownership remain exact; no reachable control is covered; responsive layouts do not overflow or change panel intent; dense structure stays bounded; Guide edits retain focus; and compact controls remain reachable.");
+console.log("Browser smoke passed: the physical QWE / ASD / RTF matrix is square with Tag at row 3 column 2 and remains stable under Shift; the centered parent Play control leaves native controls reachable; the app runs without error; a press lands on the Address drawn under it; focus and Space ownership remain exact; no reachable control is covered; responsive layouts do not overflow or change panel intent; dense structure stays bounded; Guide edits retain focus; a side panel keeps only the keys its controls can receive and hands the rest to the map; and compact controls remain reachable.");
 } finally {
   await close();
 }

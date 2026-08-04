@@ -1051,7 +1051,36 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     restored?.focus?.({ preventScroll: true });
   }
 
+  // A render may not re-enter itself.
+  //
+  // Rebuilding this list replaces the node that currently has focus, and the
+  // browser fires `focusout` synchronously in the middle of that replacement.
+  // A listener answering it with another render left the outer pass holding
+  // children that the inner pass had already discarded, so leaving a Guide
+  // Address field with Escape threw `NotFoundError` out of `replaceChildren`
+  // and abandoned the rebuild half-done. The nested request is not dropped —
+  // it is recorded and satisfied by another pass once this one has finished,
+  // so the list still settles on current state.
+  let rebuildingGuideLists = false;
+  let guideListsDirty = false;
+
   function renderGuideLists() {
+    if (rebuildingGuideLists) {
+      guideListsDirty = true;
+      return;
+    }
+    rebuildingGuideLists = true;
+    try {
+      do {
+        guideListsDirty = false;
+        rebuildGuideLists();
+      } while (guideListsDirty);
+    } finally {
+      rebuildingGuideLists = false;
+    }
+  }
+
+  function rebuildGuideLists() {
     const pinPartition = partitionGuidePins(guide());
     const pins = [...pinPartition.visible, ...pinPartition.hidden];
     const sections = sortedSections(guide());
