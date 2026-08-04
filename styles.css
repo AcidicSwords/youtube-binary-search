@@ -241,26 +241,34 @@ kbd {
   height: 100% !important;
 }
 
-.center-transport-surface {
+.center-transport-overlay {
   position: absolute;
   z-index: 8;
   inset: 0;
   display: grid;
   place-items: center;
-  width: 100%;
+  pointer-events: none;
+}
+
+.center-transport-surface {
+  display: grid;
+  width: clamp(48px, 7vw, 72px);
+  aspect-ratio: 1;
+  place-items: center;
   min-height: 0;
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: 50%;
   background: transparent;
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .center-transport-surface[hidden] { display: none; }
 
 .center-transport-icon {
   display: grid;
-  width: clamp(48px, 7vw, 72px);
+  width: 100%;
   aspect-ratio: 1;
   place-items: center;
   padding-left: 0.12em;
@@ -290,7 +298,7 @@ kbd {
 
 .center-transport-surface:focus-visible {
   outline: 2px solid rgba(121, 168, 255, 0.84);
-  outline-offset: -3px;
+  outline-offset: 3px;
 }
 
 .center-transport-surface:disabled { cursor: wait; }
@@ -1448,7 +1456,7 @@ kbd {
 #switch-endpoint { grid-area: switch-endpoint; }
 #step-forward { grid-area: step-forward; }
 #release { grid-area: release; }
-#tag { grid-area: deform; }
+#tag { grid-area: tag; }
 #focus-toggle { grid-area: focus; }
 
 .nav-action {
@@ -1489,6 +1497,39 @@ kbd {
   align-self: center;
 }
 
+.operator-auxiliary-actions {
+  display: grid;
+  width: min(100%, 20rem);
+  align-self: center;
+}
+
+.deformation-action {
+  display: grid;
+  min-height: 38px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-color: rgba(121, 168, 255, 0.38);
+  background: rgba(121, 168, 255, 0.045);
+  text-align: left;
+}
+
+.deformation-action .action-name {
+  justify-content: flex-start;
+}
+
+.deformation-action .action-meta {
+  max-width: 16ch;
+  text-align: right;
+}
+
+.deformation-action[aria-pressed="true"] {
+  border-color: rgba(121, 168, 255, 0.84);
+  background: rgba(121, 168, 255, 0.14);
+  box-shadow: 0 0 0 1px rgba(121, 168, 255, 0.22);
+}
+
 .endpoint-action {
   border-color: rgba(226, 181, 103, 0.52);
   background: rgba(226, 181, 103, 0.08);
@@ -1502,12 +1543,6 @@ kbd {
 .tag-action {
   border-color: rgba(188, 154, 255, 0.52);
   background: rgba(188, 154, 255, 0.075);
-}
-
-
-
-@media (pointer: coarse) {
-
 }
 
 .focus-action {
@@ -1641,37 +1676,6 @@ kbd {
   font-size: 1.25rem;
 }
 
-/* Normalize sits with the Timeline it straightens, not in the operator matrix:
-   it is a way of looking, and the thing it acts on is right there. */
-.timeline-normalize {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  min-height: 28px;
-  padding: 3px 9px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  color: var(--muted);
-  background: #101722;
-  font-size: 0.66rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.timeline-normalize:hover:not(:disabled),
-.timeline-normalize:focus-visible {
-  border-color: rgb(121 168 255 / 0.55);
-  color: var(--text);
-}
-
-.timeline-normalize.active {
-  border-color: rgb(121 168 255 / 0.85);
-  color: var(--text);
-  background: rgb(121 168 255 / 0.14);
-}
-
-.timeline-normalize:disabled { opacity: 0.5; cursor: default; }
-
 .guide-tabs {
   display: grid;
   /* One line, whatever the count. Two fixed columns left a third tab stranded
@@ -1786,7 +1790,7 @@ kbd {
 .guide-item.focused { border-color: rgba(121, 168, 255, 0.45); }
 
 .guide-item.extent-selected {
-  box-shadow: inset 3px 0 0 rgb(var(--interval-rgb) / 0.85);
+  box-shadow: inset -3px 0 0 rgb(var(--interval-rgb) / 0.85);
 }
 
 /* The acquired row is the only one with a filled background, because a fill is
@@ -1797,40 +1801,43 @@ kbd {
   background: rgb(121 168 255 / 0.12);
 }
 .guide-item.retained-selected.extent-selected {
-  box-shadow: inset 3px 0 0 var(--accent), 0 0 0 1px rgb(121 168 255 / 0.5);
+  box-shadow:
+    inset 3px 0 0 var(--accent),
+    inset -3px 0 0 rgb(var(--interval-rgb) / 0.85),
+    0 0 0 1px rgb(121 168 255 / 0.5);
 }
 
 .guide-item.snap-target {
   border-color: rgba(246, 200, 110, 0.66);
-  box-shadow: inset 3px 0 0 var(--pin), 0 0 10px rgba(246, 200, 110, 0.1);
+  outline: 1px dashed rgba(246, 200, 110, 0.78);
+  outline-offset: -3px;
 }
 .guide-item.snap-target.snap-armed {
   border-color: rgba(159, 217, 184, 0.78);
-  box-shadow: inset 3px 0 0 var(--success), 0 0 12px rgba(159, 217, 184, 0.14);
+  outline: 2px solid rgba(159, 217, 184, 0.82);
+  filter: drop-shadow(0 0 5px rgba(159, 217, 184, 0.2));
 }
 .guide-item.snap-source {
   border-color: rgba(246, 200, 110, 0.52);
 }
 .section-item.compressed {
-  background:
+  background-image:
     linear-gradient(
       90deg,
       transparent,
       color-mix(in srgb, var(--section-color) 13%, transparent) 50%,
       transparent
-    ),
-    #0d1219;
+    );
 }
 
 .section-item.expanded {
-  background:
+  background-image:
     linear-gradient(
       90deg,
       color-mix(in srgb, var(--section-color) 12%, transparent),
       transparent 50%,
       color-mix(in srgb, var(--section-color) 12%, transparent)
-    ),
-    #0d1219;
+    );
 }
 
 .guide-item-main {
@@ -1972,11 +1979,6 @@ kbd {
   background: rgba(121, 168, 255, 0.075);
 }
 
-.guide-action-select {
-  border-color: rgba(246, 200, 110, 0.3);
-  background: rgba(246, 200, 110, 0.055);
-}
-
 .guide-section-weight {
   display: flex;
   min-width: 0;
@@ -2002,11 +2004,6 @@ kbd {
 }
 
 .danger-text { color: var(--danger); }
-
-
-
-.section-span-link::before,
-
 
 .guide-scrim { display: none; }
 
@@ -2165,6 +2162,7 @@ kbd {
   .action-name { font-size: 0.74rem; }
   .action-meta { font-size: 0.61rem; }
 
+  .operator-auxiliary-actions,
   .history-actions {
     width: 100%;
     gap: 5px;
@@ -2636,12 +2634,6 @@ kbd {
 
 .guide-nudge:active {
   background: rgba(148, 163, 184, 0.34);
-}
-
-.guide-address-readout {
-  color: var(--text-dim);
-  font-family: var(--mono, ui-monospace, monospace);
-  font-size: 0.7rem;
 }
 
 @media (pointer: coarse) {

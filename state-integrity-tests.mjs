@@ -230,4 +230,4 @@ const clone = value => structuredClone(value);
   assert.ok(html.includes("one unit equals one source second"));
 }
 
-console.log("stabilization invariants passed");
+console.log("State integrity tests passed.");

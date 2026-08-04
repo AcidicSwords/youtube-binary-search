@@ -29,7 +29,10 @@ import {
   previousPin,
   nextPin
 } from "./guide.js";
-import { projectionForModel } from "./timeline-projection.js";
+import {
+  createTimelineProjection,
+  projectionForModel
+} from "./timeline-projection.js";
 import { deriveStepField } from "./step-field-geometry.js";
 import {
   createPlaybackTransport,
@@ -241,6 +244,56 @@ for (const [action, direct] of [
   assert.deepEqual(retained.model, before, `${action} preview must not mutate its source Session.`);
 }
 
+// Preview and commit receive the same effective projection. In particular, a
+// transient deformation bypass may not leave hover geometry on the stored
+// weighted map while the operator commits on the straightened one.
+{
+  const guide = createGuide("bypassed-preview");
+  createSectionFromTimes(guide, 30, 50, {
+    label: "Compressed",
+    weight: 0.5
+  });
+  const source = createSession({ duration: 100, current: 29, guide });
+  const projection = createTimelineProjection({
+    duration: 100,
+    guide,
+    deformationBypass: { kind: "all" }
+  });
+  const rawPreview = previewTransition(source, "refineForward");
+  const effectivePreview = previewTransition(source, "refineForward", {
+    projection
+  });
+  const effectiveCommit = refine(source, "forward", { projection });
+
+  assert.notEqual(
+    rawPreview.session.model.resolution.C,
+    effectiveCommit.session.model.resolution.C,
+    "The fixture must distinguish the stored and bypassed projections."
+  );
+  assert.deepEqual(
+    transitionGeometry(effectivePreview),
+    transitionGeometry(effectiveCommit),
+    "A bypassed Refine preview is the exact transition that commits."
+  );
+
+  const rawGo = goTo(source, 40, { operator: "nativeGo" });
+  const effectiveGo = goTo(source, 40, {
+    operator: "nativeGo",
+    projection
+  });
+  assert.notDeepEqual(
+    rawGo.session.model.resolution,
+    effectiveGo.session.model.resolution,
+    "Native reconciliation must observe the effective projection."
+  );
+  assert.deepEqual(effectiveGo.session.model.resolution, {
+    L: 7,
+    C: 40,
+    R: 62,
+    level: 0
+  });
+}
+
 // Timeline weight does not rewrite the source addresses stored by other models.
 const weightedGuide = createGuide("coherence-weight");
 createSectionFromTimes(weightedGuide, 30, 45, {
@@ -418,4 +471,4 @@ assert.deepEqual(
 assert.equal(packedControls.entries[0].controlCoordinate, 5);
 assert.equal(packedControls.entries[1].controlCoordinate, 5);
 
-console.log("Coherence tests passed: guarded Step, swapped Refine, exact previews, weighted navigation, monotonic playback, history, and uncapped timeline lanes.");
+console.log("Operator coherence tests passed: guarded Step, swapped Refine, exact previews, weighted navigation, monotonic playback, history, and uncapped timeline lanes.");

@@ -3,6 +3,11 @@ import { createSmokeEnvironment, descendants } from "./smoke-harness.mjs";
 
 const env = createSmokeEnvironment();
 const { byId, players, flush, poll, dispatchDocument, currentText } = env;
+const savedFieldBreath = { inner: 3, outer: 12, rate: 0.4 };
+env.localStorage.values.set(
+  "binary-youtube-reader:preferences:v1",
+  JSON.stringify({ fieldBreath: savedFieldBreath })
+);
 
 await import("./app.js");
 window.onYouTubeIframeAPIReady();
@@ -14,12 +19,40 @@ await flush(5);
 assert.equal(currentText(), "Current 0:00");
 assert.equal(byId.get("duration-time").textContent, "1:40");
 
+// New shipped defaults never replace an existing valid Field preference. A
+// non-preset spread remains a real selectable option and the summary derives
+// the same symmetric rate pair the runtime actually uses.
+assert.equal(byId.get("field-inner-offset").value, "3");
+assert.equal(byId.get("field-outer-offset").value, "12");
+assert.equal(byId.get("field-breath-rate").value, "0.4");
+assert.equal(byId.get("panorama-setting-value").textContent, "3–12 s · 0.6× / 1.4×");
+assert.deepEqual(
+  JSON.parse(env.localStorage.values.get("binary-youtube-reader:preferences:v1")).fieldBreath,
+  savedFieldBreath,
+  "Booting with new defaults must not rewrite a valid saved Field relation."
+);
+await poll();
+await flush();
+assert.deepEqual(
+  descendants(byId.get("field-breath-rate")).map(option => option.value),
+  ["0.25", "0.4", "0.5", "0.75"],
+  "A valid saved non-preset spread remains selectable beside the presets."
+);
+
+// Return to the ordinary interaction fixture while retaining the saved-value
+// proof above. Subsequent controls continue to exercise wide manual settings.
+byId.get("field-inner-offset").value = "0.25";
+byId.get("field-inner-offset").dispatch("change");
+byId.get("field-outer-offset").value = "2.5";
+byId.get("field-outer-offset").dispatch("change");
+await flush();
+
 // Tune rejects an empty/invalid Offset without silently converting it to the
 // minimum or leaving the field showing a value the model did not accept.
 byId.get("field-outer-offset").value = "";
 byId.get("field-outer-offset").dispatch("change");
 await flush();
-assert.equal(byId.get("field-outer-offset").value, "10");
+assert.equal(byId.get("field-outer-offset").value, "2.5");
 assert.match(byId.get("status").textContent, /positive number/);
 
 // One breathing-rate pair, not two independent side rates.
@@ -27,18 +60,14 @@ await poll();
 await flush();
 const breathOptions = descendants(byId.get("field-breath-rate"))
   .map(option => option.textContent);
-assert.deepEqual(breathOptions, ["0.75× / 1.25×", "0.5× / 1.5×", "0.25× / 1.75×"],
+assert.deepEqual(breathOptions, ["0.75× / 1.25×", "0.6× / 1.4×", "0.5× / 1.5×", "0.25× / 1.75×"],
   "The Field exposes one symmetric breathing-rate pair per step.");
-assert.equal(byId.get("field-breath-rate").value, "0.5");
-byId.get("field-breath-rate").value = "0.25";
-byId.get("field-breath-rate").dispatch("change");
-await flush();
-await poll();
-assert.equal(byId.get("field-breath-rate").value, "0.25");
+assert.equal(byId.get("field-breath-rate").value, "0.4");
 byId.get("field-breath-rate").value = "0.5";
 byId.get("field-breath-rate").dispatch("change");
 await flush();
 await poll();
+assert.equal(byId.get("field-breath-rate").value, "0.5");
 
 // 0 < inner < outer holds strictly. An inner offset that reaches the outer one
 // describes a Field with no breath, so it is repaired to the midpoint rather
@@ -46,8 +75,11 @@ await poll();
 byId.get("field-inner-offset").value = "40";
 byId.get("field-inner-offset").dispatch("change");
 await flush();
-assert.equal(byId.get("field-inner-offset").value, "5",
+assert.equal(byId.get("field-inner-offset").value, "1.25",
   "The inner offset can never reach or exceed the outer offset.");
+byId.get("field-outer-offset").value = "10";
+byId.get("field-outer-offset").dispatch("change");
+await flush();
 byId.get("field-inner-offset").value = "2.5";
 byId.get("field-inner-offset").dispatch("change");
 await flush();
@@ -208,43 +240,48 @@ byId.get("switch-endpoint").click();
 await flush();
 assert.equal(currentText(), "Current 0:50");
 
-// Step edits the active Interval instead of replacing it. Outward Step extends
-// the Pin-defined region; inward Step shrinks the same region back to its anchor.
+// Rapid opposite Steps are one gesture. Returning to the departure keeps the
+// positive visited envelope as a sparse Step Reversal residue.
 byId.get("step-forward").click();
 await env.delay(150);
 await flush();
 assert.equal(currentText(), "Current 1:00");
 assert.match(byId.get("section-window").textContent, /0:25–1:00/);
 byId.get("step-backward").click();
-await env.delay(150);
+await env.delay(300);
 await flush();
 assert.equal(currentText(), "Current 0:50");
-assert.match(byId.get("section-window").textContent, /0:25–0:50/);
+assert.match(byId.get("section-window").textContent, /0:50–1:00/);
+assert.match(byId.get("return-meta").textContent, /Step Reversal/);
 
 // Switch Endpoint preserves the ordered Interval while transposing its active
 // endpoint and retained search frame. S owns the same operator; Undo remains a
 // separate plain-Z history action outside the matrix.
 byId.get("switch-endpoint").click();
 await flush();
-assert.equal(currentText(), "Current 0:25");
-assert.match(byId.get("section-window").textContent, /0:25–0:50/);
+assert.equal(currentText(), "Current 1:00");
+assert.match(byId.get("section-window").textContent, /0:50–1:00/);
 assert.match(byId.get("switch-endpoint-meta").textContent, /0:50/);
 dispatchDocument("keydown", { key: "s", code: "KeyS" });
 await flush();
 assert.equal(currentText(), "Current 0:50");
 dispatchDocument("keydown", { key: "z", code: "KeyZ" });
 await flush();
-assert.equal(currentText(), "Current 0:25");
+assert.equal(currentText(), "Current 1:00");
 dispatchDocument("keydown", { key: "z", code: "KeyZ" });
 await flush();
 assert.equal(currentText(), "Current 0:50");
+dispatchDocument("keydown", { key: "z", code: "KeyZ" });
+await flush();
+assert.equal(currentText(), "Current 0:50");
+assert.match(byId.get("section-window").textContent, /0:25–0:50/);
 
 // The current Working Interval can own Range without being saved. Leaving restores
 // the preceding Range without adding anything to Guide.
 byId.get("focus-working-section").click();
 await flush();
 assert.equal(byId.get("range-label").textContent, "0:25–0:50");
-assert.equal(byId.get("focused-section-title").textContent, "Working Section");
+assert.equal(byId.get("focused-section-title").textContent, "Working Interval");
 assert.equal(byId.get("sections-list-count").textContent, "0");
 assert.equal(byId.get("range-start-handle").hidden, true,
   "Focus removes the competing spatial Range Start control.");
@@ -260,7 +297,7 @@ byId.get("full-video-range").disabled = false;
 byId.get("full-video-range").click();
 await flush();
 assert.equal(byId.get("range-label").textContent, "0:25–0:50");
-assert.equal(byId.get("focused-section-title").textContent, "Working Section");
+assert.equal(byId.get("focused-section-title").textContent, "Working Interval");
 byId.get("leave-section").click();
 await flush();
 assert.equal(byId.get("range-label").textContent, "0:00–1:40");
@@ -269,7 +306,7 @@ assert.equal(byId.get("range-end-handle").hidden, false);
 assert.equal(byId.get("sections-list-count").textContent, "0");
 assert.match(byId.get("section-window").textContent, /0:25–0:50/);
 
-// Guide owns explicit Section persistence and names the exact Working Section.
+// Guide owns explicit Section persistence and names the exact Working Interval.
 byId.get("section-source").value = "interval";
 byId.get("section-label").value = "Quarter to middle";
 byId.get("section-label").dispatch("input");

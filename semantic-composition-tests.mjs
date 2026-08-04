@@ -82,7 +82,7 @@ composed = goTo(composed, 90, { operator: "timeline" }).session;
 assert.ok(Math.abs(composed.model.interval.departure - beforeDirect) <= EPSILON);
 assert.ok(Math.abs(composed.model.interval.arrival - 90) <= EPSILON);
 
-// Section endpoints are Pin operands. Pin Forward/Back is linear for
+// Section endpoints are Pin operands. Previous/Next Pin is linear for
 // Resolution, but each Pin hop records its own traversal Interval rather than
 // stretching a Working Interval across every crossed Pin.
 const guide = createGuide("semantic-composition");

@@ -84,7 +84,7 @@ for (const id of [
   "section-capture", "section-source", "pin-capture", "pin-current",
   "release", "tag", "focus-toggle", "shift-layer-toggle",
   "step-size-seconds", "step-mode-fixed", "step-mode-adaptive"
-]) assert.match(html, new RegExp(`id=["']${id}["']`), `Missing v5.8 Field/Guide control: ${id}`);
+]) assert.match(html, new RegExp(`id=["']${id}["']`), `Missing Field/Guide control: ${id}`);
 
 assert.match(app, /function applyPlayerEffect\(result[\s\S]*result\?\.interval[\s\S]*startContext\(destination\)/,
   "Committed traversal must invoke automatic Context when enabled.");

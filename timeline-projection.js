@@ -23,18 +23,38 @@ function sectionActsOnSegment(section, start, end) {
     && section.end > start + EPSILON;
 }
 
-function buildSegments(duration, guide, normalize = null) {
+function resolvedDeformationBypass(guide, deformationBypass) {
+  if (deformationBypass?.kind === "all") {
+    return Object.freeze({ kind: "all" });
+  }
+  if (
+    deformationBypass?.kind === "section"
+    && typeof deformationBypass.sectionId === "string"
+    && guide?.sections?.some(section => section.id === deformationBypass.sectionId)
+  ) {
+    return Object.freeze({
+      kind: "section",
+      sectionId: deformationBypass.sectionId
+    });
+  }
+  return null;
+}
+
+function buildSegments(duration, guide, deformationBypass = null) {
   // A Section deforms the map only while its Group is active. Nothing is
   // frozen: an inactive Group simply stops contributing to the density product,
   // so toggling it is exact and instantaneous in both directions.
   const source = guide || { sections: [], pins: [], groups: [] };
-  // Normalize is the inverse of Weight, and the reason Weight is usable at all.
-  // Deformation is right almost all of the time and intolerable the rest, when
-  // you are trying to act on a straight line; without a way out you would stop
-  // deforming rather than fight it. Nothing is stored and no weight changes --
-  // the map is simply drawn and measured as if the named Sections were neutral.
+  // A deformation bypass changes only the effective projection. Stored Weight
+  // remains visible and untouched; every consumer receives this same compiled
+  // set instead of independently deciding which Sections count.
+  const bypass = resolvedDeformationBypass(source, deformationBypass);
   const sections = sortedSections(source)
-    .filter(section => normalize !== "all" && section.id !== normalize)
+    .filter(section => bypass?.kind !== "all")
+    .filter(section => !(
+      bypass?.kind === "section"
+      && section.id === bypass.sectionId
+    ))
     .filter(section => sectionIsActive(source, section))
     .filter(section => Math.abs(activeWeight(section) - 1) > EPSILON);
   const boundaries = [...new Set([
@@ -86,7 +106,8 @@ function buildSegments(duration, guide, normalize = null) {
   return {
     segments: Object.freeze(segments),
     timelineExtent: timeline,
-    weightedSections: Object.freeze(sections)
+    weightedSections: Object.freeze(sections),
+    deformationBypass: bypass
   };
 }
 
@@ -113,16 +134,15 @@ export function createTimelineProjection({
   duration = 0,
   guide = null,
   view = null,
-  // null draws every active Weight; "all" draws none; a Section id draws every
-  // Weight except that one.
-  normalize = null
+  deformationBypass = null
 } = {}) {
   const end = Math.max(0, Number(duration) || 0);
   const {
     segments,
     timelineExtent,
-    weightedSections
-  } = buildSegments(end, guide, normalize);
+    weightedSections,
+    deformationBypass: effectiveDeformationBypass
+  } = buildSegments(end, guide, deformationBypass);
 
   function sourceToTimeline(value) {
     const source = clamp(Number(value) || 0, 0, end);
@@ -274,6 +294,7 @@ export function createTimelineProjection({
     withinView,
     segments,
     weightedSections,
+    deformationBypass: effectiveDeformationBypass,
     sourceToTimeline,
     timelineToSource,
     timelineDistance,
@@ -297,6 +318,6 @@ export function projectionForModel(model, options = {}) {
     duration: model?.duration,
     guide: model?.guide,
     view: model?.focus ? model.range : null,
-    normalize: options.normalize ?? null
+    deformationBypass: options.deformationBypass ?? null
   });
 }

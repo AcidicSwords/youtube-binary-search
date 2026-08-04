@@ -23,7 +23,6 @@ export const SECTION_WEIGHT_VALUES = Object.freeze([
   4
 ]);
 export const DEFAULT_SECTION_WEIGHT = 1;
-export const DEFAULT_DEFORM_WEIGHT = 0.5;
 
 export function isSectionWeight(value) {
   const numeric = Number(value);
@@ -56,7 +55,7 @@ function now() {
 
 // A Group carries two independent relations over its Sections.
 //
-//   visible  -- exactly one Group supplies Sections and endpoint Pins to Timeline
+//   visible  -- zero or one Group supplies Sections and endpoint Pins to Timeline
 //   active   -- any number of Groups may contribute deformation
 //
 // Nothing is frozen, so nothing can go stale: an active Group contributes to the
@@ -80,15 +79,9 @@ function preferredVisibleGroup(guide, preferredId = null) {
     || null;
 }
 
-// Visibility has one spatial owner, and the Guide names it once.
-//
-// It was carried as a boolean on every Group, which made "exactly one Group is
-// visible" a rule about N fields that any mutation could break: two true, or
-// none, are both expressible, and the model was only correct because a repair
-// pass ran after every write. One identity cannot express either fault, so the
-// invariant stops being maintained and starts being structural. Activity stays
-// per-Group, because any number of Groups may be active at once -- that is a
-// genuine set, and a set is what a per-Group field is for.
+// Visibility has at most one spatial owner, named once on the Guide. A null
+// identity deliberately draws no Group. Activity stays per-Group because any
+// number may contribute Weight independently of what is drawn.
 //
 // Keeping the visible Group first also makes the Guide's order state the same
 // relation it renders, rather than maintaining a second presentation-only rule.
@@ -251,60 +244,87 @@ export function assignSectionGroup(guide, sectionId, groupId) {
   return { changed: true, section };
 }
 
-// Deleting a Group returns its Sections to the default rather than destroying
-// them: a Group is an organizing choice, not an owner. The move is refused when
-// it would collapse two distinct layered Sections into one Group identity;
-// silently merging them would destroy a layer, while keeping both would make
-// selection and exact editing ambiguous again.
-// Where a removed Group's Sections go: any surviving Group, preferring the
-// default when it is one of them.
-export function groupDeletionHeir(guide, groupId) {
-  const survivors = (guide?.groups || []).filter(entry => entry.id !== groupId);
-  return survivors.find(entry => entry.id === DEFAULT_GROUP_ID)?.id
+// A Group organizes Sections; it does not own them. Deletion therefore has one
+// explicit plan shared by confirmation, mutation, and reporting. The heir is an
+// actual surviving Group identity, not the conventional word "Map". Refusing a
+// duplicate is equally part of the plan: silently merging layered Sections
+// would destroy one, while retaining both in one Group would make exact editing
+// ambiguous.
+export function groupDeletionPlan(guide, groupId) {
+  const groups = Array.isArray(guide?.groups) ? guide.groups : [];
+  const sections = Array.isArray(guide?.sections) ? guide.sections : [];
+  const group = groups.find(entry => entry.id === groupId) || null;
+  const movedSectionIds = group
+    ? sections
+      .filter(entry => entry.groupId === groupId)
+      .map(entry => entry.id)
+    : [];
+  if (!group) {
+    return {
+      allowed: false,
+      reason: "missing-group",
+      heirGroupId: null,
+      movedSectionIds
+    };
+  }
+
+  // The default Group is ordinary. Only the last surviving Group is protected,
+  // because every retained Section must continue to belong somewhere.
+  const survivors = groups.filter(entry => entry.id !== groupId);
+  const heirGroupId = survivors.find(entry => entry.id === DEFAULT_GROUP_ID)?.id
     || survivors[0]?.id
     || null;
-}
+  if (!heirGroupId) {
+    return {
+      allowed: false,
+      reason: "last-group",
+      heirGroupId: null,
+      movedSectionIds
+    };
+  }
 
-export function groupDeletionBlockReason(guide, groupId) {
-  const group = guide.groups.find(entry => entry.id === groupId);
-  if (!group) return "missing-group";
-  // The default Group is an ordinary Group. Only the last one is undeletable,
-  // because Sections have to belong somewhere and a Guide with no Group could
-  // not say where. Removing any other -- default included -- rehomes its
-  // Sections rather than destroying them.
-  const heir = groupDeletionHeir(guide, groupId);
-  if (!heir) return "last-group";
-  for (const section of guide.sections.filter(entry => entry.groupId === groupId)) {
-    if (findDuplicateSection(
+  const collides = sections
+    .filter(entry => entry.groupId === groupId)
+    .some(section => findDuplicateSection(
       guide,
       section.startPinId,
       section.endPinId,
       section.label,
       section.id,
-      heir
-    )) return "duplicate-section";
-  }
-  return null;
+      heirGroupId
+    ));
+  return {
+    allowed: !collides,
+    reason: collides ? "duplicate-section" : null,
+    heirGroupId,
+    movedSectionIds
+  };
 }
 
 export function deleteGroup(guide, groupId) {
-  if (groupDeletionBlockReason(guide, groupId)) return false;
+  const plan = groupDeletionPlan(guide, groupId);
+  if (!plan.allowed) return plan;
+
   const index = guide.groups.findIndex(group => group.id === groupId);
+  const visibleBefore = guide.visibleGroupId;
   const changedAt = now();
-  const heir = groupDeletionHeir(guide, groupId);
   guide.groups.splice(index, 1);
   for (const section of guide.sections) {
     if (section.groupId !== groupId) continue;
-    section.groupId = heir;
+    section.groupId = plan.heirGroupId;
     section.updatedAt = changedAt;
   }
-  // Removing any Group re-resolves the named layer. When the removed Group was
-  // the drawn one its id no longer resolves and the chain lands on Map; when it
-  // was not, the id still resolves and the drawn layer does not move. One call
-  // covers both, because the fallback lives in the resolution rather than here.
-  enforceVisibleGroup(guide, guide.visibleGroupId);
+
+  // "No Group drawn" remains a deliberate state when an unrelated Group is
+  // removed. If the drawn Group itself disappears, its real heir becomes the
+  // next spatial owner.
+  if (visibleBefore === null) guide.visibleGroupId = null;
+  else enforceVisibleGroup(
+    guide,
+    visibleBefore === groupId ? plan.heirGroupId : visibleBefore
+  );
   guide.updatedAt = changedAt;
-  return true;
+  return plan;
 }
 
 export function createGuide(videoId = null) {
@@ -314,9 +334,8 @@ export function createGuide(videoId = null) {
     pins: [],
     sections: [],
     groups: [],
-    // The one Group the Timeline draws. Named here rather than flagged on each
-    // Group, so "exactly one is visible" is a shape the Guide has instead of a
-    // rule something has to keep restoring.
+    // The optional Group the Timeline draws. One nullable identity makes both
+    // zero and one explicit while making two drawn Groups unrepresentable.
     visibleGroupId: DEFAULT_GROUP_ID,
     updatedAt: now()
   };
@@ -559,11 +578,6 @@ export function partitionGuidePins(guide) {
     (pinIsVisible(guide, pin) ? visible : hidden).push(pin);
   }
   return { visible, hidden };
-}
-
-export function allPins(guide) {
-  const pins = partitionGuidePins(guide);
-  return [...pins.visible, ...pins.hidden];
 }
 
 export function deletePin(guide, pinId) {
@@ -859,60 +873,6 @@ function removeOrphanEndpoint(guide, pinId) {
   if (pin.kind === PIN_KIND.ENDPOINT && !pin.label?.trim()) {
     guide.pins = guide.pins.filter(item => item.id !== pinId);
   }
-}
-
-export function replaceSectionExtent(guide, sectionId, start, end, options = {}) {
-  const section = guide.sections.find(item => item.id === sectionId);
-  if (!section) throw new RangeError("Section not found.");
-
-  const A = clamp(Math.min(start, end), 0, Number.POSITIVE_INFINITY);
-  const B = clamp(Math.max(start, end), 0, Number.POSITIVE_INFINITY);
-  if (!(B > A + EPSILON)) throw new RangeError("A Section requires positive duration.");
-
-  const label = String(options.label ?? section.label ?? "").trim();
-
-  const existingStart = findPinAt(guide, A);
-  const existingEnd = findPinAt(guide, B);
-  if (
-    existingStart
-    && existingEnd
-    && findDuplicateSection(
-      guide,
-      existingStart.id,
-      existingEnd.id,
-      label,
-      section.id,
-      section.groupId
-    )
-  ) {
-    throw new RangeError("A Section with this title and Extent already exists.");
-  }
-
-  const previousStartPinId = section.startPinId;
-  const previousEndPinId = section.endPinId;
-  const startPin = ensurePin(guide, A, {
-    kind: PIN_KIND.ENDPOINT,
-    provenance: options.provenance ? `${options.provenance}:start` : null
-  }).pin;
-  const endPin = ensurePin(guide, B, {
-    kind: PIN_KIND.ENDPOINT,
-    provenance: options.provenance ? `${options.provenance}:end` : null
-  }).pin;
-
-  section.startPinId = startPin.id;
-  section.endPinId = endPin.id;
-  section.label = label;
-  section.provenance = options.provenance ?? section.provenance ?? null;
-  section.updatedAt = now();
-  guide.updatedAt = section.updatedAt;
-
-  for (const pinId of new Set([previousStartPinId, previousEndPinId])) {
-    if (pinId !== startPin.id && pinId !== endPin.id) {
-      removeOrphanEndpoint(guide, pinId);
-    }
-  }
-
-  return resolveSection(guide, section);
 }
 
 export function deleteSection(guide, sectionId) {

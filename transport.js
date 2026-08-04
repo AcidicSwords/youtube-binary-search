@@ -7,6 +7,16 @@ export const TRANSPORT_KIND = Object.freeze({
   PLAYBACK: "playback"
 });
 
+export const OBSERVATION_POLICY = Object.freeze({
+  PANORAMA: "panorama",
+  CENTER_ONLY: "center-only"
+});
+
+export const RATE_POLICY_KIND = Object.freeze({
+  FIXED: "fixed",
+  DYNAMIC: "dynamic"
+});
+
 export function idleTransport() {
   return { kind: TRANSPORT_KIND.IDLE };
 }
@@ -67,6 +77,87 @@ export function createContextTransport({ anchor, range, seconds }) {
   };
 }
 
+function positiveRate(value, fallback = 1) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
+}
+
+export function fixedRatePolicy(wish = 1) {
+  return {
+    kind: RATE_POLICY_KIND.FIXED,
+    wish: positiveRate(wish)
+  };
+}
+
+export function dynamicRatePolicy() {
+  return { kind: RATE_POLICY_KIND.DYNAMIC };
+}
+
+function normalizeRatePolicy(policy) {
+  return policy?.kind === RATE_POLICY_KIND.DYNAMIC
+    ? dynamicRatePolicy()
+    : fixedRatePolicy(policy?.wish);
+}
+
+function normalizeObservationPolicy(policy) {
+  return policy === OBSERVATION_POLICY.CENTER_ONLY
+    ? OBSERVATION_POLICY.CENTER_ONLY
+    : OBSERVATION_POLICY.PANORAMA;
+}
+
+function normalizedOfferedRates(rates) {
+  const offered = [...new Set(
+    (Array.isArray(rates) ? rates : [])
+      .map(Number)
+      .filter(rate => Number.isFinite(rate) && rate > 0)
+  )].sort((a, b) => a - b);
+  return offered.length ? offered : [1];
+}
+
+// Playback-rate distances are multiplicative: 0.5x is as far below 1x as 2x
+// is above it. Resolve a stored wish in that same log space. At an exact
+// geometric midpoint, prefer the offer nearer neutral so the adapter changes
+// the observation as little as possible; the numeric order is only a final,
+// deterministic tie-break for reciprocal offers equally far from neutral.
+export function resolveOfferedRate(wish, rates) {
+  const target = positiveRate(wish);
+  const offered = normalizedOfferedRates(rates);
+  const SCORE_EPSILON = 1e-12;
+
+  return offered.reduce((best, candidate) => {
+    const score = Math.abs(Math.log(candidate / target));
+    const bestScore = Math.abs(Math.log(best / target));
+    if (score < bestScore - SCORE_EPSILON) return candidate;
+    if (Math.abs(score - bestScore) > SCORE_EPSILON) return best;
+
+    const neutralDistance = Math.abs(Math.log(candidate));
+    const bestNeutralDistance = Math.abs(Math.log(best));
+    if (neutralDistance < bestNeutralDistance - SCORE_EPSILON) return candidate;
+    if (Math.abs(neutralDistance - bestNeutralDistance) > SCORE_EPSILON) return best;
+    return Math.min(candidate, best);
+  });
+}
+
+// Dynamic playback rate is the exact inverse of cumulative effective Weight.
+// The projection owns Weight; the media adapter's current offer owns which rate
+// can actually be requested. Transport adds no second set of bounds.
+export function dynamicRateForWeight(weight) {
+  const value = Number(weight);
+  if (!Number.isFinite(value) || value <= 0) return 1;
+  return 1 / value;
+}
+
+export function resolvePlaybackRate(
+  transport,
+  { offeredRates = [1], weight = 1 } = {}
+) {
+  if (transport?.kind !== TRANSPORT_KIND.PLAYBACK) return 1;
+  const wish = transport.ratePolicy?.kind === RATE_POLICY_KIND.DYNAMIC
+    ? dynamicRateForWeight(weight)
+    : positiveRate(transport.ratePolicy?.wish);
+  return resolveOfferedRate(wish, offeredRates);
+}
+
 export function createPlaybackTransport({
   departure,
   parentNeighborhood,
@@ -74,10 +165,13 @@ export function createPlaybackTransport({
   returnModel,
   label = "Playback",
   operator = "playback",
-  rate = 1,
-  dynamic = false
+  observationPolicy = OBSERVATION_POLICY.PANORAMA,
+  ratePolicy = fixedRatePolicy(1),
+  offeredRates = [1],
+  weight = 1,
+  actualRate = 1
 }) {
-  return {
+  const transport = {
     kind: TRANSPORT_KIND.PLAYBACK,
     phase: "starting",
     departure,
@@ -87,16 +181,56 @@ export function createPlaybackTransport({
     returnModel,
     label,
     operator,
-    // The rate this playback owns. A Range wrap continues the same playback and
-    // so keeps it; settling ends the playback and returns Center to 1x.
-    rate,
-    // Whether that rate is read off the map as the playback crosses it. A
-    // dynamic playback re-derives `rate` at every poll; a fixed one never does.
-    dynamic,
+    observationPolicy: normalizeObservationPolicy(observationPolicy),
+    ratePolicy: normalizeRatePolicy(ratePolicy),
+    // requestedRate is the current offer's resolution of ratePolicy. It is a
+    // command candidate, not evidence that the iframe accepted it.
+    requestedRate: 1,
+    // Only the adapter's playback-rate event confirms actualRate.
+    actualRate: positiveRate(actualRate),
     enteredPath: false,
     cycles: 0,
+    retries: 0,
     startedAt: Date.now()
   };
+  return {
+    ...transport,
+    requestedRate: resolvePlaybackRate(transport, { offeredRates, weight })
+  };
+}
+
+export function withPlaybackRequestedRate(transport, requestedRate) {
+  if (transport?.kind !== TRANSPORT_KIND.PLAYBACK) return transport;
+  const rate = positiveRate(requestedRate, null);
+  return rate === null || rate === transport.requestedRate
+    ? transport
+    : { ...transport, requestedRate: rate };
+}
+
+export function withPlaybackActualRate(transport, actualRate) {
+  if (transport?.kind !== TRANSPORT_KIND.PLAYBACK) return transport;
+  const rate = positiveRate(actualRate, null);
+  return rate === null || rate === transport.actualRate
+    ? transport
+    : { ...transport, actualRate: rate };
+}
+
+export function withPlaybackRatePolicy(transport, ratePolicy, options = {}) {
+  if (transport?.kind !== TRANSPORT_KIND.PLAYBACK) return transport;
+  const next = { ...transport, ratePolicy: normalizeRatePolicy(ratePolicy) };
+  return withPlaybackRequestedRate(next, resolvePlaybackRate(next, options));
+}
+
+// Panorama is an observation policy, not a synonym for 1x. The sides are
+// available only while that policy owns playback and the adapter confirms an
+// actual rate compatible with their fixed temporal relation.
+export function playbackAllowsPanorama(transport) {
+  const RATE_EPSILON = 1e-9;
+  return Boolean(
+    transport?.kind === TRANSPORT_KIND.PLAYBACK
+    && transport.observationPolicy === OBSERVATION_POLICY.PANORAMA
+    && Math.abs(positiveRate(transport.actualRate) - 1) <= RATE_EPSILON
+  );
 }
 
 export function rebasePlaybackTransport(
@@ -115,31 +249,19 @@ export function rebasePlaybackTransport(
   };
 }
 
+export function retryPlaybackTransport(transport, startedAt = Date.now()) {
+  if (transport?.kind !== TRANSPORT_KIND.PLAYBACK) return transport;
+  return {
+    ...transport,
+    phase: "starting",
+    enteredPath: false,
+    retries: (transport.retries || 0) + 1,
+    startedAt
+  };
+}
+
 export function withTransportPhase(transport, phase) {
   return transport?.kind === TRANSPORT_KIND.IDLE
     ? transport
     : { ...transport, phase };
-}
-
-// Dynamic playback rate: the exact inverse of cumulative weight.
-//
-// Double the map a Section receives and it plays at half the rate; halve the map
-// and it plays at double. Neutral is its own inverse, so ground nobody deformed
-// plays at the speed it always did. Stated once:
-//
-//   weight x rate = 1
-//
-// which is the same as saying Timeline Space is crossed at a constant speed. The
-// map already claims that expanded ground is bigger; playing it this way is that
-// claim carried into time rather than a second scale invented to sit beside it.
-//
-// The bounds are the player's, not the law's. Past them the relation still holds
-// on the map; the rate simply cannot follow any further, so it stops.
-export const MIN_DYNAMIC_RATE = 0.25;
-export const MAX_DYNAMIC_RATE = 2;
-
-export function dynamicRateForWeight(weight) {
-  const value = Number(weight);
-  if (!Number.isFinite(value) || value <= 0) return 1;
-  return Math.min(MAX_DYNAMIC_RATE, Math.max(MIN_DYNAMIC_RATE, 1 / value));
 }

@@ -7,7 +7,7 @@ import {
   goTo,
   switchEndpoint,
   setRange,
-  returnState,
+  undo,
   pinCurrent,
   saveIntervalAsSection,
   focusSection,
@@ -68,7 +68,7 @@ function assertSessionInvariant(session) {
 
   if (focus) {
     if (focus.kind === "working-section") {
-      assert.ok(focus.extent, "A Working Section focus must retain its projected Extent.");
+      assert.ok(focus.extent, "A Working Interval focus must retain its projected Extent.");
       assert.ok(Math.abs(focus.extent.start - range.start) <= EPSILON);
       assert.ok(Math.abs(focus.extent.end - range.end) <= EPSILON);
     } else {
@@ -103,7 +103,7 @@ for (let run = 0; run < RUNS; run += 1) {
       let end = random() * 480;
       if (start > end) [start, end] = [end, start];
       result = setRange(session, start, end, session.model.resolution.C);
-    } else if (operation === 7) result = returnState(session);
+    } else if (operation === 7) result = undo(session);
     else if (operation === 8) result = pinCurrent(session, random() < 0.2 ? "Pinned" : "");
     else if (operation === 9) result = saveIntervalAsSection(session, `Section ${Math.floor(random() * 20)}`);
     else if (operation === 10) {

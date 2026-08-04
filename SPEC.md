@@ -2,1545 +2,754 @@
 
 ## 1. Authority
 
-This document is normative for v7. Source time is the only persisted temporal truth. Timeline Space is a pure derived spatial coordinate for navigation and layout.
+This document specifies Video Cartography package release **8.0.0**. `package.json` is the release-version authority; the final implementation and its release gates are executable proofs of this specification. A contradiction among code, tests, interface text, and this document is a defect, not an alternative product generation.
 
-### 1.1 Project objective
+The objective is a stable video-comprehension instrument, not an editing suite or framework. Completion preserves these laws:
 
-A video is globally present as a source but locally actualized in playback. At any instant, its frames are linearly ordered and mutually exclusive: only one source moment can occupy the ordinary audiovisual present.
+1. source time remains authoritative;
+2. Timeline Space remains positive and invertible;
+3. depth comes from composition of small primitives;
+4. direct manipulation accepts intuition and resolves to exact canonical state;
+5. advanced mechanisms remain optional;
+6. ordinary video-player functionality remains intact;
+7. operators exclude alternatives and leave one contiguous Working Interval residue;
+8. no operation mutates an unrelated state dimension;
+9. one semantic consequence has one implementation even when multiple routes reach it.
 
-Video Cartography transforms that condition into bounded spatiotemporal availability without changing source order:
+No derived Timeline coordinate, visual lane, gradient, hover, preview, iframe drift, or transient comparison is source truth.
 
-```text
-linear temporal exclusivity
-→ bounded perceptual and spatial availability
-→ retained map
-```
+## 2. State and ownership
 
-The application maintains the usable illusion that the complete video is available as one environment while only a bounded part is being actively perceived or discriminated.
+### 2.1 Canonical source-scoped state
 
-That availability has three complementary forms:
+A loaded Session owns:
 
-- **Field availability** — Tail, Center, and Lead make a bounded temporal neighbourhood perceptually co-present.
-- **Map availability** — Timeline Space makes the complete ordered source spatially present as one deformable terrain.
-- **Guide availability** — Pins and Sections make prior distinctions persist as landmarks and regions.
+- source duration;
+- Range;
+- Current;
+- Resolution and Resolution basis;
+- an optional Working Interval with bounds, orientation, and endpoint frames;
+- optional Focus and its return Range;
+- configured Step Reach;
+- Guide version 9 Groups, Pins, Sections, labels, membership, activity, drawn Group, and Section Weight;
+- bounded Undo history and Redo future.
 
-Range and Resolution bound active perception within that whole. Operators must preserve the relation between the locally instantiated state and the broader available complement.
+The application owns the loaded source identity and the current Session. Guide persistence is keyed by source identity. Session history never crosses a source boundary.
 
-The governing implementation rule is:
+### 2.2 Persisted preferences
 
-> Every operator must produce the smallest state transformation sufficient for its goal and preserve every unrelated state dimension.
+Preferences may persist independently from a source:
 
-An operator is not defined only by what it changes. It is equally defined by what it cannot change.
+- Context duration;
+- Step Reach mode and values;
+- Field Inner Offset, Outer Offset, and breathing-rate spread;
+- Nudge quantum when no exact media frame is available;
+- Shift playback fixed wish and dynamic-policy choice;
+- Panorama enabled state and side visibility.
 
-## 2. State
+Valid saved preferences remain authoritative across release upgrades. Migration may translate a valid legacy representation into the current representation; it may not silently replace a valid choice with a new default.
 
-- **Range** — the admissible source extent. A proper subset of the video is also the native-playback loop operand.
-- **Current** — committed semantic source Address.
-- **Cursor** — transient observed player Address.
-- **Resolution** — `{ backward, current, forward, level }`, stored in source Addresses and interpreted through Timeline Space.
-- **Working Interval** — source-contiguous coverage `{ start, end }` plus active side, endpoint frames, and directed `{ departure, arrival }`.
-- **Pin** — a shared source Address with optional title.
-- **Section** — an edge between two Pins with positive source duration, optional title, and one canonical timeline `weight`.
-- **Focus context** — the containing Range restored by Unfocus.
-- **Step Reach** — independent fixed timeline units or an adaptive fraction of active weighted Range width.
-- **Field Breath** — the configured inner offset \(x\), outer offset \(y\) with \(0 < x < y\), and one symmetric breathing-rate pair.
-- **Nudge quantum** — the configured source-time increment used by fine adjustment, or an adapter-verified frame duration when one is available.
+### 2.3 Transient owners
 
-### 2.1 State dimensions
+The following are intentionally absent from Session history and Guide persistence:
 
-Operator contracts use the following canonical dimensions:
+- Cursor and media-player drift;
+- active Context or Playback transport;
+- requested and confirmed playback-rate runtime;
+- pending Step and Nudge gesture accumulators;
+- Current, Range, Pin, or Section drag state;
+- selected Timeline operand and Guide focus;
+- selected/aligned Pin indicators;
+- Matrix Shift latch, Guide Extend latch, and physical modifier state;
+- deformation bypass;
+- offered Cues and Cue-lane visibility;
+- open panels, dialogs, cluster menus, hover, focus, and preview state;
+- Field Frame transition revision, Field Breath phase, and side-player synchronization.
 
-| Dimension | State | Meaning |
-|---|---|---|
-| availability | Range and Focus context | what source territory is admissible |
-| commitment | Current | where semantic traversal is committed |
-| observation | Cursor and transport phase | what source moment is physically observed |
-| discrimination | Resolution and basis | the active scale and neighbourhood |
-| traversal coverage | Working Interval extent | what continuous crossing has been retained |
-| traversal orientation | departure, arrival, active side, endpoint frames | which side of that crossing owns the viewpoint |
-| topology | Pins, Sections, shared references | persistent landmarks and regions |
-| metric | Section weights and derived Timeline Space | how much map distance content receives |
-| movement magnitude | stored Step Reach and derived effective Reach | how far Step moves |
-| traversal provenance | `lastOperator` | which committed spatial grammar owns the next three-frame interpretation |
-| perceptual horizon | Field Frame addresses, breathing offsets, rates, Hold state | what nearby moments are perceptually co-present |
-| reversibility | history and future | which semantic transformations can be restored |
+Each transient has one owner and one settlement or cancellation boundary. A timer cannot checkpoint state after its source or gesture owner has changed.
 
-Derived values are not stored dimensions. In particular:
+### 2.4 Minimal transforms
 
-- changing Section weight may change projected positions, spatial midpoints, and adaptive effective Reach without changing any source Address or stored Step Reach;
-- moving Current may translate Field panes physically without allowing Field state to write Session state;
-- presentation selection, hover, preview, and viewport state are not semantic
-  dimensions; `lastOperator` is traversal provenance, while the preview
-  geometry derived from it remains presentation.
+An operation is defined both by what it changes and what it preserves. Presentation-only actions issue no semantic checkpoint. Media events update only media-owned facts unless a defined transport settlement converts observation into one Session transaction. Guide metadata changes issue no player command unless Current or Range also changes as an explicit consequence.
 
-## 3. Source time and Timeline Space
+## 3. Source geometry
 
-```text
-σ  Source Time      player, persistence, Range, Current, Cursor,
-                    Working Interval, Pins, Sections, Field geometry
+### 3.1 Source Time
 
-x  Timeline Space   map position, Step distance, Refine midpoints,
-                    adaptive Reach and visual layout
-```
-
-Each Section weight is selected from:
+Every durable temporal value is a finite source Address. Source order and duration are immutable for one loaded source. All accepted state must satisfy:
 
 ```text
-W = {0.125, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 4}
+0 ≤ Address ≤ duration
+Range.start ≤ Current ≤ Range.end
+Range.start < Range.end, except the empty unloaded state
 ```
 
-The interior of the ladder mirrors the familiar Tail/Lead rate scale, and the two ends extend past it: `0.125` folds a Section nearly out of the way, `4` opens one far past ordinary inspection. A weight is a property of the map and nothing else: setting one moves nothing, plays nothing, and reaches no player.
+An interface may clip a pointer candidate as it meets a physical boundary. Exact numeric input does not reinterpret the entered value.
 
-One thing reads the map back as a rate, and only by being asked to. Shift playback set to follow weight derives its rate from `ρ` at the Address it is watching — the map is the input, not the output, and turning that mode off leaves weight with no playback consequence at all.
+### 3.2 Range, Resolution, Current, and Cursor
 
-At source Address \(u\), let the effective spatial density be the product of every Section weight covering that Address:
+**Range** is the contiguous source universe currently admissible to ordinary navigation. Full Video is `[0, duration]`. A proper Range excludes at least one full-video boundary.
 
-\[
-\rho(u)=\prod_{S_i \ni u} w_i
-\]
-
-With an empty product equal to one, Timeline Space is:
-
-\[
-x(\sigma)=\int_0^\sigma \rho(u)\,du
-\]
-
-This is equivalent to a piecewise-linear map whose slope changes only at Section endpoints. Because every factor is positive, \(x\) is continuous, strictly increasing, and has one ordinary inverse. No source Address can coincide with, hide behind, or become unreachable from another.
-
-For one isolated Section of source duration \(d\), its timeline extent is \(w d\). Overlapping scales compose multiplicatively because independent spatial scale transforms compose by multiplication. The selected Section values remain canonical even when their local product is outside the selector ladder.
-
-### Reporting spatial extent
-
-Timeline Space is not a duration and must never be reported as one. A spatial extent only means something against the source extent it stretches, so every spatial figure is presented as the factor it applies to its own source span:
+**Resolution** is an ordered neighborhood `{L, C, R}` with a basis of `range` or `movement`:
 
 ```text
-stretch(a, b) = x(b) − x(a)  /  (b − a)
+Range.start ≤ L ≤ C ≤ R ≤ Range.end
+Current = C
 ```
 
-At `1` the map and the source correspond exactly and the factor is omitted rather than shown, because there is nothing to report. A one-minute source containing one 15 s Section at `2×` reads `1:00 · 1.25× spatial`: traversing it with spatial operators covers a quarter more map than source. Two disjoint 15 s Sections at `0.5×` and `1.5×` cancel, so the same source reads `1:00` with no factor at all — the interior warps while the whole traversal costs exactly what it did before.
+Refine descends within this neighborhood. Reopen restores `{Range.start, Current, Range.end}`. Step translates a neighborhood by a Timeline-space distance while retaining a valid bounded frame. Direct Go seeds a movement-scale neighborhood from departure to destination.
 
-The factor is reported at each scope against that scope's own source span: the whole source, the active Resolution, and the Range that Reopen would restore.
+**Current** is committed semantic position. **Cursor** is observed physical position. Polling Cursor must not rewrite Current. A defined transaction—Go, Step, Refine, or Playback settlement—owns any semantic conversion.
 
-## 4. Section-weight law
+### 3.3 Subtractive Working Interval
 
-Changing a Section weight:
+Range begins as the admissible universe. Navigation and search exclude alternatives from the current relation. The **Working Interval** is the positive contiguous residue that survives those exclusions.
 
-- moves no Pin, Section endpoint, Range boundary, Current, Cursor, Resolution Address, or Working Interval Address;
-- changes only the derived Timeline Space positions and distances;
-- never changes source duration, playback order, Context, or Field Offset;
-- issues no player command of its own, and changes no stored rate;
-- preserves ordinary source order and direct reachability;
-- becomes spatially neutral at `1×`.
+It stores:
 
-The deformation display is a projection of the same weight, not a second value:
+- ordered source bounds `start < end`;
+- directed `departure` and `arrival`;
+- active side and direction;
+- the operator and medium that established it;
+- endpoint frames sufficient for Switch Endpoint.
 
-- each non-neutral Section contributes a soft influence centered at its
-  projected midpoint and fading beyond its endpoints;
-- hue records sign: compression below `1×` and expansion above `1×`;
-- peak strength records the magnitude of the Section’s signed log weight;
-- overlapping influences add in log space, the visual counterpart of
-  multiplicative weight composition;
-- projected source-time contours retain the exact metric and make local density
-  visible independently of the softened atmosphere.
+It does not store a persistent path, visited-address ledger, exclusion tree, or object set. Composition resolves to the same two-bound representation.
 
-## 5. Operator laws
+Plain Refine and consecutive Step operations retain an established anchor while that anchor remains outside the newly traversed path. When a reversal reaches or passes the retained departure, the complete Current-to-target movement becomes the new residue; the old departure cannot be reused to erase part of the movement.
 
-### Refine
+A pending Step sequence may transiently record `visitedMinimum` and `visitedMaximum`. At settlement:
 
-Refine chooses the directional midpoint of the active Resolution in Timeline Space, increments `level`, and retains the usable Working Interval departure until the new movement reaches it:
+- one sequence creates one Undo transaction;
+- net forward or backward displacement receives the corresponding Step label;
+- a return to departure with positive visited extent is **Step Reversal** and retains that visited envelope with a deterministic active side;
+- the transient envelope is then discarded.
 
-1. use `Interval.departure` when `Interval.arrival === Current`;
-2. if the Current-to-target path reaches or passes that departure, rebase at pre-movement Current;
-3. otherwise retain the departure;
-4. bound the resulting departure-to-arrival extent;
-5. expand only the receding Resolution bound enough to contain it;
-6. preserve the refinement increment.
+Reopen restores excluded discrimination alternatives. Undo restores prior canonical state. Release clears the active residue. None requires a new persistent path type.
 
-Positive Timeline Space guarantees a valid spatial midpoint for every positive source span.
+### 3.4 Timeline Space
 
-### Local Refine (`Shift+Refine`)
-
-Local Refine uses the same directional midpoint and child-frame calculation,
-then records exactly the new pre-movement Current-to-target traversal. It never
-inherits the previous Working Interval departure. Therefore, when the midpoint
-lies inside an existing Working Interval, Local Refine preserves the
-complementary half from Current to that midpoint; plain Refine preserves the
-established anchor instead.
-
-Example on an unweighted normalized Range:
+For every active effective Section factor:
 
 ```text
-Refine:        50 → 25 → 12.5    Interval 50 → 12.5, frame {0,12.5,50}
-Local Refine:  50 → 25 → 12.5    Interval 25 → 12.5, frame {0,12.5,25}
-reverse Refine target             31.25
+density at source Address t = product of weights covering t
+Timeline(t) = integral from 0 to t of density
 ```
 
-Weighting changes which source Address occupies a spatial midpoint; it does not add an operator exception.
+Allowed Weights are positive, so every segment density is positive. The resulting map is continuous, strictly increasing, and singly invertible.
 
-### Step
-
-Step translates Current by the effective Reach in Timeline Space and clamps the result to Range. It preserves a usable departure, so repeated movements extend, shrink, collapse, and redraw one Working Interval predictably.
-
-The approached Resolution endpoint remains fixed while its prospective midpoint has at least one complete Step of headroom. Once a further Step would consume that guard, only the approached endpoint advances far enough to restore one Step of midpoint headroom.
-
-Step Reach is:
-
-- fixed: independently entered backward and forward spatial distances;
-- adaptive: `weightedRangeWidth × fraction`, with `1/32`, `1/16`, and `1/8`.
-
-Hold, Stretch, and Section weight editing cannot write Step Reach.
-
-Movements that arrive inside the tap-settle window coalesce into one sequence
-however the Step is engaged — hotkey, control press, or Enter on a focused
-control. A route may differ in how it acquires the movement; it may not decide
-how much history the movement leaves behind. One such sequence commits exactly
-one transaction once it has moved at all. Net
-displacement does not decide whether the transaction exists. Undo is owed to the
-movements whose counter-movement is awkward, imprecise, or several operations
-long, and a sequence of presses is undone by as many presses as it took however
-it happened to end up; withholding history because one particular inverse was
-cheap would make the rule depend on the path rather than on the operation. A
-sequence that returns to its origin therefore still records, still leaves its
-Working Interval, and still observes its arrival Address like any other Step.
-
-One settled sequence is named by its net displacement rather than by the press
-that opened it: `Step Forward`, `Step Backward`, or `Step Reversal` when the net
-displacement is zero. Forward once and backward twice is a `Step Backward`.
-
-### Pin traversal
-
-Pin traversal applies Step’s interval-anchor law to the next source-ordered retained Pin that is currently drawn on the Timeline. Standalone Pins are always drawn; section-bound Pins are drawn while at least one referencing Section belongs to the drawn Group; with no Group drawn, none is. Hidden Pins remain exact Guide targets but are not traversal stops. Range Start and Range End are synthetic stops and are deduplicated by visible real Pins at the same Address.
-
-### Pin selection and Section ownership
-
-Visible endpoint indication is derived from the Working Interval. A visible Pin
-coincident with its Start or End is indicated automatically; hidden Pins are
-never promoted into Timeline operands by that derivation. Clicking a Timeline
-Pin moves Current to its Address and selects that spatial operand without
-creating or altering the Working Interval. Clicking the same Pin in the Guide
-moves Current to the same Address and focuses its Guide row, but does not create
-a Timeline selection. Neither route changes Pin identity.
-
-Sections move together at a bound only when they reference the same Pin ID.
-Unlinking one Section endpoint creates an independent coincident Pin and rewires
-only that edge. Unlink preserves source Address and Section weight and stores no
-hidden return target. A referenced Pin links only through direct spatial
-manipulation after its edge is independent: while it is dragged within a
-16-pixel acquisition radius of another valid Pin, that Pin becomes a candidate.
-The candidate must remain stable for 450 ms before it arms; release then aligns
-and merges the source identity into the target. Leaving the radius, crossing to
-another candidate, or releasing before arming commits ordinary movement only.
-A Pin already shared by multiple Sections cannot be a link source; Unlink first
-chooses the one edge whose ownership may change. A link is
-rejected if it would collapse or reverse a Section, duplicate a Section, or
-silently discard a conflicting non-empty Pin title.
-
-### Reopen
-
-Reopen restores Resolution endpoints to Range around unchanged Current and preserves the Working Interval.
-
-### Switch Endpoint
-
-Switch swaps departure and arrival, makes the new arrival Current, and restores that endpoint’s frame. Ordered extent and source Addresses remain unchanged. Two Switch operations restore the previous model exactly.
-
-### Release
-
-Release sets the Working Interval to null and moves nothing. Release with a null Working Interval creates no history.
-
-### Deform
-
-Deform requires a positive-duration Working Interval or a selected Section and a canonical weight:
-
-- it reuses exact endpoint Pins;
-- creates or reuses the matching Section when necessary;
-- assigns the selected Section weight;
-- preserves the Working Interval;
-- makes `1×` neutral without deleting the Section.
-
-Changing weight from the operator matrix or Guide uses the same Session transaction.
-
-The input grammar separates normalization from tuning:
-
-The operator matrix carries `T` Tag where Deform used to sit. Deform did three jobs — retain an extent, assign it a Weight, and cycle a ladder — which is why it was the only operator with an Alt chord, and why it became the habitual way to make a Section when the act you wanted was retention. Tagging is now its own operator, Weight is assigned in the Guide where the value lives, and `X` normalizes.
-
-### Normalize
-
-Normalize is the inverse of Weight, and what makes Weight usable at all. Deformation is right almost all of the time and intolerable the rest, when you want to act on a straight line; without a way out you would stop deforming rather than fight it, so the way out is one key with no modifier.
-
-`X` normalizes. Scope follows what is acquired: a selected Section straightens alone, and with nothing acquired the whole Timeline does. Releasing the Working Interval releases the acquired operand with it, which is what makes "nothing acquired" reachable.
-
-It is a way of looking, not an edit. No Weight changes, nothing is stored, and it records no transaction — so it costs nothing to normalize before a drag and restore afterwards. It reaches the map through the one projection every operator measures with, so a Timeline drawn straight is also measured straight: a map drawn flat while Step still counted the deformation would land every movement somewhere other than where it was drawn.
-
-- plain `X` toggles a weighted Section to `1×` and restores its remembered
-  non-neutral factor when pressed again;
-- Weight is assigned in the Guide, on the Section it belongs to. The operator
-  matrix carries no Weight control, so no operator needs a chord to escape one.
-
-Timeline presentation renders all active Section factors as one continuous
-field. The atmosphere expresses sign, log magnitude, midpoint, and softly
-diluted span without claiming an extra boundary; the same weight is visually
-more concentrated over a narrow Section and more diffuse over a broad Section.
-Contour placement expresses the exact composed density. Presentation orders
-Pins above the weighted track and source ruler, with the Section relationship
-tree below. Individual Sections remain thin selectable Start/midpoint/End wires
-rather than weight bars; dotted relations are presentation only.
-
-### Focus / Unfocus
-
-Focus installs a Section or Working Interval as Range without changing any Section weight. Unfocus restores the containing Range exactly.
-
-Focus is the operator that makes a relation *become the world*, so while it is held the map is drawn across the focused extent alone: the focused Section or Working Interval spans the whole timeline whatever its Weight. A `0.5×` Section and a `4×` Section both fill the timeline once focused, because a focused extent no longer competes for map distance — it *is* the map.
-
-This is the viewport, and it is presentation only:
-
-- it never enters `x(σ)`, its inverse, Step distance, Refine midpoints, adaptive Reach, or any stored value;
-- an ordinary Range does not take it, because admissible territory is still territory inside a visible world;
-- Timeline hit-testing and dragging use the same viewport the map is drawn with, so a pressed position always addresses what is drawn under it;
-- Unfocus restores the whole map exactly.
-
-Weight still decides how map distance is distributed *inside* a focused extent, so a focused Section containing an unevenly weighted interior still warps internally.
-
-### Go
-
-Timeline Go converts one visible Timeline Space coordinate through the unique inverse. Guide Go targets an exact source object. Neither mutates Section weights.
-
-Every non-zero Go records the complete departure-to-arrival Working Interval and seeds a movement-scale Resolution around it. In Timeline Space, the Working Interval occupies the central fifth: two equal Interval-width margins precede it and two follow it. Range clipping removes unavailable margin without shifting the Interval or compensating on the other side.
-
-### Playback and Context settlement
-
-Playback actualizes source continuity. Cursor moves physically while Current remains semantic until settlement. Settlement translates the active Resolution through the observed path and unions watched source coverage into the Working Interval; it never shortens prior coverage.
-
-Context is bounded observation around Current, and it is transient without exception: it commits nothing. It ends by completing its window, by being superseded by the next traversal, by being turned off, or by yielding to the play command — and in every case Current is exactly where it was. Placing Current exactly is what dragging it, nudging it, and editing its Address are for.
-
-Play carries a rate. The plain command plays Center at `1×` with the Panorama; the Shift command plays Center at the configured Shift rate with the Panorama suspended. It is one command with a modifier, not two commands: either engagement pauses a running playback, and either may be issued from the key or from the Center transport surface.
-
-The rate belongs to the playback, not to the player. A proper-Range wrap continues the same playback and so keeps its rate; settling any playback returns Center to `1×`. Choosing a different rate while a Shift playback runs retunes that playback rather than beginning another.
-
-Tail and Lead hold a fixed offset from Center by playing the same material at the same rate, so no side rate preserves that relation once Center's rate changes. The Panorama therefore suspends for the duration of a playback whose rate is not `1×`. This is stated as a condition on the Field rather than as a command issued once, so it holds for as long as the rate does. Variable-speed playback is a capability an ordinary video player has; the Panorama is an experiment, and an experiment does not get to cost the reader an established capability. If all else fails, this system is still a video player.
-
-Shift plays at one of two things: a fixed rate, or a rate that follows the map. Following weight makes rate the exact inverse of cumulative weight `ρ`:
+The canonical Weight ladder is:
 
 ```text
-ρ × r = 1
+0.125×, 0.25×, 0.5×, 0.75×, 1×,
+1.25×, 1.5×, 1.75×, 2×, 4×
 ```
 
-Double the map a Section receives and it plays at half the rate; halve the map and it plays at double. Neutral is its own inverse, so ground nobody deformed plays at the speed it always did, and following weight never makes an unweighted video behave strangely. Equivalently: Timeline Space is crossed at a constant speed. The map already claims expanded ground is bigger; playing it this way carries that claim into time rather than inventing a second scale beside it.
+Overlaps compose by multiplication. Their logarithms add, so composition is order-independent and requires no Section priority. `1×` contributes identity.
+
+Timeline extent is spatial, not temporal duration. A Section with source duration `d` under one isolated Weight `w` receives `w × d` Timeline units. Playback duration remains `d`.
+
+### 3.5 Focus and viewport
+
+Focus installs an acquired Section or Working Interval as Range and saves the containing Range for Unfocus. The focused extent also becomes the viewport, so it fills the drawn Timeline at every Weight.
+
+Viewport changes presentation only. It cannot alter source↔Timeline conversion, Step, Refine, Reach, Weight, or deformation-bypass state. Spatial Range-boundary edits that would change the world defining Focus are refused with a reason. Exact editing of a focused saved Section may rebase that Focus through the Guide’s canonical operation.
+
+## 4. Retained topology and effective projection
+
+### 4.1 Pins and Sections
+
+A Pin owns one source Address and identity. A Section owns two Pin IDs, an optional title, one Group ID, one canonical Weight, provenance, and timestamps. Its resolved extent is the ordered pair of its endpoint Addresses and must have positive duration.
+
+Shared Pin identity is topology. Moving one shared Pin updates every referencing Section. Coincident Pin Addresses do not imply shared identity. Moving a Section translates only its two endpoint Pins; unrelated interior Pins do not move. Structural bounds prevent a move from collapsing or reversing any incident Section.
+
+Deleting a referenced Pin requires an explicit cascade that dissolves all referencing Sections in the same transaction. Unlinking one shared endpoint creates a new endpoint Pin at the same Address. Relinking is permitted only when:
+
+- the source Pin has one Section reference;
+- source and target are distinct and coincident at commit;
+- replacement preserves positive geometry;
+- it creates no duplicate Section in the destination Group;
+- labels do not conflict.
+
+Pointer proximity alone never links. A visible snap candidate must remain inside the threshold until its arm delay completes, and release then commits movement and linking as one semantic consequence.
+
+### 4.2 Groups
+
+Every Section belongs to exactly one ordinary Group. Group labels are unique. The default Group is not privileged except as a fallback identity in recovery.
+
+Two independent relations exist:
+
+- **drawn** — zero or one Group supplies Section wires and endpoint Pins to the Timeline;
+- **active** — any number of Groups may contribute Section Weight.
+
+No Group drawn is valid. Hiding the drawn Group does not promote another Group and does not deactivate it. Therefore landmarks may disappear while their active deformation remains.
+
+Group deletion uses one plan shared by confirmation, mutation, status, tooltip, and tests:
+
+```js
+{
+  allowed,
+  reason,
+  heirGroupId,
+  movedSectionIds
+}
+```
+
+The last Group cannot be deleted. A deletion that would create a duplicate Section in the heir Group is refused. Otherwise all member Sections move to the actual reported heir; no conventional Group name may substitute for that identity.
+
+### 4.3 One effective projection
+
+One immutable projection is built for a render or semantic operation. Its contributors and piecewise segments are resolved after:
+
+1. Group activity;
+2. canonical Section Weight;
+3. the current deformation bypass.
+
+The same projection supplies:
+
+- source→Timeline and Timeline→source mapping;
+- Timeline distance and spatial midpoint;
+- Step and Refine metric;
+- adaptive Reach;
+- hit testing and pointer-to-source drag conversion;
+- Range-handle and retained-object spatial movement;
+- section and Pin placement;
+- spatial readouts;
+- exact source-time contours;
+- deformation atmosphere contributors;
+- optional Dynamic Playback Weight.
+
+An operation or drag captures the projection it begins with. Its geometry cannot change underneath its pointer or repeat sequence. A projection-changing action must wait for, settle, cancel, or refuse an active direct-manipulation owner.
+
+### 4.4 Deformation-bypass law
+
+The only transient bypass state is:
+
+```ts
+type DeformationBypass =
+  | null
+  | { kind: "all" }
+  | { kind: "section"; sectionId: string };
+```
+
+`X` invokes **Toggle Deformation**:
+
+- an acquired Timeline Section resolves scope `{kind: "section", sectionId}`;
+- any other selection state resolves `{kind: "all"}`;
+- the same resolved active scope restores deformation;
+- a different scope transfers the single bypass;
+- the command changes no stored Weight, Guide state, player setting, history, or persisted preference.
+
+Guide focus alone never supplies the Section scope. Bare Timeline Go clears the acquired operand before navigation, making complete-map scope directly reachable.
+
+The bypass is source-scoped. Source replacement clears it. Deleting its target clears it. An invalid target self-clears. Group visibility or activity changes do not mutate it. Undo and Redo do not own it. Release preserves it.
+
+An active Current, Range, Pin, or Section drag causes `X` to refuse safely. Pending Step and Nudge settle before the projection changes. Active playback continues. `X` issues no direct media command; an explicitly dynamic playback may request a new rate later because its policy reads the changed effective projection.
+
+### 4.5 Atmosphere and contours
+
+The deformation atmosphere is derived only from `projection.weightedSections` or an equivalent effective-contributor output. It never rereads raw active Guide weights independently.
+
+- Weight below `1×` contributes violet compression influence.
+- Weight above `1×` contributes teal expansion influence.
+- Hue states sign; log-magnitude states peak strength; source span diffuses the influence; each contribution fades beyond its bounds.
+- Overlap composes in log space, matching multiplicative geometry.
+- Contours begin at uniform source increments and are projected through the exact map. Their screen spacing is metric evidence.
+
+With complete-map bypass, segments are identity, contours are evenly spaced, no compression or expansion class is present, and no colored atmosphere remains. Stored Section wires and Guide Weight values remain visible and unchanged. With a Section bypass, only that contribution disappears; overlapping effective Sections remain.
+
+## 5. Operator grammar
+
+### 5.1 Exact matrix
+
+The visible, physical, keyboard, preview, and documented matrix is exactly:
 
 ```text
-ρ     0.5    0.75    1     1.5     2      4
-r      2×    1.33×   1×    0.67×   0.5×   0.25×
+Q  Refine Backward    W  Reopen            E  Refine Forward
+A  Step Backward      S  Switch Endpoint   D  Step Forward
+R  Release            T  Tag               F  Focus / Unfocus
 ```
 
-The bounds are the player's, not the law's. Outside `0.25×`–`2×` the relation still holds on the map and the rate simply stops following, so very small and very large weights share the extreme rates. Between them the exact inverse is snapped to the nearest rate the player offers, which is what supplies the buckets: they are the player's rungs rather than a scale of this system's own invention.
+The semantic rows are:
 
-A dynamic playback re-derives its rate at the Address being watched, so it changes as playback crosses Section boundaries; only a change of offered rate reaches the player. It suspends the Panorama for its whole duration, including over neutral ground, because the rate is going to change at the next boundary and a Panorama that folded and unfolded around it would be worse than one that stays out of the way.
+1. discriminate;
+2. traverse or change viewpoint;
+3. resolve the current relation into absence, retained structure, or active scope.
 
-The offered rates are exactly the rates the player reports it can play. No ladder is assumed, and the offer is re-read rather than trusted once: a player commonly reports only `1×` until it has actually entered playback, and unknown is not the same as unsupported. The stored rate is a wish, snapped to the nearest offered rate at the moment it is used, so it returns to what it asked for as soon as that rate is genuinely available.
+The canonical action identities and shifted meanings are:
 
-### Field Frame
+| ID | Key | Visible action | Shift meaning |
+| --- | --- | --- | --- |
+| `refine-backward` | `Q` | Refine Backward | Local Refine Backward |
+| `reopen` | `W` | Reopen | unchanged |
+| `refine-forward` | `E` | Refine Forward | Local Refine Forward |
+| `step-backward` | `A` | Step Backward | Previous Pin |
+| `switch-endpoint` | `S` | Switch Endpoint | unchanged |
+| `step-forward` | `D` | Step Forward | Next Pin |
+| `release` | `R` | Release | unchanged |
+| `tag` | `T` | Tag as Pin | Tag as Section |
+| `focus-toggle` | `F` | Focus / Unfocus | unchanged |
 
-The Field Frame is the stable Tail–Center–Lead presentation used outside
-ordinary Center playback:
+Toggle Deformation is an auxiliary `X` action inside Operators and outside the square matrix. Weight is edited on its Section in Guide.
+
+### 5.2 Shift ownership
+
+Three inputs may supply Shift semantics:
+
+- physical Shift is global for the current action and consumes no latch;
+- the Matrix Shift latch belongs only to Matrix Refine, Step, and Tag;
+- Guide Extend belongs only to Guide/Cue composition.
+
+Only the matching latched owner may be consumed, and only when that latch actually supplied a modified action:
+
+```js
+consumeShiftLayer(owner)
+```
+
+An unrelated plain action preserves both latches. Matrix and Guide cannot consume one another. Source transition clears both.
+
+### 5.3 Refine Backward / Refine Forward
+
+Refine targets the Timeline-space midpoint from Current toward the corresponding Resolution side and descends to finer Resolution. It uses the effective projection.
+
+Plain Refine retains the Working Interval departure while the target remains on the same traversed side and the departure remains outside the new Current-to-target movement. A reversal that reaches or crosses the retained departure draws the complete immediate movement instead.
+
+`Shift+Q` and `Shift+E` perform **Local Refine**. Local Refine uses the same midpoint but always retains the immediate Current-to-target traversal. Refine changes neither Guide topology nor Weight.
+
+### 5.4 Reopen
+
+Reopen sets Resolution to `{Range.start, Current, Range.end}` and basis to Range. It preserves Current, Working Interval, Focus, Guide, Weight, selection, and deformation bypass. It is unavailable when Resolution already spans Range.
+
+### 5.5 Step Backward / Step Forward
+
+Step moves a configured distance through Timeline Space using the effective projection. The target is clipped to Range. The source-time displacement therefore varies with density while the requested map distance remains stable.
+
+Reach may be:
+
+- fixed directional Timeline units, linked by the interface for symmetric ordinary use; or
+- adaptive `1/32`, `1/16`, or `1/8` of the active Range’s effective Timeline width.
+
+Adaptive Reach recomputes when Range, Weight, activity, or bypass changes. Fixed Reach does not.
+
+Pressed, held, repeated, and quickly tapped routes use one Step gesture owner. Current and physical players move immediately; history and automatic Context settle once. A reversal retains the transient visited envelope as specified in §3.3.
+
+Shifted Step traverses to the previous or next visible Pin stop or synthetic Range boundary. It uses Step’s same Working Interval and endpoint-frame law; it is not a separate Go operation.
+
+### 5.6 Switch Endpoint
+
+Switch Endpoint requires a Working Interval. It makes the opposite bound Current, flips the active side and orientation, and restores the Endpoint Frame owned by that bound. It preserves the Interval extent, Range, Guide, Weight, Focus, and bypass.
+
+### 5.7 Release
+
+Release clears:
+
+- the Working Interval, if present;
+- the acquired Timeline operand.
+
+It preserves Current, Resolution, Range and Focus, Guide focus, Pins, Sections, Groups, Weight, deformation bypass, Field preferences, and playback preferences.
+
+Clearing a semantic Working Interval creates one Undoable Session transaction. Clearing only presentation selection succeeds without history.
+
+### 5.8 Tag
+
+Tag has exactly two forms:
 
 ```text
-Tail | Center | Lead
+T         Tag as Pin      operand: Current
+Shift+T   Tag as Section  operand: Working Interval
 ```
 
-It is not a semantic operator. It is a perceptual projection of the state
-produced by an operator, by Context, or by a direct manipulation. Center equals
-Current except while Context transport is displaying its Cursor or a direct
-manipulation is displaying a candidate position.
+The visible label follows physical or Matrix Shift state, never the accidental presence of a Working Interval:
 
-#### Frame ownership
+- unshifted label: `Tag as Pin`;
+- unshifted metadata: `Current <Address> → Pin`;
+- shifted label: `Tag as Section`;
+- shifted metadata: `<Working Interval> → Section`.
 
-The next settled Frame is resolved once per semantic movement.
+Plain Tag remains available while an Interval exists and still retains Current as a Pin. Shifted Tag is disabled without a positive Working Interval. An exact duplicate creates no second object or history; it selects and reports the existing Pin or Section. A newly retained Section enters the currently drawn Group, falling back to the ordinary default Group when none is drawn.
 
-When Context is enabled:
+Before retention the source object is always called a Working Interval. Section names only the retained result.
 
-```text
-Tail   = bounded Context Start
-Center = Current
-Lead   = bounded Context End
-```
+### 5.9 Focus / Unfocus
 
-When Context is disabled, the current operator supplies the framing:
+Focus chooses an acquired Timeline Section when available, otherwise a positive Working Interval. It installs that extent as Range and viewport and stores the containing Range. Current remains if already inside; otherwise it moves to an effective spatial midpoint. Focus changes neither Weight nor deformation bypass.
 
-```text
-Step/default = exact weighted Backward target | Current | exact Forward target
-Refine       = next weighted backward midpoint | Current | next forward midpoint
-Reopen       = reopened backward midpoint | Current | reopened forward midpoint
-Section      = Start | midpoint Current | End
-Go           = exact Go-derived neighbourhood around Current
-```
+Unfocus restores the containing Range and a valid Current. Focused spatial boundary edits that cannot be represented truthfully are refused rather than approximated.
 
-Context therefore has priority over operator framing, but only while Context is
-enabled.
+### 5.10 Go
 
-Direct manipulation temporarily supplies an exact Frame with the highest
-priority for the gesture's lifetime:
+Go commits an exact known source Address, seeds movement-scale Resolution, and leaves the positive departure-to-arrival residue. Bare Timeline ground performs Go only within Range and clears the acquired Timeline operand first. Pin activation performs the same canonical movement while acquiring that Pin.
 
-```text
-Current drag             = candidate neighbourhood | candidate Current | candidate neighbourhood
-Pin drag                 = candidate surrounding frame | candidate Pin | candidate surrounding frame
-Section endpoint/profile = candidate Start | candidate midpoint | candidate End
-```
+A Guide destination outside a focused Range may leave Focus or open Full Video as part of one reported transaction so the exact retained Address becomes admissible. Go to the existing Current is a no-op; Reopen is the explicit way to discard local scale at the same Current.
 
-When the gesture ends, the Field performs one transition back to the ambient
-Context Frame or operator Frame. Hover and keyboard focus remain map-only dry
-runs; they do not seek the video players.
+### 5.11 Undo and Redo
 
-`lastOperator` is part of the immutable Session snapshot solely to restore this
-interpretation through Context, Guide edits, Undo, and Redo. A Section owns the
-ambient Frame only while Current equals that Section's midpoint; once a direct
-edit displaces the midpoint from Current, Step framing resumes.
+Every semantic operator commits the smallest complete transaction. Undo restores the checkpoint immediately before it; Redo restores the displaced state. A new semantic transaction clears the Redo future.
 
-#### Slideshow transitions
+Metadata-only presentation, deformation bypass, panel state, previews, Cues, transport ticks, rate events, Field Breath, and playback wraps do not enter Session history. A changed Guide transaction is persisted after acceptance when recovery permits safe writing.
 
-Every committed movement creates one directional transition from the currently
-displayed Frame to the next.
+## 6. Selection and direct manipulation
 
-Forward traversal moves the visible strip leftward:
+### 6.1 Selection domains
 
-```text
-old Tail exits through Tail
-old Center travels toward Tail
-new Current occupies Center
-new Lead enters through Lead
-```
+`selectedRetained` is the acquired Timeline operand. `guideRetained` is Guide focus. Timeline acquisition also focuses the matching Guide row; Guide focus alone does not manufacture a spatial operand.
 
-Backward traversal moves the strip rightward, exchanging the two sides. Current
-always matches Center after the movement commits.
+If a Working Interval’s endpoints align with Pins, every visible aligned Pin is indicated. If the acquired exact Section supplies the extent, its two endpoint identities are known and selected. Geometry alone never chooses one identity arbitrarily from coincident Pins.
 
-The three roles are presented distinctly during the transition, because they are
-doing different things: the trailing side has just received the address Center
-was showing, the leading side is receiving material that was not previously
-visible, and Center sits between them. Side players cannot duplicate one
-another's surface, so the outgoing frame is handed to the trailing side by
-seeking it there rather than by moving pixels. When Step Reach matches the Field
-offset that handoff is literal; otherwise the transition is directional without
-being a frame-for-frame carousel.
+Visual channels remain independent:
 
-The visual transition neither delays nor intermediates the semantic commit.
-Session changes immediately and atomically; the Field renders a brief
-directional transition between the previous and resulting presentations. A
-movement may use the previous Current as one transient outgoing frame so it
-visibly passes toward the trailing side, and the transition then settles onto
-the newly derived Frame. This is one visual event attached to one semantic
-movement, never a sequence of reassignments.
+- quiet marker for identity;
+- background fill for acquired Timeline operand;
+- inset edge for Working Interval relation;
+- focus ring for keyboard focus;
+- outline/glow for transient snap source, target, and armed state.
 
-Rapid same-direction operations compose as one continuing slideshow. The
-transition system must never block a semantic movement while an animation is
-active, must coalesce repeated same-direction movements, must reverse cleanly
-when traversal direction reverses, must discard stale player-seek callbacks
-using a transition generation token, and must settle on the latest resulting
-Frame rather than rendering every obsolete intermediate Frame.
+No channel may erase another state’s meaning.
 
-Field Frame transitions create no Session history.
+### 6.2 Timeline pointer grammar
 
-#### Persistent Context framing
+| Target | Click | Drag |
+| --- | --- | --- |
+| bare Timeline ground | clear Timeline operand, then Go | none |
+| Current marker | no generic Go | preview candidate, commit one Step |
+| single Pin | acquire exact Pin and move Current | move that Pin |
+| Pin cluster | open a vertical, wheel-scrollable exact-choice menu | drag the chosen Pin from its menu row |
+| Section wire end region | acquire the Section endpoint relation | move that endpoint Pin |
+| Section wire middle | make the Section the Working Interval and center Current spatially | translate its two endpoint Pins |
+| Range boundary | keyboard or pointer acquisition | change Range when Focus permits |
 
-```text
-before Context   Tail = Context Start | Center = Current          | Lead = Context End
-during Context   Tail = Context Start | Center = moving Cursor    | Lead = Context End
-after Context    Tail = Context Start | Center = Current           | Lead = Context End
-```
+Section wire roles come from its end regions and middle. The Timeline does not draw redundant Start/midpoint/End node controls.
 
-The side frames show whether a visible change of state occurs inside the
-observation window. If Tail and Lead display materially different states, the
-transition lies somewhere inside Context and can be located by playing or
-stopping within it. Context beginning, ending, pausing, or settling must not
-cause another Tail/Lead reassignment; Context transport operates inside one
-stable Frame.
+A click that does not cross the drag threshold remains a click. Drag settlement suppresses the synthetic trailing click. Each gesture captures its origin model, history, future, and effective projection; cancellation restores that origin exactly.
 
-### Field Breath
-
-The Field Breath is the live Stretch relation used during ordinary Center
-playback. Preview and Breath are mutually exclusive presentation owners:
-
-```text
-ordinary playback              → Breath
-idle traversal, Context, edit  → Frame
-```
-
-#### Configured relation
-
-Let \(x\) be the inner Field offset and \(y\) the outer Field offset, with
-\(0 < x < y\). For every operational side:
-
-```text
-x ≤ side offset ≤ y
-Tail = Center − tailOffset
-Lead = Center + leadOffset
-```
-
-Neither side reaches or crosses Center during Stretch.
-
-Let Center playback rate be \(c\), and let the configured fractional spread be
-\(d\), with \(0 < d < 1\). The exact outward relation is:
-
-\[
-z=c(1-d), \qquad w=c(1+d)
-\]
-
-so \(z < c < w\) and \(c-z=w-c=cd\). At Center rate `1×`, the canonical
-spreads produce:
-
-```text
-Tail 0.75× | Center 1× | Lead 1.25×
-Tail 0.5×  | Center 1× | Lead 1.5×
-Tail 0.25× | Center 1× | Lead 1.75×
-```
-
-The interface exposes one spread rather than two independent side rates. The
-inward phase exchanges the side rates without rewriting the saved spread. The
-relation is requested only through rates actually exposed by the media adapter;
-when an exact side rate is unavailable, the runtime reports that limitation and
-uses positional correction rather than claiming a false asymmetric relation.
-
-#### Bounds and synchronization
-
-Expansion begins at the inner boundary with `Tail rate = z` and `Lead rate = w`.
-Tail falls farther behind Center, Lead advances farther ahead, and both approach
-\(y\).
-
-If one side reaches \(y\) before the other, it clamps exactly to \(y\), is
-placed at the exact boundary-relative source Address, takes Center's rate \(c\),
-follows Center while preserving that offset, and is marked as waiting at the
-outer boundary. When every operational side has reached its effective outer
-boundary, contraction begins. Unavailable, collapsed, hidden, or Range-clipped
-sides are excluded from the barrier.
-
-Contraction exchanges the side rates: `Tail rate = w` and `Lead rate = z`. Tail
-catches Center while remaining behind it, Center catches Lead while Lead remains
-ahead of it, and both offsets decrease toward \(x\). The inner boundary uses
-the same clamp-and-wait rule, and when all operational sides reach \(x\) the
-outward assignment is restored.
-
-```text
-x → expand → y → contract → x → repeat
-```
-
-Effective bounds are Range-clipped at the outer end only. The minimum offset is a
-law, not a preference: a side with less room than \(x\) cannot preserve the
-required separation, so it is non-operational, excluded from the barrier, and
-parked at whatever room remains. \(x\) is never silently reduced to fit, and a
-configured pair always satisfies \(0 < x < y\).
-
-Resuming after a proper-Range wrap continues the preserved breathing phase. The
-outward pair is correct only while expanding; a contracting Field is resumed with
-the exchanged rates.
-
-#### Hold
-
-Hold alone stops the breathing cycle. It preserves each attained offset within
-\([x, y]\), sets every held side to Center rate, keeps Tail behind and Lead
-ahead during continued playback, and preserves the current breathing direction
-for later resumption. Stretch resumes from the attained relation.
-
-A held Field is not a configured Offset change. Hold creates no Session mutation
-and no Undo checkpoint.
-
-Breathing is a coordinated Field relation and uses one combined Stretch/Hold
-control. Tail and Lead retain individual visibility, but there are no
-independent side Stretch/Hold controls.
-
-Stretch and Hold are runtime-only and cannot write Current, Working Interval,
-Resolution, Range, Guide, Weight, or Step Reach.
-
-Configured Offset and attained relation are distinct. A side already following
-its configured bound follows a new one; a partial relation is preserved and only
-clamped when the new bound requires it. Field Off or pane collapse makes that
-projection dormant: it is not a Step, Hold, Stretch, span, activation,
-video-sync, or delayed-play operand. Operational Field controls require a visible
-ready source and positive Range-contained reach. A held Field span requires both
-operational sides.
-
-Context duration and Field Offset are independent physical observation
-parameters. Their numeric relation may be intentionally useful but is not an
-ownership relation: neither operation reads, derives, persists, or rewrites the
-other.
-
-Preview, breathing, Context, and semantic state cannot overwrite one another's
-configuration.
+Pin and Section manipulation previews through the Field. A Pin uses its Step neighborhood; a Section uses its Start, midpoint, and End. Working Interval bounds that coincide with a moved Pin follow the same canonical Pin transaction.
 
 ### Current drag and Nudge as Step
 
-Dragging or nudging Current is a Step gesture, not a Go. It moves Current by the
-gestured distance under Step's retained-anchor law, so the Working Interval
-extends or shortens from the traversal already established:
+Dragging Current is Step, not Go. Pointer movement changes only a candidate and Field preview; Session Current remains at departure until commit. Release converts the source candidate into an equivalent effective Timeline distance and commits one Step gesture. A stationary press is a no-op. Cancellation restores the origin.
 
-```text
-Current drag → candidate Address → release → one Step transaction
-```
-
-It is not Pin movement, and it does not draw a new Working Interval or a new
-Resolution around the landing point. A fresh neighbourhood is what an exact Go
-is for: clicking the Timeline, or choosing an exact Guide object.
-
-Pressing Current acquires the Current marker before the Timeline can interpret
-the gesture as generic Go. Crossing the drag threshold begins the candidate
-presentation. During the drag the Current marker follows the candidate Timeline
-position, the candidate is converted through the canonical Timeline Space
-inverse, Center displays the candidate frame, the Field displays the candidate
-Context Frame when Context is enabled and the candidate operator Frame
-otherwise, the original Current may remain as a faint departure marker, and
-Session Current remains unchanged.
-
-On release, one Step of the gestured distance is committed: the retained
-departure is preserved when the interval's arrival is the departing Current, at
-most one Undo checkpoint is created, and the Field performs one transition in
-the corresponding traversal direction. On cancellation the original Current
-presentation is restored and no semantic change or history is created. A
-stationary press performs no movement.
+This law preserves the established residue: moving Current extends or shortens the same traversal instead of inventing a fresh neighborhood around the landing point. Bare Timeline Go is the distinct route for that goal.
 
 ### Nudge
 
-Fine adjustment is called Nudge unless the active media adapter supplies a
-verified frame duration:
+Nudge is one source-time operation reached by Timeline wheel, off-map wheel, keyboard comma/period, and Guide decrement/increment controls.
 
-```text
-verified frame duration available → one-frame Nudge
-frame duration unavailable        → configured source-time quantum
-```
+The target rule is:
 
-A default approximate quantum may be provided, but it is displayed as seconds
-rather than described as an exact source frame. The quantum must remain strictly
-greater than the semantic equality tolerance the kernel uses to decide that a
-movement happened; otherwise one Nudge resolves to the Address it started from
-and the operation is silently inert.
+- over Timeline, the exact Pin or Section under the pointer; bare map targets Current;
+- elsewhere outside form controls, the acquired Timeline operand; absent one, Current.
 
-Nudge acts in source time and is then reprojected. Section Weight must not change
-the temporal size of one Nudge. Nudging Current uses the same Step law as
-dragging it: the source-time quantum is converted to the equivalent Timeline
-distance at Current, so the traversal extends or shortens rather than being
-redrawn.
+Shift-wheel selects the dominant of `deltaX` and `deltaY`. Wheel right or up moves forward; left or down moves backward. High-resolution deltas accumulate until the quantum threshold is crossed, and one event may produce multiple quanta. Browser default is prevented only after a valid target is acquired.
 
-Within the Timeline, `Shift` + wheel upward or rightward nudges forward and
-downward or leftward nudges backward. The target is the exact manipulable object
-under the pointer:
+Nudge Current invokes Step law while preserving a configured source-time quantum. Nudge Pin and Nudge Section invoke the same Guide movement operations as direct manipulation. One wheel series or held repetition creates one Undo transaction after its settlement timer.
 
-```text
-Current           → nudge Current through Step
-Pin               → nudge that Pin
-Section endpoint  → nudge that endpoint Pin
-Section midpoint  → translate the complete Section
-empty Timeline    → nudge Current
-```
-
-The browser default is prevented only when a valid Timeline nudge target has been
-acquired. High-resolution trackpad deltas accumulate until one discrete Nudge
-threshold is crossed, and one continuous wheel gesture settles as one Undo
-transaction.
-
-`Shift`-drag enters precision mode: it reduces movement gain, quantizes the
-resulting source Address to the active Nudge quantum, retains the same semantic
-gesture owner, and produces one transaction on release.
-
-`,` and `.` nudge the selected or focused map object when unambiguous, and
-otherwise Current. Repeated keydown events belong to one held nudge gesture and
-settle as one Undo checkpoint.
-
-There is one Nudge implementation regardless of whether it is invoked from the
-Timeline, Guide, keyboard, or pointer.
-
-### Direct manipulation surfaces
-
-The Temporal Topography owns spatial direct manipulation because it displays the
-actual global geometry:
-
-```text
-Current marker          → Go
-Pin marker              → Move Pin
-Section Start or End    → Move endpoint Pin
-Section midpoint        → Translate Section
-Range boundary          → Change Range
-```
-
-Every object has one visually centered acquisition region and one unambiguous
-gesture owner. Direct manipulation uses the projection captured at pointer-down,
-so the geometry does not jump if Weight or another derived condition changes
-during the gesture.
+When the adapter proves an exact frame duration, that duration is the quantum and the interface may call it a frame. Otherwise the configured source-time quantum is reported honestly.
 
 ### Exact Guide editing
 
-Guide owns exact topology, metadata, and numeric editing. It does not duplicate
-the Timeline's spatial drag system.
+Guide Address fields accept finite seconds or valid `MM:SS` / `HH:MM:SS` timecode. Non-leading timecode fields must be below 60. Exact Address fields reject anything outside
+Range, any collapsed/reversed Section geometry, and any invalid structural relation. They never silently substitute a boundary value for the typed value.
 
-A Pin row contains a Title, an Address input, `−`/`+` Nudge controls, Go, a
-reference count, Rename, and Delete. Editing a shared Pin's Address updates every
-referencing Section through existing shared ownership.
+Typing a valid candidate may preview it through the same Field Frame as a drag. Commit routes through `moveGuidePin` or `moveGuideSection` and one checkpoint. Guide decrement/increment controls route through Nudge and repeat while held.
 
-A Section row contains a Title, Start and End Address inputs, a Duration readout,
-`−`/`+` controls for each endpoint, optional whole-Section translation controls,
-Weight, Focus, Unlink, Rename, and Delete. The full-map profile remains a
-read-only positional representation and acquisition link to the Timeline.
+### 6.3 Guide composition and Carry
 
-Address inputs accept canonical timecode or seconds, reject anything outside
-Range or outside its structural partners, reject Section collapse or reversal,
-reject a timecode part that is not one, preview the candidate
-Field Frame before commit, commit on Enter or explicit Apply, cancel on Escape,
-and create one Undo transaction. Increment buttons use the same Nudge operation
-as Timeline Shift-wheel and keyboard nudging.
+A plain Guide click replaces the working relation with the clicked Pin or Section. Physical Shift or Guide Extend grows the current Working Interval to the minimum contiguous extent containing the selected Cue, Pin, or Section. Composition stores the resulting extent, not an object set.
 
-### Alt Carry
+Alt with a spatial navigation operator may Carry the acquired Timeline Pin or Section by the same effective Timeline-space displacement as Current. Structural and source bounds clip or refuse the retained-object movement without changing the underlying navigation law. Carry is optional and creates no second operator family.
 
-Alt Carry modifies a semantic movement by translating the selected retained Pin or Section through the same Timeline Space displacement as Current, subject to structural bounds. It preserves the selected object’s spatial relation to Current as far as topology permits.
+## 7. Panoramic Phase Field
 
-### Undo / Redo
+### Field Frame
 
-Every semantic gesture creates at most one history entry. Deform, weight editing, drag, cascade deletion, Focus, and Unfocus each commit as one Undo transaction.
+The Field Frame is the stable Tail–Center–Lead presentation outside ordinary Panorama playback. It is a projection of canonical or direct-manipulation state, never a second semantic model.
 
-Plain `Z` restores the preceding checkpoint. Plain `C` reapplies the next checkpoint. Any new semantic commit clears the Redo future.
-
-## 6. Operator coherence and selection
-
-### 6.1 Operator families
-
-The operator surface is organized by semantic role:
+Every valid Frame satisfies:
 
 ```text
-OBSERVE
-Playback · Context · Stretch · Hold
-
-DISCRIMINATE
-Refine Backward · Reopen · Refine Forward
-Local Refine Backward · Local Refine Forward
-
-TRAVERSE
-Step Backward · Switch Endpoint · Step Forward
-Previous Pin · Next Pin · Go
-
-RESOLVE THE WORKING INTERVAL
-Release · Deform · Focus
-
-RETAIN AND EDIT TOPOLOGY
-Pin · Save Section · Join · Move · Rename · Delete
-
-RESTORE HISTORY
-Undo · Redo
+Range.start ≤ Tail ≤ Center ≤ Lead ≤ Range.end
 ```
 
-The keyboard matrix expresses the three central transformation rows:
+An edge collapsed onto Center conveys no distinct observation and may make that side unavailable.
+
+#### Frame ownership
+
+Frame ownership has one priority order:
+
+1. active direct manipulation supplies its exact candidate Frame;
+2. otherwise enabled Context supplies its bounded Context Frame;
+3. otherwise the last applicable operator supplies its Frame;
+4. ordinary playback hands presentation to Field Breath rather than Field Frame.
+
+Operator Frames use the effective projection:
+
+- Step, Pin, Go, and fallback: the configured backward Step destination, Current, and forward Step destination;
+- Refine Backward/Forward and Local Refine: the next directional Refine targets around Current;
+- Reopen: the directional midpoints available from the reopened Resolution;
+- selected Section: Start, the active midpoint, and End while Current owns that relation.
+
+Direct Pin editing uses the Step neighborhood around its candidate Address. Direct Section endpoint or whole-Section editing uses candidate Start, midpoint, and End.
+
+#### Slideshow transitions
+
+One sequencer owns settled Frame identity and revision. A new semantic movement may produce one directional transition: forward movement reads toward Lead; backward movement reads toward Tail. Semantic state commits before this presentation cue.
+
+Republishing the same Frame does not create another transition. A moving Context Cursor does not change the identity of its fixed-edge Frame. Reduced-motion preference may remove the visual transition without changing any Frame Address.
+
+#### Persistent Context framing
+
+When Context duration is positive, Context owns Tail and Lead before, during, and after its Center transport. Its source-contiguous window is centered on Current and each side clips independently at Range; unused duration on one side is not moved to the other.
+
+Tail is the first Context Address, Lead is the last, and Center is Current while idle or Cursor while running. Starting, pausing, stopping, or settling Context does not reassign the edges. Setting Context duration to zero returns ownership to operator framing.
+
+### Field Breath
+
+Field Breath is the live Tail/Lead relation during ordinary Panorama playback. Its configured relation is:
 
 ```text
-Q Refine Backward     W Reopen           E Refine Forward
-A Step Backward       S Switch Endpoint  D Step Forward
-R Release             T Tag              F Focus / Unfocus
+0 < Inner Offset x < Outer Offset y
 ```
 
-Their meanings are:
-
-- the first row changes discrimination;
-- the second row changes traversal or viewpoint;
-- the third row determines the fate of the Working Interval.
-
-The third row is one semantic trichotomy:
-
-```text
-Release  → return the relation to absence
-Deform   → make the relation modify the world
-Focus    → make the relation become the world
-```
-
-Space remains outside the matrix because observation actualizes source continuity rather than transforming the map directly. Undo and Redo remain outside because they operate on transformation history rather than the video environment.
-
-### 6.2 Optimal-goal rule
-
-An operator is optimal when its goal is present and no smaller transformation can satisfy that goal.
-
-| Goal condition | Optimal operator | Why alternatives are not optimal |
-|---|---|---|
-| choose one side at a finer scale while retaining the path of approach | Refine | Step assumes a known distance; Go assumes an exact destination |
-| choose the same midpoint but edit only the local interval relation | Local Refine | Refine retains the broader traversed thread |
-| move a known Timeline Space distance without selecting a new scale | Step | Refine changes scale; Go derives scale from an exact crossing |
-| move to the next known retained landmark | Pin traversal | ordinary Step ignores landmark identity |
-| move to an exact known Address | Go | Refine and Step deliberately derive targets rather than accept one |
-| restore broad alternatives without changing place or retained coverage | Reopen | Undo restores an old state; Go and Step move |
-| continue from the opposite side of the same retained relation | Switch Endpoint | backward movement changes the relation; Switch preserves its extent |
-| discard only the traversal trace | Release | deletion changes retained topology; Reopen changes scale |
-| allocate map distance to fixed source content | Deform | Focus changes admissibility; playback rate changes media runtime |
-| make one extent the complete active world | Focus | Deform changes metric but not admissibility |
-| return from a focused world to its containing world | Unfocus | Reopen restores Resolution only |
-| perceive continuous source development | Playback | map operators move discretely |
-| inspect a bounded audiovisual neighbourhood without immediate commitment | Context | Playback continues through Range; Go commits immediately |
-| make nearby mutually exclusive moments perceptually co-present | Stretch | Timeline deformation is spatial, not live audiovisual |
-| preserve one attained Field relation | Hold | Stretch continues changing the relation |
-| preserve a retained object’s relation while Current moves | Alt Carry | ordinary traversal changes their relative position |
-| retain one exact place | Pin | Section requires an extent |
-| retain one bounded relation | Save Section or Join | Pin retains only one Address |
-| negate or reinstate the last semantic transformation | Undo / Redo | recovery operators move forward under current state |
-
-### 6.3 Frequency and placement
-
-Placement follows expected goal frequency and motor continuity:
-
-- **continuous observation:** Space and the Field surface;
-- **high-frequency search:** directional Refine and Step;
-- **moderate-frequency orientation:** Reopen, Switch, Pin traversal, and Go;
-- **lower-frequency high-consequence resolution:** Release, Deform, and Focus;
-- **object-local map construction:** Timeline and Guide controls;
-- **global meta-history:** Undo and Redo.
-
-Shift modifies an existing family rather than introducing an unrelated one:
-
-```text
-Shift+Refine  changes Working-Interval composition while retaining the midpoint target
-Shift+Step    changes the target class from metric distance to retained landmark
-```
-
-Alt modifies whether a selected retained relation moves with Current. It does not change target selection.
-
-### 6.4 Minimal-transform contracts
-
-The following contracts are normative. “May change” includes conditional changes explicitly required by bounds or composition. Every unlisted canonical dimension must be preserved.
-
-| Operator | Must or may change | Must preserve |
-|---|---|---|
-| Refine | Current, Resolution, Working Interval coverage/orientation, traversal provenance | Range, Focus, Guide topology, weights, stored Step Reach |
-| Local Refine | Current, Resolution, membership-governed Working Interval, traversal provenance | Range, Focus, Guide topology, weights, stored Step Reach |
-| Step | Current, guarded Resolution placement, Working Interval, traversal provenance | Range, Focus, Guide topology, weights, stored Step Reach |
-| Pin traversal | same semantic dimensions as Step | Pin and Section topology, weights, Range |
-| Reopen | Resolution, basis, traversal provenance | Current, Working Interval, Range, Focus, Guide, Step Reach |
-| Switch Endpoint | Current, Resolution frame, interval orientation | interval ordered extent, traversal provenance, Range, Focus, Guide, weights, Step Reach |
-| Release | Working Interval, traversal provenance reset to default Step | Current, Resolution, Range, Focus, Guide, weights, Step Reach |
-| Deform | Section creation/reuse and/or one Section weight; derived metric | all source Addresses, Current, Resolution source Addresses, Range, Focus, Working Interval, stored Step Reach, Field |
-| Focus | Range, Focus context, root Resolution, traversal provenance; Current and Interval only when required by bounds | Guide, weights, stored Step Reach |
-| Unfocus | Range, Focus context, root Resolution, traversal provenance; Current and Interval only when required by bounds | Guide, weights, stored Step Reach |
-| Go | Current, Resolution, Working Interval, traversal provenance; Range/Focus only when opening the target | Guide, weights, stored Step Reach |
-| Section selection | Current, exact Section Resolution/Interval, traversal provenance | Range, Focus, Guide topology, weights, stored Step Reach |
-| Playback settlement | Current, translated Resolution, unioned Working Interval, traversal provenance | Range, Focus, Guide, weights, stored Step Reach |
-| Context | Cursor and runtime transport only | every Session dimension |
-| Stretch / Hold | Field runtime relation only | every Session dimension and persisted Field Offset |
-| Offset edit | one side's configured Field bound and its necessary local reconciliation | sibling side state, every Session dimension, Step Reach, Guide, weights |
-| Alt Carry | movement operator effects plus selected Guide geometry | selected object identity and weight; unrelated Guide objects except shared-endpoint consequences |
-| Weight edit | one Section weight and derived metric | every source Address, playback, Field, stored Step Reach |
-| Move Pin | one Pin Address and all incident Section extents | unrelated Pins, Section identities and weights |
-| Move Section | its two endpoint Pin Addresses and incident shared-edge consequences | unrelated interior Pins, Section identity and weight |
-| Undo / Redo | exact checkpoint model and history/future stacks | no partial reinterpretation of the checkpoint |
-
-Derived effects must not be mistaken for stored writes. For example, Deform may change Refine targets and adaptive effective Reach because the metric changed, while the stored Resolution Addresses and Step Reach remain untouched.
-
-## 7. Playback and Context
-
-Playback and Context are source-contiguous and independent of Timeline Space.
-
-- Full-video Range plays to source end and stops.
-- A proper Range loops.
-- Each wrap seeks to Range start, increments transport cycles, and resumes.
-- A wrap commits no Current, Working Interval, Resolution, Context, or history.
-- The watchdog follows the current cycle entry rather than the original departure.
-- Playback settlement unions prior Working coverage with every watched source segment; it never shortens coverage.
-
-Space is the reader-wide observation command:
-
-```text
-idle       → begin Playback
-Playback   → pause and settle observation
-Context    → accept Cursor as Current
-```
-
-Text editing and modal Guide interaction retain ordinary Space ownership.
-
-## 8. Guide lifecycle
-
-```text
-Pin Current       create or reuse a Pin at Current
-Save Section      create or reuse endpoint Pins and one Section
-Join              create a Section from two selected Pins
-Rename            change optional title only
-Set Weight        assign one canonical spatial factor
-Move Pin          update every referencing Section
-Move Section      translate only its two endpoint Pins
-Delete Section    remove Section and unshared untitled endpoint Pins
-Delete Pin        dissolve all references and clean up orphan endpoints
-```
-
-Arbitrary overlap, nesting, shared endpoints, and coincident extents are valid. The effective density is derived from independent Section factors; no stored hierarchy or priority is introduced.
-
-## 9. Invariants
-
-```text
-Section.end > Section.start
-Section.weight ∈ W
-effective spatial density > 0
-Range.start <= Current <= Range.end
-Working Interval ⊆ Range in source time
-Working Interval ⊆ Resolution ⊆ Range in Timeline Space
-spatial extent is reported as a factor on source, never as a duration
-every readout announcing a movement states the source time it actually crosses
-Addresses are written with a colon and durations with units
-every readout answers something no other readout already answers
-a retained entry is a name plus an Address; its title never carries its Address
-one operand has one control; activation and dragging are never split in two
-the play command means ordinary playback wherever it is issued
-a focused extent spans the whole drawn timeline at every Weight
-the viewport changes what is drawn and never what is computed
-Working Interval is one continuous source extent
-every source Address has one timeline position and one inverse
-playback, Context, and Field geometry are source-time operations
-adaptive Step changes with weighted Range width, not Field Offset
-Release is the only operator whose sole effect is clearing the Working Interval
-Timeline Space is derived and never persisted
-each operator changes only dimensions permitted by its effect contract
-presentation preview and semantic commit invoke the same operator implementation
-
-Center equals Current whenever Context or direct preview does not own Center
-Context start and end do not change merely because Context transport stops
-a semantic movement produces at most one Field Frame transition
-Field Frame transitions never create Session history
-rapid transitions settle on the latest committed state
-Tail remains behind Center during breathing
-Lead remains ahead of Center during breathing
-breathing offsets remain within effective [x, y] bounds
-a side waiting at a breathing boundary runs at Center rate
-Hold alone changes Stretching into Held
-dragging or nudging Current invokes Step, never Go
-a Current drag previews the Interval its Step will commit
-a preview draws the extent and the destination, and nothing else
-what a direct gesture previews is what its release commits
-Cursor is drawn only where observation has left Current
-predictive chrome stands down while the movement it predicts is being performed
-an operator that touches the Guide renders it even when the movement is unchanged
-a focused extent's own boundary cannot be dragged from inside it
-Timeline direct manipulation and Guide exact editing call the same operation
-one drag, wheel series, or held-key nudge creates at most one Undo checkpoint
-one held ladder control creates at most one Undo checkpoint
-every pending gesture settles before the next transaction commits
-a reported retention is written to storage by the transaction that reported it
-fine Nudge acts in source time, not Timeline Space
-Guide owns no independent drag geometry
-a plain Guide click replaces the Working Interval; Shift extends it
-a Cue is never persisted, projected, or traversable until it is retained
-a drawn Cue carries no attribute a pointer handler dispatches on
-Groups partition the Sections; a Section is never half-hidden
-exactly one Group supplies Timeline Sections and section-bound Pins
-the Guide names that Group once, so two visible or none cannot be written down
-removing the named Group resolves to the next Group rather than to none
-any number of Groups may be active and their Weights multiply
-new Sections belong to the visible Group unless another Group is explicit
-identical Sections may coexist across Groups but not within one Group
-a Section deforms the Timeline only while its Group is active
-an endpoint Pin is drawn while any Section referencing it is in the visible Group
-a Pin referencing no Section is never hidden by a Group
-Guide focus and Timeline operand selection are independent
-Guide navigation reaches hidden objects without making them Timeline operands
-retaining a Cue is the ordinary save and carries the offered title
-an operation acting on a Pin is reached from that Pin
-Address equality is not identity equality; coincident Pins are never chosen by order
-one name identifies an unnamed Section everywhere it is named
-a Group always has a name, because it has no Address to be known by
-no two Groups read alike, in any letter case
-the relationship band is bounded; deeper structure scrolls rather than growing it
-an edit that moves nothing settles no observation
-any operator that changes the drawn scope says so
-a focused interactive element owns Space; the reader background observes
-a typed Address is honoured exactly or refused; clamping belongs to dragging
-alignment is geometric and shared; identity is not, and is never inferred from it
-a breakpoint changes the form of a panel, never whether the reader wanted it open
-routes claiming one operation reach one canonical consequence
-Guide editing restores focus by identity, because the node it rebuilds is gone
-a Group is renamed and removed like any other retained object, destroying nothing; removal is refused when returning its Sections to Map would collapse layered identities
-composition yields an extent, never a set, so every operator consumes it unchanged
-a Guide row is expanded exactly when it has Guide focus; Timeline selection is reserved for drawn spatial operands
-preview, breathing, Context, and semantic state cannot overwrite one another
-```
-
-Source-contiguous media behavior and strict spatial invertibility are the highest-priority invariants.
-
-## 10. Implementation plan: declarative operator grammar
-
-### 10.1 New module
-
-Add a DOM-free, I/O-free module:
-
-```text
-operator-grammar.js
-```
-
-It defines frozen semantic descriptors. It does not calculate targets, mutate Session, inspect media players, or reproduce operator arithmetic.
-
-Minimum descriptor shape:
+The conservative high-coherence defaults are:
 
 ```js
+{ inner: 0.25, outer: 2.5, rate: 0.25 }
+```
+
+At Center `1×`, the default rate pair is:
+
+```text
+Tail 0.75× | Center 1× | Lead 1.25×
+```
+
+Wider offsets and stronger supported symmetric pairs remain selectable. Existing saved preferences remain unchanged. Valid legacy side settings migrate to one bounded symmetric relation.
+
+The rate value is fractional spread around Center:
+
+```text
+outward Tail = Center × (1 - rate)
+outward Lead = Center × (1 + rate)
+```
+
+During contraction the side roles exchange. A side reaching a boundary first follows Center at Center rate while preserving the attained offset. When every operational side reaches the same boundary, the phase reverses. A collapsed, hidden, unavailable, or Range-clipped side is excluded from this synchronization barrier. If a side has less room than Inner Offset, the minimum is not reduced; the side is parked within available room and does not breathe.
+
+Hold freezes attained offsets, clears waiting state, and places held sides at Center rate without rewriting the configured bounds or phase direction. Stretch resumes from that exact relation. Field Hold and Breath phase create no Session checkpoint.
+
+Field runtime suspends while Context, pending Step, direct manipulation, or an incompatible Playback policy/actual rate owns observation. Stale side-player events cannot revive a hidden, collapsed, unavailable, or superseded side.
+
+## 8. Context and Playback
+
+### 8.1 Context transport
+
+Context is transient source-contiguous Center observation around a semantic anchor. It plays at `1×` from its clipped start toward its clipped end, leaves Current unchanged, and keeps the Context Field Frame stable. A following semantic command may replace it without creating an intermediate history entry.
+
+Context duration and Field offsets are independent. Similar numeric displacement does not create shared state ownership.
+
+### 8.2 Explicit Playback ownership
+
+A Playback transport contains:
+
+```ts
 {
-  id: "refineForward",
-  family: "discriminate",
-  goal: "Inspect the forward side at a finer scale while retaining the path",
-  frequency: "primary",
-  key: "E",
-  shiftedKey: null,
-  direction: "forward",
-  operand: "resolution-midpoint",
-  targetClass: "derived",
-  availability: "can-refine-forward",
-  preview: "session-dry-run",
-  transforms: [
-    "commitment",
-    "discrimination",
-    "traversal-coverage",
-    "traversal-orientation"
-  ],
-  preserves: [
-    "availability",
-    "topology",
-    "metric-source-values",
-    "stored-step-reach"
-  ],
-  counterpart: "refineBackward",
-  recoveryComplement: "reopen",
-  matrix: { row: 0, column: 2 }
+  observationPolicy: "panorama" | "center-only",
+  ratePolicy:
+    | { kind: "fixed", wish: number }
+    | { kind: "dynamic" },
+  requestedRate: number,
+  actualRate: number
 }
 ```
 
-The registry must include:
-
-- Refine Backward and Forward;
-- Local Refine Backward and Forward;
-- Step Backward and Forward;
-- Previous and Next Pin;
-- Reopen;
-- Switch Endpoint;
-- Release;
-- Deform;
-- Focus and Unfocus;
-- Go;
-- Playback;
-- Context;
-- Stretch and Hold;
-- Pin, Save Section, Join, Weight, Move Pin, Move Section, Rename, Delete;
-- Alt Carry;
-- Undo and Redo.
-
-Runtime-only operators and semantic Session operators share the vocabulary but declare different effect domains.
-
-### 10.2 Registry rules
-
-The registry is authoritative for:
-
-- family and UI grouping;
-- user-facing goal;
-- frequency tier;
-- key and modifier presentation;
-- counterpart and complement relationships;
-- transformed and preserved dimensions;
-- preview ownership;
-- concise availability and disabled-reason identity;
-- documentation tables and audit coverage.
-
-The registry is not authoritative for:
-
-- target arithmetic;
-- Range or Resolution geometry;
-- Timeline projection;
-- Guide mutations;
-- media commands;
-- runtime Field control;
-- history commits.
-
-Those remain owned by their current modules.
-
-### 10.3 Stable operator IDs
-
-Operator IDs must be stable across:
-
-- `session.js` interval provenance;
-- `app.js` bindings;
-- `view.js` presentation;
-- keyboard help;
-- status and accessibility metadata;
-- tests and audits.
-
-Existing stored Guide and Session data must not persist the descriptor itself.
-
-## 11. Implementation plan: availability and action routing
-
-### 11.1 One action map
-
-`app.js` should expose one map from operator ID to the existing action function:
-
-```js
-const OPERATOR_ACTIONS = {
-  refineBackward: () => refine("backward"),
-  refineForward: () => refine("forward"),
-  stepBackward: selection => performStep("backward", selection.distance),
-  stepForward: selection => performStep("forward", selection.distance),
-  reopen: reopenFully,
-  switchEndpoint,
-  release: releaseWorkingSection,
-  deform: deformSelectedTarget,
-  focus: focusSelectedTarget
-};
-```
-
-The action map delegates to existing Session, transport, Guide, and Field owners. It must contain no independent semantic calculation.
-
-### 11.2 Availability resolvers
-
-Add a pure or composition-level resolver:
+Plain `Space` creates:
 
 ```text
-operator-availability.js
+observationPolicy = panorama
+ratePolicy = fixed 1×
 ```
 
-It maps descriptor availability keys to current existing predicates and block-reason helpers.
-
-Examples:
+`Shift+Space` creates:
 
 ```text
-can-refine-forward   → getTargets + refineBlockReason
-can-reopen           → canReopen
-has-interval         → Boolean(model.interval)
-has-deform-target    → selected Section or positive Working Interval
-can-focus-target     → selected Section or positive Working Interval
-has-next-pin         → nextPin within active Range
+observationPolicy = center-only
+ratePolicy = configured fixed wish or dynamic
 ```
 
-Availability resolution may aggregate existing facts but cannot derive alternate destinations.
+Observation policy does not derive from numeric rate. A fixed Shift wish that resolves to `1×` remains Center only.
 
-Each result has:
+A native Center Play event may create an ordinary Panorama Playback session at the adapter’s actual native rate. If that actual rate is incompatible with the fixed side relation, the Field suspends; ordinary Center playback continues.
 
-```js
+### 8.3 Rate authority
+
+Three rate facts remain distinct:
+
+- **wish** — persisted fixed intent, or the dynamic inverse target;
+- **requested** — the nearest currently offered rate sent to the adapter;
+- **actual** — the rate confirmed by the adapter’s playback-rate event.
+
+The actual-rate event updates only transport runtime and Field availability. It creates no new semantic Playback transaction.
+
+Fixed wishes resolve against positive offered rates in logarithmic distance, because rate distance is multiplicative. An exact tie prefers the offer nearer `1×`, then a deterministic numeric tie. If available rates expand, the fixed wish is retained and an active fixed Shift playback retunes when a closer offer appears.
+
+Dynamic Playback requests:
+
+```text
+wish = 1 / effective Weight at Current
+```
+
+The inverse is unconstrained. The media adapter’s offered rates provide the real bounds. Dynamic Playback is Center only and is the sole playback mode that reads effective projection Weight.
+
+### 8.4 Retry, wrap, and settlement
+
+Retry preserves the active observation and rate policies, re-resolves the current offer, and does not reset to `1×`.
+
+A proper-Range wrap:
+
+1. rebases the same transport at Range Start;
+2. preserves observation policy;
+3. resolves the stored fixed wish again or derives Dynamic Playback Weight at Range Start;
+4. requests that rate;
+5. preserves Panorama availability or suspension from explicit ownership and actual compatibility;
+6. adds no history.
+
+No stale pre-retune transport object may own the wrap.
+
+Playback settlement uses the transport’s departure, parent Resolution, return model, current Cursor, and completed cycles to commit at most one semantic transaction. Watched coverage extends or preserves existing Working Interval coverage and never shortens it. A completed proper-Range cycle covers the Range. Full-video playback stops at source end.
+
+### 8.5 Native-player accessibility
+
+The container over Center is non-blocking. Only the centered parent-owned Play/Panorama control accepts pointer events; the rest of the overlay does not. Native seek, captions, settings, volume, quality, and fullscreen controls remain pointer-accessible while paused, idle, or playing.
+
+Keyboard focus on a button, form control, menu item, slider, or other native Space owner keeps its native activation. Reader-background `Space` remains the universal playback toggle.
+
+## 9. Guide lifecycle and persistence
+
+### 9.1 Creation, duplicates, and deletion
+
+Tag as Pin retains Current as an explicit Pin. Tag as Section retains a positive Working Interval using existing exact endpoint Pins when available or creates endpoint Pins. Duplicate identity is determined canonically, not by visual proximity. Duplicate Tag selects the existing object.
+
+Guide renames, Weight changes, Group changes, Pin moves, Section moves, unlink/link, and deletion are ordinary Session transactions and use the same operations from every surface. Deleting the Section targeted by deformation bypass clears that bypass presentation. Deleting a focused Section leaves Focus through the same containing-Range law as other exits.
+
+### 9.2 Cues
+
+Cues are transient candidates parsed from offered text. They may be previewed, navigated with Go, composed into a Working Interval, or explicitly retained with their title. They never enter Guide persistence, Section Weight, effective projection, or Pin traversal before retention.
+
+### 9.3 Recovery result
+
+Loading Guide data returns an explicit result:
+
+```ts
 {
-  available: true,
-  reason: null,
-  target: optionalPresentationTarget,
-  consequence: optionalConciseMetadata
+  guide,
+  sourcePrefix,
+  exact,
+  sanitized,
+  discardedCount,
+  unreadableHigherPriorityRecords,
+  quarantineSucceeded,
+  safeToRewriteCurrent
 }
 ```
 
-Disabled reasons must describe the missing condition, not an implementation detail.
+Current version data is inspected before older fallbacks. Every readable candidate is normalized, sanitized against source identity and duration, and validated before use.
 
-### 11.3 Preview routing
+If a higher-priority record is unreadable and an older record is valid:
 
-Every semantic preview must continue to dry-run the exact Session operation used for commit.
+- the unreadable evidence is quarantined under a distinct key before fallback can be rewritten as current;
+- preservation is reported only when the quarantine write succeeds;
+- failure sets `safeToRewriteCurrent = false` and disables destructive overwrite for that source in the current session;
+- a migrated or sanitized Guide is rewritten only when original evidence is safe.
 
-The registry selects the preview owner; it does not calculate the preview.
+An empty Guide status distinguishes “no saved Guide existed” from “saved data could not be recovered.” Storage read and quarantine-write failures follow the same non-destructive rule.
 
-```text
-operator descriptor
-→ availability resolver
-→ exact Session dry run
-→ projected consequence
-→ presentation
-```
+### 9.4 Persistence boundary
 
-Field and transport previews use their existing runtime geometry owners.
+Guide persistence occurs after accepted semantic Guide changes and before a safe source replacement. A failed persistence write is reported. A recovery result that forbids rewrite remains authoritative for the session, even if the in-memory Guide continues to be usable.
 
-## 12. Implementation plan: executable effect contracts
+Preferences persist separately and do not rewrite source Guide data.
 
-### 12.1 Canonical state projection
+## 10. Source-boundary integrity
 
-Add a pure test helper:
+### 10.1 Generation-owned loading
 
-```text
-semantic-state-projection.js
-```
+Every requested source receives an immutable request:
 
-It converts an application or Session snapshot into normalized contract dimensions:
-
-```js
+```ts
 {
-  availability: { range, focus },
-  commitment: { current },
-  discrimination: { resolution, basis },
-  traversalCoverage: { start, end },
-  traversalOrientation: {
-    departure,
-    arrival,
-    activeSide,
-    startFrame,
-    endFrame
-  },
-  topology: {
-    pinIds,
-    sectionIds,
-    references,
-    sourceAddresses
-  },
-  metricSourceValues: {
-    sectionWeights
-  },
-  movementMagnitude: {
-    storedStepReach
-  },
-  reversibility: {
-    historyLength,
-    futureLength
-  }
+  generation,
+  videoId,
+  startSeconds,
+  metadataStartedAt
 }
 ```
 
-A separate runtime projection covers:
+Generation increments for every request. The YouTube adapter snapshot reports its actual loaded `videoId` when available. Initialization requires all of:
 
-```js
-{
-  observation: { cursor, transportKind, phase },
-  perceptualHorizon: {
-    tailAddress,
-    leadAddress,
-    rates,
-    modes,
-    configuredOffsets
-  }
-}
+- request generation and video ID still match the current request;
+- adapter loaded video ID matches the request;
+- duration is finite and positive.
+
+A stale state, duration, or CUED event from source A cannot initialize source B. Metadata retries retain the same immutable generation and identity.
+
+### 10.2 One source-transition boundary
+
+Before cueing a new identity, one boundary resolves every old-source owner:
+
+- settle or cancel the active Step sequence according to its existing law;
+- settle Nudge before its timer can checkpoint;
+- cancel Current, Pin, Section, and Range drags to their origins;
+- settle old Playback when safe and cancel Context;
+- clear native Go, programmatic placement, player-pause claims, and metadata retry;
+- close dialogs and Pin-cluster menus;
+- persist safe settled Guide changes;
+- clear Cues, Timeline selection, Guide focus, aligned Pins, Shift layers, direct preview, Field runtime, and deformation bypass;
+- reset source identity, Session, transport, offers, and physical side sources;
+- only then cue the new source.
+
+Player error and ordinary source replacement use the same boundary. No old Address, retained ID, timer, transport, preview, or history entry may reach the new Session.
+
+## 11. Route convergence
+
+Every visible route is an adapter to one semantic consequence:
+
+- Matrix click and keyboard keys call the same Refine, Reopen, Step, Switch Endpoint, Release, Tag, and Focus operations;
+- Timeline Pin click and Guide Pin Go call the same exact movement;
+- Timeline Section click and Guide Section selection install the same Working Interval;
+- Timeline and Guide Pin/Section movement call the same Guide kernel operations;
+- Timeline wheel, off-map wheel, keyboard, and Guide controls call one Nudge operation and settlement owner;
+- typed Address and pointer movement differ only in candidate acquisition and boundary policy, then converge on the same canonical move;
+- Tag duplicate detection has one identity rule;
+- Group deletion copy and mutation consume one deletion plan;
+- geometry, atmosphere, navigation, preview, and Dynamic Playback consume one effective projection.
+
+Previews are dry runs or pure projections. They cannot maintain parallel target arithmetic. When commit occurs, the same operation that supplied the preview consequence owns the canonical state transition.
+
+## 12. Invariants and completion gate
+
+The following are release invariants:
+
+- source time is the only stored temporal coordinate;
+- Range, Resolution, Working Interval, Pins, Sections, Context, and Field Frames remain source-contiguous;
+- effective Timeline density is always positive;
+- source↔Timeline mapping is continuous and invertible;
+- at most one Group is drawn, while any number may be active;
+- Section Weight is retained Guide state; deformation bypass is transient comparison state;
+- all effective spatial consumers agree on one projection;
+- the physical matrix has three equal rows and columns, with Tag at row 3 column 2;
+- Tag label, preview, availability, key route, and pointer route agree with Shift state;
+- Release clears both the semantic residue and acquired Timeline operand without collateral mutation;
+- observation policy is explicit and independent from rate;
+- actual playback rate comes from the media adapter;
+- Panorama suspension never prevents ordinary Center playback or native controls;
+- each gesture owner creates at most one Undo checkpoint;
+- source generations and transition boundary prevent cross-source state;
+- damaged Guide evidence is never overwritten without successful preservation;
+- new Field defaults do not overwrite valid saved settings or restrict available settings;
+- advanced layers can be ignored without making the ordinary player incomplete.
+
+The complete release proof is a clean locked install followed by:
+
+```bash
+npm ci
+npm run verify
 ```
 
-The projections normalize ordering and omit timestamps, labels, object identity noise, and derived Timeline coordinates unless a test explicitly targets projection.
-
-### 12.2 State diff
-
-Add:
-
-```text
-operator-effect-diff.js
-```
-
-It compares normalized before and after projections and returns changed dimension paths.
-
-It must distinguish:
-
-- stored changes;
-- derived projection changes;
-- runtime-only changes;
-- history bookkeeping;
-- optional bound-driven changes.
-
-### 12.3 Contract suite
-
-Add:
-
-```text
-operator-contract-tests.mjs
-```
-
-For every registered operator:
-
-1. construct or generate states in which it is available;
-2. invoke the actual implementation;
-3. verify the result satisfies global invariants;
-4. diff canonical dimensions;
-5. reject changes outside the declared contract;
-6. require declared core effects when the operation reports `changed`;
-7. verify one gesture creates at most one history entry;
-8. verify unavailable states return no semantic change;
-9. verify preview and commit produce equivalent candidate models;
-10. verify counterpart, complement, or involution laws where declared.
-
-Required relational tests:
-
-```text
-Switch × 2                         = exact prior model
-Undo after one semantic gesture    = exact prior checkpoint
-Redo after Undo                    = exact committed checkpoint
-Reopen                             preserves Current and Working Interval
-Release                            changes only Working Interval
-Weight edit                        preserves all source Addresses
-Deform                             preserves Working Interval
-Stretch / Hold                     preserve every Session dimension
-Pin traversal                      uses Step interval law
-Local Refine                       shares Refine target and child frame
-Refine opposite-side crossing      rebases exactly as specified
-Focus then Unfocus                 restores containing Range
-complete weight cycle to 1×        restores neutral contribution, not deletion
-```
-
-### 12.4 Generated coverage
-
-Extend deterministic fuzz and semantic state-space tests to record:
-
-- operator availability frequency;
-- successful use frequency;
-- changed dimensions;
-- block reasons;
-- contract coverage.
-
-Every registered semantic operator must be exercised in:
-
-- at least one ordinary state;
-- at least one boundary state;
-- at least one weighted state where Timeline Space differs from source time;
-- overlap or shared-topology states when relevant.
-
-## 13. Implementation plan: UI derivation
-
-### 13.1 Matrix and hierarchy
-
-`view.js` derives the operator matrix from grammar metadata:
-
-The rendered matrix is geometrically square. Its three equal columns encode
-backward, neutral, and forward roles while its three equal rows encode
-discrimination, traversal, and lifecycle; neither semantic axis may be
-visually compressed relative to the other.
-Within each cell, the shortcut is a stable corner anchor, the operator identity
-is centered and may balance across two lines, and consequence metadata occupies
-a separate compact two-line region. Dynamic labels may change words but not
-this hierarchy.
-
-```text
-row 0  discriminate
-row 1  traverse
-row 2  resolve Working Interval
-```
-
-The visible row labels or accessible group names must expose those roles.
-
-Primary emphasis follows frequency:
-
-- Refine and Step: primary;
-- Reopen, Switch, Pin traversal, Go: secondary or modifier layer;
-- Release, Deform, Focus: contextual high-consequence;
-- Undo and Redo: separate history controls.
-
-The matrix must not imply that Release, Deform, and Focus are directional counterparts. Their unity is the fate of the Working Interval.
-
-### 13.2 Shift and Alt presentation
-
-Holding or latching Shift updates the same controls in place:
-
-- Refine labels become Local Refine;
-- Step labels become Previous/Next Pin;
-- exact previews change accordingly.
-
-Holding or latching Alt:
-
-- marks the selected retained object as carried;
-- previews its translated map position and shared-endpoint consequences;
-- preserves the base movement operator’s target.
-
-### 13.3 Consequence metadata
-
-Every control displays or exposes:
-
-- goal-oriented label;
-- exact destination or transformation;
-- primary changed dimension;
-- concise blocked reason;
-- modifier consequence where active.
-
-Examples:
-
-```text
-Refine Forward
-Choose the forward half · Current 12:30 → 14:08
-
-Reopen
-Restore full Range Resolution · keep Current and Working Section
-
-Deform
-Allocate 0.5× map space to Working Section · source times unchanged
-
-Focus
-Make Working Section the active Range
-```
-
-### 13.4 Working-Interval resolution group
-
-The third row and any contextual duplicate must be labeled or described as:
-
-```text
-Resolve Working Section
-Release · Deform · Focus
-```
-
-Availability:
-
-- Release requires a Working Interval;
-- Deform requires a Working Interval or selected Section;
-- Focus requires a Working Interval or selected Section;
-- Unfocus replaces Focus when a Focus context exists.
-
-### 13.5 Observation command
-
-Space presentation must reflect current state:
-
-```text
-Play
-Pause and settle
-Accept Context position
-```
-
-The underlying key remains constant because each action crosses the same boundary between available observation and semantic commitment.
-
-### 13.6 Documentation generation
-
-Where practical, README shortcut tables, help overlays, and matrix labels should be generated from or audited against `operator-grammar.js`.
-
-A manual document may add explanation but cannot contradict:
-
-- operator ID;
-- key;
-- family;
-- goal;
-- transform contract;
-- complement relationships.
-
-## 14. Implementation phases
-
-### Phase 1 — Formal grammar without behavior change
-
-1. add state-dimension constants;
-2. add `operator-grammar.js`;
-3. register the current operator set;
-4. add registry validation;
-5. preserve all current bindings and rendering;
-6. add project-audit checks for duplicate IDs, duplicate keys within a layer, missing families, and missing actions.
-
-Acceptance:
-
-- no semantic or visual behavior changes;
-- every existing operator has one descriptor;
-- `npm run check` remains green.
-
-### Phase 2 — Effect projection and contract tests
-
-1. add semantic and runtime state projections;
-2. add normalized state diff;
-3. encode minimal-transform contracts;
-4. implement ordinary and boundary tests;
-5. add counterpart, complement, and involution tests;
-6. add preview/commit equivalence checks.
-
-Acceptance:
-
-- every registered operator is contract-tested;
-- undeclared state changes fail the suite;
-- existing fuzz and state-space tests remain green.
-
-### Phase 3 — Availability and disabled reasons
-
-1. centralize availability resolution;
-2. route matrix, keyboard, Field, Timeline, and Guide surfaces through the same operator availability identity;
-3. preserve target calculations in existing owners;
-4. make disabled reasons goal-based and consistent.
-
-Acceptance:
-
-- the same operator is available or blocked consistently on every surface;
-- no UI surface maintains independent semantic eligibility arithmetic.
-
-### Phase 4 — Grammar-derived operator presentation
-
-1. derive matrix placement and group labels;
-2. derive Shift-layer labels and keyboard help;
-3. expose primary transformation metadata;
-4. present the third row as Working-Interval resolution;
-5. separate history and observation from the matrix;
-6. preserve current exact previews.
-
-Acceptance:
-
-- UI placement matches family and frequency metadata;
-- keyboard, mouse, touch, and screen-reader labels describe the same operator;
-- no operator gains a second semantic implementation.
-
-### Phase 5 — Runtime operator integration
-
-1. add Playback, Context, Stretch, Hold, and Alt Carry descriptors;
-2. add runtime effect projections;
-3. verify Session preservation under Field-only operations;
-4. verify Space state transitions;
-5. verify Carry composes with each supported movement family.
-
-Acceptance:
-
-- runtime operations are included in the same semantic vocabulary;
-- Session/runtime ownership remains strictly separated.
-
-### Phase 6 — Usage and optimality validation
-
-Instrument development builds to collect non-content telemetry locally:
-
-- operator availability counts;
-- activation counts;
-- block reasons;
-- modifier use;
-- immediate Undo;
-- repeated switching between operators;
-- time between movement and Release/Deform/Focus.
-
-The application must not transmit video identity, source time, Guide content, labels, or personal usage data unless a separate explicit telemetry design is approved.
-
-Use findings to test placement assumptions:
-
-- whether frequent goals occupy primary surfaces;
-- whether an operator is rarely used because its goal is rare or because its meaning is unclear;
-- whether immediate Undo indicates an incorrect consequence;
-- whether users choose a larger transformation when a smaller one was available.
-
-Acceptance:
-
-- every operator has observed or testable conditions under which it is optimal;
-- no operator exists only because it is symmetrical with another;
-- low-frequency operators remain accessible without competing with primary traversal.
-
-## 15. Audits and repository ownership
-
-### 15.1 Module ownership
-
-```text
-operator-grammar.js             semantic descriptors and relationships only
-operator-availability.js        current-state eligibility composition
-semantic-state-projection.js    normalized contract state for tests/audits
-operator-effect-diff.js         canonical dimension diff
-session.js                      semantic arithmetic and history
-range-geometry.js               Range and Resolution arithmetic
-timeline-projection.js          positive metric and inverse
-guide.js                        Pin/Section topology and weights
-transport.js                    Playback and Context projection
-field-frame.js                  Field Frame derivation, direction, transitions
-step-field-geometry.js          Field source geometry and the breathing machine
-step-field.js                   Field runtime, Frame placement, breathing, Hold
-app.js                          action routing and adapter composition
-view.js                         grammar-derived presentation
-```
-
-`field-frame.js` owns Context Frame derivation, operator fallback Frame
-derivation, direct-manipulation Frame validation, movement direction
-classification, transition descriptors, and stable Frame identity. It does not
-mutate Session, seek players, calculate semantic operator targets independently,
-own Context transport, or own breathing.
-
-No new module may import DOM or media APIs unless its ownership explicitly requires them.
-
-### 15.2 Audit rules
-
-`project-audit.mjs` must fail when:
-
-- an operator used by `app.js`, `session.js`, transport, Field, or Guide has no descriptor;
-- a descriptor has no action or documented presentation-only role;
-- two operators claim the same unmodified key in the same interaction layer;
-- a matrix operator lacks family, goal, frequency, availability, transform, or preserve metadata;
-- a UI shortcut table disagrees with the registry;
-- a semantic preview bypasses the actual operation;
-- a runtime-only descriptor claims Session dimensions;
-- a semantic descriptor omits history behavior;
-- the docs describe an operator family or key that does not exist.
-
-## 16. Completion criteria
-
-The operator-coherence implementation is complete when:
-
-1. every operator is defined by one stable ID;
-2. every operator has one explicit optimal goal;
-3. every operator belongs to a semantic family;
-4. every operator declares transformed and preserved dimensions;
-5. every operator’s availability is consistent across all surfaces;
-6. every semantic preview invokes the same implementation as commit;
-7. undeclared state changes fail automated tests;
-8. Refine, Step, and Go remain differentiated by side, distance, and exact-target knowledge;
-9. Reopen remains recovery without reversal;
-10. Switch remains viewpoint inversion without extent change;
-11. Release, Deform, and Focus are presented as the three fates of the Working Interval;
-12. Playback and Context remain observation and actualization rather than map deformation;
-13. Stretch and Hold remain Field-only perceptual operations;
-14. Weight changes map geometry without changing source truth or media runtime;
-15. Alt Carry composes with movement without becoming a second movement law;
-16. Guide operations preserve graph ownership and shared Pin consequences;
-17. history operators remain outside the environmental operator matrix;
-18. every operator has at least one ordinary, boundary, and weighted contract test where relevant;
-19. all existing semantic, fuzz, audit, smoke, and browser checks pass;
-20. the interface makes the complete video remain legibly available as terrain while bounded operators determine what is currently perceived, traversed, retained, deformed, or focused.
-
-The completed grammar should make the system reconstructable from consequence:
-
-> Given the user’s goal, the available operator should be the smallest valid transformation. Given the transformation, its semantic role and placement should be inferable from the dimensions it changes and preserves.
+After this gate passes, further work is driven by observed use rather than speculative modes or abstractions.

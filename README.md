@@ -1,228 +1,168 @@
 # Video Cartography
 
-**A spatial comprehension workspace for video.**
-See the phases. Map the whole.
+**A spatial comprehension workspace for video.** See the phases. Map the whole.
 
-Video Cartography turns a linear video into a spatial map. Source time remains exact while the reader refines neighborhoods, draws a Working Interval, retains Pins and Sections, and changes how much timeline space a Section receives.
+Video Cartography keeps YouTube source time exact while making a video available in three complementary ways:
 
-A Section weight is a spatial scale, not a playback rate. Its interior copies the familiar Tail/Lead rate ladder, and it extends one step past that ladder at each end:
+- the **Panoramic Phase Field** places nearby Tail, Center, and Lead phases side by side;
+- the **Temporal Topography** projects the ordered source into a positively deformable Timeline;
+- the **Guide** retains discovered Addresses as Pins and relations as Sections.
+
+The application remains useful at every depth. You can use only the ordinary Center player, add keyboard navigation, open the Guide, or use the complete Field and weighted map. None of the advanced layers is required by another.
+
+## Load and play
+
+Paste a YouTube URL, Shorts/live/embed URL, `youtu.be` URL, or video ID and choose **Load**. A start time in the URL is honored.
+
+Center is an ordinary YouTube player. Its seek bar, captions, settings, volume, and fullscreen controls remain pointer-accessible while paused or playing. The parent Play button and `Space` start or pause a `1×` Panorama. `Shift+Space` plays Center alone using the configured fixed rate or the optional dynamic rate policy.
+
+Playback owns two independent facts:
+
+- its observation policy is either **Panorama** or **Center only**;
+- its rate policy is either a stored fixed wish or a dynamic request.
+
+The YouTube adapter remains authoritative about the actual rate. A fixed Shift wish of `1×` is still Center only. If native controls move a Panorama playback away from `1×`, Tail and Lead suspend until the actual rate is compatible again. A focused proper Range wraps; the full-video Range stops at source end.
+
+## Panoramic Phase Field
+
+```text
+Tail | Center | Lead
+```
+
+Center is audible. Tail and Lead are optional muted observations. Outside playback, the Field is a stable directional slideshow
+around Current:
+
+- Step shows the next backward and forward Step destinations;
+- Refine and Reopen show their directional midpoint candidates;
+- a selected or manipulated Section shows Start, its spatial midpoint, and End;
+- a Pin or ordinary Go uses the Step neighborhood;
+- direct manipulation temporarily previews the exact candidate relation.
+
+When Context is enabled, its bounded source window owns the Frame: Tail and Lead remain at the window edges while Center observes within it. Context duration and Field offsets are independent settings.
+
+During ordinary Panorama playback, the Field breathes continuously between inner
+and outer offsets until Hold preserves the attained relation. The conservative shipped defaults are:
+
+```text
+Inner 0.25 s · Outer 2.5 s
+Tail 0.75× | Center 1× | Lead 1.25×
+```
+
+These values favor one coherent local horizon; they are not a restriction. Wider offsets and stronger symmetric rate pairs remain available, and existing saved preferences are preserved. A collapsed, hidden, unavailable, or Range-clipped side does not participate in the breathing barrier. **Hold** freezes the attained offsets at Center rate; **Stretch** resumes from that relation.
+
+## Temporal Topography
+
+Source time is authoritative. Timeline Space is a derived, continuous coordinate:
+
+```text
+density at an Address = product of effective covering Section weights
+Timeline Space         = integral of density
+```
+
+Every factor is positive, so source order is preserved and every Timeline coordinate has one source Address. Weight changes map distance, not source duration or identity.
+
+The canonical Section Weight ladder is:
 
 ```text
 0.125×  0.25×  0.5×  0.75×  1×  1.25×  1.5×  1.75×  2×  4×
 ```
 
-The correspondence is perceptual:
+Overlapping active Sections compose by multiplication. Violet atmosphere indicates compression below `1×`; teal indicates expansion above `1×`; projected source-time contours expose the exact spatial density. The atmosphere is perceptual, while the mapping and contours are metric.
 
-- Tail/Lead rate scales motion through time in a side viewer.
-- Section weight scales the same fixed source material across the timeline.
-- Every video player still follows its own existing runtime rules; Section weight never changes playback.
+All spatial consumers share one effective projection: drawing, contours, hit testing, drag conversion, Step, Refine, adaptive Reach, spatial readouts, and the optional dynamic playback policy.
 
-Because every allowed weight is positive, every source Address remains ordered, visible, and directly reachable. There are no collapsed spans, stacked endpoints, directional faces, or vertical navigation rules. A Pin can be hidden from the Timeline — that is what Group visibility does — but it stays in the Guide, exactly reachable, and returns the moment its layer is drawn again.
+`X` is the auxiliary **Toggle Deformation** action in Operators. With an acquired Timeline Section it temporarily bypasses only that Section; otherwise it bypasses the complete map. Press `X` again on the same scope to restore it. The bypass is source-scoped, transient, absent from Undo and persistence, and never changes the stored Weight. Fixed playback receives no command from `X`; dynamic Shift playback may retune on a later transport tick because that policy explicitly reads the effective map.
 
-## The operator matrix
+## Working Interval and operators
 
-```text
-Refine Backward   Reopen             Refine Forward
-Step Backward     Switch Endpoint    Step Forward
-Release           Deform             Focus / Unfocus
-```
+Range is the admissible source universe. Refine, Step, Go, playback, and direct manipulation exclude alternatives from the current relation. The **Working Interval** is the surviving positive, contiguous residue, stored as two source bounds with orientation and endpoint frames—not as a path log.
 
-The rendered matrix is square so its three semantic rows and three directional
-columns have equal visual weight.
-
-The keyboard has the same shape:
+The visible and physical operator matrix is exactly:
 
 ```text
-Q W E
-A S D
-R T F
+Q  Refine Backward    W  Reopen            E  Refine Forward
+A  Step Backward      S  Switch Endpoint   D  Step Forward
+R  Release            T  Tag               F  Focus / Unfocus
 ```
 
-Shift changes the two directional families and raises Deform by one canonical weight step:
+- `Q/E` choose directional spatial midpoints at finer Resolution while preserving the established residue when possible.
+- `Shift+Q/E` perform Local Refine and retain only the immediate traversal.
+- `A/D` or `←/→` Step through a configured Timeline distance. A repeated sequence is one transaction; a reversal that returns to its departure retains the positive visited envelope.
+- `Shift+A/D` or `Shift+←/→` Step to the previous or next Pin or Range boundary.
+- `W` restores Range-level Resolution without discarding Current or the Working Interval.
+- `S` moves to the opposite endpoint and restores that endpoint’s saved viewpoint.
+- `R` clears the Working Interval and the acquired Timeline operand. Current, Guide focus, retained topology, Weight, Focus, and deformation bypass remain.
+- `T` tags Current as a Pin. `Shift+T` tags a positive Working Interval as a Section. Plain Tag remains a Pin action even while an Interval exists; an exact duplicate is selected rather than recreated.
+- `F` focuses an acquired Section or the Working Interval as Range and viewport; the same action unfocuses to the containing Range.
 
-- Plain `Q/E` Refine retains the Working Interval’s departure while increasing logarithmic resolution. If a reversal reaches or passes that departure, the complete Current-to-target movement becomes the new Working Interval.
-- `Shift+Q/E` invokes Local Refine. Midpoint membership decides whether it shortens the existing traversal or replaces it with the new local traversal.
-- `Shift+A/D` or `Shift+←/→` traverses Pins. Consecutive Pin hops use Step’s retained-anchor law.
-- Section weight is assigned in the Guide, on the Section it belongs to.
+The Matrix Shift button is a one-shot layer owned only by Matrix actions. Guide **Extend** is a separate one-shot layer owned only by Guide composition. Holding the physical Shift key modifies the current action without consuming either latch.
 
-The remaining operators each own one small intent:
+## Guide and direct manipulation
 
-- Reopen restores Resolution to the active Range without discarding coverage.
-- Switch Endpoint chooses the other boundary of the same Working Interval.
-- Release clears only the Working Interval.
-- Weight is assigned in the Guide, on the Section it belongs to. The operator matrix holds `T` Tag in the slot Deform used to, and `X` normalizes rather than deforming.
-- Focus makes a Working Interval or saved Section the active Range; Unfocus restores its containing Range.
-- Plain `Z` is Undo and plain `C` is Redo.
-- `T` immediately Tags Current as a Pin; `Shift+T` immediately Tags the Working
-  Interval as an untitled Section. Guide forms add optional titles explicitly.
+A Pin owns one source Address. A Section is an edge between two Pin identities and owns one Weight. Shared endpoint identity makes connected Sections move together; coincident but distinct Pins remain independent.
 
-## Timeline weighting
+The Guide has Sections, Pins, and transient Cues:
 
-For a source interval of duration \(d\) with one Section weight \(w\):
+- click a Timeline Pin to acquire it and move Current there;
+- click a Timeline Section to make its extent the Working Interval and center Current spatially within it;
+- use exact Address fields, Nudge controls, Weight, Group, rename, delete, Focus, and unlink controls in the Guide;
+- drag Pins, Section end regions, or Section middles on the Timeline or from their Guide rows; both routes invoke the same operations and preview through the Field;
+- unlink a shared endpoint to create an independent Pin at the same Address; drag it near another Pin and hold for the visible snap to arm before release to link;
+- offer chapter text as Cues, then navigate, compose, or retain it explicitly. Cues do not enter the map or Guide on their own.
 
-```text
-timeline extent = w × d
-```
+Every Section belongs to one ordinary Group. At most one Group is drawn on the Timeline, and drawing none is valid. Any number of Groups may be Active and contribute Weight even while hidden. Deleting a Group moves its Sections to the reported surviving Group; the last Group and a move that would create a duplicate Section are refused.
 
-Thus ten source seconds receive 2.5 units of timeline space at `0.25×`, ten at `1×`, and twenty at `2×`. Source duration and playback duration remain ten seconds in every case.
+The Timeline is the spatial manipulation surface. Drag Current to perform one Step gesture; drag a Pin to update every Section that shares it; drag a Section’s end region to move that endpoint or its middle to translate the whole Section. There is no extra endpoint-node chrome. Bare Timeline ground clears the retained Timeline operand and performs ordinary Go.
 
-Overlapping Section weights compose by multiplication. This is the ordinary composition of independent scale transforms, is order-independent, and needs no Section priority or stored hierarchy. Setting a Section to `1×` makes that Section spatially neutral without deleting it.
+Nudge is exact source-time adjustment. `Shift`+wheel uses the dominant wheel axis: up/right is forward and down/left is backward. High-resolution deltas accumulate into discrete quanta, and a wheel series or held repeat creates one Undo transaction. Over the Timeline, the object under the pointer owns the gesture; elsewhere, the acquired Timeline operand owns it, falling back to Current. Guide Address input accepts seconds or timecode and rejects a value outside the active Range or invalid topology instead of silently changing it.
 
-One composed field across the main timeline makes deformation legible:
+## Shortcuts
 
-- below `1×`, violet influence marks compression;
-- above `1×`, teal influence marks expansion;
-- at `1×`, regular slate contours provide neutral scale.
-
-Each Section contributes a soft influence centered on its midpoint. Hue shows
-the sign of deformation, peak strength shows the magnitude of its log weight,
-and the influence fades beyond both endpoints so adjacent Sections read as one
-continuous terrain. Overlapping influences add in log space, exactly matching
-the multiplication of the underlying weights. Source-time contours are then
-projected through the exact map: compression packs them together and expansion
-spreads them apart. The atmosphere is perceptual; the contours remain metric.
-
-## Step size
-
-Step Reach is independent from the three-player Field.
-
-- Manual mode accepts a distance in timeline units.
-- Range-relative mode derives Reach from the active Range’s weighted timeline width.
-- `1/32`, `1/16`, and `1/8` are the adaptive presets.
-- The fine Nudge quantum sits with them: both answer how far one movement goes.
-- Stretch and Hold change only the live Tail/Lead relation. They never overwrite the configured Inner/Outer Offset, Step Reach, or Section weight.
-
-Changing Section weight recomputes adaptive Reach because the active spatial width changed. It does not change fixed Reach.
-
-## Pins and Sections
-
-Pins are shared source Addresses. Sections are edges between two Pins, so endpoint ownership is never duplicated.
-
-- Sections may overlap, nest asymmetrically, share endpoints, or coincide.
-- Every Section owns one weight from the canonical ladder.
-- Every Pin remains a normal lateral traversal stop at every weight.
-- Range Start and Range End are synthetic Pin-traversal stops, deduplicated when a real Pin already exists there.
-- Moving a shared Pin updates every referencing Section.
-- Moving a Section translates only its endpoint Pins; unrelated interior Pins are not captured.
-- Deleting a referenced Pin previews the affected count and dissolves all referencing Sections in one transaction.
-
-The timeline places Pins above the weighted track and its source ruler, then
-lane-packs overlapping Sections into a relationship tree below. Each thin
-Section wire has Start, midpoint, and End nodes with faint relations back to
-its Pin/track positions. Click a Section to make its complete extent the
-Working Interval and return Current to its center. Drag near either end of a
-Section wire to move that endpoint Pin, or its middle to translate the whole
-Section, while the three viewers show the resulting extent. The
-collapsible right rail has two exclusive modes: full-height Guide, or Operators
-with Parameters. Guide and the operator controls never compete for vertical
-space. Collapse either mode to leave Viewer and Timeline as one panoramic
-surface; reopen Guide with its header control or `G` for exact weights, Addresses, and
-endpoint editing. Unlink separates one shared Section endpoint; drag that Pin
-onto another Pin's visible candidate, pause until it arms, then release to link
-their ownership again. Unlink asks for confirmation; proximity alone never
-changes the graph.
-
-## Playback, Context, and Field
-
-Current is committed semantic position. Cursor is observed physical position.
-
-Playback and Context use source time only. A proper focused Range loops; the full-video Range stops at its source end. A wrap adds no history, changes no semantic Current, and rebases each available Field side at most once.
-
-Playback settlement preserves or extends watched Working Interval coverage and never shortens it.
-
-Center is the audible player. Tail and Lead are optional muted projections.
-
-During traversal, Tail–Center–Lead behave as a stable directional slideshow
-around Current. During playback, the Field breathes continuously between inner
-and outer offsets until Hold preserves the attained relation.
-
-- The **Field Frame** is the settled Tail–Center–Lead presentation outside
-  ordinary playback. It is resolved once per semantic movement, and each
-  movement produces one directional transition: forward traversal moves the
-  visible strip leftward, backward traversal moves it rightward.
-- Context has priority over operator framing while it is enabled. Its Tail and
-  Lead are the frozen observation edges; only Center follows the Cursor, and
-  Context beginning, pausing, stopping or settling reassigns neither side.
-- Without Context, the Frame uses the current operator: exact Step destinations,
-  Refine or Reopen midpoints, a retained Section's Start and End, or an exact
-  Go-derived neighbourhood.
-- The **Field Breath** is the live relation during Center playback. Tail stays
-  behind Center and Lead stays ahead while both travel between the configured
-  Inner and Outer Offsets. A side reaching a boundary first waits there at
-  Center rate until every operational side arrives, then the cycle reverses.
-- One combined Stretch/Hold control owns that cycle, and one symmetric breathing
-  rate pair — `0.75×/1.25×`, `0.5×/1.5×`, `0.25×/1.75×` — describes both sides.
-- Hold alone stops breathing. It preserves each attained offset, sets every held
-  side to Center rate, and preserves the direction for later resumption. A held
-  Field is not a configured Offset change and creates no Undo checkpoint.
-- A collapsed or Field-off side is dormant and cannot be revived by a delayed
-  player event; unavailable panes are excluded from the breathing barrier and
-  are not Step operands.
-- Context duration and Field Offset are independent observation settings. A
-  2.5-second Offset and either half of a 5-second Context can describe the same
-  displacement, but changing either value never rewrites the other.
-- Direct manipulation temporarily supplies an exact Frame — a Current, Pin or
-  Section candidate — and one transition returns to the ambient Frame when the
-  gesture ends. Hover and keyboard focus remain map-only dry runs.
-- Timeline weighting only changes where source Addresses are drawn and navigated.
+| Keys | Action |
+| --- | --- |
+| `Space` | Play/pause `1×` Panorama |
+| `Shift+Space` | Play/pause Center-only fixed or dynamic playback |
+| `Q` / `E` | Refine backward / forward |
+| `Shift+Q` / `Shift+E` | Local Refine backward / forward |
+| `A` / `D`, `←` / `→` | Step backward / forward |
+| `Shift+A` / `Shift+D`, `Shift+←` / `Shift+→` | Previous / next Pin |
+| `W` / `S` | Reopen / Switch Endpoint |
+| `R` / `T` / `Shift+T` / `F` | Release / Tag as Pin / Tag as Section / Focus |
+| `X` | Toggle deformation for the acquired Section, otherwise the complete Timeline |
+| `Z` / `C` | Undo / Redo |
+| `[` / `]` | Decrease / increase Step Reach preset |
+| `,` / `.` | Nudge backward / forward |
+| `G` / `O` | Open Guide / Operators and Parameters |
+| `Alt+Q/W/E/A/S/D` or `Alt` + an arrow Step | Carry the acquired retained object with Current |
+| `Esc` | Cancel the active manipulation or close the transient surface |
+| `?` | Shortcut help |
 
 ## Run locally
 
-Serve the directory over HTTP:
+Use Node.js 20 or newer. Install the locked development dependencies:
 
 ```bash
-python3 -m http.server 8000
+npm ci
 ```
 
-Then open `http://localhost:8000`.
-
-Run the release gate with:
+Serve the repository over HTTP, for example:
 
 ```bash
-npm run check
+python -m http.server 8000
 ```
 
-## Direct manipulation and fine adjustment
+Open `http://localhost:8000`. The complete release gate is:
 
-The Temporal Topography owns spatial direct manipulation. Current, Pins, Section
-Start/End/midpoint nodes, and Range boundaries are all dragged there:
-
-```text
-Current marker          → Step
-Pin marker              → Move Pin
-Section wire ends       → Move endpoint Pin
-Section wire middle     → Translate Section
-Range boundary          → Change Range
+```bash
+npm run verify
 ```
 
-Dragging Current is a Step gesture, not a Go: the marker follows a candidate
-Address, the original Current remains as a faint departure marker, Session
-Current is unchanged until release, and the release commits one Step that
-extends or shortens the retained traversal. It does not draw a new Working
-Interval around the landing point — clicking the Timeline is what does that. A
-stationary press moves nothing.
+## Canonical documents
 
-Fine adjustment is called Nudge, because a verified source frame duration is not
-available from every media adapter. It acts in source time:
-
-- `Shift` + wheel up/right nudges forward, down/left nudges backward, and the
-  exact object under the pointer owns the gesture;
-- `Shift`-drag enters precision mode: reduced gain, quantized to the same Nudge
-  quantum, same gesture owner;
-- `,` and `.` nudge the selected map object, or Current when unambiguous;
-- every increment control repeats while held;
-- Guide's `−`/`+` controls invoke the same operation.
-
-One drag, wheel series, or held-key repetition creates at most one Undo
-checkpoint. Guide owns exact topology and numeric editing — Address inputs,
-Nudge increments, Go, Weight, Rename, Delete — and no second drag geometry.
-
-## Canonical project documents
-
-- `PROJECT.md` — canonical project establishment
-- `GLOSSARY.md` — normative lexicon
-- `SPEC.md` — normative state, geometry, and operator laws
-- `IMPLEMENTATION.md` — module ownership and transaction architecture
-- `INTERFACE.md` — visible grammar and direct manipulation
-- `DEVELOPMENT.md` — contribution constraints and test map
-- `VALIDATION.md` — automated and manual release gates
+- `PROJECT.md` — stable conceptual model
+- `GLOSSARY.md` — normative vocabulary
+- `SPEC.md` — normative state and behavior laws
+- `IMPLEMENTATION.md` — module and runtime ownership
+- `INTERFACE.md` — visible and interaction grammar
+- `DEVELOPMENT.md` — contribution constraints and automated suite map
+- `VALIDATION.md` — executable and manual release criteria

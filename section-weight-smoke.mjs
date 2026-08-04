@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { createSmokeEnvironment, descendants } from "./smoke-harness.mjs";
+import { resolveSection } from "./guide.js";
+import { projectionForModel } from "./timeline-projection.js";
 
 const env = createSmokeEnvironment();
 const {
@@ -126,6 +128,31 @@ assert.equal(
   2,
   "Both endpoint Pins remain ordinary lateral operands."
 );
+
+// A Timeline-acquired Section scopes X. Geometry and atmosphere consume the
+// same effective projection while the Guide retains the exact stored Weight
+// and history remains untouched.
+const acquiredSection = descendants(byId.get("section-lane"))
+  .find(node => node.dataset.sectionGo === sectionId);
+byId.get("section-lane").dispatch("click", { target: acquiredSection });
+await flush();
+const sectionBypassHistory = byId.get("return-meta").textContent;
+dispatchDocument("keydown", { key: "x", code: "KeyX" });
+await flush();
+assert.equal(byId.get("duration-time").textContent, "1:40");
+assert.equal(byId.get("deformation-toggle")["aria-pressed"], "true");
+assert.equal(byId.get("deformation-toggle-label").textContent, "Restore Section");
+assert.equal(guideWeightControl().value, "0.5",
+  "Bypassing a Section never edits its stored Weight.");
+const sectionBypassAtmosphere = descendants(byId.get("deformation-field"))
+  .find(node => node.classList.contains("deformation-atmosphere"));
+assert.equal(sectionBypassAtmosphere.classList.contains("has-compression"), false);
+assert.equal(sectionBypassAtmosphere.classList.contains("has-expansion"), false);
+assert.equal(byId.get("return-meta").textContent, sectionBypassHistory,
+  "A transient bypass creates no history transaction.");
+dispatchDocument("keydown", { key: "x", code: "KeyX" });
+await flush();
+assert.match(byId.get("duration-time").textContent, /^1:40 .*0\.9.* spatial$/);
 
 // One spatial second reaches the Section boundary; the next consumes two
 // source seconds at 0.5× density.
@@ -279,7 +306,7 @@ assert.deepEqual(
 assert.equal(byId.get("duration-time").textContent, "1:40");
 
 // Selecting the Section establishes its Working Interval and derives selection
-// for both aligned endpoint Pins. Deform and Focus reuse that identity.
+// for both aligned endpoint Pins. Focus reuses that identity.
 byId.get("release").click();
 const retainedSectionMain = descendants(byId.get("sections-list"))
   .find(node => node.dataset.sectionGo);
@@ -309,8 +336,8 @@ assert.equal(byId.get("sections-list-count").textContent, "1");
 await setSectionWeight("1");
 await flush();
 
-// The matrix Deform action creates a Section at the selected spatial factor
-// without handing anything to the media or Field layers.
+// Tag creates a Section; its Weight is then assigned in Guide without handing
+// anything to the media or Field layers.
 byId.get("release").click();
 for (const clientX of [600, 700]) {
   byId.get("timeline").dispatch("click", {
@@ -342,27 +369,24 @@ assert.equal(
   "1:40 · 0.975× spatial"
 );
 
-// X normalizes: the map is drawn and measured as if the Weights were neutral,
-// while the Weights themselves are untouched. It is the inverse of Weight and
-// the reason Weight is usable -- deformation is right almost always and
-// intolerable when you want to act on a straight line, and without a way out
-// you would stop deforming rather than fight it.
-const weightsBeforeNormalize = descendants(byId.get("sections-list"))
+// X bypasses deformation: the complete map is drawn and measured as if the
+// Weights were neutral while every stored Weight remains untouched.
+const weightsBeforeBypass = descendants(byId.get("sections-list"))
   .filter(node => node.dataset.sectionWeight !== undefined)
   .map(node => node.value);
-const historyBeforeNormalize = byId.get("return-meta").textContent;
+const historyBeforeBypass = byId.get("return-meta").textContent;
 
 dispatchDocument("keydown", { key: "x", code: "KeyX" });
 await flush();
 assert.equal(byId.get("duration-time").textContent, "1:40",
-  "Normalize draws the map straight.");
+  "A complete deformation bypass draws the map straight.");
 assert.deepEqual(
   descendants(byId.get("sections-list"))
     .filter(node => node.dataset.sectionWeight !== undefined)
     .map(node => node.value),
-  weightsBeforeNormalize,
+  weightsBeforeBypass,
   "and changes no Weight, because it is a way of looking rather than an edit.");
-assert.equal(byId.get("return-meta").textContent, historyBeforeNormalize,
+assert.equal(byId.get("return-meta").textContent, historyBeforeBypass,
   "and records no transaction, so it costs nothing to use before a drag.");
 
 dispatchDocument("keydown", { key: "x", code: "KeyX" });
@@ -376,7 +400,7 @@ assert.equal(
 assert.deepEqual(
   playerCommandCounts(),
   commandsBeforeWeight,
-  "Normalizing and restoring issue no player or Field command."
+  "Bypassing and restoring deformation issue no player or Field command."
 );
 
 // Existing Section weights remain editable during source playback without
@@ -399,10 +423,8 @@ assert.deepEqual(
   "Editing Guide weight during playback must leave all media runtime untouched."
 );
 
-// Weight is assigned in the Guide, and only there. The operator matrix used to
-// carry a Deform button and a pair of ladder steppers, which is how Deform
-// became the habitual way to make a Section and why it needed an Alt chord to
-// escape its own overload. Tag holds that slot now.
+// Weight is assigned in the Guide, and only there. Tag owns the matrix's
+// retention position; deformation bypass is a separate auxiliary operation.
 {
   const select = () => descendants(byId.get("sections-list"))
     .find(node => node.dataset.sectionWeight !== undefined);
@@ -474,17 +496,70 @@ assert.deepEqual(
   assert.equal(readout("step-size-summary"), "10 units · manual");
 }
 
-// Scope follows what is acquired, and "nothing acquired" has to be reachable or
-// whole-map Normalize is unreachable after the first Section you ever touch.
+// Selecting a Section and the Field Frame it publishes use the same effective
+// midpoint. An asymmetric overlapping Weight makes this observably different
+// from the arithmetic source midpoint.
+{
+  // With Section A at 2x, source 30 and 40 project to 25% and 41.667% of the
+  // complete 120-unit map.
+  for (const clientX of [250, 1000 * (50 / 120)]) {
+    byId.get("timeline").dispatch("click", {
+      target: byId.get("timeline"),
+      clientX
+    });
+    await flush(2);
+  }
+  byId.get("tag").dispatch("click", { shiftKey: true });
+  await flush(3);
+  const overlapWeight = descendants(byId.get("sections-list")).find(node =>
+    node.dataset.sectionWeight
+    && node.dataset.sectionWeight !== sectionId
+  );
+  assert.ok(overlapWeight, "The asymmetric overlap must be retained.");
+  overlapWeight.value = "4";
+  byId.get("sections-list").dispatch("change", { target: overlapWeight });
+  await flush(2);
+
+  const outer = descendants(byId.get("section-lane")).find(node =>
+    node.dataset.sectionGo === sectionId
+  );
+  byId.get("section-lane").dispatch("click", { target: outer });
+  await flush(3);
+  await poll();
+  await flush(3);
+  const currentGuideKey = [...env.localStorage.values.keys()]
+    .find(key => key.includes(":v9:"));
+  const storedGuide = JSON.parse(env.localStorage.values.get(currentGuideKey));
+  const outerSection = resolveSection(storedGuide, sectionId);
+  const effective = projectionForModel({
+    duration: 100,
+    range: { start: 0, end: 100 },
+    guide: storedGuide
+  });
+  const expectedCenter = effective.timelineMidpoint(
+    outerSection.start,
+    outerSection.end
+  );
+  assert.notEqual(expectedCenter, outerSection.midpoint,
+    "The asymmetric overlap must distinguish effective and arithmetic midpoints.");
+  assert.ok(Math.abs(center().currentTime - expectedCenter) < 1e-6,
+    `Section navigation centers Current in effective Timeline Space; got ${center().currentTime}, expected ${expectedCenter}.`);
+  assert.ok(Math.abs(tail().currentTime - outerSection.start) < 1e-6);
+  assert.ok(Math.abs(lead().currentTime - outerSection.end) < 1e-6,
+    "The Field uses Start / effective midpoint / End for that same Section.");
+}
+
+// Scope follows what is acquired, and bare Timeline selection makes the
+// complete-map bypass reachable after working with Sections.
 byId.get("release").click();
 await flush(3);
 const weightedSpan = byId.get("duration-time").textContent;
 dispatchDocument("keydown", { key: "x", code: "KeyX" });
 await flush();
 assert.equal(byId.get("duration-time").textContent, "1:40",
-  "With nothing acquired, Normalize straightens the whole Timeline.");
-assert.equal(byId.get("normalize-toggle")["aria-pressed"], "true",
-  "and the control near the Timeline says so.");
+  "With nothing acquired, X straightens the whole Timeline.");
+assert.equal(byId.get("deformation-toggle")["aria-pressed"], "true",
+  "and the auxiliary Operators action states that active scope.");
 dispatchDocument("keydown", { key: "x", code: "KeyX" });
 await flush();
 assert.equal(byId.get("duration-time").textContent, weightedSpan,

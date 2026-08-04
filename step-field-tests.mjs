@@ -12,6 +12,11 @@ import {
   fieldShouldSuspend,
   fieldPreferenceRequiresEstablish
 } from "./step-field.js";
+import {
+  OBSERVATION_POLICY,
+  createPlaybackTransport,
+  fixedRatePolicy
+} from "./transport.js";
 
 {
   const bounds = deriveFieldBounds({
@@ -58,6 +63,22 @@ assert.equal(FIELD_SIDE_MODE.HELD, "held");
 assert.equal(FIELD_SIDE_MODE.STRETCHING, "stretching");
 assert.equal(fieldShouldSuspend({ transportKind: "context" }), true);
 assert.equal(fieldShouldSuspend({ transportKind: "playback" }), false);
+const panoramaPlayback = createPlaybackTransport({
+  departure: 10,
+  observationPolicy: OBSERVATION_POLICY.PANORAMA,
+  ratePolicy: fixedRatePolicy(1),
+  offeredRates: [0.75, 1, 1.25],
+  actualRate: 1
+});
+const centerOnlyPlayback = createPlaybackTransport({
+  departure: 10,
+  observationPolicy: OBSERVATION_POLICY.CENTER_ONLY,
+  ratePolicy: fixedRatePolicy(1),
+  offeredRates: [0.75, 1, 1.25],
+  actualRate: 1
+});
+assert.equal(fieldShouldSuspend({ transport: panoramaPlayback }), false);
+assert.equal(fieldShouldSuspend({ transport: centerOnlyPlayback }), true);
 assert.equal(fieldShouldSuspend({ pendingStep: true, transportKind: "idle" }), true);
 assert.equal(fieldShouldSuspend({ dragging: true, transportKind: "idle" }), true);
 assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: false }), false);
@@ -123,16 +144,15 @@ assert.equal(resolveFieldPhase({
   assert.match(app, /function startFieldPlaybackFromGesture\(options = \{\}\)/);
   assert.match(app, /stepField\?\.playFromGesture\?\.\(\{ center: destination, reason: "playback" \}\);[\s\S]*player\.play\(\);/,
     "Parent-owned playback must refold/start both side players and Center in one synchronous gesture stack.");
-  // Tail and Lead hold their offset by playing the same material at the same
-  // rate, so no side rate preserves the relation once Center's rate changes.
-  // Ordinary variable-speed playback is a capability the Panorama may cost the
-  // reader nothing: it suspends instead.
+  // Observation ownership, not an inferred rate or modifier, decides whether
+  // the Panorama participates. The confirmed actual rate is then the authority
+  // on whether fixed offsets can still be maintained.
   assert.match(
     app,
-    /if \(rate === 1 && !options\.dynamic\) \{[\s\S]*stepField\?\.playFromGesture[\s\S]*\} else \{\s*stepField\?\.pause\(\{ center: destination, freeze: false \}\);/,
-    "A Center rate other than 1x suspends the Panorama rather than letting it drift."
+    /observationPolicy: shifted[\s\S]*OBSERVATION_POLICY\.CENTER_ONLY[\s\S]*OBSERVATION_POLICY\.PANORAMA[\s\S]*if \(playbackAllowsPanorama\(state\.transport\)\)/,
+    "Playback must name its observation owner explicitly before deciding whether the Panorama participates."
   );
-  assert.match(app, /player\.setRate\(rate\);\s*player\.play\(\);/,
+  assert.match(app, /player\.setRate\(state\.transport\.requestedRate\);\s*player\.play\(\);/,
     "and the rate is established before the play command that uses it.");
   assert.match(app, /center-transport-surface/);
   assert.match(fieldSource, /function playFromGesture\(options = \{\}\)/);

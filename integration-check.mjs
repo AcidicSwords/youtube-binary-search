@@ -1,28 +1,109 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import {
+  createGroup,
+  createGuide,
+  createSectionFromTimes,
+  groupDeletionPlan,
+  setGroupState,
+  setSectionWeight
+} from "./guide.js";
+import { OPERATOR_MATRIX, operatorCells } from "./operator-grammar.js";
+import {
+  createTimelineProjection
+} from "./timeline-projection.js";
+import {
+  OBSERVATION_POLICY,
+  createPlaybackTransport,
+  dynamicRateForWeight,
+  dynamicRatePolicy,
+  fixedRatePolicy,
+  playbackAllowsPanorama,
+  rebasePlaybackTransport,
+  resolveOfferedRate,
+  retryPlaybackTransport,
+  withPlaybackActualRate
+} from "./transport.js";
+import {
+  DEFAULT_FIELD_BREATH,
+  breathRatePair
+} from "./step-field-geometry.js";
 
-const read = path => readFileSync(new URL(`./${path}`, import.meta.url), "utf8");
-const html = read("index.html");
-const app = read("app.js");
-const view = read("view.js");
-const styles = read("styles.css");
-const fieldCss = read("step-field.css");
-const session = read("session.js");
-const transport = read("transport.js");
-const guide = read("guide.js");
-const projection = read("timeline-projection.js");
-const youtube = read("youtube.js");
+const read = path => readFileSync(new URL(`./${path}`, import.meta.url), "utf8")
+  .replace(/\r\n?/g, "\n");
+const stripJsComments = source => source
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/^\s*\/\/.*$/gm, "");
 
-const ids = [...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]);
+const sources = Object.fromEntries([
+  "index.html",
+  "app.js",
+  "view.js",
+  "styles.css",
+  "session.js",
+  "guide.js",
+  "transport.js",
+  "youtube.js",
+  "browser-smoke.mjs",
+  "interaction-smoke.mjs",
+  "operator-grammar-tests.mjs",
+  "guide-session-completion-tests.mjs",
+  "package.json"
+].map(path => [path, read(path)]));
+
+const html = sources["index.html"];
+const app = sources["app.js"];
+const appCode = stripJsComments(app);
+const view = sources["view.js"];
+const styles = sources["styles.css"];
+const session = sources["session.js"];
+const guideSource = sources["guide.js"];
+const transportSource = sources["transport.js"];
+const youtube = sources["youtube.js"];
+const browserSmoke = sources["browser-smoke.mjs"];
+const interactionSmoke = sources["interaction-smoke.mjs"];
+const pkg = JSON.parse(sources["package.json"]);
+
+const failures = [];
+const check = (condition, message) => {
+  if (!condition) failures.push(message);
+};
+const has = (source, pattern, message) => {
+  pattern.lastIndex = 0;
+  check(pattern.test(source), message);
+};
+const lacks = (source, pattern, message) => {
+  pattern.lastIndex = 0;
+  check(!pattern.test(source), message);
+};
+const same = (actual, expected, message) => check(
+  JSON.stringify(actual) === JSON.stringify(expected),
+  `${message} (received ${JSON.stringify(actual)})`
+);
+const topLevelFunction = (source, name) => {
+  const start = source.search(new RegExp(
+    `^[ \\t]*(?:export\\s+)?(?:async\\s+)?function\\s+${name}\\s*\\(`,
+    "m"
+  ));
+  if (start < 0) return "";
+  const openingBrace = source.indexOf("{", start);
+  if (openingBrace < 0) return "";
+  const remainder = source.slice(openingBrace + 1);
+  const next = remainder.search(/^[ \t]*(?:export\s+)?(?:async\s+)?function\s+[A-Za-z_$]/m);
+  return next < 0
+    ? source.slice(start)
+    : source.slice(start, openingBrace + 1 + next);
+};
+
+// Basic DOM integrity remains part of integration: the composition root may
+// refer to an element only when the document actually owns it.
+const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
 const htmlIds = new Set(ids);
-assert.equal(htmlIds.size, ids.length, "Every DOM id must be unique.");
-
+check(htmlIds.size === ids.length, "Every DOM id is unique.");
 for (const match of html.matchAll(/aria-controls="([^"]+)"/g)) {
   for (const id of match[1].trim().split(/\s+/)) {
-    assert.ok(htmlIds.has(id), `aria-controls references missing id: ${id}`);
+    check(htmlIds.has(id), `aria-controls references missing id ${id}.`);
   }
 }
-
 const labelled = new Set(
   [...html.matchAll(/<label\b[^>]*\bfor="([^"]+)"/g)].map(match => match[1])
 );
@@ -30,200 +111,451 @@ for (const match of html.matchAll(/<(input|select|textarea)\b([^>]*)>/g)) {
   const attributes = match[2];
   const id = attributes.match(/\bid="([^"]+)"/)?.[1];
   if (!id || /\btype="hidden"/.test(attributes)) continue;
-  assert.ok(
+  check(
     labelled.has(id)
       || /\baria-label="[^"]+"/.test(attributes)
       || /\baria-labelledby="[^"]+"/.test(attributes),
-    `Form control requires an accessible name: ${id}`
+    `Form control ${id} has an accessible name.`
   );
 }
-
 for (const match of html.matchAll(/<button\b([^>]*)>/g)) {
-  assert.match(match[1], /\btype="(button|submit|reset)"/, "Every button must declare a type.");
+  check(/\btype="(?:button|submit|reset)"/.test(match[1]), "Every button declares its type.");
+}
+const domReferences = new Set([
+  ...[...`${app}\n${view}`.matchAll(/elements\["([^"]+)"\]/g)].map(match => match[1]),
+  ...[...`${app}\n${view}`.matchAll(/elements\.([A-Za-z_][A-Za-z0-9_-]*)/g)].map(match => match[1])
+]);
+for (const id of domReferences) {
+  check(htmlIds.has(id), `Runtime DOM reference ${id} exists in index.html.`);
 }
 
-const projectionSource = `${app}\n${view}`;
-const references = new Set([
-  ...[...projectionSource.matchAll(/elements\["([^"]+)"\]/g)].map(match => match[1]),
-  ...[...projectionSource.matchAll(/elements\.([A-Za-z_][A-Za-z0-9_-]*)/g)].map(match => match[1])
-]);
-const missing = [...references].filter(id => !htmlIds.has(id));
-assert.deepEqual(missing, [], `Missing DOM ids: ${missing.join(", ")}`);
-
-for (const removed of [
-  "continue",
-  "context-action",
-  "skim",
-  "speed-select",
-  "loop",
-  "pin-backward",
-  "pin-forward",
-  "step-link",
-  "pins-access",
-  "focused-state"
-]) assert.equal(htmlIds.has(removed), false, `Retired control remains: ${removed}`);
-
-for (const required of [
-  "range-fill",
-  "resolution-fill",
-  "interval-fill",
-  "field-span-fill",
-  "section-preview-fill",
-  "deformation-field",
-  "timeline-ruler",
-  "section-lane",
-  "pin-lane",
-  "pin-cluster-menu",
-  "guide-toggle",
-  "operator-toggle",
-  "current-marker",
-  "cursor-marker",
-  "refine-backward",
-  "reopen",
-  "refine-forward",
-  "step-backward",
-  "switch-endpoint",
-  "step-forward",
-  "release",
-  "tag",
-  "focus-toggle",
-  "return-action",
-  "step-size-settings",
-  "step-mode-fixed",
-  "step-mode-adaptive",
-  "step-size-seconds",
-  "step-fraction-32",
-  "step-fraction-16",
-  "step-fraction-8",
-  "shift-layer-toggle",
-  "section-capture",
-  "section-source",
-  "focus-working-section",
-  "save-section",
-  "pin-capture",
-  "pin-current",
-  "sections-list",
-  "pins-list",
-  "leave-section"
-]) assert.ok(htmlIds.has(required), `Missing required projection: ${required}`);
-
-assert.match(
-  html,
-  /id="refine-backward"[\s\S]*id="reopen"[\s\S]*id="refine-forward"[\s\S]*id="step-backward"[\s\S]*id="switch-endpoint"[\s\S]*id="step-forward"[\s\S]*id="release"[\s\S]*id="tag"[\s\S]*id="focus-toggle"[\s\S]*id="return-action"/
+// The matrix grammar is frozen, shared, and physically proved in Chromium.
+const expectedMatrix = [
+  ["refine-backward", "reopen", "refine-forward"],
+  ["step-backward", "switch-endpoint", "step-forward"],
+  ["release", "tag", "focus-toggle"]
+];
+const expectedKeys = ["Q", "W", "E", "A", "S", "D", "R", "T", "F"];
+same(OPERATOR_MATRIX.map(row => row.map(cell => cell.id)), expectedMatrix,
+  "The grammar fixture is exactly QWE / ASD / RTF.");
+same(operatorCells().map(cell => cell.key), expectedKeys,
+  "The fixture assigns the canonical key to every matrix cell.");
+const deck = html.match(
+  /<div class="navigation-deck">([\s\S]*?)<\/div>\s*<div class="operator-auxiliary-actions">/
+)?.[1] || "";
+check(Boolean(deck), "Operators has one navigation-deck followed by auxiliary actions.");
+const deckButtons = [...deck.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)]
+  .map(match => ({
+    attributes: match[1],
+    body: match[2],
+    id: match[1].match(/\bid="([^"]+)"/)?.[1]
+  }));
+same(deckButtons.map(button => button.id), expectedMatrix.flat(),
+  "DOM order contains exactly the nine canonical matrix cells.");
+for (const [index, button] of deckButtons.entries()) {
+  const key = expectedKeys[index];
+  check(new RegExp(`<kbd>\\s*${key}\\s*<\\/kbd>`).test(button.body),
+    `${button.id} visibly carries ${key}.`);
+  check((button.attributes.match(/aria-keyshortcuts="([^"]+)"/)?.[1] || "")
+    .split(/\s+/).includes(key), `${button.id} advertises ${key} to assistive technology.`);
+}
+const areaBlock = styles.match(
+  /\.navigation-deck\s*\{[\s\S]*?grid-template-areas:\s*([\s\S]*?);/
+)?.[1] || "";
+same(
+  [...areaBlock.matchAll(/"([^"]+)"/g)].map(match => match[1].trim().split(/\s+/)),
+  [
+    ["refine-backward", "reopen", "refine-forward"],
+    ["step-backward", "switch-endpoint", "step-forward"],
+    ["release", "tag", "focus"]
+  ],
+  "CSS areas express the same three rows."
 );
-assert.match(
-  styles,
-  /grid-template-areas:[\s\S]*"refine-backward reopen refine-forward"[\s\S]*"step-backward switch-endpoint step-forward"[\s\S]*"release tag focus"/
-);
-assert.match(html, /id="return-action"[^>]*aria-keyshortcuts="Z"/);
-assert.match(html, /id="redo-action"[^>]*aria-keyshortcuts="C"/);
-assert.match(styles, /touch-action:\s*manipulation/);
-assert.match(styles, /\.timeline[^{]*\{[^}]*touch-action:\s*pan-y/s);
-assert.match(
-  fieldCss,
-  /grid-template-areas:\s*"tail center lead"[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1\.1fr\) minmax\(0, 1fr\)/
-);
+has(styles, /\.navigation-deck\s*\{[\s\S]*?aspect-ratio:\s*1\s*;/,
+  "The matrix container is square.");
+has(styles, /#tag\s*\{\s*grid-area:\s*tag\s*;\s*\}/,
+  "Tag occupies the Tag CSS area.");
+lacks(areaBlock, /\bdeform\b/i, "No dead Deform area remains in the matrix.");
+has(sources["operator-grammar-tests.mjs"], /from "\.\/operator-grammar\.js"/,
+  "The pure grammar fixture is consumed by its proof suite.");
+for (const proof of [
+  /getBoundingClientRect\(\)/,
+  /rows\.size,\s*3/,
+  /columns\.size,\s*3/,
+  /childCount,\s*9/,
+  /matrix\.cells\[2\]\[1\]\.id,\s*"tag"/,
+  /Shifted operator labels preserve the square matrix dimensions/
+]) has(browserSmoke, proof, `Chromium geometry proof includes ${proof}.`);
+for (const [key, consequence] of [
+  ["w", /reopenFully\(\)/],
+  ["q", /refine\("backward"/],
+  ["s", /switchCurrentEndpoint\(/],
+  ["e", /refine\("forward"/]
+]) {
+  has(appCode, new RegExp(`spatialKey\\("${key}"\\)[\\s\\S]{0,180}?${consequence.source}`),
+    `${key.toUpperCase()} reaches its canonical matrix consequence.`);
+}
+has(appCode, /code === "KeyA"[\s\S]{0,180}?directionalStep\("backward"\)/,
+  "A reaches Step Backward.");
+has(appCode, /code === "KeyD"[\s\S]{0,180}?directionalStep\("forward"\)/,
+  "D reaches Step Forward.");
+has(appCode, /plain && key === "r"[\s\S]{0,100}?releaseWorkingInterval\(\)/,
+  "R reaches Release.");
+has(appCode, /plain && key === "f"[\s\S]{0,100}?focusOrUnfocus\(\)/,
+  "F reaches Focus / Unfocus.");
 
-assert.ok(app.includes('from "./session.js"'));
-assert.ok(app.includes('from "./guide.js"'));
-assert.ok(app.includes('from "./transport.js"'));
-assert.ok(app.includes('from "./view.js"'));
-assert.ok(app.includes('from "./range-geometry.js"'));
-assert.ok(app.includes('from "./step-gesture.js"'));
-assert.ok(app.includes('from "./timeline-projection.js"'));
-assert.doesNotMatch(app, /from "\.\/traversal\.js"|from "\.\/structure\.js"/);
+// Tag has one grammar on pointer, keyboard, preview, and Guide surfaces.
+has(appCode, /elements\.tag\.addEventListener\("click"[\s\S]*?saveCurrentIntervalAsSection\([\s\S]*?source:\s*"interval"[\s\S]*?pinCurrent\(/,
+  "The Tag button routes Shift to Section and plain input to Current Pin.");
+has(appCode, /event\.shiftKey[\s\S]{0,180}?key === "t"[\s\S]{0,220}?saveCurrentIntervalAsSection\(/,
+  "Shift+T tags the Working Interval as a Section.");
+has(appCode, /plain && key === "t"[\s\S]{0,120}?pinCurrent\(/,
+  "Plain T tags Current as a Pin.");
+has(view, /const tagLabel = shiftLayer \? "Tag as Section" : "Tag as Pin"/,
+  "The visible Tag label follows Shift state, not Interval presence.");
+has(view, /tagMeta = shiftLayer[\s\S]*?positiveWorkingInterval[\s\S]*?→ Section[\s\S]*?Current \$\{formatTime\(semanticCurrent\)\} → Pin/,
+  "Tag meta names its exact operand and retained result.");
+has(view, /elements\.tag\.disabled\s*=\s*interactionLocked\s*\|\|\s*\(shiftLayer && !positiveWorkingInterval\)/,
+  "Only shifted Tag requires a positive Working Interval.");
+has(view, /tag:\s*shiftLayer\s*\?\s*positiveWorkingInterval\s*:\s*\{ start: semanticCurrent, end: semanticCurrent \}/,
+  "Tag preview follows the same Pin/Section operand law.");
+has(topLevelFunction(appCode, "pinCurrent"), /!result\.changed[\s\S]*?result\.value\?\.pin[\s\S]*?selectTimelineRetained\(\{ kind: "pin"/,
+  "Duplicate Tag as Pin acquires the existing exact Pin.");
+has(topLevelFunction(appCode, "saveCurrentIntervalAsSection"), /reason === "duplicate-section"[\s\S]*?selectTimelineRetained\(\{ kind: "section"/,
+  "Duplicate Tag as Section acquires the existing exact Section.");
+lacks(html, /<kbd>\s*P\s*<\/kbd>|Shift\s*\+\s*P|aria-keyshortcuts="[^"]*(?:^|\s)(?:Shift\+)?P(?:\s|$)/i,
+  "No visible or accessible P binding remains.");
+lacks(appCode, /key\s*===\s*"p"|code\s*===\s*"KeyP"/,
+  "Runtime has no P/Shift+P Tag route.");
 
-assert.match(view, /setAttribute\("role", "menuitem"\)/);
-assert.match(view, /setAttribute\("aria-haspopup", "menu"\)/);
-assert.doesNotMatch(view, /dataset\.overwriteSection|Overwrite/);
-assert.match(view, /dataset\.sectionWeight/);
-assert.match(view, /SECTION_WEIGHT_VALUES/);
-assert.match(view, /timeline-section-span/);
-assert.match(view, /function deformationInfluence[\s\S]*Math\.log2\(section\.weight\)[\s\S]*deformation-contours/);
-assert.doesNotMatch(view, /timeline-fold|foldContributors|sectionCollapse|sectionExpand/);
+// X is one transient auxiliary bypass, never a Weight edit or a tenth operator.
+const deckIndex = html.indexOf('class="navigation-deck"');
+const bypassIndex = html.indexOf('id="deformation-toggle"');
+const historyIndex = html.indexOf('class="history-actions"');
+check(deckIndex >= 0 && deckIndex < bypassIndex && bypassIndex < historyIndex,
+  "Toggle Deformation is outside the matrix and before history inside Operators.");
+has(html, /id="deformation-toggle"[^>]*aria-pressed="false"/,
+  "The auxiliary pointer route exposes resolved pressed state.");
+has(html, /id="deformation-toggle"[^>]*aria-keyshortcuts="X"/,
+  "The auxiliary pointer route exposes X and resolved pressed state.");
+lacks(html, /timeline-normalize|>\s*Normalize\s*</i,
+  "Timeline has no Normalize control or product label.");
+lacks(styles, /\.timeline-normalize\b/, "Dead Timeline Normalize CSS is absent.");
+has(appCode, /deformationBypass:\s*null/, "Composition state explicitly owns deformationBypass.");
+lacks(appCode, /state\.normalize\b|toggleNormalize\b/, "No parallel normalize state or operation remains.");
+has(appCode, /plain && key === "x"[\s\S]{0,120}?toggleDeformation\(\)/,
+  "Plain X reaches the same Toggle Deformation consequence as the button.");
+const toggleDeformation = topLevelFunction(appCode, "toggleDeformation");
+has(toggleDeformation, /state\.dragHandle \|\| state\.guideDrag \|\| state\.currentDrag/,
+  "X refuses a projection change during direct manipulation.");
+has(toggleDeformation, /settleBeforeAction\(\{ transport: false \}\)/,
+  "X settles pending spatial transactions without stopping playback.");
+has(toggleDeformation, /restoring \? null : scope/,
+  "The same scope restores and another scope transfers the one bypass.");
+lacks(toggleDeformation, /checkpoint|persist|accept\(|player\.(?:pause|play|setRate|place)/,
+  "X creates no history/persistence entry and issues no direct player command.");
+has(topLevelFunction(appCode, "resolvedDeformationBypassScope"), /state\.selectedRetained[\s\S]*?kind === "section"/,
+  "Only an acquired Timeline Section scopes X.");
+has(appCode, /deleteGuideSection[\s\S]{0,320}?state\.deformationBypass[\s\S]{0,160}?= null/,
+  "Deleting the bypass target clears it.");
+has(topLevelFunction(appCode, "resetSourceScopedState"), /state\.deformationBypass = null/,
+  "Source replacement clears the bypass.");
+lacks(session, /export function deformSection|DEFAULT_DEFORM_WEIGHT|applyDeformWeight/,
+  "The dead Deform Session surface is removed.");
 
-assert.match(session, /export function localRefine/);
-assert.match(
-  session,
-  /function retainedRefineIntervalRelation[\s\S]*classifyRetainedRefineRelation[\s\S]*export function refine[\s\S]*refineRelation:\s*intervalRelation\.relation/
+// Effective projection behavior is exercised as behavior, not certified by a
+// comment. Overlap survives a one-Section bypass; whole-map bypass is identity.
+{
+  const guide = createGuide("projection-audit");
+  const expanded = createSectionFromTimes(guide, 2, 8, {
+    id: "expanded",
+    weight: 2
+  }).section;
+  const compressed = createSectionFromTimes(guide, 4, 6, {
+    id: "compressed",
+    weight: 0.5
+  }).section;
+  const weighted = createTimelineProjection({ duration: 10, guide });
+  const sectionBypass = createTimelineProjection({
+    duration: 10,
+    guide,
+    deformationBypass: { kind: "section", sectionId: expanded.id }
+  });
+  const allBypass = createTimelineProjection({
+    duration: 10,
+    guide,
+    deformationBypass: { kind: "all" }
+  });
+  check(weighted.weightAtSource(3) === 2, "Stored active Weight deforms the effective map.");
+  check(sectionBypass.weightAtSource(3) === 1, "A Section bypass removes only its target.");
+  check(sectionBypass.weightAtSource(5) === compressed.weight,
+    "An overlapping Section still contributes while its neighbor is bypassed.");
+  same(sectionBypass.weightedSections.map(section => section.id), [compressed.id],
+    "Projection exposes exactly its effective contributors.");
+  same(allBypass.weightedSections, [], "Whole-map bypass exposes no weighted contributors.");
+  check(allBypass.timelineExtent === 10 && allBypass.sourceToTimeline(7.25) === 7.25,
+    "Whole-map bypass is the positive identity projection.");
+  for (const source of [0, 1.25, 4.5, 8.75, 10]) {
+    check(Math.abs(weighted.timelineToSource(weighted.sourceToTimeline(source)) - source) < 1e-9,
+      `Weighted projection remains singly invertible at ${source}.`);
+  }
+}
+const deformationRenderer = topLevelFunction(view, "renderTimelineDeformation");
+has(deformationRenderer, /projection\.weightedSections/,
+  "Atmosphere and contours consume effective projection contributors.");
+lacks(deformationRenderer, /sortedSections\(|guide\(\)\.sections|state\(\)\.session\.model\.guide/,
+  "Atmosphere does not reread raw stored Guide weights.");
+for (const api of ["localRefine", "refine", "step", "stepToPin", "switchEndpoint"]) {
+  has(session, new RegExp(`export function ${api}\\([^)]*options = \\{\\}`),
+    `${api} accepts operation-scoped projection options.`);
+}
+const previewTransition = topLevelFunction(session, "previewTransition");
+check(
+  (previewTransition.match(/projection:\s*options\.projection/g) || []).length === 9,
+  "Every projection-aware operator preview forwards the effective projection used by commit."
 );
-assert.match(session, /export function releaseInterval/);
-assert.match(session, /export function deformSection/);
-assert.match(session, /export function setGuideSectionWeight/);
-assert.match(session, /export function focusWorkingSection[\s\S]*FOCUS_KIND\.WORKING/);
-assert.doesNotMatch(session, /overwriteGuideSection|replaceSectionExtent/);
-assert.match(session, /syncIntervalEndpointFrames[\s\S]*containExtent/);
-assert.match(session, /projectPlayback[\s\S]*translateNeighborhood[\s\S]*sourceInterval\?\.start[\s\S]*sourceInterval\?\.end/);
-assert.match(session, /completePlayback[\s\S]*projectPlayback/);
+has(appCode, /function timelineProjection\(\)[\s\S]*?deformationBypass:\s*validDeformationBypass\(\)/,
+  "The composition root creates one bypass-aware projection.");
+has(topLevelFunction(appCode, "commitNativeGo"), /projection:\s*timelineProjection\(\)/,
+  "A paused native seek reconciles through the effective projection.");
+has(topLevelFunction(appCode, "startNativePlaybackSession"), /projection:\s*timelineProjection\(\)/,
+  "Native Play reconciles its starting Address through the effective projection.");
+has(appCode, /dynamicRatePolicy|RATE_POLICY_KIND\.DYNAMIC[\s\S]*?timelineProjection\(\)\.weightAtSource/,
+  "Explicit dynamic playback reads the effective projection.");
+has(topLevelFunction(appCode, "handleTimelineClick"), /state\.selectedRetained = null[\s\S]*?moveToAddress\(/,
+  "Bare Timeline Go clears the acquired operand before moving.");
+const release = topLevelFunction(appCode, "releaseWorkingInterval");
+has(release, /releaseSessionInterval\(state\.session\)/, "Release delegates semantic residue to Session.");
+has(release, /state\.selectedRetained = null/, "Release also clears the Timeline operand.");
+lacks(release, /guideRetained\s*=\s*null|deformationBypass\s*=|focus\s*=|setRange/,
+  "Release does not mutate Guide focus, bypass, Focus, or Range.");
 
-assert.match(guide, /SECTION_WEIGHT_VALUES[\s\S]*0\.25[\s\S]*2/);
-assert.match(guide, /export function setSectionWeight/);
-assert.match(guide, /export function translateSection/);
-assert.match(guide, /function timelineStops[\s\S]*projection\.orderedPinStops/);
-assert.match(guide, /export function previousPin[\s\S]*timelineStops/);
-assert.match(guide, /export function nextPin[\s\S]*timelineStops/);
+// Playback owns observation, requested policy, and confirmed adapter rate as
+// independent facts. Rebase and retry preserve those policies.
+{
+  const panorama = createPlaybackTransport({
+    departure: 2,
+    observationPolicy: OBSERVATION_POLICY.PANORAMA,
+    ratePolicy: fixedRatePolicy(1),
+    offeredRates: [0.5, 1, 2],
+    actualRate: 1
+  });
+  const shiftedOne = createPlaybackTransport({
+    departure: 2,
+    observationPolicy: OBSERVATION_POLICY.CENTER_ONLY,
+    ratePolicy: fixedRatePolicy(1),
+    offeredRates: [0.5, 1, 2],
+    actualRate: 1
+  });
+  check(playbackAllowsPanorama(panorama), "Plain fixed 1x playback owns Panorama.");
+  check(!playbackAllowsPanorama(shiftedOne), "Shift fixed 1x remains Center-only.");
+  check(!playbackAllowsPanorama(withPlaybackActualRate(panorama, 1.5)),
+    "Confirmed native rate incompatibility suspends Panorama.");
+  check(playbackAllowsPanorama(withPlaybackActualRate(panorama, 1)),
+    "Confirmed return to 1x restores only Panorama-owned observation.");
+  check(dynamicRateForWeight(8) === 0.125 && dynamicRateForWeight(0.125) === 8,
+    "Dynamic rate is the unconstrained inverse of effective Weight.");
+  const tieWish = Math.sqrt(0.5);
+  check(resolveOfferedRate(tieWish, [0.5, 1]) === 1,
+    "Log-space offer ties resolve toward neutral 1x.");
+  const dynamic = createPlaybackTransport({
+    departure: 2,
+    observationPolicy: OBSERVATION_POLICY.CENTER_ONLY,
+    ratePolicy: dynamicRatePolicy(),
+    offeredRates: [0.25, 0.5, 1, 2, 4],
+    weight: 2,
+    actualRate: 0.5
+  });
+  for (const continued of [retryPlaybackTransport(dynamic), rebasePlaybackTransport(dynamic, 0)]) {
+    check(continued.observationPolicy === dynamic.observationPolicy,
+      "Retry/wrap preserves observation policy.");
+    same(continued.ratePolicy, dynamic.ratePolicy, "Retry/wrap preserves rate policy.");
+    check(continued.actualRate === dynamic.actualRate, "Retry/wrap preserves confirmed actual rate.");
+  }
+}
+for (const symbol of [
+  "OBSERVATION_POLICY",
+  "RATE_POLICY_KIND",
+  "requestedRate",
+  "actualRate",
+  "resolveOfferedRate",
+  "dynamicRateForWeight"
+]) has(transportSource, new RegExp(`\\b${symbol}\\b`), `Transport exposes ${symbol}.`);
+has(appCode, /function handlePlaybackRateChange\(rate\)[\s\S]*?withPlaybackActualRate\(state\.transport, rate\)/,
+  "Adapter rate events update transport actualRate.");
+has(appCode, /onPlaybackRateChange:\s*handlePlaybackRateChange/,
+  "The YouTube adapter rate callback is wired at the composition root.");
+has(youtube, /videoId:\s*loadedVideoId\(rawPlayer\)/,
+  "Adapter snapshots report actual loaded source identity.");
+has(topLevelFunction(appCode, "wrapPlaybackRange"), /rebasePlaybackTransport[\s\S]*?resolvePlaybackRate[\s\S]*?player\.setRate/,
+  "Proper-Range wrap rebases and rederives the active policy.");
+has(appCode, /retryPlaybackTransport\(state\.transport\)[\s\S]{0,500}?resolvePlaybackRate[\s\S]{0,300}?player\.setRate/,
+  "Playback retry reapplies the active rate policy.");
+has(appCode, /availableRates[\s\S]{0,500}?RATE_POLICY_KIND\.FIXED[\s\S]{0,500}?resolvePlaybackRate/,
+  "Expanded rate offers retune active fixed Shift playback.");
+has(styles, /\.center-transport-overlay\s*\{[^}]*pointer-events:\s*none/,
+  "The full iframe overlay is non-blocking.");
+has(styles, /\.center-transport-surface\s*\{[^}]*pointer-events:\s*auto/,
+  "Only the centered parent Play control captures pointer input.");
+has(browserSmoke, /native controls reachable|control-bar pointer|centerAccess/i,
+  "Chromium checks native player control accessibility while paused.");
 
-assert.match(projection, /sourceToTimeline[\s\S]*timelineToSource/);
-assert.match(projection, /export function createTimelineProjection/);
-assert.match(projection, /contributors\.reduce[\s\S]*product \* activeWeight/);
-assert.match(projection, /stepSourceByTimeline[\s\S]*timelineToSource/);
-assert.doesNotMatch(projection, /affinity|materializ|collapse|fold/i);
+// A source change has one generation-owned boundary, and recovery explicitly
+// reports whether evidence is safe to rewrite.
+const loadRequest = topLevelFunction(appCode, "createLoadRequest");
+has(loadRequest, /loadGeneration \+= 1[\s\S]*?Object\.freeze\(\{[\s\S]*?generation:[\s\S]*?videoId:[\s\S]*?startSeconds:[\s\S]*?metadataStartedAt:/,
+  "Every load owns one immutable generation request.");
+has(topLevelFunction(appCode, "currentLoadRequest"), /request\.generation === pendingLoad\.generation[\s\S]*?request\.videoId === pendingLoad\.videoId/,
+  "Current generation and requested identity are checked together.");
+has(topLevelFunction(appCode, "initializeVideo"), /!snapshot\.videoId \|\| snapshot\.videoId !== request\.videoId/,
+  "Initialization also requires the adapter's actual source identity.");
+const sourceBoundary = topLevelFunction(appCode, "transitionSourceBoundary");
+for (const owner of [
+  /stepGesture\?\.cancel/,
+  /finishCurrentDrag[\s\S]*cancel: true/,
+  /finishGuideDrag[\s\S]*cancel: true/,
+  /cancelRangeDrag\(\)/,
+  /settleNudgeGesture\(\)/,
+  /flushPendingStep/,
+  /settleTransport/,
+  /persistGuide\(\)/,
+  /clearNativeGo\(\)/,
+  /clearProgrammaticPlacement\(\)/,
+  /closePinClusterMenu\(\)/,
+  /resetSourceScopedState\(\)/
+]) has(sourceBoundary, owner, `Source transition resolves owner ${owner}.`);
+has(topLevelFunction(appCode, "handlePlayerError"), /transitionSourceBoundary\(\)/,
+  "Player errors use the same source-transition boundary.");
+const recovery = topLevelFunction(appCode, "readStoredGuide");
+for (const field of [
+  "guide",
+  "sourcePrefix",
+  "exact",
+  "sanitized",
+  "discardedCount",
+  "unreadableHigherPriorityRecords",
+  "quarantineSucceeded",
+  "safeToRewriteCurrent"
+]) has(recovery, new RegExp(`\\b${field}\\b`), `Guide recovery returns ${field}.`);
+has(recovery, /quarantineUnreadableGuides\(unreadable\)[\s\S]*?safeToRewriteCurrent:\s*unreadable\.length === 0 \|\| quarantineSucceeded/,
+  "Unreadable higher-priority evidence gates destructive rewrite.");
+has(topLevelFunction(appCode, "persistGuide"), /safeToRewriteCurrent === false[\s\S]*?return false/,
+  "Persistence refuses to overwrite evidence when quarantine failed.");
+has(appCode, /No saved Guide|no saved Guide|No Guide was saved|unreadable|damaged saved record/i,
+  "Recovery status distinguishes absence from damaged evidence.");
 
-assert.match(transport, /PLAYBACK:\s*"playback"/);
-assert.match(transport, /CONTEXT:\s*"context"/);
-assert.doesNotMatch(transport, /\bLOOP\s*:|CONTINUE|SKIM/);
-assert.match(
-  transport,
-  /halfDuration\s*=\s*seconds\s*\/\s*2[\s\S]*boundedAnchor - halfDuration[\s\S]*boundedAnchor \+ halfDuration/,
-  "Context must remain centered in source time."
-);
-assert.match(app, /function wrapPlaybackRange[\s\S]*rebasePlaybackTransport\(transport,\s*range\.start\)[\s\S]*placePlayer\(range\.start\)[\s\S]*resumeAt[\s\S]*player\.play\(\)/);
-assert.match(app, /createStepGestureController[\s\S]*bindStepPress/);
-assert.match(app, /function goToAdjacentPin[\s\S]*stepToPinSession/);
-assert.match(app, /function releaseWorkingInterval[\s\S]*releaseSessionInterval/);
-// Weight is assigned in the Guide, through the one Session transaction that owns
-// it. The matrix no longer carries a Deform operator, so nothing else applies a
-// Weight and there is no second path to keep in step with this one.
-assert.match(app, /function changeSectionWeight[\s\S]*setGuideSectionWeight/);
-assert.match(app, /function changeSectionWeight[\s\S]*setGuideSectionWeight/);
-assert.match(app, /function focusOrUnfocus[\s\S]*focusWorkingSection/);
-assert.match(
-  app,
-  /"section-lane"\]\.addEventListener\("click"[\s\S]*?selectSectionAsWorkingInterval/
-);
-// A plain Guide click replaces the Working Interval; Shift extends it to
-// include the clicked object. One rule serves Pins and Sections alike, because
-// an extent is what every operator consumes.
-assert.match(
-  app,
-  /function handleGuideClick[\s\S]*?dataset\.sectionGo[\s\S]*?selectSectionAsWorkingInterval\(/
-);
-assert.match(
-  app,
-  /function handleGuideClick[\s\S]*?composing && extendIntervalToRetained\(\s*"pin"[\s\S]*?composing && extendIntervalToRetained\(\s*"section"/
-);
-assert.match(
-  app,
-  /function extendIntervalToRetained[\s\S]*?Math\.min\(interval\.start[\s\S]*?Math\.max\(interval\.end[\s\S]*?workFromExtent[\s\S]*?consumeShiftLayer\(\)/
-);
-assert.match(
-  app,
-  /function applyGuideState[\s\S]*?command-workspace[\s\S]*?rail-collapsed/
-);
-// X normalizes, and carries no modifier because it has one meaning. The ladder
-// is edited in the Guide, where the Weight actually lives, so the keyboard no
-// longer needs a chord for stepping it -- which is what the Alt chord was for,
-// and why Deform was the only operator with one.
-assert.match(app, /else if \(plain && key === "x"\) \{[\s\S]{0,80}toggleNormalize\(\)/);
-assert.doesNotMatch(app, /event\.altKey\) stepDeformWeight\(-1\)/,
-  "No operator carries an Alt chord.");
-assert.match(app, /function toggleNormalize\(\)[\s\S]*?state\.normalize = wasNormalized \? null : scope/);
-assert.match(app, /function timelineProjection\(\)[\s\S]*?normalize: state\.normalize/,
-  "Normalize reaches the map through the one projection every operator measures with.");
+// Group lifecycle, modifier ownership, Nudge, Step Reversal, and Field defaults
+// retain one implementation per consequence.
+{
+  const guide = createGuide("groups");
+  const other = createGroup(guide, "Other", { id: "group-other" });
+  const section = createSectionFromTimes(guide, 1, 3, {
+    id: "section-other",
+    groupId: other.id
+  }).section;
+  same(groupDeletionPlan(guide, other.id), {
+    allowed: true,
+    reason: null,
+    heirGroupId: "group-default",
+    movedSectionIds: [section.id]
+  }, "Group deletion exposes its exact shared plan and real heir.");
+  setGroupState(guide, other.id, { visible: false, active: true });
+  const hiddenActive = createTimelineProjection({ duration: 5, guide });
+  check(guide.visibleGroupId === null, "No Group drawn is a valid Guide state.");
+  check(hiddenActive.weightAtSource(2) === 1,
+    "A hidden active 1x Section remains an effective contributor without changing density.");
+  setSectionWeight(guide, section.id, 2);
+  const hiddenWeighted = createTimelineProjection({ duration: 5, guide });
+  check(hiddenWeighted.weightAtSource(2) === 2,
+    "Hidden Group activity remains independent and contributes Weight.");
+}
+has(guideSource, /export function groupDeletionPlan\([\s\S]*?allowed[\s\S]*?reason[\s\S]*?heirGroupId[\s\S]*?movedSectionIds/,
+  "Guide owns one explicit Group deletion plan.");
+has(session, /planGuideGroupDeletion[\s\S]*?groupDeletionPlan/,
+  "Session consumes the Guide deletion plan instead of duplicating it.");
+has(appCode, /function consumeShiftLayer\(owner\)[\s\S]*?state\.shiftLayers\?\.\[owner\]/,
+  "Latched Shift is consumed by named owner.");
+has(appCode, /shiftLayers:\s*\{ matrix: false, guide: false \}/,
+  "Matrix and Guide own separate Shift latches.");
+lacks(appCode, /consumeShiftLayer\(\s*\)/,
+  "No ownerless Shift-layer consumption remains.");
+has(topLevelFunction(appCode, "resetSourceScopedState"), /state\.shiftLayers = \{ matrix: false, guide: false \}/,
+  "Source reset clears both surface latches.");
+check((appCode.match(/addEventListener\("wheel",\s*handleNudgeWheel/g) || []).length === 1,
+  "One document wheel handler owns Timeline and off-map Nudge.");
+const nudgeWheel = topLevelFunction(appCode, "handleNudgeWheel");
+has(nudgeWheel, /Math\.abs\(event\.deltaX\) > Math\.abs\(event\.deltaY\)/,
+  "Nudge selects the dominant wheel axis.");
+has(nudgeWheel, /overTimeline \? \{ kind: "current" \} : selectedNudgeTarget\(\)/,
+  "Only target resolution differs between Timeline and off-map wheel routes.");
+has(nudgeWheel, /if \(!target\) return;[\s\S]*?event\.preventDefault/,
+  "Wheel default is prevented only after an operand is acquired.");
+has(nudgeWheel, /gesture\.accumulator \+= raw[\s\S]*?Math\.trunc\(gesture\.accumulator \/ NUDGE_WHEEL_THRESHOLD\)/,
+  "High-resolution wheel input shares one accumulator and quantum.");
+has(session, /export function settleStepSequence[\s\S]*?Step Reversal[\s\S]*?visitedMinimum[\s\S]*?visitedMaximum/,
+  "Step settlement retains a sparse transient reversal envelope.");
+has(sources["guide-session-completion-tests.mjs"], /visitedMinimum[\s\S]*?visitedMaximum[\s\S]*?Step Reversal[\s\S]*?history\.length, 1/,
+  "Step Reversal has focused one-transaction coverage.");
+same(DEFAULT_FIELD_BREATH, { inner: 0.25, outer: 2.5, rate: 0.25 },
+  "Field ships with conservative 0.25-2.5 second defaults.");
+same(breathRatePair(DEFAULT_FIELD_BREATH.rate), {
+  center: 1,
+  tailRate: 0.75,
+  leadRate: 1.25
+}, "Default Field rates are 0.75x / 1x / 1.25x.");
+has(html, /id="field-inner-offset"[^>]*max="300"[^>]*value="0\.25"/,
+  "Field defaults do not restrict the selectable inner-offset range.");
+has(html, /id="field-outer-offset"[^>]*max="300"[^>]*value="2\.5"/,
+  "Field defaults do not restrict the selectable outer-offset range.");
+has(interactionSmoke, /savedFieldBreath = \{ inner: 3, outer: 12, rate: 0\.4 \}/,
+  "Saved Field coverage uses values wider than the shipped defaults.");
+has(interactionSmoke, /3–12 s · 0\.6× \/ 1\.4×/,
+  "Saved non-preset Field rates have truthful presentation coverage.");
+has(interactionSmoke, /fieldBreath,[\s\S]*savedFieldBreath/,
+  "Saved Field coverage proves the valid persisted preference remains unchanged.");
 
-assert.match(youtube, /place\(address, allowSeekAhead = true\)/);
-assert.match(youtube, /isYouTubeApiReady/);
-assert.match(app, /compactGuideLayout\(\) && state\.guideOpen/);
-assert.doesNotMatch(app, /plain && event\.key === "Backspace"/);
+// Required completion suites must exist and be executed by a package script.
+const scriptCorpus = Object.values(pkg.scripts || {}).join(" && ");
+for (const suite of [
+  "operator-grammar-tests.mjs",
+  "timeline-projection-tests.mjs",
+  "section-weight-smoke.mjs",
+  "transport-tests.mjs",
+  "youtube-tests.mjs",
+  "field-breath-tests.mjs",
+  "guide-session-completion-tests.mjs",
+  "nudge-tests.mjs",
+  "browser-smoke.mjs"
+]) {
+  check(existsSync(new URL(`./${suite}`, import.meta.url)), `${suite} exists.`);
+  check(scriptCorpus.includes(suite), `${suite} is part of an automated package gate.`);
+}
 
-console.log(`Integration check passed: ${references.size} DOM references, accessible v7 controls, matrix ownership, weighted timeline, independent Step configuration, Guide graph, and proper-Range playback are connected.`);
+// The contract requires adversarial source/recovery scenarios, not only static
+// implementation strings. Keep this search deliberately semantic and outside
+// the two gauges so explanatory audit prose cannot satisfy it.
+const behavioralSuites = readdirSync(new URL("./", import.meta.url))
+  .filter(name => name.endsWith(".mjs"))
+  .filter(name => ![
+    "integration-check.mjs",
+    "project-audit.mjs",
+    "browser-harness.mjs",
+    "smoke-harness.mjs"
+  ].includes(name));
+const behaviorCorpus = behavioralSuites.map(name => read(name)).join("\n");
+has(behaviorCorpus, /stale[\s\S]{0,600}CUED|CUED[\s\S]{0,600}stale/i,
+  "A behavioral suite covers a stale CUED event across load generations.");
+has(behaviorCorpus, /quarantine[\s\S]{0,800}(?:throw|fail|error)|(?:throw|fail|error)[\s\S]{0,800}quarantine/i,
+  "A behavioral suite covers Guide quarantine-write failure.");
+has(behaviorCorpus, /source[\s-]?change[\s\S]{0,900}(?:Nudge|pending Step|Section drag|Playback|Context)/i,
+  "Behavioral coverage changes source while a transient owner is active.");
+
+if (failures.length) {
+  console.error(`Integration check failed (${failures.length}):`);
+  failures.forEach((failure, index) => console.error(`${index + 1}. ${failure}`));
+  process.exitCode = 1;
+} else {
+  console.log(
+    "Integration check passed: QWE / ASD / RTF and Tag, transient X bypass, one effective projection, playback/source ownership, Guide recovery, modifiers/Nudge, Step Reversal, native controls, and conservative Field defaults agree."
+  );
+}

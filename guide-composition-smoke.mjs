@@ -3,8 +3,8 @@
 // A plain click replaces the Working Interval with the clicked object. Shift
 // extends it to include the clicked object. One rule covers Pins and Sections
 // because an extent — not a set of objects — is what every operator already
-// consumes, so a composition is immediately Deformable, Focusable, and
-// retainable as one parent Section. Nesting is what falls out of that, rather
+// consumes, so a composition is immediately Focusable and retainable as one
+// parent Section. Nesting is what falls out of that, rather
 // than a feature of its own.
 import assert from "node:assert/strict";
 import { createSmokeEnvironment, descendants } from "./smoke-harness.mjs";
@@ -49,7 +49,10 @@ const rowText = row => descendants(row)
   .join(" ");
 const rowShowing = (rows, text) => {
   const row = rows.find(node => rowText(node).includes(text));
-  assert.ok(row, `Expected a Guide row showing ${text}.`);
+  assert.ok(
+    row,
+    `Expected a Guide row showing ${text}; rows were ${rows.map(rowText).join(" | ")}.`
+  );
   return row;
 };
 const clickSection = async (text, options = {}) => {
@@ -114,6 +117,27 @@ byId.get("shift-layer-toggle").click();
 await flush();
 assert.equal(byId.get("shift-layer-state").textContent, "Off");
 
+// Physical Shift supplies its own one gesture and consumes neither surface's
+// latched layer.
+await clickSection("0:10–0:20");
+byId.get("shift-layer-toggle").click();
+await flush();
+await clickSection("1:00–1:20", { shiftKey: true });
+assert.match(workingWindow(), /0:10–1:20/);
+assert.equal(byId.get("shift-layer-state").textContent, "On",
+  "Physical Shift must not consume the matrix latch.");
+byId.get("shift-layer-toggle").click();
+await flush();
+
+await clickSection("0:10–0:20");
+byId.get("guide-compose-toggle").click();
+await flush();
+await clickSection("1:00–1:20", { shiftKey: true });
+assert.equal(byId.get("guide-compose-toggle")["aria-pressed"], "true",
+  "Physical Shift must not consume the Guide latch.");
+byId.get("guide-compose-toggle").click();
+await flush();
+
 // --- Composition is reachable from the Guide itself ---------------------------
 // The operator matrix's Shift layer is inert while the compact Guide is open, so
 // on a phone the Guide had no route to composition at all. It owns its own.
@@ -158,4 +182,4 @@ await flush();
 assert.equal(sectionRows().length, before,
   "Undo removes the retained parent without disturbing its children.");
 
-console.log("Guide composition smoke passed: a plain click replaces, Shift extends across Pins and Sections alike, extension is monotonic, the one-shot Shift layer composes and is consumed, and a composed span Deforms into a parent Section containing its children.");
+console.log("Guide composition smoke passed: a plain click replaces, Shift extends across Pins and Sections alike, extension is monotonic, the one-shot Shift layer composes and is consumed, and Tag retains a composed span as a parent Section containing its children.");

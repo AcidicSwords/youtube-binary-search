@@ -159,25 +159,25 @@ const close = (actual, expected, tolerance = 1e-9) => {
 // The interface names the usable surfaces. The deeper constraints remain in
 // behavior and tests rather than being repeated as theory in the UI.
 {
-  const index = readFileSync(new URL("./index.html", import.meta.url), "utf8");
-  const view = readFileSync(new URL("./view.js", import.meta.url), "utf8");
-  const app = readFileSync(new URL("./app.js", import.meta.url), "utf8");
-  const styles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
+  const source = file => readFileSync(
+    new URL(file, import.meta.url),
+    "utf8"
+  ).replace(/\r\n/g, "\n");
+  const index = source("./index.html");
+  const view = source("./view.js");
+  const app = source("./app.js");
+  const styles = source("./styles.css");
   assert.match(index, /aria-label="Panorama"/);
   assert.match(index, /<h2>Timeline<\/h2>/);
   assert.match(index, /Go to Timeline Midpoint/);
   assert.doesNotMatch(index, /Step Field|Temporal map/);
   assert.match(styles, /left: var\(--section-midpoint, 50%\)/);
-  // The lane bound was removed here while INTERFACE and IMPLEMENTATION both
-  // still specified a bounded five-lane band, and this assertion froze that
-  // contradiction. The bound is restored -- with scrolling rather than modulo
-  // reuse, so no two Sections share one control -- and project-audit.mjs owns
-  // the law now. Only the part coherence-2 actually decided is kept: lanes are
-  // never reused by modulo.
+  // The bounded, scrollable lane band must never reuse a lane by modulo; every
+  // Section keeps its own reachable control even under dense overlap.
   assert.doesNotMatch(view, /lane % TIMELINE_SECTION_MAX_LANES/);
   assert.match(app, /elements\["full-video-range"\]\.addEventListener\("click", \(\) => \{\n  if \(rejectFocusedRangeBoundaryEdit\(\)\) return;/);
   assert.match(view, /elements\["full-video-range"\]\.disabled = interactionLocked\n      \|\| focusOwnsBoundaries/);
   assert.match(styles, /\.guide-group-block/);
 }
 
-console.log("Coherence-2 tests passed: unlimited Section reachability, projected source midpoints, Cue extents, flat Group blocks, Focus boundary ownership, explicit Panorama activation, and restrained user-facing names.");
+console.log("System coherence tests passed: unlimited Section reachability, projected source midpoints, Cue extents, flat Group blocks, Focus boundary ownership, explicit Panorama activation, and restrained user-facing names.");

@@ -200,8 +200,9 @@ assert.equal(sidePlays(), sidePlaysBeforeShift,
 
 dispatchDocument("keydown", { key: " ", code: "Space", shiftKey: true });
 await settle();
-assert.equal(center.rate, 1,
-  "Ending the playback returns Center to 1x: the rate belongs to the transport, not to the player.");
+assert.equal(center.rate, 2,
+  "Settling playback pauses its transport without issuing an unrelated rate command.");
+assert.equal(center.state, 2);
 
 // The rate is a stored preference, and changing it during a Shift playback
 // retunes that playback rather than starting another.
@@ -227,8 +228,10 @@ await flush(3);
 center.getAvailablePlaybackRates = () => [1];
 await poll();
 await flush(3);
-assert.deepEqual(rateSelect.options.map(option => option.value), ["1"],
-  "A player that reports only 1x offers only 1x.");
+assert.deepEqual(rateSelect.options.map(option => option.value), ["1", "2"],
+  "The control distinguishes the only offered rate from the retained fixed wish.");
+assert.match(rateSelect.options[1].textContent, /wish/);
+assert.match(byId.get("playback-rate-value").textContent, /2.*wish.*1.*offered/);
 center.getAvailablePlaybackRates = () => [0.25, 0.5, 1, 2];
 await poll();
 await flush(3);
@@ -310,7 +313,9 @@ assert.equal(rateSelect.value, "2",
 
   dispatchDocument("keydown", { key: " ", code: "Space", shiftKey: true });
   await settle();
-  assert.equal(center.rate, 1, "Ending it returns Center to 1x like any other playback.");
+  assert.equal(center.rate, insideRate,
+    "Ending playback pauses its transport without issuing an unrelated native-rate command.");
+  assert.equal(center.state, 2, "Ending dynamic playback still pauses Center exactly.");
 }
 
 console.log("Transport coherence smoke passed: live projection, exact settlement, Focus-owned proper-Range looping, one-pass Field rebasing, wrap history isolation, Unfocus restoration, full-video completion, Shift-rate playback that suspends the Panorama instead of losing variable speed, and a rate that follows Section weight across the map.");

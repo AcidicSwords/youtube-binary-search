@@ -15,11 +15,12 @@ import {
 import {
   STEP_REACH_MODE,
   createSession,
-  deformSection,
   deleteGuidePin,
   effectiveStepReach,
   goTo,
   goToGuidePin,
+  saveIntervalAsSection,
+  setGuideSectionWeight,
   step,
   stepToPin,
   switchEndpoint
@@ -37,7 +38,7 @@ const close = (actual, expected, message) => {
 };
 
 function weightedGuide(...definitions) {
-  const guide = createGuide("v7-tests");
+  const guide = createGuide("section-deformation-tests");
   const sections = definitions.map(([start, end, weight, label = ""]) =>
     createSectionFromTimes(guide, start, end, {
       label,
@@ -160,28 +161,37 @@ function weightedGuide(...definitions) {
   close(adaptive.forward, 90 / 16, "Adaptive Reach");
 }
 
-// Deform creates or reuses a retained Section, stores the chosen familiar
-// multiplier, and preserves the Working Interval.
+// Tag and Guide Weight remain two small, composable primitives. Retaining a
+// Working Interval does not silently deform it, and changing its Weight does
+// not alter the active Working Interval.
 {
   let session = createSession({ duration: 100, current: 20 });
   session = goTo(session, 40, { label: "Test Go" }).session;
   const before = { ...session.model.interval };
-  const deformed = deformSection(session, null, 0.75);
-  assert.equal(deformed.changed, true);
-  assert.equal(deformed.created, true);
-  assert.equal(deformed.section.label, "");
-  assert.equal(deformed.section.weight, 0.75);
+  const tagged = saveIntervalAsSection(session, "");
+  assert.equal(tagged.changed, true);
+  assert.equal(tagged.value.created, true);
+  assert.equal(tagged.value.section.label, "");
+  assert.equal(tagged.value.section.weight, 1,
+    "Tag retains topology without bundling a Weight mutation.");
+  const weighted = setGuideSectionWeight(
+    tagged.session,
+    tagged.value.section.id,
+    0.75
+  );
+  assert.equal(weighted.changed, true);
+  assert.equal(weighted.value.weight, 0.75);
   assert.deepEqual(
     {
-      start: deformed.session.model.interval.start,
-      end: deformed.session.model.interval.end
+      start: weighted.session.model.interval.start,
+      end: weighted.session.model.interval.end
     },
     { start: before.start, end: before.end }
   );
 }
 
-// Coextensive Sections remain distinct identities. Deform refuses to choose
-// one silently unless the caller supplies the selected Section.
+// Coextensive Sections remain distinct identities. Guide Weight takes one exact
+// retained identity and mutates no coextensive peer.
 {
   const guide = createGuide("coextensive");
   const first = createSectionFromTimes(guide, 20, 40, {
@@ -190,16 +200,11 @@ function weightedGuide(...definitions) {
   const second = createSectionFromTimes(guide, 20, 40, {
     label: "Second"
   }).section;
-  let session = createSession({ duration: 100, current: 20, guide });
-  session = goTo(session, 40, { label: "Test Go" }).session;
-  const ambiguous = deformSection(session, null, 0.5);
-  assert.equal(ambiguous.changed, false);
-  assert.equal(ambiguous.reason, "ambiguous-deform-target");
-  assert.deepEqual(new Set(ambiguous.sectionIds), new Set([first.id, second.id]));
-  const selected = deformSection(session, second.id, 2);
+  const session = createSession({ duration: 100, current: 20, guide });
+  const selected = setGuideSectionWeight(session, second.id, 2);
   assert.equal(selected.changed, true);
-  assert.equal(selected.section.id, second.id);
-  assert.equal(selected.section.weight, 2);
+  assert.equal(selected.value.id, second.id);
+  assert.equal(selected.value.weight, 2);
   assert.equal(
     resolveSection(selected.session.model.guide, first.id).weight,
     1
@@ -231,4 +236,4 @@ function weightedGuide(...definitions) {
   assert.equal(movePin(guide, interior.id, 31, 100).changed, true);
 }
 
-console.log("v7 Section deformation tests passed.");
+console.log("Section deformation tests passed.");

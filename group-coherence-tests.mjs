@@ -1,16 +1,9 @@
-// Coherence 3: one canonical visible-Group identity.
+// One nullable visible-Group identity.
 //
-// Coherence 2 established that exactly one Group supplies Sections and endpoint
-// Pins to the Timeline while any number stay active. It expressed that with a
-// boolean on every Group, which makes "exactly one is visible" a rule about N
-// fields: two true and none true are both writable, and the model was correct
-// only because a repair pass ran after every mutation. This pass moves the fact
-// onto the Guide as one identity, where neither fault can be written down.
-//
-// Everything below is behaviour, not representation, except where the schema
-// itself is the subject. Playback, source time, Nudge, Weight arithmetic,
-// Panorama rates and operator geometry are unchanged, and the last block says
-// so directly.
+// Zero or one Group supplies Sections and endpoint Pins to Timeline while any
+// number stay active. A nullable identity expresses those two valid states and
+// makes two simultaneously drawn Groups unrepresentable. These tests protect
+// that ownership, independent activity, membership, and source-time integrity.
 import assert from "node:assert/strict";
 import {
   DEFAULT_GROUP_ID,
@@ -28,7 +21,6 @@ import {
   sectionIsVisible,
   sectionIsActive,
   orderedPins,
-  allPins,
   partitionGuidePins,
   sortedSections,
   normalizeGuide,
@@ -41,11 +33,15 @@ import { createTimelineProjection } from "./timeline-projection.js";
 const DURATION = 100;
 const extentOf = guide =>
   createTimelineProjection({ duration: DURATION, guide }).timelineExtent;
+const everyPin = guide => {
+  const { visible, hidden } = partitionGuidePins(guide);
+  return [...visible, ...hidden];
+};
 
 // Two layers over one source: Map holds 0:20–0:60, Terrain holds 0:70–0:90 at
 // 2x, and one standalone Pin sits at 0:05 belonging to no Section at all.
 function build() {
-  const guide = createGuide("coherence-3");
+  const guide = createGuide("group-coherence");
   const standalone = ensurePin(guide, 5, { kind: PIN_KIND.FREE }).pin;
 
   const mapSection = createSectionFromTimes(guide, 20, 60, {
@@ -74,7 +70,7 @@ const visibleIds = guide => guide.groups
   .filter(group => groupIsVisible(guide, group))
   .map(group => group.id);
 
-// --- 1. Exactly one visible Group ---------------------------------------------
+// --- 1. At most one visible Group ---------------------------------------------
 {
   const { guide, terrain } = build();
   assert.deepEqual(visibleIds(guide), [terrain.id],
@@ -201,7 +197,7 @@ const visibleIds = guide => guide.groups
     "and the other layer's endpoints leave it."
   );
 
-  assert.equal(allPins(guide).length, 5,
+  assert.equal(everyPin(guide).length, 5,
     "Nothing was destroyed: every Pin is still retained.");
 }
 
@@ -222,7 +218,7 @@ const visibleIds = guide => guide.groups
   // A Pin referenced only by hidden Sections is the case that must disappear.
   assert.equal(orderedPins(guide).some(pin => pin.id === later.id), false,
     "while a Pin only a hidden Section references does not.");
-  assert.ok(allPins(guide).some(pin => pin.id === later.id),
+  assert.ok(everyPin(guide).some(pin => pin.id === later.id),
     "It remains retained and reachable in the Guide.");
 }
 
@@ -240,7 +236,7 @@ const visibleIds = guide => guide.groups
   );
   assert.equal(
     partition.visible.length + partition.hidden.length,
-    allPins(guide).length,
+    everyPin(guide).length,
     "The two sets partition the Pins: none is lost and none is counted twice."
   );
 }
@@ -251,7 +247,7 @@ const visibleIds = guide => guide.groups
   assert.equal(guide.visibleGroupId, terrain.id);
   const sectionsBefore = sortedSections(guide).length;
 
-  assert.equal(deleteGroup(guide, terrain.id), true);
+  assert.equal(deleteGroup(guide, terrain.id).allowed, true);
   assert.equal(guide.visibleGroupId, DEFAULT_GROUP_ID,
     "Removing the drawn layer promotes Map rather than leaving none.");
   assert.deepEqual(visibleIds(guide), [DEFAULT_GROUP_ID]);
@@ -272,7 +268,7 @@ const visibleIds = guide => guide.groups
   const spare = createGroup(guide, "Spare");
   setGroupState(guide, terrain.id, { visible: true });
   assert.equal(guide.visibleGroupId, terrain.id);
-  assert.equal(deleteGroup(guide, spare.id), true);
+  assert.equal(deleteGroup(guide, spare.id).allowed, true);
   assert.equal(guide.visibleGroupId, terrain.id,
     "Removing an undrawn layer does not move the Timeline to another one.");
 }
@@ -407,7 +403,7 @@ const visibleIds = guide => guide.groups
 // --- 14. Source time and retained Addresses are untouched ---------------------
 {
   const { guide, standalone, mapStart, mapEnd, terrainStart, terrainEnd } = build();
-  const addresses = () => allPins(guide)
+  const addresses = () => everyPin(guide)
     .map(pin => pin.t)
     .sort((a, b) => a - b);
   const before = addresses();
@@ -551,4 +547,4 @@ const visibleIds = guide => guide.groups
   assert.equal(byId.get("pins-list-count").textContent, before.pins);
 }
 
-console.log("Coherence 3 tests passed: one canonical visible-Group identity that cannot express two or none, a deterministic default and fallback, layer switching that leaves activity untouched, hidden-but-active layers still deforming, the drawn layer rendered first, standalone Pins never hidden, hidden-only endpoints excluded while shared endpoints stay, a Guide partition over all Pins, non-destructive Group removal, and a v8-to-v9 migration that preserves every identity, activity, membership, Weight and source Address.");
+console.log("Group coherence tests passed: one nullable visible-Group identity, deterministic default and fallback, independent layer activity, hidden-but-active deformation, standalone and shared Pin visibility, complete Guide partition, non-destructive Group removal, and exact v8-to-v9 identity migration.");

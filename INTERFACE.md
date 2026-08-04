@@ -1,432 +1,334 @@
 # Video Cartography — Interface Grammar
 
-## Layout
-
-The wide interface is a fixed instrument: `Viewer + Timeline | Guide` or
-`Viewer + Timeline | Operators + Parameters`. The right rail is one contextual
-surface, never three stacked panels: Guide receives the full rail when retained
-structure is being edited, while Operators and Parameters share it when the
-transformation matrix is being used. Either mode can collapse completely,
-leaving Viewer and Timeline as one panoramic surface. `G` opens or collapses
-Guide without changing operator state. Narrow layouts keep Operators and
-Parameters in flow and present Guide as a modal sheet.
-
-## Parameters
-
-Parameters expose Active Range, Context duration, and Step Reach. Resolution remains visible on the Timeline, so the wide rail does not duplicate it.
-
-- **Manual** exposes editable spatial units.
-- **Fine Nudge distance** is the source-time quantum every Nudge surface uses.
-- **Range-relative** exposes `1/32`, `1/16`, and `1/8`.
-- The summary shows the stored mode and current effective distance.
-- Single labels share one compact sans-serif level; trailing state values share
-  one compact monospaced level. A one-label disclosure is never styled as a
-  value merely because it is also its last child.
-
-Movement distance holds both magnitudes a traversal can use: Step Reach with its
-mode and presets, and the fine Nudge quantum. They belong together because both
-answer "how far does one movement go"; neither is a Field setting.
-
-Inner Offset, Outer Offset, and the breathing rate pair share one compact Tune
-disclosure in the Center bar, because they describe one Field relation rather
-than two independent sides. Field Offset never relabels or rewrites Step Reach,
-the Nudge quantum, or Section weight.
-
-## Timeline
-
-The temporal map uses lateral Timeline Space while the ruler labels source timestamps.
-
-Two time forms carry one rule each. An **Address** is written with a colon — `0:30`, `1:15.5` — and answers *where*. A **duration** is written with units — `10s`, `1m 40s` — and answers *how much*. Sub-second precision is kept only where the quantity is genuinely sub-second, such as a Nudge quantum; nothing is reported to millisecond resolution.
-
-Every readout must answer something no other readout already answers. Concretely: Current carries its own Address under its marker on the map, so no header repeats it; Cursor reports only when observation has left Current, because otherwise it is a second copy of Current; a Range boundary is labelled only where the ruler's own edge does not already label it; and an operator's line says what that operator will do, naming the Working Interval rather than reprinting an extent that is already on screen.
-
-Spatial extent is never printed as a duration. Wherever a spatial figure appears — total source, active Resolution, the Range Reopen would restore — it is shown as the stretch factor it applies to that scope's own source span, and it is omitted entirely at `1×`, where the map and the source already correspond. A one-minute source with one 15 s Section at `2×` reads `1:00 · 1.25× spatial`.
-
-Visual order:
-
-```text
-free and shared Pins
-main Range / Resolution track
-source ruler
-Section relationship tree
-```
-
-The compact key names every projection rather than requiring color recall.
-Range is the ground, Resolution is its current neighborhood contour, the
-Working Interval is the directional ridge between its endpoints, and a Held
-Field span is a patterned physical overlay. Current and Cursor have separate
-readouts and needles: Current is committed Session state; Cursor is the moving
-physical observation.
-
-The palette follows ownership rather than decoration: Range is low-contrast
-neutral slate, Resolution and Cursor use restrained blue, Working Interval and
-Pins use gold, Field uses green, operator candidates use violet, and retained
-Section wires use a separate warm structural palette. Deformation alone owns
-the violet-compression/teal-expansion field. Opacity establishes hierarchy:
-metric contours and Range recede; committed Current, active Interval, and the
-object under direct manipulation remain strongest.
-
-Sections are thin endpoint wires packed into the lowest available lane below
-the ruler. Start, midpoint, and End nodes define each extent. Faint dotted
-relations connect the two endpoint Pins and the mapped midpoint down to those
-nodes, so the lower tree explains which upper landmarks deform the track.
-Their width shows the composed global projection and their hit region remains
-easy to acquire without turning the Section into a persistent bar.
-
-The main track is the deformation display. Every weighted Section contributes
-a soft influence centered on its projected midpoint. Compression is violet,
-expansion is teal, and peak opacity follows the magnitude of the Section’s log
-weight. Width distributes that strength: a short Section concentrates the
-influence while a long Section with the same factor is more diffuse. Influence
-remains present at the endpoints and fades smoothly beyond them, so neighboring
-Sections cohere as one field rather than hard blocks.
-Signed log contributions add where Sections overlap, matching multiplicative
-weight composition. Projected source-time contours provide the exact metric:
-they pack under compression and spread under expansion.
-
-Persistent names and selectors do not consume map lanes. Click a span to make
-its complete extent the Working Interval and return Current to its center.
-
-The Temporal Topography owns spatial direct manipulation, so every draggable
-object lives here with one visually centered acquisition region and one
-unambiguous gesture owner:
-
-```text
-Current marker          → Step
-Pin marker              → Move Pin
-Section Start or End    → Move endpoint Pin
-Section midpoint        → Translate Section
-Range boundary          → Change Range
-```
-
-The Current marker is itself a control. Pressing it acquires Current before the
-Timeline can read the press as generic Go; crossing the movement threshold shows
-a candidate Address while the original Current stays as a faint departure marker,
-and release commits one Step of that distance — extending or shortening the
-retained traversal rather than drawing a new one. A stationary press moves
-nothing, and a cancelled pointer restores the original presentation without
-history.
-
-Each Section wire is its own acquisition surface: pressing within a quarter-width
-of either end drags that endpoint Pin, and pressing the middle translates the
-complete Section. No extra node chrome is drawn over the map.
-`Shift`-drag on any of these enters precision mode: reduced gain, quantized to
-the Nudge quantum, same gesture owner, one transaction on release. `Shift` +
-wheel nudges the exact object under the pointer — Current, a Pin, a Section
-endpoint, the whole Section, or Current over empty Timeline — and `,` and `.`
-nudge the selected map object from the keyboard.
-
-Timeline Section bodies are acquisition-only. A Timeline Pin is itself the
-direct manipulation surface: release without movement moves Current to it, and
-drag moves that exact Pin. Pin selection is derived from the Working Interval:
-any Pins aligned with its Start and End are highlighted together. Guide
-also provides the Section's name, endpoint relations, Focus, and complete
-weight ladder:
-
-```text
-0.125×  0.25×  0.5×  0.75×  1×  1.25×  1.5×  1.75×  2×  4×
-```
-
-Weight changes timeline geometry only. Section wires use a warm structural
-palette that is separate from the violet/teal deformation field. Every endpoint
-and interior Pin remains laterally ordered and clickable. Pin clustering follows
-the complete interactive hit region, so nearby controls neither overlap nor
-compete for the same pointer. A cluster opens a compact vertical chooser at its
-map position; the chooser scrolls through dense groups without spreading across
-the Timeline and does not move Current until an exact Pin is chosen. Shared
-endpoints gain visual weight without acquiring a different interaction rule.
-Choosing keeps the exact row visibly selected. A row is one control obeying the
-map's own rule: click goes to that Pin, drag moves it. Splitting activation from
-dragging would be a grammar used nowhere else in the interface. The cluster itself opens on
-pointer-down, before the Timeline can interpret the gesture as Go. This resolves
-a cluster before manipulation instead of asking overlapping Timeline markers
-to compete for the gesture.
-There is no perpendicular interaction axis, stacking, or hidden interior.
-
-The timeline packs actual overlap into a bounded five-lane visual band, and deeper structure scrolls inside that band rather than growing it. An unbounded band moves the whole workspace down by a lane for every overlap, so building structure would gradually destabilise the instrument; nothing is overlapped and no Section loses its own control, the depth is simply reached by scrolling. Major and minor source-time guides adapt to available width. Range, Resolution, Working Interval, exact previews, Current, and Cursor all use the same projection.
-
-## Operator matrix
-
-The nine operators occupy a square 3×3 matrix. Equal row and column geometry
-keeps backward/neutral/forward placement and discriminate/traverse/lifecycle
-placement equally legible; no axis is visually privileged.
-
-```text
-Q Refine Backward     W Reopen           E Refine Forward
-A Step Backward       S Switch Endpoint  D Step Forward
-R Release             T Tag              F Focus / Unfocus
-```
-
-Plain `T` normalizes a weighted Section to `1×` or restores its remembered
-non-neutral value. Weight is assigned in the Guide, and `X`
-lowers it one step. The small `−/+` controls appear when Deform is hovered or
-focused; Guide retains the exact canonical selector.
-
-The Shift layer relabels only directional families:
-
-```text
-Shift+Q/E   Local Refine
-Shift+A/D   Previous / Next Pin
-```
-
-Plain Refine keeps the established Working Interval anchor when possible.
-Local Refine always draws the new Current-to-midpoint path; reversing into an
-existing interval therefore selects its complementary half.
-
-Touch users can latch Shift. Mouse, keyboard, compact Field controls, and side-player surfaces invoke the same semantic operators.
-
-Each cell fixes its key in the upper-left, centers a balanced operator label,
-and reserves two compact lines below for destination or consequence. The key,
-identity, and current effect therefore remain distinct when labels change under
-Shift or Focus. Disabled controls state a concrete reason.
-
-`T` immediately Tags Current as a Pin. `Shift+T` immediately Tags the Working Interval
-as an untitled Section. These are creation commands, not shortcuts into the
-optional title fields; Guide supplies the named-creation and later Rename paths.
-
-## Guide
-
-Guide has Sections and Pins tabs.
-
-Section creation accepts:
-
-- Working Interval;
-- held Field span;
-- two selected Pins.
-
-Clicking a Guide entry replaces the Working Interval with it. `Shift`+click — or the one-shot Shift layer, for pointer-only use — **extends** the Working Interval to include the clicked entry instead. One rule serves Pins and Sections alike, because an extent, not a set of objects, is what every operator consumes: a composed span is immediately Deformable, Focusable, and retainable. Extension only ever grows the span; a plain click starts over, so the ordinary meaning of a click is always reachable.
-
-Nesting needs no operator of its own. Click one Section, `Shift`+click another, Deform: the span becomes a parent Section carrying its own Weight, with the two it was composed from inside it.
-
-The Guide reads left to right as the arc from potential to structure: **Chapters** are candidates a description offers, **Pins** are the Addresses you made objects, and **Sections** are compositions of Pins that persist and deform.
-
-Guide focus and Timeline selection are separate relations on the same retained objects. A Guide click and a Timeline click resolve the same canonical source Address or Section extent, but only the Timeline click acquires a spatial operand for Nudge, Carry, dragging, or highlighting. The Pins tab therefore separates **On Timeline** Pins from **Hidden** Pins while keeping both fully navigable and editable.
-
-The Pins tab separates the two jobs a Pin can do: **Section endpoints**, which hold Sections together, and **Standalone** Pins, which mark a place and are never hidden by a Group. **Unlink** lives here, on the shared Pin itself: a selected Pin holding more than one Section offers one Unlink per Section, each naming the Section it releases, so which Section is being taken off the Pin is stated rather than inferred from `Start`/`End`. Reading a Section to operate on a Pin left the Pin — the only object the operation is about — out of view.
-
-A Section's endpoints *are* Pins, so a Guide-focused Section names them: its `Start` and `End` labels route to those Pins where they are edited. Nothing moves and nothing is recorded. Guide focus expands the retained row; it is distinct from Timeline selection, so revealing a hidden endpoint never makes it a spatial operand.
-
-The Sections tab carries **Groups**. Exactly one Group is **On Timeline**: its Sections and section-bound Pins are the spatial objects available to Timeline hit-testing, Shift Step, dragging, linking, and selection. `Active` is independent and stackable: any number of Groups may contribute their Section Weights, including hidden Groups that establish broad terrain without adding landmarks to the working surface. The on-Timeline Group is rendered first, hidden Groups follow below it, and a newly created Group becomes the working layer. New Sections enter that visible Group unless another Group is explicitly chosen. Identical Sections may coexist in different Groups so their active Weights multiply, but not twice inside one Group. Rename and Remove sit beside the Group name; removal returns Sections to Map and is refused rather than merging two layered identities that would become duplicates.
-
-A third Guide tab holds **Cues** — candidate Addresses parsed from a pasted description. Chapters a creator wrote partition the video semantically, so a Cue owns an extent running to the next Cue's Address, and clicking one takes that extent exactly as clicking a Section does. `Shift`+click extends across Cues by the same rule. Cues render as dashed, quieter rows carrying one action, `Retain`, because there is nothing to edit in something that is not yet structure. Nothing about a Cue reaches the Guide, the map, traversal, or history until it is retained.
-
-`Show on timeline` draws every offered Cue at once, in its own lane. The list says what the creator called each part; only the map says where those parts fall against the structure already built, which is the comparison that decides what is worth retaining. The lane holds marks, not controls: every pointer route into the timeline — hit-testing, drag acquisition, Pin clustering — dispatches on a data attribute, and a drawn Cue carries none, so it cannot become traversable by a rendering decision. Drawing changes nothing a transaction owns, and clearing the offer clears the drawing with it.
-
-An unnamed Section has one name everywhere it is named: `Section` plus its Address. A Guide row states the Address in a field of its own, so its title stays bare; every other context — a transaction label, a status line, an Unlink button on a shared Pin — carries the full form, because a Pin holding two unnamed Sections would otherwise offer two buttons reading `Unlink Section`.
-
-A Guide entry is a **name**, an **Address**, and only facts not derivable from those two. A Pin exists so the viewer need not remember a time, so the time is a field of the entry and never baked into its title: an unnamed Pin is called `Section Start` or `Pin`, never `Start of Section 2:12.3–2:42.04`, which repeats the Address and then truncates. An unnamed Section is called `Section`; its extent, duration and Weight are its line. Nothing states the same fact twice inside one entry — the Weight factor already says whether it compresses or expands, and the duration is stated once.
-
-A Pin has one Address and no extent, so its row draws no positional track: one point plotted across the whole map is the Temporal Topography redrawn at useless scale. Position is read and moved on the map; the Guide holds the exact Address.
-
-A Guide row is expanded exactly when it has Guide focus, and nothing else opens one. Participating in the Working Interval, being focused as Range, being selected on the Timeline, and being a snap target are separate conditions shown as highlights rather than alternate expansion rules. Focusing a Section through the Guide keeps that Guide row open so Unfocus remains reachable without manufacturing a Timeline selection.
-
-Titles are optional. Each Section row exposes selection, Focus, Weight, Group,
-and both endpoint Pins. Compact Rename and Delete controls sit beside the title.
-Direct endpoint and whole-profile dragging make a separate replacement action
-redundant. A selected Pin row exposes its exact Address, its Rename and Delete
-controls beside the title, and — when it holds more than one Section — an
-Unlink per Section it holds. On the Timeline, the visible Pin
-and its centered hit region are one control: click moves Current to the Pin;
-drag moves the Pin only after crossing the movement threshold.
-
-Guide’s exact selector and Deform’s step controls are two views of the same transaction.
-
-Guide rows share one gutter and one control height, so title, actions and the
-Address line read as one stack rather than three separately measured bands.
-
-Guide is the exact editor. A Pin row exposes its Title, Address input, `−`/`+`
-Nudge controls, Go, reference count, Rename, and Delete. A Section row exposes
-its Title, Start and End Address inputs, a Duration readout, `−`/`+` controls for
-each endpoint and for the whole Section, Weight, Focus, Unlink, Rename, and
-Delete. Address inputs accept canonical timecode or seconds, reject anything outside Range
-and structural partners, reject Section collapse or reversal, commit on Enter,
-cancel on Escape, and create one Undo transaction. The increment controls invoke
-the same Nudge operation as Timeline Shift-wheel and keyboard nudging.
-
-Guide Section rows still project the Section against the complete timeline and
-connect their Start and End Pin controls as one owned extent, but that full-map
-profile is a read-only positional representation and an acquisition link: it owns
-no drag geometry. Click an endpoint to Go, edit its Address to move it exactly,
-or drag it on the Timeline to move it spatially. Endpoint node weight and Pin
-metadata expose how many Sections share each Pin. Unlink clones only this Section's endpoint at the same Address,
-so subsequent movement is independent. Linking is spatial rather than a
-separate command: confirm Unlink, then drag its independent endpoint Pin within
-16 pixels of another valid Pin. An amber candidate means ordinary movement is
-still active; hold on that same target for 450 ms to arm a green acquisition
-ring, then release to merge ownership. Passing through, leaving the radius, or
-releasing before arming only moves the Pin. A shared junction must first be
-Unlinked so one deliberate edge—not every connected Section—is the link source.
-No original relationship is remembered.
-Timeline and Guide Section clicks share one selection
-transaction: the Section becomes the Working Interval and Current returns to
-its midpoint. When the Working Interval's bounds coincide with Pins, those Pins
-are selected automatically. If they bound one existing Section, Deform and
-Focus reuse it instead of constructing an identical extent. Selection is a
-projection of the interval, not a separate manual mode.
-Dragging either selected endpoint Pin reshapes the corresponding Working
-Interval bound in the same transaction.
-Range Start and Range End remain visible navigation guides and synthetic
-Previous/Next Pin stops.
-
-## Focus and playback
-
-While an extent is focused, the Pins that compose its boundary cannot be dragged on the Timeline. Such a drag could only ever pull the boundary inward — the Range it defines is simultaneously the limit the drag clamps to — and every move would re-normalize the drawn map under the finger, destroying the sense of scale Focus exists to give. Unfocus to move it spatially, or edit the Address in the Guide, where the same change is exact rather than spatial.
-
-Focus clamps Range without changing any Section weight, and draws the map across the focused extent alone: a focused Section or Working Interval spans the whole timeline whatever its Weight, and its interior still warps according to the Weights inside it. Everything outside the focused extent is not drawn, so nothing piles against the edges. Pressing and dragging use the same drawn map, so a pressed position always addresses what is under it. Unfocus restores the containing Range and the whole map.
-
-Native playback loops when Range is a proper subset of the video. There is no separate Loop operator. Playback remains source-contiguous and always uses media runtime rate, never Section weight.
-
-Weight remains editable during playback; the map changes around the moving Cursor without pausing or seeking the video.
-
-## Step Field
-
-Tail and Lead form one panoramic surface around Center. Center is subtly larger;
-the smaller side projections are vertically centered with equal separation so
-their scale reads as temporal distance and curvature rather than three separate
-top-aligned players. Identity and address live in each top bar, and one
-combined Stretch/Hold control sits beneath Center. The Panorama's remembered
-tuning is not here: it is in Parameters with every other remembered setting,
-and what stays on the surface is what acts on what you are looking at.
-
-```text
-Tail:   identity · address | collapse
-Center: identity · address | Field state · Field
-Lead:   identity · address | collapse
-Bottom:            Stretch / Hold
-```
-
-Center alone is audible. Tail and Lead are muted projections.
+The interface presents one source video as a Viewer, a Temporal Topography, and
+one optional command rail. Every route resolves to canonical Session state;
+surface-local selection and previews never become a second model.
+
+## Workspace
+
+The persistent reading surface is vertically ordered:
+
+1. source loading and Guide/Operators rail controls;
+2. the Tail–Center–Lead Panorama;
+3. the Timeline;
+4. the optional command rail.
+
+On a wide desktop the Viewer and Timeline remain visible while the rail shows
+either the full-height Guide or Operators followed by Parameters. The rail can
+collapse completely, releasing its width to the panoramic surface. `G` opens or
+closes Guide; `O` opens or closes Operators and Parameters. Switching the rail
+changes presentation only.
+
+On compact layouts Guide becomes a modal sheet with a scrim and focus trap. The
+reader behind it is inert until Guide closes. Resizing does not reverse the
+reader's deliberate open/closed choice.
+
+## Panorama
+
+Center is perceptually primary: it is slightly larger than Tail and Lead. The
+two side panes are equally smaller, equally separated, and vertically centered,
+so the three projections read as one curved temporal surface rather than three
+unrelated players.
+
+Each pane's top bar contains only identity, Address, and a local visibility
+action. Center's bar also reports Panorama state. The sole bottom action is the
+centered `Stretch both` / `Hold both` control. Remembered tuning lives in
+Parameters, not around the video.
+
+Center is the audible ordinary YouTube player. Tail and Lead are muted
+projections. A non-blocking overlay contains one compact parent-owned Play
+button; the overlay itself does not receive pointer events. Native seek,
+captions, settings, volume, and fullscreen controls remain pointer-accessible
+while paused, idle, or playing.
 
 ### Field Frame
 
-Outside ordinary playback the Field is a stable Frame, not a continuously
-changing preview:
+When ordinary playback is not running, the panes form a stable directional
+slideshow around Current:
 
-- Step is the default: Tail and Lead park on the exact weighted Step Backward
-  and Step Forward destinations while Center remains at Current;
-- Refine parks Tail and Lead on the next weighted backward and forward
-  midpoints;
-- Reopen parks them on the Refine midpoints made available by the reopened
-  Neighborhood;
-- Context parks Tail on its first frame and Lead on its last frame while Center
-  follows the Cursor through that window;
-- a retained Section shows exact Start, midpoint, and End while Current owns
-  that midpoint;
-- direct manipulation temporarily shows the candidate extent.
+- Step is the default: Tail and Lead show the exact weighted backward and
+  forward Step destinations.
+- Refine shows the next weighted backward and forward midpoints.
+- Reopen shows the midpoints made available by the reopened Resolution.
+- Context fixes Tail and Lead at its source-time window edges while Center
+  observes inside it.
+- a retained Section shows Start, weighted midpoint, and End while Current owns
+  that midpoint.
+- direct Pin manipulation centers the Pin between its weighted Step targets.
+- direct Section manipulation shows Start, midpoint, and End.
 
-Every committed movement produces one directional transition between the
-displayed Frame and the next. Forward traversal moves the visible strip leftward
-and backward traversal moves it rightward, so frames enter through Tail or Lead,
-pass through Center as they become Current, and leave through the opposite side.
-Rapid same-direction movements compose as one continuing sequence; a reversal
-turns cleanly. The cue is opacity only: the trailing pane is already settled
-because it now carries the address Center just left, and the leading pane rises
-into place because its material was not previously visible. The panes are not
-translated — nothing can actually slide between roles, and moving them read as a
-shake. The transition never delays the semantic commit, and it never creates
-history.
+Direct manipulation has first preview ownership, Context second, and the last
+applicable operator third. Hover and keyboard focus preview operators on the
+Timeline without seeking any player. Movement transitions use opacity, not pane
+translation; reduced-motion users receive the same final frames without the
+transition.
 
-Context beginning, moving, pausing, or settling reassigns neither side. Its Tail
-and Lead are the frozen observation edges, so materially different side frames
-mean the transition being sought lies inside the window.
-
-Side panes remain Step controls only when they display Step targets or live
-playback relations. Context, Current, Pin, and Section Frames make those surfaces
-temporarily non-actionable; Refine and Reopen Frames are informative rather than
-disguised Step controls. Hover and keyboard focus stay on the temporal map.
+Tail and Lead act as Step controls only when their displayed Frame explicitly
+offers a Step-to-Address activation or a live playback relation. Context,
+Refine, Reopen, and direct-edit Frames remain informative; their side images do
+not disguise another operator.
 
 ### Field Breath
 
-During ordinary Center playback the Field breathes. Tail stays behind Center and
-Lead stays ahead while both travel between the configured Inner and Outer
-Offsets:
+During ordinary Panorama playback, Tail and Lead breathe between one Inner and
+one Outer source-time offset around Center. The conservative shipped setting is:
 
 ```text
-Inner offset   x
-Outer offset   y
-Breath rate    one symmetric pair
-Field          Stretch / Hold
+Inner 0.25 s · Outer 2.5 s
+Tail 0.75× · Center 1× · Lead 1.25×
 ```
 
-The breathing spread is one control, not two. At Center `1×`, its canonical pairs
-are `0.75×/1.25×`, `0.5×/1.5×`, and `0.25×/1.75×`. At any other Center rate
-`c`, the requested pair scales proportionally as `c(1−d)` and `c(1+d)` so both
-sides remain equally distant through Center and reach equal offsets together.
-Contraction exchanges the pair without rewriting the saved spread. The runtime
-uses only rates the media adapter actually exposes and reports unsupported exact
-rates rather than pretending a clamped asymmetric pair is equivalent. A side that reaches
-a boundary first waits there at Center rate until every operational side arrives,
-then the whole Field reverses direction. A side without room for the Inner Offset
-cannot hold the required separation, so it stops breathing entirely and parks at
-the room it has rather than creeping toward Center.
+This is a high-coherence default, not a universal optimum. Wider offsets and
+stronger provided rate pairs remain selectable, and existing saved values remain
+unchanged.
 
-Hold alone stops the cycle. It preserves each attained offset, sets every held
-side to Center rate, and preserves the direction for later resumption; Stretch
-resumes from the attained relation. Hold changes no configuration and creates no
-Undo checkpoint. There are no independent per-side Stretch/Hold controls.
+`Hold both` preserves the attained relation and phase while Center continues.
+`Stretch both` resumes from it. A side without enough Range room for the Inner
+Offset becomes non-operational rather than crossing Center or silently shrinking
+the configured minimum. Collapsed, hidden, or unavailable panes do not stall the
+other side.
 
-Automatic Context controls the duration of a transient Center observation; Field
-Offset controls the source-time displacement of Tail and Lead from Current. They
-can be tuned into a useful proportion — such as 2.5 seconds on each side of a
-5-second Context — but neither derives from or updates the other. Empty or
-invalid Offset input is rejected and the last canonical value is restored;
-`0 < inner < outer` is enforced against the sibling bound.
+Plain Space owns Panorama playback at fixed `1×`. Shift+Space owns Center-only
+playback at the configured fixed wish or dynamic policy. Center-only remains its
+observation policy even when its fixed wish is `1×`. If native controls change
+an ordinary Panorama's actual rate away from `1×`, Tail and Lead suspend until
+the adapter confirms compatible actual `1×` again.
 
-Field Off and pane collapse are operational boundaries, not merely visual
-styles. Their side players pause once and remain dormant; delayed CUED or
-PLAYING events cannot reactivate them, and a dormant side is excluded from the
-breathing barrier so it cannot stall the Field. A side surface becomes actionable
-only after that visible source frame is ready and a non-zero Range-contained
-relation exists. A held Field span exists only while both sides are visible and
-available.
+## Temporal Topography
 
-Starting playback clears Frame ownership synchronously and begins the breath at
-the inner offset.
+The Timeline is one weighted map with this visual order:
 
-### Direct manipulation Frames
+```text
+free and shared Pins
+main Range / Resolution / Working-Interval track
+source ruler
+bounded Section relationship tree
+```
 
-Direct manipulation temporarily turns the panoramic Viewer into an exact
-instrument. A Current drag centers the candidate Address and surrounds it with
-the candidate Context Frame when Context is enabled, or the candidate Go Frame
-otherwise. A Pin drag centers that Pin and places Tail/Lead at its exact weighted
-Step destinations. A Section endpoint or whole-Section drag parks Tail at Start,
-Center at midpoint, and Lead at End. Releasing commits one transaction and one
-transition back to the ambient Frame; cancelling restores the prior presentation.
-If an endpoint edit leaves Current away from the new midpoint, the idle Viewer
-returns to Current-centered Step rather than mislabeling Current as midpoint.
-These Frames begin only after the pointer crosses the drag threshold. Ordinary
-hover and keyboard focus preview the dry-run geometry on the timeline without
-seeking or pausing any player.
+Equal source intervals are not necessarily equal Timeline distances. Exact
+source-time contours reveal that difference: closer contours indicate
+compression, wider contours expansion. A continuous violet/teal atmosphere is
+centered on each effective Section, strengthens with signed Weight magnitude,
+diffuses over broader extents, and fades past Section bounds. Section identity
+uses a separate quiet palette, so an object's identity is not confused with the
+deformation it contributes. Neutral `1×` contributes no atmosphere.
 
-Users who prefer reduced motion receive the same resulting Frames without the
-travelling transition.
+The main layers remain distinct without relying on colour alone:
 
-## Accessibility and touch
+- Range is the admissible ground;
+- Resolution is a quiet local contour;
+- Working Interval is the surviving directional relation;
+- Current is the semantic Address and carries its own label;
+- Cursor appears only when physical observation has left Current;
+- Field span is the held Panorama relation;
+- Pins and Section wires are retained topology;
+- operator and direct-manipulation previews are transient.
 
-- Every form control has a programmatic name.
-- Every button declares a type.
-- Matrix and Guide actions remain keyboard reachable.
-- Space is the play command everywhere outside text editing and modal Guide
-  work: it starts or stops ordinary playback, and running Context yields to it
-  rather than reinterpreting the key. Enter activates a focused Step control.
-- Settings have one home. Parameters owns every remembered setting — Step
-  distance, Fine Nudge, Automatic Context, Shift playback, and the Panorama's
-  offsets and breathing pair. What acts on what you are looking at right now
-  stays where you are looking: showing the Panorama, collapsing a side, holding
-  a span. The answer to "where is that setting?" does not depend on which
-  setting it is.
-- Shift is the rate modifier on that command, not a second command. `Shift` +
-  `Space`, and Shift-clicking the Center transport surface, play Center at the
-  Shift rate set in Parameters with the Panorama suspended; either engagement
-  pauses a running playback exactly as the plain command does.
-- Pointer release clears pointer-acquired control focus, and Center playback
-  state changes release iframe focus back to the reader.
-- Narrow Timeline preserves vertical page scrolling; wide desktop keeps the application frame fixed and scrolls only the active right-rail surface.
-- Coarse pointers receive at least 48px Pin and Section-drag hit regions
-  without enlarging their visual marks.
-- Gradients are supplemented by numeric weight labels and compressed/expanded state text.
-- Compact visible markers retain coarse-pointer touch targets.
-- Plain `Z` is Undo and plain `C` is Redo.
-- `,` and `.` nudge the selected map object, or Current when unambiguous.
-- Every increment control repeats while held and settles as one transaction.
-- Reduced-motion users receive settled Field Frames without directional travel.
+One visual channel has one meaning. Object identity uses a marker, an acquired
+Timeline operand uses background fill, Working-Interval participation uses a
+separate inset edge, keyboard focus uses the focus ring, and Link candidate or
+armed state uses an outline/glow. These channels compose instead of overwriting
+one another.
+
+### Timeline interaction
+
+- Bare ground clears the acquired retained operand, then Goes to the addressed
+  source position through the effective inverse map.
+- A Pin click acquires that Pin and moves Current to its exact Address. Dragging
+  past the threshold moves the Pin instead.
+- A Section click acquires that Section, makes its complete extent the Working
+  Interval, and returns Current to its weighted midpoint.
+- A Section wire is its own control. Pressing its first or last quarter moves
+  the corresponding endpoint Pin; pressing the middle translates the complete
+  Section. The wire has no additional node controls.
+- Current drag is Step, not Go. It preserves the traversal relation and commits
+  only on release.
+- Range handles edit Range only when Focus does not own those boundaries.
+- Escape cancels the active drag to its origin before closing or stopping
+  anything behind it.
+
+Section wires are greedily lane-packed. The visible relationship band is bounded
+to five lanes; deeper overlap scrolls inside it, and no two Sections share a
+control. Faint dotted relations connect each wire's start, midpoint, and end to
+the corresponding upper position without introducing more controls.
+
+Nearby Pins cluster before their hit regions overlap. Activating a cluster opens
+a vertically ordered, wheel-scrollable menu. Each row follows the same rule as a
+single Pin: click Goes to that exact Pin; drag moves that exact Pin. Arrow keys,
+Home, End, and Escape operate the menu.
+
+## Operators
+
+The matrix is a physical square with nine equal cells in exact `QWE / ASD / RTF`
+order:
+
+| Key | Operator | Shift meaning |
+|---|---|---|
+| Q | Refine Backward | Local Refine Backward |
+| W | Reopen | — |
+| E | Refine Forward | Local Refine Forward |
+| A | Step Backward | Previous Pin |
+| S | Switch Endpoint | — |
+| D | Step Forward | Next Pin |
+| R | Release | — |
+| T | Tag as Pin | Tag as Section |
+| F | Focus / Unfocus | — |
+
+The first row discriminates, the second traverses or changes viewpoint, and the
+third resolves the current relation into absence, retained structure, or active
+scope. Labels and dry-run previews follow physical or matrix-latched Shift, not
+the incidental presence of a Working Interval.
+
+### Tag
+
+`T` always means `Tag as Pin`: Current is the operand. `Shift+T` means `Tag as
+Section`: a positive Working Interval is the operand, and the action is disabled
+without one. The shifted action creates a Section; before retention the source
+relation is still called the Working Interval. Duplicate tagging selects and
+reports the exact existing Pin or Section.
+
+### Release and Focus
+
+Release clears the Working Interval and the acquired Timeline operand. It
+preserves Current, Resolution, Range, Focus, Guide focus, retained topology,
+Weights, playback preferences, and deformation-bypass state. Clearing only a
+presentation operand creates no history; clearing the semantic interval is
+Undoable.
+
+Focus makes an acquired Section or Working Interval the active Range and drawn
+world. Unfocus restores the containing Range. Focus never edits Weight or the
+deformation-bypass scope. While focused, spatial boundary changes that cannot be
+expressed honestly are refused; exact Guide edits remain available.
+
+### Toggle Deformation
+
+The compact `X` action lives below the square but inside Operators, before
+history. It is not a tenth matrix cell and does not live in the Timeline header.
+Its contextual label is `Straighten Section`, `Restore Section`, `Straighten
+Timeline`, or `Restore Timeline`, with the exact scope shown beside it.
+
+An acquired Timeline Section scopes the action to that Section. With no acquired
+Section, it scopes the complete map. It changes geometry, contours, atmosphere,
+Step, Refine, adaptive Reach, hit testing, and explicitly dynamic Playback
+together, while the stored Weight display remains unchanged. It creates no
+history entry and sends no direct player command.
+
+## Guide
+
+Guide focus is inspection and exact editing. Timeline acquisition is the
+spatial operand for `X`, Nudge, Carry, and direct manipulation. A Guide click and
+a Timeline click can establish the same Working Interval, but only the latter
+acquires the Timeline object. Clicking bare Timeline ground clears that
+acquisition without closing the Guide row.
+
+A plain Guide click replaces the Working Interval with the clicked Pin, Section,
+or Cue extent. Physical Shift or Guide's one-shot `Extend` latch grows the
+existing interval to include it. The Guide and matrix latches are independent;
+using one cannot consume the other.
+
+### Sections
+
+Each Section row shows title, source extent, duration, Weight, and membership
+once. Selecting the row expands exact Start and End Address controls plus Focus,
+Weight, and Group. Rename and Delete remain beside the title. Start and End
+labels reveal their actual Pins in the Pins tab.
+
+Groups are a flat Section partition. At most one Group is `On Timeline`, and no
+Group drawn is valid. `Active` is independent: any number of Groups may
+contribute Weight while hidden. Hiding the drawn Group removes its Sections and
+endpoint Pins from Timeline but does not deactivate its deformation.
+
+Every Group can be renamed. The last Group cannot be removed. Removing another
+Group moves its Sections to the real heir named in the confirmation and result;
+if that move would collide with an existing Section in the heir, removal is
+refused. The default Group has no special deletion immunity.
+
+### Pins
+
+Pins are divided into `On Timeline` and `Hidden`, but every Pin remains
+navigable and exactly editable in Guide. A Pin row shows title, Address, Section
+reference count when nonzero, Rename, and Delete. A selected shared Pin offers
+one `Unlink` action per referencing Section, naming the exact Section released.
+
+Unlink gives one Section its own Pin at the same Address. To Link again, drag
+that independent endpoint near a valid Pin. Amber is a candidate; remaining on
+the same target arms a green relation; only release after arming merges identity.
+Passing through or releasing early performs ordinary movement.
+
+### Cues
+
+Cues are chapter Addresses offered from pasted text, not retained structure.
+They have no persistence, Weight, topology, or traversal identity. A Cue click
+navigates or establishes its derived extent; Shift/Extend composes it like any
+other extent. `Retain` creates an ordinary Pin or Section carrying the offered
+title. `Show on timeline` adds inert marks only: they cannot be clicked, dragged,
+or clustered.
+
+### Exact Address controls
+
+Guide Address inputs accept canonical timecode or seconds. Enter commits;
+Escape restores the committed value. Malformed timecode, an Address outside
+Range, or a move that would collapse/reverse structure is rejected rather than
+silently changed. The adjacent minus/plus buttons repeat while held and settle
+as one Nudge transaction. Spatial drag and exact input show the same Panorama
+preview and reach the same canonical mutation.
+
+## Parameters
+
+Parameters contains remembered configuration, grouped by the question it
+answers:
+
+- Active Range and Range tools;
+- Resolution state;
+- manual Step distance or adaptive `1/32`, `1/16`, `1/8` of weighted Range;
+- source-time Fine Nudge distance;
+- source-time Automatic Context duration;
+- fixed or effective-Weight-following Shift playback;
+- Panorama Inner/Outer offsets and symmetric Breath rate.
+
+Step distance is Timeline Space; at neutral Weight one unit equals one source
+second. Nudge and Context are source time. Panorama offsets are physical
+observation. Changing one setting does not rewrite another dimension.
+
+## Keyboard and modifier reference
+
+| Input | Consequence |
+|---|---|
+| Q / E | Refine Backward / Forward |
+| Shift+Q / Shift+E | Local Refine Backward / Forward |
+| A or Left / D or Right | Step Backward / Forward |
+| Shift+A or Shift+Left / Shift+D or Shift+Right | Previous / Next Pin |
+| W | Reopen |
+| S | Switch Endpoint |
+| R | Release |
+| T / Shift+T | Tag as Pin / Tag as Section |
+| X | Toggle deformation for acquired Section, otherwise complete Timeline |
+| F | Focus / Unfocus |
+| Space / Shift+Space | Panorama playback / Center-only Shift playback |
+| Alt + compatible operator | Carry the acquired retained object |
+| , / . | Nudge backward / forward |
+| Shift+wheel | Nudge the object under pointer, otherwise acquired operand or Current |
+| Shift+drag | Precision direct manipulation |
+| [ / ] | Previous / next Step preset |
+| Z / C | Undo / Redo |
+| G / O | Guide / Operators and Parameters |
+| ? | Keyboard reference |
+| Escape | Cancel active gesture, then stop or close the topmost transient layer |
+
+Space is captured only from reader background. A deliberately focused button,
+menu item, slider, form control, compact Guide, or dialog retains its native
+keyboard behavior. After Center state changes, iframe focus is released so
+reader hotkeys work without another Timeline click.
+
+## Accessibility and target integrity
+
+Every form control has an accessible name and every button declares its type.
+Operator keys are visible and exposed through `aria-keyshortcuts`. Contextual
+disabled states state the missing operand. `aria-pressed` communicates Shift,
+Field, Group, and deformation-bypass state.
+
+Fine and coarse pointers share visual marks but use different hit geometry.
+Coarse Pin and Section targets are at least 48 pixels. The visible Pin or Section
+wire and its centered hit region are one control, so clicking what is drawn does
+not fall through to bare Timeline Go. Responsive panels contain their own
+overflow; the application does not grow vertically for dense Guide structure.

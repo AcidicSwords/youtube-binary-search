@@ -70,6 +70,7 @@ function installFakeMediaApi(duration) {
       this.events = config.events || {};
       this.playerVars = config.playerVars || {};
       this.duration = duration;
+      this.videoId = null;
       this.currentTime = 0;
       this.rate = 1;
       this.state = -1;
@@ -90,18 +91,22 @@ function installFakeMediaApi(duration) {
     }
     emitState(data) { queueMicrotask(() => this.events.onStateChange?.({ data })); }
     emitRate(rate) { queueMicrotask(() => this.events.onPlaybackRateChange?.({ data: rate })); }
-    cueVideoById({ startSeconds = 0 } = {}) {
+    cueVideoById({ videoId = null, startSeconds = 0 } = {}) {
+      this.videoId = videoId;
       this.commands.push(["cue", startSeconds]);
       this.currentTime = startSeconds;
       this.state = 5;
       this.emitState(5);
     }
-    loadVideoById({ startSeconds = 0 } = {}) { this.cueVideoById({ startSeconds }); }
+    loadVideoById({ videoId = null, startSeconds = 0 } = {}) {
+      this.cueVideoById({ videoId, startSeconds });
+    }
     getDuration() { return this.duration; }
     getCurrentTime() { return this.currentTime; }
     getAvailablePlaybackRates() { return [0.5, 1, 1.5, 2]; }
     getPlayerState() { return this.state; }
     getPlaybackRate() { return this.rate; }
+    getVideoData() { return { video_id: this.videoId }; }
     getIframe() { return this.iframe; }
     setPlaybackRate(rate) { this.commands.push(["rate", rate]); this.rate = rate; this.emitRate(rate); }
     seekTo(time) { this.commands.push(["place", time]); this.currentTime = time; }

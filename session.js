@@ -26,13 +26,11 @@ import {
   renamePin,
   deletePin,
   sectionsForPin,
-  DEFAULT_DEFORM_WEIGHT,
   isSectionWeight,
   normalizeSectionWeight,
   setSectionWeight,
   DEFAULT_GROUP_ID,
   visibleGroup,
-  sectionIsVisible,
   createGroup,
   setGroupState,
   groupIsVisible,
@@ -40,7 +38,7 @@ import {
   nextGroupLabel,
   assignSectionGroup,
   deleteGroup,
-  groupDeletionBlockReason,
+  groupDeletionPlan,
   movePin,
   translateSection,
   createSection,
@@ -242,9 +240,9 @@ function resolveIntervalEndpointFrame(frame, address, opposite, interval, range,
   );
 }
 
-function syncIntervalEndpointFrames(model) {
+function syncIntervalEndpointFrames(model, suppliedMetric = null) {
   if (!model.interval) return;
-  const metric = projectionForModel(model).metric;
+  const metric = suppliedMetric || projectionForModel(model).metric;
   const preserveRefinementLevel = [
     "refineBackward",
     "refineForward"
@@ -455,7 +453,7 @@ function commit(session, label, transform, options = {}) {
     if (reconciliation.moved) detail.place = draft.resolution.C;
   }
   if (detail.changed === false) return unchanged(session, detail.reason, detail);
-  syncIntervalEndpointFrames(draft);
+  syncIntervalEndpointFrames(draft, options.projection?.metric);
 
   const returnModel = options.returnModel ? snapshotModel(options.returnModel) : session.model;
   const committedLabel = detail.historyLabel || label;
@@ -490,7 +488,7 @@ function amend(session, transform, options = {}) {
     if (reconciliation.moved) detail.place = draft.resolution.C;
   }
   if (detail.changed === false) return unchanged(session, detail.reason, detail);
-  syncIntervalEndpointFrames(draft);
+  syncIntervalEndpointFrames(draft, options.projection?.metric);
   return {
     ...detail,
     changed: true,
@@ -582,7 +580,7 @@ function moveDraft(model, destination, options = {}) {
   const opening = openAddress(model, boundedDestination);
   // Leaving Focus or opening Full Video can change the active Range. Derive the
   // movement frame only after that composite scope transition is complete.
-  const metric = projectionForModel(model).metric;
+  const metric = options.projection?.metric || projectionForModel(model).metric;
   const rangeChanged = opening.changed;
   const resolvedDestination = clamp(boundedDestination, model.range.start, model.range.end);
   let finalDestination = resolvedDestination;
@@ -742,7 +740,9 @@ export function workFromExtent(session, extent, options = {}) {
     || !Number.isFinite(end)
     || end <= start + EPSILON
   ) return unchanged(session, "invalid-extent");
-  const midpoint = (start + end) / 2;
+  const midpoint = options.projection
+    ? options.projection.timelineMidpoint(start, end)
+    : (start + end) / 2;
   const label = options.label || "Select Section";
   return commit(session, label, model => {
     const current = model.resolution.C;
@@ -807,8 +807,9 @@ function retainedRefineIntervalRelation(model, target) {
     : { departure: current, relation };
 }
 
-export function localRefine(session, direction) {
-  const metric = projectionForModel(session.model).metric;
+export function localRefine(session, direction, options = {}) {
+  const projection = options.projection || projectionForModel(session.model);
+  const metric = projection.metric;
   const target = getTargets(session.model.resolution, metric)[direction];
   if (target === null) return unchanged(session, "no-destination");
   const backward = direction === "backward";
@@ -818,12 +819,13 @@ export function localRefine(session, direction) {
     operator: backward ? "localRefineBackward" : "localRefineForward",
     label: backward ? "Local Refine Backward" : "Local Refine Forward",
     intervalDeparture: current,
-    refineRelation: "draw"
+    refineRelation: "draw",
+    projection
   });
 }
 
-export function refine(session, direction) {
-  const projection = projectionForModel(session.model);
+export function refine(session, direction, options = {}) {
+  const projection = options.projection || projectionForModel(session.model);
   const target = getTargets(session.model.resolution, projection.metric)[direction];
   if (target === null) return unchanged(session, "no-destination");
   const backward = direction === "backward";
@@ -833,12 +835,13 @@ export function refine(session, direction) {
     operator: backward ? "refineBackward" : "refineForward",
     label: backward ? "Refine Backward" : "Refine Forward",
     intervalDeparture: intervalRelation.departure,
-    refineRelation: intervalRelation.relation
+    refineRelation: intervalRelation.relation,
+    projection
   });
 }
 
 export function step(session, direction, seconds = null, options = {}) {
-  const projection = projectionForModel(session.model);
+  const projection = options.projection || projectionForModel(session.model);
   const configured = effectiveStepReach(
     session.model.stepReach,
     session.model.range,
@@ -870,14 +873,15 @@ export function step(session, direction, seconds = null, options = {}) {
     originResolution: options.originResolution,
     originResolutionBasis: options.originResolutionBasis,
     stepSeconds: reach,
-    amend: options.amend
+    amend: options.amend,
+    projection
   });
 }
 
 export function stepToPin(session, destination, direction, options = {}) {
   if (!Number.isFinite(destination)) return unchanged(session, "no-destination");
   const backward = direction === "backward";
-  const projection = projectionForModel(session.model);
+  const projection = options.projection || projectionForModel(session.model);
   const configured = effectiveStepReach(
     session.model.stepReach,
     session.model.range,
@@ -893,13 +897,14 @@ export function stepToPin(session, destination, direction, options = {}) {
   return goTo(session, destination, {
     mode: "step",
     operator: backward ? "pinBackward" : "pinForward",
-    label: backward ? "Pin Backward" : "Pin Forward",
+    label: backward ? "Previous Pin" : "Next Pin",
     intervalDeparture,
     originInterval: options.originInterval,
     originResolution: options.originResolution,
     originResolutionBasis: options.originResolutionBasis,
     stepSeconds: reach,
-    amend: options.amend
+    amend: options.amend,
+    projection
   });
 }
 
@@ -931,14 +936,14 @@ export function reopen(session) {
   });
 }
 
-export function switchEndpoint(session) {
+export function switchEndpoint(session, options = {}) {
   const interval = session.model.interval;
   if (!interval) return unchanged(session, "no-interval");
 
   return commit(session, "Switch Endpoint", draft => {
     const active = clone(draft.interval);
     if (!active) return { changed: false, reason: "no-interval" };
-    const metric = projectionForModel(draft).metric;
+    const metric = options.projection?.metric || projectionForModel(draft).metric;
     const activeSide = active.activeSide === "start" || active.activeSide === "end"
       ? active.activeSide
       : Math.abs(active.arrival - active.start) <= EPSILON
@@ -981,7 +986,7 @@ export function switchEndpoint(session) {
       place: draft.resolution.C,
       interval: draft.interval
     };
-  });
+  }, options);
 }
 
 export function releaseInterval(session) {
@@ -991,90 +996,6 @@ export function releaseInterval(session) {
     draft.lastOperator = "release";
     return { changed: true, interval: null };
   });
-}
-
-function sameExtent(first, second) {
-  return Boolean(
-    first
-    && second
-    && Math.abs(first.start - second.start) <= EPSILON
-    && Math.abs(first.end - second.end) <= EPSILON
-  );
-}
-
-export function deformSection(
-  session,
-  sectionId = null,
-  weight = DEFAULT_DEFORM_WEIGHT
-) {
-  if (!isSectionWeight(weight)) {
-    return unchanged(session, "invalid-section-weight");
-  }
-  const nextWeight = normalizeSectionWeight(weight);
-  const interval = session.model.interval;
-  if (sectionId && !resolveSection(session.model.guide, sectionId)) {
-    return unchanged(session, "missing-section");
-  }
-  const exactMatches = interval
-    ? session.model.guide.sections
-      .map(section => resolveSection(session.model.guide, section))
-      .filter(section =>
-        sectionIsVisible(session.model.guide, section)
-        && sameExtent(section, interval)
-      )
-    : [];
-  if (!sectionId && exactMatches.length > 1) {
-    return unchanged(session, "ambiguous-deform-target", {
-      sectionIds: exactMatches.map(section => section.id)
-    });
-  }
-  let target = sectionId
-    ? resolveSection(session.model.guide, sectionId)
-    : exactMatches[0] || null;
-
-  if (!target && !interval) return unchanged(session, "no-deform-target");
-
-  const label = target
-    ? `Set “${sectionDisplayName(target)}” to ${nextWeight}×`
-    : `Deform Working Interval to ${nextWeight}×`;
-  return commit(session, label, draft => {
-    let resolved = target
-      ? resolveSection(draft.guide, target.id)
-      : null;
-    let created = false;
-    if (!resolved) {
-      const working = clone(draft.interval);
-      if (!working) return { changed: false, reason: "no-interval" };
-      const value = createSectionFromTimes(
-        draft.guide,
-        working.start,
-        working.end,
-        {
-          label: "",
-          weight: nextWeight,
-          provenance: `deform:${working.operator}`
-        }
-      );
-      resolved = resolveSection(draft.guide, value.section.id);
-      created = value.created;
-    } else {
-      const value = setSectionWeight(
-        draft.guide,
-        resolved.id,
-        nextWeight
-      );
-      if (!value.changed) return value;
-      resolved = value.section;
-    }
-    return {
-      changed: true,
-      guideChanged: true,
-      value: resolved,
-      section: resolved,
-      created,
-      weight: resolved.weight
-    };
-  }, { guideEdit: true });
 }
 
 export function setRange(session, start, end, current, label = "Set Range") {
@@ -1101,7 +1022,7 @@ export function setRange(session, start, end, current, label = "Set Range") {
   });
 }
 
-export function focusSection(session, sectionId) {
+export function focusSection(session, sectionId, options = {}) {
   const section = resolveSection(session.model.guide, sectionId);
   if (!section) return unchanged(session, "missing-section");
   if (
@@ -1117,7 +1038,11 @@ export function focusSection(session, sectionId) {
     const returnRange = draft.focus?.returnRange || clone(draft.range);
     draft.focus = { kind: FOCUS_KIND.SAVED, sectionId, returnRange };
     draft.range = { start: resolved.start, end: resolved.end };
-    const current = contains(draft.range, departure) ? departure : resolved.midpoint;
+    const current = contains(draft.range, departure)
+      ? departure
+      : options.projection
+        ? options.projection.timelineMidpoint(resolved.start, resolved.end)
+        : resolved.midpoint;
     draft.resolution = createRoot(resolved.start, current, resolved.end);
     draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
     draft.lastOperator = "focus";
@@ -1130,7 +1055,7 @@ export function focusSection(session, sectionId) {
       intervalCleared,
       ...(moved ? { place: current } : {})
     };
-  });
+  }, options);
 }
 
 export function focusWorkingSection(session) {
@@ -1142,7 +1067,7 @@ export function focusWorkingSection(session) {
     && Math.abs(session.model.range.end - interval.end) <= EPSILON
   ) return unchanged(session, "already-focused");
 
-  return commit(session, "Focus Working Section", draft => {
+  return commit(session, "Focus Working Interval", draft => {
     const working = clone(draft.interval);
     if (!working) return { changed: false, reason: "no-interval" };
     const departure = draft.resolution.C;
@@ -1523,7 +1448,7 @@ function rebaseWorkingIntervalBounds(model, movements) {
 export function setGuideGroupState(session, groupId, changes) {
   const group = session.model.guide.groups?.find(entry => entry.id === groupId);
   if (!group) return unchanged(session, "missing-group");
-  // Visibility is read from the Guide's one visible-Group identity rather than
+  // Visibility is read from the Guide's nullable visible-Group identity rather than
   // from a field on this Group, so there is nothing here that can disagree with
   // the model about which layer the Timeline is drawing.
   const wasVisible = groupIsVisible(session.model.guide, group);
@@ -1561,7 +1486,7 @@ export function createGuideGroup(session, label = "") {
 
 export function renameGuideGroup(session, groupId, label) {
   const group = session.model.guide.groups?.find(entry => entry.id === groupId);
-  if (!group || groupId === DEFAULT_GROUP_ID) return unchanged(session, "missing-group");
+  if (!group) return unchanged(session, "missing-group");
   const next = typeof label === "string" ? label.trim() : "";
   // A Section's title is optional because its Address identifies it. A Group has
   // no Address, so its name is the only thing that does -- an unnamed one would
@@ -1592,20 +1517,40 @@ export function assignGuideSectionGroup(session, sectionId, groupId) {
   }, { guideEdit: true });
 }
 
-// A Group is an organizing choice, not an owner: deleting one returns its
-// Sections to the default rather than destroying anything.
+// Confirmation and mutation ask the same kernel question, so the destination
+// named before deletion is guaranteed to be the destination reported after it.
+export function planGuideGroupDeletion(session, groupId) {
+  return groupDeletionPlan(session?.model?.guide, groupId);
+}
+
+// A Group is an organizing choice, not an owner: deleting one rehomes its
+// Sections in the actual heir named by the shared plan.
 export function deleteGuideGroup(session, groupId) {
   const group = session.model.guide.groups?.find(entry => entry.id === groupId);
-  if (!group || groupId === DEFAULT_GROUP_ID) return unchanged(session, "undeletable-group");
-  const blocked = groupDeletionBlockReason(session.model.guide, groupId);
-  if (blocked) return unchanged(session, blocked);
+  const plan = planGuideGroupDeletion(session, groupId);
+  if (!plan.allowed) {
+    return unchanged(session, plan.reason, {
+      ...plan,
+      value: plan
+    });
+  }
   const name = group.label?.trim() || "Group";
   return commit(session, `Remove Group “${name}”`, draft => {
-    const reason = groupDeletionBlockReason(draft.guide, groupId);
-    if (reason || !deleteGroup(draft.guide, groupId)) {
-      return { changed: false, reason: reason || "missing-group" };
+    const result = deleteGroup(draft.guide, groupId);
+    if (!result.allowed) {
+      return {
+        changed: false,
+        reason: result.reason,
+        ...result,
+        value: result
+      };
     }
-    return { changed: true, guideChanged: true };
+    return {
+      changed: true,
+      guideChanged: true,
+      ...result,
+      value: result
+    };
   }, { guideEdit: true });
 }
 
@@ -1789,9 +1734,6 @@ export function undo(session) {
   };
 }
 
-// Compatibility name for existing imports. Canonical interface vocabulary is Undo.
-export const returnState = undo;
-
 export function redo(session) {
   const future = session.future || [];
   const entry = future.at(-1);
@@ -1820,27 +1762,43 @@ export function redo(session) {
 export function previewTransition(session, action, options = {}) {
   switch (action) {
     case "refineBackward":
-      return refine(session, "backward");
+      return refine(session, "backward", {
+        projection: options.projection
+      });
     case "refineForward":
-      return refine(session, "forward");
+      return refine(session, "forward", {
+        projection: options.projection
+      });
     case "localRefineBackward":
-      return localRefine(session, "backward");
+      return localRefine(session, "backward", {
+        projection: options.projection
+      });
     case "localRefineForward":
-      return localRefine(session, "forward");
+      return localRefine(session, "forward", {
+        projection: options.projection
+      });
     case "stepBackward":
-      return step(session, "backward", options.seconds);
+      return step(session, "backward", options.seconds, {
+        projection: options.projection
+      });
     case "stepForward":
-      return step(session, "forward", options.seconds);
+      return step(session, "forward", options.seconds, {
+        projection: options.projection
+      });
     case "pinBackward":
       return stepToPin(session, options.destination, "backward", {
-        stepSeconds: options.seconds
+        stepSeconds: options.seconds,
+        projection: options.projection
       });
     case "pinForward":
       return stepToPin(session, options.destination, "forward", {
-        stepSeconds: options.seconds
+        stepSeconds: options.seconds,
+        projection: options.projection
       });
     case "switchEndpoint":
-      return switchEndpoint(session);
+      return switchEndpoint(session, {
+        projection: options.projection
+      });
     case "reopen":
       return reopen(session);
     case "release":
@@ -1902,5 +1860,131 @@ export function relabelLastAction(session, label) {
   return {
     ...session,
     history: [...history.slice(0, -1), { ...last, label }]
+  };
+}
+
+// Step commits on its first repeat so Current moves without latency, then
+// amends that one transaction until the gesture settles. Net displacement can
+// name an ordinary sequence, but it cannot prove a reversal: departure and
+// arrival are identical there. The pending gesture therefore supplies only its
+// transient visited envelope. Settlement turns that sparse evidence into the
+// same positive contiguous Working Interval every route understands, then
+// discards it with the caller's pending object. No Path enters durable state.
+export function settleStepSequence(session, pending) {
+  if (!pending?.started) return unchanged(session, "no-step-sequence");
+
+  const arrival = Number(session?.model?.resolution?.C);
+  const departure = Number(pending.departure);
+  if (!Number.isFinite(arrival) || !Number.isFinite(departure)) {
+    return unchanged(session, "invalid-step-sequence");
+  }
+
+  const displacement = arrival - departure;
+  const direction = Math.abs(displacement) <= EPSILON
+    ? null
+    : displacement > 0 ? "forward" : "backward";
+  const label = direction === "forward"
+    ? "Step Forward"
+    : direction === "backward"
+      ? "Step Backward"
+      : "Step Reversal";
+  const visitedMinimum = Math.max(
+    session.model.range.start,
+    Math.min(
+      departure,
+      arrival,
+      Number.isFinite(Number(pending.visitedMinimum))
+        ? Number(pending.visitedMinimum)
+        : departure
+    )
+  );
+  const visitedMaximum = Math.min(
+    session.model.range.end,
+    Math.max(
+      departure,
+      arrival,
+      Number.isFinite(Number(pending.visitedMaximum))
+        ? Number(pending.visitedMaximum)
+        : departure
+    )
+  );
+
+  let settledSession = session;
+  let retainedEnvelope = false;
+  if (
+    direction === null
+    && visitedMaximum - visitedMinimum > EPSILON
+  ) {
+    // The final committed repeat supplies the deterministic viewpoint. A
+    // backward return leaves the lower side active; a forward return leaves the
+    // upper side active. The opposite visited extreme is the retained endpoint
+    // from which Switch Endpoint can reconstruct the complementary viewpoint.
+    const activeSide = pending.lastDirection === "backward" ? "start" : "end";
+    const intervalDeparture = activeSide === "start"
+      ? visitedMaximum
+      : visitedMinimum;
+    const operator = pending.lastDirection === "backward"
+      ? "stepBackward"
+      : "stepForward";
+    const amended = amend(session, draft => {
+      const extent = { start: visitedMinimum, end: visitedMaximum };
+      const metric = pending.projection?.metric || projectionForModel(draft).metric;
+      const currentFrame = currentEndpointFrame(draft);
+      const startFrame = resolveIntervalEndpointFrame(
+        Math.abs(arrival - visitedMinimum) <= EPSILON ? currentFrame : null,
+        visitedMinimum,
+        visitedMaximum,
+        extent,
+        draft.range,
+        metric
+      );
+      const endFrame = resolveIntervalEndpointFrame(
+        Math.abs(arrival - visitedMaximum) <= EPSILON ? currentFrame : null,
+        visitedMaximum,
+        visitedMinimum,
+        extent,
+        draft.range,
+        metric
+      );
+      draft.interval = createInterval(
+        intervalDeparture,
+        arrival,
+        operator,
+        "direct",
+        {
+          extent,
+          activeSide,
+          startFrame,
+          endFrame,
+          departureFrame: activeSide === "start" ? endFrame : startFrame,
+          arrivalFrame: currentFrame
+        }
+      );
+      if (!draft.interval) {
+        return { changed: false, reason: "invalid-step-envelope" };
+      }
+      draft.lastOperator = operator;
+      return {
+        changed: true,
+        interval: draft.interval,
+        retainedEnvelope: true
+      };
+    }, { projection: pending.projection });
+    if (amended.changed) {
+      settledSession = amended.session;
+      retainedEnvelope = true;
+    }
+  }
+
+  settledSession = relabelLastAction(settledSession, label);
+  return {
+    changed: settledSession !== session,
+    session: settledSession,
+    direction,
+    label,
+    retainedEnvelope,
+    visitedMinimum,
+    visitedMaximum,
+    interval: settledSession.model.interval
   };
 }
