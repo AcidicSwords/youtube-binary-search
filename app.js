@@ -1293,6 +1293,11 @@ function retainedCarryStatus(result) {
 // of the observation, not a second observation.
 function recordObservedSpans(transport, current) {
   if (!isTransportActive(transport)) return false;
+  // A Context window superseded by the next Ghost candidate is part of the scan,
+  // not a watched span. The reader is sweeping through moments to find one; only
+  // what they were still watching when the gesture ended is an observation they
+  // actually made.
+  if (state.ghostGesture) return false;
   const departure = Number(transport.entry ?? transport.departure);
   const end = Number(current);
   if (!Number.isFinite(departure) || !Number.isFinite(end)) return false;
@@ -5250,10 +5255,23 @@ function handleGhostWheel(event) {
     moved = true;
   }
   if (moved) {
-    // Center follows the recalled Address and the Field translates around it.
-    // Automatic Context deliberately does not start: the reader is looking for
-    // a moment they recognise, and a Context window would keep moving under them.
-    locateAddress(currentResolution().C, { preserveField: true });
+    // Center follows the recalled Address, and if Context is enabled it plays
+    // there.
+    //
+    // The stop condition for a recall is recognition, and a still frame is a
+    // poor thing to recognise a moment from -- a second or two of motion and
+    // sound is what actually places it. So each candidate retargets the same
+    // Context window rather than starting a new observation: the reader scrolls
+    // through their own path hearing each moment, and the window follows the
+    // wheel instead of being torn down and rebuilt at every notch.
+    //
+    // With Context off, the recall stays a silent frame-by-frame scan.
+    const landing = currentResolution().C;
+    if (state.contextSeconds > 0) {
+      startContext(landing, { retarget: transportIs(TRANSPORT_KIND.CONTEXT) });
+    } else {
+      locateAddress(landing, { preserveField: true });
+    }
     syncIntervalPinSelection();
     // A recall is otherwise almost silent -- Current moves and an Interval
     // appears, both of which many other operators also do -- so it says how far

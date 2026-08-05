@@ -179,6 +179,13 @@ moment is search and leaves no trace; releasing records that the reader
 re-entered that moment, once. So repeated recall accumulates the moments
 returned to, never mirrored copies of the searching.
 
+With automatic Context on, the recall is heard as well as seen: each candidate
+plays, because a second of motion and sound is what actually places a moment
+and a still frame is not. It is one window following the wheel, not a new one at
+every notch, so the scan sweeps rather than stutters. What the scan played
+through is still search — only the window still running when the gesture ended
+counts as watched. With Context off, recall stays a silent frame-by-frame scan.
+
 Section wires are greedily lane-packed. The visible relationship band is bounded
 to five lanes; deeper overlap scrolls inside it, and no two Sections share a
 control. Faint dotted relations connect each wire's start, midpoint, and end to

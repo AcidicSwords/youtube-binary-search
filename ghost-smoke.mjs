@@ -6,7 +6,15 @@
 // whether releasing writes one transaction, and whether Tab now acquires the
 // Guide that G used to.
 import assert from "node:assert/strict";
-import { openApp, loadVideo, boxOf } from "./browser-harness.mjs";
+import {
+  openApp,
+  loadVideo,
+  boxOf,
+  mediaClockTo,
+  mediaCommands,
+  mediaCommandCount,
+  mediaIsPlaying
+} from "./browser-harness.mjs";
 
 const { page, close, failures } = await openApp({ width: 1440, height: 1000 });
 
@@ -19,6 +27,22 @@ const anchorShown = () => page.evaluate(() => {
   const marker = document.getElementById("current-departure-marker");
   return { hidden: marker?.hidden !== false, owner: marker?.dataset.owner || null };
 });
+
+// How many moments the reader's path is currently offering. The recall reports
+// it on every notch, which makes it the one place the ledger is visible from
+// outside: "Ghost back · 0:32.61 · 7 of 8 · anchored at 0:44.89."
+const pathTotal = status => Number(/ of (\d+) /.exec(status)?.[1] || 0);
+
+// Watch a Context window through to its end. The substituted adapter has no
+// clock of its own, so the window is played by moving its position the way a
+// real player would, one poll at a time.
+async function playWindowOut() {
+  const from = await page.evaluate(() => Object.values(window.__players)[0].currentTime);
+  for (const offset of [1, 2, 3, 4, 5]) {
+    await mediaClockTo(page, from + offset);
+    await settle(160);
+  }
+}
 
 // One Ghost wheel notch. Any single turn past the threshold recalls exactly one
 // occurrence, whatever the device reports for a detent.
@@ -430,10 +454,134 @@ try {
   await settle(400);
 
   // =========================================================================
-  // 11. Nothing logged an error along the way
+  // 11. Context plays through the recall
+  // =========================================================================
+  // The stop condition for a recall is recognition, and a still frame is a poor
+  // thing to recognise a moment from. With Context on, each candidate plays --
+  // and it is the same window following the wheel, not a new observation torn
+  // down and rebuilt at every notch.
+  await page.evaluate(() => {
+    document.getElementById("context-seconds").value = "4";
+    document.getElementById("context-seconds").dispatchEvent(new Event("change", { bubbles: true }));
+    document.activeElement?.blur();
+  });
+  await settle(260);
+
+  // Walk somewhere with Context on and let the window play out, so the path
+  // contains a watched span and not only jumps.
+  await page.mouse.click(timeline.x + timeline.width * 0.5, timeline.y + timeline.height * 0.55);
+  await settle(360);
+  await playWindowOut();
+
+  // A recall with Context on plays where it lands.
+  const beforeRecall = await mediaCommandCount(page);
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, 100);
+  await settle(300);
+  const firstNotch = await mediaCommands(page, beforeRecall);
+  assert.equal(await mediaIsPlaying(page), true,
+    "With Context on, a recalled moment plays instead of sitting as a still frame.");
+  assert.ok(firstNotch.some(command => command[0] === "place")
+    && firstNotch.some(command => command[0] === "play"),
+    "The first candidate opens a window: it is placed and started.");
+
+  // The next candidate, with that window still running, retargets it. A fresh
+  // `play` here would mean the window was torn down and rebuilt, which is what
+  // makes a scan stutter instead of sweep.
+  const beforeRetarget = await mediaCommandCount(page);
+  await page.mouse.wheel(0, 100);
+  await settle(300);
+  const secondNotch = await mediaCommands(page, beforeRetarget);
+  assert.ok(secondNotch.some(command => command[0] === "place"),
+    "The next candidate moves the window,");
+  assert.ok(!secondNotch.some(command => command[0] === "play"),
+    "but reuses the one already playing rather than starting another.");
+
+  // Escape abandons the whole scan, including whatever it was playing.
+  await page.keyboard.press("Escape");
+  await page.keyboard.up("g");
+  await settle(340);
+  assert.equal(await mediaIsPlaying(page), false,
+    "Escape stops the Context along with everything else the scan did.");
+
+  // What the scan swept past is not something the reader watched. A candidate
+  // window that ran out mid-gesture must leave the path exactly as it found it,
+  // so a fresh gesture from the same Anchor offers exactly the same moments.
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, 100);
+  await settle(280);
+  const pathBefore = pathTotal(await text("#status"));
+  await playWindowOut();
+  await page.mouse.wheel(0, 100);
+  await settle(280);
+  await page.keyboard.press("Escape");
+  await page.keyboard.up("g");
+  await settle(340);
+
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, 100);
+  await settle(280);
+  const pathAfter = pathTotal(await text("#status"));
+  await page.keyboard.press("Escape");
+  await page.keyboard.up("g");
+  await settle(340);
+  assert.ok(pathBefore > 0, "The path has moments to recall,");
+  assert.equal(pathAfter, pathBefore,
+    "and a Context window the scan ran through is not one of them: it was swept past, not watched.");
+
+  // Released with the window still running, the reader is watching. That one is
+  // an observation, and it joins the path.
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, 100);
+  await settle(280);
+  const heldTotal = pathTotal(await text("#status"));
+  await page.keyboard.up("g");
+  await settle(340);
+  assert.equal(await mediaIsPlaying(page), true,
+    "Releasing keeps the landing playing rather than cutting it off,");
+  await playWindowOut();
+
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, 100);
+  await settle(280);
+  const watchedTotal = pathTotal(await text("#status"));
+  await page.keyboard.press("Escape");
+  await page.keyboard.up("g");
+  await settle(340);
+  // The injection contributes exactly one new moment -- its landing -- so any
+  // growth beyond that is the span the reader actually watched.
+  assert.ok(watchedTotal - heldTotal > 1,
+    "and the window watched to its end joins the path as watched source time.");
+
+  // Back off, so nothing downstream inherits a playing window.
+  await page.evaluate(() => {
+    document.getElementById("context-seconds").value = "0";
+    document.getElementById("context-seconds").dispatchEvent(new Event("change", { bubbles: true }));
+    document.activeElement?.blur();
+  });
+  await settle(300);
+
+  // With Context off the recall is silent again: a frame-by-frame scan.
+  await page.mouse.click(timeline.x + timeline.width * 0.3, timeline.y + timeline.height * 0.55);
+  await settle(340);
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, 100);
+  await settle(300);
+  assert.equal(await mediaIsPlaying(page), false,
+    "With Context off, recall stays the silent scan it was.");
+  await page.keyboard.up("g");
+  await settle(320);
+
+  // =========================================================================
+  // 12. Nothing logged an error along the way
   // =========================================================================
   assert.deepEqual(failures, [], `Console/page errors: ${failures.join(" | ")}`);
-  console.log("Ghost smoke passed: the Guide is on I while Tab stays the browser's and G no longer touches either; holding G moves nothing, writes no history and draws no Anchor; a wheel notch recalls an earlier moment behind a fixed Anchor and an ordinary Working Interval; releasing writes one transaction that one Undo reverses; Escape cancels exactly; Ghost owns the wheel only while G is held; one detent recalls exactly one moment; the recall says where in the path it is and what it is anchored to; Ghost interleaves with ordinary operators without ever landing where the reader has not been; releasing records the moment re-entered rather than the search that found it, so backward from it asks what led there; and input below the threshold costs nothing at all.");
+  console.log("Ghost smoke passed: the Guide is on I while Tab stays the browser's and G no longer touches either; holding G moves nothing, writes no history and draws no Anchor; a wheel notch recalls an earlier moment behind a fixed Anchor and an ordinary Working Interval; releasing writes one transaction that one Undo reverses; Escape cancels exactly; Ghost owns the wheel only while G is held; one detent recalls exactly one moment; the recall says where in the path it is and what it is anchored to; Ghost interleaves with ordinary operators without ever landing where the reader has not been; releasing records the moment re-entered rather than the search that found it, so backward from it asks what led there; input below the threshold costs nothing at all; and with Context on the recall plays where it lands, one window following the wheel rather than a new one at every notch, with only the window still running when the gesture ended joining the path.");
 } finally {
   await close();
 }

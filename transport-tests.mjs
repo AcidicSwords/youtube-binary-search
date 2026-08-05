@@ -55,6 +55,15 @@ assert.deepEqual(
   { start: context.start, anchor: context.anchor, end: context.end },
   { start: 47.5, anchor: 50, end: 52.5 }
 );
+// Watching starts at the window's own start, not at the Address that anchored
+// it. Without this a Context window is watched and never recorded: settling it
+// asks the transport where the reader entered, and a Context that cannot answer
+// leaves no trace in user time at all.
+assert.equal(context.entry, 47.5);
+assert.equal(
+  createContextTransport({ anchor: 0, range: { start: 0, end: 100 }, seconds: 5 }).entry,
+  0
+);
 assert.equal(playback.kind, TRANSPORT_KIND.PLAYBACK);
 assert.equal(playback.cycles, 0);
 assert.equal(playback.observationPolicy, OBSERVATION_POLICY.PANORAMA);

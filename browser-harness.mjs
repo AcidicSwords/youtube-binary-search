@@ -192,6 +192,31 @@ export async function boxOf(page, selector) {
   });
 }
 
+// The substituted adapter's own controls. Its clock does not run on its own --
+// nothing here decodes video -- so a test that needs to watch a window play
+// through advances the clock itself, which is exactly the reading the poll takes
+// from a real player. The command log is the other half: it says what the app
+// asked the adapter to do, which is the only way to tell a retargeted window
+// from a torn-down and rebuilt one.
+export async function mediaClockTo(page, time) {
+  await page.evaluate(value => {
+    Object.values(window.__players)[0].currentTime = value;
+  }, time);
+}
+
+export async function mediaCommands(page, from = 0) {
+  return page.evaluate(index =>
+    Object.values(window.__players)[0].commands.slice(index), from);
+}
+
+export async function mediaCommandCount(page) {
+  return page.evaluate(() => Object.values(window.__players)[0].commands.length);
+}
+
+export async function mediaIsPlaying(page) {
+  return page.evaluate(() => Object.values(window.__players)[0].state === 1);
+}
+
 export async function activeElementId(page) {
   return page.evaluate(() => {
     const active = document.activeElement;

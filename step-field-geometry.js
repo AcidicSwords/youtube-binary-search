@@ -112,7 +112,13 @@ export function breathTargetOffset({
   const entered = direction === BREATH_PHASE.CONTRACTING ? (2 * span) - from : from;
   const lap = 2 * span;
   const position = ((entered + travelled) % lap + lap) % lap;
-  return position <= span
+  // A turn reports the direction it is heading in, not the one it arrived by.
+  // Both bounds give the same offset either way, so only the direction is at
+  // stake -- and a Field sitting exactly at its outer bound is about to come
+  // back, which is what the side rates must be told. Reading the outer turn as
+  // still expanding made a leg resumed from a fully attained Hold depend on
+  // whether the resume and the next tick landed in the same millisecond.
+  return position < span
     ? { offset: inner + position, direction: BREATH_PHASE.EXPANDING }
     : { offset: inner + (lap - position), direction: BREATH_PHASE.CONTRACTING };
 }

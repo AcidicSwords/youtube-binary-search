@@ -77,6 +77,12 @@ The complete gate must prove all of the following.
   same transport, resolves fixed wish or dynamic Weight at Range Start, applies
   that request, preserves Panorama eligibility, and adds no history. Each wrap
   rebases each available side at most once.
+- Both transports say where the watching began, so settling either records the
+  source time actually crossed. A Context window enters at its own start rather
+  than at the Address that anchored it; a window that never played records
+  nothing, since a span of no extent is not an occurrence.
+- A Context window played through by a Ghost scan is search: only the window
+  still running when the gesture ended is written as observed source time.
 - Native seek, captions/settings, volume, and fullscreen hit regions remain
   pointer-accessible while paused and idle.
 
@@ -137,6 +143,9 @@ rewrite-refusal coverage.
 - Breath remains within effective Inner/Outer bounds, excludes unavailable
   sides from the barrier, reverses only when every operational side arrives,
   and resumes the preserved phase after Hold.
+- A turn reports the direction it is heading in, not the one it arrived by, so
+  a leg resumed at a fully attained bound contracts immediately rather than
+  depending on how much wall clock has passed since the resume.
 - Field Off, collapsed panes, Center-only Playback, Context, and incompatible
   actual rate keep side players dormant. Hold/Stretch changes no preference,
   Guide, Step Reach, Weight, or history.

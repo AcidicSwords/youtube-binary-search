@@ -5,6 +5,7 @@ import {
   DEFAULT_FIELD_BREATH,
   normalizeFieldBreath,
   breathRatePair,
+  breathTargetOffset,
   breathRateFromResponse,
   effectiveBreathBounds,
   createBreathRuntime,
@@ -161,6 +162,53 @@ function begin(configured = breath) {
     "Reaching the outer boundary on every operational side begins contraction.");
   assert.equal(phases[1], BREATH_PHASE.EXPANDING, "The cycle repeats: x → expand → y → contract → x.");
   assert.ok(phases.length >= 3, "Breathing continues until Hold is deliberately chosen.");
+}
+
+// A turn reports the direction it is heading in, not the one it arrived by
+{
+  // Resuming a leg that already stands at the outer bound, with no time yet
+  // elapsed, is the exact case a Stretch after a fully attained Hold produces.
+  // The Field is at its maximum, so the only thing it can do next is come back,
+  // and that is what the side rates must be told. Reading it as still expanding
+  // made the answer depend on whether the resume and the tick that followed it
+  // landed in the same millisecond -- which is not a question the geometry is
+  // allowed to have an opinion about.
+  const atOuter = breathTargetOffset({
+    direction: BREATH_PHASE.EXPANDING,
+    startedAt: 5000,
+    startingOffset: breath.outer,
+    inner: breath.inner,
+    outer: breath.outer,
+    now: 5000,
+    driftRate: breath.rate
+  });
+  assert.deepEqual(atOuter, { offset: breath.outer, direction: BREATH_PHASE.CONTRACTING });
+
+  // The inner turn is the mirror of it, and already reads this way: a
+  // contraction that has arrived turns outward.
+  const atInner = breathTargetOffset({
+    direction: BREATH_PHASE.CONTRACTING,
+    startedAt: 5000,
+    startingOffset: breath.inner,
+    inner: breath.inner,
+    outer: breath.outer,
+    now: 5000,
+    driftRate: breath.rate
+  });
+  assert.deepEqual(atInner, { offset: breath.inner, direction: BREATH_PHASE.EXPANDING });
+
+  // Nothing between the turns changes: an ordinary outward leg is still outward
+  // right up to the bound.
+  const midway = breathTargetOffset({
+    direction: BREATH_PHASE.EXPANDING,
+    startedAt: 0,
+    startingOffset: breath.inner,
+    inner: breath.inner,
+    outer: breath.outer,
+    now: 15000,
+    driftRate: breath.rate
+  });
+  assert.deepEqual(midway, { offset: 9.5, direction: BREATH_PHASE.EXPANDING });
 }
 
 // Offsets always remain inside the effective bounds and never cross Center
@@ -361,4 +409,4 @@ function begin(configured = breath) {
     "and takes the full outward duration from there, exactly as any other leg.");
 }
 
-console.log("Field Breath tests passed: one-rung side steps that keep the breath the same length at every Center rate, a wall-clock phase, bounded expansion/contraction, Range clipping that lowers the shared bound rather than desynchronizing the pair, exclusion, deliberate Hold, phase-aware resumption, Weight-bucket crossings that keep both phase and deadline, and a fresh inner-offset leg when Panorama returns.");
+console.log("Field Breath tests passed: one-rung side steps that keep the breath the same length at every Center rate, a wall-clock phase, turns that report the direction they are heading in, bounded expansion/contraction, Range clipping that lowers the shared bound rather than desynchronizing the pair, exclusion, deliberate Hold, phase-aware resumption, Weight-bucket crossings that keep both phase and deadline, and a fresh inner-offset leg when Panorama returns.");
