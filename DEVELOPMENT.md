@@ -148,6 +148,7 @@ Every executable suite is listed here by the current behavior it protects.
 
 - `tests.mjs` — Range geometry, Guide primitives, Session transactions, URL parsing, and base invariants.
 - `timeline-projection-tests.mjs` — positive factors, overlap products, forward/inverse round trips, effective contributors, bypass scope, Pin order, and migration.
+- `ghost-tests.mjs` — Ghost Traverse against a live Session: a preserved semantic world, Focus/Range bounds, one Undo per held gesture, the reversal envelope, recorded rather than recomputed Addresses, and a Section retained entirely in the past.
 - `user-time-tests.mjs` — the append-only encounter ledger: records that keep reversals, direction in user time independent of source order, watched spans subdivided by the frozen Step law and clipped to the active Range, a frozen readable stream, and injection with provenance.
 - `section-deformation-tests.mjs` — Section Weight, nested/overlapping Guide geometry, Pin movement, and spatial traversal consequences.
 - `operator-coherence-tests.mjs` — guarded Step, Refine roles, exact previews, weighted navigation, monotonic Playback residue, history, and lane packing.

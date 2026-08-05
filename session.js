@@ -1878,6 +1878,184 @@ export function relabelLastAction(session, label) {
 // transient visited envelope. Settlement turns that sparse evidence into the
 // same positive contiguous Working Interval every route understands, then
 // discards it with the caller's pending object. No Path enters durable state.
+// Ghost Traverse: move through user time while the semantic world stands still.
+//
+// Every other movement operator answers a question about source time or about
+// the map. This one answers "where was I before this moment?", and the whole
+// point is that it must disturb nothing to do it: the Pins, Sections, Weights,
+// Groups and Focus established since then are exactly what makes returning
+// worth doing. So this deliberately does not route through the ordinary Go,
+// which may leave Focus or reopen Full Video.
+//
+// What it produces is an ordinary Working Interval. The Address the reader was
+// at when the gesture began is the fixed Anchor; the recalled Address is the
+// active endpoint. Nothing downstream needs to know it came from user time --
+// Switch Endpoint, Tag, Release and Focus all act on it as they would on any
+// other Interval -- which is why there is no second interval type.
+export function ghostTraverse(session, destination, options = {}) {
+  const perform = draft => {
+    const anchor = Number(options.anchor);
+    const target = Number(destination);
+    if (!Number.isFinite(anchor) || !Number.isFinite(target)) {
+      return { changed: false, reason: "invalid-ghost-address" };
+    }
+    // A recalled Address the active Range excludes belongs to a world this one
+    // has narrowed away. Ghost preserves the environment, so it refuses rather
+    // than clamping onto a different point.
+    if (
+      target < draft.range.start - EPSILON
+      || target > draft.range.end + EPSILON
+    ) {
+      return { changed: false, reason: "ghost-outside-range" };
+    }
+    if (Math.abs(target - draft.resolution.C) <= EPSILON) {
+      return { changed: false, reason: "same-address" };
+    }
+    const metric = options.projection?.metric || projectionForModel(draft).metric;
+    const backward = options.direction === "backward";
+    const operator = backward ? "ghostBackward" : "ghostForward";
+    draft.resolution = translateNeighborhood(
+      clone(options.originResolution) || draft.resolution,
+      target,
+      draft.range,
+      metric
+    );
+    draft.resolutionBasis = options.originResolutionBasis
+      || draft.resolutionBasis
+      || RESOLUTION_BASIS.RANGE;
+    // Coming back to the Anchor is a legitimate destination: the reader went
+    // out and returned. There is simply no extent to draw at that instant, so
+    // the Interval is cleared rather than the movement refused. Settlement then
+    // decides whether the ground crossed on the way is worth retaining.
+    if (Math.abs(target - anchor) <= EPSILON) {
+      draft.interval = null;
+      draft.lastOperator = operator;
+      return {
+        changed: true,
+        departure: anchor,
+        destination: target,
+        current: target,
+        interval: null,
+        intervalCleared: true,
+        place: target
+      };
+    }
+    const activeSide = target <= anchor ? "start" : "end";
+    const extent = { start: Math.min(anchor, target), end: Math.max(anchor, target) };
+    const currentFrame = currentEndpointFrame(draft);
+    const startFrame = resolveIntervalEndpointFrame(
+      activeSide === "start" ? currentFrame : null,
+      extent.start,
+      extent.end,
+      extent,
+      draft.range,
+      metric
+    );
+    const endFrame = resolveIntervalEndpointFrame(
+      activeSide === "end" ? currentFrame : null,
+      extent.end,
+      extent.start,
+      extent,
+      draft.range,
+      metric
+    );
+    draft.interval = createInterval(anchor, target, operator, "ghost", {
+      extent,
+      activeSide,
+      startFrame,
+      endFrame,
+      departureFrame: activeSide === "start" ? endFrame : startFrame,
+      arrivalFrame: currentFrame
+    });
+    if (!draft.interval) return { changed: false, reason: "invalid-ghost-interval" };
+    draft.lastOperator = operator;
+    return {
+      changed: true,
+      departure: anchor,
+      destination: target,
+      current: target,
+      interval: clone(draft.interval),
+      place: target
+    };
+  };
+  return options.amend
+    ? amend(session, perform, { projection: options.projection })
+    : commit(session, "Ghost Traverse", perform, { projection: options.projection });
+}
+
+// A Ghost gesture that wandered and came back still happened.
+//
+// The same principle Step Reversal already follows: the reader crossed a
+// positive extent, and that extent is what they now have in view, even though
+// their net displacement is nothing. The retained envelope is the source ground
+// crossed -- it does not try to preserve the nonmonotonic user-time path as
+// geometry, because a Working Interval describes an extent and not a route.
+export function settleGhostSequence(session, gesture) {
+  if (!gesture?.changed) return unchanged(session, "no-ghost-sequence");
+  const arrival = Number(session?.model?.resolution?.C);
+  const anchor = Number(gesture.anchor);
+  if (!Number.isFinite(arrival) || !Number.isFinite(anchor)) {
+    return unchanged(session, "invalid-ghost-sequence");
+  }
+  if (Math.abs(arrival - anchor) > EPSILON) {
+    return unchanged(session, "ghost-displaced");
+  }
+  const visitedMinimum = Math.max(
+    session.model.range.start,
+    Math.min(anchor, Number.isFinite(Number(gesture.visitedMinimum))
+      ? Number(gesture.visitedMinimum)
+      : anchor)
+  );
+  const visitedMaximum = Math.min(
+    session.model.range.end,
+    Math.max(anchor, Number.isFinite(Number(gesture.visitedMaximum))
+      ? Number(gesture.visitedMaximum)
+      : anchor)
+  );
+  if (!(visitedMaximum - visitedMinimum > EPSILON)) {
+    return unchanged(session, "ghost-round-trip");
+  }
+  // The last source-time movement supplies the viewpoint, exactly as the final
+  // committed repeat does for a Step sequence.
+  const activeSide = gesture.lastSourceDirection === "backward" ? "start" : "end";
+  const operator = gesture.lastSourceDirection === "backward"
+    ? "ghostBackward"
+    : "ghostForward";
+  const intervalDeparture = activeSide === "start" ? visitedMaximum : visitedMinimum;
+  return amend(session, draft => {
+    const extent = { start: visitedMinimum, end: visitedMaximum };
+    const metric = gesture.projection?.metric || projectionForModel(draft).metric;
+    const currentFrame = currentEndpointFrame(draft);
+    const startFrame = resolveIntervalEndpointFrame(
+      Math.abs(arrival - visitedMinimum) <= EPSILON ? currentFrame : null,
+      visitedMinimum,
+      visitedMaximum,
+      extent,
+      draft.range,
+      metric
+    );
+    const endFrame = resolveIntervalEndpointFrame(
+      Math.abs(arrival - visitedMaximum) <= EPSILON ? currentFrame : null,
+      visitedMaximum,
+      visitedMinimum,
+      extent,
+      draft.range,
+      metric
+    );
+    draft.interval = createInterval(intervalDeparture, arrival, operator, "ghost", {
+      extent,
+      activeSide,
+      startFrame,
+      endFrame,
+      departureFrame: activeSide === "start" ? endFrame : startFrame,
+      arrivalFrame: currentFrame
+    });
+    if (!draft.interval) return { changed: false, reason: "invalid-ghost-envelope" };
+    draft.lastOperator = operator;
+    return { changed: true, interval: clone(draft.interval) };
+  }, { projection: gesture.projection });
+}
+
 export function settleStepSequence(session, pending) {
   if (!pending?.started) return unchanged(session, "no-step-sequence");
 
