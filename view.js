@@ -436,8 +436,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       label.textContent = pinLabel(pin);
       const time = document.createElement("time");
       time.textContent = formatTime(pin.sourceT ?? pin.t);
-      const selected = state().selectedRetained?.kind === "pin"
-        && state().selectedRetained.id === pin.id;
+      const selected = state().timelineSelection?.kind === "pin"
+        && state().timelineSelection.id === pin.id;
       if (selected) {
         button.classList.add("retained-selected");
         button.setAttribute("aria-current", "true");
@@ -801,8 +801,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     for (const entry of packedSections.entries) {
       const { section, projected, lane } = entry;
       const color = sectionColor(section.id);
-      const selected = state().selectedRetained?.kind === "section"
-        && state().selectedRetained.id === section.id;
+      const selected = state().timelineSelection?.kind === "section"
+        && state().timelineSelection.id === section.id;
       const leftFraction = clamp(projection.coordinateToFraction(projected.start), 0, 1);
       const rightFraction = clamp(projection.coordinateToFraction(projected.end), 0, 1);
       const left = leftFraction * 100;
@@ -891,8 +891,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       )
       .join(",");
     const selectedKey = [
-      state().selectedRetained?.kind,
-      state().selectedRetained?.id,
+      state().timelineSelection?.kind,
+      state().timelineSelection?.id,
       ...(state().selectedPinIds || [])
     ].join(":");
     const pinKey = pins
@@ -954,8 +954,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           button.classList.add("extent-selected");
         }
         if (
-          state().selectedRetained?.kind === "pin"
-          && state().selectedRetained.id === pin.id
+          state().timelineSelection?.kind === "pin"
+          && state().timelineSelection.id === pin.id
         ) button.classList.add("retained-selected");
         if (pin.id === state().guideDrag?.snapTargetPinId) {
           button.classList.add("snap-target");
@@ -967,8 +967,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       } else {
         button.classList.add("cluster");
         if (
-          state().selectedRetained?.kind === "pin"
-          && cluster.pins.some(pin => pin.id === state().selectedRetained.id)
+          state().timelineSelection?.kind === "pin"
+          && cluster.pins.some(pin => pin.id === state().timelineSelection.id)
         ) button.classList.add("retained-selected");
         if (
           cluster.pins.some(pin => state().selectedPinIds?.includes(pin.id))
@@ -1131,8 +1131,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       for (const section of sections) {
         const startReferences = sectionsForPin(guide(), section.startPin.id).length;
         const endReferences = sectionsForPin(guide(), section.endPin.id).length;
-        const selected = state().guideRetained?.kind === "section"
-          && state().guideRetained.id === section.id;
+        const selected = state().guideSelection?.kind === "section"
+          && state().guideSelection.id === section.id;
         const endpointSelected = state().selectedPinIds?.some(id =>
           id === section.startPin.id || id === section.endPin.id
         );
@@ -1275,8 +1275,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     } else {
       const appendPin = pin => {
         const references = sectionsForPin(guide(), pin.id).length;
-        const selected = state().guideRetained?.kind === "pin"
-          && state().guideRetained.id === pin.id;
+        const selected = state().guideSelection?.kind === "pin"
+          && state().guideSelection.id === pin.id;
         const extentSelected = state().selectedPinIds?.includes(pin.id);
         const item = document.createElement("article");
         item.className = "guide-item pin-item";
@@ -1828,8 +1828,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? nextPin(guide(), semanticCurrent, activeRange, projection)
       : null;
     const switchFrame = currentSpan?.departureNeighborhood?.resolution;
-    const selectedForPreview = currentState.selectedRetained?.kind === "section"
-      ? resolveSection(guide(), currentState.selectedRetained.id)
+    const selectedForPreview = currentState.timelineSelection?.kind === "section"
+      ? resolveSection(guide(), currentState.timelineSelection.id)
       : null;
     const positiveActiveSpan = currentSpan
       && currentSpan.end - currentSpan.start > EPSILON
@@ -2148,8 +2148,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["step-forward"].disabled = interactionLocked
       || (shiftLayer ? !next : !actionModel?.stepForward);
     elements.release.disabled = interactionLocked || !currentSpan;
-    const selectedSection = currentState.selectedRetained?.kind === "section"
-      ? resolveSection(guide(), currentState.selectedRetained.id)
+    const selectedSection = currentState.timelineSelection?.kind === "section"
+      ? resolveSection(guide(), currentState.timelineSelection.id)
       : null;
     // Plain Tag always has Current. Shifted Tag requires the positive Working
     // Interval it retains; the label and availability follow Shift, not the

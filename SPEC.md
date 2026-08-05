@@ -391,7 +391,7 @@ Metadata-only presentation, deformation bypass, panel state, previews, Cues, tra
 
 ### 6.1 Selection domains
 
-`selectedRetained` is the acquired Timeline operand. `guideRetained` is Guide focus. Timeline acquisition also focuses the matching Guide row; Guide focus alone does not manufacture a spatial operand.
+`timelineSelection` is the acquired Timeline operand. `guideSelection` is Guide focus. Timeline acquisition also focuses the matching Guide row; Guide focus alone does not manufacture a spatial operand.
 
 If a Active Span’s endpoints align with Pins, every visible aligned Pin is indicated. If the acquired exact Section supplies the extent, its two endpoint identities are known and selected. Geometry alone never chooses one identity arbitrarily from coincident Pins.
 

@@ -309,8 +309,8 @@ const state = {
   // Timeline operand selection is spatial: only currently drawn retained
   // objects may occupy it. Guide focus is independent so hidden structure can
   // remain inspectable and navigable without becoming a Timeline operand.
-  selectedRetained: null,
-  guideRetained: null,
+  timelineSelection: null,
+  guideSelection: null,
   selectedPinIds: [],
   guideDrag: null,
   guideClickSuppressed: false,
@@ -625,11 +625,11 @@ function retainedIsOnTimeline(selection) {
 }
 
 function focusGuideRetained(selection) {
-  state.guideRetained = selection ? { ...selection } : null;
+  state.guideSelection = selection ? { ...selection } : null;
 }
 
 function selectTimelineRetained(selection) {
-  state.selectedRetained = selection ? { ...selection } : null;
+  state.timelineSelection = selection ? { ...selection } : null;
   if (selection) focusGuideRetained(selection);
 }
 
@@ -643,8 +643,8 @@ function syncIntervalPinSelection() {
     state.selectedPinIds = [];
     return;
   }
-  const retainedSection = state.selectedRetained?.kind === "section"
-    ? resolveSection(guide(), state.selectedRetained.id)
+  const retainedSection = state.timelineSelection?.kind === "section"
+    ? resolveSection(guide(), state.timelineSelection.id)
     : null;
   const retainedMatches = retainedSection
     && Math.abs(retainedSection.start - interval.start) <= EPSILON
@@ -1148,11 +1148,11 @@ function accept(result, options = {}) {
   const previousModel = model();
   state.session = result.session;
   recordTraversal(previousModel, options);
-  if (!retainedExists(state.guideRetained)) state.guideRetained = null;
+  if (!retainedExists(state.guideSelection)) state.guideSelection = null;
   // A hidden retained object still exists in the Guide, but it cannot remain a
   // Timeline operand after its Group leaves the spatial surface.
-  if (!retainedIsOnTimeline(state.selectedRetained)) {
-    state.selectedRetained = null;
+  if (!retainedIsOnTimeline(state.timelineSelection)) {
+    state.timelineSelection = null;
   }
   syncIntervalPinSelection();
   const guidePersisted = result.guideChanged ? persistGuide() : true;
@@ -1180,7 +1180,7 @@ function accept(result, options = {}) {
   return true;
 }
 
-function carryRetainedThrough(result, originModel, enabled, selection = state.selectedRetained) {
+function carryRetainedThrough(result, originModel, enabled, selection = state.timelineSelection) {
   if (
     !enabled
     || !selection
@@ -1575,8 +1575,8 @@ function moveToAddress(destination, options = {}) {
   if (!state.videoLoaded || !Number.isFinite(destination)) return false;
   settleBeforeAction({ replacingContext: true });
   const carry = options.carryRetained === true || state.carryModifier;
-  const carrySelection = state.selectedRetained
-    ? { ...state.selectedRetained }
+  const carrySelection = state.timelineSelection
+    ? { ...state.timelineSelection }
     : null;
   const originModel = snapshotModel(model(), { cloneGuide: carry });
   const departure = currentNeighborhood().C;
@@ -1693,11 +1693,11 @@ function switchActiveEnd(options = {}) {
 function releaseActiveSpan() {
   if (!state.videoLoaded) return false;
   settleBeforeAction();
-  const hadTimelineOperand = Boolean(state.selectedRetained);
+  const hadTimelineOperand = Boolean(state.timelineSelection);
   const result = releaseSessionInterval(state.session);
   if (!result.changed) {
     if (hadTimelineOperand) {
-      state.selectedRetained = null;
+      state.timelineSelection = null;
       state.selectedPinIds = [];
       view.renderGuide();
       view.render();
@@ -1711,7 +1711,7 @@ function releaseActiveSpan() {
   // Nothing else cleared it, so "nothing is selected" was reachable only on a
   // fresh load -- which made every scoped operator permanently scoped to
   // whatever you last touched.
-  state.selectedRetained = null;
+  state.timelineSelection = null;
   state.selectedPinIds = [];
   return accept(result, {
     effect: false,
@@ -1720,7 +1720,7 @@ function releaseActiveSpan() {
 }
 
 function resolvedDeformationBypassScope() {
-  const selected = state.selectedRetained;
+  const selected = state.timelineSelection;
   return selected?.kind === "section" && resolveSection(guide(), selected.id)
     ? { kind: "section", sectionId: selected.id }
     : { kind: "all" };
@@ -1783,8 +1783,8 @@ function focusOrUnfocus() {
   if (!state.videoLoaded) return false;
   if (model().focus) return leaveSection();
   const working = currentSpan();
-  const selected = state.selectedRetained?.kind === "section"
-    ? resolveSection(guide(), state.selectedRetained.id)
+  const selected = state.timelineSelection?.kind === "section"
+    ? resolveSection(guide(), state.timelineSelection.id)
     : sectionForSelectedPinExtent();
   if (selected) {
     if (
@@ -1888,8 +1888,8 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
       lastDirection: direction,
       waitForGestureEnd: options.waitForGestureEnd === true,
       carryRetained: carry,
-      carrySelection: state.selectedRetained
-        ? { ...state.selectedRetained }
+      carrySelection: state.timelineSelection
+        ? { ...state.timelineSelection }
         : null,
       visitedMinimum: departure,
       visitedMaximum: departure,
@@ -2690,7 +2690,7 @@ function submitGuideDialog(event) {
 function goToPin(pin, operator = "pin", options = {}) {
   if (!pin) return;
   const carry = options.carryRetained === true || state.carryModifier;
-  const hasCarrySelection = carry && Boolean(state.selectedRetained);
+  const hasCarrySelection = carry && Boolean(state.timelineSelection);
   const spatial = options.surface !== "guide";
   const destinationSelection = options.selectionAfter
     || { kind: "pin", id: pin.id };
@@ -2731,7 +2731,7 @@ function goToAdjacentPin(direction, options = {}) {
       ? { kind: "section", id: pin.sectionId }
       : { kind: "pin", id: pin.id };
   const carry = options.carryRetained === true || state.carryModifier;
-  const hasCarrySelection = carry && Boolean(state.selectedRetained);
+  const hasCarrySelection = carry && Boolean(state.timelineSelection);
   if (!carry && destinationSelection) selectTimelineRetained(destinationSelection);
   settleBeforeAction({ replacingContext: true });
   const originModel = snapshotModel(model(), { cloneGuide: carry });
@@ -2747,7 +2747,7 @@ function goToAdjacentPin(direction, options = {}) {
     result,
     originModel,
     carry,
-    hasCarrySelection ? state.selectedRetained : null
+    hasCarrySelection ? state.timelineSelection : null
   );
   const accepted = accept(result, {
     renderGuide: true,
@@ -2860,7 +2860,7 @@ function selectSectionAsActiveSpan(sectionId, options = {}) {
   const section = resolveSection(guide(), sectionId);
   if (!section) return;
   const carry = options.carryRetained === true || state.carryModifier;
-  const hasCarrySelection = carry && Boolean(state.selectedRetained);
+  const hasCarrySelection = carry && Boolean(state.timelineSelection);
   const spatial = options.surface !== "guide";
   const destinationSelection = { kind: "section", id: sectionId };
   focusGuideRetained(destinationSelection);
@@ -2903,8 +2903,8 @@ function resetSourceScopedState() {
   state.cues = [];
   state.cuesOnTimeline = false;
   if (elements["cue-source"]) elements["cue-source"].value = "";
-  state.selectedRetained = null;
-  state.guideRetained = null;
+  state.timelineSelection = null;
+  state.guideSelection = null;
   state.selectedPinIds = [];
   state.shiftLayers = { matrix: false, guide: false };
   state.shiftKeyHeld = false;
@@ -3042,8 +3042,8 @@ function initializeVideo(request = pendingLoad) {
   state.dragHandle = null;
   state.rangeDragOrigin = null;
   state.rangeDragProjection = null;
-  state.selectedRetained = null;
-  state.guideRetained = null;
+  state.timelineSelection = null;
+  state.guideSelection = null;
   state.selectedPinIds = [];
   state.guideDrag = null;
   state.field = null;
@@ -3975,7 +3975,7 @@ function handleTimelineClick(event) {
   // Bare map ground acquires no retained object. Clear the spatial operand
   // before Go so X naturally resolves to the complete Timeline while Guide
   // focus remains an independent inspection state.
-  state.selectedRetained = null;
+  state.timelineSelection = null;
   state.selectedPinIds = [];
   moveToAddress(time, {
     operator: "timeline",
@@ -4550,7 +4550,7 @@ function nudgeTargetFromElement(node) {
 }
 
 function selectedNudgeTarget() {
-  const selected = state.selectedRetained;
+  const selected = state.timelineSelection;
   if (selected?.kind === "pin" && getPin(guide(), selected.id)) {
     return { kind: "pin", id: selected.id };
   }

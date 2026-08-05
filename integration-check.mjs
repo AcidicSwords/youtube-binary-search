@@ -263,7 +263,7 @@ has(toggleDeformation, /restoring \? null : scope/,
   "The same scope restores and another scope transfers the one bypass.");
 lacks(toggleDeformation, /checkpoint|persist|accept\(|player\.(?:pause|play|setRate|place)/,
   "X creates no history/persistence entry and issues no direct player command.");
-has(topLevelFunction(appCode, "resolvedDeformationBypassScope"), /state\.selectedRetained[\s\S]*?kind === "section"/,
+has(topLevelFunction(appCode, "resolvedDeformationBypassScope"), /state\.timelineSelection[\s\S]*?kind === "section"/,
   "Only an acquired Timeline Section scopes X.");
 has(appCode, /deleteGuideSection[\s\S]{0,320}?state\.deformationBypass[\s\S]{0,160}?= null/,
   "Deleting the bypass target clears it.");
@@ -331,12 +331,12 @@ has(topLevelFunction(appCode, "startNativePlaybackSession"), /projection:\s*time
   "Native Play reconciles its starting Address through the effective projection.");
 has(appCode, /dynamicRatePolicy|RATE_POLICY_KIND\.DYNAMIC[\s\S]*?timelineProjection\(\)\.weightAtSource/,
   "Explicit dynamic playback reads the effective projection.");
-has(topLevelFunction(appCode, "handleTimelineClick"), /state\.selectedRetained = null[\s\S]*?moveToAddress\(/,
+has(topLevelFunction(appCode, "handleTimelineClick"), /state\.timelineSelection = null[\s\S]*?moveToAddress\(/,
   "Bare Timeline Go clears the acquired operand before moving.");
 const release = topLevelFunction(appCode, "releaseActiveSpan");
 has(release, /releaseSessionInterval\(state\.session\)/, "Release delegates semantic residue to Session.");
-has(release, /state\.selectedRetained = null/, "Release also clears the Timeline operand.");
-lacks(release, /guideRetained\s*=\s*null|deformationBypass\s*=|focus\s*=|setRange/,
+has(release, /state\.timelineSelection = null/, "Release also clears the Timeline operand.");
+lacks(release, /guideSelection\s*=\s*null|deformationBypass\s*=|focus\s*=|setRange/,
   "Release does not mutate Guide focus, bypass, Focus, or Range.");
 
 // Playback owns observation, requested policy, and confirmed adapter rate as
