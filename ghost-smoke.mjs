@@ -20,8 +20,8 @@ const anchorShown = () => page.evaluate(() => {
   return { hidden: marker?.hidden !== false, owner: marker?.dataset.owner || null };
 });
 
-// One Ghost wheel notch. The threshold is 24 normalized pixels, so a full
-// mouse detent of 100 earns four; a single deliberate notch is sent as one.
+// One Ghost wheel notch. Any single turn past the threshold recalls exactly one
+// occurrence, whatever the device reports for a detent.
 async function ghostWheel(direction, notches = 1) {
   await page.keyboard.down("g");
   for (let index = 0; index < notches; index += 1) {
@@ -40,8 +40,11 @@ try {
   await page.evaluate(() => document.activeElement?.blur());
 
   // =========================================================================
-  // 1. Tab acquires the Guide; G no longer touches it
+  // 1. The Guide is on I; G no longer touches it
   // =========================================================================
+  // Tab was tried and rejected: it belongs to the browser, and a page that
+  // captures it stops being navigable by keyboard at all. I sits beside O,
+  // where Operators already is.
   await page.evaluate(() => {
     const toggle = document.getElementById("guide-toggle");
     if (toggle.getAttribute("aria-expanded") === "true") toggle.click();
@@ -57,22 +60,39 @@ try {
     "G no longer opens the Guide: it is the held Ghost modifier now.");
 
   await page.evaluate(() => document.activeElement?.blur());
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("i");
   await settle(250);
   assert.equal(await page.getAttribute("#guide-toggle", "aria-expanded"), "true",
-    "Tab acquires the Guide from the reader's background.");
-  assert.equal(await page.getAttribute("#guide-toggle", "aria-keyshortcuts"), "Tab",
-    "and the control advertises the binding it actually has.");
-  assert.match(await text("#guide-toggle"), /Tab/);
+    "I opens the Guide,");
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press("i");
+  await settle(250);
+  assert.equal(await page.getAttribute("#guide-toggle", "aria-expanded"), "false",
+    "and puts it away again, the way O already works for Operators.");
+  assert.equal(await page.getAttribute("#guide-toggle", "aria-keyshortcuts"), "I",
+    "The control advertises the binding it actually has.");
+  assert.match(await text("#guide-toggle"), /I/);
 
-  // Once focus is inside, Tab is native focus navigation again -- otherwise it
-  // would stop being a way to move through a page.
-  const insideBefore = await page.evaluate(() => document.activeElement?.tagName);
+  // Tab stays the browser's. A page that captures it stops being navigable by
+  // keyboard at all, which is a worse trade than any shortcut is worth.
+  await page.evaluate(() => document.activeElement?.blur());
+  const beforeTab = await page.getAttribute("#guide-toggle", "aria-expanded");
   await page.keyboard.press("Tab");
-  await settle(150);
-  const insideAfter = await page.evaluate(() => document.activeElement?.tagName);
-  assert.ok(insideBefore !== null && insideAfter !== null,
-    "Tab keeps moving focus once the Guide has it.");
+  await settle(250);
+  assert.equal(await page.getAttribute("#guide-toggle", "aria-expanded"), beforeTab,
+    "Tab does not act on the Guide: it is left to the browser.");
+  assert.equal(
+    await page.evaluate(() => {
+      const event = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+      document.dispatchEvent(event);
+      return event.defaultPrevented;
+    }),
+    false,
+    "and nothing here cancels it, so native focus order still works."
+  );
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press("i");
+  await settle(250);
 
   // =========================================================================
   // 2. Build a path worth recalling
@@ -190,10 +210,60 @@ try {
     "and is recorded as the Nudge it is.");
 
   // =========================================================================
-  // 7. Nothing logged an error along the way
+  // 7. One turn of the wheel is one occurrence
+  // =========================================================================
+  // Nudge carries its wheel remainder because four Nudges is four frames. An
+  // occurrence is not a quantum -- it is a place the reader has been, and the
+  // stop condition is recognising one. A mouse detent reports about 100px
+  // against a 24px threshold, so sharing Nudge's arithmetic recalled four
+  // moments per detent and made it impossible to stop where it clicked.
+  await page.evaluate(() => {
+    const toggle = document.getElementById("guide-toggle");
+    if (toggle.getAttribute("aria-expanded") === "true") toggle.click();
+    document.activeElement?.blur();
+  });
+  await settle(220);
+  const path = [];
+  for (const fraction of [0.12, 0.42, 0.28, 0.66]) {
+    await page.mouse.click(
+      timeline.x + timeline.width * fraction,
+      timeline.y + timeline.height * 0.55
+    );
+    await settle(340);
+    path.push(await currentAddress());
+  }
+
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  const stepped = [];
+  for (let notch = 0; notch < 3; notch += 1) {
+    // A full mouse detent, not a trickle: this is the size that used to move
+    // four occurrences at once.
+    await page.mouse.wheel(0, 100);
+    await settle(180);
+    stepped.push(await currentAddress());
+  }
+  const reachedDuringGesture = await text("#status");
+  await page.keyboard.up("g");
+  await settle(300);
+
+  assert.deepEqual(stepped, [path[2], path[1], path[0]],
+    "Each detent recalls exactly one earlier moment, in the reader's own order.");
+  assert.equal(new Set(stepped).size, stepped.length, "and never skips one.");
+
+  // A recall is otherwise almost silent -- Current moves and an Interval
+  // appears, which many operators do -- so it says how deep it is and what it
+  // is anchored to. Without that there is no way to tell a Ghost from a Go.
+  assert.match(reachedDuringGesture, /Ghost 3 moments back/,
+    "Ghost says how far back through its own path the reader now is,");
+  assert.match(reachedDuringGesture, /anchored at/,
+    "and what it is measuring against.");
+
+  // =========================================================================
+  // 8. Nothing logged an error along the way
   // =========================================================================
   assert.deepEqual(failures, [], `Console/page errors: ${failures.join(" | ")}`);
-  console.log("Ghost smoke passed: Tab acquires the Guide and G no longer touches it; holding G moves nothing, writes no history and draws no Anchor; a wheel notch recalls an earlier moment behind a fixed Anchor and an ordinary Working Interval; releasing writes one transaction that one Undo reverses; Escape cancels exactly; and Ghost owns the wheel only while G is held.");
+  console.log("Ghost smoke passed: the Guide is on I while Tab stays the browser's and G no longer touches either; holding G moves nothing, writes no history and draws no Anchor; a wheel notch recalls an earlier moment behind a fixed Anchor and an ordinary Working Interval; releasing writes one transaction that one Undo reverses; Escape cancels exactly; Ghost owns the wheel only while G is held; one detent recalls exactly one moment; and the recall says how deep it is and what it is anchored to.");
 } finally {
   await close();
 }

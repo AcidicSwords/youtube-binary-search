@@ -132,7 +132,7 @@ Nudge is exact source-time adjustment. `Shift`+wheel uses the dominant wheel axi
 | `Z` / `C` | Undo / Redo |
 | `[` / `]` | Decrease / increase Step Reach preset |
 | `,` / `.` | Nudge backward / forward |
-| `Tab` / `O` | Open Guide / Operators and Parameters |
+| `I` / `O` | Open Guide / Operators and Parameters |
 | Hold `G` + wheel | Ghost Traversal: backward and forward through the order you encountered Addresses in |
 | `Alt+Q/W/E/A/S/D` or `Alt` + an arrow Step | Carry the acquired retained object with Current |
 | `Esc` | Cancel the active manipulation or close the transient surface |

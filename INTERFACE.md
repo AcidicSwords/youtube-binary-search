@@ -15,7 +15,7 @@ The persistent reading surface is vertically ordered:
 
 On a wide desktop the Viewer and Timeline remain visible while the rail shows
 either the full-height Guide or Operators followed by Parameters. The rail can
-collapse completely, releasing its width to the panoramic surface. `Tab` opens or
+collapse completely, releasing its width to the panoramic surface. `I` opens or
 closes Guide; `O` opens or closes Operators and Parameters. Switching the rail
 changes presentation only.
 

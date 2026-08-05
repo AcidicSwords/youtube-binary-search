@@ -4989,25 +4989,6 @@ function inputType(element) {
   return String(element?.type || "text").toLowerCase();
 }
 
-// Whether Tab belongs to the Guide or to the browser.
-//
-// It belongs to the Guide only when the reader is on the spatial background
-// with nothing focused that could want it. Anything that takes text, anything
-// inside the Guide itself, the load bar, and every ordinary control keep native
-// focus order -- otherwise Tab would stop being a way to move through a page.
-function readerOwnsGuideTab(element) {
-  if (!element || element === document.body) return true;
-  if (ownsKeyboard(element)) return false;
-  if (elements["guide-panel"]?.contains?.(element)) return false;
-  if (elements["load-bar"]?.contains?.(element)) return false;
-  return Boolean(
-    elements["reader-column"]?.contains?.(element)
-    && !element.closest?.(
-      "button, input, select, textarea, summary, a, [role=slider], [role=menuitem]"
-    )
-  );
-}
-
 function ownsKeyboard(element) {
   if (!element) return false;
   if (element.isContentEditable === true) return true;
@@ -5189,10 +5170,19 @@ function handleGhostWheel(event) {
   const gesture = state.ghostGesture;
   state.ghostWheel ??= { accumulator: 0 };
   state.ghostWheel.accumulator += raw;
-  const count = Math.trunc(state.ghostWheel.accumulator / NUDGE_WHEEL_THRESHOLD);
+  const earned = Math.trunc(state.ghostWheel.accumulator / NUDGE_WHEEL_THRESHOLD);
   event.preventDefault?.();
-  if (!count) return true;
-  state.ghostWheel.accumulator -= count * NUDGE_WHEEL_THRESHOLD;
+  if (!earned) return true;
+  // One turn of the wheel is one occurrence, and the surplus is dropped.
+  //
+  // Nudge carries its remainder because a Nudge is a quantum of source time and
+  // four of them is simply four frames. An occurrence is not a quantum: it is a
+  // place the reader has been, and the stop condition is recognising one. A
+  // mouse detent reports about 100px against a 24px threshold, so sharing
+  // Nudge's arithmetic would recall four moments per detent and make it
+  // impossible to stop at the one that clicks.
+  const count = earned > 0 ? 1 : -1;
+  state.ghostWheel.accumulator = 0;
   // Wheel up and right are forward, the same convention Nudge already uses --
   // but forward here means forward through the reader's own path, which may run
   // either way through source time.
@@ -5239,6 +5229,16 @@ function handleGhostWheel(event) {
     // a moment they recognise, and a Context window would keep moving under them.
     locateAddress(currentResolution().C, { preserveField: true });
     syncIntervalPinSelection();
+    // A recall is otherwise almost silent -- Current moves and an Interval
+    // appears, both of which many other operators also do -- so it says how far
+    // back through its own path the reader now is. Without it there is no way to
+    // tell a Ghost from an ordinary Go.
+    const depth = gesture.visited.length;
+    setStatus(
+      `Ghost ${depth} ${depth === 1 ? "moment" : "moments"} ${
+        userDirection === "backward" ? "back" : "on"
+      } · ${formatTime(currentResolution().C)} · anchored at ${formatTime(gesture.anchor)}.`
+    );
     view.render();
   } else if (blocked === "range-blocked") {
     setStatus("Ghost history continues outside the active Range. Unfocus or widen Range to continue.");
@@ -6363,23 +6363,6 @@ document.addEventListener("keydown", event => {
     return;
   }
 
-  // Tab is Guide acquisition, not a global toggle. It reaches the Guide only
-  // from the reader's own spatial background; once focus is inside the Guide or
-  // any other control, Tab is native focus navigation again and stays that way.
-  // Shift+Tab is never captured, so there is always a way back out.
-  if (
-    event.key === "Tab"
-    && !event.shiftKey
-    && !event.ctrlKey
-    && !event.metaKey
-    && !event.altKey
-    && readerOwnsGuideTab(document.activeElement)
-  ) {
-    event.preventDefault();
-    openGuide(state.guideTab);
-    return;
-  }
-
   // A modal edit owns the keyboard. Never allow spatial commands to mutate the
   // reader behind it when focus is on one of the dialog buttons.
   if (guideDialogOpen()) {
@@ -6405,6 +6388,14 @@ document.addEventListener("keydown", event => {
   const commandUndo = plain && key === "z";
   const commandRedo = plain && key === "c";
 
+  // The Guide is I, beside Operators on O, because G became the held Ghost
+  // modifier. Tab was tried and rejected: it belongs to the browser, and a page
+  // that captures it stops being navigable by keyboard at all.
+  if (plain && key === "i") {
+    event.preventDefault();
+    toggleGuide();
+    return;
+  }
   // G is the held Ghost modifier. Arming costs nothing: no Anchor, no history,
   // no interrupted playback. Only a wheel quantum proves the reader meant it.
   if (plain && key === "g") {
