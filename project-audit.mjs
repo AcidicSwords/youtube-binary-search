@@ -73,8 +73,10 @@ check(pkg.scripts?.verify === "npm run check && npm run test:browser",
   "verify composes the DOM-free and Chromium gates.");
 check(pkg.scripts?.audit === "node integration-check.mjs && node project-audit.mjs",
   "Both final-law gauges are part of check.");
-check(pkg.scripts?.["test:browser"] === "node browser-smoke.mjs",
-  "The browser proof has one package route.");
+// Everything that needs a real browser runs from one route, so there is no way
+// to satisfy the release gate while skipping a suite that needs Chromium.
+check(pkg.scripts?.["test:browser"] === "node browser-smoke.mjs && node ghost-smoke.mjs",
+  "The browser proof has one package route covering every browser-backed suite.");
 has(pkg.scripts?.check || "", /npm run test:semantic/, "The extended semantic state-space proof runs in check.");
 has(pkg.scripts?.check || "", /npm run audit/, "The validation gauges run in check.");
 

@@ -2775,3 +2775,19 @@ kbd {
   color: var(--text);
   background: rgba(188, 154, 255, 0.16);
 }
+
+/* Ghost Traversal is transient by nature: the Anchor is the fixed thing the
+   reader is measuring against, so it stays solid, while the recalled Current
+   and the relation between them read as a gesture still in the hand. */
+#interval-fill[data-medium="ghost"] {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.current-marker[data-ghost-active="true"] {
+  opacity: 0.72;
+}
+
+.current-departure-marker[data-owner="ghost"] {
+  opacity: 1;
+}

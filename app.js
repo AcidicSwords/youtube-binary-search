@@ -3,7 +3,10 @@ import {
   createUserTime,
   appendAtomicTraversal,
   appendSequenceTraversal,
-  appendContinuousTraversal
+  appendContinuousTraversal,
+  beginGhostRead,
+  moveGhostRead,
+  appendGhostReplay
 } from "./user-time.js";
 import {
   EPSILON,
@@ -59,6 +62,8 @@ import {
   setRange as setSessionRange,
   previewRange,
   checkpoint,
+  ghostTraverse,
+  settleGhostSequence,
   settleStepSequence,
   focusSection as focusSessionSection,
   focusWorkingSection as focusSessionWorkingSection,
@@ -341,7 +346,12 @@ const state = {
   // Where the last Ghost gesture left the historical read cursor, so the next
   // one can continue through the original pattern rather than restarting from
   // the occurrence that gesture itself appended.
-  ghostResumeCursor: null
+  ghostResumeCursor: null,
+  // Armed by holding G. Holding alone does nothing at all -- no Anchor, no
+  // history, no interruption of playback -- because a tap must cost nothing.
+  ghostKeyHeld: false,
+  ghostGesture: null,
+  ghostWheel: null
 };
 
 let player = null;
@@ -1524,6 +1534,10 @@ stepGesture = createStepGestureController({
 // has not been written down yet; nothing else may commit in front of it.
 function settleBeforeAction(options = {}) {
   clearNativeGo();
+  // A held Ghost gesture is an uncommitted movement. Another operator acting on
+  // top of it would act against an amended origin, so it settles first -- except
+  // when the caller is Ghost itself, capturing its own Anchor.
+  if (options.ghost !== false) settleGhostGesture();
   stepGesture?.cancel({ finalize: false });
   settleNudgeGesture();
   view.closePinClusterMenu();
@@ -2886,6 +2900,16 @@ function resetSourceScopedState() {
   if (state.nudgeGesture?.timer) window.clearTimeout(state.nudgeGesture.timer);
   state.nudgeGesture = null;
   state.nudgeWheel = null;
+  // User time is the reader's path through one video. No Address, read cursor,
+  // Anchor, provenance or watched span may cross source identity, so the old
+  // gesture is cancelled against the world it belonged to before that world is
+  // discarded, and the ledger starts empty.
+  cancelGhostGesture({ restore: false });
+  state.userTime = createUserTime(0);
+  state.ghostKeyHeld = false;
+  state.ghostGesture = null;
+  state.ghostResumeCursor = null;
+  state.ghostWheel = null;
   state.field = null;
   view.setPreviewAction(null);
   view.setPreviewSection(null);
@@ -4869,6 +4893,12 @@ function toggleRangeTools() {
 // Escape is the universal cancel. A live direct manipulation owns it first, so
 // the same key that abandons a drag never also closes the surface behind it.
 function cancelActiveManipulation() {
+  // Ghost first: it is the only manipulation that can be in flight while no
+  // pointer is down, so nothing else would recognise it as cancellable.
+  if (state.ghostGesture) {
+    cancelGhostGesture({ restore: true });
+    return true;
+  }
   if (state.currentDrag) {
     finishCurrentDrag({ pointerId: state.currentDrag.pointerId }, { cancel: true });
     return true;
@@ -4957,6 +4987,25 @@ const SPACE_ACTIVATED_INPUT_TYPES = new Set([
 
 function inputType(element) {
   return String(element?.type || "text").toLowerCase();
+}
+
+// Whether Tab belongs to the Guide or to the browser.
+//
+// It belongs to the Guide only when the reader is on the spatial background
+// with nothing focused that could want it. Anything that takes text, anything
+// inside the Guide itself, the load bar, and every ordinary control keep native
+// focus order -- otherwise Tab would stop being a way to move through a page.
+function readerOwnsGuideTab(element) {
+  if (!element || element === document.body) return true;
+  if (ownsKeyboard(element)) return false;
+  if (elements["guide-panel"]?.contains?.(element)) return false;
+  if (elements["load-bar"]?.contains?.(element)) return false;
+  return Boolean(
+    elements["reader-column"]?.contains?.(element)
+    && !element.closest?.(
+      "button, input, select, textarea, summary, a, [role=slider], [role=menuitem]"
+    )
+  );
 }
 
 function ownsKeyboard(element) {
@@ -5089,7 +5138,175 @@ elements["current-marker"].addEventListener("pointerdown", beginCurrentDrag);
 // One wheel route owns Shift-wheel everywhere. Only target resolution differs:
 // the object under the Timeline pointer, or the acquired operand/Current away
 // from it. Accumulation, direction, quantum and Undo settlement are identical.
-document.addEventListener("wheel", handleNudgeWheel, { passive: false });
+// Ghost Traversal: hold G and scroll back through where you have been.
+//
+// The gesture is armed by the key and begun by the wheel. Holding G alone must
+// cost nothing -- a reader who taps it, or holds it and changes their mind, has
+// not asked for anything and must not have their playback settled or their
+// history touched. Only a wheel quantum proves the intent.
+function beginGhostGesture() {
+  if (!state.videoLoaded || !currentResolution()) return false;
+  // Anything still in flight becomes exact first, and is recorded, so the
+  // gesture reads a stream that already contains the movement that led here.
+  settleBeforeAction({ ghost: false });
+  const anchor = currentResolution().C;
+  const originModel = snapshotModel(model());
+  const projection = timelineProjection();
+  const stepReach = effectiveStepReach(model().stepReach, activeRange(), projection);
+  const read = beginGhostRead(state.userTime, {
+    current: anchor,
+    resumeCursor: state.ghostResumeCursor,
+    // The boundary is where the stream stands now, so the gesture can never
+    // read the replay it is itself about to append.
+    frozenStreamEnd: state.userTime.records.length,
+    range: activeRange(),
+    projection,
+    stepReach
+  });
+  state.ghostGesture = {
+    anchor,
+    originModel,
+    originHistory: state.session.history,
+    originFuture: state.session.future,
+    anchorCursor: read.index >= 0 ? read.positions[read.index] : null,
+    read,
+    projection,
+    stepReach,
+    visited: [],
+    visitedMinimum: anchor,
+    visitedMaximum: anchor,
+    lastSourceDirection: null,
+    changed: false
+  };
+  return true;
+}
+
+function handleGhostWheel(event) {
+  if (!state.ghostKeyHeld || !state.videoLoaded) return false;
+  const raw = wheelPixels(event);
+  if (!raw) return false;
+  if (!state.ghostGesture && !beginGhostGesture()) return false;
+  const gesture = state.ghostGesture;
+  state.ghostWheel ??= { accumulator: 0 };
+  state.ghostWheel.accumulator += raw;
+  const count = Math.trunc(state.ghostWheel.accumulator / NUDGE_WHEEL_THRESHOLD);
+  event.preventDefault?.();
+  if (!count) return true;
+  state.ghostWheel.accumulator -= count * NUDGE_WHEEL_THRESHOLD;
+  // Wheel up and right are forward, the same convention Nudge already uses --
+  // but forward here means forward through the reader's own path, which may run
+  // either way through source time.
+  const userDirection = count > 0 ? "forward" : "backward";
+  let moved = false;
+  let blocked = null;
+  for (let index = 0; index < Math.abs(count); index += 1) {
+    const candidate = moveGhostRead(state.userTime, gesture.read, userDirection);
+    if (!candidate.changed) {
+      blocked = candidate.reason;
+      break;
+    }
+    const previous = currentResolution().C;
+    const result = ghostTraverse(state.session, candidate.address, {
+      anchor: gesture.anchor,
+      direction: userDirection,
+      originResolution: gesture.originModel.resolution,
+      originResolutionBasis: gesture.originModel.resolutionBasis,
+      projection: gesture.projection,
+      amend: true
+    });
+    if (!result.changed) {
+      blocked = result.reason;
+      break;
+    }
+    state.session = result.session;
+    gesture.read = candidate.read;
+    gesture.visited.push({
+      address: candidate.address,
+      sourceCursor: candidate.cursor,
+      userDirection
+    });
+    gesture.visitedMinimum = Math.min(gesture.visitedMinimum, candidate.address);
+    gesture.visitedMaximum = Math.max(gesture.visitedMaximum, candidate.address);
+    if (Math.abs(candidate.address - previous) > EPSILON) {
+      gesture.lastSourceDirection = candidate.address > previous ? "forward" : "backward";
+    }
+    gesture.changed = true;
+    moved = true;
+  }
+  if (moved) {
+    // Center follows the recalled Address and the Field translates around it.
+    // Automatic Context deliberately does not start: the reader is looking for
+    // a moment they recognise, and a Context window would keep moving under them.
+    locateAddress(currentResolution().C, { preserveField: true });
+    syncIntervalPinSelection();
+    view.render();
+  } else if (blocked === "range-blocked") {
+    setStatus("Ghost history continues outside the active Range. Unfocus or widen Range to continue.");
+  } else if (blocked) {
+    setStatus(userDirection === "backward"
+      ? "There is nothing earlier to recall."
+      : "You are already at the most recent moment.");
+  }
+  return true;
+}
+
+// Releasing writes the recalled path into the live end of user time and commits
+// the whole gesture as one semantic transaction.
+function settleGhostGesture() {
+  const gesture = state.ghostGesture;
+  state.ghostGesture = null;
+  state.ghostWheel = null;
+  if (!gesture?.changed) return false;
+  const settled = settleGhostSequence(state.session, gesture);
+  if (settled.changed) state.session = settled.session;
+  state.session = checkpoint(state.session, "Ghost Traverse", gesture.originModel).session;
+  const replay = appendGhostReplay(state.userTime, {
+    anchor: gesture.anchor,
+    anchorCursor: gesture.anchorCursor,
+    visited: gesture.visited,
+    createdAt: Date.now()
+  });
+  state.userTime = replay.userTime;
+  // The next gesture continues through the historical pattern rather than
+  // through the occurrence this replay just appended. Release may sever the
+  // Working Interval afterwards without disturbing it.
+  state.ghostResumeCursor = replay.resumeCursor;
+  syncIntervalPinSelection();
+  view.renderGuide();
+  view.render();
+  return true;
+}
+
+// Escape during a gesture restores the world exactly as it was, including the
+// history and future the gesture was amending against, and appends nothing.
+function cancelGhostGesture({ restore = true } = {}) {
+  const gesture = state.ghostGesture;
+  state.ghostGesture = null;
+  state.ghostWheel = null;
+  state.ghostKeyHeld = false;
+  if (!gesture) return false;
+  if (restore && gesture.changed) {
+    state.session = {
+      model: snapshotModel(gesture.originModel),
+      history: gesture.originHistory,
+      future: gesture.originFuture
+    };
+    locateAddress(gesture.anchor);
+    syncIntervalPinSelection();
+    view.renderGuide();
+    view.render();
+  }
+  return true;
+}
+
+// One wheel, two readers. Ghost takes precedence whenever G is held; otherwise
+// the wheel belongs to Nudge exactly as before.
+function handleReaderWheel(event) {
+  if (state.ghostKeyHeld && handleGhostWheel(event)) return;
+  handleNudgeWheel(event);
+}
+
+document.addEventListener("wheel", handleReaderWheel, { passive: false });
 document.addEventListener("pointerup", finishGuideDrag);
 document.addEventListener("pointerup", finishCurrentDrag);
 document.addEventListener("pointercancel", event => {
@@ -6146,6 +6363,23 @@ document.addEventListener("keydown", event => {
     return;
   }
 
+  // Tab is Guide acquisition, not a global toggle. It reaches the Guide only
+  // from the reader's own spatial background; once focus is inside the Guide or
+  // any other control, Tab is native focus navigation again and stays that way.
+  // Shift+Tab is never captured, so there is always a way back out.
+  if (
+    event.key === "Tab"
+    && !event.shiftKey
+    && !event.ctrlKey
+    && !event.metaKey
+    && !event.altKey
+    && readerOwnsGuideTab(document.activeElement)
+  ) {
+    event.preventDefault();
+    openGuide(state.guideTab);
+    return;
+  }
+
   // A modal edit owns the keyboard. Never allow spatial commands to mutate the
   // reader behind it when focus is on one of the dialog buttons.
   if (guideDialogOpen()) {
@@ -6171,9 +6405,11 @@ document.addEventListener("keydown", event => {
   const commandUndo = plain && key === "z";
   const commandRedo = plain && key === "c";
 
+  // G is the held Ghost modifier. Arming costs nothing: no Anchor, no history,
+  // no interrupted playback. Only a wheel quantum proves the reader meant it.
   if (plain && key === "g") {
     event.preventDefault();
-    toggleGuide();
+    if (!event.repeat) state.ghostKeyHeld = true;
     return;
   }
   // The rail holds two surfaces: G opens Guide; O opens Operators together
@@ -6321,6 +6557,11 @@ document.addEventListener("keydown", event => {
 });
 
 document.addEventListener("keyup", event => {
+  if (String(event.key).toLowerCase() === "g") {
+    state.ghostKeyHeld = false;
+    settleGhostGesture();
+    return;
+  }
   if (event.key === "Alt") {
     state.carryModifier = false;
     return;
@@ -6356,6 +6597,11 @@ document.addEventListener("visibilitychange", () => {
 
 window.addEventListener("blur", () => {
   state.carryModifier = false;
+  // A keyup may never arrive once the window loses focus. A gesture that moved
+  // settles at the last candidate the reader actually saw rather than being
+  // silently abandoned mid-recall; one that was only armed disarms.
+  state.ghostKeyHeld = false;
+  settleGhostGesture();
   stepGesture.cancel({ observe: false });
   if (state.dragHandle) cancelRangeDrag();
   if (state.guideDrag) finishGuideDrag(null, { cancel: true });

@@ -1705,6 +1705,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       elements["interval-fill"].hidden = !projectedModel.interval;
       if (projectedModel.interval) {
         elements["interval-fill"].dataset.direction = projectedModel.interval.direction;
+        // A recalled relation is faint: it is real geometry and an ordinary
+        // Working Interval, but it belongs to a gesture still being held.
+        elements["interval-fill"].dataset.medium =
+          projectedModel.interval.medium || "direct";
         setSegment(
           elements["interval-fill"],
           projectedModel.interval.start,
@@ -2346,13 +2350,23 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       elements["current-marker"].appendChild(currentMarkerTime);
     }
     currentMarkerTime.textContent = formatTime(candidate);
-    elements["current-departure-marker"].hidden = !dragging;
-    if (dragging) {
-      setMarkerPosition(
-        elements["current-departure-marker"],
-        currentDrag.originSource
-      );
+    // The departure marker has two owners now. A Current drag shows where the
+    // gesture started; a Ghost gesture shows the Anchor -- the moment the reader
+    // was at when they began looking back, which is the fixed end of the
+    // relation and the thing they are measuring against. It is drawn solid,
+    // because unlike the transient Ghost Current it is not moving.
+    const ghostAnchor = state().ghostGesture?.anchor;
+    const departureAddress = Number.isFinite(ghostAnchor)
+      ? ghostAnchor
+      : dragging ? currentDrag.originSource : null;
+    elements["current-departure-marker"].hidden = departureAddress === null;
+    if (departureAddress !== null) {
+      setMarkerPosition(elements["current-departure-marker"], departureAddress);
+      elements["current-departure-marker"].dataset.owner =
+        Number.isFinite(ghostAnchor) ? "ghost" : "drag";
     }
+    elements["current-marker"].dataset.ghostActive =
+      Number.isFinite(ghostAnchor) ? "true" : "false";
 
     elements["range-start-handle"].setAttribute("aria-valuemin", "0");
     elements["range-start-handle"].setAttribute("aria-valuemax", String(Math.max(0, activeRange.end - minRangeSeconds)));

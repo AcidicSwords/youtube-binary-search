@@ -527,8 +527,16 @@ lacks(appCode, /consumeShiftLayer\(\s*\)/,
   "No ownerless Shift-layer consumption remains.");
 has(topLevelFunction(appCode, "resetSourceScopedState"), /state\.shiftLayers = \{ matrix: false, guide: false \}/,
   "Source reset clears both surface latches.");
-check((appCode.match(/addEventListener\("wheel",\s*handleNudgeWheel/g) || []).length === 1,
-  "One document wheel handler owns Timeline and off-map Nudge.");
+// One wheel, two readers, one registration. Ghost takes precedence while G is
+// held; otherwise the wheel is Nudge's exactly as before. A second listener
+// would let both act on one notch.
+check((appCode.match(/addEventListener\("wheel",\s*handleReaderWheel/g) || []).length === 1,
+  "One document wheel handler dispatches Timeline and off-map wheel input.");
+check((appCode.match(/addEventListener\("wheel"/g) || []).length === 1,
+  "and it is the only wheel listener, so no notch is read twice.");
+has(topLevelFunction(appCode, "handleReaderWheel"),
+  /state\.ghostKeyHeld && handleGhostWheel\(event\)[\s\S]*handleNudgeWheel\(event\)/,
+  "Ghost owns the wheel while G is held; Nudge owns it otherwise.");
 const nudgeWheel = topLevelFunction(appCode, "handleNudgeWheel");
 has(topLevelFunction(appCode, "wheelPixels"), /Math\.abs\(event\.deltaX\) > Math\.abs\(event\.deltaY\)/,
   "Nudge selects the dominant wheel axis.");

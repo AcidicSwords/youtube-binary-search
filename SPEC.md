@@ -614,6 +614,20 @@ No stale pre-retune transport object may own the wrap.
 
 Playback settlement uses the transport’s departure, parent Resolution, return model, current Cursor, and completed cycles to commit at most one semantic transaction. Watched coverage extends or preserves existing Working Interval coverage and never shortens it. A completed proper-Range cycle covers the Range. Full-video playback stops at source end.
 
+### 8.4b Ghost Traversal and user time
+
+Video Cartography distinguishes four temporal orders: source time, Timeline Space, semantic history, and user time — the order in which the reader actually encountered source Addresses. Only the fourth records where the reader has been, as opposed to what the world was.
+
+User time is an append-only, source-scoped ledger of traversal records. A record holds directed units: a jump has only the two Addresses occupied, while a span was continuously observed and may be recalled at any Address inside it. A route writes to it when the reader comes to occupy a different Address; editing the world without moving — renaming, reweighting, creating a Pin, toggling a Group — writes nothing, and programmatic placement never writes.
+
+Ghost Traversal is held `G` plus the wheel. Arming costs nothing: no Anchor, no history, no settled playback. The first wheel quantum settles pending work, captures Current as a fixed Anchor, and freezes the projection, the effective Step Reach and the readable extent of the stream, so the gesture reads a world that cannot change underneath it and can never follow its own output.
+
+Each quantum moves a read cursor one occurrence backward or forward through user time and applies the recalled Address as an amendment against one captured origin. Backward and forward name directions in user time; either may move either way through source time. Watched spans are subdivided by the frozen Step law, so expanded ground yields finer recall while the watched boundaries stay exact. An Address the active Range excludes is unavailable rather than clamped, and Ghost never leaves Focus, widens Range, or opens Full Video to reach one.
+
+Ghost restores no historical Pins, Sections, Groups, Weights, titles, visibility, Focus, Range, Step Reach, deformation state or Guide selection. What it produces is an ordinary Working Interval between the Anchor and the recalled Address, so Switch Endpoint, Tag, Release and Focus act on it exactly as they would on any other.
+
+Releasing appends the recalled path to the live end of user time with provenance to the occurrences it was recalled from, and commits the whole gesture as one semantic transaction; one Undo returns to the Anchor with all structure intact. A gesture that returns to its Anchor retains the positive extent it crossed, on the same principle as Step Reversal. The historical read cursor survives Release, so severing the Working Interval and Ghosting forward replays the recalled point's original successors as a newly informed traversal.
+
 ### 8.5 Native-player accessibility
 
 The container over Center is non-blocking. Only the centered parent-owned Play/Panorama control accepts pointer events; the rest of the overlay does not. Native seek, captions, settings, volume, quality, and fullscreen controls remain pointer-accessible while paused, idle, or playing.

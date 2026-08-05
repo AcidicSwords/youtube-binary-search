@@ -15,7 +15,7 @@ The persistent reading surface is vertically ordered:
 
 On a wide desktop the Viewer and Timeline remain visible while the rail shows
 either the full-height Guide or Operators followed by Parameters. The rail can
-collapse completely, releasing its width to the panoramic surface. `G` opens or
+collapse completely, releasing its width to the panoramic surface. `Tab` opens or
 closes Guide; `O` opens or closes Operators and Parameters. Switching the rail
 changes presentation only.
 
@@ -88,11 +88,13 @@ Offset becomes non-operational rather than crossing Center or silently shrinking
 the configured minimum. Collapsed, hidden, or unavailable panes do not stall the
 other side.
 
-Plain Space owns Panorama playback at fixed `1×`. Shift+Space owns Center-only
-playback at the configured fixed wish or dynamic policy. Center-only remains its
-observation policy even when its fixed wish is `1×`. If native controls change
-an ordinary Panorama's actual rate away from `1×`, Tail and Lead suspend until
-the adapter confirms compatible actual `1×` again.
+Plain Space owns Panorama playback at fixed `1×`. Shift+Space owns playback at
+the configured fixed wish or the dynamic Weight texture. A fixed wish is
+Center-only even when it is `1×`; the dynamic policy keeps its Panorama, because
+the sides sit one rate rung either side of Center and hold that relation at any
+Center the adapter's ladder can surround. Where it cannot — an end of the ladder,
+or a ladder missing a neighbour — Center plays alone without ending the Playback
+transaction.
 
 ## Temporal Topography
 
@@ -154,6 +156,23 @@ one another.
 - Range handles edit Range only when Focus does not own those boundaries.
 - Escape cancels the active drag to its origin before closing or stopping
   anything behind it.
+- Holding `G` and scrolling is Ghost Traversal: the wheel moves backward and
+  forward through the order the reader encountered Addresses in, rather than
+  through source time. Holding the key alone does nothing at all.
+
+### Ghost Traversal
+
+Ghost is drawn with what is already there. The Address the reader began at
+becomes the fixed Anchor and reuses the departure marker; the recalled Address
+is ordinary Current; the relation between them is an ordinary Working Interval
+marked as recalled. The Anchor is solid because it is the thing being measured
+against, while Current and the interval read as transient — a gesture still in
+the hand.
+
+The recalled path itself is never drawn. It exists operationally and becomes
+perceptible by scrolling through it. Drawing every occurrence would confuse
+source order with encounter order, and would turn an invisible recognition
+operator into a history editor.
 
 Section wires are greedily lane-packed. The visible relationship band is bounded
 to five lanes; deeper overlap scrolls inside it, and no two Sections share a
