@@ -405,6 +405,28 @@ for (const symbol of [
   "resolveCenterRate",
   "panoramaTriplet"
 ]) has(transportSource, new RegExp(`\\b${symbol}\\b`), `Transport exposes ${symbol}.`);
+// User time is written by the routes that actually move the reader, and by no
+// others. The ledger itself is proven in user-time-tests; what matters here is
+// that the composition root feeds it from the right places -- a recorder wired
+// to the wrong route would produce a plausible stream describing a journey
+// nobody took.
+has(topLevelFunction(appCode, "accept"), /recordTraversal\(previousModel, options\)/,
+  "Every accepted semantic movement writes one occurrence.");
+has(topLevelFunction(appCode, "flushPendingStep"), /recordTraversalSequence\(pending\.traversalPoints, "step-sequence"\)/,
+  "A held Step gesture writes every intermediate Address it passed, in order.");
+has(topLevelFunction(appCode, "settleNudgeGesture"),
+  /target\?\.kind === "current"[\s\S]{0,160}?recordTraversalSequence\(gesture\.traversalPoints/,
+  "A Nudge writes a traversal only when Current itself moved.");
+has(topLevelFunction(appCode, "settleTransport"), /recordObservedSpans\(active, current\)/,
+  "Watched source time is recorded as spans, so Ghost can recall inside it.");
+has(topLevelFunction(appCode, "recordObservedSpans"), /transport\.cycles[\s\S]*spans\.push/,
+  "and a wrapped Range contributes one directed span per crossing.");
+// Being told where to sit is a consequence of a movement, never a movement.
+lacks(topLevelFunction(appCode, "placePlayer"), /recordTraversal/,
+  "Programmatic placement writes no occurrence.");
+lacks(topLevelFunction(appCode, "recordTraversal"), /guideChanged|weight|label/i,
+  "Editing the world without moving the reader is not an encounter.");
+
 has(appCode, /function handlePlaybackRateChange\(rate\)[\s\S]*?withPlaybackActualRate\(state\.transport, rate\)/,
   "Adapter rate events update transport actualRate.");
 has(appCode, /onPlaybackRateChange:\s*handlePlaybackRateChange/,

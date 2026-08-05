@@ -1,5 +1,11 @@
 // Application composition root. Semantic mutations pass through Session; player effects pass through adapters.
 import {
+  createUserTime,
+  appendAtomicTraversal,
+  appendSequenceTraversal,
+  appendContinuousTraversal
+} from "./user-time.js";
+import {
   EPSILON,
   clamp,
   contains,
@@ -327,7 +333,15 @@ const state = {
   // The fraction of one Nudge a gentle scroll has accumulated so far. Separate
   // from the gesture above because reaching a quantum and batching an Undo entry
   // are different jobs with different lifetimes.
-  nudgeWheel: null
+  nudgeWheel: null,
+  // The order in which this reader actually encountered source Addresses. It is
+  // not history: history records what the world was, this records where the
+  // reader was. Source-scoped and session-local.
+  userTime: createUserTime(0),
+  // Where the last Ghost gesture left the historical read cursor, so the next
+  // one can continue through the original pattern rather than restarting from
+  // the occurrence that gesture itself appended.
+  ghostResumeCursor: null
 };
 
 let player = null;
@@ -1060,10 +1074,69 @@ function applyPlayerEffect(result, options = {}) {
   });
 }
 
+// Every route that actually moves the reader writes one occurrence.
+//
+// The test is whether the reader now occupies a different Address, not whether
+// the model changed: renaming a Section, changing a Weight or toggling a Group
+// alters the world without moving anyone, and recording those would fill user
+// time with positions nobody ever visited. Programmatic placement is excluded
+// for the same reason -- the player being told where to sit is a consequence of
+// a movement, never a movement of its own.
+function recordTraversal(previousModel, options = {}) {
+  if (options.recordTraversal === false) return false;
+  const from = Number(previousModel?.resolution?.C);
+  const to = Number(model()?.resolution?.C);
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return false;
+  const appended = appendAtomicTraversal(state.userTime, {
+    from,
+    to,
+    cause: model()?.lastOperator || "move",
+    createdAt: Date.now()
+  });
+  if (!appended.changed) return false;
+  state.userTime = appended.userTime;
+  // An ordinary traversal ends whatever historical pattern a previous Ghost
+  // gesture was following: the reader has gone somewhere of their own accord,
+  // so the next recall starts from where they actually are.
+  if (options.preserveGhostResume !== true) state.ghostResumeCursor = null;
+  return true;
+}
+
+// One gesture, many encounters. A held Step or a wheel of Nudges is one
+// semantic decision and one Undo entry, but the reader met every intermediate
+// Address in order -- including the ones they came back through. Collapsing
+// that to its endpoints would erase the shape they remember.
+function recordTraversalSequence(points, cause) {
+  const appended = appendSequenceTraversal(state.userTime, {
+    points,
+    cause,
+    createdAt: Date.now()
+  });
+  if (!appended.changed) return false;
+  state.userTime = appended.userTime;
+  state.ghostResumeCursor = null;
+  return true;
+}
+
+// Continuously observed source time. Any Address inside a watched span was
+// genuinely seen, so Ghost may recall it; a jump's interior never was.
+function recordTraversalSpans(spans, cause) {
+  const appended = appendContinuousTraversal(state.userTime, {
+    spans,
+    cause,
+    createdAt: Date.now()
+  });
+  if (!appended.changed) return false;
+  state.userTime = appended.userTime;
+  state.ghostResumeCursor = null;
+  return true;
+}
+
 function accept(result, options = {}) {
   if (!result?.changed) return false;
   const previousModel = model();
   state.session = result.session;
+  recordTraversal(previousModel, options);
   if (!retainedExists(state.guideRetained)) state.guideRetained = null;
   // A hidden retained object still exists in the Guide, but it cannot remain a
   // Timeline operand after its Group leaves the spatial surface.
@@ -1197,6 +1270,42 @@ function retainedCarryStatus(result) {
     : "";
 }
 
+// What the reader actually watched, as directed spans.
+//
+// The span is built from the transport's own departure and cycles, not from the
+// Working Interval it happened to leave behind: an Interval describes an extent
+// and a wrapped playback crosses its material repeatedly, so inferring one span
+// from the final geometry would lose both the repetition and the direction.
+//
+// The programmatic return from Context back to semantic Current is deliberately
+// not recorded. The adapter being told where to sit afterwards is a consequence
+// of the observation, not a second observation.
+function recordObservedSpans(transport, current) {
+  if (!isTransportActive(transport)) return false;
+  const departure = Number(transport.entry ?? transport.departure);
+  const end = Number(current);
+  if (!Number.isFinite(departure) || !Number.isFinite(end)) return false;
+  const range = activeRange();
+  const cycles = Math.max(0, Number(transport.cycles) || 0);
+  const spans = [];
+  if (cycles > 0) {
+    // Each completed lap crossed the whole Range; the first and last are
+    // partial. Range wrap is a genuine source discontinuity, so the laps are
+    // separate spans rather than one long one.
+    spans.push({ from: departure, to: range.end });
+    for (let lap = 1; lap < cycles; lap += 1) {
+      spans.push({ from: range.start, to: range.end });
+    }
+    spans.push({ from: range.start, to: end });
+  } else {
+    spans.push({ from: departure, to: end });
+  }
+  return recordTraversalSpans(
+    spans,
+    transport.kind === TRANSPORT_KIND.CONTEXT ? "context" : "playback"
+  );
+}
+
 function settleTransport(options = {}) {
   const active = state.transport;
   if (!isTransportActive(active)) return false;
@@ -1206,6 +1315,10 @@ function settleTransport(options = {}) {
   const handoffField = options.handoffField === true;
   const shouldRender = options.render !== false;
   const current = clamp(safeCurrentTime(), activeRange().start, activeRange().end);
+  // Watched source time, recorded as what was actually observed rather than as
+  // one span inferred from where it finished. A wrapped Range crosses its
+  // material more than once, and each crossing is its own directed span.
+  recordObservedSpans(active, current);
   const cancelPendingStart = issuePause && active.phase === "starting";
   if (cancelPendingStart) {
     centerPauseRequest = {
@@ -1282,6 +1395,9 @@ function flushPendingStep(options = {}) {
 
   const settled = settleStepSequence(state.session, pending);
   if (pending.started) state.session = settled.session;
+  if (pending.started) {
+    recordTraversalSequence(pending.traversalPoints, "step-sequence");
+  }
   const direction = settled.direction ?? null;
 
   let guidePersisted = true;
@@ -1732,6 +1848,7 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
       ? originModel.interval.departure
       : departure;
     state.pendingStep = {
+      traversalPoints: [currentResolution().C],
       departure,
       intervalDeparture,
       originModel,
@@ -1783,6 +1900,8 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
   state.pendingStep.carryFailed = carried.carryFailed || null;
   state.pendingStep.started = true;
   state.session = carried.session;
+  // Every repeat is an encounter, in order, including the ones that came back.
+  state.pendingStep.traversalPoints.push(currentResolution().C);
   state.pendingStep.visitedMinimum = Math.min(
     state.pendingStep.visitedMinimum,
     currentResolution().C
@@ -4108,6 +4227,7 @@ function beginNudgeGesture(target) {
     const departure = origin.resolution.C;
     state.nudgeGesture = {
       key,
+      traversalPoints: [departure],
       target: { kind: target.kind, id: target.id || null },
       origin,
       // Nudging Current is Step, not Go: it extends or shortens the retained
@@ -4144,6 +4264,11 @@ function settleNudgeGesture() {
   window.clearTimeout(gesture.timer);
   state.nudgeGesture = null;
   if (!gesture.changed) return false;
+  // Only Current moving is the reader moving. Nudging a Pin or a Section edits
+  // the world without taking anyone anywhere.
+  if (gesture.target?.kind === "current") {
+    recordTraversalSequence(gesture.traversalPoints, "nudge-sequence");
+  }
 
   // A retained object that returns to its exact acquired geometry has no
   // residue. Restore the origin snapshot so timestamps and rebased frames do
@@ -4293,6 +4418,7 @@ function nudgeTarget(target, direction, options = {}) {
   }
   if (target.kind === "current") {
     const current = currentResolution().C;
+    gesture.traversalPoints.push(current);
     gesture.lastDirection = direction > 0 ? "forward" : "backward";
     gesture.visitedMinimum = Math.min(gesture.visitedMinimum, current);
     gesture.visitedMaximum = Math.max(gesture.visitedMaximum, current);
