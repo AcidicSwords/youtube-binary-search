@@ -64,7 +64,7 @@ let session = createSession({ duration: 100, current: 50 });
 const retained = saveExtentAsSection(session, { start: 40, end: 60 }, "Field reading", "field-span");
 assert.equal(retained.changed, true);
 session = retained.session;
-assert.equal(session.model.interval, null, "Retaining a Field span must not manufacture a movement Interval.");
+assert.equal(session.model.activeSpan, null, "Retaining a Field span must not manufacture a movement Interval.");
 assert.equal(session.model.guide.sections.length, 1);
 assert.equal(session.model.guide.pins.length, 2);
 assert.equal(session.model.guide.sections[0].provenance, "field-span");
@@ -86,7 +86,7 @@ for (const id of [
   "step-size-seconds", "step-mode-fixed", "step-mode-adaptive"
 ]) assert.match(html, new RegExp(`id=["']${id}["']`), `Missing Field/Guide control: ${id}`);
 
-assert.match(app, /function applyPlayerEffect\(result[\s\S]*result\?\.interval[\s\S]*startContext\(destination\)/,
+assert.match(app, /function applyPlayerEffect\(result[\s\S]*result\?\.activeSpan[\s\S]*startContext\(destination\)/,
   "Committed traversal must invoke automatic Context when enabled.");
 assert.match(
   app,

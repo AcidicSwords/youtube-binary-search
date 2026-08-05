@@ -46,32 +46,32 @@ let session = createSession({ duration: 480, current: 120 });
 let moved = goTo(session, 180, { operator: "timeline", label: "Timeline Click" });
 assert.equal(moved.changed, true);
 session = moved.session;
-assert.deepEqual({ start: session.model.interval.start, end: session.model.interval.end }, { start: 120, end: 180 });
-assert.deepEqual(session.model.resolution, { L: 0, C: 180, R: 300, level: 0 });
+assert.deepEqual({ start: session.model.activeSpan.start, end: session.model.activeSpan.end }, { start: 120, end: 180 });
+assert.deepEqual(session.model.neighborhood, { L: 0, C: 180, R: 300, level: 0 });
 assert.equal(session.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.MOVEMENT);
-assert.deepEqual(getTargets(session.model.resolution), { backward: 90, forward: 240 });
+assert.deepEqual(getTargets(session.model.neighborhood), { backward: 90, forward: 240 });
 
 // Refine subdivides the movement-seeded Neighborhood and Undo restores it.
 const beforeRefine = snapshotModel(session.model);
 session = refine(session, "backward").session;
-assert.equal(session.model.resolution.C, 90);
+assert.equal(session.model.neighborhood.C, 90);
 assert.equal(session.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.MOVEMENT);
 session = undo(session).session;
-assert.deepEqual(session.model.resolution, beforeRefine.resolution);
+assert.deepEqual(session.model.neighborhood, beforeRefine.neighborhood);
 assert.equal(session.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.MOVEMENT);
 
 // Reopen restores Range scale and preserves Interval geometry while updating
 // the search frame stored at its active endpoint.
-const intervalBeforeReopen = copy(session.model.interval);
+const intervalBeforeReopen = copy(session.model.activeSpan);
 session = reopen(session).session;
-assert.deepEqual(session.model.resolution, { L: 0, C: 180, R: 480, level: 0 });
+assert.deepEqual(session.model.neighborhood, { L: 0, C: 180, R: 480, level: 0 });
 assert.equal(session.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.RANGE);
 assert.deepEqual(
   {
-    start: session.model.interval.start,
-    end: session.model.interval.end,
-    departure: session.model.interval.departure,
-    arrival: session.model.interval.arrival
+    start: session.model.activeSpan.start,
+    end: session.model.activeSpan.end,
+    departure: session.model.activeSpan.departure,
+    arrival: session.model.activeSpan.arrival
   },
   {
     start: intervalBeforeReopen.start,
@@ -80,9 +80,9 @@ assert.deepEqual(
     arrival: intervalBeforeReopen.arrival
   }
 );
-assert.deepEqual(session.model.interval.arrivalNeighborhood.resolution, session.model.resolution);
+assert.deepEqual(session.model.activeSpan.arrivalNeighborhood.neighborhood, session.model.neighborhood);
 session = undo(session).session;
-assert.deepEqual(session.model.resolution, { L: 0, C: 180, R: 300, level: 0 });
+assert.deepEqual(session.model.neighborhood, { L: 0, C: 180, R: 300, level: 0 });
 
 // Same-address Go is a true no-op; it never substitutes for Reopen.
 const sameBefore = snapshotModel(session.model);
@@ -99,7 +99,7 @@ let oldEquivalent = createSession({ duration: 480, current: 120 });
 oldEquivalent = goTo(oldEquivalent, 180, { operator: "timeline" }).session;
 oldEquivalent = reopen(oldEquivalent).session;
 oldEquivalent = refine(oldEquivalent, "forward").session;
-assert.equal(oldEquivalent.model.resolution.C, 330);
+assert.equal(oldEquivalent.model.neighborhood.C, 330);
 
 // Step preserves the origin Neighborhood and keeps its approached endpoint fixed
 // while the prospective midpoint still has a full Step of headroom.
@@ -108,22 +108,22 @@ stepped = goTo(stepped, 180, { operator: "timeline" }).session; // 0—180—300
 const stepOrigin = snapshotModel(stepped.model);
 stepped = step(stepped, "forward", 20, {
   departure: 180,
-  originResolution: stepOrigin.resolution,
+  originResolution: stepOrigin.neighborhood,
   originResolutionBasis: stepOrigin.neighborhoodBasis
 }).session;
-assert.deepEqual(stepped.model.resolution, { L: 0, C: 200, R: 300, level: 0 });
+assert.deepEqual(stepped.model.neighborhood, { L: 0, C: 200, R: 300, level: 0 });
 assert.equal(stepped.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.MOVEMENT);
 stepped = step(stepped, "forward", 100, {
   departure: 180,
-  originResolution: stepOrigin.resolution,
+  originResolution: stepOrigin.neighborhood,
   originResolutionBasis: stepOrigin.neighborhoodBasis,
   amend: true
 }).session;
-assert.deepEqual(stepped.model.resolution, { L: 0, C: 300, R: 480, level: 0 });
+assert.deepEqual(stepped.model.neighborhood, { L: 0, C: 300, R: 480, level: 0 });
 assert.equal(stepped.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.RANGE);
-assert.deepEqual(getTargets(stepped.model.resolution), { backward: 150, forward: 390 });
+assert.deepEqual(getTargets(stepped.model.neighborhood), { backward: 150, forward: 390 });
 assert.deepEqual(
-  { start: stepped.model.interval.start, end: stepped.model.interval.end },
+  { start: stepped.model.activeSpan.start, end: stepped.model.activeSpan.end },
   { start: 120, end: 300 },
   "Step must extend the Interval established by timeline traversal rather than replace it from the first Step departure."
 );
@@ -131,32 +131,32 @@ assert.deepEqual(
 let boundaryPush = createSession({ duration: 100, current: 50 });
 boundaryPush = refine(boundaryPush, "backward").session;
 boundaryPush = step(boundaryPush, "forward", 25).session;
-assert.deepEqual(boundaryPush.model.resolution, { L: 0, C: 50, R: 100, level: 0 });
-assert.equal(getTargets(boundaryPush.model.resolution).forward, 75);
+assert.deepEqual(boundaryPush.model.neighborhood, { L: 0, C: 50, R: 100, level: 0 });
+assert.equal(getTargets(boundaryPush.model.neighborhood).forward, 75);
 
 // Step edits the active Interval around its original departure anchor.
 let drawnInterval = createSession({ duration: 100, current: 20 });
 drawnInterval = goTo(drawnInterval, 40, { operator: "timeline" }).session;
 drawnInterval = step(drawnInterval, "forward", 10).session;
 assert.deepEqual(
-  { start: drawnInterval.model.interval.start, end: drawnInterval.model.interval.end },
+  { start: drawnInterval.model.activeSpan.start, end: drawnInterval.model.activeSpan.end },
   { start: 20, end: 50 },
   "Step outward extends the active Interval."
 );
 drawnInterval = step(drawnInterval, "backward", 10).session;
 assert.deepEqual(
-  { start: drawnInterval.model.interval.start, end: drawnInterval.model.interval.end },
+  { start: drawnInterval.model.activeSpan.start, end: drawnInterval.model.activeSpan.end },
   { start: 20, end: 40 },
   "Step inward shrinks the active Interval."
 );
 drawnInterval = step(drawnInterval, "backward", 30).session;
 assert.deepEqual(
   {
-    start: drawnInterval.model.interval.start,
-    end: drawnInterval.model.interval.end,
-    departure: drawnInterval.model.interval.departure,
-    arrival: drawnInterval.model.interval.arrival,
-    direction: drawnInterval.model.interval.direction
+    start: drawnInterval.model.activeSpan.start,
+    end: drawnInterval.model.activeSpan.end,
+    departure: drawnInterval.model.activeSpan.departure,
+    arrival: drawnInterval.model.activeSpan.arrival,
+    direction: drawnInterval.model.activeSpan.direction
   },
   { start: 10, end: 20, departure: 20, arrival: 10, direction: "backward" },
   "Crossing the anchor redraws the Interval in the opposite direction."
@@ -165,10 +165,10 @@ assert.deepEqual(
 let collapsedInterval = createSession({ duration: 100, current: 20 });
 collapsedInterval = goTo(collapsedInterval, 40, { operator: "timeline" }).session;
 collapsedInterval = step(collapsedInterval, "backward", 20).session;
-assert.equal(collapsedInterval.model.interval, null, "Landing on the anchor collapses the Interval.");
+assert.equal(collapsedInterval.model.activeSpan, null, "Landing on the anchor collapses the Interval.");
 collapsedInterval = step(collapsedInterval, "forward", 10).session;
 assert.deepEqual(
-  { start: collapsedInterval.model.interval.start, end: collapsedInterval.model.interval.end },
+  { start: collapsedInterval.model.activeSpan.start, end: collapsedInterval.model.activeSpan.end },
   { start: 20, end: 30 },
   "The next Step redraws from the collapsed anchor."
 );
@@ -176,18 +176,18 @@ assert.deepEqual(
 let refinedDraw = createSession({ duration: 100, current: 50 });
 refinedDraw = refine(refinedDraw, "forward").session;
 assert.deepEqual(
-  { start: refinedDraw.model.interval.start, end: refinedDraw.model.interval.end },
+  { start: refinedDraw.model.activeSpan.start, end: refinedDraw.model.activeSpan.end },
   { start: 50, end: 75 }
 );
 const refinedBeforeStep = snapshotModel(refinedDraw.model);
 refinedDraw = step(refinedDraw, "backward", 5).session;
 assert.deepEqual(
-  { start: refinedDraw.model.interval.start, end: refinedDraw.model.interval.end },
+  { start: refinedDraw.model.activeSpan.start, end: refinedDraw.model.activeSpan.end },
   { start: 50, end: 70 },
   "Step must trim a Refine-established Interval without replacing its anchor."
 );
 refinedDraw = undo(refinedDraw).session;
-assert.deepEqual(refinedDraw.model.interval, refinedBeforeStep.interval, "Undo restores the preceding resized-Interval checkpoint exactly.");
+assert.deepEqual(refinedDraw.model.activeSpan, refinedBeforeStep.activeSpan, "Undo restores the preceding resized-Interval checkpoint exactly.");
 
 // A coalesced Step result depends on origin plus final destination, not the path.
 let pathA = createSession({ duration: 100, current: 20 });
@@ -195,18 +195,18 @@ pathA = goTo(pathA, 40, { operator: "timeline" }).session; // 20—40—60
 const pathOrigin = snapshotModel(pathA.model);
 pathA = step(pathA, "forward", 15, {
   departure: 40,
-  originResolution: pathOrigin.resolution,
+  originResolution: pathOrigin.neighborhood,
   originResolutionBasis: pathOrigin.neighborhoodBasis
 }).session;
 pathA = step(pathA, "forward", 15, {
   departure: 40,
-  originResolution: pathOrigin.resolution,
+  originResolution: pathOrigin.neighborhood,
   originResolutionBasis: pathOrigin.neighborhoodBasis,
   amend: true
 }).session;
 pathA = step(pathA, "backward", 15, {
   departure: 40,
-  originResolution: pathOrigin.resolution,
+  originResolution: pathOrigin.neighborhood,
   originResolutionBasis: pathOrigin.neighborhoodBasis,
   amend: true
 }).session;
@@ -214,14 +214,14 @@ let pathB = createSession({ duration: 100, current: 20 });
 pathB = goTo(pathB, 40, { operator: "timeline" }).session;
 pathB = step(pathB, "forward", 15, {
   departure: 40,
-  originResolution: pathOrigin.resolution,
+  originResolution: pathOrigin.neighborhood,
   originResolutionBasis: pathOrigin.neighborhoodBasis
 }).session;
-assert.deepEqual(pathA.model.resolution, pathB.model.resolution);
+assert.deepEqual(pathA.model.neighborhood, pathB.model.neighborhood);
 assert.equal(pathA.model.neighborhoodBasis, pathB.model.neighborhoodBasis);
 assert.deepEqual(
-  pathA.model.interval && { start: pathA.model.interval.start, end: pathA.model.interval.end },
-  pathB.model.interval && { start: pathB.model.interval.start, end: pathB.model.interval.end }
+  pathA.model.activeSpan && { start: pathA.model.activeSpan.start, end: pathA.model.activeSpan.end },
+  pathB.model.activeSpan && { start: pathB.model.activeSpan.start, end: pathB.model.activeSpan.end }
 );
 
 // Native playback preserves local basis, the opposite Interval endpoint, and
@@ -232,36 +232,36 @@ const continuedReturn = snapshotModel(continued.model);
 continued = completePlayback(continued, {
   current: 200,
   departure: 180,
-  parentNeighborhood: copy(continued.model.resolution),
+  parentNeighborhood: copy(continued.model.neighborhood),
   parentResolutionBasis: continued.model.neighborhoodBasis,
   wrapped: false,
   returnModel: continuedReturn
 }).session;
-assert.deepEqual(continued.model.resolution, { L: 0, C: 200, R: 320, level: 0 });
+assert.deepEqual(continued.model.neighborhood, { L: 0, C: 200, R: 320, level: 0 });
 assert.equal(continued.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.MOVEMENT);
 continued = completePlayback(continued, {
   current: 300,
   departure: 200,
-  parentNeighborhood: copy(continued.model.resolution),
+  parentNeighborhood: copy(continued.model.neighborhood),
   parentResolutionBasis: continued.model.neighborhoodBasis,
   wrapped: false,
   returnModel: snapshotModel(continued.model)
 }).session;
 assert.equal(continued.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.MOVEMENT);
-assert.deepEqual(continued.model.resolution, { L: 0, C: 300, R: 420, level: 0 });
-assert.deepEqual({ start: continued.model.interval.start, end: continued.model.interval.end }, { start: 120, end: 300 });
+assert.deepEqual(continued.model.neighborhood, { L: 0, C: 300, R: 420, level: 0 });
+assert.deepEqual({ start: continued.model.activeSpan.start, end: continued.model.activeSpan.end }, { start: 120, end: 300 });
 
 // Range operations preserve only wholly contained Intervals.
 let ranged = createSession({ duration: 100, current: 20 });
 ranged = goTo(ranged, 40, { operator: "timeline" }).session;
-const containedInterval = copy(ranged.model.interval);
+const containedInterval = copy(ranged.model.activeSpan);
 ranged = setRange(ranged, 10, 50, 40).session;
 assert.deepEqual(
   {
-    start: ranged.model.interval.start,
-    end: ranged.model.interval.end,
-    departure: ranged.model.interval.departure,
-    arrival: ranged.model.interval.arrival
+    start: ranged.model.activeSpan.start,
+    end: ranged.model.activeSpan.end,
+    departure: ranged.model.activeSpan.departure,
+    arrival: ranged.model.activeSpan.arrival
   },
   {
     start: containedInterval.start,
@@ -270,25 +270,25 @@ assert.deepEqual(
     arrival: containedInterval.arrival
   }
 );
-assert.deepEqual(ranged.model.interval.arrivalNeighborhood.resolution, ranged.model.resolution);
+assert.deepEqual(ranged.model.activeSpan.arrivalNeighborhood.neighborhood, ranged.model.neighborhood);
 ranged = setRange(ranged, 30, 50, 40).session;
-assert.equal(ranged.model.interval, null);
+assert.equal(ranged.model.activeSpan, null);
 let previewed = createSession({ duration: 100, current: 20 });
 previewed = goTo(previewed, 40, { operator: "timeline" }).session;
 previewed = previewRange(previewed, 30, 60, 40).session;
-assert.equal(previewed.model.interval, null);
+assert.equal(previewed.model.activeSpan, null);
 
 // Focus is a Range operation, not a traversal: relocation creates no Interval.
 const focusGuide = createGuide("video");
 const retained = createSectionFromTimes(focusGuide, 100, 200, { label: "Active" }).section;
 let focused = createSession({ duration: 480, current: 20, guide: focusGuide });
 focused = goTo(focused, 40, { operator: "timeline" }).session;
-assert.ok(focused.model.interval);
+assert.ok(focused.model.activeSpan);
 const focusResult = focusSection(focused, retained.id);
 assert.equal(focusResult.changed, true);
 focused = focusResult.session;
-assert.equal(focused.model.resolution.C, 150);
-assert.equal(focused.model.interval, null);
+assert.equal(focused.model.neighborhood.C, 150);
+assert.equal(focused.model.activeSpan, null);
 assert.equal(focused.model.focus.sectionId, retained.id);
 assert.deepEqual(focused.model.range, { start: 100, end: 200 });
 assert.equal(focused.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.RANGE);
@@ -300,8 +300,8 @@ assert.equal(outside.leftFocus, true);
 assert.equal(outside.label, "Leave Section + Timeline Click");
 assert.equal(outside.session.model.focus, null);
 assert.deepEqual(outside.session.model.range, { start: 0, end: 480 });
-assert.deepEqual(outside.session.model.resolution, { L: 0, C: 300, R: 480, level: 0 });
-assert.deepEqual({ start: outside.session.model.interval.start, end: outside.session.model.interval.end }, { start: 150, end: 300 });
+assert.deepEqual(outside.session.model.neighborhood, { L: 0, C: 300, R: 480, level: 0 });
+assert.deepEqual({ start: outside.session.model.activeSpan.start, end: outside.session.model.activeSpan.end }, { start: 150, end: 300 });
 
 // Focused Section deletion clears Focus and presentation state; Undo restores all.
 let deleteFocused = createSession({ duration: 480, current: 150, guide: focusGuide });
@@ -322,7 +322,7 @@ const stalePin = ensurePin(staleGuide, 50, { label: "Fifty" }).pin;
 let stale = createSession({ duration: 480, current: 150, guide: staleGuide });
 stale.model.focus = { sectionId: "missing", returnRange: { start: 0, end: 480 } };
 stale.model.range = { start: 100, end: 200 };
-stale.model.resolution = createRoot(100, 150, 200);
+stale.model.neighborhood = createRoot(100, 150, 200);
 stale.model.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
 const reconciled = renameGuidePin(stale, stalePin.id, "Renamed");
 assert.equal(reconciled.changed, true);
@@ -337,7 +337,7 @@ const playbackOrigin = snapshotModel(playbackSession.model);
 const playbackOptions = {
   current: 195,
   departure: 180,
-  parentNeighborhood: copy(playbackSession.model.resolution),
+  parentNeighborhood: copy(playbackSession.model.neighborhood),
   parentResolutionBasis: playbackSession.model.neighborhoodBasis,
   returnModel: snapshotModel(playbackSession.model)
 };
@@ -349,24 +349,24 @@ assert.deepEqual(
 );
 playbackSession = completePlayback(playbackSession, playbackOptions).session;
 assert.equal(playbackSession.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.MOVEMENT);
-assert.deepEqual(playbackSession.model.resolution, { L: 0, C: 195, R: 315, level: 0 });
-assert.deepEqual({ start: playbackSession.model.interval.start, end: playbackSession.model.interval.end }, { start: 120, end: 195 });
-assert.deepEqual(playbackProjection.model.resolution, playbackSession.model.resolution);
+assert.deepEqual(playbackSession.model.neighborhood, { L: 0, C: 195, R: 315, level: 0 });
+assert.deepEqual({ start: playbackSession.model.activeSpan.start, end: playbackSession.model.activeSpan.end }, { start: 120, end: 195 });
+assert.deepEqual(playbackProjection.model.neighborhood, playbackSession.model.neighborhood);
 assert.equal(playbackProjection.model.neighborhoodBasis, playbackSession.model.neighborhoodBasis);
 for (const key of ["start", "end", "departure", "arrival", "operator", "mode"]) {
   assert.deepEqual(
-    playbackProjection.model.interval[key],
-    playbackSession.model.interval[key],
+    playbackProjection.model.activeSpan[key],
+    playbackSession.model.activeSpan[key],
     `Live and settled playback must agree on Interval ${key}.`
   );
 }
 assert.deepEqual(
-  playbackProjection.model.interval.departureNeighborhood,
-  playbackSession.model.interval.departureNeighborhood
+  playbackProjection.model.activeSpan.departureNeighborhood,
+  playbackSession.model.activeSpan.departureNeighborhood
 );
 assert.deepEqual(
-  playbackProjection.model.interval.arrivalNeighborhood,
-  playbackSession.model.interval.arrivalNeighborhood
+  playbackProjection.model.activeSpan.arrivalNeighborhood,
+  playbackSession.model.activeSpan.arrivalNeighborhood
 );
 
 assert.ok(EPSILON > 0);
@@ -376,7 +376,7 @@ const appSource = readFileSync(new URL("./app.js", import.meta.url), "utf8");
 const sessionSource = readFileSync(new URL("./session.js", import.meta.url), "utf8");
 const viewSource = readFileSync(new URL("./view.js", import.meta.url), "utf8");
 const cssSource = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
-assert.match(appSource, /originResolution: state\.pendingStep\.originModel\.resolution/, "Rapid Step must derive spatial state from its origin.");
+assert.match(appSource, /originResolution: state\.pendingStep\.originModel\.neighborhood/, "Rapid Step must derive spatial state from its origin.");
 assert.match(appSource, /intervalDeparture: state\.pendingStep\.intervalDeparture/, "Pending Step must freeze the Interval anchor across repeat.");
 assert.match(
   appSource,

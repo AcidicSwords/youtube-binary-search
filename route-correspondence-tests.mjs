@@ -56,7 +56,7 @@ function readCanonical(env) {
       guide.groups.find(group => group.id === guide.visibleGroupId)?.label ?? null,
     current: byId.get("pin-current-position").textContent,
     range: byId.get("range-label").textContent,
-    interval: byId.get("section-window").textContent,
+    activeSpan: byId.get("section-window").textContent,
     duration: byId.get("duration-time").textContent,
     sectionCount: byId.get("sections-list-count").textContent,
     pinCount: byId.get("pins-list-count").textContent,

@@ -527,7 +527,7 @@ export function getActionRanges(
     stepForward: forwardCoordinate > currentCoordinate + EPSILON
       ? { start: neighborhood.C, end: stepForward, destination: stepForward }
       : null,
-    interval: interval?.end > interval?.start
+    activeSpan: interval?.end > interval?.start
       ? { start: interval.start, end: interval.end }
       : null
   };

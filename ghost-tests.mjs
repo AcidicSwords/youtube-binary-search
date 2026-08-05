@@ -74,24 +74,24 @@ function worldFingerprint(model) {
 {
   const { session } = buildWorld();
   const before = worldFingerprint(session.model);
-  const anchor = session.model.resolution.C;
+  const anchor = session.model.neighborhood.C;
 
   const ghosted = ghostTraverse(session, 40, {
     anchor,
     direction: "backward",
-    originResolution: session.model.resolution,
+    originResolution: session.model.neighborhood,
     originResolutionBasis: session.model.neighborhoodBasis,
     projection: projectionFor(session)
   });
   assert.equal(ghosted.changed, true);
   assert.equal(worldFingerprint(ghosted.session.model), before,
     "Recalling an earlier Address changes no Pin, Section, Group, Weight, title, Range or Focus.");
-  assert.equal(ghosted.session.model.resolution.C, 40, "Only Current moves.");
+  assert.equal(ghosted.session.model.neighborhood.C, 40, "Only Current moves.");
   assert.equal(ghosted.place, 40, "and the player is asked to follow it.");
 
   // What appears is an ordinary Active Span, so every other operator can
   // act on it without knowing where it came from.
-  const interval = ghosted.session.model.interval;
+  const interval = ghosted.session.model.activeSpan;
   assert.equal(interval.medium, "ghost", "It is marked as recalled,");
   assert.equal(interval.start, 40);
   assert.equal(interval.end, anchor, "spans from the recalled Address to the Anchor,");
@@ -103,11 +103,11 @@ function worldFingerprint(model) {
   const forward = ghostTraverse(session, 260, {
     anchor,
     direction: "forward",
-    originResolution: session.model.resolution,
+    originResolution: session.model.neighborhood,
     projection: projectionFor(session)
   });
-  assert.equal(forward.session.model.interval.activeEnd, "end");
-  assert.equal(forward.session.model.interval.start, anchor);
+  assert.equal(forward.session.model.activeSpan.activeEnd, "end");
+  assert.equal(forward.session.model.activeSpan.start, anchor);
 }
 
 // ---------------------------------------------------------------------------
@@ -118,7 +118,7 @@ function worldFingerprint(model) {
   const focused = focusSection(session, sectionId, { projection: projectionFor(session) });
   assert.equal(focused.changed, true);
   const inFocus = focused.session;
-  const anchor = inFocus.model.resolution.C;
+  const anchor = inFocus.model.neighborhood.C;
 
   // A recalled Address outside the focused Range is refused, not clamped onto a
   // different point and not escaped by leaving Focus.
@@ -151,7 +151,7 @@ function worldFingerprint(model) {
 {
   const { session } = buildWorld();
   const originModel = session.model;
-  const anchor = originModel.resolution.C;
+  const anchor = originModel.neighborhood.C;
   const worldBefore = worldFingerprint(originModel);
   const historyBefore = session.history.length;
 
@@ -162,7 +162,7 @@ function worldFingerprint(model) {
     const amended = ghostTraverse(gesturing, address, {
       anchor,
       direction: "backward",
-      originResolution: originModel.resolution,
+      originResolution: originModel.neighborhood,
       originResolutionBasis: originModel.neighborhoodBasis,
       projection: projectionFor(session),
       amend: true
@@ -180,7 +180,7 @@ function worldFingerprint(model) {
 
   const returned = undo(settled.session);
   assert.equal(returned.changed, true);
-  assert.equal(returned.session.model.resolution.C, anchor,
+  assert.equal(returned.session.model.neighborhood.C, anchor,
     "One Undo returns to the Anchor the gesture began from.");
   assert.equal(worldFingerprint(returned.session.model), worldBefore,
     "and the structure built before Ghost is still there, because Ghost never touched it.");
@@ -191,7 +191,7 @@ function worldFingerprint(model) {
 // ---------------------------------------------------------------------------
 {
   const { session } = buildWorld();
-  const anchor = session.model.resolution.C;
+  const anchor = session.model.neighborhood.C;
 
   // Out to 40 and back to the Anchor: net displacement nothing, but the reader
   // crossed a positive extent and that extent is what they now have in view.
@@ -200,13 +200,13 @@ function worldFingerprint(model) {
     const amended = ghostTraverse(gesturing, address, {
       anchor,
       direction: address <= 120 ? "backward" : "forward",
-      originResolution: session.model.resolution,
+      originResolution: session.model.neighborhood,
       projection: projectionFor(session),
       amend: true
     });
     if (amended.changed) gesturing = amended.session;
   }
-  assert.equal(Math.abs(gesturing.model.resolution.C - anchor) <= EPSILON, true,
+  assert.equal(Math.abs(gesturing.model.neighborhood.C - anchor) <= EPSILON, true,
     "The gesture ended where it started.");
 
   const settled = settleGhostSequence(gesturing, {
@@ -218,10 +218,10 @@ function worldFingerprint(model) {
     projection: projectionFor(session)
   });
   assert.equal(settled.changed, true);
-  assert.equal(settled.session.model.interval.start, 40);
-  assert.equal(settled.session.model.interval.end, anchor,
+  assert.equal(settled.session.model.activeSpan.start, 40);
+  assert.equal(settled.session.model.activeSpan.end, anchor,
     "The positive extent crossed is retained, exactly as a Step Reversal retains its own.");
-  assert.equal(settled.session.model.interval.activeEnd, "end",
+  assert.equal(settled.session.model.activeSpan.activeEnd, "end",
     "The last source movement supplies the viewpoint.");
 
   // A gesture that never left has nothing to retain.
@@ -255,10 +255,10 @@ function worldFingerprint(model) {
   // map, then recall it: Ghost must land where the reader actually was, not
   // recompute a midpoint from terrain that did not exist at the time.
   const { session, sectionId } = buildWorld();
-  const departure = session.model.resolution.C;
+  const departure = session.model.neighborhood.C;
   const refined = refine(session, "backward", { projection: projectionFor(session) });
   assert.equal(refined.changed, true);
-  const recorded = refined.session.model.resolution.C;
+  const recorded = refined.session.model.neighborhood.C;
 
   let userTime = createUserTime(departure);
   userTime = appendAtomicTraversal(userTime, {
@@ -273,7 +273,7 @@ function worldFingerprint(model) {
     projection: projectionForModel(reweighted.model)
   });
   assert.notEqual(
-    Math.abs(wouldBeNow.session.model.resolution.C - recorded) <= EPSILON,
+    Math.abs(wouldBeNow.session.model.neighborhood.C - recorded) <= EPSILON,
     true,
     "The same operator under the new map would reach somewhere else."
   );
@@ -327,14 +327,14 @@ function worldFingerprint(model) {
     gesturing = ghostTraverse(gesturing, moved.address, {
       anchor: D,
       direction: "backward",
-      originResolution: session.model.resolution,
+      originResolution: session.model.neighborhood,
       projection: projectionFor(session),
       amend: true
     }).session;
   }
-  assert.equal(gesturing.model.resolution.C, A);
-  assert.equal(gesturing.model.interval.start, A);
-  assert.equal(gesturing.model.interval.end, D, "The Active Span reaches back to the Anchor.");
+  assert.equal(gesturing.model.neighborhood.C, A);
+  assert.equal(gesturing.model.activeSpan.start, A);
+  assert.equal(gesturing.model.activeSpan.end, D, "The Active Span reaches back to the Anchor.");
 
   // Session settlement and the ledger are different consequences of one gesture.
   // The Session retains the Anchor relation as a Active Span; user time
@@ -350,16 +350,16 @@ function worldFingerprint(model) {
   userTime = replay.userTime;
   assert.equal(replay.record.units.length, 1,
     "The ledger keeps one landing, not the scan that found it,");
-  assert.equal(gesturing.model.interval.start, A);
-  assert.equal(gesturing.model.interval.end, D,
+  assert.equal(gesturing.model.activeSpan.start, A);
+  assert.equal(gesturing.model.activeSpan.end, D,
     "while the Session keeps the whole Anchor relation.");
   assert.equal(userTime.records.length, streamBefore + 1);
   assert.equal(userTime.records.slice(0, streamBefore).length, streamBefore,
     "Everything that already happened is still there.");
 
   // Sever the present. Current stays; the resume cursor is untouched by this.
-  const severed = { ...gesturing, model: { ...gesturing.model, interval: null } };
-  assert.equal(severed.model.resolution.C, A);
+  const severed = { ...gesturing, model: { ...gesturing.model, activeSpan: null } };
+  assert.equal(severed.model.neighborhood.C, A);
 
   // Replay A's successors, now knowing D.
   let resumed = beginGhostRead(userTime, {
@@ -377,19 +377,19 @@ function worldFingerprint(model) {
   const anchored = ghostTraverse(severed, forward.address, {
     anchor: A,
     direction: "forward",
-    originResolution: severed.model.resolution,
+    originResolution: severed.model.neighborhood,
     projection: projectionFor(session),
     amend: true
   });
   assert.equal(anchored.changed, true);
-  assert.equal(anchored.session.model.interval.start, A);
-  assert.equal(anchored.session.model.interval.end, B,
+  assert.equal(anchored.session.model.activeSpan.start, A);
+  assert.equal(anchored.session.model.activeSpan.end, B,
     "The new relation is anchored at the live occurrence of A, entirely earlier than D.");
 
   // That Interval is ordinary, so retaining it is the ordinary save.
   const retained = saveExtentAsSection(
     anchored.session,
-    { start: anchored.session.model.interval.start, end: anchored.session.model.interval.end },
+    { start: anchored.session.model.activeSpan.start, end: anchored.session.model.activeSpan.end },
     { label: "Recognised" }
   );
   assert.equal(retained.changed, true);

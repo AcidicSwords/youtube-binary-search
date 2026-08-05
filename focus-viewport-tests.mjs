@@ -185,9 +185,9 @@ for (const [label, sectionId, weight] of [
   // And the operator itself agrees: one Step of 10 map units inside a 1.5x
   // Section covers 10/1.5 source seconds, focused or not.
   const atStart = goTo(focused, section.start, { operator: "timeline" }).session;
-  const stepped = step(atStart, "forward", 10).session.model.resolution.C;
+  const stepped = step(atStart, "forward", 10).session.model.neighborhood.C;
   assert.equal(
-    Number((stepped - atStart.model.resolution.C).toFixed(6)),
+    Number((stepped - atStart.model.neighborhood.C).toFixed(6)),
     Number((10 / 1.5).toFixed(6)),
     "Focus does not rescale Step: it rescales only what is drawn."
   );

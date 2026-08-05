@@ -380,7 +380,7 @@ function rejectFocusedRangeBoundaryEdit() {
 }
 
 function currentNeighborhood() {
-  return model().resolution;
+  return model().neighborhood;
 }
 
 function activeRange() {
@@ -634,7 +634,7 @@ function selectTimelineRetained(selection) {
 }
 
 function currentSpan() {
-  return model().interval;
+  return model().activeSpan;
 }
 
 function syncIntervalPinSelection() {
@@ -1068,10 +1068,10 @@ function applyPlayerEffect(result, options = {}) {
   const observe = options.observe !== false;
   const destination = Number.isFinite(result?.place)
     ? result.place
-    : result?.interval?.arrival;
+    : result?.activeSpan?.arrival;
   if (!Number.isFinite(destination)) return;
 
-  if (observe && state.contextSeconds > 0 && result?.interval) {
+  if (observe && state.contextSeconds > 0 && result?.activeSpan) {
     if (!options.fieldAligned) {
       stepField?.translateToCurrent(destination, { preserve: true });
     }
@@ -1095,8 +1095,8 @@ function applyPlayerEffect(result, options = {}) {
 // a movement, never a movement of its own.
 function recordTraversal(previousModel, options = {}) {
   if (options.recordTraversal === false) return false;
-  const from = Number(previousModel?.resolution?.C);
-  const to = Number(model()?.resolution?.C);
+  const from = Number(previousModel?.neighborhood?.C);
+  const to = Number(model()?.neighborhood?.C);
   if (!Number.isFinite(from) || !Number.isFinite(to)) return false;
   const appended = appendAtomicTraversal(state.userTime, {
     from,
@@ -1186,12 +1186,12 @@ function carryRetainedThrough(result, originModel, enabled, selection = state.ti
     || !selection
     || !result?.changed
     || !originModel
-    || !Number.isFinite(result.session?.model?.resolution?.C)
+    || !Number.isFinite(result.session?.model?.neighborhood?.C)
   ) return result;
 
   const projection = effectiveProjectionForModel(originModel);
-  const originCurrent = originModel.resolution.C;
-  const destination = result.session.model.resolution.C;
+  const originCurrent = originModel.neighborhood.C;
+  const destination = result.session.model.neighborhood.C;
   const originCoordinate = projection.sourceToTimeline(originCurrent);
   const destinationCoordinate = projection.sourceToTimeline(destination);
   const delta = destinationCoordinate - originCoordinate;
@@ -1426,7 +1426,7 @@ function flushPendingStep(options = {}) {
   if (options.effect !== false) {
     applyPlayerEffect({
       place: currentNeighborhood().C,
-      interval: currentSpan()
+      activeSpan: currentSpan()
     }, {
       observe: options.observe,
       fieldAligned: true,
@@ -1646,8 +1646,8 @@ function refine(direction, options = {}) {
     return;
   }
   result = carryRetainedThrough(result, originModel, carry);
-  const workingSection = result.interval
-    ? formatRange(result.interval)
+  const workingSection = result.activeSpan
+    ? formatRange(result.activeSpan)
     : `cleared at ${formatTime(result.destination)}`;
   accept(result, {
     status: local
@@ -1667,7 +1667,7 @@ function reopenFully() {
     return;
   }
   accept(result, {
-    status: `Reopened the Neighborhood to Range while keeping Current at ${formatTime(result.session.model.resolution.C)}.`
+    status: `Reopened the Neighborhood to Range while keeping Current at ${formatTime(result.session.model.neighborhood.C)}.`
   });
 }
 
@@ -1686,7 +1686,7 @@ function switchActiveEnd(options = {}) {
   }
   result = carryRetainedThrough(result, originModel, carry);
   accept(result, {
-    status: `Switched to ${formatTime(result.session.model.resolution.C)}; Active Span remains ${formatRange(interval)} in its restored refinement frame.${retainedCarryStatus(result)}`
+    status: `Switched to ${formatTime(result.session.model.neighborhood.C)}; Active Span remains ${formatRange(interval)} in its restored refinement frame.${retainedCarryStatus(result)}`
   });
 }
 
@@ -1874,9 +1874,9 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
     const departure = currentNeighborhood().C;
     const carry = options.carryRetained === true || state.carryModifier;
     const originModel = snapshotModel(model(), { cloneGuide: carry });
-    const intervalDeparture = originModel.interval
-      && Math.abs(originModel.interval.arrival - departure) <= EPSILON
-      ? originModel.interval.departure
+    const intervalDeparture = originModel.activeSpan
+      && Math.abs(originModel.activeSpan.arrival - departure) <= EPSILON
+      ? originModel.activeSpan.departure
       : departure;
     state.pendingStep = {
       traversalPoints: [currentNeighborhood().C],
@@ -1908,8 +1908,8 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
   const result = stepSession(state.session, direction, resolvedDistance, {
     departure: state.pendingStep.departure,
     intervalDeparture: state.pendingStep.intervalDeparture,
-    originInterval: state.pendingStep.originModel.interval,
-    originResolution: state.pendingStep.originModel.resolution,
+    originInterval: state.pendingStep.originModel.activeSpan,
+    originResolution: state.pendingStep.originModel.neighborhood,
     originResolutionBasis: state.pendingStep.originModel.neighborhoodBasis,
     amend: state.pendingStep.started,
     projection: state.pendingStep.projection
@@ -4012,7 +4012,7 @@ function updateRangeDrag(event) {
   const end = state.dragHandle === "end"
     ? clamp(time, origin.range.start + MIN_RANGE_SECONDS, origin.duration)
     : origin.range.end;
-  const current = clamp(origin.resolution.C, start, end);
+  const current = clamp(origin.neighborhood.C, start, end);
   const sameBoundaries = Math.abs(start - origin.range.start) <= EPSILON
     && Math.abs(end - origin.range.end) <= EPSILON;
 
@@ -4265,7 +4265,7 @@ function beginNudgeGesture(target) {
   } else {
     settleNudgeGesture();
     const origin = snapshotModel(model(), { cloneGuide: true });
-    const departure = origin.resolution.C;
+    const departure = origin.neighborhood.C;
     state.nudgeGesture = {
       key,
       traversalPoints: [departure],
@@ -4278,9 +4278,9 @@ function beginNudgeGesture(target) {
       visitedMaximum: departure,
       lastDirection: null,
       projection: timelineProjection(),
-      intervalDeparture: origin.interval
-        && Math.abs(origin.interval.arrival - departure) <= EPSILON
-        ? origin.interval.departure
+      intervalDeparture: origin.activeSpan
+        && Math.abs(origin.activeSpan.arrival - departure) <= EPSILON
+        ? origin.activeSpan.departure
         : departure,
       history: state.session.history,
       future: state.session.future || [],
@@ -4389,7 +4389,7 @@ function settleNudgeGesture() {
 function stepCurrentBySourceDelta(session, sourceDelta, options = {}) {
   const projection = options.projection || timelineProjection();
   const range = activeRange();
-  const current = session.model.resolution.C;
+  const current = session.model.neighborhood.C;
   const destination = clamp(current + sourceDelta, range.start, range.end);
   const distance = Math.abs(
     projection.sourceToTimeline(destination) - projection.sourceToTimeline(current)
@@ -4431,8 +4431,8 @@ function nudgeTarget(target, direction, options = {}) {
     result = stepCurrentBySourceDelta(amendable, delta, {
       departure: gesture.departure,
       intervalDeparture: gesture.intervalDeparture,
-      originInterval: gesture.origin.interval,
-      originResolution: gesture.origin.resolution,
+      originInterval: gesture.origin.activeSpan,
+      originResolution: gesture.origin.neighborhood,
       originResolutionBasis: gesture.origin.neighborhoodBasis,
       amend: true,
       projection: gesture.projection
@@ -5237,7 +5237,7 @@ function handleGhostWheel(event) {
     const result = ghostTraverse(state.session, candidate.address, {
       anchor: gesture.anchor,
       direction: userDirection,
-      originResolution: gesture.originModel.resolution,
+      originResolution: gesture.originModel.neighborhood,
       originResolutionBasis: gesture.originModel.neighborhoodBasis,
       projection: gesture.projection,
       amend: true

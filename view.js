@@ -206,10 +206,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
   const state = () => getState();
   const model = () => state().session.model;
-  const resolution = () => model().resolution;
+  const resolution = () => model().neighborhood;
   const range = () => model().range;
   const guide = () => model().guide;
-  const interval = () => model().interval;
+  const interval = () => model().activeSpan;
   const focusedSectionId = () => (
     model().focus?.kind === "active-span"
       ? null
@@ -1596,10 +1596,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const predicted = previewResult?.changed
       ? previewResult.session.model
       : null;
-    const previewNeighborhood = predicted?.resolution || null;
+    const previewNeighborhood = predicted?.neighborhood || null;
     const removedInterval = kind === "release" ? interval() : null;
     const structuralExtent = structural?.[kind] || null;
-    const previewInterval = predicted?.interval || removedInterval || structuralExtent;
+    const previewInterval = predicted?.activeSpan || removedInterval || structuralExtent;
     const structuralPoint = structuralExtent
       && Math.abs(structuralExtent.end - structuralExtent.start) <= EPSILON
       ? structuralExtent.start
@@ -1684,7 +1684,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const livePlayback = Boolean(playbackProjection?.changed);
     const projectedModel = livePlayback ? playbackProjection.model : model();
     elements["timeline-key-active-span"].dataset.active = String(
-      Boolean(projectedModel?.interval)
+      Boolean(projectedModel?.activeSpan)
     );
     for (const id of [
       "neighborhood-fill",
@@ -1694,25 +1694,25 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     ]) {
       elements[id].dataset.live = String(livePlayback);
     }
-    if (state().videoLoaded && projectedModel?.resolution) {
+    if (state().videoLoaded && projectedModel?.neighborhood) {
       setSegment(
         elements["neighborhood-fill"],
-        projectedModel.resolution.L,
-        projectedModel.resolution.R
+        projectedModel.neighborhood.L,
+        projectedModel.neighborhood.R
       );
-      setMarkerPosition(elements["neighborhood-backward-bound"], projectedModel.resolution.L);
-      setMarkerPosition(elements["neighborhood-forward-bound"], projectedModel.resolution.R);
-      elements["active-span-fill"].hidden = !projectedModel.interval;
-      if (projectedModel.interval) {
-        elements["active-span-fill"].dataset.direction = projectedModel.interval.direction;
+      setMarkerPosition(elements["neighborhood-backward-bound"], projectedModel.neighborhood.L);
+      setMarkerPosition(elements["neighborhood-forward-bound"], projectedModel.neighborhood.R);
+      elements["active-span-fill"].hidden = !projectedModel.activeSpan;
+      if (projectedModel.activeSpan) {
+        elements["active-span-fill"].dataset.direction = projectedModel.activeSpan.direction;
         // A recalled relation is faint: it is real geometry and an ordinary
         // Active Span, but it belongs to a gesture still being held.
         elements["active-span-fill"].dataset.medium =
-          projectedModel.interval.medium || "direct";
+          projectedModel.activeSpan.medium || "direct";
         setSegment(
           elements["active-span-fill"],
-          projectedModel.interval.start,
-          projectedModel.interval.end
+          projectedModel.activeSpan.start,
+          projectedModel.activeSpan.end
         );
       }
       // A Step target answers "where would a Step land". While a Step is
@@ -1728,7 +1728,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         elements["forward-target-marker"].hidden = true;
       } else {
         const projectedTargets = getTargets(
-          projectedModel.resolution,
+          projectedModel.neighborhood,
           timelineProjection().metric
         );
         elements["backward-target-marker"].hidden = projectedTargets.backward === null;
@@ -1827,7 +1827,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const next = currentNeighborhood
       ? nextPin(guide(), semanticCurrent, activeRange, projection)
       : null;
-    const switchFrame = currentSpan?.departureNeighborhood?.resolution;
+    const switchFrame = currentSpan?.departureNeighborhood?.neighborhood;
     const selectedForPreview = currentState.timelineSelection?.kind === "section"
       ? resolveSection(guide(), currentState.timelineSelection.id)
       : null;
@@ -2203,8 +2203,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? currentState.session.future.at(-1).label
       : "Nothing to redo";
     const destinationFrame = currentSpan?.departureNeighborhood;
-    const destinationScale = destinationFrame?.resolution
-      ? formatDuration(destinationFrame.resolution.R - destinationFrame.resolution.L)
+    const destinationScale = destinationFrame?.neighborhood
+      ? formatDuration(destinationFrame.neighborhood.R - destinationFrame.neighborhood.L)
       : null;
     setActionMeta(
       "switch-endpoint",

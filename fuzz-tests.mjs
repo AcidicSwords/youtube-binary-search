@@ -25,45 +25,45 @@ function random() {
 
 function assertSessionInvariant(session) {
   const { model, history } = session;
-  const { duration, range, resolution, neighborhoodBasis, interval, guide, focus } = model;
+  const { duration, range, neighborhood, neighborhoodBasis, activeSpan, guide, focus } = model;
   assert.ok(Number.isFinite(duration) && duration >= 0);
   assert.ok(range.start >= -EPSILON);
   assert.ok(range.end <= duration + EPSILON);
   assert.ok(range.start <= range.end);
-  assert.ok(resolution.L >= range.start - EPSILON);
-  assert.ok(resolution.R <= range.end + EPSILON);
-  assert.ok(resolution.L <= resolution.C && resolution.C <= resolution.R);
-  assert.ok(Number.isInteger(resolution.level) && resolution.level >= 0);
+  assert.ok(neighborhood.L >= range.start - EPSILON);
+  assert.ok(neighborhood.R <= range.end + EPSILON);
+  assert.ok(neighborhood.L <= neighborhood.C && neighborhood.C <= neighborhood.R);
+  assert.ok(Number.isInteger(neighborhood.level) && neighborhood.level >= 0);
   assert.ok(["range", "movement"].includes(neighborhoodBasis));
   assert.ok(history.length <= 100);
   assert.equal(validateGuide(guide, duration), true);
 
-  if (interval) {
-    assert.ok(interval.start >= -EPSILON);
-    assert.ok(interval.end <= duration + EPSILON);
-    assert.ok(interval.start < interval.end);
-    assert.ok(interval.start >= range.start - EPSILON);
-    assert.ok(interval.end <= range.end + EPSILON);
-    assert.ok(interval.start >= resolution.L - EPSILON);
-    assert.ok(interval.end <= resolution.R + EPSILON);
-    assert.ok(Math.abs(interval.arrival - resolution.C) <= EPSILON, "Interval arrival must remain the active endpoint at Current.");
-    assert.ok(Math.abs(interval.start - Math.min(interval.departure, interval.arrival)) <= EPSILON);
-    assert.ok(Math.abs(interval.end - Math.max(interval.departure, interval.arrival)) <= EPSILON);
+  if (activeSpan) {
+    assert.ok(activeSpan.start >= -EPSILON);
+    assert.ok(activeSpan.end <= duration + EPSILON);
+    assert.ok(activeSpan.start < activeSpan.end);
+    assert.ok(activeSpan.start >= range.start - EPSILON);
+    assert.ok(activeSpan.end <= range.end + EPSILON);
+    assert.ok(activeSpan.start >= neighborhood.L - EPSILON);
+    assert.ok(activeSpan.end <= neighborhood.R + EPSILON);
+    assert.ok(Math.abs(activeSpan.arrival - neighborhood.C) <= EPSILON, "Interval arrival must remain the active endpoint at Current.");
+    assert.ok(Math.abs(activeSpan.start - Math.min(activeSpan.departure, activeSpan.arrival)) <= EPSILON);
+    assert.ok(Math.abs(activeSpan.end - Math.max(activeSpan.departure, activeSpan.arrival)) <= EPSILON);
     for (const [role, address] of [
-      ["departureNeighborhood", interval.departure],
-      ["arrivalNeighborhood", interval.arrival]
+      ["departureNeighborhood", activeSpan.departure],
+      ["arrivalNeighborhood", activeSpan.arrival]
     ]) {
-      const frame = interval[role];
-      assert.ok(frame?.resolution, `Interval ${role} must exist.`);
+      const frame = activeSpan[role];
+      assert.ok(frame?.neighborhood, `Interval ${role} must exist.`);
       assert.ok(["range", "movement"].includes(frame.neighborhoodBasis));
-      assert.ok(frame.resolution.L >= range.start - EPSILON, `${role} begins outside Range.`);
-      assert.ok(frame.resolution.R <= range.end + EPSILON, `${role} ends outside Range.`);
-      assert.ok(frame.resolution.L <= interval.start + EPSILON, `${role} does not contain the Interval start.`);
-      assert.ok(frame.resolution.R >= interval.end - EPSILON, `${role} does not contain the Interval end.`);
-      assert.ok(Math.abs(frame.resolution.C - address) <= EPSILON);
+      assert.ok(frame.neighborhood.L >= range.start - EPSILON, `${role} begins outside Range.`);
+      assert.ok(frame.neighborhood.R <= range.end + EPSILON, `${role} ends outside Range.`);
+      assert.ok(frame.neighborhood.L <= activeSpan.start + EPSILON, `${role} does not contain the Interval start.`);
+      assert.ok(frame.neighborhood.R >= activeSpan.end - EPSILON, `${role} does not contain the Interval end.`);
+      assert.ok(Math.abs(frame.neighborhood.C - address) <= EPSILON);
     }
-    assert.deepEqual(interval.arrivalNeighborhood.resolution, resolution, "The active endpoint frame must match current Resolution.");
-    assert.equal(interval.arrivalNeighborhood.neighborhoodBasis, neighborhoodBasis);
+    assert.deepEqual(activeSpan.arrivalNeighborhood.neighborhood, neighborhood, "The active endpoint frame must match current Resolution.");
+    assert.equal(activeSpan.arrivalNeighborhood.neighborhoodBasis, neighborhoodBasis);
   }
 
   if (focus) {
@@ -102,7 +102,7 @@ for (let run = 0; run < RUNS; run += 1) {
       let start = random() * 480;
       let end = random() * 480;
       if (start > end) [start, end] = [end, start];
-      result = setRange(session, start, end, session.model.resolution.C);
+      result = setRange(session, start, end, session.model.neighborhood.C);
     } else if (operation === 7) result = undo(session);
     else if (operation === 8) result = retainCurrentAsPin(session, random() < 0.2 ? "Pinned" : "");
     else if (operation === 9) result = retainSpanAsSection(session, `Section ${Math.floor(random() * 20)}`);

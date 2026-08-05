@@ -179,17 +179,17 @@ function createEndpointFrame(resolution, neighborhoodBasis = NEIGHBORHOOD_BASIS.
     || !Number.isFinite(resolution.R)
   ) return null;
   return {
-    resolution: clone(resolution),
+    neighborhood: clone(resolution),
     neighborhoodBasis: neighborhoodBasis || NEIGHBORHOOD_BASIS.RANGE
   };
 }
 
 function currentEndpointFrame(model) {
-  return createEndpointFrame(model.resolution, model.neighborhoodBasis);
+  return createEndpointFrame(model.neighborhood, model.neighborhoodBasis);
 }
 
 function usableEndpointFrame(frame, address, range) {
-  const resolution = frame?.resolution;
+  const resolution = frame?.neighborhood;
   return Boolean(
     resolution
     && Number.isFinite(address)
@@ -208,10 +208,10 @@ function resolveEndpointFrame(frame, address, opposite, range, metric = null) {
   if (usableEndpointFrame(frame, address, range)) {
     const current = clamp(address, range.start, range.end);
     const resolution = {
-      L: Math.min(current, clamp(frame.resolution.L, range.start, range.end)),
+      L: Math.min(current, clamp(frame.neighborhood.L, range.start, range.end)),
       C: current,
-      R: Math.max(current, clamp(frame.resolution.R, range.start, range.end)),
-      level: frame.resolution.level ?? 0
+      R: Math.max(current, clamp(frame.neighborhood.R, range.start, range.end)),
+      level: frame.neighborhood.level ?? 0
     };
     return createEndpointFrame(
       resolution,
@@ -231,7 +231,7 @@ function resolveEndpointFrame(frame, address, opposite, range, metric = null) {
 
 function resolveIntervalEndpointFrame(frame, address, opposite, interval, range, metric = null) {
   const resolved = resolveEndpointFrame(frame, address, opposite, range, metric);
-  const resolution = containExtent(resolved.resolution, interval, range);
+  const resolution = containExtent(resolved.neighborhood, interval, range);
   return createEndpointFrame(
     resolution,
     isRangeNeighborhood(resolution, range)
@@ -241,25 +241,25 @@ function resolveIntervalEndpointFrame(frame, address, opposite, interval, range,
 }
 
 function syncIntervalEndpointFrames(model, suppliedMetric = null) {
-  if (!model.interval) return;
+  if (!model.activeSpan) return;
   const metric = suppliedMetric || projectionForModel(model).metric;
   const preserveRefinementLevel = [
     "refineBackward",
     "refineForward"
-  ].includes(model.interval.operator);
-  const activeLevel = model.resolution.level;
-  model.resolution = containExtent(model.resolution, model.interval, model.range);
-  if (preserveRefinementLevel) model.resolution.level = activeLevel;
+  ].includes(model.activeSpan.operator);
+  const activeLevel = model.neighborhood.level;
+  model.neighborhood = containExtent(model.neighborhood, model.activeSpan, model.range);
+  if (preserveRefinementLevel) model.neighborhood.level = activeLevel;
 
-  const interval = model.interval;
+  const interval = model.activeSpan;
   const activeEnd = interval.activeEnd === "start" || interval.activeEnd === "end"
     ? interval.activeEnd
     : Math.abs(interval.arrival - interval.start) <= EPSILON
       ? "start"
       : "end";
   const currentFrame = currentEndpointFrame(model);
-  const currentAtStart = Math.abs(model.resolution.C - interval.start) <= EPSILON;
-  const currentAtEnd = Math.abs(model.resolution.C - interval.end) <= EPSILON;
+  const currentAtStart = Math.abs(model.neighborhood.C - interval.start) <= EPSILON;
+  const currentAtEnd = Math.abs(model.neighborhood.C - interval.end) <= EPSILON;
   const startFrame = resolveIntervalEndpointFrame(
     currentAtStart
       ? currentFrame
@@ -272,7 +272,7 @@ function syncIntervalEndpointFrames(model, suppliedMetric = null) {
       ),
     interval.start,
     interval.end,
-    model.interval,
+    model.activeSpan,
     model.range,
     metric
   );
@@ -288,7 +288,7 @@ function syncIntervalEndpointFrames(model, suppliedMetric = null) {
       ),
     interval.end,
     interval.start,
-    model.interval,
+    model.activeSpan,
     model.range,
     metric
   );
@@ -297,7 +297,7 @@ function syncIntervalEndpointFrames(model, suppliedMetric = null) {
   interval.startFrame = startFrame;
   interval.endFrame = endFrame;
   interval.departure = activeEnd === "start" ? interval.end : interval.start;
-  interval.arrival = model.resolution.C;
+  interval.arrival = model.neighborhood.C;
   interval.direction = interval.arrival < interval.departure
     ? "backward"
     : "forward";
@@ -354,8 +354,8 @@ function createActiveSpan(departure, arrival, operator, medium = "direct", endpo
   };
 }
 
-function stepIntervalAnchor(model, sourceInterval = model.interval) {
-  const current = model.resolution.C;
+function stepIntervalAnchor(model, sourceInterval = model.activeSpan) {
+  const current = model.neighborhood.C;
   if (
     !sourceInterval
     || !Number.isFinite(sourceInterval.departure)
@@ -372,11 +372,11 @@ export function createSession({ duration = 0, current = 0, guide = createGuide()
     model: {
       duration: end,
       range: { start: 0, end },
-      resolution: createRoot(0, C, end),
+      neighborhood: createRoot(0, C, end),
       neighborhoodBasis: NEIGHBORHOOD_BASIS.RANGE,
       lastOperator: null,
       focus: null,
-      interval: null,
+      activeSpan: null,
       stepReach: normalizeStepReach(stepReach),
       guide
     },
@@ -389,11 +389,11 @@ export function snapshotModel(model, options = {}) {
   return {
     duration: model.duration,
     range: clone(model.range),
-    resolution: clone(model.resolution),
+    neighborhood: clone(model.neighborhood),
     neighborhoodBasis: model.neighborhoodBasis || NEIGHBORHOOD_BASIS.RANGE,
     lastOperator: model.lastOperator || null,
     focus: clone(model.focus),
-    interval: clone(model.interval),
+    activeSpan: clone(model.activeSpan),
     stepReach: normalizeStepReach(model.stepReach),
     guide: options.cloneGuide ? clone(model.guide) : model.guide
   };
@@ -425,10 +425,10 @@ function reconcileFocusDraft(model) {
   }
 
   const returnRange = clone(model.focus.returnRange) || { start: 0, end: model.duration };
-  const departure = model.resolution.C;
+  const departure = model.neighborhood.C;
   const current = clamp(departure, returnRange.start, returnRange.end);
   model.range = returnRange;
-  model.resolution = createRoot(returnRange.start, current, returnRange.end);
+  model.neighborhood = createRoot(returnRange.start, current, returnRange.end);
   model.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
   model.focus = null;
   return {
@@ -450,7 +450,7 @@ function commit(session, label, transform, options = {}) {
     detail.rangeChanged = true;
     detail.focusReconciled = true;
     if (reconciliation.intervalCleared) detail.intervalCleared = true;
-    if (reconciliation.moved) detail.place = draft.resolution.C;
+    if (reconciliation.moved) detail.place = draft.neighborhood.C;
   }
   if (detail.changed === false) return unchanged(session, detail.reason, detail);
   syncIntervalEndpointFrames(draft, options.projection?.metric);
@@ -485,7 +485,7 @@ function amend(session, transform, options = {}) {
     detail.rangeChanged = true;
     detail.focusReconciled = true;
     if (reconciliation.intervalCleared) detail.intervalCleared = true;
-    if (reconciliation.moved) detail.place = draft.resolution.C;
+    if (reconciliation.moved) detail.place = draft.neighborhood.C;
   }
   if (detail.changed === false) return unchanged(session, detail.reason, detail);
   syncIntervalEndpointFrames(draft, options.projection?.metric);
@@ -516,10 +516,10 @@ function intervalInsideRange(interval, range) {
 }
 
 function clearIntervalOutsideRange(model) {
-  const interval = model.interval;
+  const interval = model.activeSpan;
   if (!interval) return false;
   if (!intervalInsideRange(interval, model.range)) {
-    model.interval = null;
+    model.activeSpan = null;
     return true;
   }
 
@@ -532,7 +532,7 @@ function clearIntervalOutsideRange(model) {
     else if (Math.abs(interval[key] - previousEnd) <= EPSILON) interval[key] = interval.end;
   }
   if (interval.end - interval.start <= EPSILON) {
-    model.interval = null;
+    model.activeSpan = null;
     return true;
   }
   return false;
@@ -543,7 +543,7 @@ function openAddress(model, address) {
     return { changed: false, leftFocus: false, openedFullVideo: false };
   }
 
-  const current = model.resolution.C;
+  const current = model.neighborhood.C;
   const leftFocus = Boolean(model.focus);
   if (model.focus) {
     model.range = clone(model.focus.returnRange);
@@ -556,7 +556,7 @@ function openAddress(model, address) {
     openedFullVideo = true;
   }
 
-  model.resolution = createRoot(
+  model.neighborhood = createRoot(
     model.range.start,
     clamp(current, model.range.start, model.range.end),
     model.range.end
@@ -570,12 +570,12 @@ function moveDraft(model, destination, options = {}) {
   if (!Number.isFinite(destination)) return { changed: false, reason: "invalid-destination" };
 
   const sourceInterval = clone(
-    options.originInterval === undefined ? model.interval : options.originInterval
+    options.originInterval === undefined ? model.activeSpan : options.originInterval
   );
   const movementDepartureFrame = currentEndpointFrame(model);
   const departure = Number.isFinite(options.departure)
     ? options.departure
-    : model.resolution.C;
+    : model.neighborhood.C;
   const boundedDestination = clamp(destination, 0, model.duration);
   const opening = openAddress(model, boundedDestination);
   // Leaving Focus or opening Full Video can change the active Range. Derive the
@@ -587,14 +587,14 @@ function moveDraft(model, destination, options = {}) {
 
   // Direct Go at Current is a true no-op. Reopen is the one explicit operation
   // that discards local scale while retaining Current and Interval.
-  if (Math.abs(resolvedDestination - model.resolution.C) <= EPSILON) {
+  if (Math.abs(resolvedDestination - model.neighborhood.C) <= EPSILON) {
     if (rangeChanged) model.lastOperator = options.operator || "go";
     return {
       changed: rangeChanged,
       reason: rangeChanged ? null : "same-address",
       departure,
       destination: resolvedDestination,
-      current: model.resolution.C,
+      current: model.neighborhood.C,
       rangeChanged,
       leftFocus: opening.leftFocus,
       openedFullVideo: opening.openedFullVideo
@@ -602,50 +602,50 @@ function moveDraft(model, destination, options = {}) {
   }
 
   if (options.mode === "refine") {
-    model.resolution = refineNeighborhood(model.resolution, resolvedDestination, model.range);
+    model.neighborhood = refineNeighborhood(model.neighborhood, resolvedDestination, model.range);
   } else if (options.mode === "step") {
-    const baseNeighborhood = clone(options.originResolution || model.resolution);
+    const baseNeighborhood = clone(options.originResolution || model.neighborhood);
     const baseBasis = options.originResolutionBasis
       || model.neighborhoodBasis
       || NEIGHBORHOOD_BASIS.RANGE;
 
-    model.resolution = stepNeighborhood(
+    model.neighborhood = stepNeighborhood(
       baseNeighborhood,
       resolvedDestination,
       model.range,
       options.stepSeconds,
       metric
     );
-    finalDestination = model.resolution.C;
-    model.neighborhoodBasis = isRangeNeighborhood(model.resolution, model.range)
+    finalDestination = model.neighborhood.C;
+    model.neighborhoodBasis = isRangeNeighborhood(model.neighborhood, model.range)
       ? NEIGHBORHOOD_BASIS.RANGE
       : baseBasis;
   } else if (options.mode === "linear") {
-    const baseNeighborhood = clone(options.originResolution || model.resolution);
+    const baseNeighborhood = clone(options.originResolution || model.neighborhood);
     const baseBasis = options.originResolutionBasis
       || model.neighborhoodBasis
       || NEIGHBORHOOD_BASIS.RANGE;
-    model.resolution = translateNeighborhood(
+    model.neighborhood = translateNeighborhood(
       baseNeighborhood,
       resolvedDestination,
       model.range,
       metric
     );
-    finalDestination = model.resolution.C;
-    model.neighborhoodBasis = isRangeNeighborhood(model.resolution, model.range)
+    finalDestination = model.neighborhood.C;
+    model.neighborhoodBasis = isRangeNeighborhood(model.neighborhood, model.range)
       ? NEIGHBORHOOD_BASIS.RANGE
       : baseBasis;
   } else {
     // Direct Go abandons the preceding recursive path while retaining the scale
     // communicated by the actual movement. The crossed Interval forms one side
     // of the next Neighborhood; Reopen restores Range-level availability.
-    model.resolution = seedNeighborhoodFromMovement(
+    model.neighborhood = seedNeighborhoodFromMovement(
       departure,
       resolvedDestination,
       model.range,
       metric
     );
-    model.neighborhoodBasis = isRangeNeighborhood(model.resolution, model.range)
+    model.neighborhoodBasis = isRangeNeighborhood(model.neighborhood, model.range)
       ? NEIGHBORHOOD_BASIS.RANGE
       : NEIGHBORHOOD_BASIS.MOVEMENT;
   }
@@ -664,7 +664,7 @@ function moveDraft(model, destination, options = {}) {
   const intervalDepartureFrame = clone(options.intervalDepartureFrame)
     || clone(inheritedDepartureFrame)
     || (
-      Math.abs((originDepartureFrame?.resolution.C ?? NaN) - intervalDeparture) <= EPSILON
+      Math.abs((originDepartureFrame?.neighborhood.C ?? NaN) - intervalDeparture) <= EPSILON
         ? originDepartureFrame
         : null
     )
@@ -680,7 +680,7 @@ function moveDraft(model, destination, options = {}) {
         )
     );
   const intervalArrivalFrame = currentEndpointFrame(model);
-  model.interval = createActiveSpan(
+  model.activeSpan = createActiveSpan(
     intervalDeparture,
     finalDestination,
     options.operator || "go",
@@ -705,14 +705,14 @@ function moveDraft(model, destination, options = {}) {
     changed: true,
     departure,
     destination: finalDestination,
-    current: model.resolution.C,
+    current: model.neighborhood.C,
     rangeChanged,
     leftFocus: opening.leftFocus,
     openedFullVideo: opening.openedFullVideo,
     ...(historyLabel ? { historyLabel } : {}),
     ...(options.refineRelation ? { refineRelation: options.refineRelation } : {}),
-    interval: model.interval,
-    place: model.resolution.C
+    activeSpan: model.activeSpan,
+    place: model.neighborhood.C
   };
 }
 
@@ -745,25 +745,25 @@ export function workFromExtent(session, extent, options = {}) {
     : (start + end) / 2;
   const label = options.label || "Select Section";
   return commit(session, label, model => {
-    const current = model.resolution.C;
+    const current = model.neighborhood.C;
     const operator = options.operator || "section";
     const alreadySelected = (
-      Math.abs(model.resolution.L - start) <= EPSILON
-      && Math.abs(model.resolution.C - midpoint) <= EPSILON
-      && Math.abs(model.resolution.R - end) <= EPSILON
-      && Math.abs((model.interval?.start ?? NaN) - start) <= EPSILON
-      && Math.abs((model.interval?.end ?? NaN) - end) <= EPSILON
-      && model.interval?.operator === operator
+      Math.abs(model.neighborhood.L - start) <= EPSILON
+      && Math.abs(model.neighborhood.C - midpoint) <= EPSILON
+      && Math.abs(model.neighborhood.R - end) <= EPSILON
+      && Math.abs((model.activeSpan?.start ?? NaN) - start) <= EPSILON
+      && Math.abs((model.activeSpan?.end ?? NaN) - end) <= EPSILON
+      && model.activeSpan?.operator === operator
     );
     if (alreadySelected) return { changed: false, reason: "selected-section" };
 
     const startOpening = openAddress(model, start);
     const endOpening = openAddress(model, end);
-    model.resolution = createRoot(start, midpoint, end);
-    model.neighborhoodBasis = isRangeNeighborhood(model.resolution, model.range)
+    model.neighborhood = createRoot(start, midpoint, end);
+    model.neighborhoodBasis = isRangeNeighborhood(model.neighborhood, model.range)
       ? NEIGHBORHOOD_BASIS.RANGE
       : NEIGHBORHOOD_BASIS.MOVEMENT;
-    model.interval = createActiveSpan(
+    model.activeSpan = createActiveSpan(
       start,
       midpoint,
       operator,
@@ -781,7 +781,7 @@ export function workFromExtent(session, extent, options = {}) {
       destination: midpoint,
       current: midpoint,
       place: midpoint,
-      interval: model.interval,
+      activeSpan: model.activeSpan,
       rangeChanged: startOpening.changed || endOpening.changed,
       leftFocus: startOpening.leftFocus || endOpening.leftFocus,
       openedFullVideo: startOpening.openedFullVideo || endOpening.openedFullVideo
@@ -800,20 +800,20 @@ export function goToGuideSection(session, sectionId, options = {}) {
 }
 
 function retainedRefineIntervalRelation(model, target) {
-  const current = model.resolution.C;
-  const relation = classifyRetainedRefineRelation(model.interval, current, target);
+  const current = model.neighborhood.C;
+  const relation = classifyRetainedRefineRelation(model.activeSpan, current, target);
   return relation === "retain"
-    ? { departure: model.interval.departure, relation }
+    ? { departure: model.activeSpan.departure, relation }
     : { departure: current, relation };
 }
 
 export function localRefine(session, direction, options = {}) {
   const projection = options.projection || projectionForModel(session.model);
   const metric = projection.metric;
-  const target = getTargets(session.model.resolution, metric)[direction];
+  const target = getTargets(session.model.neighborhood, metric)[direction];
   if (target === null) return unchanged(session, "no-destination");
   const backward = direction === "backward";
-  const current = session.model.resolution.C;
+  const current = session.model.neighborhood.C;
   return goTo(session, target, {
     mode: "refine",
     operator: backward ? "localRefineBackward" : "localRefineForward",
@@ -826,7 +826,7 @@ export function localRefine(session, direction, options = {}) {
 
 export function refine(session, direction, options = {}) {
   const projection = options.projection || projectionForModel(session.model);
-  const target = getTargets(session.model.resolution, projection.metric)[direction];
+  const target = getTargets(session.model.neighborhood, projection.metric)[direction];
   if (target === null) return unchanged(session, "no-destination");
   const backward = direction === "backward";
   const intervalRelation = retainedRefineIntervalRelation(session.model, target);
@@ -851,7 +851,7 @@ export function step(session, direction, seconds = null, options = {}) {
     ? Number(seconds)
     : configured[direction];
   const target = projection.stepTarget(
-    session.model.resolution.C,
+    session.model.neighborhood.C,
     reach,
     direction,
     session.model.range
@@ -865,12 +865,12 @@ export function step(session, direction, seconds = null, options = {}) {
   // compressed Section while the identical Nudge worked on a normalized map.
   // The threshold was ρ > EPSILON / reach, which no reader could have guessed.
   if (
-    Math.abs(target - session.model.resolution.C) <= EPSILON
+    Math.abs(target - session.model.neighborhood.C) <= EPSILON
   ) return unchanged(session, "range-edge");
   const backward = direction === "backward";
   const intervalDeparture = Number.isFinite(options.intervalDeparture)
     ? options.intervalDeparture
-    : stepIntervalAnchor(session.model, options.originInterval ?? session.model.interval);
+    : stepIntervalAnchor(session.model, options.originInterval ?? session.model.activeSpan);
   return goTo(session, target, {
     mode: "step",
     operator: backward ? "stepBackward" : "stepForward",
@@ -901,7 +901,7 @@ export function stepToPin(session, destination, direction, options = {}) {
     : configured[direction];
   const intervalDeparture = Number.isFinite(options.intervalDeparture)
     ? options.intervalDeparture
-    : stepIntervalAnchor(session.model, options.originInterval ?? session.model.interval);
+    : stepIntervalAnchor(session.model, options.originInterval ?? session.model.activeSpan);
   return goTo(session, destination, {
     mode: "step",
     operator: backward ? "pinBackward" : "pinForward",
@@ -933,11 +933,11 @@ export function setStepReach(session, nextReach, label = "Set Step Reach") {
 }
 
 export function reopen(session) {
-  if (!canReopen(session.model.resolution, session.model.range)) {
+  if (!canReopen(session.model.neighborhood, session.model.range)) {
     return unchanged(session, "already-open");
   }
   return commit(session, "Reopen", draft => {
-    draft.resolution = reopenToRange(draft.resolution.C, draft.range);
+    draft.neighborhood = reopenToRange(draft.neighborhood.C, draft.range);
     draft.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
     draft.lastOperator = "reopen";
     return { changed: true };
@@ -945,12 +945,12 @@ export function reopen(session) {
 }
 
 export function switchActiveEnd(session, options = {}) {
-  const interval = session.model.interval;
-  if (!interval) return unchanged(session, "no-interval");
+  const interval = session.model.activeSpan;
+  if (!interval) return unchanged(session, "no-active-span");
 
   return commit(session, "Switch End", draft => {
-    const active = clone(draft.interval);
-    if (!active) return { changed: false, reason: "no-interval" };
+    const active = clone(draft.activeSpan);
+    if (!active) return { changed: false, reason: "no-active-span" };
     const metric = options.projection?.metric || projectionForModel(draft).metric;
     const activeEnd = active.activeEnd === "start" || active.activeEnd === "end"
       ? active.activeEnd
@@ -977,9 +977,9 @@ export function switchActiveEnd(session, options = {}) {
       metric
     );
 
-    draft.resolution = clone(frameBeingEntered.resolution);
+    draft.neighborhood = clone(frameBeingEntered.neighborhood);
     draft.neighborhoodBasis = frameBeingEntered.neighborhoodBasis;
-    draft.interval = {
+    draft.activeSpan = {
       ...active,
       departure: retainedDeparture,
       arrival: departure,
@@ -991,18 +991,18 @@ export function switchActiveEnd(session, options = {}) {
 
     return {
       changed: true,
-      place: draft.resolution.C,
-      interval: draft.interval
+      place: draft.neighborhood.C,
+      activeSpan: draft.activeSpan
     };
   }, options);
 }
 
 export function releaseInterval(session) {
-  if (!session.model.interval) return unchanged(session, "no-interval");
+  if (!session.model.activeSpan) return unchanged(session, "no-active-span");
   return commit(session, "Release Active Span", draft => {
-    draft.interval = null;
+    draft.activeSpan = null;
     draft.lastOperator = "release";
-    return { changed: true, interval: null };
+    return { changed: true, activeSpan: null };
   });
 }
 
@@ -1011,13 +1011,13 @@ export function setRange(session, start, end, current, label = "Set Range") {
   if (!next) return unchanged(session, "invalid-range");
   const sameRange = Math.abs(next.start - session.model.range.start) <= EPSILON
     && Math.abs(next.end - session.model.range.end) <= EPSILON;
-  const sameCurrent = Math.abs(next.current - session.model.resolution.C) <= EPSILON;
+  const sameCurrent = Math.abs(next.current - session.model.neighborhood.C) <= EPSILON;
   if (sameRange && sameCurrent && !session.model.focus) return unchanged(session, "unchanged-range");
 
   return commit(session, label, draft => {
     draft.range = { start: next.start, end: next.end };
     draft.focus = null;
-    draft.resolution = createRoot(next.start, next.current, next.end);
+    draft.neighborhood = createRoot(next.start, next.current, next.end);
     draft.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
     draft.lastOperator = "range";
     const intervalCleared = clearIntervalOutsideRange(draft);
@@ -1025,7 +1025,7 @@ export function setRange(session, start, end, current, label = "Set Range") {
       changed: true,
       rangeChanged: true,
       intervalCleared,
-      ...(sameCurrent ? {} : { place: draft.resolution.C })
+      ...(sameCurrent ? {} : { place: draft.neighborhood.C })
     };
   });
 }
@@ -1042,7 +1042,7 @@ export function focusSection(session, sectionId, options = {}) {
 
   return commit(session, `Focus “${sectionDisplayName(section)}”`, draft => {
     const resolved = resolveSection(draft.guide, sectionId);
-    const departure = draft.resolution.C;
+    const departure = draft.neighborhood.C;
     const returnRange = draft.focus?.returnRange || clone(draft.range);
     draft.focus = { kind: FOCUS_KIND.SAVED, sectionId, returnRange };
     draft.range = { start: resolved.start, end: resolved.end };
@@ -1051,7 +1051,7 @@ export function focusSection(session, sectionId, options = {}) {
       : options.projection
         ? options.projection.timelineMidpoint(resolved.start, resolved.end)
         : resolved.midpoint;
-    draft.resolution = createRoot(resolved.start, current, resolved.end);
+    draft.neighborhood = createRoot(resolved.start, current, resolved.end);
     draft.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
     draft.lastOperator = "focus";
     const moved = Math.abs(current - departure) > EPSILON;
@@ -1067,8 +1067,8 @@ export function focusSection(session, sectionId, options = {}) {
 }
 
 export function focusWorkingSection(session) {
-  const interval = session.model.interval;
-  if (!interval) return unchanged(session, "no-interval");
+  const interval = session.model.activeSpan;
+  if (!interval) return unchanged(session, "no-active-span");
   if (
     focusKind(session.model.focus) === FOCUS_KIND.ACTIVE_SPAN
     && Math.abs(session.model.range.start - interval.start) <= EPSILON
@@ -1076,9 +1076,9 @@ export function focusWorkingSection(session) {
   ) return unchanged(session, "already-focused");
 
   return commit(session, "Focus Active Span", draft => {
-    const working = clone(draft.interval);
-    if (!working) return { changed: false, reason: "no-interval" };
-    const departure = draft.resolution.C;
+    const working = clone(draft.activeSpan);
+    if (!working) return { changed: false, reason: "no-active-span" };
+    const departure = draft.neighborhood.C;
     const returnRange = draft.focus?.returnRange || clone(draft.range);
     draft.focus = {
       kind: FOCUS_KIND.ACTIVE_SPAN,
@@ -1087,7 +1087,7 @@ export function focusWorkingSection(session) {
     };
     draft.range = { start: working.start, end: working.end };
     const current = clamp(departure, working.start, working.end);
-    draft.resolution = createRoot(working.start, current, working.end);
+    draft.neighborhood = createRoot(working.start, current, working.end);
     draft.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
     draft.lastOperator = "focus";
     return {
@@ -1103,10 +1103,10 @@ export function leaveSection(session) {
   if (!session.model.focus) return unchanged(session, "not-focused");
   return commit(session, "Leave Section", draft => {
     const returnRange = clone(draft.focus.returnRange) || { start: 0, end: draft.duration };
-    const departure = draft.resolution.C;
+    const departure = draft.neighborhood.C;
     const current = clamp(departure, returnRange.start, returnRange.end);
     draft.range = returnRange;
-    draft.resolution = createRoot(returnRange.start, current, returnRange.end);
+    draft.neighborhood = createRoot(returnRange.start, current, returnRange.end);
     draft.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
     draft.lastOperator = "unfocus";
     draft.focus = null;
@@ -1122,10 +1122,10 @@ export function leaveSection(session) {
 
 export function projectPlayback(model, options = {}) {
   const originModel = snapshotModel(options.returnModel || model);
-  if (originModel.interval) syncIntervalEndpointFrames(originModel);
+  if (originModel.activeSpan) syncIntervalEndpointFrames(originModel);
   const departure = Number.isFinite(options.departure)
     ? options.departure
-    : originModel.resolution.C;
+    : originModel.neighborhood.C;
   const requestedCurrent = Number(options.current);
   const current = clamp(
     Number.isFinite(requestedCurrent) ? requestedCurrent : departure,
@@ -1142,18 +1142,18 @@ export function projectPlayback(model, options = {}) {
     };
   }
 
-  const sourceInterval = clone(originModel.interval);
+  const sourceInterval = clone(originModel.activeSpan);
   const parentNeighborhood = clone(
     options.parentNeighborhood
-    || originModel.resolution
-    || projected.resolution
+    || originModel.neighborhood
+    || projected.neighborhood
   );
   const parentBasis = options.parentResolutionBasis
     || originModel.neighborhoodBasis
     || projected.neighborhoodBasis
     || NEIGHBORHOOD_BASIS.RANGE;
-  projected.resolution = translateNeighborhood(parentNeighborhood, current, projected.range);
-  projected.neighborhoodBasis = isRangeNeighborhood(projected.resolution, projected.range)
+  projected.neighborhood = translateNeighborhood(parentNeighborhood, current, projected.range);
+  projected.neighborhoodBasis = isRangeNeighborhood(projected.neighborhood, projected.range)
     ? NEIGHBORHOOD_BASIS.RANGE
     : parentBasis;
 
@@ -1201,7 +1201,7 @@ export function projectPlayback(model, options = {}) {
   if (Math.abs(extent.end - current) <= EPSILON) endFrame = currentFrame;
   else if (Math.abs(extent.end - departure) <= EPSILON) endFrame ||= parentFrame;
 
-  projected.interval = createActiveSpan(
+  projected.activeSpan = createActiveSpan(
     intervalDeparture,
     current,
     options.operator || "playback",
@@ -1238,21 +1238,21 @@ export function completePlayback(session, options) {
   playbackCheckpoint.stepReach = normalizeStepReach(session.model.stepReach);
   playbackCheckpoint.guide = session.model.guide;
   return commit(session, options.label || "Playback", draft => {
-    draft.resolution = clone(projection.model.resolution);
+    draft.neighborhood = clone(projection.model.neighborhood);
     draft.neighborhoodBasis = projection.model.neighborhoodBasis;
-    draft.interval = clone(projection.model.interval);
+    draft.activeSpan = clone(projection.model.activeSpan);
     draft.lastOperator = projection.model.lastOperator;
     return {
       changed: true,
       place: projection.current,
-      interval: draft.interval
+      activeSpan: draft.activeSpan
     };
   }, { returnModel: playbackCheckpoint });
 }
 
 export function retainCurrentAsPin(session, label = "") {
   const text = String(label || "").trim();
-  const existing = findPinAt(session.model.guide, session.model.resolution.C);
+  const existing = findPinAt(session.model.guide, session.model.neighborhood.C);
   if (
     existing
     && existing.kind === PIN_KIND.EXPLICIT
@@ -1264,7 +1264,7 @@ export function retainCurrentAsPin(session, label = "") {
   }
 
   return commit(session, "Pin Current", draft => {
-    const value = ensurePin(draft.guide, draft.resolution.C, {
+    const value = ensurePin(draft.guide, draft.neighborhood.C, {
       label: text,
       kind: PIN_KIND.EXPLICIT,
       provenance: "pin"
@@ -1329,12 +1329,12 @@ export function saveExtentAsSection(session, extent, label, provenance = "extent
 }
 
 export function retainSpanAsSection(session, label) {
-  if (!session.model.interval) return unchanged(session, "no-interval");
+  if (!session.model.activeSpan) return unchanged(session, "no-active-span");
   return saveExtentAsSection(
     session,
-    session.model.interval,
+    session.model.activeSpan,
     label,
-    `interval:${session.model.interval.operator}`
+    `activeSpan:${session.model.activeSpan.operator}`
   );
 }
 
@@ -1403,7 +1403,7 @@ function rebaseFocusedGuideSection(model) {
   if (!section) {
     return { rangeChanged: false, moved: false, intervalCleared: false };
   }
-  const previous = model.resolution.C;
+  const previous = model.neighborhood.C;
   const current = clamp(previous, section.start, section.end);
   const rangeChanged = Math.abs(model.range.start - section.start) > EPSILON
     || Math.abs(model.range.end - section.end) > EPSILON;
@@ -1411,7 +1411,7 @@ function rebaseFocusedGuideSection(model) {
     return { rangeChanged: false, moved: false, intervalCleared: false };
   }
   model.range = { start: section.start, end: section.end };
-  model.resolution = createRoot(section.start, current, section.end);
+  model.neighborhood = createRoot(section.start, current, section.end);
   model.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
   return {
     rangeChanged: true,
@@ -1421,7 +1421,7 @@ function rebaseFocusedGuideSection(model) {
 }
 
 function rebaseActiveSpanBounds(model, movements) {
-  const interval = model.interval;
+  const interval = model.activeSpan;
   if (!interval) return { changed: false, cleared: false };
   const destinationFor = bound => movements.find(
     movement => Math.abs(bound - movement.source) <= EPSILON
@@ -1435,7 +1435,7 @@ function rebaseActiveSpanBounds(model, movements) {
   let start = Number.isFinite(movedStart) ? movedStart : interval.start;
   let end = Number.isFinite(movedEnd) ? movedEnd : interval.end;
   if (Math.abs(end - start) <= EPSILON) {
-    model.interval = null;
+    model.activeSpan = null;
     return { changed: true, cleared: true };
   }
   if (start > end) {
@@ -1596,7 +1596,7 @@ export function moveGuidePin(session, pinId, address, options = {}) {
       [{ source, destination: value.destination }]
     );
     const focus = rebaseFocusedGuideSection(draft);
-    if (draft.interval && interval.changed && !focus.intervalCleared) {
+    if (draft.activeSpan && interval.changed && !focus.intervalCleared) {
       syncIntervalEndpointFrames(draft);
     }
     return {
@@ -1606,7 +1606,7 @@ export function moveGuidePin(session, pinId, address, options = {}) {
       rangeChanged: focus.rangeChanged,
       intervalChanged: interval.changed,
       intervalCleared: interval.cleared || focus.intervalCleared,
-      ...(focus.moved ? { place: draft.resolution.C } : {})
+      ...(focus.moved ? { place: draft.neighborhood.C } : {})
     };
   };
   return options.amend
@@ -1634,7 +1634,7 @@ export function moveGuideSection(session, sectionId, requestedDelta, options = {
       { source: source.end, destination: value.section.end }
     ]);
     const focus = rebaseFocusedGuideSection(draft);
-    if (draft.interval && interval.changed && !focus.intervalCleared) {
+    if (draft.activeSpan && interval.changed && !focus.intervalCleared) {
       syncIntervalEndpointFrames(draft);
     }
     return {
@@ -1644,7 +1644,7 @@ export function moveGuideSection(session, sectionId, requestedDelta, options = {
       rangeChanged: focus.rangeChanged,
       intervalChanged: interval.changed,
       intervalCleared: interval.cleared || focus.intervalCleared,
-      ...(focus.moved ? { place: draft.resolution.C } : {})
+      ...(focus.moved ? { place: draft.neighborhood.C } : {})
     };
   };
   return options.amend
@@ -1670,7 +1670,7 @@ export function unlinkGuideSectionEndpoint(session, sectionId, role) {
       value,
       rangeChanged: focus.rangeChanged,
       intervalCleared: focus.intervalCleared,
-      ...(focus.moved ? { place: draft.resolution.C } : {})
+      ...(focus.moved ? { place: draft.neighborhood.C } : {})
     };
   }, { guideEdit: true });
 }
@@ -1689,7 +1689,7 @@ export function linkGuidePins(session, sourcePinId, targetPinId, options = {}) {
       value,
       rangeChanged: focus.rangeChanged,
       intervalCleared: focus.intervalCleared,
-      ...(focus.moved ? { place: draft.resolution.C } : {})
+      ...(focus.moved ? { place: draft.neighborhood.C } : {})
     };
   };
   return options.amend
@@ -1701,23 +1701,23 @@ export function deleteGuideSection(session, sectionId) {
   if (!resolveSection(session.model.guide, sectionId)) return unchanged(session, "missing-section");
   return commit(session, "Delete Section", draft => {
     const wasFocused = draft.focus?.sectionId === sectionId;
-    const departure = draft.resolution.C;
+    const departure = draft.neighborhood.C;
     if (wasFocused) {
       const returnRange = clone(draft.focus.returnRange) || { start: 0, end: draft.duration };
       const current = clamp(departure, returnRange.start, returnRange.end);
       draft.range = returnRange;
-      draft.resolution = createRoot(returnRange.start, current, returnRange.end);
+      draft.neighborhood = createRoot(returnRange.start, current, returnRange.end);
       draft.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
       draft.focus = null;
       clearIntervalOutsideRange(draft);
     }
     const changed = deleteSection(draft.guide, sectionId);
-    const moved = Math.abs(draft.resolution.C - departure) > EPSILON;
+    const moved = Math.abs(draft.neighborhood.C - departure) > EPSILON;
     return {
       changed,
       guideChanged: changed,
       ...(wasFocused ? { rangeChanged: true } : {}),
-      ...(moved ? { place: draft.resolution.C } : {})
+      ...(moved ? { place: draft.neighborhood.C } : {})
     };
   }, { guideEdit: true });
 }
@@ -1729,7 +1729,7 @@ export function undo(session) {
   return {
     changed: true,
     label: entry.label,
-    place: entry.model.resolution.C,
+    place: entry.model.neighborhood.C,
     guideChanged: entry.model.guide !== session.model.guide,
     session: {
       model: snapshotModel(entry.model),
@@ -1749,7 +1749,7 @@ export function redo(session) {
   return {
     changed: true,
     label: entry.label,
-    place: entry.model.resolution.C,
+    place: entry.model.neighborhood.C,
     guideChanged: entry.model.guide !== session.model.guide,
     session: {
       model: snapshotModel(entry.model),
@@ -1821,19 +1821,19 @@ export function previewRange(session, start, end, current) {
   if (!next) return unchanged(session, "invalid-range");
   const sameRange = Math.abs(next.start - session.model.range.start) <= EPSILON
     && Math.abs(next.end - session.model.range.end) <= EPSILON;
-  const sameCurrent = Math.abs(next.current - session.model.resolution.C) <= EPSILON;
+  const sameCurrent = Math.abs(next.current - session.model.neighborhood.C) <= EPSILON;
   if (sameRange && sameCurrent && !session.model.focus) return unchanged(session, "unchanged-range");
 
   return amend(session, draft => {
     draft.range = { start: next.start, end: next.end };
     draft.focus = null;
-    draft.resolution = createRoot(next.start, next.current, next.end);
+    draft.neighborhood = createRoot(next.start, next.current, next.end);
     draft.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
     draft.lastOperator = "range";
     const intervalCleared = clearIntervalOutsideRange(draft);
     return {
       changed: true,
-      place: draft.resolution.C,
+      place: draft.neighborhood.C,
       rangeChanged: true,
       intervalCleared
     };
@@ -1908,14 +1908,14 @@ export function ghostTraverse(session, destination, options = {}) {
     ) {
       return { changed: false, reason: "ghost-outside-range" };
     }
-    if (Math.abs(target - draft.resolution.C) <= EPSILON) {
+    if (Math.abs(target - draft.neighborhood.C) <= EPSILON) {
       return { changed: false, reason: "same-address" };
     }
     const metric = options.projection?.metric || projectionForModel(draft).metric;
     const backward = options.direction === "backward";
     const operator = backward ? "ghostBackward" : "ghostForward";
-    draft.resolution = translateNeighborhood(
-      clone(options.originResolution) || draft.resolution,
+    draft.neighborhood = translateNeighborhood(
+      clone(options.originResolution) || draft.neighborhood,
       target,
       draft.range,
       metric
@@ -1928,14 +1928,14 @@ export function ghostTraverse(session, destination, options = {}) {
     // the Interval is cleared rather than the movement refused. Settlement then
     // decides whether the ground crossed on the way is worth retaining.
     if (Math.abs(target - anchor) <= EPSILON) {
-      draft.interval = null;
+      draft.activeSpan = null;
       draft.lastOperator = operator;
       return {
         changed: true,
         departure: anchor,
         destination: target,
         current: target,
-        interval: null,
+        activeSpan: null,
         intervalCleared: true,
         place: target
       };
@@ -1959,7 +1959,7 @@ export function ghostTraverse(session, destination, options = {}) {
       draft.range,
       metric
     );
-    draft.interval = createActiveSpan(anchor, target, operator, "ghost", {
+    draft.activeSpan = createActiveSpan(anchor, target, operator, "ghost", {
       extent,
       activeEnd,
       startFrame,
@@ -1967,14 +1967,14 @@ export function ghostTraverse(session, destination, options = {}) {
       departureNeighborhood: activeEnd === "start" ? endFrame : startFrame,
       arrivalNeighborhood: currentFrame
     });
-    if (!draft.interval) return { changed: false, reason: "invalid-ghost-interval" };
+    if (!draft.activeSpan) return { changed: false, reason: "invalid-ghost-interval" };
     draft.lastOperator = operator;
     return {
       changed: true,
       departure: anchor,
       destination: target,
       current: target,
-      interval: clone(draft.interval),
+      activeSpan: clone(draft.activeSpan),
       place: target
     };
   };
@@ -1992,7 +1992,7 @@ export function ghostTraverse(session, destination, options = {}) {
 // geometry, because a Active Span describes an extent and not a route.
 export function settleGhostSequence(session, gesture) {
   if (!gesture?.changed) return unchanged(session, "no-ghost-sequence");
-  const arrival = Number(session?.model?.resolution?.C);
+  const arrival = Number(session?.model?.neighborhood?.C);
   const anchor = Number(gesture.anchor);
   if (!Number.isFinite(arrival) || !Number.isFinite(anchor)) {
     return unchanged(session, "invalid-ghost-sequence");
@@ -2042,7 +2042,7 @@ export function settleGhostSequence(session, gesture) {
       draft.range,
       metric
     );
-    draft.interval = createActiveSpan(intervalDeparture, arrival, operator, "ghost", {
+    draft.activeSpan = createActiveSpan(intervalDeparture, arrival, operator, "ghost", {
       extent,
       activeEnd,
       startFrame,
@@ -2050,16 +2050,16 @@ export function settleGhostSequence(session, gesture) {
       departureNeighborhood: activeEnd === "start" ? endFrame : startFrame,
       arrivalNeighborhood: currentFrame
     });
-    if (!draft.interval) return { changed: false, reason: "invalid-ghost-envelope" };
+    if (!draft.activeSpan) return { changed: false, reason: "invalid-ghost-envelope" };
     draft.lastOperator = operator;
-    return { changed: true, interval: clone(draft.interval) };
+    return { changed: true, activeSpan: clone(draft.activeSpan) };
   }, { projection: gesture.projection });
 }
 
 export function settleStepSequence(session, pending) {
   if (!pending?.started) return unchanged(session, "no-step-sequence");
 
-  const arrival = Number(session?.model?.resolution?.C);
+  const arrival = Number(session?.model?.neighborhood?.C);
   const departure = Number(pending.departure);
   if (!Number.isFinite(arrival) || !Number.isFinite(departure)) {
     return unchanged(session, "invalid-step-sequence");
@@ -2132,7 +2132,7 @@ export function settleStepSequence(session, pending) {
         draft.range,
         metric
       );
-      draft.interval = createActiveSpan(
+      draft.activeSpan = createActiveSpan(
         intervalDeparture,
         arrival,
         operator,
@@ -2146,13 +2146,13 @@ export function settleStepSequence(session, pending) {
           arrivalNeighborhood: currentFrame
         }
       );
-      if (!draft.interval) {
+      if (!draft.activeSpan) {
         return { changed: false, reason: "invalid-step-envelope" };
       }
       draft.lastOperator = operator;
       return {
         changed: true,
-        interval: draft.interval,
+        activeSpan: draft.activeSpan,
         retainedEnvelope: true
       };
     }, { projection: pending.projection });
@@ -2171,6 +2171,6 @@ export function settleStepSequence(session, pending) {
     retainedEnvelope,
     visitedMinimum,
     visitedMaximum,
-    interval: settledSession.model.interval
+    activeSpan: settledSession.model.activeSpan
   };
 }

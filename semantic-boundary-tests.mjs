@@ -38,17 +38,17 @@ session = step(session, "backward", 25).session;
 session = step(session, "forward", 25).session;
 session = step(session, "forward", 25).session;
 const reopenPresentation = getActionRanges(
-  session.model.resolution,
+  session.model.neighborhood,
   session.model.range,
-  session.model.interval,
-  session.model.resolution.C,
+  session.model.activeSpan,
+  session.model.neighborhood.C,
   session.model.stepReach
 ).reopen;
 finding(
   "reopen-kernel-view-disagreement",
   reopen(session).changed && reopenPresentation === null,
   {
-    resolution: session.model.resolution,
+    neighborhood: session.model.neighborhood,
     basis: session.model.neighborhoodBasis
   }
 );
@@ -61,17 +61,17 @@ for (let index = 0; index < 10; index += 1) {
   assert.equal(result.changed, true);
   refined = result.session;
 }
-const fineFrame = structuredClone(refined.model.resolution);
+const fineFrame = structuredClone(refined.model.neighborhood);
 refined = step(refined, "forward", 10).session;
 finding(
   "refinement-level-survives-coarse-step-deformation",
-  refined.model.resolution.level === fineFrame.level
-    && refined.model.resolution.R - refined.model.resolution.L
+  refined.model.neighborhood.level === fineFrame.level
+    && refined.model.neighborhood.R - refined.model.neighborhood.L
       > (fineFrame.R - fineFrame.L) * 100,
   {
     before: fineFrame,
-    after: refined.model.resolution,
-    targets: getTargets(refined.model.resolution)
+    after: refined.model.neighborhood,
+    targets: getTargets(refined.model.neighborhood)
   }
 );
 
@@ -119,7 +119,7 @@ const reachBeforeSettlement = structuredClone(playback.model.stepReach);
 playback = completePlayback(playback, {
   current: 30,
   departure: 20,
-  parentNeighborhood: playbackReturn.resolution,
+  parentNeighborhood: playbackReturn.neighborhood,
   parentResolutionBasis: playbackReturn.neighborhoodBasis,
   returnModel: playbackReturn
 }).session;

@@ -316,7 +316,7 @@ function build() {
     hiddenStart.id
   );
   assert.equal(moved.changed, true);
-  assert.equal(moved.session.model.resolution.C, 10,
+  assert.equal(moved.session.model.neighborhood.C, 10,
     "Guide navigation reaches the canonical hidden Pin Address.");
   assert.equal(sectionIsVisible(moved.session.model.guide, hidden), false,
     "Navigating to it neither reveals nor spatially selects its hidden Section.");

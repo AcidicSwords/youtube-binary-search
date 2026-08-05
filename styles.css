@@ -578,7 +578,7 @@ kbd {
 .active-span-fill[data-live="true"] {
   transition: left 90ms linear, width 90ms linear;
 }
-.resolution-marker[data-live="true"] {
+.neighborhood-marker[data-live="true"] {
   transition: left 90ms linear;
   background: rgb(var(--resolution-rgb) / 0.6);
 }
@@ -668,7 +668,7 @@ kbd {
   box-shadow: 0 0 0 2px rgba(8, 11, 16, 0.7);
 }
 
-.resolution-marker,
+.neighborhood-marker,
 .target-marker,
 .current-marker,
 .current-departure-marker,

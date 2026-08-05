@@ -116,7 +116,7 @@ function weightedGuide(...definitions) {
   const session = createSession({ duration: 100, current: 20, guide });
   const moved = goToGuidePin(session, interior.id);
   assert.equal(moved.changed, true);
-  assert.equal(moved.session.model.resolution.C, 37);
+  assert.equal(moved.session.model.neighborhood.C, 37);
   assert.equal(
     resolveSection(moved.session.model.guide, sections[0].id).weight,
     0.25
@@ -132,17 +132,17 @@ function weightedGuide(...definitions) {
   session = step(session, "forward", 1).session;
   assert.deepEqual(
     {
-      departure: session.model.interval.departure,
-      arrival: session.model.interval.arrival,
-      start: session.model.interval.start,
-      end: session.model.interval.end
+      departure: session.model.activeSpan.departure,
+      arrival: session.model.activeSpan.arrival,
+      start: session.model.activeSpan.start,
+      end: session.model.activeSpan.end
     },
     { departure: 29, arrival: 51, start: 29, end: 51 }
   );
   session = switchActiveEnd(session).session;
-  assert.equal(session.model.resolution.C, 29);
+  assert.equal(session.model.neighborhood.C, 29);
   session = switchActiveEnd(session).session;
-  assert.equal(session.model.resolution.C, 51);
+  assert.equal(session.model.neighborhood.C, 51);
 }
 
 // Adaptive Reach follows weighted Range width; fixed Reach is already expressed
@@ -167,7 +167,7 @@ function weightedGuide(...definitions) {
 {
   let session = createSession({ duration: 100, current: 20 });
   session = goTo(session, 40, { label: "Test Go" }).session;
-  const before = { ...session.model.interval };
+  const before = { ...session.model.activeSpan };
   const tagged = retainSpanAsSection(session, "");
   assert.equal(tagged.changed, true);
   assert.equal(tagged.value.created, true);
@@ -183,8 +183,8 @@ function weightedGuide(...definitions) {
   assert.equal(weighted.value.weight, 0.75);
   assert.deepEqual(
     {
-      start: weighted.session.model.interval.start,
-      end: weighted.session.model.interval.end
+      start: weighted.session.model.activeSpan.start,
+      end: weighted.session.model.activeSpan.end
     },
     { start: before.start, end: before.end }
   );

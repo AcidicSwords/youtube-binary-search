@@ -32,52 +32,52 @@ function random() {
 
 function assertInvariant(session) {
   const { model, history } = session;
-  const { duration, range, resolution, interval, focus, guide, stepReach } = model;
+  const { duration, range, neighborhood, activeSpan, focus, guide, stepReach } = model;
   assert.ok(range.start >= -EPSILON && range.end <= duration + EPSILON);
-  assert.ok(range.start <= resolution.L + EPSILON);
-  assert.ok(resolution.L <= resolution.C && resolution.C <= resolution.R);
-  assert.ok(resolution.R <= range.end + EPSILON);
-  assert.ok(Number.isInteger(resolution.level) && resolution.level >= 0);
+  assert.ok(range.start <= neighborhood.L + EPSILON);
+  assert.ok(neighborhood.L <= neighborhood.C && neighborhood.C <= neighborhood.R);
+  assert.ok(neighborhood.R <= range.end + EPSILON);
+  assert.ok(Number.isInteger(neighborhood.level) && neighborhood.level >= 0);
   assert.ok(["range", "movement"].includes(model.neighborhoodBasis));
   assert.ok(stepReach.backward >= 0.25 && stepReach.backward <= 300);
   assert.ok(stepReach.forward >= 0.25 && stepReach.forward <= 300);
   assert.ok(history.length <= 100);
   assert.equal(validateGuide(guide, duration), true);
 
-  const targets = getTargets(resolution);
-  assert.equal(targets.backward === null, resolution.C - resolution.L <= EPSILON * 2);
-  assert.equal(targets.forward === null, resolution.R - resolution.C <= EPSILON * 2);
+  const targets = getTargets(neighborhood);
+  assert.equal(targets.backward === null, neighborhood.C - neighborhood.L <= EPSILON * 2);
+  assert.equal(targets.forward === null, neighborhood.R - neighborhood.C <= EPSILON * 2);
 
-  if (interval) {
-    assert.ok(interval.end - interval.start > EPSILON);
-    assert.ok(interval.start >= range.start - EPSILON);
-    assert.ok(interval.end <= range.end + EPSILON);
+  if (activeSpan) {
+    assert.ok(activeSpan.end - activeSpan.start > EPSILON);
+    assert.ok(activeSpan.start >= range.start - EPSILON);
+    assert.ok(activeSpan.end <= range.end + EPSILON);
     assert.ok(
-      interval.start >= resolution.L - EPSILON
-      && interval.end <= resolution.R + EPSILON,
-      `Active Interval must remain inside Resolution: ${JSON.stringify({ interval, resolution })}`
+      activeSpan.start >= neighborhood.L - EPSILON
+      && activeSpan.end <= neighborhood.R + EPSILON,
+      `Active Interval must remain inside Resolution: ${JSON.stringify({ activeSpan, neighborhood })}`
     );
-    assert.ok(Math.abs(interval.arrival - resolution.C) <= EPSILON);
-    assert.ok(interval.arrival >= interval.start - EPSILON);
-    assert.ok(interval.arrival <= interval.end + EPSILON);
+    assert.ok(Math.abs(activeSpan.arrival - neighborhood.C) <= EPSILON);
+    assert.ok(activeSpan.arrival >= activeSpan.start - EPSILON);
+    assert.ok(activeSpan.arrival <= activeSpan.end + EPSILON);
     assert.ok(
-      Math.abs(interval.departure - interval.start) <= EPSILON
-      || Math.abs(interval.departure - interval.end) <= EPSILON
+      Math.abs(activeSpan.departure - activeSpan.start) <= EPSILON
+      || Math.abs(activeSpan.departure - activeSpan.end) <= EPSILON
     );
     for (const [key, address] of [
-      ["departureNeighborhood", interval.departure],
-      ["arrivalNeighborhood", interval.arrival]
+      ["departureNeighborhood", activeSpan.departure],
+      ["arrivalNeighborhood", activeSpan.arrival]
     ]) {
-      const frame = interval[key];
-      assert.ok(frame?.resolution);
-      assert.ok(frame.resolution.L >= range.start - EPSILON);
-      assert.ok(frame.resolution.R <= range.end + EPSILON);
-      assert.ok(Math.abs(frame.resolution.C - address) <= EPSILON);
-      assert.ok(frame.resolution.L <= interval.start + EPSILON);
-      assert.ok(frame.resolution.R >= interval.end - EPSILON);
+      const frame = activeSpan[key];
+      assert.ok(frame?.neighborhood);
+      assert.ok(frame.neighborhood.L >= range.start - EPSILON);
+      assert.ok(frame.neighborhood.R <= range.end + EPSILON);
+      assert.ok(Math.abs(frame.neighborhood.C - address) <= EPSILON);
+      assert.ok(frame.neighborhood.L <= activeSpan.start + EPSILON);
+      assert.ok(frame.neighborhood.R >= activeSpan.end - EPSILON);
     }
-    assert.deepEqual(interval.arrivalNeighborhood.resolution, resolution);
-    assert.equal(interval.arrivalNeighborhood.neighborhoodBasis, model.neighborhoodBasis);
+    assert.deepEqual(activeSpan.arrivalNeighborhood.neighborhood, neighborhood);
+    assert.equal(activeSpan.arrivalNeighborhood.neighborhoodBasis, model.neighborhoodBasis);
   }
 
   if (focus) {
@@ -95,8 +95,8 @@ function assertInvariant(session) {
 }
 
 function refineExpectation(session, direction) {
-  const current = session.model.resolution.C;
-  const target = getTargets(session.model.resolution)[direction];
+  const current = session.model.neighborhood.C;
+  const target = getTargets(session.model.neighborhood)[direction];
   if (target === null) return null;
   return {
     relation: "draw",
@@ -134,7 +134,7 @@ for (let run = 0; run < RUNS; run += 1) {
       let start = random() * 600;
       let end = random() * 600;
       if (start > end) [start, end] = [end, start];
-      result = setRange(session, start, end, session.model.resolution.C);
+      result = setRange(session, start, end, session.model.neighborhood.C);
     } else if (operation === 9) {
       result = setStepReach(session, {
         backward: 0.25 + random() * 299.75,
@@ -170,7 +170,7 @@ for (let run = 0; run < RUNS; run += 1) {
     }
     if (expectedRefine && result.changed) {
       assert.equal(result.refineRelation, expectedRefine.relation);
-      const resultingInterval = result.session.model.interval;
+      const resultingInterval = result.session.model.activeSpan;
       if (Math.abs(expectedRefine.departure - expectedRefine.target) <= EPSILON) {
         assert.equal(resultingInterval, null, "Endpoint coincidence must collapse the Active Span.");
       } else {
@@ -201,13 +201,13 @@ for (let trial = 0; trial < TARGET_TRIALS; trial += 1) {
   const target = random() * 600;
   let locator = createSession({ duration: 600, current: random() * 600 });
   let count = 0;
-  while (Math.abs(locator.model.resolution.C - target) > EPSILON) {
-    const direction = target < locator.model.resolution.C ? "backward" : "forward";
+  while (Math.abs(locator.model.neighborhood.C - target) > EPSILON) {
+    const direction = target < locator.model.neighborhood.C ? "backward" : "forward";
     const result = localRefine(locator, direction);
     assert.equal(result.changed, true);
     locator = result.session;
-    assert.ok(target >= locator.model.resolution.L - EPSILON);
-    assert.ok(target <= locator.model.resolution.R + EPSILON);
+    assert.ok(target >= locator.model.neighborhood.L - EPSILON);
+    assert.ok(target <= locator.model.neighborhood.R + EPSILON);
     count += 1;
     assert.ok(count < 32);
   }
@@ -231,10 +231,10 @@ for (let trial = 0; trial < INTERVAL_TRIALS; trial += 1) {
   intervalSession = switchActiveEnd(intervalSession).session;
   const direction = B < P ? "backward" : "forward";
   intervalSession = step(intervalSession, direction, Math.abs(B - P)).session;
-  assert.ok(Math.abs(intervalSession.model.interval.departure - A) <= EPSILON);
-  assert.ok(Math.abs(intervalSession.model.interval.arrival - B) <= EPSILON);
-  assert.ok(Math.abs(intervalSession.model.interval.start - Math.min(A, B)) <= EPSILON);
-  assert.ok(Math.abs(intervalSession.model.interval.end - Math.max(A, B)) <= EPSILON);
+  assert.ok(Math.abs(intervalSession.model.activeSpan.departure - A) <= EPSILON);
+  assert.ok(Math.abs(intervalSession.model.activeSpan.arrival - B) <= EPSILON);
+  assert.ok(Math.abs(intervalSession.model.activeSpan.start - Math.min(A, B)) <= EPSILON);
+  assert.ok(Math.abs(intervalSession.model.activeSpan.end - Math.max(A, B)) <= EPSILON);
 }
 
 console.log(JSON.stringify({

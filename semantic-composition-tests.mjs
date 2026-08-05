@@ -21,15 +21,15 @@ import {
 } from "./guide.js";
 
 function assertLoopContained(session) {
-  const { interval, range, resolution } = session.model;
-  assert.ok(interval);
-  assert.ok(interval.start >= resolution.L - EPSILON);
-  assert.ok(interval.end <= resolution.R + EPSILON);
-  assert.ok(resolution.L >= range.start - EPSILON);
-  assert.ok(resolution.R <= range.end + EPSILON);
-  for (const frame of [interval.departureNeighborhood, interval.arrivalNeighborhood]) {
-    assert.ok(frame.resolution.L <= interval.start + EPSILON);
-    assert.ok(frame.resolution.R >= interval.end - EPSILON);
+  const { activeSpan, range, neighborhood } = session.model;
+  assert.ok(activeSpan);
+  assert.ok(activeSpan.start >= neighborhood.L - EPSILON);
+  assert.ok(activeSpan.end <= neighborhood.R + EPSILON);
+  assert.ok(neighborhood.L >= range.start - EPSILON);
+  assert.ok(neighborhood.R <= range.end + EPSILON);
+  for (const frame of [activeSpan.departureNeighborhood, activeSpan.arrivalNeighborhood]) {
+    assert.ok(frame.neighborhood.L <= activeSpan.start + EPSILON);
+    assert.ok(frame.neighborhood.R >= activeSpan.end - EPSILON);
   }
 }
 
@@ -41,10 +41,10 @@ const replaced = localRefine(composed, "forward");
 assert.equal(replaced.refineRelation, "draw");
 assert.deepEqual(
   {
-    start: replaced.session.model.interval.start,
-    end: replaced.session.model.interval.end,
-    departure: replaced.session.model.interval.departure,
-    arrival: replaced.session.model.interval.arrival
+    start: replaced.session.model.activeSpan.start,
+    end: replaced.session.model.activeSpan.end,
+    departure: replaced.session.model.activeSpan.departure,
+    arrival: replaced.session.model.activeSpan.arrival
   },
   { start: 70, end: 85, departure: 70, arrival: 85 }
 );
@@ -53,10 +53,10 @@ const replacedBackward = localRefine(composed, "backward");
 assert.equal(replacedBackward.refineRelation, "draw");
 assert.deepEqual(
   {
-    start: replacedBackward.session.model.interval.start,
-    end: replacedBackward.session.model.interval.end,
-    departure: replacedBackward.session.model.interval.departure,
-    arrival: replacedBackward.session.model.interval.arrival
+    start: replacedBackward.session.model.activeSpan.start,
+    end: replacedBackward.session.model.activeSpan.end,
+    departure: replacedBackward.session.model.activeSpan.departure,
+    arrival: replacedBackward.session.model.activeSpan.arrival
   },
   { start: 40, end: 70, departure: 70, arrival: 40 }
 );
@@ -65,10 +65,10 @@ const replacedPast = localRefine(switchActiveEnd(composed).session, "forward");
 assert.equal(replacedPast.refineRelation, "draw");
 assert.deepEqual(
   {
-    start: replacedPast.session.model.interval.start,
-    end: replacedPast.session.model.interval.end,
-    departure: replacedPast.session.model.interval.departure,
-    arrival: replacedPast.session.model.interval.arrival
+    start: replacedPast.session.model.activeSpan.start,
+    end: replacedPast.session.model.activeSpan.end,
+    departure: replacedPast.session.model.activeSpan.departure,
+    arrival: replacedPast.session.model.activeSpan.arrival
   },
   { start: 50, end: 75, departure: 50, arrival: 75 }
 );
@@ -77,10 +77,10 @@ assertLoopContained(replacedPast.session);
 // A direct Go remains a replacement boundary rather than silently inheriting
 // the matrix anchor.
 composed = replacedPast.session;
-const beforeDirect = composed.model.resolution.C;
+const beforeDirect = composed.model.neighborhood.C;
 composed = goTo(composed, 90, { operator: "timeline" }).session;
-assert.ok(Math.abs(composed.model.interval.departure - beforeDirect) <= EPSILON);
-assert.ok(Math.abs(composed.model.interval.arrival - 90) <= EPSILON);
+assert.ok(Math.abs(composed.model.activeSpan.departure - beforeDirect) <= EPSILON);
+assert.ok(Math.abs(composed.model.activeSpan.arrival - 90) <= EPSILON);
 
 // Section endpoints are Pin operands. Previous/Next Pin is linear for
 // Resolution, but each Pin hop records its own traversal Interval rather than
@@ -93,19 +93,19 @@ assert.equal(orderedPins(guide).length, 4);
 let pinComposition = createSession({ duration: 100, current: 10, guide });
 pinComposition = goTo(pinComposition, 20, { operator: "targetA" }).session;
 pinComposition = switchActiveEnd(pinComposition).session;
-for (let pin = nextPin(guide, pinComposition.model.resolution.C, pinComposition.model.range);
+for (let pin = nextPin(guide, pinComposition.model.neighborhood.C, pinComposition.model.range);
   pin;
-  pin = nextPin(guide, pinComposition.model.resolution.C, pinComposition.model.range)) {
+  pin = nextPin(guide, pinComposition.model.neighborhood.C, pinComposition.model.range)) {
   pinComposition = goTo(pinComposition, pin.t, {
     operator: "nextPin",
     mode: "linear"
   }).session;
   if (pin.t >= 80 - EPSILON) break;
 }
-assert.equal(pinComposition.model.interval.departure, 60);
-assert.equal(pinComposition.model.interval.arrival, 80);
+assert.equal(pinComposition.model.activeSpan.departure, 60);
+assert.equal(pinComposition.model.activeSpan.arrival, 80);
 assert.deepEqual(
-  { start: pinComposition.model.interval.start, end: pinComposition.model.interval.end },
+  { start: pinComposition.model.activeSpan.start, end: pinComposition.model.activeSpan.end },
   { start: 60, end: 80 }
 );
 assertLoopContained(pinComposition);
@@ -116,9 +116,9 @@ assertLoopContained(pinComposition);
 let linear = createSession({ duration: 200, current: 50 });
 linear = goTo(linear, 70, { operator: "timeline" }).session; // 10—70—110
 linear = step(linear, "forward", 5).session;
-assert.deepEqual(linear.model.resolution, { L: 10, C: 75, R: 110, level: 0 });
+assert.deepEqual(linear.model.neighborhood, { L: 10, C: 75, R: 110, level: 0 });
 assert.deepEqual(
-  { start: linear.model.interval.start, end: linear.model.interval.end },
+  { start: linear.model.activeSpan.start, end: linear.model.activeSpan.end },
   { start: 50, end: 75 }
 );
 assertLoopContained(linear);
@@ -127,13 +127,13 @@ const playbackOrigin = snapshotModel(linear.model);
 linear = completePlayback(linear, {
   departure: 75,
   current: 85,
-  parentNeighborhood: playbackOrigin.resolution,
+  parentNeighborhood: playbackOrigin.neighborhood,
   parentResolutionBasis: playbackOrigin.neighborhoodBasis,
   returnModel: playbackOrigin
 }).session;
-assert.deepEqual(linear.model.resolution, { L: 10, C: 85, R: 120, level: 0 });
+assert.deepEqual(linear.model.neighborhood, { L: 10, C: 85, R: 120, level: 0 });
 assert.deepEqual(
-  { start: linear.model.interval.start, end: linear.model.interval.end },
+  { start: linear.model.activeSpan.start, end: linear.model.activeSpan.end },
   { start: 50, end: 85 }
 );
 assertLoopContained(linear);
@@ -142,13 +142,13 @@ linear = goTo(linear, 100, {
   operator: "nextPin",
   mode: "linear"
 }).session;
-assert.deepEqual(linear.model.resolution, { L: 10, C: 100, R: 135, level: 0 });
+assert.deepEqual(linear.model.neighborhood, { L: 10, C: 100, R: 135, level: 0 });
 assert.deepEqual(
   {
-    start: linear.model.interval.start,
-    end: linear.model.interval.end,
-    departure: linear.model.interval.departure,
-    arrival: linear.model.interval.arrival
+    start: linear.model.activeSpan.start,
+    end: linear.model.activeSpan.end,
+    departure: linear.model.activeSpan.departure,
+    arrival: linear.model.activeSpan.arrival
   },
   { start: 85, end: 100, departure: 85, arrival: 100 }
 );

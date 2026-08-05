@@ -46,8 +46,8 @@ const weighted = sessionAtWeight(2);
 function addresses(model) {
   return {
     range: [model.range.start, model.range.end],
-    current: model.resolution.C,
-    interval: model.interval && [model.interval.start, model.interval.end],
+    current: model.neighborhood.C,
+    activeSpan: model.activeSpan && [model.activeSpan.start, model.activeSpan.end],
     pins: model.guide.pins.map(pin => pin.t).sort((a, b) => a - b),
     sections: model.guide.sections
       .map(section => [section.startPin, section.endPin])
@@ -80,21 +80,21 @@ function addresses(model) {
 // never do is move an already-established Resolution.
 {
   assert.notDeepEqual(
-    [neutral.session.model.resolution.L, neutral.session.model.resolution.R],
-    [weighted.session.model.resolution.L, weighted.session.model.resolution.R],
+    [neutral.session.model.neighborhood.L, neutral.session.model.neighborhood.R],
+    [weighted.session.model.neighborhood.L, weighted.session.model.neighborhood.R],
     "A spatially seeded neighbourhood follows the metric it was seeded in."
   );
 
   const before = {
     ...addresses(neutral.session.model),
-    resolution: [neutral.session.model.resolution.L, neutral.session.model.resolution.R]
+    neighborhood: [neutral.session.model.neighborhood.L, neutral.session.model.neighborhood.R]
   };
   const edited = setGuideSectionWeight(neutral.session, neutral.sectionId, 0.25);
   assert.equal(edited.changed, true);
   assert.deepEqual(
     {
       ...addresses(edited.session.model),
-      resolution: [edited.session.model.resolution.L, edited.session.model.resolution.R]
+      neighborhood: [edited.session.model.neighborhood.L, edited.session.model.neighborhood.R]
     },
     before,
     "A Weight edit changes only the metric — not even a derived Resolution bound."
@@ -134,14 +134,14 @@ function addresses(model) {
 {
   // Step is a distance in Timeline Space, so the same Reach covers less source
   // time inside an expanded Section.
-  const plainStep = step(neutral.session, "forward", 10).session.model.resolution.C;
-  const scaledStep = step(weighted.session, "forward", 10).session.model.resolution.C;
+  const plainStep = step(neutral.session, "forward", 10).session.model.neighborhood.C;
+  const scaledStep = step(weighted.session, "forward", 10).session.model.neighborhood.C;
   assert.equal(plainStep, 60, "At 1x, ten timeline units are ten source seconds.");
   assert.equal(scaledStep, 55, "At 2x, the same ten units are five source seconds.");
 
   // Refine chooses a spatial midpoint, so its destination follows the metric.
-  const plainRefine = refine(neutral.session, "forward").session.model.resolution.C;
-  const scaledRefine = refine(weighted.session, "forward").session.model.resolution.C;
+  const plainRefine = refine(neutral.session, "forward").session.model.neighborhood.C;
+  const scaledRefine = refine(weighted.session, "forward").session.model.neighborhood.C;
   assert.notEqual(plainRefine, scaledRefine,
     "A spatial midpoint must move when the metric changes.");
 
@@ -184,7 +184,7 @@ function addresses(model) {
   const quantum = 0.5;
   const displacement = model => {
     const projection = projectionForModel(model);
-    const current = model.resolution.C;
+    const current = model.neighborhood.C;
     const distance = Math.abs(
       projection.sourceToTimeline(current + quantum) - projection.sourceToTimeline(current)
     );
@@ -229,7 +229,7 @@ function addresses(model) {
     for (const configured of [1 / 24, 0.25, 0.5, 1]) {
       const session = nestedAt(outer, inner);
       const projection = projectionForModel(session.model);
-      const current = session.model.resolution.C;
+      const current = session.model.neighborhood.C;
       const distance = Math.abs(
         projection.sourceToTimeline(current + configured)
         - projection.sourceToTimeline(current)
@@ -239,7 +239,7 @@ function addresses(model) {
       assert.equal(result.changed, true,
         `A ${configured}s Nudge must move Current at composed Weight ${composed}.`);
       assert.ok(
-        Math.abs(result.session.model.resolution.C - (current + configured)) < 1e-6,
+        Math.abs(result.session.model.neighborhood.C - (current + configured)) < 1e-6,
         `and must land exactly one quantum later at composed Weight ${composed}.`
       );
     }

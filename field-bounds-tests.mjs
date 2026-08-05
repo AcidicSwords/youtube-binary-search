@@ -237,7 +237,7 @@ function makeControllerHarness() {
   assert.doesNotMatch(fieldSource, /transportKind === "loop"/);
   assert.match(fieldSource, /function resetAtCurrent\(\)[\s\S]*invalidate\(\{ pause: false \}\)/);
   assert.match(app, /resetField[\s\S]*stepField\?\.resetAtCurrent/);
-  assert.doesNotMatch(fieldSource, /snapshot\.resolution/, "Field bounds must not depend on Resolution.");
+  assert.doesNotMatch(fieldSource, /snapshot\.neighborhood/, "Field bounds must not depend on Resolution.");
 }
 
 console.log("Field bounds tests passed: Range containment, Context suspension, native playback, Hold, and side Step.");

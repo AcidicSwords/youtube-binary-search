@@ -1791,7 +1791,7 @@ export function createStepFieldController({
       step: "Step",
       refine: "Refine",
       reopen: "Reopen",
-      resolution: "Resolution",
+      neighborhood: "Resolution",
       go: "Go",
       context: "Context",
       current: "Current",

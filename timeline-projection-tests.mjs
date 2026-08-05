@@ -241,11 +241,11 @@ session = setGuideSectionWeight(
   0.5
 ).session;
 session = step(session, "forward", 2).session;
-assert.equal(session.model.resolution.C, 32);
+assert.equal(session.model.neighborhood.C, 32);
 
 const exactPin = ensurePin(session.model.guide, 40, { label: "Exact" }).pin;
 const navigated = goToGuidePin(session, exactPin.id);
-assert.equal(navigated.session.model.resolution.C, 40);
+assert.equal(navigated.session.model.neighborhood.C, 40);
 assert.equal(
   resolveSection(navigated.session.model.guide, saved.value.section.id).weight,
   0.5,
@@ -318,7 +318,7 @@ assert.equal("collapsed" in migrated.sections[1], false);
   createSectionFromTimes(nested, 102.56, 126.8, { weight: 4 });
   createSectionFromTimes(nested, 103.37, 123.23, { weight: 4 });
   const projection = projectionForModel({
-    duration, guide: nested, range, resolution: { C: 0 }, stepReach: null
+    duration, guide: nested, range, neighborhood: { C: 0 }, stepReach: null
   });
 
   let worstIdentity = 0;

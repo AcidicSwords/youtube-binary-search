@@ -196,12 +196,12 @@ const clone = value => structuredClone(value);
   const projection = projectionForModel(session.model);
   const target = 40;
   const distance = projection.timelineDistance(
-    session.model.resolution.C,
+    session.model.neighborhood.C,
     target
   );
   const moved = step(session, "forward", distance);
   assert.equal(moved.changed, true);
-  assert.ok(Math.abs(moved.session.model.resolution.C - target) < 1e-6);
+  assert.ok(Math.abs(moved.session.model.neighborhood.C - target) < 1e-6);
 }
 
 // Composition-root guards ensure alternate routes retain the same owner.

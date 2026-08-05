@@ -135,8 +135,8 @@ function performStepSequence(directions, reach = 10) {
     const moved = step(session, direction, reach, {
       departure: pending.departure,
       intervalDeparture: pending.intervalDeparture,
-      originInterval: originModel.interval,
-      originResolution: originModel.resolution,
+      originInterval: originModel.activeSpan,
+      originResolution: originModel.neighborhood,
       originResolutionBasis: originModel.neighborhoodBasis,
       amend: pending.started
     });
@@ -146,11 +146,11 @@ function performStepSequence(directions, reach = 10) {
     pending.lastDirection = direction;
     pending.visitedMinimum = Math.min(
       pending.visitedMinimum,
-      session.model.resolution.C
+      session.model.neighborhood.C
     );
     pending.visitedMaximum = Math.max(
       pending.visitedMaximum,
-      session.model.resolution.C
+      session.model.neighborhood.C
     );
   }
   return { session, pending };
@@ -161,7 +161,7 @@ function performStepSequence(directions, reach = 10) {
 // Active Span, never a durable Path.
 {
   const { session, pending } = performStepSequence(["forward", "backward"]);
-  assert.equal(session.model.resolution.C, pending.departure);
+  assert.equal(session.model.neighborhood.C, pending.departure);
   assert.equal(session.history.length, 1);
   const settled = settleStepSequence(session, pending);
   assert.equal(settled.direction, null);
@@ -169,11 +169,11 @@ function performStepSequence(directions, reach = 10) {
   assert.equal(settled.retainedEnvelope, true);
   assert.deepEqual(
     {
-      start: settled.interval.start,
-      end: settled.interval.end,
-      departure: settled.interval.departure,
-      arrival: settled.interval.arrival,
-      activeEnd: settled.interval.activeEnd
+      start: settled.activeSpan.start,
+      end: settled.activeSpan.end,
+      departure: settled.activeSpan.departure,
+      arrival: settled.activeSpan.arrival,
+      activeEnd: settled.activeSpan.activeEnd
     },
     { start: 50, end: 60, departure: 60, arrival: 50, activeEnd: "start" }
   );
@@ -185,12 +185,12 @@ function performStepSequence(directions, reach = 10) {
 
   const switched = switchActiveEnd(settled.session);
   assert.equal(switched.changed, true);
-  assert.equal(switched.session.model.resolution.C, 60,
+  assert.equal(switched.session.model.neighborhood.C, 60,
     "The retained endpoint frame supports deterministic Switch End.");
   const restored = undo(settled.session);
   assert.equal(restored.changed, true);
-  assert.equal(restored.session.model.resolution.C, 50);
-  assert.equal(restored.session.model.interval, null);
+  assert.equal(restored.session.model.neighborhood.C, 50);
+  assert.equal(restored.session.model.activeSpan, null);
 }
 
 // A reversal may visit both sides of its departure. The sparse envelope keeps
@@ -206,11 +206,11 @@ function performStepSequence(directions, reach = 10) {
   assert.equal(settled.label, "Step Reversal");
   assert.deepEqual(
     {
-      start: settled.interval.start,
-      end: settled.interval.end,
-      departure: settled.interval.departure,
-      arrival: settled.interval.arrival,
-      activeEnd: settled.interval.activeEnd
+      start: settled.activeSpan.start,
+      end: settled.activeSpan.end,
+      departure: settled.activeSpan.departure,
+      arrival: settled.activeSpan.arrival,
+      activeEnd: settled.activeSpan.activeEnd
     },
     { start: 40, end: 60, departure: 40, arrival: 50, activeEnd: "end" }
   );
@@ -221,12 +221,12 @@ function performStepSequence(directions, reach = 10) {
 // transaction and does not synthesize an envelope for a non-reversal.
 {
   const { session, pending } = performStepSequence(["forward", "forward"]);
-  const intervalBefore = session.model.interval;
+  const intervalBefore = session.model.activeSpan;
   const settled = settleStepSequence(session, pending);
   assert.equal(settled.direction, "forward");
   assert.equal(settled.label, "Step Forward");
   assert.equal(settled.retainedEnvelope, false);
-  assert.equal(settled.session.model.interval, intervalBefore);
+  assert.equal(settled.session.model.activeSpan, intervalBefore);
   assert.equal(settled.session.history.length, 1);
 }
 

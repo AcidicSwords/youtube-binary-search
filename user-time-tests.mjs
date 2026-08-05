@@ -26,7 +26,7 @@ const neutralProjection = projectionForModel({
   duration: DURATION,
   guide: createGuide("neutral"),
   range: RANGE,
-  resolution: { C: 0 },
+  neighborhood: { C: 0 },
   stepReach: null
 });
 const reach = seconds => ({ backward: seconds, forward: seconds });
@@ -202,7 +202,7 @@ function walk(userTime, ghostRead, direction, limit = 40) {
     duration: DURATION,
     guide,
     range: RANGE,
-    resolution: { C: 0 },
+    neighborhood: { C: 0 },
     stepReach: null
   });
   let userTime = createUserTime(20);

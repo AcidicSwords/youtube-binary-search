@@ -55,17 +55,17 @@ import { packTimelineSectionLanes } from "./view.js";
   });
   const selectedResult = goToGuideSection(selectionSession, selected.id);
   assert.equal(selectedResult.changed, true);
-  assert.deepEqual(selectedResult.session.model.resolution, {
+  assert.deepEqual(selectedResult.session.model.neighborhood, {
     L: 40,
     C: 60,
     R: 80,
     level: 0
   });
-  assert.equal(selectedResult.session.model.interval.start, 40);
-  assert.equal(selectedResult.session.model.interval.end, 80);
-  assert.equal(selectedResult.session.model.interval.arrival, 60);
-  assert.equal(selectedResult.session.model.interval.departure, 40);
-  assert.equal(selectedResult.session.model.interval.operator, "section");
+  assert.equal(selectedResult.session.model.activeSpan.start, 40);
+  assert.equal(selectedResult.session.model.activeSpan.end, 80);
+  assert.equal(selectedResult.session.model.activeSpan.arrival, 60);
+  assert.equal(selectedResult.session.model.activeSpan.departure, 40);
+  assert.equal(selectedResult.session.model.activeSpan.operator, "section");
   assert.equal(
     goToGuideSection(selectedResult.session, selected.id).changed,
     false,
@@ -139,25 +139,25 @@ assert.deepEqual(
 let retained = createSession({ duration: 100, current: 50 });
 retained = refine(retained, "backward").session;
 retained = refine(retained, "backward").session;
-assert.deepEqual(retained.model.resolution, { L: 0, C: 12.5, R: 50, level: 2 });
+assert.deepEqual(retained.model.neighborhood, { L: 0, C: 12.5, R: 50, level: 2 });
 assert.deepEqual(
-  { start: retained.model.interval.start, end: retained.model.interval.end },
+  { start: retained.model.activeSpan.start, end: retained.model.activeSpan.end },
   { start: 12.5, end: 50 }
 );
 
 let local = createSession({ duration: 100, current: 50 });
 local = localRefine(local, "backward").session;
 local = localRefine(local, "backward").session;
-assert.deepEqual(local.model.resolution, { L: 0, C: 12.5, R: 25, level: 2 });
+assert.deepEqual(local.model.neighborhood, { L: 0, C: 12.5, R: 25, level: 2 });
 assert.deepEqual(
-  { start: local.model.interval.start, end: local.model.interval.end },
+  { start: local.model.activeSpan.start, end: local.model.activeSpan.end },
   { start: 12.5, end: 25 }
 );
 
 const mixed = localRefine(retained, "forward").session;
-assert.deepEqual(mixed.model.resolution, { L: 12.5, C: 31.25, R: 50, level: 3 });
+assert.deepEqual(mixed.model.neighborhood, { L: 12.5, C: 31.25, R: 50, level: 3 });
 assert.deepEqual(
-  { start: mixed.model.interval.start, end: mixed.model.interval.end },
+  { start: mixed.model.activeSpan.start, end: mixed.model.activeSpan.end },
   { start: 12.5, end: 31.25 }
 );
 
@@ -173,10 +173,10 @@ const oppositePlain = refine(reopenedReverse, "forward");
 assert.equal(oppositePlain.refineRelation, "full");
 assert.deepEqual(
   {
-    start: oppositePlain.session.model.interval.start,
-    end: oppositePlain.session.model.interval.end,
-    departure: oppositePlain.session.model.interval.departure,
-    arrival: oppositePlain.session.model.interval.arrival
+    start: oppositePlain.session.model.activeSpan.start,
+    end: oppositePlain.session.model.activeSpan.end,
+    departure: oppositePlain.session.model.activeSpan.departure,
+    arrival: oppositePlain.session.model.activeSpan.arrival
   },
   { start: 25, end: 62.5, departure: 25, arrival: 62.5 }
 );
@@ -184,10 +184,10 @@ const continuingPlain = refine(reopenedReverse, "backward");
 assert.equal(continuingPlain.refineRelation, "retain");
 assert.deepEqual(
   {
-    start: continuingPlain.session.model.interval.start,
-    end: continuingPlain.session.model.interval.end,
-    departure: continuingPlain.session.model.interval.departure,
-    arrival: continuingPlain.session.model.interval.arrival
+    start: continuingPlain.session.model.activeSpan.start,
+    end: continuingPlain.session.model.activeSpan.end,
+    departure: continuingPlain.session.model.activeSpan.departure,
+    arrival: continuingPlain.session.model.activeSpan.arrival
   },
   { start: 12.5, end: 50, departure: 50, arrival: 12.5 }
 );
@@ -195,10 +195,10 @@ const oppositeLocal = localRefine(reopenedReverse, "forward");
 assert.equal(oppositeLocal.refineRelation, "draw");
 assert.deepEqual(
   {
-    start: oppositeLocal.session.model.interval.start,
-    end: oppositeLocal.session.model.interval.end,
-    departure: oppositeLocal.session.model.interval.departure,
-    arrival: oppositeLocal.session.model.interval.arrival
+    start: oppositeLocal.session.model.activeSpan.start,
+    end: oppositeLocal.session.model.activeSpan.end,
+    departure: oppositeLocal.session.model.activeSpan.departure,
+    arrival: oppositeLocal.session.model.activeSpan.arrival
   },
   { start: 25, end: 62.5, departure: 25, arrival: 62.5 }
 );
@@ -210,22 +210,22 @@ const mirroredOppositePlain = refine(mirroredReopenedReverse, "backward");
 assert.equal(mirroredOppositePlain.refineRelation, "full");
 assert.deepEqual(
   {
-    start: mirroredOppositePlain.session.model.interval.start,
-    end: mirroredOppositePlain.session.model.interval.end,
-    departure: mirroredOppositePlain.session.model.interval.departure,
-    arrival: mirroredOppositePlain.session.model.interval.arrival
+    start: mirroredOppositePlain.session.model.activeSpan.start,
+    end: mirroredOppositePlain.session.model.activeSpan.end,
+    departure: mirroredOppositePlain.session.model.activeSpan.departure,
+    arrival: mirroredOppositePlain.session.model.activeSpan.arrival
   },
   { start: 37.5, end: 75, departure: 75, arrival: 37.5 }
 );
 
 function transitionGeometry(result) {
-  const interval = result.session.model.interval;
+  const interval = result.session.model.activeSpan;
   const { createdAt: _createdAt, ...stableInterval } = interval || {};
   return {
     range: result.session.model.range,
-    resolution: result.session.model.resolution,
+    neighborhood: result.session.model.neighborhood,
     neighborhoodBasis: result.session.model.neighborhoodBasis,
-    interval: interval ? stableInterval : null
+    activeSpan: interval ? stableInterval : null
   };
 }
 
@@ -266,8 +266,8 @@ for (const [action, direct] of [
   const effectiveCommit = refine(source, "forward", { projection });
 
   assert.notEqual(
-    rawPreview.session.model.resolution.C,
-    effectiveCommit.session.model.resolution.C,
+    rawPreview.session.model.neighborhood.C,
+    effectiveCommit.session.model.neighborhood.C,
     "The fixture must distinguish the stored and bypassed projections."
   );
   assert.deepEqual(
@@ -282,11 +282,11 @@ for (const [action, direct] of [
     projection
   });
   assert.notDeepEqual(
-    rawGo.session.model.resolution,
-    effectiveGo.session.model.resolution,
+    rawGo.session.model.neighborhood,
+    effectiveGo.session.model.neighborhood,
     "Native reconciliation must observe the effective projection."
   );
-  assert.deepEqual(effectiveGo.session.model.resolution, {
+  assert.deepEqual(effectiveGo.session.model.neighborhood, {
     L: 7,
     C: 40,
     R: 62,
@@ -326,12 +326,12 @@ let weightedWalk = createSession({
   stepReach: 1
 });
 weightedWalk = step(weightedWalk, "forward", 1).session;
-assert.equal(weightedWalk.model.resolution.C, 30);
-assert.ok(weightedWalk.model.interval.start <= 29);
-assert.ok(weightedWalk.model.interval.end >= 30);
-assert.ok(weightedWalk.model.resolution.L <= weightedWalk.model.interval.start);
-assert.ok(weightedWalk.model.resolution.R >= weightedWalk.model.interval.end);
-assert.notEqual(getTargets(weightedWalk.model.resolution, projectionForModel(weightedWalk.model).metric).forward, null);
+assert.equal(weightedWalk.model.neighborhood.C, 30);
+assert.ok(weightedWalk.model.activeSpan.start <= 29);
+assert.ok(weightedWalk.model.activeSpan.end >= 30);
+assert.ok(weightedWalk.model.neighborhood.L <= weightedWalk.model.activeSpan.start);
+assert.ok(weightedWalk.model.neighborhood.R >= weightedWalk.model.activeSpan.end);
+assert.notEqual(getTargets(weightedWalk.model.neighborhood, projectionForModel(weightedWalk.model).metric).forward, null);
 
 const weightedPinProjection = projectionForModel(createSession({
   duration: 100,
@@ -356,7 +356,7 @@ let pinWalk = createSession({
 pinWalk = stepToPin(pinWalk, sectionStart.t, "forward", { stepSeconds: 1 }).session;
 pinWalk = stepToPin(pinWalk, sectionEnd.t, "forward", { stepSeconds: 1 }).session;
 assert.deepEqual(
-  { start: pinWalk.model.interval.start, end: pinWalk.model.interval.end },
+  { start: pinWalk.model.activeSpan.start, end: pinWalk.model.activeSpan.end },
   { start: 29, end: 45 }
 );
 
@@ -383,16 +383,16 @@ const playbackOrigin = snapshotModel(watched.model);
 const projectedPlayback = projectPlayback(watched.model, {
   departure: 25,
   current: 30,
-  parentNeighborhood: playbackOrigin.resolution,
+  parentNeighborhood: playbackOrigin.neighborhood,
   parentResolutionBasis: playbackOrigin.neighborhoodBasis,
   returnModel: playbackOrigin
 });
 assert.deepEqual(
   {
-    start: projectedPlayback.model.interval.start,
-    end: projectedPlayback.model.interval.end,
-    departure: projectedPlayback.model.interval.departure,
-    arrival: projectedPlayback.model.interval.arrival
+    start: projectedPlayback.model.activeSpan.start,
+    end: projectedPlayback.model.activeSpan.end,
+    departure: projectedPlayback.model.activeSpan.departure,
+    arrival: projectedPlayback.model.activeSpan.arrival
   },
   { start: 25, end: 50, departure: 50, arrival: 30 }
 );
@@ -400,18 +400,18 @@ assert.deepEqual(
 watched = completePlayback(watched, {
   departure: 25,
   current: 30,
-  parentNeighborhood: playbackOrigin.resolution,
+  parentNeighborhood: playbackOrigin.neighborhood,
   parentResolutionBasis: playbackOrigin.neighborhoodBasis,
   returnModel: playbackOrigin
 }).session;
 assert.deepEqual(
-  { start: watched.model.interval.start, end: watched.model.interval.end },
+  { start: watched.model.activeSpan.start, end: watched.model.activeSpan.end },
   { start: 25, end: 50 }
 );
 const watchedBoundary = switchActiveEnd(watched).session;
-assert.equal(watchedBoundary.model.resolution.C, 50);
+assert.equal(watchedBoundary.model.neighborhood.C, 50);
 assert.deepEqual(
-  { start: watchedBoundary.model.interval.start, end: watchedBoundary.model.interval.end },
+  { start: watchedBoundary.model.activeSpan.start, end: watchedBoundary.model.activeSpan.end },
   { start: 25, end: 50 }
 );
 
@@ -422,7 +422,7 @@ const completedCycle = projectPlayback(watched.model, {
   returnModel: watched.model
 });
 assert.deepEqual(
-  { start: completedCycle.model.interval.start, end: completedCycle.model.interval.end },
+  { start: completedCycle.model.activeSpan.start, end: completedCycle.model.activeSpan.end },
   watched.model.range
 );
 

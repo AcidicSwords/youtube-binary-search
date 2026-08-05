@@ -172,13 +172,13 @@ function makeHarness({
     );
 
     const semanticInterval = Object.freeze({ departure: 30, arrival: 50 });
-    h.snapshot = { ...h.snapshot, interval: semanticInterval, transportKind: "context" };
+    h.snapshot = { ...h.snapshot, activeSpan: semanticInterval, transportKind: "context" };
     h.controller.tick();
     assert.equal(h.controller.snapshot().phase, "suspended");
     h.snapshot = { ...h.snapshot, transportKind: "idle" };
     const started = h.controller.playFromGesture({ center: 50 });
     assert.deepEqual(started, { tail: true, lead: true }, "A Context settled in the same gesture stack must not leave stale suspension behind.");
-    assert.deepEqual(h.snapshot.interval, semanticInterval, "Physical Field activation must not mutate semantic Interval.");
+    assert.deepEqual(h.snapshot.activeSpan, semanticInterval, "Physical Field activation must not mutate semantic Interval.");
     assert.ok(["cue", "place"].includes(h.tail().commands.at(-2)?.[0]));
     assert.equal(h.tail().commands.at(-2)?.[1], 48, "A fresh breath begins at the inner offset behind Center.");
     assert.deepEqual(h.tail().commands.at(-1), ["play"]);
@@ -211,7 +211,7 @@ function makeHarness({
     assert.equal(h.controller.snapshot().leadMode, FIELD_SIDE_MODE.HELD);
     assert.equal(h.controller.breath().held, true, "Hold alone changes Stretching into Held.");
     assert.equal(h.controller.breath().phase, "expanding", "Hold preserves the breathing direction.");
-    assert.deepEqual(h.snapshot.interval, semanticInterval, "Hold changes runtime Field state only; it must not redefine Interval.");
+    assert.deepEqual(h.snapshot.activeSpan, semanticInterval, "Hold changes runtime Field state only; it must not redefine Interval.");
     const heldTail = h.controller.breath().sides.tail.offset;
     const heldLead = h.controller.breath().sides.lead.offset;
     assert.ok(heldTail >= 2 && heldTail <= 10, "A held offset stays inside the configured [x, y] bounds.");
