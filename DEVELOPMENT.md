@@ -209,6 +209,7 @@ Every executable suite is listed here by the current behavior it protects.
 
 - `integration-check.mjs` — DOM references, accessibility names, exact matrix, module seams, source boundary, projection use, and route wiring.
 - `project-audit.mjs` — lockfile/release coherence, retired-language exclusions, canonical document agreement, CSS and module boundaries, and suite completeness.
+- `lexicon-audit.mjs` — scans every product surface against `LEXICON.md` for retired vocabulary; report-only during the lexicon overhaul, `--strict` in the final gate. Run with `npm run audit:lexicon`.
 - `browser-smoke.mjs` — real Chromium geometry, equal square matrix cells, stable shifted labels, native-control hit access, exact Timeline pointer mapping, focus, responsive rails, dense structure, and compact reachability.
 
 ## Change completion
