@@ -5233,19 +5233,26 @@ function handleGhostWheel(event) {
     // appears, both of which many other operators also do -- so it says how far
     // back through its own path the reader now is. Without it there is no way to
     // tell a Ghost from an ordinary Go.
-    const depth = gesture.visited.length;
+    // Where the reader is in their own path, not just how many notches they
+    // have turned. Depth alone cannot say how much further there is to go, and
+    // a reader who cannot see that has no way to tell a working recall from one
+    // that has quietly run out -- which is most of what made this feel broken.
+    const place = gesture.read.index + 1;
+    const total = gesture.read.positions.length;
     setStatus(
-      `Ghost ${depth} ${depth === 1 ? "moment" : "moments"} ${
-        userDirection === "backward" ? "back" : "on"
-      } · ${formatTime(currentResolution().C)} · anchored at ${formatTime(gesture.anchor)}.`
+      `Ghost ${userDirection === "backward" ? "back" : "on"} · ${
+        formatTime(currentResolution().C)
+      } · ${place} of ${total} · anchored at ${formatTime(gesture.anchor)}.`
     );
     view.render();
   } else if (blocked === "range-blocked") {
     setStatus("Ghost history continues outside the active Range. Unfocus or widen Range to continue.");
   } else if (blocked) {
+    // Running out is the common case at the live end, and it is not a failure:
+    // say which end was reached and how to leave it.
     setStatus(userDirection === "backward"
-      ? "There is nothing earlier to recall."
-      : "You are already at the most recent moment.");
+      ? "Ghost is at the beginning of your path; there is nothing earlier to recall."
+      : "Ghost is at the most recent moment of your path; scroll the other way to look back.");
   }
   return true;
 }
@@ -6391,7 +6398,7 @@ document.addEventListener("keydown", event => {
   // The Guide is I, beside Operators on O, because G became the held Ghost
   // modifier. Tab was tried and rejected: it belongs to the browser, and a page
   // that captures it stops being navigable by keyboard at all.
-  if (plain && key === "i") {
+  if (spatialKey("i")) {
     event.preventDefault();
     toggleGuide();
     return;
@@ -6403,9 +6410,10 @@ document.addEventListener("keydown", event => {
     if (!event.repeat) state.ghostKeyHeld = true;
     return;
   }
-  // The rail holds two surfaces: G opens Guide; O opens Operators together
-  // with Parameters.
-  if (plain && key === "o") {
+  // The rail holds two surfaces: I opens Guide; O opens Operators together with
+  // Parameters. Both match the physical key as well as the character, so a
+  // layout that does not produce "i" or "o" there still reaches them.
+  if (spatialKey("o")) {
     event.preventDefault();
     toggleControls();
     return;

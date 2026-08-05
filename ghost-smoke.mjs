@@ -59,11 +59,14 @@ try {
   assert.equal(await page.getAttribute("#guide-toggle", "aria-expanded"), "false",
     "G no longer opens the Guide: it is the held Ghost modifier now.");
 
-  await page.evaluate(() => document.activeElement?.blur());
+  // Pressed from where a reader actually is, not after a synthetic blur: the
+  // focus left behind by clicking the map or a rail control must not swallow it.
+  await page.mouse.click(timeline.x + timeline.width * 0.4, timeline.y + timeline.height * 0.55);
+  await settle(320);
   await page.keyboard.press("i");
   await settle(250);
   assert.equal(await page.getAttribute("#guide-toggle", "aria-expanded"), "true",
-    "I opens the Guide,");
+    "I opens the Guide from wherever the reader left focus,");
   await page.evaluate(() => document.activeElement?.blur());
   await page.keyboard.press("i");
   await settle(250);
@@ -72,6 +75,21 @@ try {
   assert.equal(await page.getAttribute("#guide-toggle", "aria-keyshortcuts"), "I",
     "The control advertises the binding it actually has.");
   assert.match(await text("#guide-toggle"), /I/);
+
+  // The physical key counts as well as the character. A layout where that key
+  // does not produce "i" would otherwise have no Guide binding at all, and the
+  // spatial cluster already matches this way.
+  await page.evaluate(() => document.activeElement?.blur());
+  const beforePhysical = await page.getAttribute("#guide-toggle", "aria-expanded");
+  await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", {
+    key: "ı", code: "KeyI", bubbles: true, cancelable: true
+  })));
+  await settle(250);
+  assert.notEqual(await page.getAttribute("#guide-toggle", "aria-expanded"), beforePhysical,
+    "The Guide answers the I key by position, not only by the character it prints.");
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press("i");
+  await settle(250);
 
   // Tab stays the browser's. A page that captures it stops being navigable by
   // keyboard at all, which is a worse trade than any shortcut is worth.
@@ -254,16 +272,91 @@ try {
   // A recall is otherwise almost silent -- Current moves and an Interval
   // appears, which many operators do -- so it says how deep it is and what it
   // is anchored to. Without that there is no way to tell a Ghost from a Go.
-  assert.match(reachedDuringGesture, /Ghost 3 moments back/,
-    "Ghost says how far back through its own path the reader now is,");
+  // Depth alone cannot say how much further there is to go, so the recall
+  // reports its place in the whole path. Without that there is no way to tell a
+  // working recall from one that has quietly run out.
+  assert.match(reachedDuringGesture, /Ghost back ·/,
+    "Ghost says which way it is reading,");
+  assert.match(reachedDuringGesture, /\d+ of \d+/,
+    "where in the reader's path it now is,");
   assert.match(reachedDuringGesture, /anchored at/,
     "and what it is measuring against.");
 
   // =========================================================================
-  // 8. Nothing logged an error along the way
+  // 8. Ghost and ordinary operators interleave without losing the thread
+  // =========================================================================
+  // Recalling, acting on what was recalled, recalling again, acting again. Each
+  // gesture must anchor on wherever the reader actually is, and every Address it
+  // offers must be one they actually occupied -- an operator in between changes
+  // the path but must never make the recall incoherent.
+  await page.evaluate(() => {
+    const toggle = document.getElementById("guide-toggle");
+    if (toggle.getAttribute("aria-expanded") === "true") toggle.click();
+    document.activeElement?.blur();
+  });
+  await settle(220);
+
+  const occupied = new Set();
+  const note = async () => { occupied.add(await currentAddress()); };
+  for (const fraction of [0.10, 0.28, 0.46, 0.64, 0.82]) {
+    await page.mouse.click(
+      timeline.x + timeline.width * fraction,
+      timeline.y + timeline.height * 0.55
+    );
+    await settle(330);
+    await note();
+  }
+
+  for (const round of [1, 2, 3]) {
+    const anchorAddress = await currentAddress();
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.keyboard.down("g");
+    const recalledHere = [];
+    for (let notch = 0; notch < 2; notch += 1) {
+      await page.mouse.wheel(0, 100);
+      await settle(180);
+      recalledHere.push(await currentAddress());
+    }
+    const duringStatus = await text("#status");
+    await page.keyboard.up("g");
+    await settle(320);
+
+    for (const address of recalledHere) {
+      assert.ok(occupied.has(address),
+        `Round ${round}: Ghost only ever lands where the reader has been (${address}).`);
+    }
+    assert.match(duringStatus, /anchored at/,
+      `Round ${round}: the recall names what it is anchored to.`);
+    assert.ok(duringStatus.includes(anchorAddress),
+      `Round ${round}: and it is anchored on wherever the reader actually was.`);
+
+    // Act on what was recalled. The operator moves the reader on, which is a new
+    // encounter and part of the path from here.
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.keyboard.press(round % 2 ? "q" : "d");
+    await settle(360);
+    await note();
+    assert.match(await undoTop(), /Refine|Step/,
+      `Round ${round}: an ordinary operator still commits ordinarily after a recall.`);
+  }
+
+  // After all of that the reader is at the live end of their own path, so
+  // forward has nowhere to go and says so rather than failing silently.
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, -100);
+  await settle(220);
+  const forwardStatus = await text("#status");
+  await page.keyboard.up("g");
+  await settle(300);
+  assert.match(forwardStatus, /most recent moment|Ghost on/,
+    "At the live end, Ghosting forward reports the boundary instead of doing nothing.");
+
+  // =========================================================================
+  // 9. Nothing logged an error along the way
   // =========================================================================
   assert.deepEqual(failures, [], `Console/page errors: ${failures.join(" | ")}`);
-  console.log("Ghost smoke passed: the Guide is on I while Tab stays the browser's and G no longer touches either; holding G moves nothing, writes no history and draws no Anchor; a wheel notch recalls an earlier moment behind a fixed Anchor and an ordinary Working Interval; releasing writes one transaction that one Undo reverses; Escape cancels exactly; Ghost owns the wheel only while G is held; one detent recalls exactly one moment; and the recall says how deep it is and what it is anchored to.");
+  console.log("Ghost smoke passed: the Guide is on I while Tab stays the browser's and G no longer touches either; holding G moves nothing, writes no history and draws no Anchor; a wheel notch recalls an earlier moment behind a fixed Anchor and an ordinary Working Interval; releasing writes one transaction that one Undo reverses; Escape cancels exactly; Ghost owns the wheel only while G is held; one detent recalls exactly one moment; the recall says where in the path it is and what it is anchored to; and Ghost interleaves with ordinary operators without ever landing where the reader has not been.");
 } finally {
   await close();
 }
