@@ -13,7 +13,7 @@ export const OPERATOR_MATRIX = Object.freeze([
   ]),
   Object.freeze([
     Object.freeze({ id: "release", area: "release", key: "R", label: "Release" }),
-    Object.freeze({ id: "tag", area: "tag", key: "T", label: "Tag as Pin", shifted: "Tag as Section" }),
+    Object.freeze({ id: "retain", area: "retain", key: "T", label: "Retain Pin", shifted: "Retain Section" }),
     Object.freeze({ id: "focus-toggle", area: "focus", key: "F", label: "Focus / Unfocus" })
   ])
 ]);

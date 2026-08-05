@@ -252,7 +252,7 @@ assert.equal(rateSelect.value, "2",
   await env.delay(350); await flush(3);
   byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 400 });
   await env.delay(350); await flush(3);
-  byId.get("section-capture").dispatch("submit");
+  byId.get("section-retain-form").dispatch("submit");
   await flush(3);
   byId.get("release").click();
   await flush(3);

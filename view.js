@@ -1848,7 +1848,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         ? { start: switchFrame.L, end: switchFrame.R }
         : currentSpan,
       release: currentSpan,
-      tag: shiftLayer
+      retain: shiftLayer
         ? positiveActiveSpan
         : { start: semanticCurrent, end: semanticCurrent },
       focus: currentSpan || selectedForPreview
@@ -2154,7 +2154,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     // Plain Tag always has Current. Shifted Tag requires the positive Working
     // Interval it retains; the label and availability follow Shift, not the
     // incidental existence of an Interval.
-    elements.tag.disabled = interactionLocked
+    elements.retain.disabled = interactionLocked
       || (shiftLayer && !positiveActiveSpan);
     elements["focus-toggle"].disabled = interactionLocked || !(
       focused
@@ -2280,15 +2280,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["release-meta"].textContent = currentSpan
       ? "Active Span"
       : "No Active Span";
-    const tagLabel = shiftLayer ? "Tag as Section" : "Tag as Pin";
-    const tagMeta = shiftLayer
+    const retainLabel = shiftLayer ? "Retain Section" : "Retain Pin";
+    const retainMeta = shiftLayer
       ? positiveActiveSpan
         ? `${formatRange(positiveActiveSpan)} → Section`
         : "No Active Span"
       : `Current ${formatTime(semanticCurrent)} → Pin`;
-    elements["tag-label"].textContent = tagLabel;
-    elements["tag-meta"].textContent = tagMeta;
-    elements.tag.setAttribute("aria-label", `${tagLabel}: ${tagMeta}`);
+    elements["retain-label"].textContent = retainLabel;
+    elements["retain-meta"].textContent = retainMeta;
+    elements.retain.setAttribute("aria-label", `${retainLabel}: ${retainMeta}`);
     elements["focus-toggle-meta"].textContent = focused
       ? `restore ${formatRange(model().focus.returnRange)}`
       : currentSpan

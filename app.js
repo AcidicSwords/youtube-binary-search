@@ -70,8 +70,8 @@ import {
   focusWorkingSection as focusSessionWorkingSection,
   leaveSection as leaveSessionSection,
   completePlayback,
-  pinCurrent as pinSessionCurrent,
-  saveIntervalAsSection,
+  retainCurrentAsPin as pinSessionCurrent,
+  retainSpanAsSection,
   saveExtentAsSection,
   renameGuidePin,
   deleteGuidePin,
@@ -2276,7 +2276,7 @@ function sectionForSelectedPinExtent() {
   return matches.length === 1 ? matches[0] : null;
 }
 
-function pinCurrent(event = null, options = {}) {
+function retainCurrentAsPin(event = null, options = {}) {
   event?.preventDefault?.();
   const label = options.useFormLabel === false
     ? ""
@@ -2318,7 +2318,7 @@ function selectedSectionExtent(source = null) {
   };
 }
 
-function saveCurrentIntervalAsSection(event = null, options = {}) {
+function retainActiveSpanAsSection(event = null, options = {}) {
   event?.preventDefault?.();
   const label = options.useFormLabel === false
     ? ""
@@ -2327,7 +2327,7 @@ function saveCurrentIntervalAsSection(event = null, options = {}) {
   if (!extent) return setStatus("Establish the selected Extent before saving a Section.", true);
   settleBeforeAction();
   const result = kind === "interval"
-    ? saveIntervalAsSection(state.session, label)
+    ? retainSpanAsSection(state.session, label)
     : saveExtentAsSection(
       state.session,
       extent,
@@ -5654,14 +5654,14 @@ elements["switch-endpoint"].addEventListener("click", event => {
 elements.release.addEventListener("click", releaseActiveSpan);
 // Tag resolves Current into a Pin or, when Shift actually supplies the matrix
 // layer, resolves the positive Active Span into a Section.
-elements.tag.addEventListener("click", event => {
+elements.retain.addEventListener("click", event => {
   const latchedMatrix = event.shiftKey !== true && state.shiftLayers.matrix;
   if (event.shiftKey || latchedMatrix) {
-    saveCurrentIntervalAsSection(event, { source: "interval", useFormLabel: false });
+    retainActiveSpanAsSection(event, { source: "interval", useFormLabel: false });
     if (latchedMatrix) consumeShiftLayer("matrix");
     return;
   }
-  pinCurrent(event, { useFormLabel: false });
+  retainCurrentAsPin(event, { useFormLabel: false });
 });
 elements["deformation-toggle"].addEventListener("click", toggleDeformation);
 elements["focus-toggle"].addEventListener("click", focusOrUnfocus);
@@ -5876,11 +5876,11 @@ for (const control of document.querySelectorAll("[data-step-fraction]")) {
 }
 
 // Guide creation and Range affordances
-elements["section-capture"].addEventListener("submit", saveCurrentIntervalAsSection);
+elements["section-retain-form"].addEventListener("submit", retainActiveSpanAsSection);
 elements["section-label"].addEventListener("input", view.render);
 elements["section-source"].addEventListener("change", view.render);
 elements["focus-active-span"].addEventListener("click", focusWorkingSection);
-elements["pin-capture"].addEventListener("submit", pinCurrent);
+elements["pin-retain-form"].addEventListener("submit", retainCurrentAsPin);
 elements["pin-label"].addEventListener("input", view.render);
 elements["range-state"].addEventListener("click", toggleRangeTools);
 elements["range-tools"].addEventListener("toggle", () => {
@@ -6566,14 +6566,14 @@ document.addEventListener("keydown", event => {
   // transactions used by their pointer controls.
   else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && key === "t") {
     event.preventDefault();
-    saveCurrentIntervalAsSection(event, {
+    retainActiveSpanAsSection(event, {
       source: "interval",
       useFormLabel: false
     });
   }
   else if (plain && key === "t") {
     event.preventDefault();
-    pinCurrent(event, { useFormLabel: false });
+    retainCurrentAsPin(event, { useFormLabel: false });
   }
   // X transiently bypasses deformation for the acquired Section, or for the
   // complete map when no Section is acquired. Weight itself remains Guide state.

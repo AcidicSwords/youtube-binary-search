@@ -8,8 +8,8 @@ import {
   switchActiveEnd,
   setRange,
   undo,
-  pinCurrent,
-  saveIntervalAsSection,
+  retainCurrentAsPin,
+  retainSpanAsSection,
   focusSection,
   focusWorkingSection,
   leaveSection
@@ -104,8 +104,8 @@ for (let run = 0; run < RUNS; run += 1) {
       if (start > end) [start, end] = [end, start];
       result = setRange(session, start, end, session.model.resolution.C);
     } else if (operation === 7) result = undo(session);
-    else if (operation === 8) result = pinCurrent(session, random() < 0.2 ? "Pinned" : "");
-    else if (operation === 9) result = saveIntervalAsSection(session, `Section ${Math.floor(random() * 20)}`);
+    else if (operation === 8) result = retainCurrentAsPin(session, random() < 0.2 ? "Pinned" : "");
+    else if (operation === 9) result = retainSpanAsSection(session, `Section ${Math.floor(random() * 20)}`);
     else if (operation === 10) {
       const sections = session.model.guide.sections;
       result = sections.length

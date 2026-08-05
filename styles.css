@@ -1454,7 +1454,7 @@ kbd {
   grid-template-areas:
     "refine-backward reopen refine-forward"
     "step-backward switch-endpoint step-forward"
-    "release tag focus";
+    "release retain focus";
   gap: 8px;
   align-items: stretch;
   align-self: center;
@@ -1468,7 +1468,7 @@ kbd {
 #switch-endpoint { grid-area: switch-endpoint; }
 #step-forward { grid-area: step-forward; }
 #release { grid-area: release; }
-#tag { grid-area: tag; }
+#retain { grid-area: retain; }
 #focus-toggle { grid-area: focus; }
 
 .nav-action {
@@ -1552,7 +1552,7 @@ kbd {
   background: rgba(159, 217, 184, 0.055);
 }
 
-.tag-action {
+.retain-action {
   border-color: rgba(188, 154, 255, 0.52);
   background: rgba(188, 154, 255, 0.075);
 }

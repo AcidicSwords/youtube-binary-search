@@ -104,7 +104,7 @@ async function route(build) {
       await flush();
       byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: to });
       await flush();
-      byId.get("section-capture").dispatch("submit");
+      byId.get("section-retain-form").dispatch("submit");
       await flush();
       byId.get("release").click();
       await flush();
@@ -228,7 +228,7 @@ converge(
     byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 600 });
     await flush();
     byId.get("section-label").value = "Chapter";
-    byId.get("section-capture").dispatch("submit");
+    byId.get("section-retain-form").dispatch("submit");
     await flush();
     byId.get("release").click();
     await flush();

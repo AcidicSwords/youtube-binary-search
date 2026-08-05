@@ -187,7 +187,7 @@ await clickIn("sections-list", sectionRows()[0]);
 await clickIn("sections-list", sectionRows()[1], { shiftKey: true });
 const composed = byId.get("section-window").textContent;
 const beforeCompose = sectionRows().length;
-byId.get("tag").dispatch("click", { detail: 1, shiftKey: true });
+byId.get("retain").dispatch("click", { detail: 1, shiftKey: true });
 await flush();
 assert.equal(sectionRows().length, beforeCompose + 1,
   "A composed span is an ordinary extent, so Tag retains it as a parent.");

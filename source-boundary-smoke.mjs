@@ -110,7 +110,7 @@ for (const clientX of [200, 400]) {
   });
   await flush(2);
 }
-byId.get("tag").dispatch("click", { shiftKey: true });
+byId.get("retain").dispatch("click", { shiftKey: true });
 await flush(3);
 const sectionBody = descendants(byId.get("section-lane"))
   .find(node => node.dataset.sectionGo);
@@ -157,7 +157,7 @@ dispatchDocument("pointermove", {
 await finishLoad("HHHHHHHHHHH", 12);
 assert.equal(currentText(), "Current 0:12");
 
-byId.get("tag").click();
+byId.get("retain").click();
 await flush(3);
 const pin = descendants(byId.get("pin-lane")).find(node => node.dataset.pinGo);
 assert.ok(pin);

@@ -23,7 +23,7 @@
 - **Guide Focus** — the Pin or Section being inspected in Guide. It remains distinct from an acquired Timeline operand and does not by itself scope Toggle Deformation.
 - **Pin** — a retained source landmark with one Address, one identity, and an optional title.
 - **Section** — a retained positive edge between two Pin identities, with an optional title, one Group, and one Weight.
-- **Tag** — the matrix retention operator. `T` is Tag as Pin from Current; `Shift+T` is Tag as Section from a positive Active Span.
+- **Tag** — the matrix retention operator. `T` is Retain Pin from Current; `Shift+T` is Retain Section from a positive Active Span.
 - **Guide** — the persistent source-scoped graph of Groups, Pins, and Sections, including objects not currently drawn on the Timeline.
 - **Cue** — a transient Address or extent offered from chapter-like text. It is not persisted, weighted, or traversable as a Pin until explicitly retained. When optionally drawn on the Timeline, its inert presentation is positioned through the effective projection without entering the Guide or traversal.
 - **Group** — one ordinary partition of Sections. Every Section belongs to one Group; the last Group cannot be removed.

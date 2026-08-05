@@ -158,7 +158,7 @@ assert.equal(byId.get("current-marker").style.left, "50%");
 
 // Guide owns Pin creation, naming, and storage.
 byId.get("pin-label").value = "Middle";
-byId.get("pin-capture").dispatch("submit");
+byId.get("pin-retain-form").dispatch("submit");
 await flush();
 assert.equal(byId.get("pins-list-count").textContent, "1");
 assert.equal(byId.get("pin-label").value, "");
@@ -166,7 +166,7 @@ assert.ok(descendants(byId.get("pins-list")).some(node => node.textContent === "
 
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 250 });
 byId.get("pin-label").value = "Quarter";
-byId.get("pin-capture").dispatch("submit");
+byId.get("pin-retain-form").dispatch("submit");
 await flush();
 assert.equal(byId.get("pins-list-count").textContent, "2");
 assert.equal(currentText(), "Current 0:25");
@@ -310,7 +310,7 @@ assert.match(byId.get("section-window").textContent, /0:25–0:50/);
 byId.get("section-source").value = "interval";
 byId.get("section-label").value = "Quarter to middle";
 byId.get("section-label").dispatch("input");
-byId.get("section-capture").dispatch("submit");
+byId.get("section-retain-form").dispatch("submit");
 await flush();
 assert.equal(byId.get("sections-list-count").textContent, "1");
 const sectionNodes = descendants(byId.get("sections-list"));
@@ -364,7 +364,7 @@ byId.get("timeline").dispatch("click", {
 });
 await flush();
 byId.get("section-label").value = "Link test";
-byId.get("section-capture").dispatch("submit");
+byId.get("section-retain-form").dispatch("submit");
 await flush();
 assert.equal(byId.get("sections-list-count").textContent, "2");
 const guideItemNamed = name => descendants(byId.get("sections-list"))
@@ -905,14 +905,14 @@ byId.get("timeline").dispatch("click", {
   clientX: 640
 });
 byId.get("pin-label").value = "Cluster A";
-byId.get("pin-capture").dispatch("submit");
+byId.get("pin-retain-form").dispatch("submit");
 await flush();
 byId.get("timeline").dispatch("click", {
   target: byId.get("timeline"),
   clientX: 650
 });
 byId.get("pin-label").value = "Cluster B";
-byId.get("pin-capture").dispatch("submit");
+byId.get("pin-retain-form").dispatch("submit");
 await flush();
 assert.equal(byId.get("timeline").style["--pin-hit-size"], "52px");
 const clusterButton = descendants(byId.get("pin-lane"))
@@ -1109,7 +1109,7 @@ assert.equal(byId.has("context-action"), false);
 assert.equal(byId.has("skim"), false);
 assert.equal(byId.has("loop"), false);
 assert.equal(byId.get("release").classList.contains("lifecycle-action"), true);
-assert.equal(byId.get("tag").classList.contains("lifecycle-action"), true);
+assert.equal(byId.get("retain").classList.contains("lifecycle-action"), true);
 assert.equal(byId.get("focus-toggle").classList.contains("lifecycle-action"), true);
 
 byId.get("focus-toggle").focus();
@@ -1184,7 +1184,7 @@ assert.equal(env.document.activeElement, null, "Pointer activation must not leav
   const workingExtent = byId.get("section-window").textContent;
   assert.match(workingExtent, /\d:\d\d–\d:\d\d/);
   const extent = workingExtent.match(/(\d+:\d\d–\d+:\d\d)/)[1];
-  for (const id of ["release-meta", "tag-meta", "focus-toggle-meta"]) {
+  for (const id of ["release-meta", "retain-meta", "focus-toggle-meta"]) {
     assert.ok(
       !byId.get(id).textContent.includes(extent),
       `${id} must not reprint the extent section-window already shows.`

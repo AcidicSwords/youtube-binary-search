@@ -19,7 +19,7 @@ import {
   effectiveStepReach,
   goTo,
   goToGuidePin,
-  saveIntervalAsSection,
+  retainSpanAsSection,
   setGuideSectionWeight,
   step,
   stepToPin,
@@ -168,7 +168,7 @@ function weightedGuide(...definitions) {
   let session = createSession({ duration: 100, current: 20 });
   session = goTo(session, 40, { label: "Test Go" }).session;
   const before = { ...session.model.interval };
-  const tagged = saveIntervalAsSection(session, "");
+  const tagged = retainSpanAsSection(session, "");
   assert.equal(tagged.changed, true);
   assert.equal(tagged.value.created, true);
   assert.equal(tagged.value.section.label, "");

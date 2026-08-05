@@ -127,7 +127,7 @@ Nudge is exact source-time adjustment. `Shift`+wheel uses the dominant wheel axi
 | `A` / `D`, `←` / `→` | Step backward / forward |
 | `Shift+A` / `Shift+D`, `Shift+←` / `Shift+→` | Previous / next Pin |
 | `W` / `S` | Reopen / Switch End |
-| `R` / `T` / `Shift+T` / `F` | Release / Tag as Pin / Tag as Section / Focus |
+| `R` / `T` / `Shift+T` / `F` | Release / Retain Pin / Retain Section / Focus |
 | `X` | Toggle deformation for the acquired Section, otherwise the complete Timeline |
 | `Z` / `C` | Undo / Redo |
 | `[` / `]` | Decrease / increase Step Reach preset |

@@ -16,7 +16,7 @@ assert.deepEqual(
   [
     ["refine-backward", "reopen", "refine-forward"],
     ["step-backward", "switch-endpoint", "step-forward"],
-    ["release", "tag", "focus-toggle"]
+    ["release", "retain", "focus-toggle"]
   ]
 );
 
@@ -62,11 +62,11 @@ for (const key of ["w", "q", "s", "e"]) {
   );
 }
 assert.match(app, /key === "r"[\s\S]*releaseActiveSpan\(\)/);
-assert.match(app, /key === "t"[\s\S]*pinCurrent\(/);
+assert.match(app, /key === "t"[\s\S]*retainCurrentAsPin\(/);
 assert.match(app, /key === "f"[\s\S]*focusOrUnfocus\(\)/);
 assert.match(app, /shiftedSpatialKey\("a"\)[\s\S]*traverseToAdjacentPin\("backward"/);
 assert.match(app, /shiftedSpatialKey\("d"\)[\s\S]*traverseToAdjacentPin\("forward"/);
-assert.match(app, /event\.shiftKey[\s\S]*key === "t"[\s\S]*saveCurrentIntervalAsSection\(/);
+assert.match(app, /event\.shiftKey[\s\S]*key === "t"[\s\S]*retainActiveSpanAsSection\(/);
 
 const canonicalDocs = [
   source("./README.md"),
@@ -85,7 +85,7 @@ for (const cell of cells) {
     "Canonical documents must name " + cell.label + "."
   );
 }
-assert.match(canonicalDocs, /Tag as Pin/);
-assert.match(canonicalDocs, /Tag as Section/);
+assert.match(canonicalDocs, /Retain Pin/);
+assert.match(canonicalDocs, /Retain Section/);
 
 console.log("Operator grammar tests passed: QWE / ASD / RTF is identical in the fixture, DOM, keys, runtime branches, CSS areas, and canonical documentation.");

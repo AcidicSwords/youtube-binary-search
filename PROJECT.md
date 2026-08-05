@@ -134,8 +134,8 @@ Its semantic rows are:
 Tag has two exact forms:
 
 ```text
-T         Tag as Pin      — Current becomes retained location
-Shift+T   Tag as Section  — the Active Span becomes retained relation
+T         Retain Pin      — Current becomes retained location
+Shift+T   Retain Section  — the Active Span becomes retained relation
 ```
 
 Weight remains an attribute of the retained Section in Guide. `X` remains an auxiliary comparison action inside Operators but outside the square matrix, and so does held `G` — Ghost reads the reader's own path rather than acting on the map, which is why it is a held modifier on the wheel and not a letter in the square. The bottom row therefore has one coherent progression:
@@ -146,7 +146,7 @@ Tag     → retain a location or relation as structure
 Focus   → make the relation the active world
 ```
 
-Shift modifies Refine into Local Refine, Step into Pin traversal, and Tag as Pin into Tag as Section. The Matrix latch and Guide Extend latch are independent owners; holding physical Shift consumes neither.
+Shift modifies Refine into Local Refine, Step into Pin traversal, and Retain Pin into Retain Section. The Matrix latch and Guide Extend latch are independent owners; holding physical Shift consumes neither.
 
 ## Playback as observation
 

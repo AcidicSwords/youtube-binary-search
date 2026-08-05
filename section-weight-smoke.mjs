@@ -44,7 +44,7 @@ for (const clientX of [300, 500]) {
 }
 byId.get("section-label").value = "Section A";
 byId.get("section-label").dispatch("input");
-byId.get("section-capture").dispatch("submit");
+byId.get("section-retain-form").dispatch("submit");
 await flush();
 
 let sectionNodes = descendants(byId.get("sections-list"));
@@ -348,7 +348,7 @@ for (const clientX of [600, 700]) {
 }
 commandsBeforeWeight = playerCommandCounts();
 // Weight is assigned in the Guide, where the value lives.
-byId.get("section-capture").dispatch("submit");
+byId.get("section-retain-form").dispatch("submit");
 await flush(3);
 {
   const select = descendants(byId.get("sections-list"))
@@ -509,7 +509,7 @@ assert.deepEqual(
     });
     await flush(2);
   }
-  byId.get("tag").dispatch("click", { shiftKey: true });
+  byId.get("retain").dispatch("click", { shiftKey: true });
   await flush(3);
   const overlapWeight = descendants(byId.get("sections-list")).find(node =>
     node.dataset.sectionWeight

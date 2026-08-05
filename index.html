@@ -302,11 +302,11 @@
                 <span>Weights are edited in the Guide</span>
                 <span><kbd>F</kbd> Focus / Unfocus</span>
                 <span><kbd>Alt</kbd> Carry selected retained object</span>
-                <span><kbd>T</kbd> Tag as Pin</span>
+                <span><kbd>T</kbd> Retain Pin</span>
                 <span><kbd>Space</kbd> Native play/pause</span>
                 <span><kbd>Shift</kbd>+<kbd>Space</kbd> Play at the Shift rate, Panorama suspended</span>
                 <span><kbd>O</kbd> Operators and Parameters</span>
-                <span><kbd>⇧T</kbd> Tag as Section</span>
+                <span><kbd>⇧T</kbd> Retain Section</span>
                 <span><kbd>I</kbd> Guide</span>
                 <span>Hold <kbd>G</kbd> + wheel Ghost Traversal</span>
                 <span><kbd>[</kbd>/<kbd>]</kbd> Step size</span>
@@ -365,9 +365,9 @@
                 <span class="action-name"><kbd>R</kbd> <span class="action-label">Release</span></span>
                 <span id="release-meta" class="action-meta">No Active Span</span>
               </button>
-              <button id="tag" class="nav-action lifecycle-action tag-action" type="button" data-preview-action="tag" aria-keyshortcuts="T Shift+T" disabled>
-                <span class="action-name"><kbd>T</kbd> <span id="tag-label" class="action-label">Tag as Pin</span></span>
-                <span id="tag-meta" class="action-meta">Current → Pin</span>
+              <button id="retain" class="nav-action lifecycle-action retain-action" type="button" data-preview-action="retain" aria-keyshortcuts="T Shift+T" disabled>
+                <span class="action-name"><kbd>T</kbd> <span id="retain-label" class="action-label">Retain Pin</span></span>
+                <span id="retain-meta" class="action-meta">Current → Pin</span>
               </button>
               <button id="focus-toggle" class="nav-action lifecycle-action focus-action" type="button" data-preview-action="focus" aria-keyshortcuts="F" disabled>
                 <span class="action-name"><kbd>F</kbd> <span id="focus-toggle-label" class="action-label">Focus</span></span>
@@ -423,8 +423,8 @@
 
             <section id="guide-sections-panel" class="guide-tab-panel" role="tabpanel" aria-labelledby="guide-tab-sections">
               <details class="guide-create-disclosure">
-                <summary><span>Tag as Section</span><kbd>⇧T</kbd></summary>
-                <form id="section-capture" class="guide-create-form section-create-form">
+                <summary><span>Retain Section</span><kbd>⇧T</kbd></summary>
+                <form id="section-retain-form" class="guide-create-form section-create-form">
                 <div class="guide-create-heading">
                   <span class="eyebrow">Create Section</span>
                   <strong id="section-window">No current extent</strong>
@@ -441,7 +441,7 @@
                 </label>
                 <div class="section-create-actions">
                   <button id="focus-active-span" type="button" disabled>Focus Active Span</button>
-                  <button id="save-section" class="primary" type="submit" aria-keyshortcuts="Shift+T" disabled>Tag as Section</button>
+                  <button id="save-section" class="primary" type="submit" aria-keyshortcuts="Shift+T" disabled>Retain Section</button>
                 </div>
                 </form>
               </details>
@@ -450,16 +450,16 @@
 
             <section id="guide-pins-panel" class="guide-tab-panel" role="tabpanel" aria-labelledby="guide-tab-pins" hidden>
               <details class="guide-create-disclosure">
-                <summary><span>Tag as Pin</span><kbd>T</kbd></summary>
-                <form id="pin-capture" class="guide-create-form pin-create-form">
+                <summary><span>Retain Pin</span><kbd>T</kbd></summary>
+                <form id="pin-retain-form" class="guide-create-form pin-create-form">
                 <div class="guide-create-heading">
-                  <span class="eyebrow">Tag as Pin</span>
+                  <span class="eyebrow">Retain Pin</span>
                   <strong id="pin-current-position">Current —</strong>
                 </div>
                 <label for="pin-label">Title
                   <input id="pin-label" type="text" maxlength="100" placeholder="Optional Pin title" disabled>
                 </label>
-                <button id="pin-current" class="primary" type="submit" aria-keyshortcuts="T" disabled>Tag as Pin</button>
+                <button id="pin-current" class="primary" type="submit" aria-keyshortcuts="T" disabled>Retain Pin</button>
                 </form>
               </details>
               <div id="pins-list" class="guide-list"><p class="empty-state">No Pins for this video.</p></div>

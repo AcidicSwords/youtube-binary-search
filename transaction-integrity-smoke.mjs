@@ -146,7 +146,7 @@ byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 
 await flush();
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 300 });
 await flush();
-byId.get("section-capture").dispatch("submit");
+byId.get("section-retain-form").dispatch("submit");
 await flush();
 byId.get("release").click();
 await flush();
@@ -179,7 +179,7 @@ for (let index = 0; index < 12; index += 1) {
   await flush();
   byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 700 - index * 3 });
   await flush();
-  byId.get("section-capture").dispatch("submit");
+  byId.get("section-retain-form").dispatch("submit");
   await flush();
   byId.get("release").click();
   await flush();

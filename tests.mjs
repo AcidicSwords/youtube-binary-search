@@ -65,8 +65,8 @@ import {
   focusWorkingSection,
   leaveSection,
   completePlayback,
-  pinCurrent,
-  saveIntervalAsSection,
+  retainCurrentAsPin,
+  retainSpanAsSection,
   renameGuidePin,
   deleteGuidePin,
   renameGuideSection,
@@ -846,7 +846,7 @@ assert.deepEqual(
 );
 assert.equal(working.model.guide.sections.length, 0);
 
-working = saveIntervalAsSection(working, "Working").session;
+working = retainSpanAsSection(working, "Working").session;
 const retainedWorkingId = working.model.guide.sections[0].id;
 assert.equal(resolveSection(working.model.guide, retainedWorkingId).label, "Working");
 assert.deepEqual(
@@ -860,12 +860,12 @@ assert.deepEqual(
 // Guide operations participate in the same Undo chain.
 let edited = createSession({ duration: 100, current: 40, guide: createGuide("video") });
 const guideBeforeEdit = edited.model.guide;
-edited = pinCurrent(edited, "Forty").session;
+edited = retainCurrentAsPin(edited, "Forty").session;
 assert.notEqual(edited.model.guide, guideBeforeEdit, "Guide edits must replace the immutable Guide value.");
 assert.equal(guideBeforeEdit.pins.length, 0);
 assert.equal(edited.model.guide.pins.length, 1);
 edited = goTo(edited, 60, { operator: "timeline", label: "Timeline Click" }).session;
-edited = saveIntervalAsSection(edited, "Forty to sixty").session;
+edited = retainSpanAsSection(edited, "Forty to sixty").session;
 assert.equal(edited.model.guide.sections.length, 1);
 edited = undo(edited).session;
 assert.equal(edited.model.guide.sections.length, 0);
@@ -874,12 +874,12 @@ assert.equal(edited.model.resolution.C, 60);
 
 // No-op Guide commands do not create history or replace the Guide.
 let noops = createSession({ duration: 100, current: 40, guide: createGuide("video") });
-let noOpResult = pinCurrent(noops, "Forty");
+let noOpResult = retainCurrentAsPin(noops, "Forty");
 noops = noOpResult.session;
 const noOpGuide = noops.model.guide;
 const noOpHistoryLength = noops.history.length;
 const noOpPin = noops.model.guide.pins[0];
-noOpResult = pinCurrent(noops, "Forty");
+noOpResult = retainCurrentAsPin(noops, "Forty");
 assert.equal(noOpResult.changed, false);
 assert.equal(noOpResult.session.model.guide, noOpGuide);
 assert.equal(noOpResult.session.history.length, noOpHistoryLength);
@@ -888,10 +888,10 @@ assert.equal(noOpResult.changed, false);
 noOpResult = deleteGuidePin(noops, "missing-pin");
 assert.equal(noOpResult.changed, false);
 noops = goTo(noops, 60, { operator: "timeline", label: "Timeline Click" }).session;
-noops = saveIntervalAsSection(noops, "Forty to sixty").session;
+noops = retainSpanAsSection(noops, "Forty to sixty").session;
 const noOpSection = noops.model.guide.sections[0];
 const sectionHistoryLength = noops.history.length;
-noOpResult = saveIntervalAsSection(noops, "Forty to sixty");
+noOpResult = retainSpanAsSection(noops, "Forty to sixty");
 assert.equal(noOpResult.changed, false);
 assert.equal(noOpResult.session.history.length, sectionHistoryLength);
 noOpResult = renameGuideSection(noops, noOpSection.id, "Forty to sixty");

@@ -30,7 +30,7 @@ for (const [from, to] of [[100, 200], [600, 800]]) {
   await flush();
   byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: to });
   await flush();
-  byId.get("section-capture").dispatch("submit");
+  byId.get("section-retain-form").dispatch("submit");
   await flush();
 }
 byId.get("release").click();
@@ -163,10 +163,10 @@ assert.match(workingWindow(), /0:10–1:20/);
 // So Tag retains it as one parent Section containing the two it was composed
 // from. Nesting by construction, with no nesting feature.
 const before = sectionRows().length;
-byId.get("tag").dispatch("click", { detail: 1, shiftKey: true });
+byId.get("retain").dispatch("click", { detail: 1, shiftKey: true });
 await flush();
 assert.equal(sectionRows().length, before + 1,
-  "Tagging a composed span retains it as a new Section.");
+  "Retaining a composed span retains it as a new Section.");
 const spans = sectionRows().map(rowText);
 assert.ok(spans.some(text => text.includes("0:10–1:20")),
   "The new Section spans both Sections it was composed from.");

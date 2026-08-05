@@ -465,7 +465,7 @@ const visibleIds = guide => guide.groups
     await flush();
     byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: to });
     await flush();
-    byId.get("section-capture").dispatch("submit");
+    byId.get("section-retain-form").dispatch("submit");
     await flush();
   };
 

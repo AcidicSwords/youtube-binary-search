@@ -9,10 +9,10 @@ import {
   focusWorkingSection,
   goTo,
   leaveSection,
-  pinCurrent,
+  retainCurrentAsPin,
   localRefine,
   reopen,
-  saveIntervalAsSection,
+  retainSpanAsSection,
   setRange,
   setStepReach,
   step,
@@ -142,9 +142,9 @@ for (let run = 0; run < RUNS; run += 1) {
         linked: false
       });
     } else if (operation === 10) {
-      result = pinCurrent(session, random() < 0.4 ? `Pin ${Math.floor(random() * 20)}` : "");
+      result = retainCurrentAsPin(session, random() < 0.4 ? `Pin ${Math.floor(random() * 20)}` : "");
     } else if (operation === 11) {
-      result = saveIntervalAsSection(session, `Section ${Math.floor(random() * 30)}`);
+      result = retainSpanAsSection(session, `Section ${Math.floor(random() * 30)}`);
     } else if (operation === 12) {
       const sections = session.model.guide.sections;
       result = sections.length

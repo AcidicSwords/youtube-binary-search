@@ -1250,7 +1250,7 @@ export function completePlayback(session, options) {
   }, { returnModel: playbackCheckpoint });
 }
 
-export function pinCurrent(session, label = "") {
+export function retainCurrentAsPin(session, label = "") {
   const text = String(label || "").trim();
   const existing = findPinAt(session.model.guide, session.model.resolution.C);
   if (
@@ -1328,7 +1328,7 @@ export function saveExtentAsSection(session, extent, label, provenance = "extent
   }, { guideEdit: true });
 }
 
-export function saveIntervalAsSection(session, label) {
+export function retainSpanAsSection(session, label) {
   if (!session.model.interval) return unchanged(session, "no-interval");
   return saveExtentAsSection(
     session,

@@ -70,7 +70,7 @@ async function boot(environment, name) {
   );
 
   environment.localStorage.throwOnSet = false;
-  environment.byId.get("tag").click();
+  environment.byId.get("retain").click();
   await environment.flush(3);
   assert.equal(environment.localStorage.values.get(currentKey), damaged,
     "Later semantic edits cannot overwrite evidence whose quarantine failed.");
@@ -92,7 +92,7 @@ async function boot(environment, name) {
   );
 
   environment.localStorage.throwOnGet = false;
-  environment.byId.get("tag").click();
+  environment.byId.get("retain").click();
   await environment.flush(3);
   assert.equal(environment.localStorage.values.has(currentKey), false,
     "A read failure cannot be followed by a destructive current-version save.");

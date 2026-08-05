@@ -152,7 +152,7 @@ if (existsSync(new URL("./operator-grammar.js", import.meta.url))) {
     "Grammar fixture states the QWE row.");
   has(grammar, /id: "step-backward"[\s\S]*?id: "switch-endpoint"[\s\S]*?id: "step-forward"/,
     "Grammar fixture states the ASD row.");
-  has(grammar, /id: "release"[\s\S]*?id: "tag"[\s\S]*?id: "focus-toggle"/,
+  has(grammar, /id: "release"[\s\S]*?id: "retain"[\s\S]*?id: "focus-toggle"/,
     "Grammar fixture states the RTF row.");
 }
 has(read("operator-grammar-tests.mjs"), /from "\.\/operator-grammar\.js"/,
@@ -341,7 +341,7 @@ const retiredLanguage = [
     "A Timeline Normalize control remains documented."]
 ];
 for (const [pattern, message] of retiredLanguage) lacks(canonicalText, pattern, message);
-lacks(productText, /\bWorking Section\b|toggleNormalize\b|state\.normalize\b|timeline-normalize|#tag\s*\{\s*grid-area:\s*deform/i,
+lacks(productText, /\bWorking Section\b|toggleNormalize\b|state\.normalize\b|timeline-normalize|#retain\s*\{\s*grid-area:\s*deform/i,
   "Product source contains no retired Normalize/Working Section/matrix seam.");
 lacks(html, /<kbd>\s*P\s*<\/kbd>|Shift\s*\+\s*P|Shift\s*\+\s*X|Alt\s*\+\s*X|>\s*Normalize\s*</i,
   "Visible controls advertise no retired binding or Normalize label.");

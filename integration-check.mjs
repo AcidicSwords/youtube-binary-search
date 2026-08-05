@@ -135,7 +135,7 @@ for (const id of domReferences) {
 const expectedMatrix = [
   ["refine-backward", "reopen", "refine-forward"],
   ["step-backward", "switch-endpoint", "step-forward"],
-  ["release", "tag", "focus-toggle"]
+  ["release", "retain", "focus-toggle"]
 ];
 const expectedKeys = ["Q", "W", "E", "A", "S", "D", "R", "T", "F"];
 same(OPERATOR_MATRIX.map(row => row.map(cell => cell.id)), expectedMatrix,
@@ -169,13 +169,13 @@ same(
   [
     ["refine-backward", "reopen", "refine-forward"],
     ["step-backward", "switch-endpoint", "step-forward"],
-    ["release", "tag", "focus"]
+    ["release", "retain", "focus"]
   ],
   "CSS areas express the same three rows."
 );
 has(styles, /\.navigation-deck\s*\{[\s\S]*?aspect-ratio:\s*1\s*;/,
   "The matrix container is square.");
-has(styles, /#tag\s*\{\s*grid-area:\s*tag\s*;\s*\}/,
+has(styles, /#retain\s*\{\s*grid-area:\s*retain\s*;\s*\}/,
   "Tag occupies the Tag CSS area.");
 lacks(areaBlock, /\bdeform\b/i, "No dead Deform area remains in the matrix.");
 has(sources["operator-grammar-tests.mjs"], /from "\.\/operator-grammar\.js"/,
@@ -185,7 +185,7 @@ for (const proof of [
   /rows\.size,\s*3/,
   /columns\.size,\s*3/,
   /childCount,\s*9/,
-  /matrix\.cells\[2\]\[1\]\.id,\s*"tag"/,
+  /matrix\.cells\[2\]\[1\]\.id,\s*"retain"/,
   /Shifted operator labels preserve the square matrix dimensions/
 ]) has(browserSmoke, proof, `Chromium geometry proof includes ${proof}.`);
 for (const [key, consequence] of [
@@ -207,24 +207,24 @@ has(appCode, /plain && key === "f"[\s\S]{0,100}?focusOrUnfocus\(\)/,
   "F reaches Focus / Unfocus.");
 
 // Tag has one grammar on pointer, keyboard, preview, and Guide surfaces.
-has(appCode, /elements\.tag\.addEventListener\("click"[\s\S]*?saveCurrentIntervalAsSection\([\s\S]*?source:\s*"interval"[\s\S]*?pinCurrent\(/,
+has(appCode, /elements\.retain\.addEventListener\("click"[\s\S]*?retainActiveSpanAsSection\([\s\S]*?source:\s*"interval"[\s\S]*?retainCurrentAsPin\(/,
   "The Tag button routes Shift to Section and plain input to Current Pin.");
-has(appCode, /event\.shiftKey[\s\S]{0,180}?key === "t"[\s\S]{0,220}?saveCurrentIntervalAsSection\(/,
+has(appCode, /event\.shiftKey[\s\S]{0,180}?key === "t"[\s\S]{0,220}?retainActiveSpanAsSection\(/,
   "Shift+T tags the Active Span as a Section.");
-has(appCode, /plain && key === "t"[\s\S]{0,120}?pinCurrent\(/,
+has(appCode, /plain && key === "t"[\s\S]{0,120}?retainCurrentAsPin\(/,
   "Plain T tags Current as a Pin.");
-has(view, /const tagLabel = shiftLayer \? "Tag as Section" : "Tag as Pin"/,
+has(view, /const retainLabel = shiftLayer \? "Retain Section" : "Retain Pin"/,
   "The visible Tag label follows Shift state, not Interval presence.");
-has(view, /tagMeta = shiftLayer[\s\S]*?positiveActiveSpan[\s\S]*?→ Section[\s\S]*?Current \$\{formatTime\(semanticCurrent\)\} → Pin/,
+has(view, /retainMeta = shiftLayer[\s\S]*?positiveActiveSpan[\s\S]*?→ Section[\s\S]*?Current \$\{formatTime\(semanticCurrent\)\} → Pin/,
   "Tag meta names its exact operand and retained result.");
-has(view, /elements\.tag\.disabled\s*=\s*interactionLocked\s*\|\|\s*\(shiftLayer && !positiveActiveSpan\)/,
+has(view, /elements\.retain\.disabled\s*=\s*interactionLocked\s*\|\|\s*\(shiftLayer && !positiveActiveSpan\)/,
   "Only shifted Tag requires a positive Active Span.");
-has(view, /tag:\s*shiftLayer\s*\?\s*positiveActiveSpan\s*:\s*\{ start: semanticCurrent, end: semanticCurrent \}/,
+has(view, /retain:\s*shiftLayer\s*\?\s*positiveActiveSpan\s*:\s*\{ start: semanticCurrent, end: semanticCurrent \}/,
   "Tag preview follows the same Pin/Section operand law.");
-has(topLevelFunction(appCode, "pinCurrent"), /!result\.changed[\s\S]*?result\.value\?\.pin[\s\S]*?selectTimelineRetained\(\{ kind: "pin"/,
-  "Duplicate Tag as Pin acquires the existing exact Pin.");
-has(topLevelFunction(appCode, "saveCurrentIntervalAsSection"), /reason === "duplicate-section"[\s\S]*?selectTimelineRetained\(\{ kind: "section"/,
-  "Duplicate Tag as Section acquires the existing exact Section.");
+has(topLevelFunction(appCode, "retainCurrentAsPin"), /!result\.changed[\s\S]*?result\.value\?\.pin[\s\S]*?selectTimelineRetained\(\{ kind: "pin"/,
+  "Duplicate Retain Pin acquires the existing exact Pin.");
+has(topLevelFunction(appCode, "retainActiveSpanAsSection"), /reason === "duplicate-section"[\s\S]*?selectTimelineRetained\(\{ kind: "section"/,
+  "Duplicate Retain Section acquires the existing exact Section.");
 lacks(html, /<kbd>\s*P\s*<\/kbd>|Shift\s*\+\s*P|aria-keyshortcuts="[^"]*(?:^|\s)(?:Shift\+)?P(?:\s|$)/i,
   "No visible or accessible P binding remains.");
 lacks(appCode, /key\s*===\s*"p"|code\s*===\s*"KeyP"/,

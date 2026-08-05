@@ -81,8 +81,8 @@ for (const retired of ["continue", "context-action", "skim", "speed-select", "fi
 for (const id of [
   "field-transport-state", "field-both-toggle", "field-span-fill",
   "field-inner-offset", "field-outer-offset", "field-breath-rate",
-  "section-capture", "section-source", "pin-capture", "pin-current",
-  "release", "tag", "focus-toggle", "shift-layer-toggle",
+  "section-retain-form", "section-source", "pin-retain-form", "pin-current",
+  "release", "retain", "focus-toggle", "shift-layer-toggle",
   "step-size-seconds", "step-mode-fixed", "step-mode-adaptive"
 ]) assert.match(html, new RegExp(`id=["']${id}["']`), `Missing Field/Guide control: ${id}`);
 

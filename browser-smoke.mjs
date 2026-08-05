@@ -40,7 +40,7 @@ try {
     const ids = [
       ["refine-backward", "reopen", "refine-forward"],
       ["step-backward", "switch-endpoint", "step-forward"],
-      ["release", "tag", "focus-toggle"]
+      ["release", "retain", "focus-toggle"]
     ];
     const deck = document.querySelector(".navigation-deck").getBoundingClientRect();
     const cells = ids.map(row => row.map(id => {
@@ -92,24 +92,24 @@ try {
       && matrix.cells[1][column].y < matrix.cells[2][column].y,
     `Matrix column ${column + 1} follows QAR / WST / EDF physical order.`);
   }
-  assert.equal(matrix.cells[2][1].id, "tag",
+  assert.equal(matrix.cells[2][1].id, "retain",
     "Tag physically occupies row 3, column 2.");
-  assert.equal(await text("#tag-label"), "Tag as Pin");
-  assert.match(await text("#tag-meta"), /^Current .* → Pin$/);
-  assert.equal(await page.$eval("#tag", element => element.disabled), false,
+  assert.equal(await text("#retain-label"), "Retain Pin");
+  assert.match(await text("#retain-meta"), /^Current .* → Pin$/);
+  assert.equal(await page.$eval("#retain", element => element.disabled), false,
     "Plain Tag is available without a Active Span.");
-  await page.hover("#tag");
+  await page.hover("#retain");
   await settle(80);
-  const pinTagPreview = await page.evaluate(() => ({
+  const pinRetainPreview = await page.evaluate(() => ({
     pointHidden: document.getElementById("preview-current-marker").hidden,
     pointLeft: document.getElementById("preview-current-marker").style.left,
     currentLeft: document.getElementById("current-marker").style.left,
     intervalHidden: document.getElementById("action-preview-fill").hidden
   }));
-  assert.deepEqual(pinTagPreview, {
+  assert.deepEqual(pinRetainPreview, {
     pointHidden: false,
-    pointLeft: pinTagPreview.currentLeft,
-    currentLeft: pinTagPreview.currentLeft,
+    pointLeft: pinRetainPreview.currentLeft,
+    currentLeft: pinRetainPreview.currentLeft,
     intervalHidden: true
   }, "Plain Tag previews Current as a point, never the Active Span.");
   await page.mouse.move(0, 0);
@@ -120,9 +120,9 @@ try {
   assert.equal(await text("#refine-forward-label"), "Local Refine Forward");
   assert.equal(await text("#step-backward-label"), "Previous Pin");
   assert.equal(await text("#step-forward-label"), "Next Pin");
-  assert.equal(await text("#tag-label"), "Tag as Section");
-  assert.equal(await text("#tag-meta"), "No Active Span");
-  assert.equal(await page.$eval("#tag", element => element.disabled), true,
+  assert.equal(await text("#retain-label"), "Retain Section");
+  assert.equal(await text("#retain-meta"), "No Active Span");
+  assert.equal(await page.$eval("#retain", element => element.disabled), true,
     "Shifted Tag refuses a missing Active Span.");
   const shiftedMatrix = await page.evaluate(() => {
     const deck = document.querySelector(".navigation-deck").getBoundingClientRect();
@@ -195,15 +195,15 @@ try {
 
   await page.click("#operator-toggle");
   await settle(120);
-  assert.equal(await text("#tag-label"), "Tag as Pin",
+  assert.equal(await text("#retain-label"), "Retain Pin",
     "An Interval never changes the plain Tag grammar.");
   await page.click("#shift-layer-toggle");
   await settle(80);
-  assert.equal(await text("#tag-label"), "Tag as Section");
-  assert.match(await text("#tag-meta"), /→ Section$/);
-  assert.equal(await page.$eval("#tag", element => element.disabled), false,
+  assert.equal(await text("#retain-label"), "Retain Section");
+  assert.match(await text("#retain-meta"), /→ Section$/);
+  assert.equal(await page.$eval("#retain", element => element.disabled), false,
     "Shifted Tag becomes available for a positive Active Span.");
-  await page.hover("#tag");
+  await page.hover("#retain");
   await settle(80);
   assert.equal(await page.$eval("#action-preview-fill", element => element.hidden), false,
     "Shifted Tag previews the Active Span extent.");
@@ -335,7 +335,7 @@ try {
     const box = await boxOf(page, "#timeline");
     await page.mouse.click(box.x + box.width * (0.10 + index * 0.01), box.y + box.height * 0.3);
     await page.mouse.click(box.x + box.width * (0.80 - index * 0.01), box.y + box.height * 0.3);
-    await page.evaluate(() => document.getElementById("section-capture")
+    await page.evaluate(() => document.getElementById("section-retain-form")
       .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     // Release lives in the operator matrix, which is genuinely not displayed
     // while the rail shows Guide. It is invoked directly rather than by opening

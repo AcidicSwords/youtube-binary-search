@@ -210,7 +210,7 @@ order:
 | S | Switch End | — |
 | D | Step Forward | Next Pin |
 | R | Release | — |
-| T | Tag as Pin | Tag as Section |
+| T | Retain Pin | Retain Section |
 | F | Focus / Unfocus | — |
 
 The first row discriminates, the second traverses or changes viewpoint, and the
@@ -220,7 +220,7 @@ the incidental presence of a Active Span.
 
 ### Tag
 
-`T` always means `Tag as Pin`: Current is the operand. `Shift+T` means `Tag as
+`T` always means `Retain Pin`: Current is the operand. `Shift+T` means `Tag as
 Section`: a positive Active Span is the operand, and the action is disabled
 without one. The shifted action creates a Section; before retention the source
 relation is still called the Active Span. Duplicate tagging selects and
@@ -340,7 +340,7 @@ observation. Changing one setting does not rewrite another dimension.
 | W | Reopen |
 | S | Switch End |
 | R | Release |
-| T / Shift+T | Tag as Pin / Tag as Section |
+| T / Shift+T | Retain Pin / Retain Section |
 | X | Toggle deformation for acquired Section, otherwise complete Timeline |
 | F | Focus / Unfocus |
 | Space / Shift+Space | Panorama playback / Center-only Shift playback |

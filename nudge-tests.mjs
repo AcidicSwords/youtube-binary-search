@@ -296,7 +296,7 @@ await flush();
 
 // A Pin under the pointer owns the nudge instead of Current.
 byId.get("pin-label").value = "Nudge target";
-byId.get("pin-capture").dispatch("submit");
+byId.get("pin-retain-form").dispatch("submit");
 await flush();
 // Move Current away so the Pin is an independent manipulable object.
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 300 });
@@ -430,7 +430,7 @@ assert.equal(committedPinAddress(), addressBeforePreview);
   byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 400 });
   await flush(3);
   byId.get("section-label").value = "Frame parity";
-  byId.get("section-capture").dispatch("submit");
+  byId.get("section-retain-form").dispatch("submit");
   await flush(3);
   const row = descendants(byId.get("sections-list")).find(node => node.dataset.sectionGo);
   byId.get("sections-list").dispatch("click", { target: row });

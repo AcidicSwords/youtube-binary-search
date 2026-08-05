@@ -70,7 +70,7 @@ const makeSection = async (from, to) => {
   await flush();
   byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: to });
   await flush();
-  byId.get("section-capture").dispatch("submit");
+  byId.get("section-retain-form").dispatch("submit");
   await flush();
 };
 const groupToggle = (groupId, state) => inSections("groupToggle")
@@ -288,7 +288,7 @@ assert.match(workingWindow(), /0:00–1:20/,
 
 // The composed span is an ordinary extent, so Tag retains it.
 const beforeCompose = sectionRows().length;
-byId.get("tag").dispatch("click", { detail: 1, shiftKey: true });
+byId.get("retain").dispatch("click", { detail: 1, shiftKey: true });
 await flush();
 assert.equal(sectionRows().length, beforeCompose + 1,
   "A span composed from a Cue and a Section retains like any other.");

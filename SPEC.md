@@ -286,7 +286,7 @@ The canonical action identities and shifted meanings are:
 | `switch-endpoint` | `S` | Switch End | unchanged |
 | `step-forward` | `D` | Step Forward | Next Pin |
 | `release` | `R` | Release | unchanged |
-| `tag` | `T` | Tag as Pin | Tag as Section |
+| `tag` | `T` | Retain Pin | Retain Section |
 | `focus-toggle` | `F` | Focus / Unfocus | unchanged |
 
 Toggle Deformation is an auxiliary `X` action inside Operators and outside the square matrix. Weight is edited on its Section in Guide.
@@ -354,15 +354,15 @@ Clearing a semantic Active Span creates one Undoable Session transaction. Cleari
 Tag has exactly two forms:
 
 ```text
-T         Tag as Pin      operand: Current
-Shift+T   Tag as Section  operand: Active Span
+T         Retain Pin      operand: Current
+Shift+T   Retain Section  operand: Active Span
 ```
 
 The visible label follows physical or Matrix Shift state, never the accidental presence of a Active Span:
 
-- unshifted label: `Tag as Pin`;
+- unshifted label: `Retain Pin`;
 - unshifted metadata: `Current <Address> → Pin`;
-- shifted label: `Tag as Section`;
+- shifted label: `Retain Section`;
 - shifted metadata: `<Active Span> → Section`.
 
 Plain Tag remains available while an Interval exists and still retains Current as a Pin. Shifted Tag is disabled without a positive Active Span. An exact duplicate creates no second object or history; it selects and reports the existing Pin or Section. A newly retained Section enters the currently drawn Group, falling back to the ordinary default Group when none is drawn.
@@ -646,7 +646,7 @@ A focused control keeps only the keys it can act on, which is a question about t
 
 ### 9.1 Creation, duplicates, and deletion
 
-Tag as Pin retains Current as an explicit Pin. Tag as Section retains a positive Active Span using existing exact endpoint Pins when available or creates endpoint Pins. Duplicate identity is determined canonically, not by visual proximity. Duplicate Tag selects the existing object.
+Retain Pin retains Current as an explicit Pin. Retain Section retains a positive Active Span using existing exact endpoint Pins when available or creates endpoint Pins. Duplicate identity is determined canonically, not by visual proximity. Duplicate Tag selects the existing object.
 
 Guide renames, Weight changes, Group changes, Pin moves, Section moves, unlink/link, and deletion are ordinary Session transactions and use the same operations from every surface. Deleting the Section targeted by deformation bypass clears that bypass presentation. Deleting a focused Section leaves Focus through the same containing-Range law as other exits.
 

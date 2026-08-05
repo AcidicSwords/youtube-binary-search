@@ -37,7 +37,7 @@ The complete gate must prove all of the following.
 - Shifted labels do not change matrix geometry.
 - Matrix click and `T` create or select the same Pin. Shifted matrix click and
   `Shift+T` create or select the same Section.
-- Plain Tag remains `Tag as Pin` when a Active Span exists. Shifted Tag is
+- Plain Tag remains `Retain Pin` when a Active Span exists. Shifted Tag is
   disabled without a positive Active Span, and label, meta, and preview
   follow Shift state.
 - Guide creation summaries use `T` and `Shift+T`.
