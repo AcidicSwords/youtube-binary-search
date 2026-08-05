@@ -13,7 +13,7 @@ import {
   appendContinuousTraversal,
   beginGhostRead,
   moveGhostRead,
-  appendGhostReplay,
+  appendGhostInjection,
   latestCursorAtAddress,
   cursorIsValid
 } from "./user-time.js";
@@ -311,76 +311,6 @@ function walk(userTime, ghostRead, direction, limit = 40) {
 }
 
 // ---------------------------------------------------------------------------
-// Injection is append-only
-// ---------------------------------------------------------------------------
-{
-  // Traverse A → B → C → D, then recall B. The stream becomes A → B → C → D → B',
-  // where B' is the same Address as B and a different occurrence: it was reached
-  // knowing what C and D turned out to be.
-  const [A, B, C, D] = [10, 20, 30, 40];
-  let userTime = createUserTime(A);
-  for (const [from, to] of [[A, B], [B, C], [C, D]]) {
-    userTime = appendAtomicTraversal(userTime, { from, to, cause: "go" }).userTime;
-  }
-  const before = userTime.records.length;
-  const frozenEnd = userTime.records.length;
-
-  let ghostRead = beginGhostRead(userTime, {
-    current: D,
-    frozenStreamEnd: frozenEnd,
-    range: RANGE,
-    projection: neutralProjection,
-    stepReach: reach(5)
-  });
-  const visited = [];
-  for (const expected of [C, B]) {
-    const moved = moveGhostRead(userTime, ghostRead, "backward");
-    assert.equal(moved.address, expected);
-    visited.push({ address: moved.address, sourceCursor: moved.cursor });
-    ghostRead = moved.read;
-  }
-
-  const replayed = appendGhostReplay(userTime, {
-    anchor: D,
-    anchorCursor: { recordId: userTime.records.at(-1).id, unitIndex: 0, address: D },
-    visited,
-    createdAt: 1
-  });
-  assert.equal(replayed.changed, true);
-  assert.equal(replayed.userTime.records.length, before + 1, "One gesture writes one record.");
-  assert.equal(replayed.record.kind, TRAVERSAL_KIND.GHOST_REPLAY);
-  assert.equal(replayed.userTime.latestOccurrence.address, B,
-    "The recalled Address becomes the live occurrence.");
-
-  // Nothing was rewritten or dropped.
-  for (let index = 0; index < before; index += 1) {
-    assert.deepEqual(replayed.userTime.records[index], userTime.records[index],
-      "Recalling the past does not edit it.");
-  }
-
-  // The new occurrence knows which one it came from.
-  assert.equal(replayed.record.provenance.anchorAddress, D);
-  assert.equal(replayed.record.provenance.recalledOccurrences.length, 2);
-  assert.equal(replayed.record.provenance.recalledOccurrences.at(-1).address, B);
-
-  // The resume cursor points at the historical occurrence, not the injected one,
-  // so Ghosting forward next time retraces what originally followed B rather
-  // than retracing the replay.
-  assert.ok(cursorIsValid(replayed.userTime, replayed.resumeCursor, { range: RANGE }));
-  assert.equal(replayed.resumeCursor.address, B);
-  const resumed = beginGhostRead(replayed.userTime, {
-    current: B,
-    resumeCursor: replayed.resumeCursor,
-    range: RANGE,
-    projection: neutralProjection,
-    stepReach: reach(5)
-  });
-  const forward = walk(replayed.userTime, resumed, "forward");
-  assert.equal(forward.addresses[0], C,
-    "Resuming continues through the historical successors of the recalled point.");
-}
-
-// ---------------------------------------------------------------------------
 // Cursor validity
 // ---------------------------------------------------------------------------
 {
@@ -426,79 +356,125 @@ function walk(userTime, ghostRead, direction, limit = 40) {
   const moved = moveGhostRead(empty, ghostRead, "backward");
   assert.equal(moved.changed, false);
   assert.equal(moved.reason, "no-user-time");
-  assert.equal(appendGhostReplay(empty, { anchor: 0, visited: [] }).changed, false,
-    "A gesture that recalled nothing writes nothing.");
+  assert.equal(appendGhostInjection(empty, { anchor: 0, landing: 0 }).changed, false,
+    "A gesture that landed nowhere writes nothing.");
 }
 
-// A recall is not a journey, so recalling does not fold the stream in half
+// A scan is not a journey, but a landing is
 {
-  // The reader walks forward deliberately, recalls back along it, and then goes
-  // somewhere new. If the replay were offered back as somewhere to recall *to*,
-  // the stream would be a palindrome: scrolling backward would walk forward
-  // through the original journey and then turn around, which is disorienting
-  // and says nothing the original records do not already say.
-  const walked = [0, 10, 20, 30, 40];
-  let userTime = createUserTime(walked[0]);
-  for (let index = 1; index < walked.length; index += 1) {
-    userTime = appendAtomicTraversal(userTime, {
-      from: walked[index - 1],
-      to: walked[index],
-      cause: "timeline"
-    }).userTime;
+  // The reader walks A -> B -> C -> D, then recalls back to B and releases.
+  // What enters the stream is one occurrence of B, not the search that found it.
+  const [A, B, C, D] = [10, 20, 30, 40];
+  let userTime = createUserTime(A);
+  for (const [from, to] of [[A, B], [B, C], [C, D]]) {
+    userTime = appendAtomicTraversal(userTime, { from, to, cause: "go" }).userTime;
   }
+  const beforeRecords = userTime.records.length;
 
-  // Recall back along it.
-  let ghostRead = read(userTime, 40);
-  const visited = [];
-  for (let notch = 0; notch < 3; notch += 1) {
+  let ghostRead = read(userTime, D, { frozenStreamEnd: userTime.records.length });
+  const scanned = [];
+  for (let notch = 0; notch < 2; notch += 1) {
     const moved = moveGhostRead(userTime, ghostRead, "backward");
-    visited.push({ address: moved.address, sourceCursor: moved.cursor });
+    scanned.push({ address: moved.address, cursor: moved.cursor });
     ghostRead = moved.read;
   }
-  assert.deepEqual(visited.map(entry => entry.address), [30, 20, 10],
-    "Recalling walks back along what was walked.");
+  assert.deepEqual(scanned.map(entry => entry.address), [C, B],
+    "The scan crosses C on the way to B.");
 
-  const replayed = appendGhostReplay(userTime, {
-    anchor: 40,
-    anchorCursor: { recordId: userTime.records.at(-1).id, unitIndex: 0, address: 40 },
-    visited,
+  const injected = appendGhostInjection(userTime, {
+    anchor: D,
+    anchorCursor: { recordId: userTime.records.at(-1).id, unitIndex: 0, address: D },
+    landing: B,
+    recalledCursor: scanned.at(-1).cursor,
+    scan: { candidateCount: scanned.length, visitedMinimum: B, visitedMaximum: D },
     createdAt: 1
   });
+  assert.equal(injected.changed, true);
+  assert.equal(injected.userTime.records.length, beforeRecords + 1,
+    "One gesture writes one record,");
+  assert.equal(injected.record.units.length, 1,
+    "carrying one jump: the Anchor to what was re-entered.");
+  assert.deepEqual(injected.record.units[0], { kind: UNIT_KIND.JUMP, from: D, to: B });
+  assert.equal(injected.record.kind, TRAVERSAL_KIND.GHOST_INJECTION);
 
-  // The record is kept in full -- units, provenance, and its place in the order
-  // are all part of what happened.
-  assert.equal(replayed.record.kind, TRAVERSAL_KIND.GHOST_REPLAY);
-  assert.equal(replayed.record.units.length, 3);
-  assert.equal(replayed.record.provenance.recalledOccurrences.length, 3);
+  // The search is kept as evidence and never as traversal.
+  assert.equal(injected.record.provenance.scan.candidateCount, 2);
+  assert.equal(injected.record.provenance.recalledOccurrence.address, B);
+  assert.equal(injected.record.provenance.anchorOccurrence.address, D);
 
-  // It is simply not offered back as somewhere to recall to.
-  const after = read(replayed.userTime, 10);
-  assert.deepEqual(
-    after.positions.map(position => position.address),
-    walked,
-    "The readable stream stays the journey the reader actually made."
-  );
+  // The landing is readable user time -- the reader really did re-enter B after
+  // reaching D, and that fact is worth as much as any other movement.
+  const stream = read(injected.userTime, B);
+  assert.deepEqual(stream.positions.map(position => position.address), [A, B, C, D, B],
+    "The stream is the journey plus the landing: not the scan, and not nothing.");
+  assert.equal(stream.positions.at(-1).occurrenceKind, "injection",
+    "and the landing knows it is a re-entry,");
+  assert.equal(stream.positions.at(-1).recalledFrom.address, B,
+    "linked to the occurrence it re-entered.");
+  assert.equal(injected.userTime.latestOccurrence.address, B);
 
-  // And from the recalled Address, forward retraces what originally followed it
-  // -- the reader resolves onto the historical occurrence, not the replayed one.
-  const forward = walk(replayed.userTime, after, "forward");
-  assert.deepEqual(forward.addresses, [20, 30, 40],
-    "Ghosting forward from a recalled moment replays its original successors.");
+  // Backward from the injected occurrence follows the live stream: what led to
+  // this re-entry. Forward may resume what originally followed the moment.
+  const backward = moveGhostRead(injected.userTime, stream, "backward");
+  assert.equal(backward.address, D,
+    "Backward asks what led here, so the live predecessor comes first.");
 
-  // Going somewhere new afterwards is ordinary navigation and does appear.
-  const moved = appendAtomicTraversal(replayed.userTime, {
-    from: 10, to: 90, cause: "timeline"
+  const resumed = read(injected.userTime, B, { resumeCursor: injected.resumeCursor });
+  const forward = walk(injected.userTime, resumed, "forward");
+  assert.deepEqual(forward.addresses.slice(0, 2), [C, D],
+    "Forward asks what originally followed the moment re-entered.");
+  // Carrying on past them eventually arrives at the injection itself, which is
+  // simply where the reader is standing: the live stream has caught up with them.
+  assert.equal(forward.addresses.at(-1), B);
+
+  // Recalling twice does not accumulate mirrored copies of the search.
+  let twice = appendAtomicTraversal(injected.userTime, {
+    from: B, to: 90, cause: "go"
   }).userTime;
-  const later = walk(moved, read(moved, 90), "backward");
-  assert.deepEqual(later.addresses, [10, 40, 30, 20, 10, 0],
-    "so a later backward recall reverses the journey: where they left from, then the walk itself.");
-  // 10 appears twice because the reader genuinely stood there twice -- once on
-  // the way out and once after recalling. What does not appear is the recall
-  // between them, which was looking rather than going.
-  assert.equal(later.addresses.filter(address => address === 10).length, 2);
-  assert.equal(later.addresses.includes(20), true);
-  assert.deepEqual(later.addresses.slice(1), [40, 30, 20, 10, 0],
-    "and the tail is the original walk in reverse, with no fold in it.");
+  const second = appendGhostInjection(twice, {
+    anchor: 90,
+    anchorCursor: null,
+    landing: B,
+    recalledCursor: scanned.at(-1).cursor,
+    scan: { candidateCount: 4 },
+    createdAt: 2
+  });
+  assert.deepEqual(
+    read(second.userTime, B).positions.map(position => position.address),
+    [A, B, C, D, B, 90, B],
+    "Two returns to B remain two occurrences, separated by what happened between."
+  );
 }
 
-console.log("User time tests passed: append-only records that keep reversals, direction in user time independent of source order, shared endpoints as one position, watched spans subdivided by the frozen Step law and clipped to the active Range, a frozen readable stream, injection that adds an occurrence without editing the one it was recalled from, and a recall that is recorded in full without being offered back as somewhere to recall to.");
+// Returning to the Anchor writes nothing
+{
+  // The Session may still retain the ground crossed, but a zero-distance
+  // occurrence would sit in the stream indistinguishable from its neighbour and
+  // cost a future wheel detent to pass.
+  let userTime = createUserTime(0);
+  userTime = appendAtomicTraversal(userTime, { from: 0, to: 50, cause: "go" }).userTime;
+  const unchanged = appendGhostInjection(userTime, {
+    anchor: 50,
+    landing: 50,
+    recalledCursor: null,
+    scan: { candidateCount: 6, visitedMinimum: 10, visitedMaximum: 50 },
+    createdAt: 1
+  });
+  assert.equal(unchanged.changed, false, "A round trip appends no occurrence,");
+  assert.equal(unchanged.userTime, userTime, "and leaves the ledger exactly as it was.");
+}
+
+// A resume cursor describes where the reader is standing
+{
+  let userTime = createUserTime(0);
+  for (const [from, to] of [[0, 10], [10, 20]]) {
+    userTime = appendAtomicTraversal(userTime, { from, to, cause: "go" }).userTime;
+  }
+  const cursor = { recordId: userTime.records[0].id, unitIndex: 0, address: 10 };
+  assert.equal(cursorIsValid(userTime, cursor, { current: 10 }), true);
+  assert.equal(cursorIsValid(userTime, cursor, { current: 20 }), false,
+    "A reader who has moved on is no longer standing in the moment it describes.");
+}
+
+
+console.log("User time tests passed: append-only records that keep reversals, direction in user time independent of source order, shared endpoints as one position, watched spans subdivided by the frozen Step law and clipped to the active Range, a frozen readable stream, and injection that records one landing rather than the search that found it, readable, linked to both the Anchor it came from and the moment it re-enters.");

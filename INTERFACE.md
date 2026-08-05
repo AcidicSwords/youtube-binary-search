@@ -174,6 +174,11 @@ perceptible by scrolling through it. Drawing every occurrence would confuse
 source order with encounter order, and would turn an invisible recognition
 operator into a history editor.
 
+Scanning and landing are different events. The wheel motion used to find a
+moment is search and leaves no trace; releasing records that the reader
+re-entered that moment, once. So repeated recall accumulates the moments
+returned to, never mirrored copies of the searching.
+
 Section wires are greedily lane-packed. The visible relationship band is bounded
 to five lanes; deeper overlap scrolls inside it, and no two Sections share a
 control. Faint dotted relations connect each wire's start, midpoint, and end to

@@ -6,7 +6,8 @@ import {
   appendContinuousTraversal,
   beginGhostRead,
   moveGhostRead,
-  appendGhostReplay
+  appendGhostInjection,
+  cursorIsValid
 } from "./user-time.js";
 import {
   EPSILON,
@@ -5125,18 +5126,31 @@ elements["current-marker"].addEventListener("pointerdown", beginCurrentDrag);
 // cost nothing -- a reader who taps it, or holds it and changes their mind, has
 // not asked for anything and must not have their playback settled or their
 // history touched. Only a wheel quantum proves the intent.
-function beginGhostGesture() {
+function beginGhostGesture({ initialDirection } = {}) {
   if (!state.videoLoaded || !currentResolution()) return false;
   // Anything still in flight becomes exact first, and is recorded, so the
   // gesture reads a stream that already contains the movement that led here.
+  // This is why activation waits for a whole earned quantum: settling live
+  // Playback because a trackpad twitched would be a real cost paid for an
+  // intention the reader never expressed.
   settleBeforeAction({ ghost: false });
   const anchor = currentResolution().C;
   const originModel = snapshotModel(model());
   const projection = timelineProjection();
   const stepReach = effectiveStepReach(model().stepReach, activeRange(), projection);
+  // Which stream this gesture reads is decided once, by the direction it opens
+  // with. Forward from a re-entered moment asks what originally followed it, so
+  // it resumes the historical occurrence. Backward asks what led to the present
+  // re-entry, which is the live stream. Reversing the wheel later retraces the
+  // cursor already chosen rather than switching streams underneath the reader.
+  const resumable = initialDirection === "forward"
+    && cursorIsValid(state.userTime, state.ghostResumeCursor, {
+      current: anchor,
+      range: activeRange()
+    });
   const read = beginGhostRead(state.userTime, {
     current: anchor,
-    resumeCursor: state.ghostResumeCursor,
+    resumeCursor: resumable ? state.ghostResumeCursor : null,
     // The boundary is where the stream stands now, so the gesture can never
     // read the replay it is itself about to append.
     frozenStreamEnd: state.userTime.records.length,
@@ -5153,7 +5167,10 @@ function beginGhostGesture() {
     read,
     projection,
     stepReach,
+    initialDirection,
+    readOrigin: resumable ? "historical-successor" : "live-occurrence",
     visited: [],
+    directionChanges: 0,
     visitedMinimum: anchor,
     visitedMaximum: anchor,
     lastSourceDirection: null,
@@ -5166,13 +5183,18 @@ function handleGhostWheel(event) {
   if (!state.ghostKeyHeld || !state.videoLoaded) return false;
   const raw = wheelPixels(event);
   if (!raw) return false;
-  if (!state.ghostGesture && !beginGhostGesture()) return false;
-  const gesture = state.ghostGesture;
   state.ghostWheel ??= { accumulator: 0 };
   state.ghostWheel.accumulator += raw;
   const earned = Math.trunc(state.ghostWheel.accumulator / NUDGE_WHEEL_THRESHOLD);
   event.preventDefault?.();
+  // Below the threshold nothing at all has happened yet -- no Anchor, no settled
+  // Playback, no frozen stream. Arming is free and staying armed is free; only a
+  // whole quantum is a request.
   if (!earned) return true;
+  const openingDirection = earned > 0 ? "forward" : "backward";
+  if (!state.ghostGesture
+    && !beginGhostGesture({ initialDirection: openingDirection })) return false;
+  const gesture = state.ghostGesture;
   // One turn of the wheel is one occurrence, and the surplus is dropped.
   //
   // Nudge carries its remainder because a Nudge is a quantum of source time and
@@ -5220,6 +5242,10 @@ function handleGhostWheel(event) {
     if (Math.abs(candidate.address - previous) > EPSILON) {
       gesture.lastSourceDirection = candidate.address > previous ? "forward" : "backward";
     }
+    if (gesture.lastUserDirection && gesture.lastUserDirection !== userDirection) {
+      gesture.directionChanges += 1;
+    }
+    gesture.lastUserDirection = userDirection;
     gesture.changed = true;
     moved = true;
   }
@@ -5267,17 +5293,30 @@ function settleGhostGesture() {
   const settled = settleGhostSequence(state.session, gesture);
   if (settled.changed) state.session = settled.session;
   state.session = checkpoint(state.session, "Ghost Traverse", gesture.originModel).session;
-  const replay = appendGhostReplay(state.userTime, {
+  // One landing, not the search that found it. The scan is kept as provenance
+  // so what the reader crossed is still on the record, but it is not a path
+  // anybody walked and must not be offered back as one.
+  const finalVisit = gesture.visited.at(-1) || null;
+  const injection = appendGhostInjection(state.userTime, {
     anchor: gesture.anchor,
     anchorCursor: gesture.anchorCursor,
-    visited: gesture.visited,
+    landing: currentResolution().C,
+    recalledCursor: finalVisit?.sourceCursor || null,
+    scan: {
+      candidateCount: gesture.visited.length,
+      visitedMinimum: gesture.visitedMinimum,
+      visitedMaximum: gesture.visitedMaximum,
+      directionChanges: gesture.directionChanges
+    },
     createdAt: Date.now()
   });
-  state.userTime = replay.userTime;
-  // The next gesture continues through the historical pattern rather than
-  // through the occurrence this replay just appended. Release may sever the
-  // Working Interval afterwards without disturbing it.
-  state.ghostResumeCursor = replay.resumeCursor;
+  if (injection.changed) {
+    state.userTime = injection.userTime;
+    // The historical occurrence just re-entered, so an immediately forward
+    // gesture can resume its original successors. Release may sever the Working
+    // Interval afterwards without disturbing it.
+    state.ghostResumeCursor = injection.resumeCursor;
+  }
   syncIntervalPinSelection();
   view.renderGuide();
   view.render();

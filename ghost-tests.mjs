@@ -27,7 +27,7 @@ import {
   appendContinuousTraversal,
   beginGhostRead,
   moveGhostRead,
-  appendGhostReplay
+  appendGhostInjection
 } from "./user-time.js";
 
 const DURATION = 300;
@@ -336,13 +336,23 @@ function worldFingerprint(model) {
   assert.equal(gesturing.model.interval.start, A);
   assert.equal(gesturing.model.interval.end, D, "The Working Interval reaches back to the Anchor.");
 
-  const replay = appendGhostReplay(userTime, {
+  // Session settlement and the ledger are different consequences of one gesture.
+  // The Session retains the Anchor relation as a Working Interval; user time
+  // records only where the reader landed.
+  const replay = appendGhostInjection(userTime, {
     anchor: D,
     anchorCursor: { recordId: userTime.records.at(-1).id, unitIndex: 0, address: D },
-    visited,
+    landing: A,
+    recalledCursor: visited.at(-1).sourceCursor,
+    scan: { candidateCount: visited.length, visitedMinimum: A, visitedMaximum: D },
     createdAt: 1
   });
   userTime = replay.userTime;
+  assert.equal(replay.record.units.length, 1,
+    "The ledger keeps one landing, not the scan that found it,");
+  assert.equal(gesturing.model.interval.start, A);
+  assert.equal(gesturing.model.interval.end, D,
+    "while the Session keeps the whole Anchor relation.");
   assert.equal(userTime.records.length, streamBefore + 1);
   assert.equal(userTime.records.slice(0, streamBefore).length, streamBefore,
     "Everything that already happened is still there.");

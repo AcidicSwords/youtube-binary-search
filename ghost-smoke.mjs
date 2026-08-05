@@ -353,10 +353,87 @@ try {
     "At the live end, Ghosting forward reports the boundary instead of doing nothing.");
 
   // =========================================================================
-  // 9. Nothing logged an error along the way
+  // 9. A landing is recorded; the search that found it is not
+  // =========================================================================
+  // Walk deliberately, recall back two moments, release. The stream must gain
+  // the moment re-entered and nothing else -- then Ghosting backward from there
+  // follows what led to the re-entry, which is the Anchor, not the scan.
+  await page.evaluate(() => {
+    const toggle = document.getElementById("guide-toggle");
+    if (toggle.getAttribute("aria-expanded") === "true") toggle.click();
+    document.activeElement?.blur();
+  });
+  await settle(220);
+  const deliberate = [];
+  for (const fraction of [0.14, 0.34, 0.54, 0.74]) {
+    await page.mouse.click(
+      timeline.x + timeline.width * fraction,
+      timeline.y + timeline.height * 0.55
+    );
+    await settle(330);
+    deliberate.push(await currentAddress());
+  }
+  const anchorAt = deliberate.at(-1);
+
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, 100);
+  await settle(180);
+  await page.mouse.wheel(0, 100);
+  await settle(180);
+  const landedAt = await currentAddress();
+  await page.keyboard.up("g");
+  await settle(320);
+  assert.equal(landedAt, deliberate[1],
+    "Two detents back from the fourth stop lands on the second.");
+  assert.equal(await currentAddress(), landedAt, "and releasing keeps it.");
+
+  // Backward from the injected landing follows the live stream: the Anchor is
+  // what led here, not the moment scanned through on the way.
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, 100);
+  await settle(200);
+  const afterLanding = await currentAddress();
+  await page.keyboard.up("g");
+  await settle(320);
+  assert.equal(afterLanding, anchorAt,
+    "Backward from a re-entered moment asks what led to it, so the Anchor comes first.");
+  assert.notEqual(afterLanding, deliberate[2],
+    "and never the moment the scan merely passed through.");
+
+  // =========================================================================
+  // 10. Sub-threshold input costs nothing
+  // =========================================================================
+  // Arming is free and staying armed is free. A trackpad twitch under the
+  // threshold must not settle Playback, capture an Anchor, or write anything.
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press("Space");
+  await settle(500);
+  const playingBefore = await text("#field-transport-state");
+  const currentBefore = await currentAddress();
+  const undoBeforeTwitch = await undoTop();
+
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, 6);
+  await settle(150);
+  await page.mouse.wheel(0, 6);
+  await settle(150);
+  assert.equal((await anchorShown()).hidden, true,
+    "A twitch below the threshold captures no Anchor,");
+  await page.keyboard.up("g");
+  await settle(300);
+  assert.equal(await undoTop(), undoBeforeTwitch, "writes no history,");
+  assert.equal(await text("#field-transport-state"), playingBefore,
+    "and does not settle what was already running.");
+  await page.keyboard.press("Space");
+  await settle(400);
+
+  // =========================================================================
+  // 11. Nothing logged an error along the way
   // =========================================================================
   assert.deepEqual(failures, [], `Console/page errors: ${failures.join(" | ")}`);
-  console.log("Ghost smoke passed: the Guide is on I while Tab stays the browser's and G no longer touches either; holding G moves nothing, writes no history and draws no Anchor; a wheel notch recalls an earlier moment behind a fixed Anchor and an ordinary Working Interval; releasing writes one transaction that one Undo reverses; Escape cancels exactly; Ghost owns the wheel only while G is held; one detent recalls exactly one moment; the recall says where in the path it is and what it is anchored to; and Ghost interleaves with ordinary operators without ever landing where the reader has not been.");
+  console.log("Ghost smoke passed: the Guide is on I while Tab stays the browser's and G no longer touches either; holding G moves nothing, writes no history and draws no Anchor; a wheel notch recalls an earlier moment behind a fixed Anchor and an ordinary Working Interval; releasing writes one transaction that one Undo reverses; Escape cancels exactly; Ghost owns the wheel only while G is held; one detent recalls exactly one moment; the recall says where in the path it is and what it is anchored to; Ghost interleaves with ordinary operators without ever landing where the reader has not been; releasing records the moment re-entered rather than the search that found it, so backward from it asks what led there; and input below the threshold costs nothing at all.");
 } finally {
   await close();
 }

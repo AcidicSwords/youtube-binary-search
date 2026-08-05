@@ -27,7 +27,7 @@ export const TRAVERSAL_KIND = Object.freeze({
   ATOMIC: "atomic",
   SEQUENCE: "sequence",
   CONTINUOUS: "continuous",
-  GHOST_REPLAY: "ghost-replay"
+  GHOST_INJECTION: "ghost-injection"
 });
 
 export const UNIT_KIND = Object.freeze({
@@ -187,31 +187,33 @@ function readablePositions(userTime, { frozenStreamEnd, range, projection, stepR
   };
   const positions = [];
   let blocked = false;
-  const push = (address, recordId, unitIndex) => {
-    // Consecutive duplicates are one position, not two. A jump's arrival and the
-    // next jump's departure are the same occurrence seen from either side, and
-    // offering it twice would spend a wheel notch going nowhere.
+  const push = (address, recordId, unitIndex, identity = {}) => {
+    // Only *adjacent* duplicates are one position. A jump's arrival and the next
+    // jump's departure are the same occurrence seen from either side, and
+    // offering it twice would spend a wheel notch going nowhere. Two visits to
+    // the same Address separated by other occurrences are two encounters and
+    // must both survive -- that separation is the whole content of a return.
     const previous = positions.at(-1);
     if (previous && near(previous.address, address)) return;
-    positions.push(Object.freeze({ address, recordId, unitIndex }));
+    positions.push(Object.freeze({
+      address,
+      recordId,
+      unitIndex,
+      occurrenceKind: identity.occurrenceKind || "arrival",
+      recalledFrom: identity.recalledFrom || null
+    }));
   };
   for (let index = 0; index < limit; index += 1) {
     const record = userTime.records[index];
-    // A recall is not a journey.
+    // A scan is not a journey, but a landing is.
     //
-    // A ghost-replay records that the reader recalled these Addresses, and it
-    // is kept in full: its units, its provenance, and its place in the order
-    // are all part of what happened. But it is not offered back as somewhere to
-    // recall *to*, because its path is the reverse of a path already in the
-    // stream. Offering both makes the stream a palindrome, and then scrolling
-    // backward walks forward through the original journey and turns around --
-    // which is disorienting and tells the reader nothing the original records
-    // do not already say.
-    //
-    // Excluding it also gives §2.2 for free: the reader standing on a recalled
-    // Address resolves onto its *historical* occurrence, so Ghosting forward
-    // from there retraces what originally followed it.
-    if (record.kind === TRAVERSAL_KIND.GHOST_REPLAY) continue;
+    // The wheel motion used to find a moment is search, and copying it into the
+    // stream made it a palindrome: scrolling backward walked forward through the
+    // original journey and turned around. Only the settled landing is recorded,
+    // and it is one jump from the live Anchor to the Address re-entered -- so
+    // this contributes exactly one new position, and re-entering a moment stays
+    // in the record where it belongs.
+    const injected = record.kind === TRAVERSAL_KIND.GHOST_INJECTION;
     record.units.forEach((unit, unitIndex) => {
       if (unit.kind === UNIT_KIND.SPAN) {
         const inside = spanPositions(unit, { range: bounds, projection, stepReach });
@@ -227,7 +229,13 @@ function readablePositions(userTime, { frozenStreamEnd, range, projection, stepR
           blocked = true;
           continue;
         }
-        push(address, record.id, unitIndex);
+        const landing = injected && near(address, unit.to);
+        push(address, record.id, unitIndex, landing
+          ? {
+            occurrenceKind: "injection",
+            recalledFrom: record.provenance?.recalledOccurrence || null
+          }
+          : {});
       }
     });
   }
@@ -249,6 +257,11 @@ export function latestCursorAtAddress(userTime, address, options = {}) {
 
 export function cursorIsValid(userTime, cursor, options = {}) {
   if (!cursor || !Number.isFinite(cursor.address)) return false;
+  // A resume cursor describes the moment the reader is standing in. If they have
+  // since moved, it describes somewhere else and must not be resumed from.
+  if (Number.isFinite(options.current) && !near(options.current, cursor.address)) {
+    return false;
+  }
   const record = userTime.records.find(entry => entry.id === cursor.recordId);
   if (!record) return false;
   const unit = record.units[cursor.unitIndex];
@@ -285,9 +298,13 @@ export function beginGhostRead(userTime, {
     stepReach
   });
   let index = -1;
-  // A resume cursor continues the historical pattern the reader was following
-  // rather than restarting from the occurrence their own last replay appended.
-  if (resumeCursor && cursorIsValid(userTime, resumeCursor, { range })) {
+  // The resume cursor is the historical occurrence a previous landing re-entered.
+  // Following it means "what originally came after this moment", which is only a
+  // question a forward gesture asks -- a backward gesture is asking what led to
+  // the present re-entry, and that is the live stream. The caller decides which,
+  // and having decided at activation it does not switch mid-gesture: reversing
+  // the wheel retraces the cursor already chosen.
+  if (resumeCursor && cursorIsValid(userTime, resumeCursor, { range, current })) {
     index = frozen.positions.findIndex(position =>
       position.recordId === resumeCursor.recordId
       && position.unitIndex === resumeCursor.unitIndex
@@ -343,37 +360,64 @@ export function moveGhostRead(userTime, ghostRead, direction) {
   };
 }
 
-// Committing a gesture writes what the reader just did — recalled these
-// Addresses, in this order, from this Anchor — at the live end of the stream.
-// The occurrences it was recalled from stay exactly where they are.
-export function appendGhostReplay(userTime, { anchor, anchorCursor, visited, createdAt } = {}) {
-  const path = (Array.isArray(visited) ? visited : [])
-    .filter(entry => Number.isFinite(entry?.address));
-  if (!path.length) return { userTime, record: null, resumeCursor: null, changed: false };
-  const points = [Number(anchor), ...path.map(entry => entry.address)];
-  const units = [];
-  for (let index = 1; index < points.length; index += 1) {
-    units.push({ kind: UNIT_KIND.JUMP, from: points[index - 1], to: points[index] });
+// Releasing at a recalled Address injects that landing, and nothing else.
+//
+// The scan and the landing are different events. Scrolling while G is held
+// inspects prior user time; it may cross many occurrences and reverse direction,
+// and none of that is a journey the reader took -- it is the search they used to
+// find one moment. Writing it down made the stream a palindrome and spent later
+// wheel detents crossing the reader's own search motion.
+//
+// What is written is one jump: from the live Anchor to the Address re-entered.
+// It is linked in both directions -- to the Anchor it was recalled *from*, and
+// to the historical occurrence it re-enters -- because those are the two
+// questions worth asking at a re-entry. Backward asks what led here; forward
+// asks what originally followed the moment now standing in.
+//
+// A gesture that returns to its Anchor writes nothing, because its one unit
+// spans no distance and `appendRecord` refuses those wherever they come from --
+// a zero-distance occurrence would sit in the stream indistinguishable from its
+// neighbour and cost a future detent to pass. The Session may still retain the
+// ground crossed; that is a different consequence of the same gesture.
+export function appendGhostInjection(userTime, {
+  anchor,
+  anchorCursor,
+  landing,
+  recalledCursor,
+  scan,
+  createdAt
+} = {}) {
+  const from = Number(anchor);
+  const to = Number(landing);
+  if (!Number.isFinite(from) || !Number.isFinite(to)) {
+    return { userTime, record: null, occurrence: null, resumeCursor: null, changed: false };
   }
   const appended = appendRecord(userTime, {
-    cause: "ghost-replay",
-    kind: TRAVERSAL_KIND.GHOST_REPLAY,
+    cause: "ghost",
+    kind: TRAVERSAL_KIND.GHOST_INJECTION,
     createdAt,
-    units,
+    units: [{ kind: UNIT_KIND.JUMP, from, to }],
     provenance: {
-      anchorAddress: Number(anchor),
       anchorOccurrence: anchorCursor ? Object.freeze({ ...anchorCursor }) : null,
-      recalledOccurrences: Object.freeze(
-        path.map(entry => Object.freeze({ ...(entry.sourceCursor || {}) }))
-      )
+      recalledOccurrence: recalledCursor ? Object.freeze({ ...recalledCursor }) : null,
+      // The search itself is kept as evidence, never as traversal.
+      scan: Object.freeze({
+        candidateCount: Number(scan?.candidateCount) || 0,
+        visitedMinimum: Number(scan?.visitedMinimum),
+        visitedMaximum: Number(scan?.visitedMaximum),
+        directionChanges: Number(scan?.directionChanges) || 0
+      })
     }
   });
+  if (!appended.changed) {
+    return { userTime, record: null, occurrence: null, resumeCursor: null, changed: false };
+  }
   return {
     ...appended,
-    // The next gesture continues through the historical pattern, not through the
-    // occurrence this replay just appended. Without it, Ghosting forward after a
-    // Release would retrace the replay itself rather than what originally
-    // followed the recalled point.
-    resumeCursor: path.at(-1)?.sourceCursor || null
+    occurrence: appended.userTime.latestOccurrence,
+    // The historical occurrence that was re-entered, so an immediately forward
+    // gesture can resume its original successors rather than retracing the live
+    // stream it has just been added to.
+    resumeCursor: recalledCursor ? Object.freeze({ ...recalledCursor }) : null
   };
 }
