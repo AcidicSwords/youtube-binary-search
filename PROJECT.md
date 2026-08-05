@@ -121,14 +121,14 @@ The visible and physical grammar is exactly:
 
 ```text
 Q  Refine Backward    W  Reopen            E  Refine Forward
-A  Step Backward      S  Switch Endpoint   D  Step Forward
+A  Step Backward      S  Switch End   D  Step Forward
 R  Release            T  Tag               F  Focus / Unfocus
 ```
 
 Its semantic rows are:
 
 1. **discriminate** — Refine Backward, Reopen, Refine Forward;
-2. **traverse or change viewpoint** — Step Backward, Switch Endpoint, Step Forward;
+2. **traverse or change viewpoint** — Step Backward, Switch End, Step Forward;
 3. **resolve the active relation** — Release it, Tag what is known, or Focus it as the active world.
 
 Tag has two exact forms:

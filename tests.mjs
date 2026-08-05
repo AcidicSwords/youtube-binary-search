@@ -74,7 +74,7 @@ import {
   moveGuidePin,
   unlinkGuideSectionEndpoint,
   linkGuidePins,
-  switchEndpoint,
+  switchActiveEnd,
   undo
 } from "./session.js";
 import { parseTimeValue, parseYouTubeUrl } from "./youtube.js";
@@ -511,7 +511,7 @@ assert.deepEqual(
   { start: 40, end: 70, departure: 70, arrival: 40 },
   "An adjacent midpoint outside the central mapped Interval must record the complete new traversal."
 );
-const transposedReplacement = localRefine(switchEndpoint(membershipBase).session, "forward");
+const transposedReplacement = localRefine(switchActiveEnd(membershipBase).session, "forward");
 assert.equal(transposedReplacement.refineRelation, "draw");
 assert.deepEqual(
   {

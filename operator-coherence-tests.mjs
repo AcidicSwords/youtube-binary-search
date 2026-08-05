@@ -14,7 +14,7 @@ import {
   reopen,
   step,
   stepToPin,
-  switchEndpoint,
+  switchActiveEnd,
   completePlayback,
   projectPlayback,
   previewTransition,
@@ -233,7 +233,7 @@ function transitionGeometry(result) {
 for (const [action, direct] of [
   ["refineBackward", source => refine(source, "backward")],
   ["localRefineBackward", source => localRefine(source, "backward")],
-  ["switchEndpoint", source => switchEndpoint(source)],
+  ["switchActiveEnd", source => switchActiveEnd(source)],
   ["release", source => releaseInterval(source)]
 ]) {
   const before = structuredClone(retained.model);
@@ -378,7 +378,7 @@ assert.equal(nextPin(emptyGuide, 50, { start: 10, end: 90 }).id, realEnd.id);
 // may be interior; switching still reaches a stable stored boundary.
 let watched = createSession({ duration: 100, current: 25 });
 watched = goTo(watched, 50, { operator: "timeline" }).session;
-watched = switchEndpoint(watched).session;
+watched = switchActiveEnd(watched).session;
 const playbackOrigin = snapshotModel(watched.model);
 const projectedPlayback = projectPlayback(watched.model, {
   departure: 25,
@@ -408,7 +408,7 @@ assert.deepEqual(
   { start: watched.model.interval.start, end: watched.model.interval.end },
   { start: 25, end: 50 }
 );
-const watchedBoundary = switchEndpoint(watched).session;
+const watchedBoundary = switchActiveEnd(watched).session;
 assert.equal(watchedBoundary.model.resolution.C, 50);
 assert.deepEqual(
   { start: watchedBoundary.model.interval.start, end: watchedBoundary.model.interval.end },

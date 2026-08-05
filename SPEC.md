@@ -111,7 +111,7 @@ It stores:
 - directed `departure` and `arrival`;
 - active side and direction;
 - the operator and medium that established it;
-- endpoint frames sufficient for Switch Endpoint.
+- endpoint frames sufficient for Switch End.
 
 It does not store a persistent path, visited-address ledger, exclusion tree, or object set. Composition resolves to the same two-bound representation.
 
@@ -265,7 +265,7 @@ The visible, physical, keyboard, preview, and documented matrix is exactly:
 
 ```text
 Q  Refine Backward    W  Reopen            E  Refine Forward
-A  Step Backward      S  Switch Endpoint   D  Step Forward
+A  Step Backward      S  Switch End   D  Step Forward
 R  Release            T  Tag               F  Focus / Unfocus
 ```
 
@@ -283,7 +283,7 @@ The canonical action identities and shifted meanings are:
 | `reopen` | `W` | Reopen | unchanged |
 | `refine-forward` | `E` | Refine Forward | Local Refine Forward |
 | `step-backward` | `A` | Step Backward | Previous Pin |
-| `switch-endpoint` | `S` | Switch Endpoint | unchanged |
+| `switch-endpoint` | `S` | Switch End | unchanged |
 | `step-forward` | `D` | Step Forward | Next Pin |
 | `release` | `R` | Release | unchanged |
 | `tag` | `T` | Tag as Pin | Tag as Section |
@@ -334,9 +334,9 @@ Pressed, held, repeated, and quickly tapped routes use one Step gesture owner. C
 
 Shifted Step traverses to the previous or next visible Pin stop or synthetic Range boundary. It uses Step’s same Active Span and endpoint-frame law; it is not a separate Go operation.
 
-### 5.6 Switch Endpoint
+### 5.6 Switch End
 
-Switch Endpoint requires a Active Span. It makes the opposite bound Current, flips the active side and orientation, and restores the Endpoint Frame owned by that bound. It preserves the Interval extent, Range, Guide, Weight, Focus, and bypass.
+Switch End requires a Active Span. It makes the opposite bound Current, flips the active side and orientation, and restores the Endpoint Frame owned by that bound. It preserves the Interval extent, Range, Guide, Weight, Focus, and bypass.
 
 ### 5.7 Release
 
@@ -626,7 +626,7 @@ Ghost Traversal is held `G` plus the wheel. Arming costs nothing: no Anchor, no 
 
 Each quantum moves a read cursor one occurrence backward or forward through user time and applies the recalled Address as an amendment against one captured origin. Backward and forward name directions in user time; either may move either way through source time. Watched spans are subdivided by the frozen Step law, so expanded ground yields finer recall while the watched boundaries stay exact. An Address the active Range excludes is unavailable rather than clamped, and Ghost never leaves Focus, widens Range, or opens Full Video to reach one.
 
-Ghost restores no historical Pins, Sections, Groups, Weights, titles, visibility, Focus, Range, Step Reach, deformation state or Guide selection. What it produces is an ordinary Active Span between the Anchor and the recalled Address, so Switch Endpoint, Tag, Release and Focus act on it exactly as they would on any other.
+Ghost restores no historical Pins, Sections, Groups, Weights, titles, visibility, Focus, Range, Step Reach, deformation state or Guide selection. What it produces is an ordinary Active Span between the Anchor and the recalled Address, so Switch End, Tag, Release and Focus act on it exactly as they would on any other.
 
 Where automatic Context is enabled, each recalled Address plays: the stop condition for a recall is recognition, and a still frame is a poor thing to recognise a moment from. Successive candidates retarget one Context window rather than opening a new one, so the window follows the wheel instead of being torn down and rebuilt at every notch. A window superseded or run out during the scan is search and writes no observation; only the one still running when the gesture ended was watched, and it joins the path as observed source time on its own terms. Escape stops it with everything else the scan did. With Context off, recall remains a silent frame-by-frame scan.
 
@@ -732,7 +732,7 @@ Player error and ordinary source replacement use the same boundary. No old Addre
 
 Every visible route is an adapter to one semantic consequence:
 
-- Matrix click and keyboard keys call the same Refine, Reopen, Step, Switch Endpoint, Release, Tag, and Focus operations;
+- Matrix click and keyboard keys call the same Refine, Reopen, Step, Switch End, Release, Tag, and Focus operations;
 - Timeline Pin click and Guide Pin Go call the same exact movement;
 - Timeline Section click and Guide Section selection install the same Active Span;
 - Timeline and Guide Pin/Section movement call the same Guide kernel operations;

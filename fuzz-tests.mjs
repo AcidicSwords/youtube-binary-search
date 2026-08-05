@@ -5,7 +5,7 @@ import {
   reopen,
   step,
   goTo,
-  switchEndpoint,
+  switchActiveEnd,
   setRange,
   undo,
   pinCurrent,
@@ -112,7 +112,7 @@ for (let run = 0; run < RUNS; run += 1) {
         ? focusSection(session, sections[Math.floor(random() * sections.length)].id)
         : { session, changed: false };
     } else if (operation === 11) result = leaveSection(session);
-    else if (operation === 12) result = switchEndpoint(session);
+    else if (operation === 12) result = switchActiveEnd(session);
     else result = focusWorkingSection(session);
 
     if (result?.session) session = result.session;

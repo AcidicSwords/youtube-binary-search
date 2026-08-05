@@ -944,11 +944,11 @@ export function reopen(session) {
   });
 }
 
-export function switchEndpoint(session, options = {}) {
+export function switchActiveEnd(session, options = {}) {
   const interval = session.model.interval;
   if (!interval) return unchanged(session, "no-interval");
 
-  return commit(session, "Switch Endpoint", draft => {
+  return commit(session, "Switch End", draft => {
     const active = clone(draft.interval);
     if (!active) return { changed: false, reason: "no-interval" };
     const metric = options.projection?.metric || projectionForModel(draft).metric;
@@ -1803,8 +1803,8 @@ export function previewTransition(session, action, options = {}) {
         stepSeconds: options.seconds,
         projection: options.projection
       });
-    case "switchEndpoint":
-      return switchEndpoint(session, {
+    case "switchActiveEnd":
+      return switchActiveEnd(session, {
         projection: options.projection
       });
     case "reopen":
@@ -1890,7 +1890,7 @@ export function relabelLastAction(session, label) {
 // What it produces is an ordinary Active Span. The Address the reader was
 // at when the gesture began is the fixed Anchor; the recalled Address is the
 // active endpoint. Nothing downstream needs to know it came from user time --
-// Switch Endpoint, Tag, Release and Focus all act on it as they would on any
+// Switch End, Tag, Release and Focus all act on it as they would on any
 // other Interval -- which is why there is no second interval type.
 export function ghostTraverse(session, destination, options = {}) {
   const perform = draft => {
@@ -2104,7 +2104,7 @@ export function settleStepSequence(session, pending) {
     // The final committed repeat supplies the deterministic viewpoint. A
     // backward return leaves the lower side active; a forward return leaves the
     // upper side active. The opposite visited extreme is the retained endpoint
-    // from which Switch Endpoint can reconstruct the complementary viewpoint.
+    // from which Switch End can reconstruct the complementary viewpoint.
     const activeEnd = pending.lastDirection === "backward" ? "start" : "end";
     const intervalDeparture = activeEnd === "start"
       ? visitedMaximum

@@ -14,7 +14,7 @@ import {
   deleteGuideGroup,
   step,
   settleStepSequence,
-  switchEndpoint,
+  switchActiveEnd,
   undo
 } from "./session.js";
 
@@ -183,10 +183,10 @@ function performStepSequence(directions, reach = 10) {
   assert.equal("visitedMaximum" in settled.session.model, false);
   assert.equal("path" in settled.session.model, false);
 
-  const switched = switchEndpoint(settled.session);
+  const switched = switchActiveEnd(settled.session);
   assert.equal(switched.changed, true);
   assert.equal(switched.session.model.resolution.C, 60,
-    "The retained endpoint frame supports deterministic Switch Endpoint.");
+    "The retained endpoint frame supports deterministic Switch End.");
   const restored = undo(settled.session);
   assert.equal(restored.changed, true);
   assert.equal(restored.session.model.resolution.C, 50);

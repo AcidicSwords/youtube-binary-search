@@ -8,7 +8,7 @@
 - **Current** — the committed semantic Address.
 - **Cursor** — the transient physical Address reported while media is being observed.
 - **Active Span** — the positive contiguous residue left after alternatives have been excluded from Range. It stores bounds, orientation, and endpoint frames, not a persistent path.
-- **Endpoint Frame** — the Resolution and basis associated with one side of a Active Span, restored by Switch Endpoint.
+- **Endpoint Frame** — the Resolution and basis associated with one side of a Active Span, restored by Switch End.
 - **Timeline Space** — the positive, continuous, strictly increasing spatial coordinate derived from Source Time and effective Section factors.
 - **Temporal Topography** — the source projected into navigable Timeline Space, including its contours, retained landmarks, and relation wires.
 - **Density** — the product of effective covering Section weights at a source segment; integrating it produces Timeline Space.
@@ -37,7 +37,7 @@
 - **Step Backward / Step Forward** — traverse a configured distance in Timeline Space while retaining a contiguous residue.
 - **Step Reversal** — one coalesced Step sequence whose final Address is its departure but whose transient visited envelope has positive extent; that envelope becomes the Active Span.
 - **Pin traversal** — shifted Step to the previous or next retained landmark or synthetic Range boundary, using Step’s interval law.
-- **Switch Endpoint** — make the opposite Active Span side Current and restore that side’s Endpoint Frame.
+- **Switch End** — make the opposite Active Span side Current and restore that side’s Endpoint Frame.
 - **Release** — clear the Active Span and acquired Timeline operand. It preserves Current, Resolution, Range and Focus, Guide focus, retained topology, Weight, deformation bypass, and playback preferences.
 - **Focus / Unfocus** — install an acquired Section or Active Span as Range and viewport / restore its containing Range.
 - **Go** — move to an exact known Address, seed a movement-scale Resolution, and establish the corresponding contiguous residue.

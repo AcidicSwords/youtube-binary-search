@@ -1844,7 +1844,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       stepForward: shiftLayer && next
         ? { start: semanticCurrent, end: next.t }
         : null,
-      switchEndpoint: switchFrame
+      switchActiveEnd: switchFrame
         ? { start: switchFrame.L, end: switchFrame.R }
         : currentSpan,
       release: currentSpan,
@@ -2209,7 +2209,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     setActionMeta(
       "switch-endpoint",
       "switch-endpoint-meta",
-      "Switch Endpoint",
+      "Switch End",
       currentSpan
         ? `to ${formatTime(currentSpan.departure)}${destinationScale ? ` · ${destinationScale} ${destinationFrame.neighborhoodBasis === NEIGHBORHOOD_BASIS.RANGE ? "Range" : "movement"} scale` : ""}`
         : "No Active Span"

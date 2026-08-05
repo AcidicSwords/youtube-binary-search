@@ -8,7 +8,7 @@ export const OPERATOR_MATRIX = Object.freeze([
   ]),
   Object.freeze([
     Object.freeze({ id: "step-backward", area: "step-backward", key: "A", label: "Step Backward", shifted: "Previous Pin" }),
-    Object.freeze({ id: "switch-endpoint", area: "switch-endpoint", key: "S", label: "Switch Endpoint" }),
+    Object.freeze({ id: "switch-endpoint", area: "switch-endpoint", key: "S", label: "Switch End" }),
     Object.freeze({ id: "step-forward", area: "step-forward", key: "D", label: "Step Forward", shifted: "Next Pin" })
   ]),
   Object.freeze([

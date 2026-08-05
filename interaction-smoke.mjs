@@ -254,7 +254,7 @@ assert.equal(currentText(), "Current 0:50");
 assert.match(byId.get("section-window").textContent, /0:50–1:00/);
 assert.match(byId.get("return-meta").textContent, /Step Reversal/);
 
-// Switch Endpoint preserves the ordered Interval while transposing its active
+// Switch End preserves the ordered Interval while transposing its active
 // endpoint and retained search frame. S owns the same operator; Undo remains a
 // separate plain-Z history action outside the matrix.
 byId.get("switch-endpoint").click();
@@ -834,7 +834,7 @@ assert.equal(lead.currentTime, 68, "Paused Lead must preview the exact Step Forw
 assert.equal(tail.state, 2);
 assert.equal(lead.state, 2);
 
-// Playback settlement must not strand Switch Endpoint on the short physical
+// Playback settlement must not strand Switch End on the short physical
 // playback segment. It still transposes the preserved Interval endpoints exactly.
 byId.get("switch-endpoint").click();
 await flush();

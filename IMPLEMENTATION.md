@@ -54,7 +54,7 @@ acquired Timeline operand and toggling deformation bypass are examples.
 The Active Span is the contiguous residue left by excluding alternatives.
 Its compact endpoint representation records bounds, orientation, active side,
 and endpoint frames; no persistent Path or exclusion ledger exists. Refine,
-Step, Switch Endpoint, direct manipulation, retained extents, and Playback all
+Step, Switch End, direct manipulation, retained extents, and Playback all
 resolve to that same representation. Reopen and Undo restore previously
 excluded alternatives or prior state. Release clears the residue without
 deleting retained topology.
@@ -72,7 +72,7 @@ The physical, visible, and keyboard matrix is exactly:
 
 ```text
 Q  Refine Backward    W  Reopen            E  Refine Forward
-A  Step Backward      S  Switch Endpoint   D  Step Forward
+A  Step Backward      S  Switch End   D  Step Forward
 R  Release            T  Tag               F  Focus / Unfocus
 ```
 

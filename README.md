@@ -81,7 +81,7 @@ The visible and physical operator matrix is exactly:
 
 ```text
 Q  Refine Backward    W  Reopen            E  Refine Forward
-A  Step Backward      S  Switch Endpoint   D  Step Forward
+A  Step Backward      S  Switch End   D  Step Forward
 R  Release            T  Tag               F  Focus / Unfocus
 ```
 
@@ -126,7 +126,7 @@ Nudge is exact source-time adjustment. `Shift`+wheel uses the dominant wheel axi
 | `Shift+Q` / `Shift+E` | Local Refine backward / forward |
 | `A` / `D`, `←` / `→` | Step backward / forward |
 | `Shift+A` / `Shift+D`, `Shift+←` / `Shift+→` | Previous / next Pin |
-| `W` / `S` | Reopen / Switch Endpoint |
+| `W` / `S` | Reopen / Switch End |
 | `R` / `T` / `Shift+T` / `F` | Release / Tag as Pin / Tag as Section / Focus |
 | `X` | Toggle deformation for the acquired Section, otherwise the complete Timeline |
 | `Z` / `C` | Undo / Redo |

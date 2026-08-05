@@ -207,7 +207,7 @@ order:
 | W | Reopen | — |
 | E | Refine Forward | Local Refine Forward |
 | A | Step Backward | Previous Pin |
-| S | Switch Endpoint | — |
+| S | Switch End | — |
 | D | Step Forward | Next Pin |
 | R | Release | — |
 | T | Tag as Pin | Tag as Section |
@@ -338,7 +338,7 @@ observation. Changing one setting does not rewrite another dimension.
 | A or Left / D or Right | Step Backward / Forward |
 | Shift+A or Shift+Left / Shift+D or Shift+Right | Previous / Next Pin |
 | W | Reopen |
-| S | Switch Endpoint |
+| S | Switch End |
 | R | Release |
 | T / Shift+T | Tag as Pin / Tag as Section |
 | X | Toggle deformation for acquired Section, otherwise complete Timeline |

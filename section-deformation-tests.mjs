@@ -23,7 +23,7 @@ import {
   setGuideSectionWeight,
   step,
   stepToPin,
-  switchEndpoint
+  switchActiveEnd
 } from "./session.js";
 import {
   createTimelineProjection,
@@ -139,9 +139,9 @@ function weightedGuide(...definitions) {
     },
     { departure: 29, arrival: 51, start: 29, end: 51 }
   );
-  session = switchEndpoint(session).session;
+  session = switchActiveEnd(session).session;
   assert.equal(session.model.resolution.C, 29);
-  session = switchEndpoint(session).session;
+  session = switchActiveEnd(session).session;
   assert.equal(session.model.resolution.C, 51);
 }
 

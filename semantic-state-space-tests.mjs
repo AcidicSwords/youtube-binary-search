@@ -16,7 +16,7 @@ import {
   setRange,
   setStepReach,
   step,
-  switchEndpoint,
+  switchActiveEnd,
   undo
 } from "./session.js";
 import {
@@ -128,7 +128,7 @@ for (let run = 0; run < RUNS; run += 1) {
         operator: "timeline",
         label: "Timeline Click"
       });
-    } else if (operation === 6) result = switchEndpoint(session);
+    } else if (operation === 6) result = switchActiveEnd(session);
     else if (operation === 7) result = undo(session);
     else if (operation === 8) {
       let start = random() * 600;
@@ -155,10 +155,10 @@ for (let run = 0; run < RUNS; run += 1) {
     else {
       // Metamorphic check: Endpoint Transposition must remain an involution for
       // every randomly reached valid Interval, not only hand-authored examples.
-      const once = switchEndpoint(session);
+      const once = switchActiveEnd(session);
       if (!once.changed) result = once;
       else {
-        const twice = switchEndpoint(once.session);
+        const twice = switchActiveEnd(once.session);
         assert.equal(twice.changed, true);
         assert.deepEqual(twice.session.model, session.model);
         result = once;
@@ -228,7 +228,7 @@ for (let trial = 0; trial < INTERVAL_TRIALS; trial += 1) {
   }
   let intervalSession = createSession({ duration: 600, current: P });
   intervalSession = goTo(intervalSession, A, { operator: "targetA" }).session;
-  intervalSession = switchEndpoint(intervalSession).session;
+  intervalSession = switchActiveEnd(intervalSession).session;
   const direction = B < P ? "backward" : "forward";
   intervalSession = step(intervalSession, direction, Math.abs(B - P)).session;
   assert.ok(Math.abs(intervalSession.model.interval.departure - A) <= EPSILON);

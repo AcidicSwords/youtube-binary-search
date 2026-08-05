@@ -11,7 +11,7 @@ import {
   localRefine,
   snapshotModel,
   step,
-  switchEndpoint
+  switchActiveEnd
 } from "./session.js";
 import {
   createGuide,
@@ -61,7 +61,7 @@ assert.deepEqual(
   { start: 40, end: 70, departure: 70, arrival: 40 }
 );
 
-const replacedPast = localRefine(switchEndpoint(composed).session, "forward");
+const replacedPast = localRefine(switchActiveEnd(composed).session, "forward");
 assert.equal(replacedPast.refineRelation, "draw");
 assert.deepEqual(
   {
@@ -92,7 +92,7 @@ assert.equal(orderedPins(guide).length, 4);
 
 let pinComposition = createSession({ duration: 100, current: 10, guide });
 pinComposition = goTo(pinComposition, 20, { operator: "targetA" }).session;
-pinComposition = switchEndpoint(pinComposition).session;
+pinComposition = switchActiveEnd(pinComposition).session;
 for (let pin = nextPin(guide, pinComposition.model.resolution.C, pinComposition.model.range);
   pin;
   pin = nextPin(guide, pinComposition.model.resolution.C, pinComposition.model.range)) {

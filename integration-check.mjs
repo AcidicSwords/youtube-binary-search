@@ -191,7 +191,7 @@ for (const proof of [
 for (const [key, consequence] of [
   ["w", /reopenFully\(\)/],
   ["q", /refine\("backward"/],
-  ["s", /switchCurrentEndpoint\(/],
+  ["s", /switchActiveEnd\(/],
   ["e", /refine\("forward"/]
 ]) {
   has(appCode, new RegExp(`spatialKey\\("${key}"\\)[\\s\\S]{0,180}?${consequence.source}`),
@@ -314,7 +314,7 @@ has(deformationRenderer, /projection\.weightedSections/,
   "Atmosphere and contours consume effective projection contributors.");
 lacks(deformationRenderer, /sortedSections\(|guide\(\)\.sections|state\(\)\.session\.model\.guide/,
   "Atmosphere does not reread raw stored Guide weights.");
-for (const api of ["localRefine", "refine", "step", "stepToPin", "switchEndpoint"]) {
+for (const api of ["localRefine", "refine", "step", "stepToPin", "switchActiveEnd"]) {
   has(session, new RegExp(`export function ${api}\\([^)]*options = \\{\\}`),
     `${api} accepts operation-scoped projection options.`);
 }

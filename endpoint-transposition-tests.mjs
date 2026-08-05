@@ -10,7 +10,7 @@ import {
   reopen,
   step,
   completePlayback,
-  switchEndpoint,
+  switchActiveEnd,
   undo
 } from "./session.js";
 
@@ -33,9 +33,9 @@ const originalHistoryLength = session.history.length;
 assert.deepEqual(session.model.interval.departureNeighborhood, departureNeighborhood);
 assert.deepEqual(session.model.interval.arrivalNeighborhood, arrivalNeighborhood);
 
-let switched = switchEndpoint(session);
+let switched = switchActiveEnd(session);
 assert.equal(switched.changed, true);
-assert.equal(switched.label, "Switch Endpoint");
+assert.equal(switched.label, "Switch End");
 assert.equal(switched.session.history.length, originalHistoryLength + 1);
 assert.equal(switched.session.model.resolution.C, originalInterval.departure);
 assert.deepEqual(frameOf(switched.session.model), departureNeighborhood);
@@ -58,7 +58,7 @@ assert.deepEqual(
 
 // Endpoint Transposition is an involution over semantic state. Each switch
 // captures the frame being left and restores the frame stored at the endpoint.
-switched = switchEndpoint(switched.session);
+switched = switchActiveEnd(switched.session);
 assert.equal(switched.session.model.resolution.C, originalInterval.arrival);
 assert.deepEqual(frameOf(switched.session.model), arrivalNeighborhood);
 assert.deepEqual(switched.session.model.interval, originalInterval);
@@ -68,7 +68,7 @@ assert.deepEqual(switched.session.model.interval, originalInterval);
 // complete Current-to-midpoint traversal becomes the Active Span.
 let overrun = createSession({ duration: 100, current: 50 });
 overrun = goTo(overrun, 70, { operator: "timeline" }).session;
-overrun = switchEndpoint(overrun).session;
+overrun = switchActiveEnd(overrun).session;
 const overrunResult = localRefine(overrun, "forward");
 assert.equal(overrunResult.refineRelation, "draw");
 assert.deepEqual(
@@ -88,12 +88,12 @@ assert.deepEqual(overrunResult.session.model.resolution, {
 });
 
 // Playback accumulates watched coverage without replacing or shortening the
-// Interval that Switch Endpoint is transposing. Boundary search frames survive
+// Interval that Switch End is transposing. Boundary search frames survive
 // an interior Current and a subsequent switch.
 let played = createSession({ duration: 120, current: 10 });
 played = goTo(played, 50, { operator: "timeline" }).session;
 const frameAtFifty = frameOf(played.model);
-played = switchEndpoint(played).session;
+played = switchActiveEnd(played).session;
 const playbackOrigin = snapshotModel(played.model);
 played = completePlayback(played, {
   current: 20,
@@ -114,13 +114,13 @@ assert.deepEqual(
 );
 assert.equal(played.model.resolution.L, playbackOrigin.resolution.L);
 assert.equal(played.model.resolution.C, 20);
-played = switchEndpoint(played).session;
+played = switchActiveEnd(played).session;
 assert.equal(played.model.resolution.C, 50);
 assert.deepEqual(frameOf(played.model), frameAtFifty);
 assert.deepEqual(
   { start: played.model.interval.start, end: played.model.interval.end },
   { start: 10, end: 50 },
-  "Switch Endpoint must not change accumulated playback coverage."
+  "Switch End must not change accumulated playback coverage."
 );
 
 // Reopen changes the active endpoint frame without changing Interval extent.
@@ -132,8 +132,8 @@ assert.deepEqual(
   { start: reopened.model.interval.start, end: reopened.model.interval.end },
   { start: originalInterval.start, end: originalInterval.end }
 );
-reopened = switchEndpoint(reopened).session;
-reopened = switchEndpoint(reopened).session;
+reopened = switchActiveEnd(reopened).session;
+reopened = switchActiveEnd(reopened).session;
 assert.deepEqual(frameOf(reopened.model), reopenedArrivalFrame);
 
 // Step composes around whichever endpoint is currently the departure anchor.
@@ -160,10 +160,10 @@ stepped = step(stepped, "forward", 10, {
 assert.equal(stepped.history.length, originHistoryLength + 1);
 const activeEndpointFrame = frameOf(stepped.model);
 const anchorFrame = stepped.model.interval.departureNeighborhood;
-stepped = switchEndpoint(stepped).session;
+stepped = switchActiveEnd(stepped).session;
 assert.equal(stepped.model.resolution.C, 20);
 assert.deepEqual(frameOf(stepped.model), anchorFrame);
-stepped = switchEndpoint(stepped).session;
+stepped = switchActiveEnd(stepped).session;
 assert.equal(stepped.model.resolution.C, 60);
 assert.deepEqual(frameOf(stepped.model), activeEndpointFrame);
 
@@ -186,12 +186,12 @@ blankStep = step(blankStep, "forward", 10, {
   originResolutionBasis: blankOrigin.neighborhoodBasis,
   amend: true
 }).session;
-blankStep = switchEndpoint(blankStep).session;
+blankStep = switchActiveEnd(blankStep).session;
 assert.equal(blankStep.model.resolution.C, 50);
 assert.deepEqual(frameOf(blankStep.model), frameOf(blankOrigin));
 
 // Step after a switch edits from the newly transposed anchor.
-stepped = switchEndpoint(stepped).session; // Current 20, anchor 60.
+stepped = switchActiveEnd(stepped).session; // Current 20, anchor 60.
 const frameAtSixty = stepped.model.interval.departureNeighborhood;
 stepped = step(stepped, "backward", 5).session;
 assert.deepEqual(
@@ -203,7 +203,7 @@ assert.deepEqual(
   },
   { start: 15, end: 60, departure: 60, arrival: 15 }
 );
-stepped = switchEndpoint(stepped).session;
+stepped = switchActiveEnd(stepped).session;
 assert.equal(stepped.model.resolution.C, 60);
 assert.deepEqual(frameOf(stepped.model), {
   ...frameAtSixty,
@@ -221,14 +221,14 @@ collapsed = goTo(collapsed, 40, { operator: "timeline" }).session;
 collapsed = step(collapsed, "backward", 20).session;
 assert.equal(collapsed.model.interval, null);
 const collapsedHistoryLength = collapsed.history.length;
-const noSwitch = switchEndpoint(collapsed);
+const noSwitch = switchActiveEnd(collapsed);
 assert.equal(noSwitch.changed, false);
 assert.equal(noSwitch.reason, "no-interval");
 assert.equal(noSwitch.session.history.length, collapsedHistoryLength);
 
 // Undo remains a separate history operation and restores the pre-switch state.
 const beforeSwitch = snapshotModel(session.model);
-const afterSwitch = switchEndpoint(session).session;
+const afterSwitch = switchActiveEnd(session).session;
 const undone = undo(afterSwitch);
 assert.equal(undone.changed, true);
 assert.deepEqual(undone.session.model, beforeSwitch);
@@ -240,7 +240,7 @@ delete legacy.model.interval.departureNeighborhood;
 delete legacy.model.interval.arrivalNeighborhood;
 delete legacy.model.interval.startFrame;
 delete legacy.model.interval.endFrame;
-legacy = switchEndpoint(legacy).session;
+legacy = switchActiveEnd(legacy).session;
 assert.equal(legacy.model.resolution.C, 20);
 assert.ok(legacy.model.interval.departureNeighborhood);
 assert.ok(legacy.model.interval.arrivalNeighborhood);
@@ -257,12 +257,12 @@ assert.match(html, /id="return-action"[^>]*aria-keyshortcuts="Z"/);
 assert.match(html, /id="redo-action"[^>]*aria-keyshortcuts="C"/);
 assert.match(
   app,
-  /spatialKey\("s"\)[\s\S]*switchCurrentEndpoint\(\{ carryRetained: carryChord \}\)/
+  /spatialKey\("s"\)[\s\S]*switchActiveEnd\(\{ carryRetained: carryChord \}\)/
 );
 assert.doesNotMatch(
   app,
   /forceInterval|foldedEndpoint/,
-  "Switch Endpoint must remain one exact involution without projection-specific modes."
+  "Switch End must remain one exact involution without projection-specific modes."
 );
 assert.match(styles, /"refine-backward reopen refine-forward"/);
 assert.match(styles, /"step-backward switch-endpoint step-forward"/);

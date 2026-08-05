@@ -230,7 +230,7 @@ first clicking Timeline.
    Current-to-midpoint half.
 3. Step repeatedly, reverse direction, and return to departure. Confirm one
    `Step Reversal` Undo entry and a positive visited Active Span.
-4. Switch Endpoint twice. Current, Resolution, orientation, and endpoint frames
+4. Switch End twice. Current, Resolution, orientation, and endpoint frames
    must return exactly.
 5. Release. Current and Guide focus stay; Active Span and acquired Timeline
    operand clear.

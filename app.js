@@ -58,7 +58,7 @@ import {
   normalizeStepReach,
   effectiveStepReach,
   reopen as reopenSession,
-  switchEndpoint as switchSessionEndpoint,
+  switchActiveEnd as switchSessionEndpoint,
   releaseInterval as releaseSessionInterval,
   setRange as setSessionRange,
   previewRange,
@@ -1671,7 +1671,7 @@ function reopenFully() {
   });
 }
 
-function switchCurrentEndpoint(options = {}) {
+function switchActiveEnd(options = {}) {
   if (!state.videoLoaded) return;
   settleBeforeAction({ replacingContext: true });
   const carry = options.carryRetained === true || state.carryModifier;
@@ -1681,7 +1681,7 @@ function switchCurrentEndpoint(options = {}) {
     projection: timelineProjection()
   });
   if (!result.changed) {
-    setStatus("There is no active Interval endpoint to switch.");
+    setStatus("There is no Active End to switch.");
     return;
   }
   result = carryRetainedThrough(result, originModel, carry);
@@ -5647,7 +5647,7 @@ elements["refine-forward"].addEventListener("click", event => {
 });
 elements.reopen.addEventListener("click", reopenFully);
 elements["switch-endpoint"].addEventListener("click", event => {
-  switchCurrentEndpoint({
+  switchActiveEnd({
     carryRetained: event.altKey === true
   });
 });
@@ -6537,7 +6537,7 @@ document.addEventListener("keydown", event => {
   }
   else if (spatialKey("s") || carrySpatialKey("s")) {
     event.preventDefault();
-    switchCurrentEndpoint({ carryRetained: carryChord });
+    switchActiveEnd({ carryRetained: carryChord });
   }
   else if (spatialKey("e") || carrySpatialKey("e")) {
     event.preventDefault();
