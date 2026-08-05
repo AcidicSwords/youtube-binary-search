@@ -1101,7 +1101,7 @@ function recordTraversal(previousModel, options = {}) {
   const appended = appendAtomicTraversal(state.userTime, {
     from,
     to,
-    cause: model()?.lastOperator || "move",
+    cause: options.cause || model()?.lastOperator || "move",
     createdAt: Date.now()
   });
   if (!appended.changed) return false;
@@ -1805,7 +1805,7 @@ function focusOrUnfocus() {
   return false;
 }
 
-function traverseHistory(transform, emptyMessage, completedVerb) {
+function traverseHistory(transform, emptyMessage, completedVerb, cause) {
   settleBeforeAction({ replacingContext: true });
   const previousModel = model();
   const departure = currentResolution().C;
@@ -1815,6 +1815,15 @@ function traverseHistory(transform, emptyMessage, completedVerb) {
     return false;
   }
   state.session = result.session;
+  // Semantic history and user time are different orders, and traversing one
+  // moves through the other. An Undo that puts the reader somewhere else is a
+  // route they took: they now occupy that Address, and the moment they came
+  // from is the one they were just in. Leaving it unwritten made Ghost answer
+  // "what led here" with whatever led here the first time, which is the past
+  // rather than what just happened. Undoing a rename or a Weight moves nobody
+  // and still writes nothing -- the test is the Address, as it is everywhere
+  // else.
+  recordTraversal(previousModel, { cause });
   syncIntervalPinSelection();
   persistPreferences();
   const guidePersisted = result.guideChanged ? persistGuide() : true;
@@ -1842,7 +1851,8 @@ function undoLastAction() {
   return traverseHistory(
     undoSession,
     "There is no preceding state to Undo.",
-    "Undid"
+    "Undid",
+    "undo"
   );
 }
 
@@ -1850,7 +1860,8 @@ function redoLastAction() {
   return traverseHistory(
     redoSession,
     "There is no subsequent state to Redo.",
-    "Redid"
+    "Redid",
+    "redo"
   );
 }
 

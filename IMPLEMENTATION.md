@@ -19,6 +19,7 @@ is a module and ownership map, not a history of earlier designs.
 | `step-field-geometry.js` | Pure Field offsets, breathing phases, bounds, and rate pairs |
 | `step-field.js` | Tail/Lead players, placement, Field transitions, Breath runtime, Hold, and stale-event rejection |
 | `cues.js` | Parsing offered chapter Addresses into transient candidate extents |
+| `user-time.js` | The append-only encounter ledger: traversal records, the frozen readable stream, read cursors, and Ghost injection |
 | `view.js` | DOM projection, timeline atmosphere and contours, Guide rows, operator labels, and accessible state |
 | `app.js` | Composition, interaction acquisition, source generations, persistence, transient ownership, and adapter effects |
 
@@ -247,6 +248,48 @@ its end quarters for endpoint Pins and its middle for whole-Section translation;
 no additional Timeline node chrome exists. Every gesture snapshots one origin,
 amends it while moving, and checkpoints once on release. Escape or a lost
 pointer restores the origin.
+
+## User time and Ghost Traversal
+
+`user-time.js` is pure: no DOM, no media, no Session, no persistence. It holds
+one append-only ledger per source.
+
+```js
+{ kind: "atomic" | "sequence" | "continuous" | "ghost-injection",
+  cause, createdAt,
+  units: [{ kind: "jump" | "span", from, to }] }
+```
+
+`app.js` owns every decision about *when* to write. One route, one shape: a
+single movement is atomic; a held or coalesced gesture is a sequence that keeps
+its reversals, because collapsing a Step run to its endpoints erases the shape
+the reader remembers; watched source time is continuous, so any Address inside
+it may be recalled. A unit of no extent is refused by the ledger itself, which
+is what keeps an inert operation — a rename, a Weight, an Undo of either — out
+of the stream without every caller having to test for it. Undo and Redo write
+when they move the reader and not otherwise: semantic history and user time are
+different orders, and traversing one is a route through the other.
+
+A gesture resolves the whole readable sequence once, at the moment it begins:
+the frozen stream end, the active Range, the projection, and the effective Step
+Reach. That single decision settles three separate requirements — the gesture
+cannot follow its own newly injected output, a mid-gesture Weight change cannot
+move candidates already passed, and the Range in force at the start is the Range
+the whole gesture obeys.
+
+`session.js` supplies `ghostTraverse`, which amends one captured origin per
+notch, and `settleGhostSequence`, which commits the gesture as one transaction.
+Releasing appends exactly one occurrence — Anchor to landing — with the scan
+kept as provenance rather than as traversal. A resume cursor lets an
+immediately-forward gesture replay the historical successors of the moment
+re-entered; it is refused once the reader is standing anywhere else, once its
+record or unit is gone, once its Address is not one the unit actually occupied,
+and once the active Range excludes it. Any route that moves the reader also
+withdraws it outright, so stepping away and back does not revive it.
+
+Where automatic Context is enabled, each Ghost candidate retargets one Context
+window rather than opening a new one. A window superseded or run out during the
+scan writes no observation; the one still running when the gesture ended does.
 
 ## Playback and media authority
 

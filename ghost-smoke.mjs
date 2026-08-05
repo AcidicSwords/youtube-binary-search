@@ -578,10 +578,261 @@ try {
   await settle(320);
 
   // =========================================================================
-  // 12. Nothing logged an error along the way
+  // 12. A forward scan settled mid-way lands once
+  // =========================================================================
+  // Backward is the easy direction to get right, because running out is
+  // obvious. Forward has somewhere to go for a while, so a scan that stops
+  // short of the live end is the case where a search could quietly be written
+  // as a path. Walk deliberately, go back several moments, then come forward
+  // and stop in the middle: the path must gain that one moment and nothing it
+  // passed through on the way.
+  await page.evaluate(() => document.activeElement?.blur());
+  const walked = [];
+  for (const fraction of [0.12, 0.3, 0.48, 0.66, 0.84]) {
+    await page.mouse.click(
+      timeline.x + timeline.width * fraction,
+      timeline.y + timeline.height * 0.55
+    );
+    await settle(330);
+    walked.push(await currentAddress());
+  }
+
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  for (let index = 0; index < 4; index += 1) {
+    await page.mouse.wheel(0, 100);
+    await settle(170);
+  }
+  const beforeForward = pathTotal(await text("#status"));
+  await page.keyboard.up("g");
+  await settle(340);
+  assert.equal(await currentAddress(), walked[0],
+    "Four moments back from the fifth stop is the first.");
+
+  // Forward from there, stopping two short of where the scan could still go.
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, -100);
+  await settle(200);
+  await page.mouse.wheel(0, -100);
+  await settle(200);
+  const settledMidway = await currentAddress();
+  await page.keyboard.up("g");
+  await settle(340);
+  assert.equal(await currentAddress(), settledMidway,
+    "A forward scan settles where it stopped, not where it could have reached.");
+  assert.notEqual(settledMidway, walked.at(-1),
+    "and stopping short is a landing in its own right, not a run to the live end.");
+
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, 100);
+  await settle(280);
+  const afterForward = pathTotal(await text("#status"));
+  const backFromLanding = await currentAddress();
+  await page.keyboard.press("Escape");
+  await page.keyboard.up("g");
+  await settle(340);
+  // Two gestures, two landings, two new moments: the backward scan's four
+  // candidates and the forward scan's two are search and cost nothing.
+  assert.equal(afterForward - beforeForward, 2,
+    "Two settled gestures add exactly two moments, whatever they scanned through.");
+  assert.equal(backFromLanding, walked[0],
+    "and backward from the landing follows what led there, which is the Anchor.");
+
+  // =========================================================================
+  // 13. An ordinary Step ends the historical pattern
+  // =========================================================================
+  // The resume cursor exists so that Ghosting forward out of a re-entered
+  // moment can replay what originally followed it. That offer is only good
+  // while the reader is still standing there. Moving of their own accord --
+  // any operator at all -- makes the next recall start from where they now
+  // actually are, on the live stream.
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, 100);
+  await settle(200);
+  await page.mouse.wheel(0, 100);
+  await settle(200);
+  const reEntered = await currentAddress();
+  await page.keyboard.up("g");
+  await settle(340);
+
+  // Straight forward from the re-entry resumes the historical successors: the
+  // reader has not moved, so the offer still stands.
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, -100);
+  await settle(280);
+  const historicalNext = await currentAddress();
+  await page.keyboard.press("Escape");
+  await page.keyboard.up("g");
+  await settle(340);
+  assert.equal(await currentAddress(), reEntered, "Escape leaves the re-entry intact.");
+
+  // Now step out and straight back. Standing on the same Address again is the
+  // one case that separates the law from the safety net: a cursor is also
+  // rejected when the reader has moved off it, so a reader who walked away
+  // would look right either way. Coming back makes the address match again, and
+  // only the Step having genuinely ended the pattern keeps the old offer down.
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press("d");
+  await settle(420);
+  const steppedTo = await currentAddress();
+  assert.notEqual(steppedTo, reEntered, "An ordinary Step moves the reader,");
+  await page.keyboard.press("a");
+  await settle(420);
+  assert.equal(await currentAddress(), reEntered,
+    "and stepping back puts them on the same Address they were recalled to.");
+
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, -100);
+  await settle(280);
+  const afterStepForward = await text("#status");
+  await page.keyboard.press("Escape");
+  await page.keyboard.up("g");
+  await settle(340);
+  // Those two Steps are the newest thing in the path, so its live end is here.
+  // Forward therefore has nowhere left to go -- which is what a withdrawn offer
+  // looks like from outside. A retained cursor would still be replaying the old
+  // moment's successors, from a place the reader has since left and returned to
+  // by a route of their own.
+  assert.match(afterStepForward, /most recent moment/,
+    "so the historical successors it was offering are no longer on the table.");
+  assert.ok(historicalNext && historicalNext !== reEntered,
+    "The offer really existed before the Step: forward had somewhere to go.");
+
+  // =========================================================================
+  // 14. Dragging Current is one movement, not every frame it passed
+  // =========================================================================
+  // The drag places Center at every candidate under the pointer, and the reader
+  // sees each one. None of it is a moment they went to: the gesture is a search
+  // for a place, exactly like a Ghost scan, and only the release is an arrival.
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, 100);
+  await settle(280);
+  const beforeDrag = pathTotal(await text("#status"));
+  await page.keyboard.press("Escape");
+  await page.keyboard.up("g");
+  await settle(340);
+  const dragOrigin = await currentAddress();
+
+  const marker = await boxOf(page, "#current-marker");
+  await page.mouse.move(marker.x + marker.width / 2, marker.y + marker.height / 2);
+  await page.mouse.down();
+  // Deliberately slow and across a lot of ground, so a sampled implementation
+  // would have plenty of positions to record.
+  for (const fraction of [0.3, 0.42, 0.55, 0.68, 0.8]) {
+    await page.mouse.move(
+      timeline.x + timeline.width * fraction,
+      timeline.y + timeline.height * 0.55,
+      { steps: 8 }
+    );
+    await settle(120);
+  }
+  await page.mouse.up();
+  await settle(420);
+  const dragLanding = await currentAddress();
+  assert.notEqual(dragLanding, dragOrigin, "The drag moved the reader,");
+
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, 100);
+  await settle(280);
+  const afterDrag = pathTotal(await text("#status"));
+  const dragPredecessor = await currentAddress();
+  await page.keyboard.press("Escape");
+  await page.keyboard.up("g");
+  await settle(340);
+  assert.equal(afterDrag - beforeDrag, 1,
+    "but records one moment, not the ground it was dragged across.");
+  assert.equal(dragPredecessor, dragOrigin,
+    "so the moment before the landing is where the drag began.");
+
+  // =========================================================================
+  // 15. Undo is a route the reader took
+  // =========================================================================
+  // Semantic history and user time are different orders, and traversing one
+  // moves through the other. An Undo that puts the reader somewhere else is a
+  // movement like any other: they now occupy that Address, and the moment they
+  // came from is the one they were just in. Left unwritten, Ghost answered
+  // "what led here" with whatever led here the first time -- the past, rather
+  // than what actually just happened.
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.mouse.click(timeline.x + timeline.width * 0.22, timeline.y + timeline.height * 0.55);
+  await settle(360);
+  const beforeUndo = await currentAddress();
+
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press("z");
+  await settle(420);
+  const undoneTo = await currentAddress();
+  assert.notEqual(undoneTo, beforeUndo, "Undo moved the reader,");
+
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, 100);
+  await settle(280);
+  const afterUndoBack = await currentAddress();
+  await page.keyboard.press("Escape");
+  await page.keyboard.up("g");
+  await settle(340);
+  assert.equal(afterUndoBack, beforeUndo,
+    "so the moment that led here is where they were standing before the Undo.");
+
+  // Redo is the same movement in the other direction and writes its own.
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press("c");
+  await settle(420);
+  assert.equal(await currentAddress(), beforeUndo, "Redo puts them back,");
+
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, 100);
+  await settle(280);
+  const afterRedoBack = await currentAddress();
+  await page.keyboard.press("Escape");
+  await page.keyboard.up("g");
+  await settle(340);
+  assert.equal(afterRedoBack, undoneTo,
+    "and what led there is where the Undo had left them.");
+
+  // Undoing something that moves nobody writes nothing. The test is the
+  // Address, here as everywhere else -- a Weight or a name changes the world
+  // without changing where the reader is standing.
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, 100);
+  await settle(280);
+  const beforeInert = pathTotal(await text("#status"));
+  await page.keyboard.press("Escape");
+  await page.keyboard.up("g");
+  await settle(340);
+
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press("[");
+  await settle(320);
+  await page.keyboard.press("z");
+  await settle(420);
+
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, 100);
+  await settle(280);
+  const afterInert = pathTotal(await text("#status"));
+  await page.keyboard.press("Escape");
+  await page.keyboard.up("g");
+  await settle(340);
+  assert.equal(afterInert, beforeInert,
+    "An Undo that moves nobody adds no moment to the path.");
+
+  // =========================================================================
+  // 16. Nothing logged an error along the way
   // =========================================================================
   assert.deepEqual(failures, [], `Console/page errors: ${failures.join(" | ")}`);
-  console.log("Ghost smoke passed: the Guide is on I while Tab stays the browser's and G no longer touches either; holding G moves nothing, writes no history and draws no Anchor; a wheel notch recalls an earlier moment behind a fixed Anchor and an ordinary Working Interval; releasing writes one transaction that one Undo reverses; Escape cancels exactly; Ghost owns the wheel only while G is held; one detent recalls exactly one moment; the recall says where in the path it is and what it is anchored to; Ghost interleaves with ordinary operators without ever landing where the reader has not been; releasing records the moment re-entered rather than the search that found it, so backward from it asks what led there; input below the threshold costs nothing at all; and with Context on the recall plays where it lands, one window following the wheel rather than a new one at every notch, with only the window still running when the gesture ended joining the path.");
+  console.log("Ghost smoke passed: the Guide is on I while Tab stays the browser's and G no longer touches either; holding G moves nothing, writes no history and draws no Anchor; a wheel notch recalls an earlier moment behind a fixed Anchor and an ordinary Working Interval; releasing writes one transaction that one Undo reverses; Escape cancels exactly; Ghost owns the wheel only while G is held; one detent recalls exactly one moment; the recall says where in the path it is and what it is anchored to; Ghost interleaves with ordinary operators without ever landing where the reader has not been; releasing records the moment re-entered rather than the search that found it, so backward from it asks what led there; input below the threshold costs nothing at all; and with Context on the recall plays where it lands, one window following the wheel rather than a new one at every notch, with only the window still running when the gesture ended joining the path; a forward scan settled short of the live end lands exactly once; stepping out and back onto a re-entered moment does not revive the offer the Step withdrew; dragging Current records one movement rather than the ground it crossed; and an Undo that moves the reader is itself a route they took, while one that moves nobody writes nothing.");
 } finally {
   await close();
 }

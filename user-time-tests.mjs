@@ -474,7 +474,48 @@ function walk(userTime, ghostRead, direction, limit = 40) {
   assert.equal(cursorIsValid(userTime, cursor, { current: 10 }), true);
   assert.equal(cursorIsValid(userTime, cursor, { current: 20 }), false,
     "A reader who has moved on is no longer standing in the moment it describes.");
+
+  // The whole matrix, because a cursor is an offer to replay history and every
+  // way it can go stale is a way to replay somebody else's. Each of these is a
+  // separate reason, and none of them is covered by the others.
+  const sequence = appendSequenceTraversal(userTime, {
+    points: [20, 30, 25],
+    cause: "step-sequence"
+  }).userTime;
+  const sequenceId = sequence.records.at(-1).id;
+  // The two malformed Addresses are aimed at real records whose arithmetic
+  // would otherwise accept them: `null` coerces to 0, which the 0 -> 10 jump
+  // genuinely has an endpoint at, and "30" coerces to 30, which the sequence
+  // genuinely reaches. Only an Address that is a number gets that far.
+  for (const [label, candidate, options] of [
+    ["a cursor with no Address at all",
+      { recordId: userTime.records[0].id, unitIndex: 0, address: null }, {}],
+    ["an Address that is not a number",
+      { recordId: sequenceId, unitIndex: 0, address: "30" }, {}],
+    ["a record the ledger never held", { recordId: 4096, unitIndex: 0, address: 10 }, {}],
+    ["a unit index past the end of its record", { recordId: sequenceId, unitIndex: 7, address: 30 }, {}],
+    ["an Address belonging to a different unit of the same record",
+      { recordId: sequenceId, unitIndex: 0, address: 25 }, {}],
+    ["an Address the active Range excludes",
+      { recordId: sequenceId, unitIndex: 0, address: 30 }, { range: { start: 0, end: 22 } }],
+    ["a reader standing somewhere else",
+      { recordId: sequenceId, unitIndex: 0, address: 30 }, { current: 25 }]
+  ]) {
+    assert.equal(cursorIsValid(sequence, candidate, options), false,
+      `A resume cursor is refused for ${label}.`);
+  }
+
+  // And the same cursor, with nothing wrong with it, is accepted -- so the
+  // matrix above is measuring the reasons and not a blanket refusal.
+  assert.equal(
+    cursorIsValid(sequence, { recordId: sequenceId, unitIndex: 0, address: 30 }, {
+      current: 30,
+      range: { start: 0, end: 100 }
+    }),
+    true,
+    "A cursor with none of those faults still resumes."
+  );
 }
 
 
-console.log("User time tests passed: append-only records that keep reversals, direction in user time independent of source order, shared endpoints as one position, watched spans subdivided by the frozen Step law and clipped to the active Range, a frozen readable stream, and injection that records one landing rather than the search that found it, readable, linked to both the Anchor it came from and the moment it re-enters.");
+console.log("User time tests passed: append-only records that keep reversals, direction in user time independent of source order, shared endpoints as one position, watched spans subdivided by the frozen Step law and clipped to the active Range, a frozen readable stream, every way a resume cursor can go stale refused for its own reason, and injection that records one landing rather than the search that found it, readable, linked to both the Anchor it came from and the moment it re-enters.");

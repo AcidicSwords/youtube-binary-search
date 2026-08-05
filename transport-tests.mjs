@@ -314,4 +314,89 @@ const LADDER = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
     "A log-space tie between 1x and 2x resolves toward neutral.");
 }
 
-console.log("Transport tests passed: source Context, explicit playback observation/rate policy, authoritative actual rate, policy-preserving retry/wrap, log-space offer resolution, a log-compressed Weight texture of one rate step per octave, and Panorama triplets that suspend rather than turn asymmetric.");
+// What the adapter does with a dynamic request, when it disagrees.
+//
+// The Weight texture asks for a Center rate, and Panorama's triplet is a
+// relation around Center. Those are two different questions and the adapter can
+// answer the first one differently from what was asked, or not answer it yet.
+// Every one of these cases judges Panorama on the rate that is actually
+// playing, because the sides are real players and a triplet built on a rate
+// nobody is using would be a lie about what the reader is hearing.
+{
+  const dynamicAt = (weight, actualRate) => createPlaybackTransport({
+    departure: 40,
+    observationPolicy: OBSERVATION_POLICY.PANORAMA,
+    ratePolicy: dynamicRatePolicy(),
+    offeredRates: LADDER,
+    weight,
+    actualRate
+  });
+
+  // 1. Substitution. The Weight asked for 1.25x and the adapter is playing
+  // 1.5x. Panorama is judged on 1.5x, and its triplet is 1.5x's neighbours --
+  // not the ones the request would have had.
+  const substituted = dynamicAt(0.5, 1.5);
+  assert.equal(substituted.requestedRate, 1.25, "Half the Weight asks for one step up,");
+  assert.equal(substituted.actualRate, 1.5, "and the adapter answered with another.");
+  assert.equal(playbackAllowsPanorama(substituted, { offeredRates: LADDER }), true);
+  assert.deepEqual(panoramaTriplet(substituted.actualRate, LADDER),
+    { tail: 1.25, center: 1.5, lead: 1.75 },
+    "The sides bracket what is playing, not what was asked for.");
+  assert.notDeepEqual(panoramaTriplet(substituted.requestedRate, LADDER),
+    panoramaTriplet(substituted.actualRate, LADDER),
+    "The two answers genuinely differ, so following the wrong one would show.");
+
+  // 2. Delayed confirmation. A request to move Center has been issued and the
+  // adapter has said nothing yet. Nothing has moved, so nothing is re-judged:
+  // Panorama still stands on the rate last confirmed.
+  const requestedOnly = withPlaybackRequestedRate(dynamicAt(1, 1), 0.25);
+  assert.equal(requestedOnly.requestedRate, 0.25);
+  assert.equal(requestedOnly.actualRate, 1, "A request is not a confirmation,");
+  assert.equal(playbackAllowsPanorama(requestedOnly, { offeredRates: LADDER }), true,
+    "so a rate with no triplet does not suspend Panorama until it is real.");
+  const confirmed = withPlaybackActualRate(requestedOnly, 0.25);
+  assert.equal(playbackAllowsPanorama(confirmed, { offeredRates: LADDER }), false,
+    "Confirmation is what suspends it.");
+  assert.equal(confirmed.ratePolicy.kind, RATE_POLICY_KIND.DYNAMIC,
+    "and suspension is a presentation consequence, not the end of the policy.");
+  assert.equal(confirmed.requestedRate, 0.25, "nor a rewrite of the request.");
+
+  // 3. A native rate change, made in the player's own menu mid-Playback. It
+  // moves actual rate and nothing else -- the Weight texture is still the
+  // policy, and re-resolving it against the offer still yields the Weight's
+  // answer rather than what the reader picked by hand.
+  const native = withPlaybackActualRate(dynamicAt(4, 0.5), 2);
+  assert.equal(native.ratePolicy.kind, RATE_POLICY_KIND.DYNAMIC);
+  assert.equal(native.requestedRate, 0.5, "Two octaves of Weight still ask for two steps down,");
+  assert.equal(playbackAllowsPanorama(native, { offeredRates: LADDER }), false,
+    "and the top of the ladder has no Lead, so Center plays alone.");
+  assert.equal(resolvePlaybackRate(native, { offeredRates: LADDER, weight: 4 }), 0.5,
+    "A hand-set rate does not become the policy.");
+  assert.equal(playbackAllowsPanorama(withPlaybackActualRate(native, 1.5), {
+    offeredRates: LADDER
+  }), true, "Returning to a rate with a complete triplet restores Panorama.");
+
+  // 4. An adapter that has not published its ladder has not published a missing
+  // rung either. It falls back to the one rate every player has, so a dynamic
+  // request that Weight resolved elsewhere cannot claim a triplet on evidence
+  // that does not exist.
+  const unknownOffer = { offeredRates: [1] };
+  assert.equal(offerIsKnown(unknownOffer.offeredRates), false);
+  assert.equal(playbackAllowsPanorama(dynamicAt(1, 1), unknownOffer), true,
+    "1x is the one rate a silent adapter can be trusted to hold,");
+  assert.equal(playbackAllowsPanorama(dynamicAt(0.25, 1.5), unknownOffer), false,
+    "and any other rate is a triplet nobody has offered.");
+
+  // 5. Both extremes of the texture. Eight octaves apart, both outside the
+  // Panorama window, and neither ends the Playback transaction.
+  for (const [weight, rate] of [[8, 0.25], [0.03125, 2]]) {
+    const extreme = dynamicAt(weight, resolveCenterRate(weight, LADDER));
+    assert.equal(extreme.requestedRate, rate, `Weight ${weight} asks for ${rate}x,`);
+    assert.equal(playbackAllowsPanorama(extreme, { offeredRates: LADDER }), false,
+      "which has no complete triplet,");
+    assert.equal(extreme.ratePolicy.kind, RATE_POLICY_KIND.DYNAMIC,
+      "and Center goes on playing under the same policy.");
+  }
+}
+
+console.log("Transport tests passed: source Context that says where its watching began, explicit playback observation/rate policy, authoritative actual rate under substitution, delay, native change and an unpublished ladder, policy-preserving retry/wrap, log-space offer resolution, a log-compressed Weight texture of one rate step per octave, and Panorama triplets that suspend rather than turn asymmetric.");

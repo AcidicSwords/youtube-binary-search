@@ -86,6 +86,39 @@ The complete gate must prove all of the following.
 - Native seek, captions/settings, volume, and fullscreen hit regions remain
   pointer-accessible while paused and idle.
 
+### User time and Ghost Traversal
+
+`user-time-tests.mjs` owns the ledger, `ghost-tests.mjs` the Session operator,
+and `ghost-smoke.mjs` the gesture in a real browser.
+
+- Every route that moves the reader writes one occurrence: Go, Step, Nudge, a
+  Current drag, Playback, a watched Context window, and an Undo or Redo that
+  puts them somewhere else. A rename, a Weight, a Group toggle, a new Pin, and
+  an Undo of any of those write nothing. Programmatic placement never writes.
+- A held or coalesced gesture writes one sequence that keeps its reversals; a
+  Current drag writes one movement, not the ground it was dragged across.
+- Watched spans are recallable at any Address inside them, subdivided by the
+  frozen Step law and clipped to the active Range. Jumps offer only their two
+  endpoints.
+- Arming `G` costs nothing: no Anchor, no history, no settled playback, until a
+  whole wheel quantum is earned. One turn of the wheel recalls exactly one
+  moment whatever the device reports for a detent.
+- A gesture freezes the readable stream, Range, projection, and Step Reach at
+  its start, so it can never follow its own output and no mid-gesture change
+  moves a candidate already passed.
+- The scan is transient in both directions: a backward scan that crosses many
+  moments and a forward scan settled short of the live end each append exactly
+  one occurrence, the landing. Escape appends nothing and restores the origin,
+  history and future exactly.
+- Backward from an injected occurrence follows its live predecessor; forward may
+  resume the historical successors of the moment re-entered. The choice is made
+  once from the direction the gesture opens with. Any route the reader takes of
+  their own withdraws that offer, including one that leaves and returns to the
+  same Address.
+- A recalled Address the active Range excludes is unavailable rather than
+  clamped; Ghost never leaves Focus, widens Range, or opens Full Video.
+- One Undo returns to the Anchor with all structure intact.
+
 ### Source and Guide integrity
 
 `source-boundary-smoke.mjs` owns generation and transient-cleanup coverage;

@@ -93,6 +93,16 @@ The Timeline’s violet/teal atmosphere shows the sign and perceptual strength o
 
 **Toggle Deformation** is a comparison, not an edit. `X` bypasses the acquired Timeline Section’s contribution or, with no Section acquired, all deformation. The retained Weight remains visible and exact. The bypass is transient and source-scoped; it creates no history and no persisted setting.
 
+## The reader's own path
+
+There are four temporal orders here, and only three of them are about the work. Source time is what the video is. Timeline Space is what the map makes of it. Semantic history is what the reader did to the map. **User time** is the fourth: the order in which the reader actually encountered source Addresses. It is the only one that records where they have been, as opposed to what the world was.
+
+It is an append-only, source-scoped ledger. A record holds directed units: a **jump** was a movement between two Addresses and only those two were occupied; a **span** was watched continuously and any Address inside it was genuinely seen. Every route that moves the reader writes one — Go, Step, Nudge, a Current drag, Playback, an automatic Context window watched to its end, and an Undo or Redo that puts them somewhere else. Editing the world without moving writes nothing: a rename, a Weight, a new Pin, a Group toggled, an Undo of any of those. Programmatic placement never writes, because the player being told where to sit is a consequence of a movement rather than a movement of its own.
+
+**Ghost Traversal** — held `G` plus the wheel — reads that ledger while the semantic world stands still. The Address the reader began at becomes a fixed Anchor; each wheel quantum recalls one occurrence backward or forward through their own path, which may run either way through source time. What it produces is an ordinary Working Interval between the two, so every operator that acts on one acts on this. It restores no historical Guide, Weight, Group, Focus or Range: it recalls where they were, not what the world was then.
+
+Searching and arriving are different events. The scan is transient — it may cross many moments and reverse direction, and none of that is a path anybody walked. Releasing appends exactly one occurrence: a jump from the live Anchor to the moment re-entered, carrying provenance to both and to the scan as evidence. So repeated recall accumulates the moments returned to, never mirrored copies of the searching.
+
 ## Guide
 
 The Guide is the retained cartographic graph.
@@ -128,7 +138,7 @@ T         Tag as Pin      — Current becomes retained location
 Shift+T   Tag as Section  — the Working Interval becomes retained relation
 ```
 
-Weight remains an attribute of the retained Section in Guide. `X` remains an auxiliary comparison action inside Operators but outside the square matrix. The bottom row therefore has one coherent progression:
+Weight remains an attribute of the retained Section in Guide. `X` remains an auxiliary comparison action inside Operators but outside the square matrix, and so does held `G` — Ghost reads the reader's own path rather than acting on the map, which is why it is a held modifier on the wheel and not a letter in the square. The bottom row therefore has one coherent progression:
 
 ```text
 Release → return the active relation to absence
