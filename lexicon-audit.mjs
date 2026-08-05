@@ -52,10 +52,10 @@ function term(pattern, replacement, options = {}) {
 // plan. Exact code identifiers are matched verbatim; visible phrases are matched
 // case-insensitively where they appear in both prose and code.
 export const RETIRED_TERMS = [
-  // Phase 2 — Carry / Alt
-  term("carryModifier", "(removed) Carry is retired", { category: "carry" }),
-  term("carryRetained", "(removed) Carry is retired", { category: "carry" }),
-  term("carriedRetained", "(removed) Carry is retired", { category: "carry" }),
+  // Carry is a kept feature (Alt carries the Timeline Selection through a
+  // traversal), so its identifiers are canonical, not retired. Its operand name
+  // `selectedRetained` migrates to `timelineSelection` under Phase 3 like every
+  // other reference to the acquired Timeline operand.
 
   // Phase 3 — Current Neighborhood
   term("Resolution", "Current Neighborhood", { word: true, category: "neighborhood" }),

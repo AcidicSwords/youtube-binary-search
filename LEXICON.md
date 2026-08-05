@@ -344,6 +344,18 @@ Each canonical term carries:
 - **Code stem** `extendSpan` · **UI label** Extend Span
 - **Forbidden synonyms** Extend (naked), `guideCompose`, guide-compose-toggle.
 
+### Carry
+- **Class** operator modifier · **Owner** `app.js` · **Key** `Alt`
+- **Definition** While held, carries the current Timeline Selection through a
+  traversal (Step, Refine, Go, Pin traversal), so the acquired Pin or Section
+  moves with Current instead of being left behind.
+- **Code stem** `carry` (`carryModifier`, `carryRetained`,
+  `carryRetainedThrough`) · **UI label** Carry (Alt)
+- **Qualifiers** carried Timeline Selection.
+- **Non-effects** Not a semantic operator of its own; it modifies another
+  traversal and commits within that traversal's transaction. Distinct from
+  Extend Span, which grows the Active Span rather than moving a retained object.
+
 ---
 
 ## Topography and playback texture
@@ -721,6 +733,7 @@ Switch Endpoint · Endpoint Frame
 Tag · Tag as Pin · Tag as Section
 Carry · carryModifier · Alt + operator
 Section Weight · Group Active · Apply Weightings · Weights Applied
+  (Carry / Alt is a kept feature — see the Carry entry — not retired.)
 Deformation · Deformation Field · Deformation Atmosphere · Deformation Bypass ·
   Toggle Deformation · Straighten Timeline · Straighten Section · Bypass Weight ·
   Suspend Weight
