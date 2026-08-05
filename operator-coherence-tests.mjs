@@ -224,7 +224,7 @@ function transitionGeometry(result) {
   return {
     range: result.session.model.range,
     resolution: result.session.model.resolution,
-    resolutionBasis: result.session.model.resolutionBasis,
+    neighborhoodBasis: result.session.model.neighborhoodBasis,
     interval: interval ? stableInterval : null
   };
 }
@@ -384,7 +384,7 @@ const projectedPlayback = projectPlayback(watched.model, {
   departure: 25,
   current: 30,
   parentNeighborhood: playbackOrigin.resolution,
-  parentResolutionBasis: playbackOrigin.resolutionBasis,
+  parentResolutionBasis: playbackOrigin.neighborhoodBasis,
   returnModel: playbackOrigin
 });
 assert.deepEqual(
@@ -401,7 +401,7 @@ watched = completePlayback(watched, {
   departure: 25,
   current: 30,
   parentNeighborhood: playbackOrigin.resolution,
-  parentResolutionBasis: playbackOrigin.resolutionBasis,
+  parentResolutionBasis: playbackOrigin.neighborhoodBasis,
   returnModel: playbackOrigin
 }).session;
 assert.deepEqual(

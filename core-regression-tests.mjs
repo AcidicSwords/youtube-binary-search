@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   EPSILON,
-  RESOLUTION_BASIS,
+  NEIGHBORHOOD_BASIS,
   createRoot,
   getTargets,
   seedNeighborhoodFromMovement,
@@ -48,24 +48,24 @@ assert.equal(moved.changed, true);
 session = moved.session;
 assert.deepEqual({ start: session.model.interval.start, end: session.model.interval.end }, { start: 120, end: 180 });
 assert.deepEqual(session.model.resolution, { L: 0, C: 180, R: 300, level: 0 });
-assert.equal(session.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
+assert.equal(session.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.MOVEMENT);
 assert.deepEqual(getTargets(session.model.resolution), { backward: 90, forward: 240 });
 
 // Refine subdivides the movement-seeded Neighborhood and Undo restores it.
 const beforeRefine = snapshotModel(session.model);
 session = refine(session, "backward").session;
 assert.equal(session.model.resolution.C, 90);
-assert.equal(session.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
+assert.equal(session.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.MOVEMENT);
 session = undo(session).session;
 assert.deepEqual(session.model.resolution, beforeRefine.resolution);
-assert.equal(session.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
+assert.equal(session.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.MOVEMENT);
 
 // Reopen restores Range scale and preserves Interval geometry while updating
 // the search frame stored at its active endpoint.
 const intervalBeforeReopen = copy(session.model.interval);
 session = reopen(session).session;
 assert.deepEqual(session.model.resolution, { L: 0, C: 180, R: 480, level: 0 });
-assert.equal(session.model.resolutionBasis, RESOLUTION_BASIS.RANGE);
+assert.equal(session.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.RANGE);
 assert.deepEqual(
   {
     start: session.model.interval.start,
@@ -80,7 +80,7 @@ assert.deepEqual(
     arrival: intervalBeforeReopen.arrival
   }
 );
-assert.deepEqual(session.model.interval.arrivalFrame.resolution, session.model.resolution);
+assert.deepEqual(session.model.interval.arrivalNeighborhood.resolution, session.model.resolution);
 session = undo(session).session;
 assert.deepEqual(session.model.resolution, { L: 0, C: 180, R: 300, level: 0 });
 
@@ -109,18 +109,18 @@ const stepOrigin = snapshotModel(stepped.model);
 stepped = step(stepped, "forward", 20, {
   departure: 180,
   originResolution: stepOrigin.resolution,
-  originResolutionBasis: stepOrigin.resolutionBasis
+  originResolutionBasis: stepOrigin.neighborhoodBasis
 }).session;
 assert.deepEqual(stepped.model.resolution, { L: 0, C: 200, R: 300, level: 0 });
-assert.equal(stepped.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
+assert.equal(stepped.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.MOVEMENT);
 stepped = step(stepped, "forward", 100, {
   departure: 180,
   originResolution: stepOrigin.resolution,
-  originResolutionBasis: stepOrigin.resolutionBasis,
+  originResolutionBasis: stepOrigin.neighborhoodBasis,
   amend: true
 }).session;
 assert.deepEqual(stepped.model.resolution, { L: 0, C: 300, R: 480, level: 0 });
-assert.equal(stepped.model.resolutionBasis, RESOLUTION_BASIS.RANGE);
+assert.equal(stepped.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.RANGE);
 assert.deepEqual(getTargets(stepped.model.resolution), { backward: 150, forward: 390 });
 assert.deepEqual(
   { start: stepped.model.interval.start, end: stepped.model.interval.end },
@@ -196,18 +196,18 @@ const pathOrigin = snapshotModel(pathA.model);
 pathA = step(pathA, "forward", 15, {
   departure: 40,
   originResolution: pathOrigin.resolution,
-  originResolutionBasis: pathOrigin.resolutionBasis
+  originResolutionBasis: pathOrigin.neighborhoodBasis
 }).session;
 pathA = step(pathA, "forward", 15, {
   departure: 40,
   originResolution: pathOrigin.resolution,
-  originResolutionBasis: pathOrigin.resolutionBasis,
+  originResolutionBasis: pathOrigin.neighborhoodBasis,
   amend: true
 }).session;
 pathA = step(pathA, "backward", 15, {
   departure: 40,
   originResolution: pathOrigin.resolution,
-  originResolutionBasis: pathOrigin.resolutionBasis,
+  originResolutionBasis: pathOrigin.neighborhoodBasis,
   amend: true
 }).session;
 let pathB = createSession({ duration: 100, current: 20 });
@@ -215,10 +215,10 @@ pathB = goTo(pathB, 40, { operator: "timeline" }).session;
 pathB = step(pathB, "forward", 15, {
   departure: 40,
   originResolution: pathOrigin.resolution,
-  originResolutionBasis: pathOrigin.resolutionBasis
+  originResolutionBasis: pathOrigin.neighborhoodBasis
 }).session;
 assert.deepEqual(pathA.model.resolution, pathB.model.resolution);
-assert.equal(pathA.model.resolutionBasis, pathB.model.resolutionBasis);
+assert.equal(pathA.model.neighborhoodBasis, pathB.model.neighborhoodBasis);
 assert.deepEqual(
   pathA.model.interval && { start: pathA.model.interval.start, end: pathA.model.interval.end },
   pathB.model.interval && { start: pathB.model.interval.start, end: pathB.model.interval.end }
@@ -233,21 +233,21 @@ continued = completePlayback(continued, {
   current: 200,
   departure: 180,
   parentNeighborhood: copy(continued.model.resolution),
-  parentResolutionBasis: continued.model.resolutionBasis,
+  parentResolutionBasis: continued.model.neighborhoodBasis,
   wrapped: false,
   returnModel: continuedReturn
 }).session;
 assert.deepEqual(continued.model.resolution, { L: 0, C: 200, R: 320, level: 0 });
-assert.equal(continued.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
+assert.equal(continued.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.MOVEMENT);
 continued = completePlayback(continued, {
   current: 300,
   departure: 200,
   parentNeighborhood: copy(continued.model.resolution),
-  parentResolutionBasis: continued.model.resolutionBasis,
+  parentResolutionBasis: continued.model.neighborhoodBasis,
   wrapped: false,
   returnModel: snapshotModel(continued.model)
 }).session;
-assert.equal(continued.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
+assert.equal(continued.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.MOVEMENT);
 assert.deepEqual(continued.model.resolution, { L: 0, C: 300, R: 420, level: 0 });
 assert.deepEqual({ start: continued.model.interval.start, end: continued.model.interval.end }, { start: 120, end: 300 });
 
@@ -270,7 +270,7 @@ assert.deepEqual(
     arrival: containedInterval.arrival
   }
 );
-assert.deepEqual(ranged.model.interval.arrivalFrame.resolution, ranged.model.resolution);
+assert.deepEqual(ranged.model.interval.arrivalNeighborhood.resolution, ranged.model.resolution);
 ranged = setRange(ranged, 30, 50, 40).session;
 assert.equal(ranged.model.interval, null);
 let previewed = createSession({ duration: 100, current: 20 });
@@ -291,7 +291,7 @@ assert.equal(focused.model.resolution.C, 150);
 assert.equal(focused.model.interval, null);
 assert.equal(focused.model.focus.sectionId, retained.id);
 assert.deepEqual(focused.model.range, { start: 100, end: 200 });
-assert.equal(focused.model.resolutionBasis, RESOLUTION_BASIS.RANGE);
+assert.equal(focused.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.RANGE);
 
 // Direct Go outside Focus is the explicit composite Leave Section + Go.
 const outside = goTo(focused, 300, { operator: "timeline", label: "Timeline Click" });
@@ -323,7 +323,7 @@ let stale = createSession({ duration: 480, current: 150, guide: staleGuide });
 stale.model.focus = { sectionId: "missing", returnRange: { start: 0, end: 480 } };
 stale.model.range = { start: 100, end: 200 };
 stale.model.resolution = createRoot(100, 150, 200);
-stale.model.resolutionBasis = RESOLUTION_BASIS.RANGE;
+stale.model.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
 const reconciled = renameGuidePin(stale, stalePin.id, "Renamed");
 assert.equal(reconciled.changed, true);
 assert.equal(reconciled.session.model.focus, null);
@@ -338,7 +338,7 @@ const playbackOptions = {
   current: 195,
   departure: 180,
   parentNeighborhood: copy(playbackSession.model.resolution),
-  parentResolutionBasis: playbackSession.model.resolutionBasis,
+  parentResolutionBasis: playbackSession.model.neighborhoodBasis,
   returnModel: snapshotModel(playbackSession.model)
 };
 const playbackProjection = projectPlayback(playbackSession.model, playbackOptions);
@@ -348,11 +348,11 @@ assert.deepEqual(
   "Live playback projection must not mutate Session before settlement."
 );
 playbackSession = completePlayback(playbackSession, playbackOptions).session;
-assert.equal(playbackSession.model.resolutionBasis, RESOLUTION_BASIS.MOVEMENT);
+assert.equal(playbackSession.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.MOVEMENT);
 assert.deepEqual(playbackSession.model.resolution, { L: 0, C: 195, R: 315, level: 0 });
 assert.deepEqual({ start: playbackSession.model.interval.start, end: playbackSession.model.interval.end }, { start: 120, end: 195 });
 assert.deepEqual(playbackProjection.model.resolution, playbackSession.model.resolution);
-assert.equal(playbackProjection.model.resolutionBasis, playbackSession.model.resolutionBasis);
+assert.equal(playbackProjection.model.neighborhoodBasis, playbackSession.model.neighborhoodBasis);
 for (const key of ["start", "end", "departure", "arrival", "operator", "mode"]) {
   assert.deepEqual(
     playbackProjection.model.interval[key],
@@ -361,12 +361,12 @@ for (const key of ["start", "end", "departure", "arrival", "operator", "mode"]) 
   );
 }
 assert.deepEqual(
-  playbackProjection.model.interval.departureFrame,
-  playbackSession.model.interval.departureFrame
+  playbackProjection.model.interval.departureNeighborhood,
+  playbackSession.model.interval.departureNeighborhood
 );
 assert.deepEqual(
-  playbackProjection.model.interval.arrivalFrame,
-  playbackSession.model.interval.arrivalFrame
+  playbackProjection.model.interval.arrivalNeighborhood,
+  playbackSession.model.interval.arrivalNeighborhood
 );
 
 assert.ok(EPSILON > 0);
@@ -391,7 +391,7 @@ assert.match(sessionSource, /export function focusWorkingSection[\s\S]*FOCUS_KIN
 assert.match(appSource, /Left the focused Section and opened Full Video/, "Composite direct Go must disclose its Range escape.");
 assert.match(appSource, /createPlaybackTransport/, "Native playback must own continuous settlement.");
 assert.doesNotMatch(appSource, /startSkim|createSkimTransport|desiredSkimRate/, "Skim must be removed from the runtime.");
-assert.match(viewSource, /resolutionBasis === RESOLUTION_BASIS\.MOVEMENT/, "Resolution presentation must distinguish movement scale.");
+assert.match(viewSource, /neighborhoodBasis === NEIGHBORHOOD_BASIS\.MOVEMENT/, "Resolution presentation must distinguish movement scale.");
 assert.doesNotMatch(viewSource, /skim/i, "The projection layer must not expose retired Skim controls.");
 assert.match(viewSource, /focused-section-title"\]\.textContent = "—"/, "View must clear stale focused Section text.");
 assert.match(cssSource, /\[hidden\]\s*\{\s*display:\s*none\s*!important;/, "Hidden state must override component display rules.");

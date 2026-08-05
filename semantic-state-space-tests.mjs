@@ -38,7 +38,7 @@ function assertInvariant(session) {
   assert.ok(resolution.L <= resolution.C && resolution.C <= resolution.R);
   assert.ok(resolution.R <= range.end + EPSILON);
   assert.ok(Number.isInteger(resolution.level) && resolution.level >= 0);
-  assert.ok(["range", "movement"].includes(model.resolutionBasis));
+  assert.ok(["range", "movement"].includes(model.neighborhoodBasis));
   assert.ok(stepReach.backward >= 0.25 && stepReach.backward <= 300);
   assert.ok(stepReach.forward >= 0.25 && stepReach.forward <= 300);
   assert.ok(history.length <= 100);
@@ -65,8 +65,8 @@ function assertInvariant(session) {
       || Math.abs(interval.departure - interval.end) <= EPSILON
     );
     for (const [key, address] of [
-      ["departureFrame", interval.departure],
-      ["arrivalFrame", interval.arrival]
+      ["departureNeighborhood", interval.departure],
+      ["arrivalNeighborhood", interval.arrival]
     ]) {
       const frame = interval[key];
       assert.ok(frame?.resolution);
@@ -76,8 +76,8 @@ function assertInvariant(session) {
       assert.ok(frame.resolution.L <= interval.start + EPSILON);
       assert.ok(frame.resolution.R >= interval.end - EPSILON);
     }
-    assert.deepEqual(interval.arrivalFrame.resolution, resolution);
-    assert.equal(interval.arrivalFrame.resolutionBasis, model.resolutionBasis);
+    assert.deepEqual(interval.arrivalNeighborhood.resolution, resolution);
+    assert.equal(interval.arrivalNeighborhood.neighborhoodBasis, model.neighborhoodBasis);
   }
 
   if (focus) {

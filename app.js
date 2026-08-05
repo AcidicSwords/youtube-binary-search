@@ -379,7 +379,7 @@ function rejectFocusedRangeBoundaryEdit() {
   return true;
 }
 
-function currentResolution() {
+function currentNeighborhood() {
   return model().resolution;
 }
 
@@ -454,7 +454,7 @@ function sectionFrame(start, end, projection = timelineProjection()) {
 }
 
 function operatorFrameRequest() {
-  const center = currentResolution().C;
+  const center = currentNeighborhood().C;
   const projection = timelineProjection();
   const operator = model().lastOperator;
   const range = activeRange();
@@ -464,7 +464,7 @@ function operatorFrameRequest() {
     "localRefineBackward",
     "localRefineForward"
   ].includes(operator)) {
-    const targets = getTargets(currentResolution(), projection.metric);
+    const targets = getTargets(currentNeighborhood(), projection.metric);
     return {
       kind: "refine",
       center,
@@ -474,7 +474,7 @@ function operatorFrameRequest() {
     };
   }
   if (operator === "reopen") {
-    const targets = getTargets(currentResolution(), projection.metric);
+    const targets = getTargets(currentNeighborhood(), projection.metric);
     return {
       kind: "reopen",
       center,
@@ -514,7 +514,7 @@ function operatorFrameRequest() {
 }
 
 function fieldFrameRequest() {
-  if (!state.videoLoaded || !currentResolution() || !activeRange()) return null;
+  if (!state.videoLoaded || !currentNeighborhood() || !activeRange()) return null;
   // Direct manipulation temporarily supplies an exact Frame and has priority
   // over both Context and operator framing for the gesture's lifetime.
   if (state.directFrame) {
@@ -544,7 +544,7 @@ function fieldFrameRequest() {
     const window = contextRunning
       ? { start: transport.start, end: transport.end }
       : deriveContextWindow(
-        currentResolution().C,
+        currentNeighborhood().C,
         activeRange(),
         state.contextSeconds
       );
@@ -553,7 +553,7 @@ function fieldFrameRequest() {
         owner: FIELD_FRAME_OWNER.CONTEXT,
         start: window.start,
         end: window.end,
-        current: currentResolution().C,
+        current: currentNeighborhood().C,
         cursor: contextRunning ? safeCurrentTime() : undefined,
         range: activeRange()
       };
@@ -686,7 +686,7 @@ function timelineGeometryKey(sourceModel) {
 
 function playerSnapshot() {
   return player?.read?.() || {
-    time: currentResolution()?.C || 0,
+    time: currentNeighborhood()?.C || 0,
     duration: model().duration || 0,
     videoId: null,
     rate: 1,
@@ -697,7 +697,7 @@ function playerSnapshot() {
 
 function safeCurrentTime() {
   const value = playerSnapshot().time;
-  return Number.isFinite(value) ? value : currentResolution()?.C || 0;
+  return Number.isFinite(value) ? value : currentNeighborhood()?.C || 0;
 }
 
 const view = createView({
@@ -980,7 +980,7 @@ function commitNativeGo(candidate) {
   }
 
   const destination = clamp(physical, activeRange().start, activeRange().end);
-  if (Math.abs(destination - currentResolution().C) <= EPSILON) {
+  if (Math.abs(destination - currentNeighborhood().C) <= EPSILON) {
     if (Math.abs(physical - destination) > EPSILON) placePlayer(destination);
     view.renderTransport();
     return;
@@ -1351,9 +1351,9 @@ function settleTransport(options = {}) {
   if (issuePause) player.pause();
 
   if (active.kind === TRANSPORT_KIND.CONTEXT) {
-    if (restoreObservation && !handoffField && currentResolution()) {
-      placePlayer(currentResolution().C);
-      stepField?.translateToCurrent(currentResolution().C, { preserve: true });
+    if (restoreObservation && !handoffField && currentNeighborhood()) {
+      placePlayer(currentNeighborhood().C);
+      stepField?.translateToCurrent(currentNeighborhood().C, { preserve: true });
     }
     if (shouldRender) view.render();
     return true;
@@ -1425,7 +1425,7 @@ function flushPendingStep(options = {}) {
 
   if (options.effect !== false) {
     applyPlayerEffect({
-      place: currentResolution().C,
+      place: currentNeighborhood().C,
       interval: currentInterval()
     }, {
       observe: options.observe,
@@ -1452,9 +1452,9 @@ function completePendingStep(options = {}) {
   const interval = currentInterval();
   const intervalStatus = interval
     ? formatRange(interval)
-    : `cleared at ${formatTime(currentResolution().C)}`;
+    : `cleared at ${formatTime(currentNeighborhood().C)}`;
   if (outcome.guidePersisted !== false) {
-    const arrival = formatTime(currentResolution().C);
+    const arrival = formatTime(currentNeighborhood().C);
     setStatus(
       `${outcome.direction
         ? `Stepped ${outcome.direction === "backward" ? "Backward" : "Forward"} to ${arrival}`
@@ -1579,7 +1579,7 @@ function moveToAddress(destination, options = {}) {
     ? { ...state.selectedRetained }
     : null;
   const originModel = snapshotModel(model(), { cloneGuide: carry });
-  const departure = currentResolution().C;
+  const departure = currentNeighborhood().C;
   const operationProjection = options.projection || timelineProjection();
   let result = typeof options.transaction === "function"
     ? options.transaction(state.session, destination, operationProjection)
@@ -1632,14 +1632,14 @@ function refine(direction, options = {}) {
     : refineSession(state.session, direction, { projection });
   if (!result.changed) {
     const reason = refineBlockReason(
-      currentResolution(),
+      currentNeighborhood(),
       activeRange(),
       direction,
       timelineProjection().metric
     );
     const label = direction === "backward" ? "Backward" : "Forward";
     setStatus(
-      reason === "resolution-limit"
+      reason === "refinement-limit"
         ? `Cannot Refine ${label}: this side has reached the Resolution limit. Reopen or Step to restore scale.`
         : `Cannot Refine ${label}: Current is at the Range ${direction === "backward" ? "start" : "end"}.`
     );
@@ -1690,7 +1690,7 @@ function switchCurrentEndpoint(options = {}) {
   });
 }
 
-function releaseWorkingInterval() {
+function releaseActiveSpan() {
   if (!state.videoLoaded) return false;
   settleBeforeAction();
   const hadTimelineOperand = Boolean(state.selectedRetained);
@@ -1715,7 +1715,7 @@ function releaseWorkingInterval() {
   state.selectedPinIds = [];
   return accept(result, {
     effect: false,
-    status: `Released the Working Interval; Current remains ${formatTime(currentResolution().C)}.`
+    status: `Released the Working Interval; Current remains ${formatTime(currentNeighborhood().C)}.`
   });
 }
 
@@ -1808,7 +1808,7 @@ function focusOrUnfocus() {
 function traverseHistory(transform, emptyMessage, completedVerb, cause) {
   settleBeforeAction({ replacingContext: true });
   const previousModel = model();
-  const departure = currentResolution().C;
+  const departure = currentNeighborhood().C;
   const result = transform(state.session);
   if (!result.changed) {
     setStatus(emptyMessage);
@@ -1827,7 +1827,7 @@ function traverseHistory(transform, emptyMessage, completedVerb, cause) {
   syncIntervalPinSelection();
   persistPreferences();
   const guidePersisted = result.guideChanged ? persistGuide() : true;
-  const destination = currentResolution().C;
+  const destination = currentNeighborhood().C;
   const currentMoved = Math.abs(destination - departure) > EPSILON;
   const rangeChanged = Math.abs(previousModel.range.start - activeRange().start) > EPSILON
     || Math.abs(previousModel.range.end - activeRange().end) > EPSILON;
@@ -1871,7 +1871,7 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
   if (!(Number.isFinite(resolvedDistance) && resolvedDistance > 0)) return false;
   if (!state.pendingStep) {
     settleBeforeAction({ replacingContext: true });
-    const departure = currentResolution().C;
+    const departure = currentNeighborhood().C;
     const carry = options.carryRetained === true || state.carryModifier;
     const originModel = snapshotModel(model(), { cloneGuide: carry });
     const intervalDeparture = originModel.interval
@@ -1879,7 +1879,7 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
       ? originModel.interval.departure
       : departure;
     state.pendingStep = {
-      traversalPoints: [currentResolution().C],
+      traversalPoints: [currentNeighborhood().C],
       departure,
       intervalDeparture,
       originModel,
@@ -1910,7 +1910,7 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
     intervalDeparture: state.pendingStep.intervalDeparture,
     originInterval: state.pendingStep.originModel.interval,
     originResolution: state.pendingStep.originModel.resolution,
-    originResolutionBasis: state.pendingStep.originModel.resolutionBasis,
+    originResolutionBasis: state.pendingStep.originModel.neighborhoodBasis,
     amend: state.pendingStep.started,
     projection: state.pendingStep.projection
   });
@@ -1932,14 +1932,14 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
   state.pendingStep.started = true;
   state.session = carried.session;
   // Every repeat is an encounter, in order, including the ones that came back.
-  state.pendingStep.traversalPoints.push(currentResolution().C);
+  state.pendingStep.traversalPoints.push(currentNeighborhood().C);
   state.pendingStep.visitedMinimum = Math.min(
     state.pendingStep.visitedMinimum,
-    currentResolution().C
+    currentNeighborhood().C
   );
   state.pendingStep.visitedMaximum = Math.max(
     state.pendingStep.visitedMaximum,
-    currentResolution().C
+    currentNeighborhood().C
   );
   syncIntervalPinSelection();
   if (
@@ -1948,12 +1948,12 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
     view.renderGuide();
   }
   if (carried.rangeChanged) stepField?.resetAtCurrent?.();
-  else stepField?.translateToCurrent(currentResolution().C, { preserve: true });
+  else stepField?.translateToCurrent(currentNeighborhood().C, { preserve: true });
   // A pending Step delays only automatic Context and history settlement. Its
   // semantic Current and all three physical panes move immediately, so a held
   // or rapidly tapped sequence remains a visible traversal rather than a marker
   // moving over a stale Center frame.
-  placePlayer(currentResolution().C);
+  placePlayer(currentNeighborhood().C);
 
   clearTimeout(state.pendingStep.timer);
   state.pendingStep.timer = null;
@@ -1972,7 +1972,7 @@ function startNativePlaybackSession() {
   clearProgrammaticPlacement();
   const current = clamp(safeCurrentTime(), activeRange().start, activeRange().end);
 
-  if (Math.abs(current - currentResolution().C) > NATIVE_POSITION_TOLERANCE_SECONDS) {
+  if (Math.abs(current - currentNeighborhood().C) > NATIVE_POSITION_TOLERANCE_SECONDS) {
     const direct = goTo(state.session, current, {
       operator: "nativeGo",
       label: "Native Go",
@@ -1987,8 +1987,8 @@ function startNativePlaybackSession() {
   const snapshot = playerSnapshot();
   state.transport = createPlaybackTransport({
     departure: current,
-    parentNeighborhood: copy(currentResolution()),
-    parentResolutionBasis: model().resolutionBasis,
+    parentNeighborhood: copy(currentNeighborhood()),
+    parentResolutionBasis: model().neighborhoodBasis,
     returnModel: snapshotModel(model()),
     label: "Playback",
     operator: "playback",
@@ -2014,7 +2014,7 @@ function startFieldPlaybackFromGesture(options = {}) {
   clearNativeGo();
   clearProgrammaticPlacement();
   centerPauseRequest = null;
-  const destination = currentResolution().C;
+  const destination = currentNeighborhood().C;
   if (Math.abs(safeCurrentTime() - destination) > NATIVE_POSITION_TOLERANCE_SECONDS) {
     placePlayer(destination);
   }
@@ -2026,8 +2026,8 @@ function startFieldPlaybackFromGesture(options = {}) {
   const snapshot = playerSnapshot();
   state.transport = createPlaybackTransport({
     departure: destination,
-    parentNeighborhood: copy(currentResolution()),
-    parentResolutionBasis: model().resolutionBasis,
+    parentNeighborhood: copy(currentNeighborhood()),
+    parentResolutionBasis: model().neighborhoodBasis,
     returnModel: snapshotModel(model()),
     label: dynamic
       ? "Playback by weight"
@@ -2155,7 +2155,7 @@ function acceptRangeTransition(result, { status, closeGuide = false } = {}) {
     status
   });
   if (!accepted) return false;
-  locateAddress(currentResolution().C, { resetField: true });
+  locateAddress(currentNeighborhood().C, { resetField: true });
   if (closeGuide) closeCompactGuideAfterSelection();
   return true;
 }
@@ -2719,8 +2719,8 @@ function goToPin(pin, operator = "pin", options = {}) {
 function goToAdjacentPin(direction, options = {}) {
   const projection = timelineProjection();
   const pin = direction === "backward"
-    ? previousPin(guide(), currentResolution().C, activeRange(), projection)
-    : nextPin(guide(), currentResolution().C, activeRange(), projection);
+    ? previousPin(guide(), currentNeighborhood().C, activeRange(), projection)
+    : nextPin(guide(), currentNeighborhood().C, activeRange(), projection);
   if (!pin) {
     setStatus(`There is no ${direction === "backward" ? "previous" : "next"} Pin within the active Range.`);
     return false;
@@ -3339,10 +3339,10 @@ function pollPlayer() {
     && [YOUTUBE_STATE.PAUSED, YOUTUBE_STATE.CUED].includes(state.playerState)
     && !programmaticPlacementActive
     && !directManipulationActive()
-    && Math.abs(now - currentResolution().C) > NATIVE_POSITION_TOLERANCE_SECONDS
+    && Math.abs(now - currentNeighborhood().C) > NATIVE_POSITION_TOLERANCE_SECONDS
   ) {
     scheduleNativeGo(now);
-  } else if (Math.abs(now - currentResolution().C) <= NATIVE_POSITION_TOLERANCE_SECONDS) {
+  } else if (Math.abs(now - currentNeighborhood().C) <= NATIVE_POSITION_TOLERANCE_SECONDS) {
     clearNativeGo();
   }
 
@@ -3359,7 +3359,7 @@ function timeFromPointer(
   constrainToRange = false
 ) {
   const rect = elements.timeline.getBoundingClientRect();
-  if (!Number.isFinite(rect.width) || rect.width <= 0) return currentResolution().C;
+  if (!Number.isFinite(rect.width) || rect.width <= 0) return currentNeighborhood().C;
   const coordinate = projection.fractionToCoordinate(
     (event.clientX - rect.left) / rect.width
   );
@@ -3574,8 +3574,8 @@ function previewGuideDrag(drag) {
 function clearGuideDragPreview({ restore = true } = {}) {
   state.directFrame = null;
   stepField?.clearPreview?.({ restore: false });
-  if (!restore || !state.videoLoaded || !currentResolution()) return;
-  const current = currentResolution().C;
+  if (!restore || !state.videoLoaded || !currentNeighborhood()) return;
+  const current = currentNeighborhood().C;
   placePlayer(current);
   stepField?.translateToCurrent?.(current, { preserve: true });
 }
@@ -3786,7 +3786,7 @@ function finishGuideDrag(event, options = {}) {
   const guidePersisted = persistGuide();
   if (drag.rangeChanged) {
     clearGuideDragPreview({ restore: false });
-    locateAddress(currentResolution().C, { resetField: true });
+    locateAddress(currentNeighborhood().C, { resetField: true });
   } else {
     clearGuideDragPreview();
   }
@@ -3818,17 +3818,17 @@ function beginCurrentDrag(event) {
     || state.dragHandle
     || state.guideDrag
     || state.currentDrag
-    || !currentResolution()
+    || !currentNeighborhood()
   ) return;
   event.stopPropagation?.();
   state.currentDrag = {
     pointerId: event.pointerId,
     originClientX: event.clientX,
-    originSource: currentResolution().C,
+    originSource: currentNeighborhood().C,
     // The projection captured at pointer-down stays authoritative so the
     // geometry cannot jump if Weight or another derived condition changes.
     projection: timelineProjection(),
-    candidate: currentResolution().C,
+    candidate: currentNeighborhood().C,
     threshold: 6,
     moved: false,
     precision: event.shiftKey === true
@@ -3864,7 +3864,7 @@ function updateCurrentDrag(event) {
   if (!drag.moved) {
     drag.moved = true;
     settleBeforeAction();
-    drag.originSource = currentResolution().C;
+    drag.originSource = currentNeighborhood().C;
     drag.projection = timelineProjection();
     try {
       elements.timeline.setPointerCapture?.(event.pointerId);
@@ -3930,8 +3930,8 @@ function finishCurrentDrag(event, options = {}) {
     // Cancellation restores the original Current presentation and creates no
     // semantic change and no history.
     stepField?.clearPreview?.({ restore: false });
-    locateAddress(currentResolution().C);
-    stepField?.translateToCurrent?.(currentResolution().C, { preserve: true });
+    locateAddress(currentNeighborhood().C);
+    stepField?.translateToCurrent?.(currentNeighborhood().C, { preserve: true });
     view.render();
     return false;
   }
@@ -3951,8 +3951,8 @@ function finishCurrentDrag(event, options = {}) {
     );
   if (committed) completePendingStep();
   else {
-    locateAddress(currentResolution().C);
-    stepField?.translateToCurrent?.(currentResolution().C, { preserve: true });
+    locateAddress(currentNeighborhood().C);
+    stepField?.translateToCurrent?.(currentNeighborhood().C, { preserve: true });
     view.render();
   }
   return Boolean(committed);
@@ -4047,7 +4047,7 @@ function finishRangeDrag() {
   state.rangeDragProjection = null;
   if (changed) {
     state.session = checkpoint(state.session, "Adjust Range", origin).session;
-    locateAddress(currentResolution().C, { resetField: true });
+    locateAddress(currentNeighborhood().C, { resetField: true });
     view.renderGuide();
     setStatus(`Range set to ${formatRange(activeRange())}.`);
   } else if (origin) {
@@ -4074,7 +4074,7 @@ function cancelRangeDrag() {
       future: state.session.future || []
     };
     syncIntervalPinSelection();
-    locateAddress(currentResolution().C);
+    locateAddress(currentNeighborhood().C);
     view.renderGuide();
   }
   setStatus("Range adjustment cancelled.");
@@ -4106,10 +4106,10 @@ function adjustRangeHandle(kind, event) {
 
   if (kind === "start") {
     value = clamp(value, 0, range.end - MIN_RANGE_SECONDS);
-    setRange(value, range.end, currentResolution().C, "Adjust Range Start", `Range Start is ${formatTime(value)}.`);
+    setRange(value, range.end, currentNeighborhood().C, "Adjust Range Start", `Range Start is ${formatTime(value)}.`);
   } else {
     value = clamp(value, range.start + MIN_RANGE_SECONDS, model().duration);
-    setRange(range.start, value, currentResolution().C, "Adjust Range End", `Range End is ${formatTime(value)}.`);
+    setRange(range.start, value, currentNeighborhood().C, "Adjust Range End", `Range End is ${formatTime(value)}.`);
   }
 }
 
@@ -4361,7 +4361,7 @@ function settleNudgeGesture() {
   );
   state.session = committed.session;
   const currentReversal = gesture.target?.kind === "current"
-    && Math.abs(currentResolution().C - gesture.departure) <= EPSILON
+    && Math.abs(currentNeighborhood().C - gesture.departure) <= EPSILON
     && gesture.visitedMaximum - gesture.visitedMinimum > EPSILON;
   if (currentReversal) {
     const settled = settleStepSequence(state.session, {
@@ -4410,7 +4410,7 @@ function nudgeTargetKey(target) {
 // The one Nudge operation. Timeline Shift-wheel, keyboard, and every Guide
 // increment control route through here, so they always agree.
 function nudgeTarget(target, direction, options = {}) {
-  if (!state.videoLoaded || !currentResolution()) return false;
+  if (!state.videoLoaded || !currentNeighborhood()) return false;
   const steps = Number.isFinite(options.steps) ? Math.trunc(options.steps) : 1;
   if (!steps) return false;
   const delta = direction * steps * nudgeQuantum();
@@ -4433,7 +4433,7 @@ function nudgeTarget(target, direction, options = {}) {
       intervalDeparture: gesture.intervalDeparture,
       originInterval: gesture.origin.interval,
       originResolution: gesture.origin.resolution,
-      originResolutionBasis: gesture.origin.resolutionBasis,
+      originResolutionBasis: gesture.origin.neighborhoodBasis,
       amend: true,
       projection: gesture.projection
     });
@@ -4458,14 +4458,14 @@ function nudgeTarget(target, direction, options = {}) {
     return false;
   }
   if (target.kind === "current") {
-    const current = currentResolution().C;
+    const current = currentNeighborhood().C;
     gesture.traversalPoints.push(current);
     gesture.lastDirection = direction > 0 ? "forward" : "backward";
     gesture.visitedMinimum = Math.min(gesture.visitedMinimum, current);
     gesture.visitedMaximum = Math.max(gesture.visitedMaximum, current);
   }
   gesture.changed = true;
-  locateAddress(currentResolution().C);
+  locateAddress(currentNeighborhood().C);
   syncIntervalPinSelection();
   view.invalidateTimelinePins();
   view.renderGuide();
@@ -4591,7 +4591,7 @@ function wheelPixels(event) {
 }
 
 function handleNudgeWheel(event) {
-  if (!event.shiftKey || !state.videoLoaded || !currentResolution()) return;
+  if (!event.shiftKey || !state.videoLoaded || !currentNeighborhood()) return;
   const overTimeline = withinTimeline(event.target);
   if (
     !overTimeline
@@ -5035,7 +5035,7 @@ function initializePlayerApi() {
     getSnapshot: () => ({
       videoLoaded: state.videoLoaded,
       videoId: state.videoId,
-      current: currentResolution()?.C || 0,
+      current: currentNeighborhood()?.C || 0,
       range: activeFieldRange(),
       // Step Field offsets are physical observation settings. They are
       // intentionally independent from the semantic Step Reach.
@@ -5143,14 +5143,14 @@ elements["current-marker"].addEventListener("pointerdown", beginCurrentDrag);
 // not asked for anything and must not have their playback settled or their
 // history touched. Only a wheel quantum proves the intent.
 function beginGhostGesture({ initialDirection } = {}) {
-  if (!state.videoLoaded || !currentResolution()) return false;
+  if (!state.videoLoaded || !currentNeighborhood()) return false;
   // Anything still in flight becomes exact first, and is recorded, so the
   // gesture reads a stream that already contains the movement that led here.
   // This is why activation waits for a whole earned quantum: settling live
   // Playback because a trackpad twitched would be a real cost paid for an
   // intention the reader never expressed.
   settleBeforeAction({ ghost: false });
-  const anchor = currentResolution().C;
+  const anchor = currentNeighborhood().C;
   const originModel = snapshotModel(model());
   const projection = timelineProjection();
   const stepReach = effectiveStepReach(model().stepReach, activeRange(), projection);
@@ -5233,12 +5233,12 @@ function handleGhostWheel(event) {
       blocked = candidate.reason;
       break;
     }
-    const previous = currentResolution().C;
+    const previous = currentNeighborhood().C;
     const result = ghostTraverse(state.session, candidate.address, {
       anchor: gesture.anchor,
       direction: userDirection,
       originResolution: gesture.originModel.resolution,
-      originResolutionBasis: gesture.originModel.resolutionBasis,
+      originResolutionBasis: gesture.originModel.neighborhoodBasis,
       projection: gesture.projection,
       amend: true
     });
@@ -5277,7 +5277,7 @@ function handleGhostWheel(event) {
     // wheel instead of being torn down and rebuilt at every notch.
     //
     // With Context off, the recall stays a silent frame-by-frame scan.
-    const landing = currentResolution().C;
+    const landing = currentNeighborhood().C;
     if (state.contextSeconds > 0) {
       startContext(landing, { retarget: transportIs(TRANSPORT_KIND.CONTEXT) });
     } else {
@@ -5296,7 +5296,7 @@ function handleGhostWheel(event) {
     const total = gesture.read.positions.length;
     setStatus(
       `Ghost ${userDirection === "backward" ? "back" : "on"} · ${
-        formatTime(currentResolution().C)
+        formatTime(currentNeighborhood().C)
       } · ${place} of ${total} · anchored at ${formatTime(gesture.anchor)}.`
     );
     view.render();
@@ -5329,7 +5329,7 @@ function settleGhostGesture() {
   const injection = appendGhostInjection(state.userTime, {
     anchor: gesture.anchor,
     anchorCursor: gesture.anchorCursor,
-    landing: currentResolution().C,
+    landing: currentNeighborhood().C,
     recalledCursor: finalVisit?.sourceCursor || null,
     scan: {
       candidateCount: gesture.visited.length,
@@ -5575,21 +5575,21 @@ document.addEventListener("pointerdown", event => {
 elements["range-start-here"].addEventListener("click", () => {
   if (rejectFocusedRangeBoundaryEdit()) return;
   setRange(
-    currentResolution().C,
+    currentNeighborhood().C,
     activeRange().end,
-    currentResolution().C,
+    currentNeighborhood().C,
     "Set Range Start",
-    `Set Range Start to ${formatTime(currentResolution().C)}.`
+    `Set Range Start to ${formatTime(currentNeighborhood().C)}.`
   );
 });
 elements["range-end-here"].addEventListener("click", () => {
   if (rejectFocusedRangeBoundaryEdit()) return;
   setRange(
     activeRange().start,
-    currentResolution().C,
-    currentResolution().C,
+    currentNeighborhood().C,
+    currentNeighborhood().C,
     "Set Range End",
-    `Set Range End to ${formatTime(currentResolution().C)}.`
+    `Set Range End to ${formatTime(currentNeighborhood().C)}.`
   );
 });
 elements["go-range-start"].addEventListener("click", event => {
@@ -5622,7 +5622,7 @@ elements["go-range-end"].addEventListener("click", event => {
 });
 elements["full-video-range"].addEventListener("click", () => {
   if (rejectFocusedRangeBoundaryEdit()) return;
-  setRange(0, model().duration, currentResolution().C, "Full Video Range", "Restored Full Video Range.");
+  setRange(0, model().duration, currentNeighborhood().C, "Full Video Range", "Restored Full Video Range.");
 });
 
 // Navigation and observation
@@ -5651,7 +5651,7 @@ elements["switch-endpoint"].addEventListener("click", event => {
     carryRetained: event.altKey === true
   });
 });
-elements.release.addEventListener("click", releaseWorkingInterval);
+elements.release.addEventListener("click", releaseActiveSpan);
 // Tag resolves Current into a Pin or, when Shift actually supplies the matrix
 // layer, resolves the positive Working Interval into a Section.
 elements.tag.addEventListener("click", event => {
@@ -5705,14 +5705,14 @@ const directionalStep = direction => event => {
 };
 const sideStep = role => event => {
   const selection = stepField?.getStepSelection?.(role) || null;
-  if (!selection || !Number.isFinite(selection.address) || !currentResolution()) {
+  if (!selection || !Number.isFinite(selection.address) || !currentNeighborhood()) {
     return null;
   }
   // The Field presents an exact source Address; Step consumes Timeline Space.
   // Convert at the application boundary so activating a visible phase lands on
   // that phase under neutral, compressed, expanded, and overlapping terrain.
   const distance = timelineProjection().timelineDistance(
-    currentResolution().C,
+    currentNeighborhood().C,
     selection.address
   );
   if (!(distance > EPSILON)) return null;
@@ -5753,7 +5753,7 @@ elements["context-seconds"].addEventListener("change", event => {
       settleTransport();
       setStatus("Automatic Context turned off.");
     } else {
-      startContext(currentResolution().C, { retarget: true });
+      startContext(currentNeighborhood().C, { retarget: true });
       setStatus(`Automatic Context updated to ${state.contextSeconds}s.`);
     }
   }
@@ -6119,7 +6119,7 @@ function applyGuideAddressInput(input) {
   state.session = committed.session;
   syncIntervalPinSelection();
   persistGuide();
-  locateAddress(currentResolution().C);
+  locateAddress(currentNeighborhood().C);
   view.invalidateTimelinePins();
   view.renderGuide();
   view.render();
@@ -6190,9 +6190,9 @@ function clearGuideAddressPreview() {
   if (!state.directFrame) return false;
   state.directFrame = null;
   stepField?.clearPreview?.({ restore: false });
-  if (state.videoLoaded && currentResolution()) {
-    locateAddress(currentResolution().C);
-    stepField?.translateToCurrent?.(currentResolution().C, { preserve: true });
+  if (state.videoLoaded && currentNeighborhood()) {
+    locateAddress(currentNeighborhood().C);
+    stepField?.translateToCurrent?.(currentNeighborhood().C, { preserve: true });
   }
   view.render();
   return true;
@@ -6559,7 +6559,7 @@ document.addEventListener("keydown", event => {
   }
   else if (plain && key === "r") {
     event.preventDefault();
-    releaseWorkingInterval();
+    releaseActiveSpan();
   }
   // Tag is T. Plain retains Current as a Pin; Shift retains the positive
   // Working Interval as a Section. Both routes converge on the same Guide

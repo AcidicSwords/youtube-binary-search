@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {
   EPSILON,
-  RESOLUTION_BASIS,
+  NEIGHBORHOOD_BASIS,
   clamp,
   contains,
   midpoint,
@@ -659,7 +659,7 @@ assert.deepEqual(
   { L: 0, C: 20, R: 100, level: 0 },
   "Direct Go must establish Current independently and clip its five-times movement frame to Range."
 );
-assert.equal(session.model.resolutionBasis, RESOLUTION_BASIS.RANGE);
+assert.equal(session.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.RANGE);
 assert.deepEqual(getTargets(session.model.resolution), { backward: 10, forward: 60 });
 assert.deepEqual(
   { start: session.model.interval.start, end: session.model.interval.end },
@@ -676,10 +676,10 @@ assert.deepEqual(
   { L: 0, C: 10, R: 100, level: 0 },
   "Direct Go must discard the preceding recursive path and clip the new movement frame to Range."
 );
-assert.equal(directFromRefined.model.resolutionBasis, RESOLUTION_BASIS.RANGE);
+assert.equal(directFromRefined.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.RANGE);
 const reopenedDirect = reopen(directFromRefined).session;
 assert.deepEqual(reopenedDirect.model.resolution, { L: 0, C: 10, R: 100, level: 0 });
-assert.equal(reopenedDirect.model.resolutionBasis, RESOLUTION_BASIS.RANGE);
+assert.equal(reopenedDirect.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.RANGE);
 
 let directAtSameAddress = createSession({ duration: 100, current: 50 });
 directAtSameAddress = refine(directAtSameAddress, "forward").session;
@@ -750,7 +750,7 @@ assert.deepEqual(
     arrival: loopBeforeRange.arrival
   }
 );
-assert.deepEqual(ranged.model.interval.arrivalFrame.resolution, ranged.model.resolution);
+assert.deepEqual(ranged.model.interval.arrivalNeighborhood.resolution, ranged.model.resolution);
 assert.deepEqual(ranged.model.range, { start: 20, end: 80 });
 ranged = setRange(ranged, 60, 80, 70, "Narrow Range").session;
 assert.equal(ranged.model.interval, null, "Range changes clear Intervals they no longer contain.");
@@ -799,7 +799,7 @@ assert.deepEqual(
     arrival: beforeUnfocusLoop.arrival
   }
 );
-assert.deepEqual(focusedAgain.model.interval.arrivalFrame.resolution, focusedAgain.model.resolution);
+assert.deepEqual(focusedAgain.model.interval.arrivalNeighborhood.resolution, focusedAgain.model.resolution);
 
 // The active Interval is a semi-persistent Working Interval. Focus projects it into
 // Range without retaining it in Guide; Leave preserves the deformed working
@@ -917,7 +917,7 @@ playback = completePlayback(playback, {
   current: 70,
   departure: 30,
   parentNeighborhood: copy(playback.model.resolution),
-  parentResolutionBasis: playback.model.resolutionBasis,
+  parentResolutionBasis: playback.model.neighborhoodBasis,
   returnModel: playbackUndo,
   label: "Playback"
 }).session;
@@ -937,7 +937,7 @@ const fullCycleResult = completePlayback(fullCycle, {
   current: 1,
   departure: 0,
   parentNeighborhood: copy(fullCycleReturn.resolution),
-  parentResolutionBasis: fullCycleReturn.resolutionBasis,
+  parentResolutionBasis: fullCycleReturn.neighborhoodBasis,
   returnModel: fullCycleReturn,
   label: "Playback"
 });

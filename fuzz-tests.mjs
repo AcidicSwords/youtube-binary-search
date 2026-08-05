@@ -25,7 +25,7 @@ function random() {
 
 function assertSessionInvariant(session) {
   const { model, history } = session;
-  const { duration, range, resolution, resolutionBasis, interval, guide, focus } = model;
+  const { duration, range, resolution, neighborhoodBasis, interval, guide, focus } = model;
   assert.ok(Number.isFinite(duration) && duration >= 0);
   assert.ok(range.start >= -EPSILON);
   assert.ok(range.end <= duration + EPSILON);
@@ -34,7 +34,7 @@ function assertSessionInvariant(session) {
   assert.ok(resolution.R <= range.end + EPSILON);
   assert.ok(resolution.L <= resolution.C && resolution.C <= resolution.R);
   assert.ok(Number.isInteger(resolution.level) && resolution.level >= 0);
-  assert.ok(["range", "movement"].includes(resolutionBasis));
+  assert.ok(["range", "movement"].includes(neighborhoodBasis));
   assert.ok(history.length <= 100);
   assert.equal(validateGuide(guide, duration), true);
 
@@ -50,20 +50,20 @@ function assertSessionInvariant(session) {
     assert.ok(Math.abs(interval.start - Math.min(interval.departure, interval.arrival)) <= EPSILON);
     assert.ok(Math.abs(interval.end - Math.max(interval.departure, interval.arrival)) <= EPSILON);
     for (const [role, address] of [
-      ["departureFrame", interval.departure],
-      ["arrivalFrame", interval.arrival]
+      ["departureNeighborhood", interval.departure],
+      ["arrivalNeighborhood", interval.arrival]
     ]) {
       const frame = interval[role];
       assert.ok(frame?.resolution, `Interval ${role} must exist.`);
-      assert.ok(["range", "movement"].includes(frame.resolutionBasis));
+      assert.ok(["range", "movement"].includes(frame.neighborhoodBasis));
       assert.ok(frame.resolution.L >= range.start - EPSILON, `${role} begins outside Range.`);
       assert.ok(frame.resolution.R <= range.end + EPSILON, `${role} ends outside Range.`);
       assert.ok(frame.resolution.L <= interval.start + EPSILON, `${role} does not contain the Interval start.`);
       assert.ok(frame.resolution.R >= interval.end - EPSILON, `${role} does not contain the Interval end.`);
       assert.ok(Math.abs(frame.resolution.C - address) <= EPSILON);
     }
-    assert.deepEqual(interval.arrivalFrame.resolution, resolution, "The active endpoint frame must match current Resolution.");
-    assert.equal(interval.arrivalFrame.resolutionBasis, resolutionBasis);
+    assert.deepEqual(interval.arrivalNeighborhood.resolution, resolution, "The active endpoint frame must match current Resolution.");
+    assert.equal(interval.arrivalNeighborhood.neighborhoodBasis, neighborhoodBasis);
   }
 
   if (focus) {

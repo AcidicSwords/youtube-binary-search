@@ -61,7 +61,7 @@ for (const key of ["w", "q", "s", "e"]) {
     "Runtime is missing " + key.toUpperCase() + "."
   );
 }
-assert.match(app, /key === "r"[\s\S]*releaseWorkingInterval\(\)/);
+assert.match(app, /key === "r"[\s\S]*releaseActiveSpan\(\)/);
 assert.match(app, /key === "t"[\s\S]*pinCurrent\(/);
 assert.match(app, /key === "f"[\s\S]*focusOrUnfocus\(\)/);
 assert.match(app, /shiftedSpatialKey\("a"\)[\s\S]*traverseToAdjacentPin\("backward"/);

@@ -37,9 +37,9 @@ tail.currentTime = 54;
 lead.currentTime = 66;
 await poll();
 
-assert.equal(byId.get("interval-fill").dataset.live, "true");
-assert.equal(byId.get("resolution-start-marker").dataset.live, "true");
-assert.equal(byId.get("resolution-end-marker").dataset.live, "true");
+assert.equal(byId.get("active-span-fill").dataset.live, "true");
+assert.equal(byId.get("neighborhood-backward-bound").dataset.live, "true");
+assert.equal(byId.get("neighborhood-forward-bound").dataset.live, "true");
 assert.equal(
   currentText(),
   "Current 0:50",
@@ -57,7 +57,7 @@ await poll();
 
 assert.equal(currentText(), "Current 0:58");
 assert.match(byId.get("section-window").textContent, /0:25–0:58/);
-assert.equal(byId.get("interval-fill").dataset.live, "false");
+assert.equal(byId.get("active-span-fill").dataset.live, "false");
 assert.equal(
   center.commands.filter(command => command[0] === "pause").length,
   pausesBeforeSpace.center + 1

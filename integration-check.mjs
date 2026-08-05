@@ -201,7 +201,7 @@ has(appCode, /code === "KeyA"[\s\S]{0,180}?directionalStep\("backward"\)/,
   "A reaches Step Backward.");
 has(appCode, /code === "KeyD"[\s\S]{0,180}?directionalStep\("forward"\)/,
   "D reaches Step Forward.");
-has(appCode, /plain && key === "r"[\s\S]{0,100}?releaseWorkingInterval\(\)/,
+has(appCode, /plain && key === "r"[\s\S]{0,100}?releaseActiveSpan\(\)/,
   "R reaches Release.");
 has(appCode, /plain && key === "f"[\s\S]{0,100}?focusOrUnfocus\(\)/,
   "F reaches Focus / Unfocus.");
@@ -215,11 +215,11 @@ has(appCode, /plain && key === "t"[\s\S]{0,120}?pinCurrent\(/,
   "Plain T tags Current as a Pin.");
 has(view, /const tagLabel = shiftLayer \? "Tag as Section" : "Tag as Pin"/,
   "The visible Tag label follows Shift state, not Interval presence.");
-has(view, /tagMeta = shiftLayer[\s\S]*?positiveWorkingInterval[\s\S]*?→ Section[\s\S]*?Current \$\{formatTime\(semanticCurrent\)\} → Pin/,
+has(view, /tagMeta = shiftLayer[\s\S]*?positiveActiveSpan[\s\S]*?→ Section[\s\S]*?Current \$\{formatTime\(semanticCurrent\)\} → Pin/,
   "Tag meta names its exact operand and retained result.");
-has(view, /elements\.tag\.disabled\s*=\s*interactionLocked\s*\|\|\s*\(shiftLayer && !positiveWorkingInterval\)/,
+has(view, /elements\.tag\.disabled\s*=\s*interactionLocked\s*\|\|\s*\(shiftLayer && !positiveActiveSpan\)/,
   "Only shifted Tag requires a positive Working Interval.");
-has(view, /tag:\s*shiftLayer\s*\?\s*positiveWorkingInterval\s*:\s*\{ start: semanticCurrent, end: semanticCurrent \}/,
+has(view, /tag:\s*shiftLayer\s*\?\s*positiveActiveSpan\s*:\s*\{ start: semanticCurrent, end: semanticCurrent \}/,
   "Tag preview follows the same Pin/Section operand law.");
 has(topLevelFunction(appCode, "pinCurrent"), /!result\.changed[\s\S]*?result\.value\?\.pin[\s\S]*?selectTimelineRetained\(\{ kind: "pin"/,
   "Duplicate Tag as Pin acquires the existing exact Pin.");
@@ -333,7 +333,7 @@ has(appCode, /dynamicRatePolicy|RATE_POLICY_KIND\.DYNAMIC[\s\S]*?timelineProject
   "Explicit dynamic playback reads the effective projection.");
 has(topLevelFunction(appCode, "handleTimelineClick"), /state\.selectedRetained = null[\s\S]*?moveToAddress\(/,
   "Bare Timeline Go clears the acquired operand before moving.");
-const release = topLevelFunction(appCode, "releaseWorkingInterval");
+const release = topLevelFunction(appCode, "releaseActiveSpan");
 has(release, /releaseSessionInterval\(state\.session\)/, "Release delegates semantic residue to Session.");
 has(release, /state\.selectedRetained = null/, "Release also clears the Timeline operand.");
 lacks(release, /guideRetained\s*=\s*null|deformationBypass\s*=|focus\s*=|setRange/,

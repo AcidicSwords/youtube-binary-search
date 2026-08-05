@@ -182,7 +182,7 @@ try {
   assert.equal(anchor.owner, "ghost", "owned by the gesture,");
   assert.equal(await page.getAttribute("#current-marker", "data-ghost-active"), "true",
     "and Current reads as transient while it is held.");
-  assert.equal(await page.getAttribute("#interval-fill", "data-medium"), "ghost",
+  assert.equal(await page.getAttribute("#active-span-fill", "data-medium"), "ghost",
     "The relation drawn is an ordinary Working Interval, marked as recalled.");
 
   // While it is held, nothing has been committed.

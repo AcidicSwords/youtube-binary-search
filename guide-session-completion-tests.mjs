@@ -137,7 +137,7 @@ function performStepSequence(directions, reach = 10) {
       intervalDeparture: pending.intervalDeparture,
       originInterval: originModel.interval,
       originResolution: originModel.resolution,
-      originResolutionBasis: originModel.resolutionBasis,
+      originResolutionBasis: originModel.neighborhoodBasis,
       amend: pending.started
     });
     assert.equal(moved.changed, true);
@@ -173,9 +173,9 @@ function performStepSequence(directions, reach = 10) {
       end: settled.interval.end,
       departure: settled.interval.departure,
       arrival: settled.interval.arrival,
-      activeSide: settled.interval.activeSide
+      activeEnd: settled.interval.activeEnd
     },
-    { start: 50, end: 60, departure: 60, arrival: 50, activeSide: "start" }
+    { start: 50, end: 60, departure: 60, arrival: 50, activeEnd: "start" }
   );
   assert.equal(settled.session.history.length, 1);
   assert.equal(settled.session.history[0].label, "Step Reversal");
@@ -210,9 +210,9 @@ function performStepSequence(directions, reach = 10) {
       end: settled.interval.end,
       departure: settled.interval.departure,
       arrival: settled.interval.arrival,
-      activeSide: settled.interval.activeSide
+      activeEnd: settled.interval.activeEnd
     },
-    { start: 40, end: 60, departure: 40, arrival: 50, activeSide: "end" }
+    { start: 40, end: 60, departure: 40, arrival: 50, activeEnd: "end" }
   );
   assert.equal(settled.session.history.length, 1);
 }

@@ -80,7 +80,7 @@ function worldFingerprint(model) {
     anchor,
     direction: "backward",
     originResolution: session.model.resolution,
-    originResolutionBasis: session.model.resolutionBasis,
+    originResolutionBasis: session.model.neighborhoodBasis,
     projection: projectionFor(session)
   });
   assert.equal(ghosted.changed, true);
@@ -95,7 +95,7 @@ function worldFingerprint(model) {
   assert.equal(interval.medium, "ghost", "It is marked as recalled,");
   assert.equal(interval.start, 40);
   assert.equal(interval.end, anchor, "spans from the recalled Address to the Anchor,");
-  assert.equal(interval.activeSide, "start",
+  assert.equal(interval.activeEnd, "start",
     "and the recalled end is the active one: the Anchor is what stays fixed.");
   assert.equal(interval.direction, "backward");
 
@@ -106,7 +106,7 @@ function worldFingerprint(model) {
     originResolution: session.model.resolution,
     projection: projectionFor(session)
   });
-  assert.equal(forward.session.model.interval.activeSide, "end");
+  assert.equal(forward.session.model.interval.activeEnd, "end");
   assert.equal(forward.session.model.interval.start, anchor);
 }
 
@@ -163,7 +163,7 @@ function worldFingerprint(model) {
       anchor,
       direction: "backward",
       originResolution: originModel.resolution,
-      originResolutionBasis: originModel.resolutionBasis,
+      originResolutionBasis: originModel.neighborhoodBasis,
       projection: projectionFor(session),
       amend: true
     });
@@ -221,7 +221,7 @@ function worldFingerprint(model) {
   assert.equal(settled.session.model.interval.start, 40);
   assert.equal(settled.session.model.interval.end, anchor,
     "The positive extent crossed is retained, exactly as a Step Reversal retains its own.");
-  assert.equal(settled.session.model.interval.activeSide, "end",
+  assert.equal(settled.session.model.interval.activeEnd, "end",
     "The last source movement supplies the viewpoint.");
 
   // A gesture that never left has nothing to retain.

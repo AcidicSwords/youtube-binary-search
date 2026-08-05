@@ -27,7 +27,7 @@ function assertLoopContained(session) {
   assert.ok(interval.end <= resolution.R + EPSILON);
   assert.ok(resolution.L >= range.start - EPSILON);
   assert.ok(resolution.R <= range.end + EPSILON);
-  for (const frame of [interval.departureFrame, interval.arrivalFrame]) {
+  for (const frame of [interval.departureNeighborhood, interval.arrivalNeighborhood]) {
     assert.ok(frame.resolution.L <= interval.start + EPSILON);
     assert.ok(frame.resolution.R >= interval.end - EPSILON);
   }
@@ -128,7 +128,7 @@ linear = completePlayback(linear, {
   departure: 75,
   current: 85,
   parentNeighborhood: playbackOrigin.resolution,
-  parentResolutionBasis: playbackOrigin.resolutionBasis,
+  parentResolutionBasis: playbackOrigin.neighborhoodBasis,
   returnModel: playbackOrigin
 }).session;
 assert.deepEqual(linear.model.resolution, { L: 10, C: 85, R: 120, level: 0 });
@@ -158,7 +158,7 @@ assertLoopContained(linear);
 // their recovery operators are different.
 const fine = { L: 49.98, C: 50, R: 50.02, level: 12 };
 assert.deepEqual(getTargets(fine), { backward: null, forward: null });
-assert.equal(refineBlockReason(fine, { start: 0, end: 100 }, "backward"), "resolution-limit");
+assert.equal(refineBlockReason(fine, { start: 0, end: 100 }, "backward"), "refinement-limit");
 assert.equal(
   refineBlockReason({ L: 0, C: 0, R: 10, level: 1 }, { start: 0, end: 100 }, "backward"),
   "range-start"

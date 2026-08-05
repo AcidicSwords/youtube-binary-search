@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { RESOLUTION_BASIS, createRoot } from "./range-geometry.js";
+import { NEIGHBORHOOD_BASIS, createRoot } from "./range-geometry.js";
 import {
   createSession,
   snapshotModel,
@@ -17,28 +17,28 @@ import {
 function frameOf(model) {
   return {
     resolution: model.resolution,
-    resolutionBasis: model.resolutionBasis
+    neighborhoodBasis: model.neighborhoodBasis
   };
 }
 
 // Movement records both endpoint search frames. Switching transposes the
 // directed Interval without changing its ordered extent.
 let session = createSession({ duration: 100, current: 20 });
-const departureFrame = frameOf(session.model);
+const departureNeighborhood = frameOf(session.model);
 session = refine(session, "forward").session;
-const arrivalFrame = frameOf(session.model);
+const arrivalNeighborhood = frameOf(session.model);
 const originalInterval = structuredClone(session.model.interval);
 const originalHistoryLength = session.history.length;
 
-assert.deepEqual(session.model.interval.departureFrame, departureFrame);
-assert.deepEqual(session.model.interval.arrivalFrame, arrivalFrame);
+assert.deepEqual(session.model.interval.departureNeighborhood, departureNeighborhood);
+assert.deepEqual(session.model.interval.arrivalNeighborhood, arrivalNeighborhood);
 
 let switched = switchEndpoint(session);
 assert.equal(switched.changed, true);
 assert.equal(switched.label, "Switch Endpoint");
 assert.equal(switched.session.history.length, originalHistoryLength + 1);
 assert.equal(switched.session.model.resolution.C, originalInterval.departure);
-assert.deepEqual(frameOf(switched.session.model), departureFrame);
+assert.deepEqual(frameOf(switched.session.model), departureNeighborhood);
 assert.deepEqual(
   {
     start: switched.session.model.interval.start,
@@ -60,7 +60,7 @@ assert.deepEqual(
 // captures the frame being left and restores the frame stored at the endpoint.
 switched = switchEndpoint(switched.session);
 assert.equal(switched.session.model.resolution.C, originalInterval.arrival);
-assert.deepEqual(frameOf(switched.session.model), arrivalFrame);
+assert.deepEqual(frameOf(switched.session.model), arrivalNeighborhood);
 assert.deepEqual(switched.session.model.interval, originalInterval);
 
 // Refine after transposition may pass the preserved opposite endpoint. Because
@@ -99,7 +99,7 @@ played = completePlayback(played, {
   current: 20,
   departure: 10,
   parentNeighborhood: playbackOrigin.resolution,
-  parentResolutionBasis: playbackOrigin.resolutionBasis,
+  parentResolutionBasis: playbackOrigin.neighborhoodBasis,
   returnModel: playbackOrigin
 }).session;
 assert.deepEqual(
@@ -127,7 +127,7 @@ assert.deepEqual(
 // Switching away captures that updated frame; switching back restores it.
 let reopened = reopen(session).session;
 const reopenedArrivalFrame = frameOf(reopened.model);
-assert.equal(reopened.model.resolutionBasis, RESOLUTION_BASIS.RANGE);
+assert.equal(reopened.model.neighborhoodBasis, NEIGHBORHOOD_BASIS.RANGE);
 assert.deepEqual(
   { start: reopened.model.interval.start, end: reopened.model.interval.end },
   { start: originalInterval.start, end: originalInterval.end }
@@ -147,19 +147,19 @@ stepped = step(stepped, "forward", 10, {
   intervalDeparture: 20,
   originInterval: origin.interval,
   originResolution: origin.resolution,
-  originResolutionBasis: origin.resolutionBasis
+  originResolutionBasis: origin.neighborhoodBasis
 }).session;
 stepped = step(stepped, "forward", 10, {
   departure: 40,
   intervalDeparture: 20,
   originInterval: origin.interval,
   originResolution: origin.resolution,
-  originResolutionBasis: origin.resolutionBasis,
+  originResolutionBasis: origin.neighborhoodBasis,
   amend: true
 }).session;
 assert.equal(stepped.history.length, originHistoryLength + 1);
 const activeEndpointFrame = frameOf(stepped.model);
-const anchorFrame = stepped.model.interval.departureFrame;
+const anchorFrame = stepped.model.interval.departureNeighborhood;
 stepped = switchEndpoint(stepped).session;
 assert.equal(stepped.model.resolution.C, 20);
 assert.deepEqual(frameOf(stepped.model), anchorFrame);
@@ -176,14 +176,14 @@ blankStep = step(blankStep, "forward", 10, {
   intervalDeparture: 50,
   originInterval: null,
   originResolution: blankOrigin.resolution,
-  originResolutionBasis: blankOrigin.resolutionBasis
+  originResolutionBasis: blankOrigin.neighborhoodBasis
 }).session;
 blankStep = step(blankStep, "forward", 10, {
   departure: 50,
   intervalDeparture: 50,
   originInterval: null,
   originResolution: blankOrigin.resolution,
-  originResolutionBasis: blankOrigin.resolutionBasis,
+  originResolutionBasis: blankOrigin.neighborhoodBasis,
   amend: true
 }).session;
 blankStep = switchEndpoint(blankStep).session;
@@ -192,7 +192,7 @@ assert.deepEqual(frameOf(blankStep.model), frameOf(blankOrigin));
 
 // Step after a switch edits from the newly transposed anchor.
 stepped = switchEndpoint(stepped).session; // Current 20, anchor 60.
-const frameAtSixty = stepped.model.interval.departureFrame;
+const frameAtSixty = stepped.model.interval.departureNeighborhood;
 stepped = step(stepped, "backward", 5).session;
 assert.deepEqual(
   {
@@ -236,15 +236,15 @@ assert.deepEqual(undone.session.model, beforeSwitch);
 // A bounded legacy Interval without frames is repaired defensively.
 let legacy = createSession({ duration: 100, current: 20 });
 legacy = goTo(legacy, 40, { operator: "timeline" }).session;
-delete legacy.model.interval.departureFrame;
-delete legacy.model.interval.arrivalFrame;
+delete legacy.model.interval.departureNeighborhood;
+delete legacy.model.interval.arrivalNeighborhood;
 delete legacy.model.interval.startFrame;
 delete legacy.model.interval.endFrame;
 legacy = switchEndpoint(legacy).session;
 assert.equal(legacy.model.resolution.C, 20);
-assert.ok(legacy.model.interval.departureFrame);
-assert.ok(legacy.model.interval.arrivalFrame);
-assert.deepEqual(legacy.model.interval.arrivalFrame.resolution, createRoot(0, 20, 80));
+assert.ok(legacy.model.interval.departureNeighborhood);
+assert.ok(legacy.model.interval.arrivalNeighborhood);
+assert.deepEqual(legacy.model.interval.arrivalNeighborhood.resolution, createRoot(0, 20, 80));
 
 const html = readFileSync(new URL("./index.html", import.meta.url), "utf8");
 const app = readFileSync(new URL("./app.js", import.meta.url), "utf8");

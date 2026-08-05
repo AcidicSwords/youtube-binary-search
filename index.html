@@ -126,7 +126,7 @@
               <span id="timeline-key-sections" class="timeline-key key-sections" title="Sections: retained weighted extents"><i aria-hidden="true"></i>Sections</span>
               <span id="timeline-key-range" class="timeline-key key-range" title="Range: navigable boundary"><i aria-hidden="true"></i>Range</span>
               <span id="timeline-key-resolution" class="timeline-key key-resolution" title="Resolution: current neighborhood"><i aria-hidden="true"></i>Resolution</span>
-              <span id="timeline-key-interval" class="timeline-key key-interval" title="Working Interval: ordered movement extent"><i aria-hidden="true"></i>Working Interval</span>
+              <span id="timeline-key-active-span" class="timeline-key key-interval" title="Working Interval: ordered movement extent"><i aria-hidden="true"></i>Working Interval</span>
               <span id="timeline-key-field" class="timeline-key key-field" title="Panorama span: held spread"><i aria-hidden="true"></i>Panorama span</span>
               <span id="timeline-key-pins" class="timeline-key key-pins" title="Pins: retained source Addresses"><i aria-hidden="true"></i>Pins</span>
             </div>
@@ -141,8 +141,8 @@
             <div class="track">
               <div id="deformation-field" class="deformation-field" aria-hidden="true"></div>
               <div id="range-fill" class="range-fill"></div>
-              <div id="resolution-fill" class="resolution-fill"></div>
-              <div id="interval-fill" class="interval-fill" hidden></div>
+              <div id="neighborhood-fill" class="neighborhood-fill"></div>
+              <div id="active-span-fill" class="active-span-fill" hidden></div>
               <div id="section-preview-fill" class="section-preview-fill" hidden></div>
               <div id="pin-preview-marker" class="pin-preview-marker" hidden></div>
               <div id="action-preview-fill" class="action-preview-fill" hidden></div>
@@ -155,8 +155,8 @@
 
             <button id="range-start-handle" class="marker range-handle" type="button" role="slider" aria-label="Range Start" aria-orientation="horizontal" aria-valuemin="0" aria-valuenow="0"></button>
             <button id="range-end-handle" class="marker range-handle" type="button" role="slider" aria-label="Range End" aria-orientation="horizontal" aria-valuemin="0" aria-valuenow="0"></button>
-            <span id="resolution-start-marker" class="marker resolution-marker" aria-hidden="true"></span>
-            <span id="resolution-end-marker" class="marker resolution-marker" aria-hidden="true"></span>
+            <span id="neighborhood-backward-bound" class="marker resolution-marker" aria-hidden="true"></span>
+            <span id="neighborhood-forward-bound" class="marker resolution-marker" aria-hidden="true"></span>
             <span id="backward-target-marker" class="marker target-marker" aria-hidden="true"></span>
             <span id="forward-target-marker" class="marker target-marker" aria-hidden="true"></span>
             <span id="current-departure-marker" class="marker current-departure-marker" aria-hidden="true" hidden></span>
@@ -180,7 +180,7 @@
               <span>Active Range</span><strong id="range-label">—</strong>
             </button>
 
-            <div id="resolution-state" class="parameter-state">
+            <div id="neighborhood-state" class="parameter-state">
               <span>Resolution</span><strong id="resolution-label">—</strong>
             </div>
 

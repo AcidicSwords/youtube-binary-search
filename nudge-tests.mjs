@@ -132,7 +132,7 @@ assert.equal(byId.get("action-preview-fill").dataset.kind, "stepForward",
 // drew it no longer exist: the operators that push a midpoint already show it
 // in the destination, and five extra elements read as noise rather than
 // information.
-assert.equal(byId.get("preview-resolution-fill"), undefined,
+assert.equal(byId.get("preview-neighborhood-fill"), undefined,
   "A preview has no neighbourhood chrome left to draw.");
 assert.equal(byId.get("preview-current-marker").hidden, false,
   "It draws the destination the movement lands on.");
@@ -164,8 +164,8 @@ assert.equal(byId.get("action-preview-fill").hidden, true,
   "The preview is released with the gesture.");
 assert.deepEqual(
   {
-    left: byId.get("interval-fill").style.left,
-    width: byId.get("interval-fill").style.width
+    left: byId.get("active-span-fill").style.left,
+    width: byId.get("active-span-fill").style.width
   },
   previewedInterval,
   "What the drag previewed is exactly what the release commits."

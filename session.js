@@ -2,7 +2,7 @@
 import { sectionDisplayName } from "./format.js";
 import {
   EPSILON,
-  RESOLUTION_BASIS,
+  NEIGHBORHOOD_BASIS,
   clamp,
   contains,
   containExtent,
@@ -171,7 +171,7 @@ export function copy(value) {
 
 const clone = copy;
 
-function createEndpointFrame(resolution, resolutionBasis = RESOLUTION_BASIS.RANGE) {
+function createEndpointFrame(resolution, neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE) {
   if (
     !resolution
     || !Number.isFinite(resolution.L)
@@ -180,12 +180,12 @@ function createEndpointFrame(resolution, resolutionBasis = RESOLUTION_BASIS.RANG
   ) return null;
   return {
     resolution: clone(resolution),
-    resolutionBasis: resolutionBasis || RESOLUTION_BASIS.RANGE
+    neighborhoodBasis: neighborhoodBasis || NEIGHBORHOOD_BASIS.RANGE
   };
 }
 
 function currentEndpointFrame(model) {
-  return createEndpointFrame(model.resolution, model.resolutionBasis);
+  return createEndpointFrame(model.resolution, model.neighborhoodBasis);
 }
 
 function usableEndpointFrame(frame, address, range) {
@@ -216,16 +216,16 @@ function resolveEndpointFrame(frame, address, opposite, range, metric = null) {
     return createEndpointFrame(
       resolution,
       isRangeNeighborhood(resolution, range)
-        ? RESOLUTION_BASIS.RANGE
-        : frame.resolutionBasis
+        ? NEIGHBORHOOD_BASIS.RANGE
+        : frame.neighborhoodBasis
     );
   }
   const resolution = seedNeighborhoodFromMovement(opposite, address, range, metric);
   return createEndpointFrame(
     resolution,
     isRangeNeighborhood(resolution, range)
-      ? RESOLUTION_BASIS.RANGE
-      : RESOLUTION_BASIS.MOVEMENT
+      ? NEIGHBORHOOD_BASIS.RANGE
+      : NEIGHBORHOOD_BASIS.MOVEMENT
   );
 }
 
@@ -235,8 +235,8 @@ function resolveIntervalEndpointFrame(frame, address, opposite, interval, range,
   return createEndpointFrame(
     resolution,
     isRangeNeighborhood(resolution, range)
-      ? RESOLUTION_BASIS.RANGE
-      : resolved.resolutionBasis
+      ? NEIGHBORHOOD_BASIS.RANGE
+      : resolved.neighborhoodBasis
   );
 }
 
@@ -252,8 +252,8 @@ function syncIntervalEndpointFrames(model, suppliedMetric = null) {
   if (preserveRefinementLevel) model.resolution.level = activeLevel;
 
   const interval = model.interval;
-  const activeSide = interval.activeSide === "start" || interval.activeSide === "end"
-    ? interval.activeSide
+  const activeEnd = interval.activeEnd === "start" || interval.activeEnd === "end"
+    ? interval.activeEnd
     : Math.abs(interval.arrival - interval.start) <= EPSILON
       ? "start"
       : "end";
@@ -265,9 +265,9 @@ function syncIntervalEndpointFrames(model, suppliedMetric = null) {
       ? currentFrame
       : interval.startFrame || (
         Math.abs(interval.departure - interval.start) <= EPSILON
-          ? interval.departureFrame
+          ? interval.departureNeighborhood
           : Math.abs(interval.arrival - interval.start) <= EPSILON
-            ? interval.arrivalFrame
+            ? interval.arrivalNeighborhood
             : null
       ),
     interval.start,
@@ -281,9 +281,9 @@ function syncIntervalEndpointFrames(model, suppliedMetric = null) {
       ? currentFrame
       : interval.endFrame || (
         Math.abs(interval.departure - interval.end) <= EPSILON
-          ? interval.departureFrame
+          ? interval.departureNeighborhood
           : Math.abs(interval.arrival - interval.end) <= EPSILON
-            ? interval.arrivalFrame
+            ? interval.arrivalNeighborhood
             : null
       ),
     interval.end,
@@ -293,18 +293,18 @@ function syncIntervalEndpointFrames(model, suppliedMetric = null) {
     metric
   );
 
-  interval.activeSide = activeSide;
+  interval.activeEnd = activeEnd;
   interval.startFrame = startFrame;
   interval.endFrame = endFrame;
-  interval.departure = activeSide === "start" ? interval.end : interval.start;
+  interval.departure = activeEnd === "start" ? interval.end : interval.start;
   interval.arrival = model.resolution.C;
   interval.direction = interval.arrival < interval.departure
     ? "backward"
     : "forward";
-  interval.departureFrame = clone(
-    activeSide === "start" ? endFrame : startFrame
+  interval.departureNeighborhood = clone(
+    activeEnd === "start" ? endFrame : startFrame
   );
-  interval.arrivalFrame = currentEndpointFrame(model);
+  interval.arrivalNeighborhood = currentEndpointFrame(model);
 }
 
 function createInterval(departure, arrival, operator, medium = "direct", endpointFrames = {}) {
@@ -322,19 +322,19 @@ function createInterval(departure, arrival, operator, medium = "direct", endpoin
   const end = Number.isFinite(endpointFrames.extent?.end)
     ? Math.max(endpointFrames.extent.end, maximum)
     : maximum;
-  const activeSide = endpointFrames.activeSide === "start"
-    || endpointFrames.activeSide === "end"
-    ? endpointFrames.activeSide
+  const activeEnd = endpointFrames.activeEnd === "start"
+    || endpointFrames.activeEnd === "end"
+    ? endpointFrames.activeEnd
     : Math.abs(arrival - start) <= EPSILON
       ? "start"
       : "end";
-  const departureFrame = clone(endpointFrames.departureFrame) || null;
-  const arrivalFrame = clone(endpointFrames.arrivalFrame) || null;
+  const departureNeighborhood = clone(endpointFrames.departureNeighborhood) || null;
+  const arrivalNeighborhood = clone(endpointFrames.arrivalNeighborhood) || null;
   const startFrame = clone(endpointFrames.startFrame) || (
-    departure <= arrival ? departureFrame : arrivalFrame
+    departure <= arrival ? departureNeighborhood : arrivalNeighborhood
   );
   const endFrame = clone(endpointFrames.endFrame) || (
-    departure <= arrival ? arrivalFrame : departureFrame
+    departure <= arrival ? arrivalNeighborhood : departureNeighborhood
   );
 
   return {
@@ -342,12 +342,12 @@ function createInterval(departure, arrival, operator, medium = "direct", endpoin
     end,
     departure,
     arrival,
-    activeSide,
+    activeEnd,
     operator,
     medium,
     direction: arrival < departure ? "backward" : "forward",
-    departureFrame,
-    arrivalFrame,
+    departureNeighborhood,
+    arrivalNeighborhood,
     startFrame,
     endFrame,
     createdAt: Date.now()
@@ -373,7 +373,7 @@ export function createSession({ duration = 0, current = 0, guide = createGuide()
       duration: end,
       range: { start: 0, end },
       resolution: createRoot(0, C, end),
-      resolutionBasis: RESOLUTION_BASIS.RANGE,
+      neighborhoodBasis: NEIGHBORHOOD_BASIS.RANGE,
       lastOperator: null,
       focus: null,
       interval: null,
@@ -390,7 +390,7 @@ export function snapshotModel(model, options = {}) {
     duration: model.duration,
     range: clone(model.range),
     resolution: clone(model.resolution),
-    resolutionBasis: model.resolutionBasis || RESOLUTION_BASIS.RANGE,
+    neighborhoodBasis: model.neighborhoodBasis || NEIGHBORHOOD_BASIS.RANGE,
     lastOperator: model.lastOperator || null,
     focus: clone(model.focus),
     interval: clone(model.interval),
@@ -429,7 +429,7 @@ function reconcileFocusDraft(model) {
   const current = clamp(departure, returnRange.start, returnRange.end);
   model.range = returnRange;
   model.resolution = createRoot(returnRange.start, current, returnRange.end);
-  model.resolutionBasis = RESOLUTION_BASIS.RANGE;
+  model.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
   model.focus = null;
   return {
     changed: true,
@@ -561,7 +561,7 @@ function openAddress(model, address) {
     clamp(current, model.range.start, model.range.end),
     model.range.end
   );
-  model.resolutionBasis = RESOLUTION_BASIS.RANGE;
+  model.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
   clearIntervalOutsideRange(model);
   return { changed: true, leftFocus, openedFullVideo };
 }
@@ -606,8 +606,8 @@ function moveDraft(model, destination, options = {}) {
   } else if (options.mode === "step") {
     const baseNeighborhood = clone(options.originResolution || model.resolution);
     const baseBasis = options.originResolutionBasis
-      || model.resolutionBasis
-      || RESOLUTION_BASIS.RANGE;
+      || model.neighborhoodBasis
+      || NEIGHBORHOOD_BASIS.RANGE;
 
     model.resolution = stepNeighborhood(
       baseNeighborhood,
@@ -617,14 +617,14 @@ function moveDraft(model, destination, options = {}) {
       metric
     );
     finalDestination = model.resolution.C;
-    model.resolutionBasis = isRangeNeighborhood(model.resolution, model.range)
-      ? RESOLUTION_BASIS.RANGE
+    model.neighborhoodBasis = isRangeNeighborhood(model.resolution, model.range)
+      ? NEIGHBORHOOD_BASIS.RANGE
       : baseBasis;
   } else if (options.mode === "linear") {
     const baseNeighborhood = clone(options.originResolution || model.resolution);
     const baseBasis = options.originResolutionBasis
-      || model.resolutionBasis
-      || RESOLUTION_BASIS.RANGE;
+      || model.neighborhoodBasis
+      || NEIGHBORHOOD_BASIS.RANGE;
     model.resolution = translateNeighborhood(
       baseNeighborhood,
       resolvedDestination,
@@ -632,8 +632,8 @@ function moveDraft(model, destination, options = {}) {
       metric
     );
     finalDestination = model.resolution.C;
-    model.resolutionBasis = isRangeNeighborhood(model.resolution, model.range)
-      ? RESOLUTION_BASIS.RANGE
+    model.neighborhoodBasis = isRangeNeighborhood(model.resolution, model.range)
+      ? NEIGHBORHOOD_BASIS.RANGE
       : baseBasis;
   } else {
     // Direct Go abandons the preceding recursive path while retaining the scale
@@ -645,9 +645,9 @@ function moveDraft(model, destination, options = {}) {
       model.range,
       metric
     );
-    model.resolutionBasis = isRangeNeighborhood(model.resolution, model.range)
-      ? RESOLUTION_BASIS.RANGE
-      : RESOLUTION_BASIS.MOVEMENT;
+    model.neighborhoodBasis = isRangeNeighborhood(model.resolution, model.range)
+      ? NEIGHBORHOOD_BASIS.RANGE
+      : NEIGHBORHOOD_BASIS.MOVEMENT;
   }
 
   const intervalDeparture = Number.isFinite(options.intervalDeparture)
@@ -655,7 +655,7 @@ function moveDraft(model, destination, options = {}) {
     : departure;
   const inheritedDepartureFrame = sourceInterval
     && Math.abs(sourceInterval.departure - intervalDeparture) <= EPSILON
-    ? sourceInterval.departureFrame
+    ? sourceInterval.departureNeighborhood
     : null;
   const originDepartureFrame = createEndpointFrame(
     options.originResolution,
@@ -686,8 +686,8 @@ function moveDraft(model, destination, options = {}) {
     options.operator || "go",
     options.medium || "direct",
     {
-      departureFrame: intervalDepartureFrame,
-      arrivalFrame: intervalArrivalFrame
+      departureNeighborhood: intervalDepartureFrame,
+      arrivalNeighborhood: intervalArrivalFrame
     }
   );
   model.lastOperator = options.operator || "go";
@@ -760,9 +760,9 @@ export function workFromExtent(session, extent, options = {}) {
     const startOpening = openAddress(model, start);
     const endOpening = openAddress(model, end);
     model.resolution = createRoot(start, midpoint, end);
-    model.resolutionBasis = isRangeNeighborhood(model.resolution, model.range)
-      ? RESOLUTION_BASIS.RANGE
-      : RESOLUTION_BASIS.MOVEMENT;
+    model.neighborhoodBasis = isRangeNeighborhood(model.resolution, model.range)
+      ? NEIGHBORHOOD_BASIS.RANGE
+      : NEIGHBORHOOD_BASIS.MOVEMENT;
     model.interval = createInterval(
       start,
       midpoint,
@@ -770,7 +770,7 @@ export function workFromExtent(session, extent, options = {}) {
       options.medium || "retained",
       {
         extent: { start, end },
-        activeSide: "end"
+        activeEnd: "end"
       }
     );
     model.lastOperator = operator;
@@ -938,7 +938,7 @@ export function reopen(session) {
   }
   return commit(session, "Reopen", draft => {
     draft.resolution = reopenToRange(draft.resolution.C, draft.range);
-    draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
+    draft.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
     draft.lastOperator = "reopen";
     return { changed: true };
   });
@@ -952,16 +952,16 @@ export function switchEndpoint(session, options = {}) {
     const active = clone(draft.interval);
     if (!active) return { changed: false, reason: "no-interval" };
     const metric = options.projection?.metric || projectionForModel(draft).metric;
-    const activeSide = active.activeSide === "start" || active.activeSide === "end"
-      ? active.activeSide
+    const activeEnd = active.activeEnd === "start" || active.activeEnd === "end"
+      ? active.activeEnd
       : Math.abs(active.arrival - active.start) <= EPSILON
         ? "start"
         : "end";
-    const nextSide = activeSide === "start" ? "end" : "start";
+    const nextSide = activeEnd === "start" ? "end" : "start";
     const departure = nextSide === "start" ? active.start : active.end;
-    const retainedDeparture = activeSide === "start" ? active.start : active.end;
+    const retainedDeparture = activeEnd === "start" ? active.start : active.end;
     const frameBeingLeft = resolveIntervalEndpointFrame(
-      activeSide === "start" ? active.startFrame : active.endFrame,
+      activeEnd === "start" ? active.startFrame : active.endFrame,
       retainedDeparture,
       departure,
       active,
@@ -978,15 +978,15 @@ export function switchEndpoint(session, options = {}) {
     );
 
     draft.resolution = clone(frameBeingEntered.resolution);
-    draft.resolutionBasis = frameBeingEntered.resolutionBasis;
+    draft.neighborhoodBasis = frameBeingEntered.neighborhoodBasis;
     draft.interval = {
       ...active,
       departure: retainedDeparture,
       arrival: departure,
-      activeSide: nextSide,
+      activeEnd: nextSide,
       direction: departure < retainedDeparture ? "backward" : "forward",
-      departureFrame: frameBeingLeft,
-      arrivalFrame: frameBeingEntered
+      departureNeighborhood: frameBeingLeft,
+      arrivalNeighborhood: frameBeingEntered
     };
 
     return {
@@ -1018,7 +1018,7 @@ export function setRange(session, start, end, current, label = "Set Range") {
     draft.range = { start: next.start, end: next.end };
     draft.focus = null;
     draft.resolution = createRoot(next.start, next.current, next.end);
-    draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
+    draft.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
     draft.lastOperator = "range";
     const intervalCleared = clearIntervalOutsideRange(draft);
     return {
@@ -1052,7 +1052,7 @@ export function focusSection(session, sectionId, options = {}) {
         ? options.projection.timelineMidpoint(resolved.start, resolved.end)
         : resolved.midpoint;
     draft.resolution = createRoot(resolved.start, current, resolved.end);
-    draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
+    draft.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
     draft.lastOperator = "focus";
     const moved = Math.abs(current - departure) > EPSILON;
     const intervalCleared = clearIntervalOutsideRange(draft);
@@ -1088,7 +1088,7 @@ export function focusWorkingSection(session) {
     draft.range = { start: working.start, end: working.end };
     const current = clamp(departure, working.start, working.end);
     draft.resolution = createRoot(working.start, current, working.end);
-    draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
+    draft.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
     draft.lastOperator = "focus";
     return {
       changed: true,
@@ -1107,7 +1107,7 @@ export function leaveSection(session) {
     const current = clamp(departure, returnRange.start, returnRange.end);
     draft.range = returnRange;
     draft.resolution = createRoot(returnRange.start, current, returnRange.end);
-    draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
+    draft.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
     draft.lastOperator = "unfocus";
     draft.focus = null;
     const intervalCleared = clearIntervalOutsideRange(draft);
@@ -1149,12 +1149,12 @@ export function projectPlayback(model, options = {}) {
     || projected.resolution
   );
   const parentBasis = options.parentResolutionBasis
-    || originModel.resolutionBasis
-    || projected.resolutionBasis
-    || RESOLUTION_BASIS.RANGE;
+    || originModel.neighborhoodBasis
+    || projected.neighborhoodBasis
+    || NEIGHBORHOOD_BASIS.RANGE;
   projected.resolution = translateNeighborhood(parentNeighborhood, current, projected.range);
-  projected.resolutionBasis = isRangeNeighborhood(projected.resolution, projected.range)
-    ? RESOLUTION_BASIS.RANGE
+  projected.neighborhoodBasis = isRangeNeighborhood(projected.resolution, projected.range)
+    ? NEIGHBORHOOD_BASIS.RANGE
     : parentBasis;
 
   const parentFrame = createEndpointFrame(parentNeighborhood, parentBasis);
@@ -1167,33 +1167,33 @@ export function projectPlayback(model, options = {}) {
         start: Math.min(sourceInterval?.start ?? pathStart, pathStart),
         end: Math.max(sourceInterval?.end ?? pathEnd, pathEnd)
       };
-  const inheritedSide = sourceInterval?.activeSide === "start"
-    || sourceInterval?.activeSide === "end"
-    ? sourceInterval.activeSide
+  const inheritedSide = sourceInterval?.activeEnd === "start"
+    || sourceInterval?.activeEnd === "end"
+    ? sourceInterval.activeEnd
     : null;
-  const activeSide = current <= extent.start + EPSILON
+  const activeEnd = current <= extent.start + EPSILON
     ? "start"
     : current >= extent.end - EPSILON
       ? "end"
       : completedCycle
         ? "start"
         : inheritedSide || (current < departure ? "start" : "end");
-  const intervalDeparture = activeSide === "start" ? extent.end : extent.start;
+  const intervalDeparture = activeEnd === "start" ? extent.end : extent.start;
 
   let startFrame = clone(sourceInterval?.startFrame);
   let endFrame = clone(sourceInterval?.endFrame);
   if (!startFrame && sourceInterval) {
     startFrame = clone(
       Math.abs(sourceInterval.departure - sourceInterval.start) <= EPSILON
-        ? sourceInterval.departureFrame
-        : sourceInterval.arrivalFrame
+        ? sourceInterval.departureNeighborhood
+        : sourceInterval.arrivalNeighborhood
     );
   }
   if (!endFrame && sourceInterval) {
     endFrame = clone(
       Math.abs(sourceInterval.departure - sourceInterval.end) <= EPSILON
-        ? sourceInterval.departureFrame
-        : sourceInterval.arrivalFrame
+        ? sourceInterval.departureNeighborhood
+        : sourceInterval.arrivalNeighborhood
     );
   }
   if (Math.abs(extent.start - current) <= EPSILON) startFrame = currentFrame;
@@ -1208,11 +1208,11 @@ export function projectPlayback(model, options = {}) {
     "continuous",
     {
       extent,
-      activeSide,
+      activeEnd,
       startFrame,
       endFrame,
-      departureFrame: activeSide === "start" ? endFrame : startFrame,
-      arrivalFrame: currentFrame
+      departureNeighborhood: activeEnd === "start" ? endFrame : startFrame,
+      arrivalNeighborhood: currentFrame
     }
   );
   projected.lastOperator = options.operator || "playback";
@@ -1239,7 +1239,7 @@ export function completePlayback(session, options) {
   playbackCheckpoint.guide = session.model.guide;
   return commit(session, options.label || "Playback", draft => {
     draft.resolution = clone(projection.model.resolution);
-    draft.resolutionBasis = projection.model.resolutionBasis;
+    draft.neighborhoodBasis = projection.model.neighborhoodBasis;
     draft.interval = clone(projection.model.interval);
     draft.lastOperator = projection.model.lastOperator;
     return {
@@ -1412,7 +1412,7 @@ function rebaseFocusedGuideSection(model) {
   }
   model.range = { start: section.start, end: section.end };
   model.resolution = createRoot(section.start, current, section.end);
-  model.resolutionBasis = RESOLUTION_BASIS.RANGE;
+  model.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
   return {
     rangeChanged: true,
     moved: Math.abs(current - previous) > EPSILON,
@@ -1444,7 +1444,7 @@ function rebaseWorkingIntervalBounds(model, movements) {
       interval.endFrame,
       interval.startFrame
     ];
-    interval.activeSide = interval.activeSide === "start" ? "end" : "start";
+    interval.activeEnd = interval.activeEnd === "start" ? "end" : "start";
   }
   interval.start = start;
   interval.end = end;
@@ -1707,7 +1707,7 @@ export function deleteGuideSection(session, sectionId) {
       const current = clamp(departure, returnRange.start, returnRange.end);
       draft.range = returnRange;
       draft.resolution = createRoot(returnRange.start, current, returnRange.end);
-      draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
+      draft.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
       draft.focus = null;
       clearIntervalOutsideRange(draft);
     }
@@ -1828,7 +1828,7 @@ export function previewRange(session, start, end, current) {
     draft.range = { start: next.start, end: next.end };
     draft.focus = null;
     draft.resolution = createRoot(next.start, next.current, next.end);
-    draft.resolutionBasis = RESOLUTION_BASIS.RANGE;
+    draft.neighborhoodBasis = NEIGHBORHOOD_BASIS.RANGE;
     draft.lastOperator = "range";
     const intervalCleared = clearIntervalOutsideRange(draft);
     return {
@@ -1920,9 +1920,9 @@ export function ghostTraverse(session, destination, options = {}) {
       draft.range,
       metric
     );
-    draft.resolutionBasis = options.originResolutionBasis
-      || draft.resolutionBasis
-      || RESOLUTION_BASIS.RANGE;
+    draft.neighborhoodBasis = options.originResolutionBasis
+      || draft.neighborhoodBasis
+      || NEIGHBORHOOD_BASIS.RANGE;
     // Coming back to the Anchor is a legitimate destination: the reader went
     // out and returned. There is simply no extent to draw at that instant, so
     // the Interval is cleared rather than the movement refused. Settlement then
@@ -1940,11 +1940,11 @@ export function ghostTraverse(session, destination, options = {}) {
         place: target
       };
     }
-    const activeSide = target <= anchor ? "start" : "end";
+    const activeEnd = target <= anchor ? "start" : "end";
     const extent = { start: Math.min(anchor, target), end: Math.max(anchor, target) };
     const currentFrame = currentEndpointFrame(draft);
     const startFrame = resolveIntervalEndpointFrame(
-      activeSide === "start" ? currentFrame : null,
+      activeEnd === "start" ? currentFrame : null,
       extent.start,
       extent.end,
       extent,
@@ -1952,7 +1952,7 @@ export function ghostTraverse(session, destination, options = {}) {
       metric
     );
     const endFrame = resolveIntervalEndpointFrame(
-      activeSide === "end" ? currentFrame : null,
+      activeEnd === "end" ? currentFrame : null,
       extent.end,
       extent.start,
       extent,
@@ -1961,11 +1961,11 @@ export function ghostTraverse(session, destination, options = {}) {
     );
     draft.interval = createInterval(anchor, target, operator, "ghost", {
       extent,
-      activeSide,
+      activeEnd,
       startFrame,
       endFrame,
-      departureFrame: activeSide === "start" ? endFrame : startFrame,
-      arrivalFrame: currentFrame
+      departureNeighborhood: activeEnd === "start" ? endFrame : startFrame,
+      arrivalNeighborhood: currentFrame
     });
     if (!draft.interval) return { changed: false, reason: "invalid-ghost-interval" };
     draft.lastOperator = operator;
@@ -2017,11 +2017,11 @@ export function settleGhostSequence(session, gesture) {
   }
   // The last source-time movement supplies the viewpoint, exactly as the final
   // committed repeat does for a Step sequence.
-  const activeSide = gesture.lastSourceDirection === "backward" ? "start" : "end";
+  const activeEnd = gesture.lastSourceDirection === "backward" ? "start" : "end";
   const operator = gesture.lastSourceDirection === "backward"
     ? "ghostBackward"
     : "ghostForward";
-  const intervalDeparture = activeSide === "start" ? visitedMaximum : visitedMinimum;
+  const intervalDeparture = activeEnd === "start" ? visitedMaximum : visitedMinimum;
   return amend(session, draft => {
     const extent = { start: visitedMinimum, end: visitedMaximum };
     const metric = gesture.projection?.metric || projectionForModel(draft).metric;
@@ -2044,11 +2044,11 @@ export function settleGhostSequence(session, gesture) {
     );
     draft.interval = createInterval(intervalDeparture, arrival, operator, "ghost", {
       extent,
-      activeSide,
+      activeEnd,
       startFrame,
       endFrame,
-      departureFrame: activeSide === "start" ? endFrame : startFrame,
-      arrivalFrame: currentFrame
+      departureNeighborhood: activeEnd === "start" ? endFrame : startFrame,
+      arrivalNeighborhood: currentFrame
     });
     if (!draft.interval) return { changed: false, reason: "invalid-ghost-envelope" };
     draft.lastOperator = operator;
@@ -2105,8 +2105,8 @@ export function settleStepSequence(session, pending) {
     // backward return leaves the lower side active; a forward return leaves the
     // upper side active. The opposite visited extreme is the retained endpoint
     // from which Switch Endpoint can reconstruct the complementary viewpoint.
-    const activeSide = pending.lastDirection === "backward" ? "start" : "end";
-    const intervalDeparture = activeSide === "start"
+    const activeEnd = pending.lastDirection === "backward" ? "start" : "end";
+    const intervalDeparture = activeEnd === "start"
       ? visitedMaximum
       : visitedMinimum;
     const operator = pending.lastDirection === "backward"
@@ -2139,11 +2139,11 @@ export function settleStepSequence(session, pending) {
         "direct",
         {
           extent,
-          activeSide,
+          activeEnd,
           startFrame,
           endFrame,
-          departureFrame: activeSide === "start" ? endFrame : startFrame,
-          arrivalFrame: currentFrame
+          departureNeighborhood: activeEnd === "start" ? endFrame : startFrame,
+          arrivalNeighborhood: currentFrame
         }
       );
       if (!draft.interval) {

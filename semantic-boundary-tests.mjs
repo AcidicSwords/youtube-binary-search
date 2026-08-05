@@ -49,7 +49,7 @@ finding(
   reopen(session).changed && reopenPresentation === null,
   {
     resolution: session.model.resolution,
-    basis: session.model.resolutionBasis
+    basis: session.model.neighborhoodBasis
   }
 );
 
@@ -120,7 +120,7 @@ playback = completePlayback(playback, {
   current: 30,
   departure: 20,
   parentNeighborhood: playbackReturn.resolution,
-  parentResolutionBasis: playbackReturn.resolutionBasis,
+  parentResolutionBasis: playbackReturn.neighborhoodBasis,
   returnModel: playbackReturn
 }).session;
 const playbackUndone = undo(playback).session;

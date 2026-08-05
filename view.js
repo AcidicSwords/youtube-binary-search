@@ -12,7 +12,7 @@ import {
   classifyRetainedRefineRelation,
   getActionRanges,
   refineBlockReason,
-  RESOLUTION_BASIS
+  NEIGHBORHOOD_BASIS
 } from "./range-geometry.js";
 import {
   PIN_KIND,
@@ -1596,7 +1596,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const predicted = previewResult?.changed
       ? previewResult.session.model
       : null;
-    const previewResolution = predicted?.resolution || null;
+    const previewNeighborhood = predicted?.resolution || null;
     const removedInterval = kind === "release" ? interval() : null;
     const structuralExtent = structural?.[kind] || null;
     const previewInterval = predicted?.interval || removedInterval || structuralExtent;
@@ -1627,7 +1627,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     // operators that push a midpoint show it in the destination anyway. The
     // extent and the destination are all that remain; the rest was noise the
     // moment the movement was invoked, so it is gone rather than hidden.
-    const previewCurrent = previewResolution?.C ?? structuralPoint;
+    const previewCurrent = previewNeighborhood?.C ?? structuralPoint;
     elements["preview-current-marker"].hidden = previewCurrent === null;
     if (previewCurrent === null) return;
     setMarkerPosition(elements["preview-current-marker"], previewCurrent);
@@ -1650,9 +1650,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
   }
 
   function renderTransport() {
-    const currentResolution = resolution();
+    const currentNeighborhood = resolution();
     const activeRange = range();
-    const semanticCurrent = currentResolution?.C ?? 0;
+    const semanticCurrent = currentNeighborhood?.C ?? 0;
     const physical = getPlayerTime();
     const moving = isTransportActive(state().transport)
       || state().playerState === YOUTUBE_STATE.PLAYING;
@@ -1683,34 +1683,34 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : null;
     const livePlayback = Boolean(playbackProjection?.changed);
     const projectedModel = livePlayback ? playbackProjection.model : model();
-    elements["timeline-key-interval"].dataset.active = String(
+    elements["timeline-key-active-span"].dataset.active = String(
       Boolean(projectedModel?.interval)
     );
     for (const id of [
-      "resolution-fill",
-      "interval-fill",
-      "resolution-start-marker",
-      "resolution-end-marker"
+      "neighborhood-fill",
+      "active-span-fill",
+      "neighborhood-backward-bound",
+      "neighborhood-forward-bound"
     ]) {
       elements[id].dataset.live = String(livePlayback);
     }
     if (state().videoLoaded && projectedModel?.resolution) {
       setSegment(
-        elements["resolution-fill"],
+        elements["neighborhood-fill"],
         projectedModel.resolution.L,
         projectedModel.resolution.R
       );
-      setMarkerPosition(elements["resolution-start-marker"], projectedModel.resolution.L);
-      setMarkerPosition(elements["resolution-end-marker"], projectedModel.resolution.R);
-      elements["interval-fill"].hidden = !projectedModel.interval;
+      setMarkerPosition(elements["neighborhood-backward-bound"], projectedModel.resolution.L);
+      setMarkerPosition(elements["neighborhood-forward-bound"], projectedModel.resolution.R);
+      elements["active-span-fill"].hidden = !projectedModel.interval;
       if (projectedModel.interval) {
-        elements["interval-fill"].dataset.direction = projectedModel.interval.direction;
+        elements["active-span-fill"].dataset.direction = projectedModel.interval.direction;
         // A recalled relation is faint: it is real geometry and an ordinary
         // Working Interval, but it belongs to a gesture still being held.
-        elements["interval-fill"].dataset.medium =
+        elements["active-span-fill"].dataset.medium =
           projectedModel.interval.medium || "direct";
         setSegment(
-          elements["interval-fill"],
+          elements["active-span-fill"],
           projectedModel.interval.start,
           projectedModel.interval.end
         );
@@ -1772,7 +1772,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       }
     }
 
-    if (state().videoLoaded && currentResolution) {
+    if (state().videoLoaded && currentNeighborhood) {
       // A Current drag seeks the player to the candidate, so the Cursor would
       // track the Current marker exactly and draw a second marker underneath
       // it. Cursor reports observation that has left Current; during the drag
@@ -1794,26 +1794,26 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const shiftLayer = currentState.shiftLayers?.matrix === true
       || currentState.shiftKeyHeld;
     const activeRange = range();
-    const currentResolution = resolution();
+    const currentNeighborhood = resolution();
     const currentInterval = interval();
     const projection = timelineProjection();
     const field = currentState.field;
     const fieldSpan = field?.span?.held && field.span.available
       ? { start: field.span.start, end: field.span.end }
       : null;
-    const semanticCurrent = currentResolution?.C ?? 0;
+    const semanticCurrent = currentNeighborhood?.C ?? 0;
     const configuredReach = model().stepReach;
     const effectiveReach = effectiveStepReach(
       configuredReach,
       activeRange,
       projection
     );
-    const targets = currentResolution
-      ? getTargets(currentResolution, projection.metric)
+    const targets = currentNeighborhood
+      ? getTargets(currentNeighborhood, projection.metric)
       : { backward: null, forward: null };
-    const actionModel = currentResolution
+    const actionModel = currentNeighborhood
       ? getActionRanges(
-          currentResolution,
+          currentNeighborhood,
           activeRange,
           currentInterval,
           semanticCurrent,
@@ -1821,21 +1821,21 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           projection.metric
         )
       : null;
-    const previous = currentResolution
+    const previous = currentNeighborhood
       ? previousPin(guide(), semanticCurrent, activeRange, projection)
       : null;
-    const next = currentResolution
+    const next = currentNeighborhood
       ? nextPin(guide(), semanticCurrent, activeRange, projection)
       : null;
-    const switchFrame = currentInterval?.departureFrame?.resolution;
+    const switchFrame = currentInterval?.departureNeighborhood?.resolution;
     const selectedForPreview = currentState.selectedRetained?.kind === "section"
       ? resolveSection(guide(), currentState.selectedRetained.id)
       : null;
-    const positiveWorkingInterval = currentInterval
+    const positiveActiveSpan = currentInterval
       && currentInterval.end - currentInterval.start > EPSILON
       ? currentInterval
       : null;
-    const structuralPresentation = currentResolution ? {
+    const structuralPresentation = currentNeighborhood ? {
       previousPin: previous ? { start: previous.t, end: semanticCurrent } : null,
       nextPin: next ? { start: semanticCurrent, end: next.t } : null,
       stepBackward: shiftLayer && previous
@@ -1849,7 +1849,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         : currentInterval,
       release: currentInterval,
       tag: shiftLayer
-        ? positiveWorkingInterval
+        ? positiveActiveSpan
         : { start: semanticCurrent, end: semanticCurrent },
       focus: currentInterval || selectedForPreview
     } : null;
@@ -1918,8 +1918,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       Boolean(sortedSections(guide()).length)
     );
     elements["timeline-key-range"].dataset.active = String(loaded);
-    elements["timeline-key-resolution"].dataset.active = String(Boolean(currentResolution));
-    elements["timeline-key-interval"].dataset.active = String(Boolean(currentInterval));
+    elements["timeline-key-resolution"].dataset.active = String(Boolean(currentNeighborhood));
+    elements["timeline-key-active-span"].dataset.active = String(Boolean(currentInterval));
     elements["timeline-key-field"].dataset.active = String(Boolean(fieldSpan));
     elements["timeline-key-pins"].dataset.active = String(
       Boolean(orderedPins(guide()).length)
@@ -1929,28 +1929,28 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? `${formatTime(model().duration)} · ${overallStretch} spatial`
       : formatTime(model().duration);
     elements["range-label"].textContent = loaded ? formatRange(activeRange) : "—";
-    const resolutionTimelineExtent = currentResolution
-      ? projection.timelineDistance(currentResolution.L, currentResolution.R)
+    const resolutionTimelineExtent = currentNeighborhood
+      ? projection.timelineDistance(currentNeighborhood.L, currentNeighborhood.R)
       : null;
-    const resolutionSourceDuration = currentResolution
-      ? currentResolution.R - currentResolution.L
+    const resolutionSourceDuration = currentNeighborhood
+      ? currentNeighborhood.R - currentNeighborhood.L
       : null;
     const resolutionStretch = formatStretch(
       resolutionTimelineExtent,
       resolutionSourceDuration
     );
-    elements["resolution-label"].textContent = currentResolution
+    elements["resolution-label"].textContent = currentNeighborhood
       ? `${
           formatDuration(resolutionSourceDuration)
         }${
           resolutionStretch ? ` · ${resolutionStretch} spatial` : ""
         } · ${
-          currentState.session.model.resolutionBasis === RESOLUTION_BASIS.MOVEMENT
+          currentState.session.model.neighborhoodBasis === NEIGHBORHOOD_BASIS.MOVEMENT
             ? "Movement scale"
             : "Range scale"
         }`
       : "—";
-    elements["pin-current-position"].textContent = currentResolution ? `Current ${formatTime(semanticCurrent)}` : "Current —";
+    elements["pin-current-position"].textContent = currentNeighborhood ? `Current ${formatTime(semanticCurrent)}` : "Current —";
     elements["context-setting-value"].textContent = currentState.contextSeconds > 0
       ? `${currentState.contextSeconds} s centered on Current`
       : "Off";
@@ -1977,7 +1977,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     // Adaptive Reach derives a live map distance from the weighted Range, so it
     // is reported as the source time the next forward Step would actually
     // cross rather than as its raw map size.
-    const adaptiveSourceSpan = loaded && currentResolution
+    const adaptiveSourceSpan = loaded && currentNeighborhood
       ? Math.abs(
           projection.stepTarget(
             semanticCurrent,
@@ -2155,7 +2155,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     // Interval it retains; the label and availability follow Shift, not the
     // incidental existence of an Interval.
     elements.tag.disabled = interactionLocked
-      || (shiftLayer && !positiveWorkingInterval);
+      || (shiftLayer && !positiveActiveSpan);
     elements["focus-toggle"].disabled = interactionLocked || !(
       focused
       || currentInterval
@@ -2163,7 +2163,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     );
     elements["shift-layer-toggle"].disabled = interactionLocked;
 
-    const currentPin = currentResolution ? findPinAt(guide(), semanticCurrent) : null;
+    const currentPin = currentNeighborhood ? findPinAt(guide(), semanticCurrent) : null;
     const alreadyPinned = currentPin?.kind === PIN_KIND.EXPLICIT;
     elements["pin-current"].disabled = interactionLocked || (alreadyPinned && !elements["pin-label"].value.trim());
     elements["focus-toggle-label"].textContent = focused ? "Unfocus" : "Focus";
@@ -2177,16 +2177,16 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       || atFullVideo;
     elements["range-start-here"].disabled = interactionLocked
       || focusOwnsBoundaries
-      || !currentResolution
+      || !currentNeighborhood
       || semanticCurrent <= activeRange.start + EPSILON
       || semanticCurrent >= activeRange.end - minRangeSeconds;
     elements["range-end-here"].disabled = interactionLocked
       || focusOwnsBoundaries
-      || !currentResolution
+      || !currentNeighborhood
       || semanticCurrent >= activeRange.end - EPSILON
       || semanticCurrent <= activeRange.start + minRangeSeconds;
     elements["range-midpoint"].disabled = interactionLocked
-      || !currentResolution
+      || !currentNeighborhood
       || projection.timelineDistance(
         semanticCurrent,
         projection.timelineMidpoint(activeRange.start, activeRange.end)
@@ -2202,7 +2202,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["redo-meta"].textContent = (currentState.session.future || []).length
       ? currentState.session.future.at(-1).label
       : "Nothing to redo";
-    const destinationFrame = currentInterval?.departureFrame;
+    const destinationFrame = currentInterval?.departureNeighborhood;
     const destinationScale = destinationFrame?.resolution
       ? formatDuration(destinationFrame.resolution.R - destinationFrame.resolution.L)
       : null;
@@ -2211,21 +2211,21 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "switch-endpoint-meta",
       "Switch Endpoint",
       currentInterval
-        ? `to ${formatTime(currentInterval.departure)}${destinationScale ? ` · ${destinationScale} ${destinationFrame.resolutionBasis === RESOLUTION_BASIS.RANGE ? "Range" : "movement"} scale` : ""}`
+        ? `to ${formatTime(currentInterval.departure)}${destinationScale ? ` · ${destinationScale} ${destinationFrame.neighborhoodBasis === NEIGHBORHOOD_BASIS.RANGE ? "Range" : "movement"} scale` : ""}`
         : "No Interval"
     );
-    const backwardBlock = currentResolution
-      ? refineBlockReason(currentResolution, activeRange, "backward", projection.metric)
+    const backwardBlock = currentNeighborhood
+      ? refineBlockReason(currentNeighborhood, activeRange, "backward", projection.metric)
       : null;
-    const forwardBlock = currentResolution
-      ? refineBlockReason(currentResolution, activeRange, "forward", projection.metric)
+    const forwardBlock = currentNeighborhood
+      ? refineBlockReason(currentNeighborhood, activeRange, "forward", projection.metric)
       : null;
     setActionMeta(
       "refine-backward",
       "backward-meta",
       "Refine Backward",
       targets.backward === null
-        ? backwardBlock === "resolution-limit" ? "Resolution limit" : "Range start"
+        ? backwardBlock === "refinement-limit" ? "Resolution limit" : "Range start"
         : shiftLayer
           ? `draw Current-to-midpoint Interval · to ${formatTime(targets.backward)}`
           : `${classifyRetainedRefineRelation(currentInterval, semanticCurrent, targets.backward) === "full" ? "full movement" : "retain anchor"} · to ${formatTime(targets.backward)}`
@@ -2235,7 +2235,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "forward-meta",
       "Refine Forward",
       targets.forward === null
-        ? forwardBlock === "resolution-limit" ? "Resolution limit" : "Range end"
+        ? forwardBlock === "refinement-limit" ? "Resolution limit" : "Range end"
         : shiftLayer
           ? `draw Current-to-midpoint Interval · to ${formatTime(targets.forward)}`
           : `${classifyRetainedRefineRelation(currentInterval, semanticCurrent, targets.forward) === "full" ? "full movement" : "retain anchor"} · to ${formatTime(targets.forward)}`
@@ -2282,8 +2282,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : "No Interval";
     const tagLabel = shiftLayer ? "Tag as Section" : "Tag as Pin";
     const tagMeta = shiftLayer
-      ? positiveWorkingInterval
-        ? `${formatRange(positiveWorkingInterval)} → Section`
+      ? positiveActiveSpan
+        ? `${formatRange(positiveActiveSpan)} → Section`
         : "No Working Interval"
       : `Current ${formatTime(semanticCurrent)} → Pin`;
     elements["tag-label"].textContent = tagLabel;
@@ -2297,13 +2297,13 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           ? formatRange(selectedSection)
           : "No target";
 
-    if (!loaded || !currentResolution) {
+    if (!loaded || !currentNeighborhood) {
       for (const id of [
-        "range-start-handle", "range-end-handle", "resolution-start-marker",
-        "resolution-end-marker", "backward-target-marker", "forward-target-marker", "current-marker", "cursor-marker",
+        "range-start-handle", "range-end-handle", "neighborhood-backward-bound",
+        "neighborhood-forward-bound", "backward-target-marker", "forward-target-marker", "current-marker", "cursor-marker",
         "current-departure-marker"
       ]) elements[id].hidden = true;
-      elements["interval-fill"].hidden = true;
+      elements["active-span-fill"].hidden = true;
       elements["field-span-fill"].hidden = true;
       elements["section-preview-fill"].hidden = true;
       elements["action-preview-fill"].hidden = true;
@@ -2314,7 +2314,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     }
 
     for (const id of [
-      "resolution-start-marker", "resolution-end-marker", "current-marker"
+      "neighborhood-backward-bound", "neighborhood-forward-bound", "current-marker"
     ]) elements[id].hidden = false;
     for (const id of ["range-start-handle", "range-end-handle"]) {
       elements[id].hidden = focusOwnsBoundaries;

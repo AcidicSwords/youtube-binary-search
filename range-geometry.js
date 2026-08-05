@@ -1,5 +1,5 @@
 export const EPSILON = 0.04;
-export const RESOLUTION_BASIS = Object.freeze({
+export const NEIGHBORHOOD_BASIS = Object.freeze({
   RANGE: "range",
   MOVEMENT: "movement"
 });
@@ -155,12 +155,12 @@ export function refineBlockReason(neighborhood, range, direction, metric = null)
   if (direction === "backward") {
     return neighborhood.C <= range.start + EPSILON
       ? "range-start"
-      : "resolution-limit";
+      : "refinement-limit";
   }
   if (direction === "forward") {
     return neighborhood.C >= range.end - EPSILON
       ? "range-end"
-      : "resolution-limit";
+      : "refinement-limit";
   }
   throw new TypeError(`Unknown direction: ${direction}`);
 }
