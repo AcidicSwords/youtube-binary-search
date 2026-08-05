@@ -197,6 +197,21 @@ function readablePositions(userTime, { frozenStreamEnd, range, projection, stepR
   };
   for (let index = 0; index < limit; index += 1) {
     const record = userTime.records[index];
+    // A recall is not a journey.
+    //
+    // A ghost-replay records that the reader recalled these Addresses, and it
+    // is kept in full: its units, its provenance, and its place in the order
+    // are all part of what happened. But it is not offered back as somewhere to
+    // recall *to*, because its path is the reverse of a path already in the
+    // stream. Offering both makes the stream a palindrome, and then scrolling
+    // backward walks forward through the original journey and turns around --
+    // which is disorienting and tells the reader nothing the original records
+    // do not already say.
+    //
+    // Excluding it also gives §2.2 for free: the reader standing on a recalled
+    // Address resolves onto its *historical* occurrence, so Ghosting forward
+    // from there retraces what originally followed it.
+    if (record.kind === TRAVERSAL_KIND.GHOST_REPLAY) continue;
     record.units.forEach((unit, unitIndex) => {
       if (unit.kind === UNIT_KIND.SPAN) {
         const inside = spanPositions(unit, { range: bounds, projection, stepReach });

@@ -430,4 +430,75 @@ function walk(userTime, ghostRead, direction, limit = 40) {
     "A gesture that recalled nothing writes nothing.");
 }
 
-console.log("User time tests passed: append-only records that keep reversals, direction in user time independent of source order, shared endpoints as one position, watched spans subdivided by the frozen Step law and clipped to the active Range, a frozen readable stream, and injection that adds an occurrence without editing the one it was recalled from.");
+// A recall is not a journey, so recalling does not fold the stream in half
+{
+  // The reader walks forward deliberately, recalls back along it, and then goes
+  // somewhere new. If the replay were offered back as somewhere to recall *to*,
+  // the stream would be a palindrome: scrolling backward would walk forward
+  // through the original journey and then turn around, which is disorienting
+  // and says nothing the original records do not already say.
+  const walked = [0, 10, 20, 30, 40];
+  let userTime = createUserTime(walked[0]);
+  for (let index = 1; index < walked.length; index += 1) {
+    userTime = appendAtomicTraversal(userTime, {
+      from: walked[index - 1],
+      to: walked[index],
+      cause: "timeline"
+    }).userTime;
+  }
+
+  // Recall back along it.
+  let ghostRead = read(userTime, 40);
+  const visited = [];
+  for (let notch = 0; notch < 3; notch += 1) {
+    const moved = moveGhostRead(userTime, ghostRead, "backward");
+    visited.push({ address: moved.address, sourceCursor: moved.cursor });
+    ghostRead = moved.read;
+  }
+  assert.deepEqual(visited.map(entry => entry.address), [30, 20, 10],
+    "Recalling walks back along what was walked.");
+
+  const replayed = appendGhostReplay(userTime, {
+    anchor: 40,
+    anchorCursor: { recordId: userTime.records.at(-1).id, unitIndex: 0, address: 40 },
+    visited,
+    createdAt: 1
+  });
+
+  // The record is kept in full -- units, provenance, and its place in the order
+  // are all part of what happened.
+  assert.equal(replayed.record.kind, TRAVERSAL_KIND.GHOST_REPLAY);
+  assert.equal(replayed.record.units.length, 3);
+  assert.equal(replayed.record.provenance.recalledOccurrences.length, 3);
+
+  // It is simply not offered back as somewhere to recall to.
+  const after = read(replayed.userTime, 10);
+  assert.deepEqual(
+    after.positions.map(position => position.address),
+    walked,
+    "The readable stream stays the journey the reader actually made."
+  );
+
+  // And from the recalled Address, forward retraces what originally followed it
+  // -- the reader resolves onto the historical occurrence, not the replayed one.
+  const forward = walk(replayed.userTime, after, "forward");
+  assert.deepEqual(forward.addresses, [20, 30, 40],
+    "Ghosting forward from a recalled moment replays its original successors.");
+
+  // Going somewhere new afterwards is ordinary navigation and does appear.
+  const moved = appendAtomicTraversal(replayed.userTime, {
+    from: 10, to: 90, cause: "timeline"
+  }).userTime;
+  const later = walk(moved, read(moved, 90), "backward");
+  assert.deepEqual(later.addresses, [10, 40, 30, 20, 10, 0],
+    "so a later backward recall reverses the journey: where they left from, then the walk itself.");
+  // 10 appears twice because the reader genuinely stood there twice -- once on
+  // the way out and once after recalling. What does not appear is the recall
+  // between them, which was looking rather than going.
+  assert.equal(later.addresses.filter(address => address === 10).length, 2);
+  assert.equal(later.addresses.includes(20), true);
+  assert.deepEqual(later.addresses.slice(1), [40, 30, 20, 10, 0],
+    "and the tail is the original walk in reverse, with no fold in it.");
+}
+
+console.log("User time tests passed: append-only records that keep reversals, direction in user time independent of source order, shared endpoints as one position, watched spans subdivided by the frozen Step law and clipped to the active Range, a frozen readable stream, injection that adds an occurrence without editing the one it was recalled from, and a recall that is recorded in full without being offered back as somewhere to recall to.");
