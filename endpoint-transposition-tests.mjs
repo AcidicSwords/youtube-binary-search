@@ -65,7 +65,7 @@ assert.deepEqual(switched.session.model.interval, originalInterval);
 
 // Refine after transposition may pass the preserved opposite endpoint. Because
 // that target is outside the current Interval, the old Interval is discarded and the
-// complete Current-to-midpoint traversal becomes the Working Interval.
+// complete Current-to-midpoint traversal becomes the Active Span.
 let overrun = createSession({ duration: 100, current: 50 });
 overrun = goTo(overrun, 70, { operator: "timeline" }).session;
 overrun = switchEndpoint(overrun).session;

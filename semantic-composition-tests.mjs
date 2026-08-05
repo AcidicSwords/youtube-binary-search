@@ -84,7 +84,7 @@ assert.ok(Math.abs(composed.model.interval.arrival - 90) <= EPSILON);
 
 // Section endpoints are Pin operands. Previous/Next Pin is linear for
 // Resolution, but each Pin hop records its own traversal Interval rather than
-// stretching a Working Interval across every crossed Pin.
+// stretching a Active Span across every crossed Pin.
 const guide = createGuide("semantic-composition");
 createSectionFromTimes(guide, 20, 40, { label: "First" });
 createSectionFromTimes(guide, 60, 80, { label: "Second" });

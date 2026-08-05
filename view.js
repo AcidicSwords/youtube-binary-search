@@ -211,16 +211,16 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
   const guide = () => model().guide;
   const interval = () => model().interval;
   const focusedSectionId = () => (
-    model().focus?.kind === "working-section"
+    model().focus?.kind === "active-span"
       ? null
       : model().focus?.sectionId || null
   );
   const focusedProjection = () => {
     const focus = model().focus;
     if (!focus) return null;
-    if (focus.kind === "working-section") {
+    if (focus.kind === "active-span") {
       return {
-        label: "Working Interval",
+        label: "Active Span",
         start: focus.extent?.start ?? model().range.start,
         end: focus.extent?.end ?? model().range.end
       };
@@ -1252,7 +1252,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
         item.append(header);
         // One rule for every Guide row: a row is expanded exactly when it is
-        // the selected object. Participating in the Working Interval, being
+        // the selected object. Participating in the Active Span, being
         // focused, or being a snap target are conditions worth showing, and
         // they are shown as highlights — they do not open rows on their own,
         // because rows that open themselves make selection unreadable.
@@ -1570,7 +1570,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         ? `${formatRange(cue)} · ${formatDuration(cue.end - cue.start)}`
         : formatTime(cue.time);
       main.title = spans
-        ? `${cueName(cue) || "Cue"} at ${formatTime(cue.time)}; click to go and take its extent, Shift+click to extend the Working Interval`
+        ? `${cueName(cue) || "Cue"} at ${formatTime(cue.time)}; click to go and take its extent, Shift+click to extend the Active Span`
         : `${cueName(cue) || "Cue"} at ${formatTime(cue.time)}; click to go`;
       main.append(title, meta);
       const actions = document.createElement("div");
@@ -1706,7 +1706,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       if (projectedModel.interval) {
         elements["active-span-fill"].dataset.direction = projectedModel.interval.direction;
         // A recalled relation is faint: it is real geometry and an ordinary
-        // Working Interval, but it belongs to a gesture still being held.
+        // Active Span, but it belongs to a gesture still being held.
         elements["active-span-fill"].dataset.medium =
           projectedModel.interval.medium || "direct";
         setSegment(
@@ -1795,7 +1795,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       || currentState.shiftKeyHeld;
     const activeRange = range();
     const currentNeighborhood = resolution();
-    const currentInterval = interval();
+    const currentSpan = interval();
     const projection = timelineProjection();
     const field = currentState.field;
     const fieldSpan = field?.span?.held && field.span.available
@@ -1815,7 +1815,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? getActionRanges(
           currentNeighborhood,
           activeRange,
-          currentInterval,
+          currentSpan,
           semanticCurrent,
           effectiveReach,
           projection.metric
@@ -1827,13 +1827,13 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const next = currentNeighborhood
       ? nextPin(guide(), semanticCurrent, activeRange, projection)
       : null;
-    const switchFrame = currentInterval?.departureNeighborhood?.resolution;
+    const switchFrame = currentSpan?.departureNeighborhood?.resolution;
     const selectedForPreview = currentState.selectedRetained?.kind === "section"
       ? resolveSection(guide(), currentState.selectedRetained.id)
       : null;
-    const positiveActiveSpan = currentInterval
-      && currentInterval.end - currentInterval.start > EPSILON
-      ? currentInterval
+    const positiveActiveSpan = currentSpan
+      && currentSpan.end - currentSpan.start > EPSILON
+      ? currentSpan
       : null;
     const structuralPresentation = currentNeighborhood ? {
       previousPin: previous ? { start: previous.t, end: semanticCurrent } : null,
@@ -1846,12 +1846,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         : null,
       switchEndpoint: switchFrame
         ? { start: switchFrame.L, end: switchFrame.R }
-        : currentInterval,
-      release: currentInterval,
+        : currentSpan,
+      release: currentSpan,
       tag: shiftLayer
         ? positiveActiveSpan
         : { start: semanticCurrent, end: semanticCurrent },
-      focus: currentInterval || selectedForPreview
+      focus: currentSpan || selectedForPreview
     } : null;
     let resolvedPreviewAction = previewAction;
     if (shiftLayer && previewAction === "refineBackward") {
@@ -1868,7 +1868,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : "forward";
     const previewPin = previewDirection === "backward" ? previous : next;
     // Dragging Current commits a Step, so the drag must show the Step it will
-    // commit. Without this the Working Interval and the neighbourhood stand
+    // commit. Without this the Active Span and the neighbourhood stand
     // still under a moving marker and then jump on release, which reads as the
     // gesture doing something other than what it does.
     const activeCurrentDrag = currentState.currentDrag?.moved
@@ -1919,7 +1919,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     );
     elements["timeline-key-range"].dataset.active = String(loaded);
     elements["timeline-key-resolution"].dataset.active = String(Boolean(currentNeighborhood));
-    elements["timeline-key-active-span"].dataset.active = String(Boolean(currentInterval));
+    elements["timeline-key-active-span"].dataset.active = String(Boolean(currentSpan));
     elements["timeline-key-field"].dataset.active = String(Boolean(fieldSpan));
     elements["timeline-key-pins"].dataset.active = String(
       Boolean(orderedPins(guide()).length)
@@ -2060,21 +2060,21 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? fieldSpan
       : sectionKind === "selected-pins"
         ? selectedPinExtent
-        : currentInterval;
+        : currentSpan;
     const sourceOptions = [...elements["section-source"].options];
     const fieldOption = sourceOptions.find(option => option.value === "field-span");
     if (fieldOption) fieldOption.disabled = !fieldSpan;
     const selectedPinsOption = sourceOptions.find(option => option.value === "selected-pins");
     if (selectedPinsOption) selectedPinsOption.disabled = !selectedPinExtent;
-    if (sectionKind === "field-span" && !fieldSpan && currentInterval) {
+    if (sectionKind === "field-span" && !fieldSpan && currentSpan) {
       elements["section-source"].value = "interval";
       sectionKind = "interval";
-      sectionExtent = currentInterval;
+      sectionExtent = currentSpan;
     }
-    if (sectionKind === "selected-pins" && !selectedPinExtent && currentInterval) {
+    if (sectionKind === "selected-pins" && !selectedPinExtent && currentSpan) {
       elements["section-source"].value = "interval";
       sectionKind = "interval";
-      sectionExtent = currentInterval;
+      sectionExtent = currentSpan;
     }
     elements["section-window"].textContent = sectionExtent
       ? `${
@@ -2082,20 +2082,20 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
             ? "Panorama"
             : sectionKind === "selected-pins"
               ? "Selected Pins"
-              : "Working Interval"
+              : "Active Span"
         } ${formatRange(sectionExtent)}`
       : `No ${
           sectionKind === "field-span"
             ? "Held Panorama span"
             : sectionKind === "selected-pins"
               ? "two selected Pins"
-              : "Working Interval"
+              : "Active Span"
         }`;
 
     elements["focused-section"].hidden = !focused;
     if (focused) {
       elements["focused-section-title"].textContent = focused.label?.trim()
-        || (focusedSectionId() ? sectionLabel(focused) : "Working Interval");
+        || (focusedSectionId() ? sectionLabel(focused) : "Active Span");
       elements["focused-section-range"].textContent = formatRange(focused);
     } else {
       elements["focused-section-title"].textContent = "—";
@@ -2124,17 +2124,17 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     }
 
     elements["save-section"].disabled = interactionLocked || !sectionExtent;
-    const workingFocus = model().focus?.kind === "working-section";
+    const workingFocus = model().focus?.kind === "active-span";
     const workingAlreadyOwnsRange = workingFocus
-      && currentInterval
-      && Math.abs(activeRange.start - currentInterval.start) <= EPSILON
-      && Math.abs(activeRange.end - currentInterval.end) <= EPSILON;
-    elements["focus-working-section"].textContent = workingFocus
+      && currentSpan
+      && Math.abs(activeRange.start - currentSpan.start) <= EPSILON
+      && Math.abs(activeRange.end - currentSpan.end) <= EPSILON;
+    elements["focus-active-span"].textContent = workingFocus
       ? "Refocus Working"
-      : "Focus Working";
-    elements["focus-working-section"].disabled = interactionLocked
+      : "Focus Active Span";
+    elements["focus-active-span"].disabled = interactionLocked
       || sectionKind !== "interval"
-      || !currentInterval
+      || !currentSpan
       || workingAlreadyOwnsRange;
     elements["leave-section"].disabled = interactionLocked || !focused;
     elements["refine-backward"].disabled = interactionLocked || targets.backward === null;
@@ -2142,12 +2142,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements.reopen.disabled = interactionLocked || !actionModel?.reopen;
     elements["return-action"].disabled = !loaded || !currentState.session.history.length;
     elements["redo-action"].disabled = !loaded || !(currentState.session.future || []).length;
-    elements["switch-endpoint"].disabled = interactionLocked || !currentInterval;
+    elements["switch-endpoint"].disabled = interactionLocked || !currentSpan;
     elements["step-backward"].disabled = interactionLocked
       || (shiftLayer ? !previous : !actionModel?.stepBackward);
     elements["step-forward"].disabled = interactionLocked
       || (shiftLayer ? !next : !actionModel?.stepForward);
-    elements.release.disabled = interactionLocked || !currentInterval;
+    elements.release.disabled = interactionLocked || !currentSpan;
     const selectedSection = currentState.selectedRetained?.kind === "section"
       ? resolveSection(guide(), currentState.selectedRetained.id)
       : null;
@@ -2158,7 +2158,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       || (shiftLayer && !positiveActiveSpan);
     elements["focus-toggle"].disabled = interactionLocked || !(
       focused
-      || currentInterval
+      || currentSpan
       || selectedSection
     );
     elements["shift-layer-toggle"].disabled = interactionLocked;
@@ -2202,7 +2202,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["redo-meta"].textContent = (currentState.session.future || []).length
       ? currentState.session.future.at(-1).label
       : "Nothing to redo";
-    const destinationFrame = currentInterval?.departureNeighborhood;
+    const destinationFrame = currentSpan?.departureNeighborhood;
     const destinationScale = destinationFrame?.resolution
       ? formatDuration(destinationFrame.resolution.R - destinationFrame.resolution.L)
       : null;
@@ -2210,9 +2210,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "switch-endpoint",
       "switch-endpoint-meta",
       "Switch Endpoint",
-      currentInterval
-        ? `to ${formatTime(currentInterval.departure)}${destinationScale ? ` · ${destinationScale} ${destinationFrame.neighborhoodBasis === NEIGHBORHOOD_BASIS.RANGE ? "Range" : "movement"} scale` : ""}`
-        : "No Interval"
+      currentSpan
+        ? `to ${formatTime(currentSpan.departure)}${destinationScale ? ` · ${destinationScale} ${destinationFrame.neighborhoodBasis === NEIGHBORHOOD_BASIS.RANGE ? "Range" : "movement"} scale` : ""}`
+        : "No Active Span"
     );
     const backwardBlock = currentNeighborhood
       ? refineBlockReason(currentNeighborhood, activeRange, "backward", projection.metric)
@@ -2228,7 +2228,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         ? backwardBlock === "refinement-limit" ? "Resolution limit" : "Range start"
         : shiftLayer
           ? `draw Current-to-midpoint Interval · to ${formatTime(targets.backward)}`
-          : `${classifyRetainedRefineRelation(currentInterval, semanticCurrent, targets.backward) === "full" ? "full movement" : "retain anchor"} · to ${formatTime(targets.backward)}`
+          : `${classifyRetainedRefineRelation(currentSpan, semanticCurrent, targets.backward) === "full" ? "full movement" : "retain anchor"} · to ${formatTime(targets.backward)}`
     );
     setActionMeta(
       "refine-forward",
@@ -2238,7 +2238,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         ? forwardBlock === "refinement-limit" ? "Resolution limit" : "Range end"
         : shiftLayer
           ? `draw Current-to-midpoint Interval · to ${formatTime(targets.forward)}`
-          : `${classifyRetainedRefineRelation(currentInterval, semanticCurrent, targets.forward) === "full" ? "full movement" : "retain anchor"} · to ${formatTime(targets.forward)}`
+          : `${classifyRetainedRefineRelation(currentSpan, semanticCurrent, targets.forward) === "full" ? "full movement" : "retain anchor"} · to ${formatTime(targets.forward)}`
     );
     const rangeSourceSpan = activeRange.end - activeRange.start;
     const rangeStretch = formatStretch(
@@ -2277,22 +2277,22 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : shiftLayer && next
         ? `${formatTime(next.t)} · ${pinLabel(next)}`
         : "Range end";
-    elements["release-meta"].textContent = currentInterval
-      ? "Working Interval"
-      : "No Interval";
+    elements["release-meta"].textContent = currentSpan
+      ? "Active Span"
+      : "No Active Span";
     const tagLabel = shiftLayer ? "Tag as Section" : "Tag as Pin";
     const tagMeta = shiftLayer
       ? positiveActiveSpan
         ? `${formatRange(positiveActiveSpan)} → Section`
-        : "No Working Interval"
+        : "No Active Span"
       : `Current ${formatTime(semanticCurrent)} → Pin`;
     elements["tag-label"].textContent = tagLabel;
     elements["tag-meta"].textContent = tagMeta;
     elements.tag.setAttribute("aria-label", `${tagLabel}: ${tagMeta}`);
     elements["focus-toggle-meta"].textContent = focused
       ? `restore ${formatRange(model().focus.returnRange)}`
-      : currentInterval
-        ? "Working Interval"
+      : currentSpan
+        ? "Active Span"
         : selectedSection
           ? formatRange(selectedSection)
           : "No target";

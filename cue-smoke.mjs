@@ -78,7 +78,7 @@ await flush();
 assert.equal(currentText(), "Current 0:40",
   "Clicking a Cue centres Current in its extent.");
 assert.match(byId.get("section-window").textContent, /0:20–1:00/,
-  "and takes its extent as the Working Interval.");
+  "and takes its extent as the Active Span.");
 assert.deepEqual(guideCounts(), emptyGuide,
   "Navigating a Cue still retains nothing.");
 
@@ -89,7 +89,7 @@ assert.match(byId.get("section-window").textContent, /0:00–0:20/);
 byId.get("cues-list").dispatch("click", { target: cueRows()[2], shiftKey: true });
 await flush();
 assert.match(byId.get("section-window").textContent, /0:00–1:40/,
-  "Shift+click extends the Working Interval across both Cues, exactly as it does for Sections.");
+  "Shift+click extends the Active Span across both Cues, exactly as it does for Sections.");
 assert.deepEqual(guideCounts(), emptyGuide,
   "Composing candidates retains nothing.");
 

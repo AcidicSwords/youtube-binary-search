@@ -37,8 +37,8 @@ The complete gate must prove all of the following.
 - Shifted labels do not change matrix geometry.
 - Matrix click and `T` create or select the same Pin. Shifted matrix click and
   `Shift+T` create or select the same Section.
-- Plain Tag remains `Tag as Pin` when a Working Interval exists. Shifted Tag is
-  disabled without a positive Working Interval, and label, meta, and preview
+- Plain Tag remains `Tag as Pin` when a Active Span exists. Shifted Tag is
+  disabled without a positive Active Span, and label, meta, and preview
   follow Shift state.
 - Guide creation summaries use `T` and `Shift+T`.
 
@@ -229,10 +229,10 @@ first clicking Timeline.
    Plain Refine keeps its established anchor; Local Refine draws the complementary
    Current-to-midpoint half.
 3. Step repeatedly, reverse direction, and return to departure. Confirm one
-   `Step Reversal` Undo entry and a positive visited Working Interval.
+   `Step Reversal` Undo entry and a positive visited Active Span.
 4. Switch Endpoint twice. Current, Resolution, orientation, and endpoint frames
    must return exactly.
-5. Release. Current and Guide focus stay; Working Interval and acquired Timeline
+5. Release. Current and Guide focus stay; Active Span and acquired Timeline
    operand clear.
 6. Undo and Redo, then make a new action after Undo and confirm Redo clears.
 
@@ -242,9 +242,9 @@ semantic state, and a gesture produces at most one history entry.
 ### Journey C — retain and compose
 
 1. Press `T`; confirm Current becomes a Pin and the exact Pin is acquired.
-2. Establish a positive Working Interval. Press plain `T` again and confirm it
+2. Establish a positive Active Span. Press plain `T` again and confirm it
    still tags Current as a Pin.
-3. Press `Shift+T`; confirm the Working Interval becomes a Section and duplicate
+3. Press `Shift+T`; confirm the Active Span becomes a Section and duplicate
    Tag selects rather than duplicates it.
 4. Plain-click and Shift/Extend-click Pins, Sections, and a Cue. Confirm plain
    selection replaces and shifted selection expands one contiguous extent.
@@ -295,7 +295,7 @@ rate policy remain independent and no preview breaks live Breath behavior.
 
 1. Begin an unsaved Nudge or Step sequence, then load another source. Repeat
    during a Section drag, Playback, Context, and active deformation bypass.
-2. Confirm the fresh source has no old Working Interval, Guide identity,
+2. Confirm the fresh source has no old Active Span, Guide identity,
    selection, timer, transport, Field preview, Shift latch, or bypass.
 3. Rapidly request source A then source B. Allow late A events to arrive. Only B
    may initialize.
@@ -347,8 +347,8 @@ or preservation that did not happen.
 
 ```text
 Range.start ≤ Current ≤ Range.end
-Working Interval ⊆ Range in source time
-Working Interval ⊆ Resolution ⊆ Range in effective Timeline Space
+Active Span ⊆ Range in source time
+Active Span ⊆ Resolution ⊆ Range in effective Timeline Space
 every Section has positive source duration and one canonical Weight
 every Section belongs to one existing Group
 zero or one Group is On Timeline; any number may be Active

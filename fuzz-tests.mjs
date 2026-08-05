@@ -67,8 +67,8 @@ function assertSessionInvariant(session) {
   }
 
   if (focus) {
-    if (focus.kind === "working-section") {
-      assert.ok(focus.extent, "A Working Interval focus must retain its projected Extent.");
+    if (focus.kind === "active-span") {
+      assert.ok(focus.extent, "A Active Span focus must retain its projected Extent.");
       assert.ok(Math.abs(focus.extent.start - range.start) <= EPSILON);
       assert.ok(Math.abs(focus.extent.end - range.end) <= EPSILON);
     } else {

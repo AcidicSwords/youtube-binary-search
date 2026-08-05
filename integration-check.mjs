@@ -210,7 +210,7 @@ has(appCode, /plain && key === "f"[\s\S]{0,100}?focusOrUnfocus\(\)/,
 has(appCode, /elements\.tag\.addEventListener\("click"[\s\S]*?saveCurrentIntervalAsSection\([\s\S]*?source:\s*"interval"[\s\S]*?pinCurrent\(/,
   "The Tag button routes Shift to Section and plain input to Current Pin.");
 has(appCode, /event\.shiftKey[\s\S]{0,180}?key === "t"[\s\S]{0,220}?saveCurrentIntervalAsSection\(/,
-  "Shift+T tags the Working Interval as a Section.");
+  "Shift+T tags the Active Span as a Section.");
 has(appCode, /plain && key === "t"[\s\S]{0,120}?pinCurrent\(/,
   "Plain T tags Current as a Pin.");
 has(view, /const tagLabel = shiftLayer \? "Tag as Section" : "Tag as Pin"/,
@@ -218,7 +218,7 @@ has(view, /const tagLabel = shiftLayer \? "Tag as Section" : "Tag as Pin"/,
 has(view, /tagMeta = shiftLayer[\s\S]*?positiveActiveSpan[\s\S]*?→ Section[\s\S]*?Current \$\{formatTime\(semanticCurrent\)\} → Pin/,
   "Tag meta names its exact operand and retained result.");
 has(view, /elements\.tag\.disabled\s*=\s*interactionLocked\s*\|\|\s*\(shiftLayer && !positiveActiveSpan\)/,
-  "Only shifted Tag requires a positive Working Interval.");
+  "Only shifted Tag requires a positive Active Span.");
 has(view, /tag:\s*shiftLayer\s*\?\s*positiveActiveSpan\s*:\s*\{ start: semanticCurrent, end: semanticCurrent \}/,
   "Tag preview follows the same Pin/Section operand law.");
 has(topLevelFunction(appCode, "pinCurrent"), /!result\.changed[\s\S]*?result\.value\?\.pin[\s\S]*?selectTimelineRetained\(\{ kind: "pin"/,

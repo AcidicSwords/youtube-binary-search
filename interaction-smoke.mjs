@@ -276,12 +276,12 @@ await flush();
 assert.equal(currentText(), "Current 0:50");
 assert.match(byId.get("section-window").textContent, /0:25–0:50/);
 
-// The current Working Interval can own Range without being saved. Leaving restores
+// The current Active Span can own Range without being saved. Leaving restores
 // the preceding Range without adding anything to Guide.
-byId.get("focus-working-section").click();
+byId.get("focus-active-span").click();
 await flush();
 assert.equal(byId.get("range-label").textContent, "0:25–0:50");
-assert.equal(byId.get("focused-section-title").textContent, "Working Interval");
+assert.equal(byId.get("focused-section-title").textContent, "Active Span");
 assert.equal(byId.get("sections-list-count").textContent, "0");
 assert.equal(byId.get("range-start-handle").hidden, true,
   "Focus removes the competing spatial Range Start control.");
@@ -297,7 +297,7 @@ byId.get("full-video-range").disabled = false;
 byId.get("full-video-range").click();
 await flush();
 assert.equal(byId.get("range-label").textContent, "0:25–0:50");
-assert.equal(byId.get("focused-section-title").textContent, "Working Interval");
+assert.equal(byId.get("focused-section-title").textContent, "Active Span");
 byId.get("leave-section").click();
 await flush();
 assert.equal(byId.get("range-label").textContent, "0:00–1:40");
@@ -306,7 +306,7 @@ assert.equal(byId.get("range-end-handle").hidden, false);
 assert.equal(byId.get("sections-list-count").textContent, "0");
 assert.match(byId.get("section-window").textContent, /0:25–0:50/);
 
-// Guide owns explicit Section persistence and names the exact Working Interval.
+// Guide owns explicit Section persistence and names the exact Active Span.
 byId.get("section-source").value = "interval";
 byId.get("section-label").value = "Quarter to middle";
 byId.get("section-label").dispatch("input");
@@ -564,7 +564,7 @@ assert.equal(
     .filter(node => node.dataset.pinGo && node.classList.contains("extent-selected"))
     .length,
   2,
-  "Working Interval bounds aligned with Pins must select both endpoint Pins."
+  "Active Span bounds aligned with Pins must select both endpoint Pins."
 );
 let selectedSectionNodes = descendants(byId.get("sections-list"));
 assert.ok(
@@ -593,7 +593,7 @@ assert.equal(byId.get("field-span-label").textContent, "0:15–0:50");
 assert.match(
   byId.get("section-window").textContent,
   /0:15–0:50/,
-  "Dragging an aligned endpoint Pin must reshape the Working Interval."
+  "Dragging an aligned endpoint Pin must reshape the Active Span."
 );
 assert.equal(tail.currentTime, 15);
 assert.equal(center.currentTime, 32.5);
@@ -682,7 +682,7 @@ assert.equal(
     .filter(node => node.dataset.pinGo && node.classList.contains("extent-selected"))
     .length,
   2,
-  "Pin Go must preserve endpoint selection derived from the Working Interval."
+  "Pin Go must preserve endpoint selection derived from the Active Span."
 );
 
 // The profile is the whole-Section handle. Its preview translates all three
@@ -718,7 +718,7 @@ assert.equal(byId.get("field-span-label").textContent, "0:35–1:00");
 assert.match(
   byId.get("section-window").textContent,
   /0:35–1:00/,
-  "Translating both aligned endpoint Pins must translate the Working Interval."
+  "Translating both aligned endpoint Pins must translate the Active Span."
 );
 assert.equal(tail.currentTime, 35);
 assert.equal(center.currentTime, 47.5);
@@ -1118,7 +1118,7 @@ assert.equal(env.document.activeElement, null, "Pointer activation must not leav
 
 // One expansion rule for every Guide row: a row is open exactly when it is the
 // selected object. Previously a Pin row opened itself whenever it happened to
-// bound the Working Interval while an equivalently placed Section row only
+// bound the Active Span while an equivalently placed Section row only
 // highlighted, so drawing an Interval silently opened rows nobody chose.
 {
   const guideRows = list => descendants(byId.get(list))
@@ -1147,7 +1147,7 @@ assert.equal(env.document.activeElement, null, "Pointer activation must not leav
   for (const row of extentOnly) {
     assert.ok(
       !descendants(row).some(node => node.classList?.contains?.("guide-addresses")),
-      "Bounding the Working Interval highlights a Pin row; it must not open it."
+      "Bounding the Active Span highlights a Pin row; it must not open it."
     );
   }
 }
@@ -1179,7 +1179,7 @@ assert.equal(env.document.activeElement, null, "Pointer activation must not leav
   assert.equal(byId.get("cursor-time").textContent, "—",
     "An undisplaced Cursor must report nothing rather than repeat Current.");
 
-  // The Working Interval is printed once, by section-window. Operator metas say
+  // The Active Span is printed once, by section-window. Operator metas say
   // what their operator does and name the extent rather than reprinting it.
   const workingExtent = byId.get("section-window").textContent;
   assert.match(workingExtent, /\d:\d\d–\d:\d\d/);
@@ -1190,7 +1190,7 @@ assert.equal(env.document.activeElement, null, "Pointer activation must not leav
       `${id} must not reprint the extent section-window already shows.`
     );
   }
-  assert.equal(byId.get("release-meta").textContent, "Working Interval");
+  assert.equal(byId.get("release-meta").textContent, "Active Span");
 }
 
 // A Guide entry is a name, an Address, and only facts that are not derivable

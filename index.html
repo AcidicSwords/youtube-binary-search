@@ -126,7 +126,7 @@
               <span id="timeline-key-sections" class="timeline-key key-sections" title="Sections: retained weighted extents"><i aria-hidden="true"></i>Sections</span>
               <span id="timeline-key-range" class="timeline-key key-range" title="Range: navigable boundary"><i aria-hidden="true"></i>Range</span>
               <span id="timeline-key-resolution" class="timeline-key key-resolution" title="Resolution: current neighborhood"><i aria-hidden="true"></i>Resolution</span>
-              <span id="timeline-key-active-span" class="timeline-key key-interval" title="Working Interval: ordered movement extent"><i aria-hidden="true"></i>Working Interval</span>
+              <span id="timeline-key-active-span" class="timeline-key key-interval" title="Active Span: ordered movement extent"><i aria-hidden="true"></i>Active Span</span>
               <span id="timeline-key-field" class="timeline-key key-field" title="Panorama span: held spread"><i aria-hidden="true"></i>Panorama span</span>
               <span id="timeline-key-pins" class="timeline-key key-pins" title="Pins: retained source Addresses"><i aria-hidden="true"></i>Pins</span>
             </div>
@@ -327,7 +327,7 @@
                 <h2 id="navigation-heading">Operators</h2>
               </div>
               <div class="navigation-heading-tools">
-                <p>Operators share one Working Interval and traverse the weighted timeline; every source Address remains ordered and reachable.</p>
+                <p>Operators share one Active Span and traverse the weighted timeline; every source Address remains ordered and reachable.</p>
                 <button id="shift-layer-toggle" class="shift-layer-toggle" type="button" aria-pressed="false">
                   <span>Shift layer</span><strong id="shift-layer-state">Off</strong>
                 </button>
@@ -354,7 +354,7 @@
               </button>
               <button id="switch-endpoint" class="nav-action endpoint-action" type="button" data-preview-action="switchEndpoint" aria-keyshortcuts="S" disabled>
                 <span class="action-name"><kbd>S</kbd> <span class="action-label">Switch Endpoint</span></span>
-                <span id="switch-endpoint-meta" class="action-meta">No Interval</span>
+                <span id="switch-endpoint-meta" class="action-meta">No Active Span</span>
               </button>
               <button id="step-forward" class="nav-action direction forward" type="button" data-preview-action="stepForward" aria-keyshortcuts="D ArrowRight Shift+D Shift+ArrowRight" disabled>
                 <span class="action-name"><kbd>D</kbd> <span id="step-forward-label" class="action-label">Step Forward</span></span>
@@ -363,7 +363,7 @@
 
               <button id="release" class="nav-action lifecycle-action" type="button" data-preview-action="release" aria-keyshortcuts="R" disabled>
                 <span class="action-name"><kbd>R</kbd> <span class="action-label">Release</span></span>
-                <span id="release-meta" class="action-meta">No Interval</span>
+                <span id="release-meta" class="action-meta">No Active Span</span>
               </button>
               <button id="tag" class="nav-action lifecycle-action tag-action" type="button" data-preview-action="tag" aria-keyshortcuts="T Shift+T" disabled>
                 <span class="action-name"><kbd>T</kbd> <span id="tag-label" class="action-label">Tag as Pin</span></span>
@@ -401,7 +401,7 @@
                 <h2>Guide</h2>
               </div>
               <div class="guide-header-actions">
-                <button id="guide-compose-toggle" class="guide-compose-toggle" type="button" aria-pressed="false" title="Extend: the next Chapter, Pin or Section you choose is added to the Working Interval instead of replacing it">Extend</button>
+                <button id="guide-compose-toggle" class="guide-compose-toggle" type="button" aria-pressed="false" title="Extend: the next Chapter, Pin or Section you choose is added to the Active Span instead of replacing it">Extend</button>
                 <button id="guide-close" class="guide-close" type="button" aria-label="Collapse Guide" title="Collapse Guide"><span aria-hidden="true">›</span></button>
               </div>
             </div>
@@ -431,7 +431,7 @@
                 </div>
                 <label for="section-source">Source
                   <select id="section-source" disabled>
-                    <option value="interval">Working Interval</option>
+                    <option value="interval">Active Span</option>
                     <option value="field-span">Held Panorama span</option>
                     <option value="selected-pins">Two selected Pins</option>
                   </select>
@@ -440,7 +440,7 @@
                   <input id="section-label" type="text" maxlength="100" placeholder="Optional Section title" disabled>
                 </label>
                 <div class="section-create-actions">
-                  <button id="focus-working-section" type="button" disabled>Focus Working</button>
+                  <button id="focus-active-span" type="button" disabled>Focus Active Span</button>
                   <button id="save-section" class="primary" type="submit" aria-keyshortcuts="Shift+T" disabled>Tag as Section</button>
                 </div>
                 </form>

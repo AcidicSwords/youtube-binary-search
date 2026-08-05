@@ -162,8 +162,8 @@ function weightedGuide(...definitions) {
 }
 
 // Tag and Guide Weight remain two small, composable primitives. Retaining a
-// Working Interval does not silently deform it, and changing its Weight does
-// not alter the active Working Interval.
+// Active Span does not silently deform it, and changing its Weight does
+// not alter the active Active Span.
 {
   let session = createSession({ duration: 100, current: 20 });
   session = goTo(session, 40, { label: "Test Go" }).session;

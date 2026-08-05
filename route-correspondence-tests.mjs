@@ -190,7 +190,7 @@ converge(
   }
 );
 
-// --- Working Interval: Timeline Section click versus Guide Section click ------
+// --- Active Span: Timeline Section click versus Guide Section click ------
 converge(
   "Timeline Section selection and Guide Section selection",
   async ({ byId, flush, makeSection, descendants: walk }) => {
@@ -322,5 +322,5 @@ if (indexArg !== undefined) {
       `${pair.name}: two routes to one operation must agree on ${pair.form}.`
     );
   }
-  console.log("Route correspondence tests passed: an exact Address edit and twelve Nudges reach one Address; Timeline and Guide Section selection reach one Working Interval; a retained Cue is an ordinary Section; Focus from the operator and from a Guide row install one scope; and Group membership is the same partition however it is reached.");
+  console.log("Route correspondence tests passed: an exact Address edit and twelve Nudges reach one Address; Timeline and Guide Section selection reach one Active Span; a retained Cue is an ordinary Section; Focus from the operator and from a Guide row install one scope; and Group membership is the same partition however it is reached.");
 }

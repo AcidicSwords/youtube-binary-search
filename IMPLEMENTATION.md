@@ -31,7 +31,7 @@ constructs `YT.Player`.
 ## Canonical model and transactions
 
 Source time is the only stored temporal coordinate. A Session model contains
-duration, Range, Current within a Resolution, the optional Working Interval,
+duration, Range, Current within a Resolution, the optional Active Span,
 Focus, Step Reach, Guide, and the last semantic operator. Pins and Section
 endpoints are source Addresses. Timeline coordinates, lanes, gradients, hover
 state, open panels, and deformation bypass are never stored in the model.
@@ -51,7 +51,7 @@ Session history is bounded to 100 entries. A new commit clears the Redo future.
 Presentation-only consequences do not manufacture history: releasing only an
 acquired Timeline operand and toggling deformation bypass are examples.
 
-The Working Interval is the contiguous residue left by excluding alternatives.
+The Active Span is the contiguous residue left by excluding alternatives.
 Its compact endpoint representation records bounds, orientation, active side,
 and endpoint frames; no persistent Path or exclusion ledger exists. Refine,
 Step, Switch Endpoint, direct manipulation, retained extents, and Playback all
@@ -63,7 +63,7 @@ Step commits its first movement immediately and amends that transaction for the
 rest of the gesture. The pending gesture alone records `visitedMinimum` and
 `visitedMaximum`. Settlement labels the transaction by net direction; if it
 returns to its departure after visiting a positive extent, `Step Reversal`
-retains that extent as the same contiguous Working Interval. The envelope is
+retains that extent as the same contiguous Active Span. The envelope is
 then discarded.
 
 ## Operator routes
@@ -78,7 +78,7 @@ R  Release            T  Tag               F  Focus / Unfocus
 
 `Shift+Q/E` invokes Local Refine, `Shift+A/D` traverses to the previous or next
 visible Pin stop, `T` tags Current as a Pin, and `Shift+T` tags a positive
-Working Interval as a Section. Button and key routes call the same functions.
+Active Span as a Section. Button and key routes call the same functions.
 Duplicate Tag selects the exact existing result rather than creating another.
 
 The matrix and Guide each own an independent one-shot Shift latch. Physical
@@ -86,7 +86,7 @@ Shift is global and consumes neither latch. `consumeShiftLayer(owner)` clears
 only the latch that supplied the modified action. Alt carries an acquired
 retained object through compatible movement without changing the base operator.
 
-Release clears a semantic Working Interval through Session and separately
+Release clears a semantic Active Span through Session and separately
 clears the acquired Timeline operand. The semantic change is Undoable; a
 selection-only release is not. Bare Timeline Go clears the acquired operand
 before navigating. Guide focus remains independent in both cases.

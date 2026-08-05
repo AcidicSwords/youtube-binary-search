@@ -73,9 +73,9 @@ All spatial consumers share one effective projection: drawing, contours, hit tes
 
 `X` is the auxiliary **Toggle Deformation** action in Operators. With an acquired Timeline Section it temporarily bypasses only that Section; otherwise it bypasses the complete map. Press `X` again on the same scope to restore it. The bypass is source-scoped, transient, absent from Undo and persistence, and never changes the stored Weight. Fixed playback receives no command from `X`; dynamic Shift playback may retune on a later transport tick because that policy explicitly reads the effective map.
 
-## Working Interval and operators
+## Active Span and operators
 
-Range is the admissible source universe. Refine, Step, Go, playback, and direct manipulation exclude alternatives from the current relation. The **Working Interval** is the surviving positive, contiguous residue, stored as two source bounds with orientation and endpoint frames—not as a path log.
+Range is the admissible source universe. Refine, Step, Go, playback, and direct manipulation exclude alternatives from the current relation. The **Active Span** is the surviving positive, contiguous residue, stored as two source bounds with orientation and endpoint frames—not as a path log.
 
 The visible and physical operator matrix is exactly:
 
@@ -89,11 +89,11 @@ R  Release            T  Tag               F  Focus / Unfocus
 - `Shift+Q/E` perform Local Refine and retain only the immediate traversal.
 - `A/D` or `←/→` Step through a configured Timeline distance. A repeated sequence is one transaction; a reversal that returns to its departure retains the positive visited envelope.
 - `Shift+A/D` or `Shift+←/→` Step to the previous or next Pin or Range boundary.
-- `W` restores Range-level Resolution without discarding Current or the Working Interval.
+- `W` restores Range-level Resolution without discarding Current or the Active Span.
 - `S` moves to the opposite endpoint and restores that endpoint’s saved viewpoint.
-- `R` clears the Working Interval and the acquired Timeline operand. Current, Guide focus, retained topology, Weight, Focus, and deformation bypass remain.
-- `T` tags Current as a Pin. `Shift+T` tags a positive Working Interval as a Section. Plain Tag remains a Pin action even while an Interval exists; an exact duplicate is selected rather than recreated.
-- `F` focuses an acquired Section or the Working Interval as Range and viewport; the same action unfocuses to the containing Range.
+- `R` clears the Active Span and the acquired Timeline operand. Current, Guide focus, retained topology, Weight, Focus, and deformation bypass remain.
+- `T` tags Current as a Pin. `Shift+T` tags a positive Active Span as a Section. Plain Tag remains a Pin action even while an Interval exists; an exact duplicate is selected rather than recreated.
+- `F` focuses an acquired Section or the Active Span as Range and viewport; the same action unfocuses to the containing Range.
 
 The Matrix Shift button is a one-shot layer owned only by Matrix actions. Guide **Extend** is a separate one-shot layer owned only by Guide composition. Holding the physical Shift key modifies the current action without consuming either latch.
 
@@ -104,7 +104,7 @@ A Pin owns one source Address. A Section is an edge between two Pin identities a
 The Guide has Sections, Pins, and transient Cues:
 
 - click a Timeline Pin to acquire it and move Current there;
-- click a Timeline Section to make its extent the Working Interval and center Current spatially within it;
+- click a Timeline Section to make its extent the Active Span and center Current spatially within it;
 - use exact Address fields, Nudge controls, Weight, Group, rename, delete, Focus, and unlink controls in the Guide;
 - drag Pins, Section end regions, or Section middles on the Timeline or from their Guide rows; both routes invoke the same operations and preview through the Field;
 - unlink a shared endpoint to create an independent Pin at the same Address; drag it near another Pin and hold for the visible snap to arm before release to link;

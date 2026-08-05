@@ -278,7 +278,7 @@ for (const mark of descendants(byId.get("cue-lane"))) {
 // ==============================================================================
 await clickIn("cues-list", cueRows()[0]);
 assert.match(workingWindow(), /0:00–0:20/,
-  "A Cue takes its extent as the Working Interval.");
+  "A Cue takes its extent as the Active Span.");
 await clickIn("sections-list", sectionRows()[1], { shiftKey: true });
 assert.match(workingWindow(), /0:00–1:20/,
   "and a retained Section extends it by the same law.");
@@ -310,7 +310,7 @@ await clickIn("sections-list", revealStart);
 assert.equal(byId.get("guide-tab-pins")["aria-selected"], "true",
   "Revealing switches to where Pins are operated on.");
 assert.equal(workingWindow(), intervalBeforeReveal,
-  "and moves no Working Interval,");
+  "and moves no Active Span,");
 assert.equal(currentText(), currentBeforeReveal, "no Current,");
 assert.equal(undoLabel(), undoBeforeReveal, "and records no transaction.");
 assert.ok(

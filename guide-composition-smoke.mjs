@@ -1,6 +1,6 @@
 // Composition in the Guide.
 //
-// A plain click replaces the Working Interval with the clicked object. Shift
+// A plain click replaces the Active Span with the clicked object. Shift
 // extends it to include the clicked object. One rule covers Pins and Sections
 // because an extent — not a set of objects — is what every operator already
 // consumes, so a composition is immediately Focusable and retainable as one
@@ -68,7 +68,7 @@ assert.equal(sectionRows().length, 2, "Two retained Sections are needed to compo
 // --- A plain click replaces ---------------------------------------------------
 await clickSection("0:10–0:20");
 assert.match(workingWindow(), /0:10–0:20/,
-  "A plain click makes the clicked Section the Working Interval.");
+  "A plain click makes the clicked Section the Active Span.");
 await clickSection("1:00–1:20");
 assert.match(workingWindow(), /1:00–1:20/,
   "A second plain click replaces rather than composing, so the ordinary meaning of a click is always reachable.");
@@ -77,7 +77,7 @@ assert.match(workingWindow(), /1:00–1:20/,
 await clickSection("0:10–0:20");
 await clickSection("1:00–1:20", { shiftKey: true });
 assert.match(workingWindow(), /0:10–1:20/,
-  "Shift+click extends the Working Interval to span both Sections.");
+  "Shift+click extends the Active Span to span both Sections.");
 
 // Extension is monotonic: composing again can only grow the extent.
 await clickSection("0:10–0:20", { shiftKey: true });
@@ -96,7 +96,7 @@ byId.get("pins-list").dispatch("click", {
 });
 await flush();
 assert.match(workingWindow(), /0:10–1:20/,
-  "Shift+click on a Pin extends the same Working Interval by the same rule.");
+  "Shift+click on a Pin extends the same Active Span by the same rule.");
 
 // --- A Shift layer belongs to the surface that armed it -----------------------
 // Both surfaces surface a one-shot Shift, and each one means "the next click

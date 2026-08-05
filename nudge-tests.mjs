@@ -121,10 +121,10 @@ assert.equal(byId.get("field-transport-state").textContent, "Current Frame",
   "Direct manipulation temporarily supplies an exact Field Frame.");
 assert.equal(env.center().currentTime, 65, "Center displays the candidate frame.");
 // The drag commits a Step, so it must show the Step it will commit. Without a
-// live preview the Working Interval and neighbourhood stand still under a
+// live preview the Active Span and neighbourhood stand still under a
 // moving marker and jump on release, which reads as a different gesture.
 assert.equal(byId.get("action-preview-fill").hidden, false,
-  "Dragging Current must preview the Working Interval the Step will land.");
+  "Dragging Current must preview the Active Span the Step will land.");
 assert.equal(byId.get("action-preview-fill").dataset.kind, "stepForward",
   "The previewed extent is a Step, never a Go.");
 // A preview answers where the movement lands and across what. The
@@ -158,7 +158,7 @@ await poll();
 assert.equal(currentText(), "Current 1:05");
 assert.equal(byId.get("current-departure-marker").hidden, true);
 // Dragging Current is Step, not Go: it extends the retained traversal from the
-// same departure instead of drawing a new Working Interval around the landing.
+// same departure instead of drawing a new Active Span around the landing.
 assert.match(byId.get("status").textContent, /Stepped Forward to 1:05/);
 assert.equal(byId.get("action-preview-fill").hidden, true,
   "The preview is released with the gesture.");

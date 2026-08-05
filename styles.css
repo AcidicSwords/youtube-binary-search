@@ -1781,13 +1781,13 @@ kbd {
 /* One colour, one meaning.
  *
  * Gold said four things at once: "this is a Pin", "this is an endpoint of the
- * Working Interval", "this is a drag snap target", and "this is a snap source".
+ * Active Span", "this is a drag snap target", and "this is a snap source".
  * Identity was being drawn in a state colour, so every row carried the mark
  * that was supposed to distinguish one of them, and nothing read as selected.
  *
  *   identity  -- what kind of thing this is: a quiet left bar, never a border
  *   acquired  -- what the operators act on: accent, and the only tinted row
- *   relation  -- an endpoint of the Working Interval: gold bar, no border
+ *   relation  -- an endpoint of the Active Span: gold bar, no border
  *   transient -- a live drag's snap state: only while a drag is happening
  */
 .pin-item::before {

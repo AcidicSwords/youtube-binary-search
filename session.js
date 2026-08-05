@@ -64,7 +64,7 @@ export const STEP_REACH_MODE = Object.freeze({
 export const DEFAULT_STEP_FRACTION = 1 / 16;
 export const FOCUS_KIND = Object.freeze({
   SAVED: "saved-section",
-  WORKING: "working-section"
+  ACTIVE_SPAN: "active-span"
 });
 
 // Focus makes its extent the active world. Spatial Range boundary controls must
@@ -307,7 +307,7 @@ function syncIntervalEndpointFrames(model, suppliedMetric = null) {
   interval.arrivalNeighborhood = currentEndpointFrame(model);
 }
 
-function createInterval(departure, arrival, operator, medium = "direct", endpointFrames = {}) {
+function createActiveSpan(departure, arrival, operator, medium = "direct", endpointFrames = {}) {
   if (
     !Number.isFinite(departure)
     || !Number.isFinite(arrival)
@@ -410,7 +410,7 @@ function appendHistory(history, entry) {
 
 function focusKind(focus) {
   if (!focus) return null;
-  if (focus.kind === FOCUS_KIND.WORKING) return FOCUS_KIND.WORKING;
+  if (focus.kind === FOCUS_KIND.ACTIVE_SPAN) return FOCUS_KIND.ACTIVE_SPAN;
   if (focus.kind === FOCUS_KIND.SAVED || focus.sectionId) return FOCUS_KIND.SAVED;
   return null;
 }
@@ -418,7 +418,7 @@ function focusKind(focus) {
 function reconcileFocusDraft(model) {
   if (
     !model.focus
-    || focusKind(model.focus) === FOCUS_KIND.WORKING
+    || focusKind(model.focus) === FOCUS_KIND.ACTIVE_SPAN
     || resolveSection(model.guide, model.focus.sectionId)
   ) {
     return { changed: false, moved: false, intervalCleared: false };
@@ -680,7 +680,7 @@ function moveDraft(model, destination, options = {}) {
         )
     );
   const intervalArrivalFrame = currentEndpointFrame(model);
-  model.interval = createInterval(
+  model.interval = createActiveSpan(
     intervalDeparture,
     finalDestination,
     options.operator || "go",
@@ -763,7 +763,7 @@ export function workFromExtent(session, extent, options = {}) {
     model.neighborhoodBasis = isRangeNeighborhood(model.resolution, model.range)
       ? NEIGHBORHOOD_BASIS.RANGE
       : NEIGHBORHOOD_BASIS.MOVEMENT;
-    model.interval = createInterval(
+    model.interval = createActiveSpan(
       start,
       midpoint,
       operator,
@@ -999,7 +999,7 @@ export function switchEndpoint(session, options = {}) {
 
 export function releaseInterval(session) {
   if (!session.model.interval) return unchanged(session, "no-interval");
-  return commit(session, "Release Working Interval", draft => {
+  return commit(session, "Release Active Span", draft => {
     draft.interval = null;
     draft.lastOperator = "release";
     return { changed: true, interval: null };
@@ -1070,18 +1070,18 @@ export function focusWorkingSection(session) {
   const interval = session.model.interval;
   if (!interval) return unchanged(session, "no-interval");
   if (
-    focusKind(session.model.focus) === FOCUS_KIND.WORKING
+    focusKind(session.model.focus) === FOCUS_KIND.ACTIVE_SPAN
     && Math.abs(session.model.range.start - interval.start) <= EPSILON
     && Math.abs(session.model.range.end - interval.end) <= EPSILON
   ) return unchanged(session, "already-focused");
 
-  return commit(session, "Focus Working Interval", draft => {
+  return commit(session, "Focus Active Span", draft => {
     const working = clone(draft.interval);
     if (!working) return { changed: false, reason: "no-interval" };
     const departure = draft.resolution.C;
     const returnRange = draft.focus?.returnRange || clone(draft.range);
     draft.focus = {
-      kind: FOCUS_KIND.WORKING,
+      kind: FOCUS_KIND.ACTIVE_SPAN,
       extent: { start: working.start, end: working.end },
       returnRange
     };
@@ -1201,7 +1201,7 @@ export function projectPlayback(model, options = {}) {
   if (Math.abs(extent.end - current) <= EPSILON) endFrame = currentFrame;
   else if (Math.abs(extent.end - departure) <= EPSILON) endFrame ||= parentFrame;
 
-  projected.interval = createInterval(
+  projected.interval = createActiveSpan(
     intervalDeparture,
     current,
     options.operator || "playback",
@@ -1420,7 +1420,7 @@ function rebaseFocusedGuideSection(model) {
   };
 }
 
-function rebaseWorkingIntervalBounds(model, movements) {
+function rebaseActiveSpanBounds(model, movements) {
   const interval = model.interval;
   if (!interval) return { changed: false, cleared: false };
   const destinationFor = bound => movements.find(
@@ -1591,7 +1591,7 @@ export function moveGuidePin(session, pinId, address, options = {}) {
     if (!validateGuide(draft.guide, draft.duration)) {
       return { changed: false, reason: "invalid-guide-geometry" };
     }
-    const interval = rebaseWorkingIntervalBounds(
+    const interval = rebaseActiveSpanBounds(
       draft,
       [{ source, destination: value.destination }]
     );
@@ -1629,7 +1629,7 @@ export function moveGuideSection(session, sectionId, requestedDelta, options = {
     if (!validateGuide(draft.guide, draft.duration)) {
       return { changed: false, reason: "invalid-guide-geometry" };
     }
-    const interval = rebaseWorkingIntervalBounds(draft, [
+    const interval = rebaseActiveSpanBounds(draft, [
       { source: source.start, destination: value.section.start },
       { source: source.end, destination: value.section.end }
     ]);
@@ -1765,7 +1765,7 @@ export function redo(session) {
 /**
  * Dry-run one navigation transition through the exact semantic operator used
  * for commit. Presentation can therefore preview the resulting Current,
- * Resolution, and Working Interval without maintaining a second rule set.
+ * Resolution, and Active Span without maintaining a second rule set.
  */
 export function previewTransition(session, action, options = {}) {
   switch (action) {
@@ -1876,7 +1876,7 @@ export function relabelLastAction(session, label) {
 // name an ordinary sequence, but it cannot prove a reversal: departure and
 // arrival are identical there. The pending gesture therefore supplies only its
 // transient visited envelope. Settlement turns that sparse evidence into the
-// same positive contiguous Working Interval every route understands, then
+// same positive contiguous Active Span every route understands, then
 // discards it with the caller's pending object. No Path enters durable state.
 // Ghost Traverse: move through user time while the semantic world stands still.
 //
@@ -1887,7 +1887,7 @@ export function relabelLastAction(session, label) {
 // worth doing. So this deliberately does not route through the ordinary Go,
 // which may leave Focus or reopen Full Video.
 //
-// What it produces is an ordinary Working Interval. The Address the reader was
+// What it produces is an ordinary Active Span. The Address the reader was
 // at when the gesture began is the fixed Anchor; the recalled Address is the
 // active endpoint. Nothing downstream needs to know it came from user time --
 // Switch Endpoint, Tag, Release and Focus all act on it as they would on any
@@ -1959,7 +1959,7 @@ export function ghostTraverse(session, destination, options = {}) {
       draft.range,
       metric
     );
-    draft.interval = createInterval(anchor, target, operator, "ghost", {
+    draft.interval = createActiveSpan(anchor, target, operator, "ghost", {
       extent,
       activeEnd,
       startFrame,
@@ -1989,7 +1989,7 @@ export function ghostTraverse(session, destination, options = {}) {
 // positive extent, and that extent is what they now have in view, even though
 // their net displacement is nothing. The retained envelope is the source ground
 // crossed -- it does not try to preserve the nonmonotonic user-time path as
-// geometry, because a Working Interval describes an extent and not a route.
+// geometry, because a Active Span describes an extent and not a route.
 export function settleGhostSequence(session, gesture) {
   if (!gesture?.changed) return unchanged(session, "no-ghost-sequence");
   const arrival = Number(session?.model?.resolution?.C);
@@ -2042,7 +2042,7 @@ export function settleGhostSequence(session, gesture) {
       draft.range,
       metric
     );
-    draft.interval = createInterval(intervalDeparture, arrival, operator, "ghost", {
+    draft.interval = createActiveSpan(intervalDeparture, arrival, operator, "ghost", {
       extent,
       activeEnd,
       startFrame,
@@ -2132,7 +2132,7 @@ export function settleStepSequence(session, pending) {
         draft.range,
         metric
       );
-      draft.interval = createInterval(
+      draft.interval = createActiveSpan(
         intervalDeparture,
         arrival,
         operator,

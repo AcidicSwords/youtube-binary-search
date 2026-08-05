@@ -127,7 +127,7 @@ The main layers remain distinct without relying on colour alone:
 
 - Range is the admissible ground;
 - Resolution is a quiet local contour;
-- Working Interval is the surviving directional relation;
+- Active Span is the surviving directional relation;
 - Current is the semantic Address and carries its own label;
 - Cursor appears only when physical observation has left Current;
 - Field span is the held Panorama relation;
@@ -164,7 +164,7 @@ one another.
 
 Ghost is drawn with what is already there. The Address the reader began at
 becomes the fixed Anchor and reuses the departure marker; the recalled Address
-is ordinary Current; the relation between them is an ordinary Working Interval
+is ordinary Current; the relation between them is an ordinary Active Span
 marked as recalled. The Anchor is solid because it is the thing being measured
 against, while Current and the interval read as transient — a gesture still in
 the hand.
@@ -216,25 +216,25 @@ order:
 The first row discriminates, the second traverses or changes viewpoint, and the
 third resolves the current relation into absence, retained structure, or active
 scope. Labels and dry-run previews follow physical or matrix-latched Shift, not
-the incidental presence of a Working Interval.
+the incidental presence of a Active Span.
 
 ### Tag
 
 `T` always means `Tag as Pin`: Current is the operand. `Shift+T` means `Tag as
-Section`: a positive Working Interval is the operand, and the action is disabled
+Section`: a positive Active Span is the operand, and the action is disabled
 without one. The shifted action creates a Section; before retention the source
-relation is still called the Working Interval. Duplicate tagging selects and
+relation is still called the Active Span. Duplicate tagging selects and
 reports the exact existing Pin or Section.
 
 ### Release and Focus
 
-Release clears the Working Interval and the acquired Timeline operand. It
+Release clears the Active Span and the acquired Timeline operand. It
 preserves Current, Resolution, Range, Focus, Guide focus, retained topology,
 Weights, playback preferences, and deformation-bypass state. Clearing only a
 presentation operand creates no history; clearing the semantic interval is
 Undoable.
 
-Focus makes an acquired Section or Working Interval the active Range and drawn
+Focus makes an acquired Section or Active Span the active Range and drawn
 world. Unfocus restores the containing Range. Focus never edits Weight or the
 deformation-bypass scope. While focused, spatial boundary changes that cannot be
 expressed honestly are refused; exact Guide edits remain available.
@@ -256,11 +256,11 @@ history entry and sends no direct player command.
 
 Guide focus is inspection and exact editing. Timeline acquisition is the
 spatial operand for `X`, Nudge, Carry, and direct manipulation. A Guide click and
-a Timeline click can establish the same Working Interval, but only the latter
+a Timeline click can establish the same Active Span, but only the latter
 acquires the Timeline object. Clicking bare Timeline ground clears that
 acquisition without closing the Guide row.
 
-A plain Guide click replaces the Working Interval with the clicked Pin, Section,
+A plain Guide click replaces the Active Span with the clicked Pin, Section,
 or Cue extent. Physical Shift or Guide's one-shot `Extend` latch grows the
 existing interval to include it. The Guide and matrix latches are independent;
 using one cannot consume the other.

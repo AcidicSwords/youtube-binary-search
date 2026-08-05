@@ -81,7 +81,7 @@ function assertInvariant(session) {
   }
 
   if (focus) {
-    if (focus.kind === "working-section") {
+    if (focus.kind === "active-span") {
       assert.ok(focus.extent);
       assert.ok(Math.abs(focus.extent.start - range.start) <= EPSILON);
       assert.ok(Math.abs(focus.extent.end - range.end) <= EPSILON);
@@ -172,7 +172,7 @@ for (let run = 0; run < RUNS; run += 1) {
       assert.equal(result.refineRelation, expectedRefine.relation);
       const resultingInterval = result.session.model.interval;
       if (Math.abs(expectedRefine.departure - expectedRefine.target) <= EPSILON) {
-        assert.equal(resultingInterval, null, "Endpoint coincidence must collapse the Working Interval.");
+        assert.equal(resultingInterval, null, "Endpoint coincidence must collapse the Active Span.");
       } else {
         assert.ok(resultingInterval);
         assert.ok(Math.abs(resultingInterval.departure - expectedRefine.departure) <= EPSILON);

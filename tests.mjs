@@ -408,7 +408,7 @@ const intervalEndPin = ensurePin(
 let intervalPinSession = workFromExtent(
   createSession({ duration: 100, current: 40, guide: intervalGuide }),
   { start: 20, end: 60 },
-  { label: "Working Interval" }
+  { label: "Active Span" }
 ).session;
 let intervalPinMove = moveGuidePin(intervalPinSession, intervalStartPin.id, 10);
 assert.equal(intervalPinMove.changed, true);
@@ -485,7 +485,7 @@ assert.equal(session.model.interval, null);
 
 // Shift+Refine always draws the newly traversed Current-to-midpoint region.
 // This deliberately selects the opposite half when its target lies inside the
-// existing Working Interval; plain Refine retains the established anchor.
+// existing Active Span; plain Refine retains the established anchor.
 let membershipBase = createSession({ duration: 100, current: 50 });
 membershipBase = goTo(membershipBase, 70, { operator: "timeline" }).session;
 const outsideRefine = localRefine(membershipBase, "forward");
@@ -730,7 +730,7 @@ pushedBackward = step(pushedBackward, "backward", 25).session;
 assert.deepEqual(pushedBackward.model.resolution, { L: 0, C: 50, R: 100, level: 0 });
 assert.deepEqual(getTargets(pushedBackward.model.resolution), { backward: 25, forward: 75 });
 
-// Range deformation preserves the Working Interval while rebasing endpoint frames
+// Range deformation preserves the Active Span while rebasing endpoint frames
 // to the new hard bound.
 let ranged = createSession({ duration: 100, current: 50 });
 ranged = goTo(ranged, 70, { operator: "timeline", label: "Timeline Click" }).session;
@@ -777,7 +777,7 @@ assert.equal(focused.model.focus, null);
 assert.deepEqual(focused.model.range, { start: 0, end: 100 });
 assert.equal(focused.model.resolution.C, 80);
 
-// Unfocus restores only Range and preserves the current Working Interval while
+// Unfocus restores only Range and preserves the current Active Span while
 // recording the restored active-endpoint frame.
 let focusedAgain = createSession({ duration: 100, current: 20, guide: focusGuide });
 focusedAgain = goTo(focusedAgain, 25, { operator: "timeline", label: "Timeline Click" }).session;
@@ -801,14 +801,14 @@ assert.deepEqual(
 );
 assert.deepEqual(focusedAgain.model.interval.arrivalNeighborhood.resolution, focusedAgain.model.resolution);
 
-// The active Interval is a semi-persistent Working Interval. Focus projects it into
+// The active Interval is a semi-persistent Active Span. Focus projects it into
 // Range without retaining it in Guide; Leave preserves the deformed working
 // value, while Save is the explicit persistence boundary.
 let working = createSession({ duration: 100, current: 50, guide: createGuide("video") });
 working = goTo(working, 70, { operator: "timeline" }).session;
 const workingBeforeFocus = copy(working.model.interval);
 working = focusWorkingSection(working).session;
-assert.equal(working.model.focus.kind, FOCUS_KIND.WORKING);
+assert.equal(working.model.focus.kind, FOCUS_KIND.ACTIVE_SPAN);
 assert.deepEqual(working.model.focus.extent, { start: 50, end: 70 });
 assert.deepEqual(working.model.range, { start: 50, end: 70 });
 assert.deepEqual(
@@ -825,7 +825,7 @@ assert.deepEqual(
     arrival: workingBeforeFocus.arrival
   }
 );
-assert.equal(working.model.guide.sections.length, 0, "Focus must not save the Working Interval.");
+assert.equal(working.model.guide.sections.length, 0, "Focus must not save the Active Span.");
 
 working = refine(working, "backward").session;
 assert.deepEqual(
@@ -842,7 +842,7 @@ assert.deepEqual(working.model.range, { start: 0, end: 100 });
 assert.deepEqual(
   { start: working.model.interval.start, end: working.model.interval.end },
   { start: 50, end: 60 },
-  "Leave must preserve the unsaved Working Interval."
+  "Leave must preserve the unsaved Active Span."
 );
 assert.equal(working.model.guide.sections.length, 0);
 

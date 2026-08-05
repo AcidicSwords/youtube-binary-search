@@ -202,9 +202,9 @@ assert.equal(currentText(), "Current 0:40");
 assert.match(
   byId.get("section-window").textContent,
   /0:30–0:50/,
-  "Selecting a Section must make its full extent the Working Interval."
+  "Selecting a Section must make its full extent the Active Span."
 );
-assert.equal(byId.get("release-meta").textContent, "Working Interval");
+assert.equal(byId.get("release-meta").textContent, "Active Span");
 sectionNodes = descendants(byId.get("sections-list"));
 const focusAction = sectionNodes.find(node =>
   node.dataset.focusSection === sectionId
@@ -305,7 +305,7 @@ assert.deepEqual(
 );
 assert.equal(byId.get("duration-time").textContent, "1:40");
 
-// Selecting the Section establishes its Working Interval and derives selection
+// Selecting the Section establishes its Active Span and derives selection
 // for both aligned endpoint Pins. Focus reuses that identity.
 byId.get("release").click();
 const retainedSectionMain = descendants(byId.get("sections-list"))
@@ -320,9 +320,9 @@ assert.equal(
     .filter(node => node.dataset.pinGo && node.classList.contains("extent-selected"))
     .length,
   2,
-  "Working Interval alignment must select both endpoint Pins."
+  "Active Span alignment must select both endpoint Pins."
 );
-assert.match(byId.get("status").textContent, /Working Interval/);
+assert.match(byId.get("status").textContent, /Active Span/);
 assert.equal(byId.get("sections-list-count").textContent, "1");
 byId.get("focus-toggle").click();
 await flush();

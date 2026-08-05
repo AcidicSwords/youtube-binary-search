@@ -40,7 +40,7 @@ import {
 } from "./transport.js";
 import { packTimelineSectionLanes } from "./view.js";
 
-// Selecting retained topology makes its full extent the Working Interval and
+// Selecting retained topology makes its full extent the Active Span and
 // returns Current to the center. This is one semantic transaction regardless
 // of whether the gesture originates in Timeline or Guide.
 {
@@ -73,7 +73,7 @@ import { packTimelineSectionLanes } from "./view.js";
   );
 }
 
-// Direct placement gives the new Working Interval two equal margins on each
+// Direct placement gives the new Active Span two equal margins on each
 // side in Timeline Space: the unclipped Resolution is exactly five Interval
 // widths. Range clipping removes only unavailable margin.
 assert.deepEqual(
@@ -161,7 +161,7 @@ assert.deepEqual(
   { start: 12.5, end: 31.25 }
 );
 
-// Reopen abandons the local frame without changing the Working Interval.
+// Reopen abandons the local frame without changing the Active Span.
 // Crossing the old departure makes it part of the new path: plain Refine must
 // then record the complete Current-to-target movement rather than discard the
 // Current-to-departure portion. Continuing away from the departure still

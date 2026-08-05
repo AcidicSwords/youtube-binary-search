@@ -7,8 +7,8 @@
 - **Resolution** — the ordered left/Current/right neighborhood that defines the present discrimination scale and its basis.
 - **Current** — the committed semantic Address.
 - **Cursor** — the transient physical Address reported while media is being observed.
-- **Working Interval** — the positive contiguous residue left after alternatives have been excluded from Range. It stores bounds, orientation, and endpoint frames, not a persistent path.
-- **Endpoint Frame** — the Resolution and basis associated with one side of a Working Interval, restored by Switch Endpoint.
+- **Active Span** — the positive contiguous residue left after alternatives have been excluded from Range. It stores bounds, orientation, and endpoint frames, not a persistent path.
+- **Endpoint Frame** — the Resolution and basis associated with one side of a Active Span, restored by Switch Endpoint.
 - **Timeline Space** — the positive, continuous, strictly increasing spatial coordinate derived from Source Time and effective Section factors.
 - **Temporal Topography** — the source projected into navigable Timeline Space, including its contours, retained landmarks, and relation wires.
 - **Density** — the product of effective covering Section weights at a source segment; integrating it produces Timeline Space.
@@ -23,7 +23,7 @@
 - **Guide Focus** — the Pin or Section being inspected in Guide. It remains distinct from an acquired Timeline operand and does not by itself scope Toggle Deformation.
 - **Pin** — a retained source landmark with one Address, one identity, and an optional title.
 - **Section** — a retained positive edge between two Pin identities, with an optional title, one Group, and one Weight.
-- **Tag** — the matrix retention operator. `T` is Tag as Pin from Current; `Shift+T` is Tag as Section from a positive Working Interval.
+- **Tag** — the matrix retention operator. `T` is Tag as Pin from Current; `Shift+T` is Tag as Section from a positive Active Span.
 - **Guide** — the persistent source-scoped graph of Groups, Pins, and Sections, including objects not currently drawn on the Timeline.
 - **Cue** — a transient Address or extent offered from chapter-like text. It is not persisted, weighted, or traversable as a Pin until explicitly retained. When optionally drawn on the Timeline, its inert presentation is positioned through the effective projection without entering the Guide or traversal.
 - **Group** — one ordinary partition of Sections. Every Section belongs to one Group; the last Group cannot be removed.
@@ -31,15 +31,15 @@
 - **Active Group** — a Group whose Section weights contribute to the effective projection. Activity is independent of whether the Group is drawn.
 - **Unlink** — give one Section endpoint a new independent Pin identity at the same Address.
 - **Link** — replace one Pin identity with another compatible Pin after an explicit snap has armed, making all references share that endpoint.
-- **Refine Backward / Refine Forward** — select the corresponding spatial midpoint at finer Resolution while retaining the established Working Interval anchor when possible.
+- **Refine Backward / Refine Forward** — select the corresponding spatial midpoint at finer Resolution while retaining the established Active Span anchor when possible.
 - **Local Refine** — the shifted Refine law that retains only the immediate Current-to-midpoint traversal.
-- **Reopen** — restore Resolution to the active Range without changing Current or clearing the Working Interval.
+- **Reopen** — restore Resolution to the active Range without changing Current or clearing the Active Span.
 - **Step Backward / Step Forward** — traverse a configured distance in Timeline Space while retaining a contiguous residue.
-- **Step Reversal** — one coalesced Step sequence whose final Address is its departure but whose transient visited envelope has positive extent; that envelope becomes the Working Interval.
+- **Step Reversal** — one coalesced Step sequence whose final Address is its departure but whose transient visited envelope has positive extent; that envelope becomes the Active Span.
 - **Pin traversal** — shifted Step to the previous or next retained landmark or synthetic Range boundary, using Step’s interval law.
-- **Switch Endpoint** — make the opposite Working Interval side Current and restore that side’s Endpoint Frame.
-- **Release** — clear the Working Interval and acquired Timeline operand. It preserves Current, Resolution, Range and Focus, Guide focus, retained topology, Weight, deformation bypass, and playback preferences.
-- **Focus / Unfocus** — install an acquired Section or Working Interval as Range and viewport / restore its containing Range.
+- **Switch Endpoint** — make the opposite Active Span side Current and restore that side’s Endpoint Frame.
+- **Release** — clear the Active Span and acquired Timeline operand. It preserves Current, Resolution, Range and Focus, Guide focus, retained topology, Weight, deformation bypass, and playback preferences.
+- **Focus / Unfocus** — install an acquired Section or Active Span as Range and viewport / restore its containing Range.
 - **Go** — move to an exact known Address, seed a movement-scale Resolution, and establish the corresponding contiguous residue.
 - **Nudge** — precise source-time movement of Current or retained topology through one shared operation. It is called a frame only when the media adapter proves an exact frame duration.
 - **Carry** — translate the acquired Timeline Pin or Section through the same Timeline-space displacement as a navigation action, within its structural boundary.
@@ -54,13 +54,13 @@
 - **Stretch** — begin or resume Field Breath from its current relation.
 - **Hold** — preserve the attained Field offsets and direction while every held side follows Center at Center rate.
 - **Context** — bounded source-contiguous Center observation around Current. While enabled, its stable edges own the Field Frame.
-- **Playback** — source-contiguous observation that settles watched coverage into the Working Interval without shortening existing coverage.
+- **Playback** — source-contiguous observation that settles watched coverage into the Active Span without shortening existing coverage.
 - **Observation Policy** — explicit playback ownership of either `panorama` or `center-only`, independent from rate.
 - **Rate Policy** — either a fixed stored wish or a dynamic request. It is resolved against the media adapter’s offered rates.
 - **Requested Rate** — the offered rate selected for the current Rate Policy; it is a command candidate, not proof of acceptance.
 - **Actual Rate** — the playback rate confirmed by the media adapter’s rate event and used to decide whether Panorama can remain coherent.
 - **User time** — the order in which the reader actually encountered source Addresses, as distinct from source time, Timeline Space and semantic history. Append-only and source-scoped: recalling an earlier Address writes a new occurrence linked by provenance to the historical one rather than rewinding to it.
-- **Ghost Traversal** — the auxiliary operator that moves through user time while the semantic world stands still. Holding `G` and scrolling moves a read cursor through the reader's own path; the Address they began at becomes a fixed Anchor and the recalled Address becomes the active endpoint of an ordinary Working Interval. It restores no historical Guide, Weight, Group, Focus or Range.
+- **Ghost Traversal** — the auxiliary operator that moves through user time while the semantic world stands still. Holding `G` and scrolling moves a read cursor through the reader's own path; the Address they began at becomes a fixed Anchor and the recalled Address becomes the active endpoint of an ordinary Active Span. It restores no historical Guide, Weight, Group, Focus or Range.
 - **Ghost scan** — the transient wheel movement while `G` is held. It inspects prior user time, may cross many occurrences and reverse direction, and is never written as a path. Where automatic Context is enabled each candidate plays, one window retargeted by the wheel; a window superseded or run out during the scan is search, and only the one still running when the gesture ended is an observation.
 - **Ghost injection** — the one occurrence appended on release: a jump from the live Anchor to the Address re-entered, linked to both. Backward from an injected occurrence follows its live predecessor; forward may resume the historical successors of the occurrence it re-entered.
 - **Dynamic Playback** — the optional Shift playback policy that reads cumulative active Section Weight as a playback texture: each doubling or halving of Weight shifts Center by one playback-rate step, so compressed ground plays faster and expanded ground plays slower. It is a log-compressed reading of the map, not a correction of it, and it retunes as Current or deformation bypass changes.

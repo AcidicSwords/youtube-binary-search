@@ -3,7 +3,7 @@
 // The ledger suite proves what user time offers. This one proves what happens
 // when a recalled Address is applied to a real semantic model: that the world
 // the reader built survives the recall completely, that what appears is an
-// ordinary Working Interval, and that one held gesture is one Undo.
+// ordinary Active Span, and that one held gesture is one Undo.
 import assert from "node:assert/strict";
 import {
   createSession,
@@ -89,7 +89,7 @@ function worldFingerprint(model) {
   assert.equal(ghosted.session.model.resolution.C, 40, "Only Current moves.");
   assert.equal(ghosted.place, 40, "and the player is asked to follow it.");
 
-  // What appears is an ordinary Working Interval, so every other operator can
+  // What appears is an ordinary Active Span, so every other operator can
   // act on it without knowing where it came from.
   const interval = ghosted.session.model.interval;
   assert.equal(interval.medium, "ghost", "It is marked as recalled,");
@@ -334,10 +334,10 @@ function worldFingerprint(model) {
   }
   assert.equal(gesturing.model.resolution.C, A);
   assert.equal(gesturing.model.interval.start, A);
-  assert.equal(gesturing.model.interval.end, D, "The Working Interval reaches back to the Anchor.");
+  assert.equal(gesturing.model.interval.end, D, "The Active Span reaches back to the Anchor.");
 
   // Session settlement and the ledger are different consequences of one gesture.
-  // The Session retains the Anchor relation as a Working Interval; user time
+  // The Session retains the Anchor relation as a Active Span; user time
   // records only where the reader landed.
   const replay = appendGhostInjection(userTime, {
     anchor: D,

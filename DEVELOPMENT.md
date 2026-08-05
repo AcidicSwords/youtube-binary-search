@@ -46,7 +46,7 @@ runs the same complete `npm run verify` gate before publishing.
 4. A semantic consequence has one implementation even when several routes
    acquire its operands differently.
 5. An operation changes only the state dimension named by that operation.
-6. Working Interval is the contiguous residue of excluded alternatives; do not
+6. Active Span is the contiguous residue of excluded alternatives; do not
    add a persistent Path.
 7. One gesture creates at most one Undo checkpoint.
 8. Current, Cursor, and media position are different authorities.
@@ -65,7 +65,7 @@ runs the same complete `npm run verify` gate before publishing.
 | Change | Primary owner | Required neighboring proof |
 |---|---|---|
 | Range, Resolution, Refine, Step geometry | `range-geometry.js` | `session.js` transaction and pure tests |
-| Working Interval, operator consequence, Focus, history | `session.js` | route preview and application smoke |
+| Active Span, operator consequence, Focus, history | `session.js` | route preview and application smoke |
 | Pin/Section/Group graph, Weight ladder, migration | `guide.js` | Guide validation, persistence, and group tests |
 | Operator identity, key, and shifted label | `operator-grammar.js` | DOM order, runtime branch, CSS area, browser geometry, canonical docs |
 | Effective density, inverse map, spatial midpoint | `timeline-projection.js` | every spatial consumer and atmosphere |

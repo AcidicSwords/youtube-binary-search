@@ -486,7 +486,7 @@ function operatorFrameRequest() {
   if (operator === "section") {
     // A retained Section supplies its Start and End only while Current owns its
     // midpoint. Otherwise the Frame returns to the exact Step neighbourhood.
-    const interval = currentInterval();
+    const interval = currentSpan();
     const midpoint = interval
       ? projection.timelineMidpoint(interval.start, interval.end)
       : NaN;
@@ -633,12 +633,12 @@ function selectTimelineRetained(selection) {
   if (selection) focusGuideRetained(selection);
 }
 
-function currentInterval() {
+function currentSpan() {
   return model().interval;
 }
 
 function syncIntervalPinSelection() {
-  const interval = currentInterval();
+  const interval = currentSpan();
   if (!interval) {
     state.selectedPinIds = [];
     return;
@@ -919,7 +919,7 @@ function clearProgrammaticPlacement() {
 // still for a moment let the poll schedule a Native Go and commit it underneath
 // the gesture: Session Current moved, a traversal was retained, and the drag
 // carried on measuring from an anchor that no longer meant anything. Releasing
-// then drew a Working Interval nobody had asked for.
+// then drew a Active Span nobody had asked for.
 //
 // A gesture is a state, not a duration. It lasts exactly as long as the pointer
 // is down, however long the reader pauses to think.
@@ -1284,7 +1284,7 @@ function retainedCarryStatus(result) {
 // What the reader actually watched, as directed spans.
 //
 // The span is built from the transport's own departure and cycles, not from the
-// Working Interval it happened to leave behind: an Interval describes an extent
+// Active Span it happened to leave behind: an Interval describes an extent
 // and a wrapped playback crosses its material repeatedly, so inferring one span
 // from the final geometry would lose both the repetition and the direction.
 //
@@ -1402,7 +1402,7 @@ function settlePausedTransport() {
 // be cheap: it exists for the movements whose inverse is awkward, imprecise, or
 // several operations long, and the rule that earns it has to be uniform. A
 // sequence that returns to its origin still traversed a path and still leaves a
-// Working Interval behind it, so it is a state worth returning from.
+// Active Span behind it, so it is a state worth returning from.
 function flushPendingStep(options = {}) {
   const pending = state.pendingStep;
   if (!pending) return { flushed: false, direction: null };
@@ -1426,7 +1426,7 @@ function flushPendingStep(options = {}) {
   if (options.effect !== false) {
     applyPlayerEffect({
       place: currentNeighborhood().C,
-      interval: currentInterval()
+      interval: currentSpan()
     }, {
       observe: options.observe,
       fieldAligned: true,
@@ -1449,7 +1449,7 @@ function completePendingStep(options = {}) {
     effect: options.effect !== false
   });
   if (!outcome.flushed) return outcome;
-  const interval = currentInterval();
+  const interval = currentSpan();
   const intervalStatus = interval
     ? formatRange(interval)
     : `cleared at ${formatTime(currentNeighborhood().C)}`;
@@ -1651,10 +1651,10 @@ function refine(direction, options = {}) {
     : `cleared at ${formatTime(result.destination)}`;
   accept(result, {
     status: local
-      ? `Local Refine ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; drew a new Current-to-midpoint Working Interval ${workingSection}.${retainedCarryStatus(result)}`
+      ? `Local Refine ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; drew a new Current-to-midpoint Active Span ${workingSection}.${retainedCarryStatus(result)}`
       : result.refineRelation === "full"
         ? `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; recorded the full movement as ${workingSection}.${retainedCarryStatus(result)}`
-        : `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; retained Working Interval ${workingSection}.${retainedCarryStatus(result)}`
+        : `Refined ${direction === "backward" ? "Backward" : "Forward"} to ${formatTime(result.destination)}; retained Active Span ${workingSection}.${retainedCarryStatus(result)}`
   });
 }
 
@@ -1676,7 +1676,7 @@ function switchCurrentEndpoint(options = {}) {
   settleBeforeAction({ replacingContext: true });
   const carry = options.carryRetained === true || state.carryModifier;
   const originModel = snapshotModel(model(), { cloneGuide: carry });
-  const interval = currentInterval();
+  const interval = currentSpan();
   let result = switchSessionEndpoint(state.session, {
     projection: timelineProjection()
   });
@@ -1686,7 +1686,7 @@ function switchCurrentEndpoint(options = {}) {
   }
   result = carryRetainedThrough(result, originModel, carry);
   accept(result, {
-    status: `Switched to ${formatTime(result.session.model.resolution.C)}; Working Interval remains ${formatRange(interval)} in its restored refinement frame.${retainedCarryStatus(result)}`
+    status: `Switched to ${formatTime(result.session.model.resolution.C)}; Active Span remains ${formatRange(interval)} in its restored refinement frame.${retainedCarryStatus(result)}`
   });
 }
 
@@ -1704,10 +1704,10 @@ function releaseActiveSpan() {
       setStatus("Released the acquired Timeline operand; Current and Guide focus are unchanged.");
       return true;
     }
-    setStatus("There is no Working Interval to release.");
+    setStatus("There is no Active Span to release.");
     return false;
   }
-  // Releasing the Working Interval releases the retained operand with it.
+  // Releasing the Active Span releases the retained operand with it.
   // Nothing else cleared it, so "nothing is selected" was reachable only on a
   // fresh load -- which made every scoped operator permanently scoped to
   // whatever you last touched.
@@ -1715,7 +1715,7 @@ function releaseActiveSpan() {
   state.selectedPinIds = [];
   return accept(result, {
     effect: false,
-    status: `Released the Working Interval; Current remains ${formatTime(currentNeighborhood().C)}.`
+    status: `Released the Active Span; Current remains ${formatTime(currentNeighborhood().C)}.`
   });
 }
 
@@ -1782,7 +1782,7 @@ function toggleDeformation() {
 function focusOrUnfocus() {
   if (!state.videoLoaded) return false;
   if (model().focus) return leaveSection();
-  const working = currentInterval();
+  const working = currentSpan();
   const selected = state.selectedRetained?.kind === "section"
     ? resolveSection(guide(), state.selectedRetained.id)
     : sectionForSelectedPinExtent();
@@ -1801,7 +1801,7 @@ function focusOrUnfocus() {
     }
   }
   if (working) return focusWorkingSection();
-  setStatus("Establish a Working Interval or select a Section before Focus.");
+  setStatus("Establish a Active Span or select a Section before Focus.");
   return false;
 }
 
@@ -2193,18 +2193,18 @@ function focusSection(sectionId) {
 
 function focusWorkingSection() {
   settleBeforeAction();
-  const interval = currentInterval();
+  const interval = currentSpan();
   if (!interval) {
-    setStatus("Establish a Working Interval before focusing it.", true);
+    setStatus("Establish a Active Span before focusing it.", true);
     return;
   }
   const result = focusSessionWorkingSection(state.session);
   if (!result.changed) {
-    setStatus("The Working Interval already owns the active Range.");
+    setStatus("The Active Span already owns the active Range.");
     return;
   }
   acceptRangeTransition(result, {
-    status: `Focused Working Interval ${formatRange(interval)} without saving it.`
+    status: `Focused Active Span ${formatRange(interval)} without saving it.`
   });
 }
 
@@ -2314,7 +2314,7 @@ function selectedSectionExtent(source = null) {
       ? heldFieldSpan()
       : kind === "selected-pins"
         ? selectedPinExtent()
-        : currentInterval()
+        : currentSpan()
   };
 }
 
@@ -2623,7 +2623,7 @@ function submitGuideDialog(event) {
     // which changes the scope of everything drawn. Every other exit from a Focus
     // says so; this one has to as well, or the map silently zooms out.
     const wasFocused = model().focus?.sectionId === action.id
-      && model().focus?.kind !== "working-section";
+      && model().focus?.kind !== "active-span";
     result = deleteGuideSection(state.session, action.id);
     if (
       result.changed
@@ -2775,8 +2775,8 @@ function traverseToAdjacentPin(direction, carryRetained = false, consumeOwner = 
 
 // Composition in the Guide.
 //
-// A plain click replaces: the clicked object becomes the Working Interval.
-// Shift extends: the Working Interval grows to include the clicked object,
+// A plain click replaces: the clicked object becomes the Active Span.
+// Shift extends: the Active Span grows to include the clicked object,
 // whatever kind it is. One rule covers Pins and Sections because the extent —
 // not a set of objects — is what every operator already consumes, so a
 // composition is immediately Focusable and retainable as one
@@ -2827,7 +2827,7 @@ function extendIntervalToRetained(kind, id, name, options = {}) {
 // is not in the Guide and owns no identity -- composes exactly as a Section
 // does. Composition is a fact about extents, not about retained objects.
 function extendIntervalToExtent(extent, name, selection = null, options = {}) {
-  const interval = currentInterval();
+  const interval = currentSpan();
   if (!interval || !extent) return false;
   const span = {
     start: Math.min(interval.start, extent.start),
@@ -2845,9 +2845,9 @@ function extendIntervalToExtent(extent, name, selection = null, options = {}) {
       projection
     }),
     renderGuide: true,
-    unchangedStatus: `The Working Interval already spans ${name}.`,
+    unchangedStatus: `The Active Span already spans ${name}.`,
     status: destination =>
-      `Working Interval extends ${formatRange(span)}; Current is centered at ${formatTime(destination)}.`
+      `Active Span extends ${formatRange(span)}; Current is centered at ${formatTime(destination)}.`
   });
   if (options.consumeShiftOwner) {
     consumeShiftLayer(options.consumeShiftOwner);
@@ -2856,7 +2856,7 @@ function extendIntervalToExtent(extent, name, selection = null, options = {}) {
   return true;
 }
 
-function selectSectionAsWorkingInterval(sectionId, options = {}) {
+function selectSectionAsActiveSpan(sectionId, options = {}) {
   const section = resolveSection(guide(), sectionId);
   if (!section) return;
   const carry = options.carryRetained === true || state.carryModifier;
@@ -2879,8 +2879,8 @@ function selectSectionAsWorkingInterval(sectionId, options = {}) {
     ),
     renderGuide: true,
     carryRetained: carry,
-    unchangedStatus: `“${sectionName(section)}” is already the Working Interval.`,
-    status: destination => `“${sectionName(section)}” is the Working Interval; Current is centered at ${formatTime(destination)}.`
+    unchangedStatus: `“${sectionName(section)}” is already the Active Span.`,
+    status: destination => `“${sectionName(section)}” is the Active Span; Current is centered at ${formatTime(destination)}.`
   });
   if (!hasCarrySelection && carry && spatial) {
     selectTimelineRetained(destinationSelection);
@@ -4715,7 +4715,7 @@ function goToCue(index, { composing = false, consumeShiftOwner = null } = {}) {
       projection
     }),
     status: destination =>
-      `${cueLabelFor(cue)} is the Working Interval; Current is centered at ${formatTime(destination)}.`
+      `${cueLabelFor(cue)} is the Active Span; Current is centered at ${formatTime(destination)}.`
   });
 }
 
@@ -5450,7 +5450,7 @@ elements["section-lane"].addEventListener("click", event => {
   const body = event.target.closest("[data-section-go]");
   if (body) {
     event.stopPropagation();
-    selectSectionAsWorkingInterval(
+    selectSectionAsActiveSpan(
       body.dataset.sectionGo,
       { carryRetained: event.altKey === true }
     );
@@ -5653,7 +5653,7 @@ elements["switch-endpoint"].addEventListener("click", event => {
 });
 elements.release.addEventListener("click", releaseActiveSpan);
 // Tag resolves Current into a Pin or, when Shift actually supplies the matrix
-// layer, resolves the positive Working Interval into a Section.
+// layer, resolves the positive Active Span into a Section.
 elements.tag.addEventListener("click", event => {
   const latchedMatrix = event.shiftKey !== true && state.shiftLayers.matrix;
   if (event.shiftKey || latchedMatrix) {
@@ -5879,7 +5879,7 @@ for (const control of document.querySelectorAll("[data-step-fraction]")) {
 elements["section-capture"].addEventListener("submit", saveCurrentIntervalAsSection);
 elements["section-label"].addEventListener("input", view.render);
 elements["section-source"].addEventListener("change", view.render);
-elements["focus-working-section"].addEventListener("click", focusWorkingSection);
+elements["focus-active-span"].addEventListener("click", focusWorkingSection);
 elements["pin-capture"].addEventListener("submit", pinCurrent);
 elements["pin-label"].addEventListener("input", view.render);
 elements["range-state"].addEventListener("click", toggleRangeTools);
@@ -6272,7 +6272,7 @@ function handleGuideClick(event) {
       `“${sectionName(resolveSection(guide(), id))}”`,
       { consumeShiftOwner }
     )) return;
-    return selectSectionAsWorkingInterval(
+    return selectSectionAsActiveSpan(
       id,
       { carryRetained: event.altKey === true, surface: "guide" }
     );
@@ -6562,7 +6562,7 @@ document.addEventListener("keydown", event => {
     releaseActiveSpan();
   }
   // Tag is T. Plain retains Current as a Pin; Shift retains the positive
-  // Working Interval as a Section. Both routes converge on the same Guide
+  // Active Span as a Section. Both routes converge on the same Guide
   // transactions used by their pointer controls.
   else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && key === "t") {
     event.preventDefault();

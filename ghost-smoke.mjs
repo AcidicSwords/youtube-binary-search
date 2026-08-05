@@ -183,7 +183,7 @@ try {
   assert.equal(await page.getAttribute("#current-marker", "data-ghost-active"), "true",
     "and Current reads as transient while it is held.");
   assert.equal(await page.getAttribute("#active-span-fill", "data-medium"), "ghost",
-    "The relation drawn is an ordinary Working Interval, marked as recalled.");
+    "The relation drawn is an ordinary Active Span, marked as recalled.");
 
   // While it is held, nothing has been committed.
   assert.equal(await undoTop(), undoBeforeTap,
@@ -832,7 +832,7 @@ try {
   // 16. Nothing logged an error along the way
   // =========================================================================
   assert.deepEqual(failures, [], `Console/page errors: ${failures.join(" | ")}`);
-  console.log("Ghost smoke passed: the Guide is on I while Tab stays the browser's and G no longer touches either; holding G moves nothing, writes no history and draws no Anchor; a wheel notch recalls an earlier moment behind a fixed Anchor and an ordinary Working Interval; releasing writes one transaction that one Undo reverses; Escape cancels exactly; Ghost owns the wheel only while G is held; one detent recalls exactly one moment; the recall says where in the path it is and what it is anchored to; Ghost interleaves with ordinary operators without ever landing where the reader has not been; releasing records the moment re-entered rather than the search that found it, so backward from it asks what led there; input below the threshold costs nothing at all; and with Context on the recall plays where it lands, one window following the wheel rather than a new one at every notch, with only the window still running when the gesture ended joining the path; a forward scan settled short of the live end lands exactly once; stepping out and back onto a re-entered moment does not revive the offer the Step withdrew; dragging Current records one movement rather than the ground it crossed; and an Undo that moves the reader is itself a route they took, while one that moves nobody writes nothing.");
+  console.log("Ghost smoke passed: the Guide is on I while Tab stays the browser's and G no longer touches either; holding G moves nothing, writes no history and draws no Anchor; a wheel notch recalls an earlier moment behind a fixed Anchor and an ordinary Active Span; releasing writes one transaction that one Undo reverses; Escape cancels exactly; Ghost owns the wheel only while G is held; one detent recalls exactly one moment; the recall says where in the path it is and what it is anchored to; Ghost interleaves with ordinary operators without ever landing where the reader has not been; releasing records the moment re-entered rather than the search that found it, so backward from it asks what led there; input below the threshold costs nothing at all; and with Context on the recall plays where it lands, one window following the wheel rather than a new one at every notch, with only the window still running when the gesture ended joining the path; a forward scan settled short of the live end lands exactly once; stepping out and back onto a re-entered moment does not revive the offer the Step withdrew; dragging Current records one movement rather than the ground it crossed; and an Undo that moves the reader is itself a route they took, while one that moves nobody writes nothing.");
 } finally {
   await close();
 }

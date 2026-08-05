@@ -60,7 +60,7 @@ function addresses(model) {
 
 // --- Retained truth is Weight-blind ------------------------------------------
 // The same gesture sequence performed at two Weights commits the same Range,
-// Current, Working Interval, Pins and Section endpoints.
+// Current, Active Span, Pins and Section endpoints.
 {
   assert.deepEqual(
     addresses(neutral.session.model),

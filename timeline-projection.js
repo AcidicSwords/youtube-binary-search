@@ -329,7 +329,7 @@ export function createTimelineProjection({
 }
 
 // Focus is the operator that makes a relation become the world. Once a Section
-// or Working Interval is the world, the map must be drawn across it: the
+// or Active Span is the world, the map must be drawn across it: the
 // focused extent occupies the whole timeline. An ordinary Range is admissible
 // territory inside a world that is still visible around it, so it does not
 // take the viewport.

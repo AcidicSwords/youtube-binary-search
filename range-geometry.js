@@ -214,7 +214,7 @@ export function refineNeighborhood(neighborhood, destination, range) {
 /**
  * Establish a local two-sided Neighborhood from an actual movement.
  *
- * The crossed Working Interval is the central fifth of the new frame in the
+ * The crossed Active Span is the central fifth of the new frame in the
  * active metric: two Interval-width margins precede it and two follow it.
  * Clipping at Range may remove unavailable margin, but never shifts the
  * Interval or invents distance on the other side. Current remains the arrival

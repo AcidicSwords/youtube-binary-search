@@ -99,7 +99,7 @@ assert.notEqual(afterFirstRefine, startedAt, "Refine forward moves Current.");
 await press("e");
 await press("q");
 assert.match(byId.get("section-window").textContent, /\d/,
-  "Refining establishes a Working Interval, which is what every later operator consumes.");
+  "Refining establishes a Active Span, which is what every later operator consumes.");
 const surveyed = byId.get("section-window").textContent;
 
 // ==============================================================================
@@ -118,7 +118,7 @@ assert.match(rowText(pinnedAt), /\d:\d\d/,
 // ==============================================================================
 await press("T", { shiftKey: true });
 assert.equal(sectionRows().length, 1,
-  "Shift+T tags the Working Interval as a Section.");
+  "Shift+T tags the Active Span as a Section.");
 assert.match(byId.get("section-window").textContent, new RegExp(
   surveyed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").slice(0, 12)
 ), "Retaining does not disturb the extent it retained.");

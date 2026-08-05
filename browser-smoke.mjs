@@ -97,7 +97,7 @@ try {
   assert.equal(await text("#tag-label"), "Tag as Pin");
   assert.match(await text("#tag-meta"), /^Current .* → Pin$/);
   assert.equal(await page.$eval("#tag", element => element.disabled), false,
-    "Plain Tag is available without a Working Interval.");
+    "Plain Tag is available without a Active Span.");
   await page.hover("#tag");
   await settle(80);
   const pinTagPreview = await page.evaluate(() => ({
@@ -111,7 +111,7 @@ try {
     pointLeft: pinTagPreview.currentLeft,
     currentLeft: pinTagPreview.currentLeft,
     intervalHidden: true
-  }, "Plain Tag previews Current as a point, never the Working Interval.");
+  }, "Plain Tag previews Current as a point, never the Active Span.");
   await page.mouse.move(0, 0);
 
   await page.click("#shift-layer-toggle");
@@ -121,9 +121,9 @@ try {
   assert.equal(await text("#step-backward-label"), "Previous Pin");
   assert.equal(await text("#step-forward-label"), "Next Pin");
   assert.equal(await text("#tag-label"), "Tag as Section");
-  assert.equal(await text("#tag-meta"), "No Working Interval");
+  assert.equal(await text("#tag-meta"), "No Active Span");
   assert.equal(await page.$eval("#tag", element => element.disabled), true,
-    "Shifted Tag refuses a missing Working Interval.");
+    "Shifted Tag refuses a missing Active Span.");
   const shiftedMatrix = await page.evaluate(() => {
     const deck = document.querySelector(".navigation-deck").getBoundingClientRect();
     const cells = [...document.querySelector(".navigation-deck").children].map(element => {
@@ -202,11 +202,11 @@ try {
   assert.equal(await text("#tag-label"), "Tag as Section");
   assert.match(await text("#tag-meta"), /→ Section$/);
   assert.equal(await page.$eval("#tag", element => element.disabled), false,
-    "Shifted Tag becomes available for a positive Working Interval.");
+    "Shifted Tag becomes available for a positive Active Span.");
   await page.hover("#tag");
   await settle(80);
   assert.equal(await page.$eval("#action-preview-fill", element => element.hidden), false,
-    "Shifted Tag previews the Working Interval extent.");
+    "Shifted Tag previews the Active Span extent.");
   await page.mouse.move(0, 0);
   await page.click("#shift-layer-toggle");
   await page.click("#guide-toggle");

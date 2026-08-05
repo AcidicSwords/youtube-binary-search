@@ -158,7 +158,7 @@ function performStepSequence(directions, reach = 10) {
 
 // Departure/arrival equality no longer destroys the evidence that Step crossed
 // a positive region. Settlement keeps one transaction and one contiguous
-// Working Interval, never a durable Path.
+// Active Span, never a durable Path.
 {
   const { session, pending } = performStepSequence(["forward", "backward"]);
   assert.equal(session.model.resolution.C, pending.departure);

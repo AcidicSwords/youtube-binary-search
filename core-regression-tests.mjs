@@ -386,8 +386,8 @@ assert.match(
 assert.match(sessionSource, /stepIntervalAnchor[\s\S]*intervalDeparture/, "Session must separate Step movement departure from the Interval anchor.");
 assert.match(sessionSource, /export function localRefine[\s\S]*intervalDeparture:\s*current[\s\S]*refineRelation:\s*"draw"/,
   "Local Refine must draw the Current-to-midpoint traversal instead of retaining the previous anchor.");
-assert.match(sessionSource, /export function focusWorkingSection[\s\S]*FOCUS_KIND\.WORKING/,
-  "The Working Interval must be focusable without a Guide record.");
+assert.match(sessionSource, /export function focusWorkingSection[\s\S]*FOCUS_KIND\.ACTIVE_SPAN/,
+  "The Active Span must be focusable without a Guide record.");
 assert.match(appSource, /Left the focused Section and opened Full Video/, "Composite direct Go must disclose its Range escape.");
 assert.match(appSource, /createPlaybackTransport/, "Native playback must own continuous settlement.");
 assert.doesNotMatch(appSource, /startSkim|createSkimTransport|desiredSkimRate/, "Skim must be removed from the runtime.");

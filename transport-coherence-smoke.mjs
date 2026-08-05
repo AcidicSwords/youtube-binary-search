@@ -71,7 +71,7 @@ assert.equal(
   pausesBeforeSpace.lead + 1
 );
 
-// Focus turns the Working Interval into the sole playback loop operand.
+// Focus turns the Active Span into the sole playback loop operand.
 byId.get("focus-toggle").click();
 await flush();
 assert.equal(byId.get("range-label").textContent, "0:25–0:58");

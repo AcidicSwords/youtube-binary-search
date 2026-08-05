@@ -12,7 +12,7 @@ The objective is a stable video-comprehension instrument, not an editing suite o
 4. direct manipulation accepts intuition and resolves to exact canonical state;
 5. advanced mechanisms remain optional;
 6. ordinary video-player functionality remains intact;
-7. operators exclude alternatives and leave one contiguous Working Interval residue;
+7. operators exclude alternatives and leave one contiguous Active Span residue;
 8. no operation mutates an unrelated state dimension;
 9. one semantic consequence has one implementation even when multiple routes reach it.
 
@@ -28,7 +28,7 @@ A loaded Session owns:
 - Range;
 - Current;
 - Resolution and Resolution basis;
-- an optional Working Interval with bounds, orientation, and endpoint frames;
+- an optional Active Span with bounds, orientation, and endpoint frames;
 - optional Focus and its return Range;
 - configured Step Reach;
 - Guide version 9 Groups, Pins, Sections, labels, membership, activity, drawn Group, and Section Weight;
@@ -101,9 +101,9 @@ Refine descends within this neighborhood. Reopen restores `{Range.start, Current
 
 **Current** is committed semantic position. **Cursor** is observed physical position. Polling Cursor must not rewrite Current. A defined transaction—Go, Step, Refine, or Playback settlement—owns any semantic conversion.
 
-### 3.3 Subtractive Working Interval
+### 3.3 Subtractive Active Span
 
-Range begins as the admissible universe. Navigation and search exclude alternatives from the current relation. The **Working Interval** is the positive contiguous residue that survives those exclusions.
+Range begins as the admissible universe. Navigation and search exclude alternatives from the current relation. The **Active Span** is the positive contiguous residue that survives those exclusions.
 
 It stores:
 
@@ -150,7 +150,7 @@ Timeline extent is spatial, not temporal duration. A Section with source duratio
 
 ### 3.5 Focus and viewport
 
-Focus installs an acquired Section or Working Interval as Range and saves the containing Range for Unfocus. The focused extent also becomes the viewport, so it fills the drawn Timeline at every Weight.
+Focus installs an acquired Section or Active Span as Range and saves the containing Range for Unfocus. The focused extent also becomes the viewport, so it fills the drawn Timeline at every Weight.
 
 Viewport changes presentation only. It cannot alter source↔Timeline conversion, Step, Refine, Reach, Weight, or deformation-bypass state. Spatial Range-boundary edits that would change the world defining Focus are refused with a reason. Exact editing of a focused saved Section may rebase that Focus through the Guide’s canonical operation.
 
@@ -311,13 +311,13 @@ An unrelated plain action preserves both latches. Matrix and Guide cannot consum
 
 Refine targets the Timeline-space midpoint from Current toward the corresponding Resolution side and descends to finer Resolution. It uses the effective projection.
 
-Plain Refine retains the Working Interval departure while the target remains on the same traversed side and the departure remains outside the new Current-to-target movement. A reversal that reaches or crosses the retained departure draws the complete immediate movement instead.
+Plain Refine retains the Active Span departure while the target remains on the same traversed side and the departure remains outside the new Current-to-target movement. A reversal that reaches or crosses the retained departure draws the complete immediate movement instead.
 
 `Shift+Q` and `Shift+E` perform **Local Refine**. Local Refine uses the same midpoint but always retains the immediate Current-to-target traversal. Refine changes neither Guide topology nor Weight.
 
 ### 5.4 Reopen
 
-Reopen sets Resolution to `{Range.start, Current, Range.end}` and basis to Range. It preserves Current, Working Interval, Focus, Guide, Weight, selection, and deformation bypass. It is unavailable when Resolution already spans Range.
+Reopen sets Resolution to `{Range.start, Current, Range.end}` and basis to Range. It preserves Current, Active Span, Focus, Guide, Weight, selection, and deformation bypass. It is unavailable when Resolution already spans Range.
 
 ### 5.5 Step Backward / Step Forward
 
@@ -332,22 +332,22 @@ Adaptive Reach recomputes when Range, Weight, activity, or bypass changes. Fixed
 
 Pressed, held, repeated, and quickly tapped routes use one Step gesture owner. Current and physical players move immediately; history and automatic Context settle once. A reversal retains the transient visited envelope as specified in §3.3.
 
-Shifted Step traverses to the previous or next visible Pin stop or synthetic Range boundary. It uses Step’s same Working Interval and endpoint-frame law; it is not a separate Go operation.
+Shifted Step traverses to the previous or next visible Pin stop or synthetic Range boundary. It uses Step’s same Active Span and endpoint-frame law; it is not a separate Go operation.
 
 ### 5.6 Switch Endpoint
 
-Switch Endpoint requires a Working Interval. It makes the opposite bound Current, flips the active side and orientation, and restores the Endpoint Frame owned by that bound. It preserves the Interval extent, Range, Guide, Weight, Focus, and bypass.
+Switch Endpoint requires a Active Span. It makes the opposite bound Current, flips the active side and orientation, and restores the Endpoint Frame owned by that bound. It preserves the Interval extent, Range, Guide, Weight, Focus, and bypass.
 
 ### 5.7 Release
 
 Release clears:
 
-- the Working Interval, if present;
+- the Active Span, if present;
 - the acquired Timeline operand.
 
 It preserves Current, Resolution, Range and Focus, Guide focus, Pins, Sections, Groups, Weight, deformation bypass, Field preferences, and playback preferences.
 
-Clearing a semantic Working Interval creates one Undoable Session transaction. Clearing only presentation selection succeeds without history.
+Clearing a semantic Active Span creates one Undoable Session transaction. Clearing only presentation selection succeeds without history.
 
 ### 5.8 Tag
 
@@ -355,23 +355,23 @@ Tag has exactly two forms:
 
 ```text
 T         Tag as Pin      operand: Current
-Shift+T   Tag as Section  operand: Working Interval
+Shift+T   Tag as Section  operand: Active Span
 ```
 
-The visible label follows physical or Matrix Shift state, never the accidental presence of a Working Interval:
+The visible label follows physical or Matrix Shift state, never the accidental presence of a Active Span:
 
 - unshifted label: `Tag as Pin`;
 - unshifted metadata: `Current <Address> → Pin`;
 - shifted label: `Tag as Section`;
-- shifted metadata: `<Working Interval> → Section`.
+- shifted metadata: `<Active Span> → Section`.
 
-Plain Tag remains available while an Interval exists and still retains Current as a Pin. Shifted Tag is disabled without a positive Working Interval. An exact duplicate creates no second object or history; it selects and reports the existing Pin or Section. A newly retained Section enters the currently drawn Group, falling back to the ordinary default Group when none is drawn.
+Plain Tag remains available while an Interval exists and still retains Current as a Pin. Shifted Tag is disabled without a positive Active Span. An exact duplicate creates no second object or history; it selects and reports the existing Pin or Section. A newly retained Section enters the currently drawn Group, falling back to the ordinary default Group when none is drawn.
 
-Before retention the source object is always called a Working Interval. Section names only the retained result.
+Before retention the source object is always called a Active Span. Section names only the retained result.
 
 ### 5.9 Focus / Unfocus
 
-Focus chooses an acquired Timeline Section when available, otherwise a positive Working Interval. It installs that extent as Range and viewport and stores the containing Range. Current remains if already inside; otherwise it moves to an effective spatial midpoint. Focus changes neither Weight nor deformation bypass.
+Focus chooses an acquired Timeline Section when available, otherwise a positive Active Span. It installs that extent as Range and viewport and stores the containing Range. Current remains if already inside; otherwise it moves to an effective spatial midpoint. Focus changes neither Weight nor deformation bypass.
 
 Unfocus restores the containing Range and a valid Current. Focused spatial boundary edits that cannot be represented truthfully are refused rather than approximated.
 
@@ -393,13 +393,13 @@ Metadata-only presentation, deformation bypass, panel state, previews, Cues, tra
 
 `selectedRetained` is the acquired Timeline operand. `guideRetained` is Guide focus. Timeline acquisition also focuses the matching Guide row; Guide focus alone does not manufacture a spatial operand.
 
-If a Working Interval’s endpoints align with Pins, every visible aligned Pin is indicated. If the acquired exact Section supplies the extent, its two endpoint identities are known and selected. Geometry alone never chooses one identity arbitrarily from coincident Pins.
+If a Active Span’s endpoints align with Pins, every visible aligned Pin is indicated. If the acquired exact Section supplies the extent, its two endpoint identities are known and selected. Geometry alone never chooses one identity arbitrarily from coincident Pins.
 
 Visual channels remain independent:
 
 - quiet marker for identity;
 - background fill for acquired Timeline operand;
-- inset edge for Working Interval relation;
+- inset edge for Active Span relation;
 - focus ring for keyboard focus;
 - outline/glow for transient snap source, target, and armed state.
 
@@ -414,14 +414,14 @@ No channel may erase another state’s meaning.
 | single Pin | acquire exact Pin and move Current | move that Pin |
 | Pin cluster | open a vertical, wheel-scrollable exact-choice menu | drag the chosen Pin from its menu row |
 | Section wire end region | acquire the Section endpoint relation | move that endpoint Pin |
-| Section wire middle | make the Section the Working Interval and center Current spatially | translate its two endpoint Pins |
+| Section wire middle | make the Section the Active Span and center Current spatially | translate its two endpoint Pins |
 | Range boundary | keyboard or pointer acquisition | change Range when Focus permits |
 
 Section wire roles come from its end regions and middle. The Timeline does not draw redundant Start/midpoint/End node controls.
 
 A click that does not cross the drag threshold remains a click. Drag settlement suppresses the synthetic trailing click. Each gesture captures its origin model, history, future, and effective projection; cancellation restores that origin exactly.
 
-Pin and Section manipulation previews through the Field. A Pin uses its Step neighborhood; a Section uses its Start, midpoint, and End. Working Interval bounds that coincide with a moved Pin follow the same canonical Pin transaction.
+Pin and Section manipulation previews through the Field. A Pin uses its Step neighborhood; a Section uses its Start, midpoint, and End. Active Span bounds that coincide with a moved Pin follow the same canonical Pin transaction.
 
 ### Current drag and Nudge as Step
 
@@ -453,7 +453,7 @@ Typing a valid candidate may preview it through the same Field Frame as a drag. 
 
 ### 6.3 Guide composition and Carry
 
-A plain Guide click replaces the working relation with the clicked Pin or Section. Physical Shift or Guide Extend grows the current Working Interval to the minimum contiguous extent containing the selected Cue, Pin, or Section. Composition stores the resulting extent, not an object set.
+A plain Guide click replaces the working relation with the clicked Pin or Section. Physical Shift or Guide Extend grows the current Active Span to the minimum contiguous extent containing the selected Cue, Pin, or Section. Composition stores the resulting extent, not an object set.
 
 Alt with a spatial navigation operator may Carry the acquired Timeline Pin or Section by the same effective Timeline-space displacement as Current. Structural and source bounds clip or refuse the retained-object movement without changing the underlying navigation law. Carry is optional and creates no second operator family.
 
@@ -612,7 +612,7 @@ A proper-Range wrap:
 
 No stale pre-retune transport object may own the wrap.
 
-Playback settlement uses the transport’s departure, parent Resolution, return model, current Cursor, and completed cycles to commit at most one semantic transaction. Watched coverage extends or preserves existing Working Interval coverage and never shortens it. A completed proper-Range cycle covers the Range. Full-video playback stops at source end.
+Playback settlement uses the transport’s departure, parent Resolution, return model, current Cursor, and completed cycles to commit at most one semantic transaction. Watched coverage extends or preserves existing Active Span coverage and never shortens it. A completed proper-Range cycle covers the Range. Full-video playback stops at source end.
 
 ### 8.4b Ghost Traversal and user time
 
@@ -626,13 +626,13 @@ Ghost Traversal is held `G` plus the wheel. Arming costs nothing: no Anchor, no 
 
 Each quantum moves a read cursor one occurrence backward or forward through user time and applies the recalled Address as an amendment against one captured origin. Backward and forward name directions in user time; either may move either way through source time. Watched spans are subdivided by the frozen Step law, so expanded ground yields finer recall while the watched boundaries stay exact. An Address the active Range excludes is unavailable rather than clamped, and Ghost never leaves Focus, widens Range, or opens Full Video to reach one.
 
-Ghost restores no historical Pins, Sections, Groups, Weights, titles, visibility, Focus, Range, Step Reach, deformation state or Guide selection. What it produces is an ordinary Working Interval between the Anchor and the recalled Address, so Switch Endpoint, Tag, Release and Focus act on it exactly as they would on any other.
+Ghost restores no historical Pins, Sections, Groups, Weights, titles, visibility, Focus, Range, Step Reach, deformation state or Guide selection. What it produces is an ordinary Active Span between the Anchor and the recalled Address, so Switch Endpoint, Tag, Release and Focus act on it exactly as they would on any other.
 
 Where automatic Context is enabled, each recalled Address plays: the stop condition for a recall is recognition, and a still frame is a poor thing to recognise a moment from. Successive candidates retarget one Context window rather than opening a new one, so the window follows the wheel instead of being torn down and rebuilt at every notch. A window superseded or run out during the scan is search and writes no observation; only the one still running when the gesture ended was watched, and it joins the path as observed source time on its own terms. Escape stops it with everything else the scan did. With Context off, recall remains a silent frame-by-frame scan.
 
 Scanning and injection are different events. The scan is transient: it inspects prior user time and is never written as a path, because copying the search motion into the stream mirrors paths already in it. Releasing appends exactly one occurrence — a jump from the live Anchor to the Address re-entered — carrying provenance to the Anchor occurrence, to the historical occurrence re-entered, and to the scan as evidence. A gesture that returns to its Anchor appends nothing, though the Session may still retain the ground crossed. The whole gesture commits as one semantic transaction; one Undo returns to the Anchor with all structure intact.
 
-An injected occurrence has two relations, and direction chooses between them. Backward follows the live predecessor and asks what led to this re-entry. Forward may resume the historical successors of the occurrence re-entered and asks what originally followed it. The choice is made once, from the direction the gesture opens with, and reversing the wheel afterwards retraces the cursor already chosen rather than switching streams mid-gesture. A gesture begins only once a whole wheel quantum is earned, so input below the threshold settles nothing and captures no Anchor. A gesture that returns to its Anchor retains the positive extent it crossed, on the same principle as Step Reversal. The historical read cursor survives Release, so severing the Working Interval and Ghosting forward replays the recalled point's original successors as a newly informed traversal.
+An injected occurrence has two relations, and direction chooses between them. Backward follows the live predecessor and asks what led to this re-entry. Forward may resume the historical successors of the occurrence re-entered and asks what originally followed it. The choice is made once, from the direction the gesture opens with, and reversing the wheel afterwards retraces the cursor already chosen rather than switching streams mid-gesture. A gesture begins only once a whole wheel quantum is earned, so input below the threshold settles nothing and captures no Anchor. A gesture that returns to its Anchor retains the positive extent it crossed, on the same principle as Step Reversal. The historical read cursor survives Release, so severing the Active Span and Ghosting forward replays the recalled point's original successors as a newly informed traversal.
 
 ### 8.5 Native-player accessibility
 
@@ -646,13 +646,13 @@ A focused control keeps only the keys it can act on, which is a question about t
 
 ### 9.1 Creation, duplicates, and deletion
 
-Tag as Pin retains Current as an explicit Pin. Tag as Section retains a positive Working Interval using existing exact endpoint Pins when available or creates endpoint Pins. Duplicate identity is determined canonically, not by visual proximity. Duplicate Tag selects the existing object.
+Tag as Pin retains Current as an explicit Pin. Tag as Section retains a positive Active Span using existing exact endpoint Pins when available or creates endpoint Pins. Duplicate identity is determined canonically, not by visual proximity. Duplicate Tag selects the existing object.
 
 Guide renames, Weight changes, Group changes, Pin moves, Section moves, unlink/link, and deletion are ordinary Session transactions and use the same operations from every surface. Deleting the Section targeted by deformation bypass clears that bypass presentation. Deleting a focused Section leaves Focus through the same containing-Range law as other exits.
 
 ### 9.2 Cues
 
-Cues are transient candidates parsed from offered text. They may be previewed, navigated with Go, composed into a Working Interval, or explicitly retained with their title. They never enter Guide persistence, Section Weight, effective projection, or Pin traversal before retention.
+Cues are transient candidates parsed from offered text. They may be previewed, navigated with Go, composed into a Active Span, or explicitly retained with their title. They never enter Guide persistence, Section Weight, effective projection, or Pin traversal before retention.
 
 ### 9.3 Recovery result
 
@@ -734,7 +734,7 @@ Every visible route is an adapter to one semantic consequence:
 
 - Matrix click and keyboard keys call the same Refine, Reopen, Step, Switch Endpoint, Release, Tag, and Focus operations;
 - Timeline Pin click and Guide Pin Go call the same exact movement;
-- Timeline Section click and Guide Section selection install the same Working Interval;
+- Timeline Section click and Guide Section selection install the same Active Span;
 - Timeline and Guide Pin/Section movement call the same Guide kernel operations;
 - Timeline wheel, off-map wheel, keyboard, and Guide controls call one Nudge operation and settlement owner;
 - typed Address and pointer movement differ only in candidate acquisition and boundary policy, then converge on the same canonical move;
@@ -749,7 +749,7 @@ Previews are dry runs or pure projections. They cannot maintain parallel target 
 The following are release invariants:
 
 - source time is the only stored temporal coordinate;
-- Range, Resolution, Working Interval, Pins, Sections, Context, and Field Frames remain source-contiguous;
+- Range, Resolution, Active Span, Pins, Sections, Context, and Field Frames remain source-contiguous;
 - effective Timeline density is always positive;
 - source↔Timeline mapping is continuous and invertible;
 - at most one Group is drawn, while any number may be active;

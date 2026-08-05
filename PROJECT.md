@@ -32,17 +32,17 @@ The project is complete only while these laws remain true:
 - direct manipulation accepts perceptual intuition and resolves to exact canonical state;
 - ordinary video-player capability remains intact;
 - advanced mechanisms remain optional;
-- an operator excludes alternatives and leaves one contiguous Working Interval residue;
+- an operator excludes alternatives and leaves one contiguous Active Span residue;
 - an operation does not mutate an unrelated state dimension;
 - one semantic consequence has one implementation even when several routes reach it.
 
 The source is never edited. The application changes the environment through which the source can be perceived, traversed, structured, and understood.
 
-## Source, Range, and the Working Interval
+## Source, Range, and the Active Span
 
-Every meaningful temporal value is a source Address. Duration, Range, Current, Cursor, Resolution, Working Interval bounds, Pins, Sections, Context, and Field positions all remain in source time.
+Every meaningful temporal value is a source Address. Duration, Range, Current, Cursor, Resolution, Active Span bounds, Pins, Sections, Context, and Field positions all remain in source time.
 
-**Range** is the admissible source universe. A chain of navigation or search operations excludes alternatives from the current admissible relation. The **Working Interval** is the positive, contiguous residue that survives those exclusions. It carries two source bounds, orientation, and endpoint viewpoints; it is not a persistent record of the traversed path.
+**Range** is the admissible source universe. A chain of navigation or search operations excludes alternatives from the current admissible relation. The **Active Span** is the positive, contiguous residue that survives those exclusions. It carries two source bounds, orientation, and endpoint viewpoints; it is not a persistent record of the traversed path.
 
 **Reopen** restores Range-level discrimination without discarding the residue. **Undo** restores prior semantic state. **Release** clears the active residue and the acquired Timeline operand while preserving Current, retained topology, Guide focus, Focus, Weight, and the current deformation-bypass comparison.
 
@@ -99,7 +99,7 @@ There are four temporal orders here, and only three of them are about the work. 
 
 It is an append-only, source-scoped ledger. A record holds directed units: a **jump** was a movement between two Addresses and only those two were occupied; a **span** was watched continuously and any Address inside it was genuinely seen. Every route that moves the reader writes one — Go, Step, Nudge, a Current drag, Playback, an automatic Context window watched to its end, and an Undo or Redo that puts them somewhere else. Editing the world without moving writes nothing: a rename, a Weight, a new Pin, a Group toggled, an Undo of any of those. Programmatic placement never writes, because the player being told where to sit is a consequence of a movement rather than a movement of its own.
 
-**Ghost Traversal** — held `G` plus the wheel — reads that ledger while the semantic world stands still. The Address the reader began at becomes a fixed Anchor; each wheel quantum recalls one occurrence backward or forward through their own path, which may run either way through source time. What it produces is an ordinary Working Interval between the two, so every operator that acts on one acts on this. It restores no historical Guide, Weight, Group, Focus or Range: it recalls where they were, not what the world was then.
+**Ghost Traversal** — held `G` plus the wheel — reads that ledger while the semantic world stands still. The Address the reader began at becomes a fixed Anchor; each wheel quantum recalls one occurrence backward or forward through their own path, which may run either way through source time. What it produces is an ordinary Active Span between the two, so every operator that acts on one acts on this. It restores no historical Guide, Weight, Group, Focus or Range: it recalls where they were, not what the world was then.
 
 Searching and arriving are different events. The scan is transient — it may cross many moments and reverse direction, and none of that is a path anybody walked. Releasing appends exactly one occurrence: a jump from the live Anchor to the moment re-entered, carrying provenance to both and to the scan as evidence. So repeated recall accumulates the moments returned to, never mirrored copies of the searching.
 
@@ -135,7 +135,7 @@ Tag has two exact forms:
 
 ```text
 T         Tag as Pin      — Current becomes retained location
-Shift+T   Tag as Section  — the Working Interval becomes retained relation
+Shift+T   Tag as Section  — the Active Span becomes retained relation
 ```
 
 Weight remains an attribute of the retained Section in Guide. `X` remains an auxiliary comparison action inside Operators but outside the square matrix, and so does held `G` — Ghost reads the reader's own path rather than acting on the map, which is why it is a held modifier on the wheel and not a letter in the square. The bottom row therefore has one coherent progression:
@@ -150,7 +150,7 @@ Shift modifies Refine into Local Refine, Step into Pin traversal, and Tag as Pin
 
 ## Playback as observation
 
-Playback extends watched Working Interval coverage without shortening prior coverage. A focused proper Range wraps without history; the full-video Range stops at its source end.
+Playback extends watched Active Span coverage without shortening prior coverage. A focused proper Range wraps without history; the full-video Range stops at its source end.
 
 Observation and rate are separate dimensions. Plain `Space` requests a `1×` Panorama. `Shift+Space` requests playback at a configured fixed wish, or at the optional dynamic Weight texture: `c*(W) = 1 − 0.25·log₂W`, one playback-rate step per octave of cumulative active Weight. Panorama accompanies any Center rate with a complete adjacent triplet on the adapter's ladder and stands aside at the ends of it, without ending the Playback transaction. The media adapter’s offered and confirmed actual rates remain authoritative. A Center-only request stays Center only even when its actual rate is `1×`.
 
@@ -162,7 +162,7 @@ The Field never confiscates ordinary player controls. If the confirmed actual Ce
 load a source and use ordinary playback
 → perceive the local Field
 → Refine, Step, or Go
-→ leave a contiguous Working Interval
+→ leave a contiguous Active Span
 → verify through Context and the Field Frame
 → Tag Current as a Pin or the Interval as a Section
 → assign Section Weight in Guide

@@ -183,7 +183,7 @@ for (const section of [
   /## Load and play/,
   /## Panoramic Phase Field/,
   /## Temporal Topography/,
-  /## Working Interval and operators/,
+  /## Active Span and operators/,
   /## Guide and direct manipulation/,
   /## Shortcuts/,
   /## Run locally/
@@ -198,7 +198,7 @@ check(docs["README.md"].split("\n").length <= 240,
 for (const law of [
   /source time is authoritative/i,
   /Timeline Space is positive[\s\S]*invertible/i,
-  /contiguous Working Interval residue/i,
+  /contiguous Active Span residue/i,
   /one semantic consequence has one implementation/i,
   /ordinary video-player capability/i,
   /advanced mechanism.*optional/i
@@ -223,7 +223,7 @@ for (const entry of [
 }
 has(docs["GLOSSARY.md"], /Drawn Group[\s\S]{0,240}?At most one Group is drawn[\s\S]{0,100}?no Group/i,
   "Glossary defines zero-or-one drawn Group.");
-has(docs["GLOSSARY.md"], /Release[\s\S]{0,300}?Working Interval[\s\S]{0,120}?acquired Timeline operand[\s\S]{0,220}?preserves Current/i,
+has(docs["GLOSSARY.md"], /Release[\s\S]{0,300}?Active Span[\s\S]{0,120}?acquired Timeline operand[\s\S]{0,220}?preserves Current/i,
   "Glossary defines Release's exact cleared and preserved dimensions.");
 has(docs["GLOSSARY.md"], /Dynamic Playback[\s\S]{0,400}?Section Weight[\s\S]{0,200}?playback-rate step/i,
   "Glossary qualifies the optional dynamic Weight read-through as one rate step per octave.");
@@ -239,7 +239,7 @@ lacks(docs["GLOSSARY.md"], /^\s*- \*\*Cue\*\*[^\n]*not[^\n]*projected/im,
   "Glossary does not contradict the projection used to draw optional Cues.");
 
 for (const law of [
-  /### 3\.3 Subtractive Working Interval/,
+  /### 3\.3 Subtractive Active Span/,
   /### 4\.3 One effective projection/,
   /### 4\.4 Deformation-bypass law/,
   /### 5\.1 Exact matrix/,
