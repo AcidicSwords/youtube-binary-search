@@ -395,7 +395,7 @@ try {
   // The question is what the control does with the key, and only text can be
   // typed into. This needs a real focus model and real controls, so it can only
   // be asked here.
-  const bypassState = () => page.getAttribute("#deformation-toggle", "aria-pressed");
+  const bypassState = () => page.getAttribute("#weight-relaxation-toggle", "aria-pressed");
   const weightSelect = await page.$("#sections-list [data-section-weight]");
   if (weightSelect) {
     const beforeCommit = await bypassState();

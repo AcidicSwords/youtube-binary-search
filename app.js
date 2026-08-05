@@ -320,7 +320,7 @@ const state = {
   // One transient, source-scoped deformation bypass. It changes the effective
   // projection used by every spatial consumer without editing or persisting
   // Weight. A new source always clears it.
-  deformationBypass: null,
+  weightRelaxation: null,
   shiftLayers: { matrix: false, guide: false },
   shiftKeyHeld: false,
   field: null,
@@ -670,7 +670,7 @@ function timelineProjection() {
 
 function effectiveProjectionForModel(sourceModel) {
   return projectionForModel(sourceModel, {
-    deformationBypass: validDeformationBypass()
+    weightRelaxation: validWeightRelaxation()
   });
 }
 
@@ -1719,14 +1719,14 @@ function releaseActiveSpan() {
   });
 }
 
-function resolvedDeformationBypassScope() {
+function resolvedWeightRelaxationScope() {
   const selected = state.timelineSelection;
   return selected?.kind === "section" && resolveSection(guide(), selected.id)
     ? { kind: "section", sectionId: selected.id }
     : { kind: "all" };
 }
 
-function sameDeformationBypass(first, second) {
+function sameWeightRelaxation(first, second) {
   return first?.kind === second?.kind
     && (
       first?.kind !== "section"
@@ -1734,13 +1734,13 @@ function sameDeformationBypass(first, second) {
     );
 }
 
-function validDeformationBypass() {
-  const bypass = state.deformationBypass;
+function validWeightRelaxation() {
+  const bypass = state.weightRelaxation;
   if (
     bypass?.kind === "section"
     && !resolveSection(guide(), bypass.sectionId)
   ) {
-    state.deformationBypass = null;
+    state.weightRelaxation = null;
     return null;
   }
   return bypass?.kind === "all" || bypass?.kind === "section"
@@ -1748,7 +1748,7 @@ function validDeformationBypass() {
     : null;
 }
 
-function toggleDeformation() {
+function toggleWeightRelaxation() {
   if (!state.videoLoaded) return false;
   if (directManipulationActive()) {
     setStatus("Finish or cancel the active Timeline manipulation before toggling deformation.");
@@ -1758,9 +1758,9 @@ function toggleDeformation() {
   // Playback deliberately continues: X issues no player command, though a
   // dynamic playback may read the new effective map on its next tick.
   settleBeforeAction({ transport: false });
-  const scope = resolvedDeformationBypassScope();
-  const restoring = sameDeformationBypass(validDeformationBypass(), scope);
-  state.deformationBypass = restoring ? null : scope;
+  const scope = resolvedWeightRelaxationScope();
+  const restoring = sameWeightRelaxation(validWeightRelaxation(), scope);
+  state.weightRelaxation = restoring ? null : scope;
   view.invalidateTimelinePins();
   view.renderGuide();
   view.render();
@@ -2627,9 +2627,9 @@ function submitGuideDialog(event) {
     result = deleteGuideSection(state.session, action.id);
     if (
       result.changed
-      && state.deformationBypass?.kind === "section"
-      && state.deformationBypass.sectionId === action.id
-    ) state.deformationBypass = null;
+      && state.weightRelaxation?.kind === "section"
+      && state.weightRelaxation.sectionId === action.id
+    ) state.weightRelaxation = null;
     status = result.changed
       ? wasFocused
         ? "Deleted the focused Section and restored its containing Range."
@@ -2912,7 +2912,7 @@ function resetSourceScopedState() {
   state.guideClickSuppressed = false;
   state.currentDrag = null;
   state.directFrame = null;
-  state.deformationBypass = null;
+  state.weightRelaxation = null;
   state.guideRecovery = null;
   if (state.nudgeGesture?.timer) window.clearTimeout(state.nudgeGesture.timer);
   state.nudgeGesture = null;
@@ -5663,7 +5663,7 @@ elements.retain.addEventListener("click", event => {
   }
   retainCurrentAsPin(event, { useFormLabel: false });
 });
-elements["deformation-toggle"].addEventListener("click", toggleDeformation);
+elements["weight-relaxation-toggle"].addEventListener("click", toggleWeightRelaxation);
 elements["focus-toggle"].addEventListener("click", focusOrUnfocus);
 elements["shift-layer-toggle"].addEventListener("click", () => {
   state.shiftLayers.matrix = !state.shiftLayers.matrix;
@@ -6579,7 +6579,7 @@ document.addEventListener("keydown", event => {
   // complete map when no Section is acquired. Weight itself remains Guide state.
   else if (plain && key === "x") {
     event.preventDefault();
-    toggleDeformation();
+    toggleWeightRelaxation();
   }
   else if (plain && key === "f") {
     event.preventDefault();

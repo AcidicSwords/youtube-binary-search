@@ -152,7 +152,7 @@ assert.deepEqual(
 const sectionBypass = createTimelineProjection({
   duration: 100,
   guide: overlapGuide,
-  deformationBypass: {
+  weightRelaxation: {
     kind: "section",
     sectionId: compressedOverlap.id
   }
@@ -179,7 +179,7 @@ assert.equal(resolveSection(overlapGuide, expandedOverlap.id).weight, 2);
 const wholeBypass = createTimelineProjection({
   duration: 100,
   guide: overlapGuide,
-  deformationBypass: { kind: "all" }
+  weightRelaxation: { kind: "all" }
 });
 assert.deepEqual(wholeBypass.weightedSections, []);
 assert.deepEqual(
@@ -201,9 +201,9 @@ assert.deepEqual(
 const staleBypass = createTimelineProjection({
   duration: 100,
   guide: overlapGuide,
-  deformationBypass: { kind: "section", sectionId: "missing-section" }
+  weightRelaxation: { kind: "section", sectionId: "missing-section" }
 });
-assert.equal(staleBypass.deformationBypass, null);
+assert.equal(staleBypass.weightRelaxation, null);
 assert.deepEqual(staleBypass.segments, overlap.segments);
 
 const coextensiveGuide = createGuide("coextensive");

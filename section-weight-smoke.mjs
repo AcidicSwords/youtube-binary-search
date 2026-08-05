@@ -112,16 +112,16 @@ assert.equal(
   byId.get("duration-time").textContent,
   "1:40 · 0.9× spatial"
 );
-timelineNodes = descendants(byId.get("deformation-field"));
+timelineNodes = descendants(byId.get("topography-layer"));
 const gradient = timelineNodes.find(node =>
-  node.classList.contains("deformation-atmosphere")
+  node.classList.contains("weight-gradient")
   && node.classList.contains("has-compression")
 );
 assert.ok(gradient);
 assert.ok(
-  descendants(byId.get("deformation-field"))
-    .some(node => node.classList.contains("deformation-contours")),
-  "Compression remains legible through projected source contours."
+  descendants(byId.get("topography-layer"))
+    .some(node => node.classList.contains("source-time-grid")),
+  "Compression remains legible through projected source sourceGridLines."
 );
 assert.equal(
   descendants(byId.get("pin-lane")).filter(node => node.dataset.pinGo).length,
@@ -140,12 +140,12 @@ const sectionBypassHistory = byId.get("return-meta").textContent;
 dispatchDocument("keydown", { key: "x", code: "KeyX" });
 await flush();
 assert.equal(byId.get("duration-time").textContent, "1:40");
-assert.equal(byId.get("deformation-toggle")["aria-pressed"], "true");
-assert.equal(byId.get("deformation-toggle-label").textContent, "Restore Section");
+assert.equal(byId.get("weight-relaxation-toggle")["aria-pressed"], "true");
+assert.equal(byId.get("weight-relaxation-toggle-label").textContent, "Restore Section");
 assert.equal(guideWeightControl().value, "0.5",
   "Bypassing a Section never edits its stored Weight.");
-const sectionBypassAtmosphere = descendants(byId.get("deformation-field"))
-  .find(node => node.classList.contains("deformation-atmosphere"));
+const sectionBypassAtmosphere = descendants(byId.get("topography-layer"))
+  .find(node => node.classList.contains("weight-gradient"));
 assert.equal(sectionBypassAtmosphere.classList.contains("has-compression"), false);
 assert.equal(sectionBypassAtmosphere.classList.contains("has-expansion"), false);
 assert.equal(byId.get("return-meta").textContent, sectionBypassHistory,
@@ -287,9 +287,9 @@ assert.equal(
   "1:40 · 1.2× spatial"
 );
 assert.ok(
-  descendants(byId.get("deformation-field"))
+  descendants(byId.get("topography-layer"))
     .some(node =>
-      node.classList.contains("deformation-atmosphere")
+      node.classList.contains("weight-gradient")
       && node.classList.contains("has-expansion")
     )
 );
@@ -558,7 +558,7 @@ dispatchDocument("keydown", { key: "x", code: "KeyX" });
 await flush();
 assert.equal(byId.get("duration-time").textContent, "1:40",
   "With nothing acquired, X straightens the whole Timeline.");
-assert.equal(byId.get("deformation-toggle")["aria-pressed"], "true",
+assert.equal(byId.get("weight-relaxation-toggle")["aria-pressed"], "true",
   "and the auxiliary Operators action states that active scope.");
 dispatchDocument("keydown", { key: "x", code: "KeyX" });
 await flush();

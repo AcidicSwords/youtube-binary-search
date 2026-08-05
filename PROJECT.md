@@ -87,9 +87,9 @@ Every effective factor is positive. Consequently the projection is continuous, s
 
 Weight changes the map allocation of fixed source material. It does not change source duration, identity, or order. Overlapping active Sections compose multiplicatively, so no priority or stored hierarchy is required. `1×` is spatially neutral.
 
-One effective projection compiles Group activity, stored Weight, and the transient deformation bypass. Geometry, Step, Refine, adaptive Reach, drag conversion, hit testing, spatial readouts, atmosphere, contours, and explicitly dynamic playback read that same object. Fixed playback does not read Section Weight.
+One effective projection compiles Group activity, stored Weight, and the transient deformation bypass. Geometry, Step, Refine, adaptive Reach, drag conversion, hit testing, spatial readouts, atmosphere, sourceGridLines, and explicitly dynamic playback read that same object. Fixed playback does not read Section Weight.
 
-The Timeline’s violet/teal atmosphere shows the sign and perceptual strength of compression or expansion. Projected source-time contours show the exact metric consequence. Focus changes only the viewport through which this map is drawn; it does not define a second map.
+The Timeline’s violet/teal atmosphere shows the sign and perceptual strength of compression or expansion. Projected source-time sourceGridLines show the exact metric consequence. Focus changes only the viewport through which this map is drawn; it does not define a second map.
 
 **Toggle Deformation** is a comparison, not an edit. `X` bypasses the acquired Timeline Section’s contribution or, with no Section acquired, all deformation. The retained Weight remains visible and exact. The bypass is transient and source-scoped; it creates no history and no persisted setting.
 

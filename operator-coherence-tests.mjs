@@ -257,7 +257,7 @@ for (const [action, direct] of [
   const projection = createTimelineProjection({
     duration: 100,
     guide,
-    deformationBypass: { kind: "all" }
+    weightRelaxation: { kind: "all" }
   });
   const rawPreview = previewTransition(source, "refineForward");
   const effectivePreview = previewTransition(source, "refineForward", {

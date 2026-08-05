@@ -20,7 +20,7 @@ is a module and ownership map, not a history of earlier designs.
 | `step-field.js` | Tail/Lead players, placement, Field transitions, Breath runtime, Hold, and stale-event rejection |
 | `cues.js` | Parsing offered chapter Addresses into transient candidate extents |
 | `user-time.js` | The append-only encounter ledger: traversal records, the frozen readable stream, read cursors, and Ghost injection |
-| `view.js` | DOM projection, timeline atmosphere and contours, Guide rows, operator labels, and accessible state |
+| `view.js` | DOM projection, timeline atmosphere and sourceGridLines, Guide rows, operator labels, and accessible state |
 | `app.js` | Composition, interaction acquisition, source generations, persistence, transient ownership, and adapter effects |
 
 The pure semantic modules do not read the DOM or issue media commands. The
@@ -112,10 +112,10 @@ increasing, and singly invertible. Overlaps compose by multiplication without
 priority or stored hierarchy.
 
 The projection exposes its effective `segments`, `weightedSections`, and
-resolved `deformationBypass`, together with source/timeline conversion,
+resolved `weightRelaxation`, together with source/timeline conversion,
 distance, midpoint, Step target, Pin-stop ordering, projected extents, and
 `weightAtSource()`. Step, Refine, adaptive Reach, hit testing, drag conversion,
-spatial readouts, exact contours, atmosphere, and explicitly dynamic Playback
+spatial readouts, exact sourceGridLines, atmosphere, and explicitly dynamic Playback
 all consume this same object. No consumer rereads raw Guide Weight to decide
 what counts.
 
@@ -142,7 +142,7 @@ player command, although a dynamic rate policy may read the changed projection
 on a later tick.
 
 Because `view.js` draws atmosphere from `projection.weightedSections`, a whole-
-map bypass yields even contours and no compression/expansion atmosphere while
+map bypass yields even sourceGridLines and no compression/expansion atmosphere while
 stored Section wires and Guide Weight values remain intact. A Section-scoped
 bypass removes only that contributor; overlapping contributors remain.
 

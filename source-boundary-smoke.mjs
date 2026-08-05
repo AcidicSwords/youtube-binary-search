@@ -116,9 +116,9 @@ const sectionBody = descendants(byId.get("section-lane"))
   .find(node => node.dataset.sectionGo);
 assert.ok(sectionBody);
 byId.get("section-lane").dispatch("click", { target: sectionBody });
-byId.get("deformation-toggle").click();
+byId.get("weight-relaxation-toggle").click();
 await flush(2);
-assert.equal(byId.get("deformation-toggle")["aria-pressed"], "true");
+assert.equal(byId.get("weight-relaxation-toggle")["aria-pressed"], "true");
 byId.get("section-lane").dispatch("pointerdown", {
   target: sectionBody,
   clientX: 500,
@@ -137,7 +137,7 @@ await flush(8);
 await poll();
 assert.equal(currentText(), "Current 1:17");
 assert.equal(byId.get("sections-list-count").textContent, "0");
-assert.equal(byId.get("deformation-toggle")["aria-pressed"], "false");
+assert.equal(byId.get("weight-relaxation-toggle")["aria-pressed"], "false");
 
 // Current, Pin and Range direct-manipulation owners are each cancelled before
 // their provisional frames or coordinates can be observed by the next source.

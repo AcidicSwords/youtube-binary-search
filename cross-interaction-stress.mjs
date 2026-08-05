@@ -42,7 +42,7 @@ const drawnPins = () => descendants(byId.get("pin-lane"))
   .filter(node => node.dataset.pinGo || node.dataset.clusterIndex).length;
 const cueMarks = () => descendants(byId.get("cue-lane"))
   .filter(node => node.className === "timeline-cue");
-const deformed = () => descendants(byId.get("deformation-field"))
+const deformed = () => descendants(byId.get("topography-layer"))
   .some(node => String(node.className).includes("has-"));
 const workingWindow = () => byId.get("section-window").textContent;
 const undoLabel = () => byId.get("return-action").textContent;

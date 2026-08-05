@@ -23,24 +23,24 @@ function sectionActsOnSegment(section, start, end) {
     && section.end > start + EPSILON;
 }
 
-function resolvedDeformationBypass(guide, deformationBypass) {
-  if (deformationBypass?.kind === "all") {
+function resolvedWeightRelaxation(guide, weightRelaxation) {
+  if (weightRelaxation?.kind === "all") {
     return Object.freeze({ kind: "all" });
   }
   if (
-    deformationBypass?.kind === "section"
-    && typeof deformationBypass.sectionId === "string"
-    && guide?.sections?.some(section => section.id === deformationBypass.sectionId)
+    weightRelaxation?.kind === "section"
+    && typeof weightRelaxation.sectionId === "string"
+    && guide?.sections?.some(section => section.id === weightRelaxation.sectionId)
   ) {
     return Object.freeze({
       kind: "section",
-      sectionId: deformationBypass.sectionId
+      sectionId: weightRelaxation.sectionId
     });
   }
   return null;
 }
 
-function buildSegments(duration, guide, deformationBypass = null) {
+function buildSegments(duration, guide, weightRelaxation = null) {
   // A Section deforms the map only while its Group is active. Nothing is
   // frozen: an inactive Group simply stops contributing to the density product,
   // so toggling it is exact and instantaneous in both directions.
@@ -48,7 +48,7 @@ function buildSegments(duration, guide, deformationBypass = null) {
   // A deformation bypass changes only the effective projection. Stored Weight
   // remains visible and untouched; every consumer receives this same compiled
   // set instead of independently deciding which Sections count.
-  const bypass = resolvedDeformationBypass(source, deformationBypass);
+  const bypass = resolvedWeightRelaxation(source, weightRelaxation);
   const sections = sortedSections(source)
     .filter(section => bypass?.kind !== "all")
     .filter(section => !(
@@ -107,7 +107,7 @@ function buildSegments(duration, guide, deformationBypass = null) {
     segments: Object.freeze(segments),
     timelineExtent: timeline,
     weightedSections: Object.freeze(sections),
-    deformationBypass: bypass
+    weightRelaxation: bypass
   };
 }
 
@@ -154,15 +154,15 @@ export function createTimelineProjection({
   duration = 0,
   guide = null,
   view = null,
-  deformationBypass = null
+  weightRelaxation = null
 } = {}) {
   const end = Math.max(0, Number(duration) || 0);
   const {
     segments,
     timelineExtent,
     weightedSections,
-    deformationBypass: effectiveDeformationBypass
-  } = buildSegments(end, guide, deformationBypass);
+    weightRelaxation: effectiveWeightRelaxation
+  } = buildSegments(end, guide, weightRelaxation);
 
   function sourceToTimeline(value) {
     const source = clamp(Number(value) || 0, 0, end);
@@ -314,7 +314,7 @@ export function createTimelineProjection({
     withinView,
     segments,
     weightedSections,
-    deformationBypass: effectiveDeformationBypass,
+    weightRelaxation: effectiveWeightRelaxation,
     sourceToTimeline,
     timelineToSource,
     timelineDistance,
@@ -338,6 +338,6 @@ export function projectionForModel(model, options = {}) {
     duration: model?.duration,
     guide: model?.guide,
     view: model?.focus ? model.range : null,
-    deformationBypass: options.deformationBypass ?? null
+    weightRelaxation: options.weightRelaxation ?? null
   });
 }

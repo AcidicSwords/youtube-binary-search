@@ -478,7 +478,7 @@ kbd {
 }
 
 .range-fill,
-.deformation-field,
+.topography-layer,
 .neighborhood-fill,
 .active-span-fill,
 .section-preview-fill,
@@ -499,7 +499,7 @@ kbd {
   );
 }
 
-.deformation-field {
+.topography-layer {
   z-index: 0;
   inset: 0;
   overflow: hidden;
@@ -511,13 +511,13 @@ kbd {
   );
 }
 
-.deformation-atmosphere,
-.deformation-contours {
+.weight-gradient,
+.source-time-grid {
   position: absolute;
   inset: 0;
 }
 
-.deformation-atmosphere {
+.weight-gradient {
   background: linear-gradient(
     90deg,
     transparent,
@@ -527,7 +527,7 @@ kbd {
   filter: saturate(1.04);
 }
 
-.deformation-contours i {
+.source-time-grid i {
   position: absolute;
   inset-block: 0;
   width: 1px;
@@ -1515,7 +1515,7 @@ kbd {
   align-self: center;
 }
 
-.deformation-action {
+.weight-relaxation-action {
   display: grid;
   min-height: 38px;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1527,16 +1527,16 @@ kbd {
   text-align: left;
 }
 
-.deformation-action .action-name {
+.weight-relaxation-action .action-name {
   justify-content: flex-start;
 }
 
-.deformation-action .action-meta {
+.weight-relaxation-action .action-meta {
   max-width: 16ch;
   text-align: right;
 }
 
-.deformation-action[aria-pressed="true"] {
+.weight-relaxation-action[aria-pressed="true"] {
   border-color: rgba(121, 168, 255, 0.84);
   background: rgba(121, 168, 255, 0.14);
   box-shadow: 0 0 0 1px rgba(121, 168, 255, 0.22);

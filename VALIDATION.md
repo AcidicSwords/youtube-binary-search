@@ -48,10 +48,10 @@ The complete gate must prove all of the following.
   round-trips source ↔ Timeline within tolerance.
 - Active overlapping Weight factors compose by multiplication in any insertion
   order. Reciprocal factors cancel over only their shared extent.
-- Section-scoped bypass removes only that Section from geometry, contours,
+- Section-scoped bypass removes only that Section from geometry, sourceGridLines,
   atmosphere, Step, Refine, adaptive Reach, hit testing, and dynamic-rate input.
   Stored Weight and history are unchanged; other overlapping Sections remain.
-- Whole-map bypass produces identity geometry, even contours, and neutral
+- Whole-map bypass produces identity geometry, even sourceGridLines, and neutral
   atmosphere while retained Section wires and Guide values remain visible.
 - Repeating the same `X` scope restores the exact prior projection. Changing
   scope transfers the one active bypass.
@@ -259,7 +259,7 @@ activity.
 ### Journey D — deformation comparison
 
 1. Give a Section a non-neutral Weight and acquire it from Timeline.
-2. Press `X`. Its geometry, exact contours, atmosphere contribution, Step,
+2. Press `X`. Its geometry, exact sourceGridLines, atmosphere contribution, Step,
    Refine, adaptive Reach, and hit testing must all use the straightened relation.
 3. Confirm its Guide Weight remains visible and unchanged and history is
    unchanged. Overlapping weighted Sections must continue contributing.

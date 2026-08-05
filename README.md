@@ -67,9 +67,9 @@ The canonical Section Weight ladder is:
 0.125×  0.25×  0.5×  0.75×  1×  1.25×  1.5×  1.75×  2×  4×
 ```
 
-Overlapping active Sections compose by multiplication. Violet atmosphere indicates compression below `1×`; teal indicates expansion above `1×`; projected source-time contours expose the exact spatial density. The atmosphere is perceptual, while the mapping and contours are metric.
+Overlapping active Sections compose by multiplication. Violet atmosphere indicates compression below `1×`; teal indicates expansion above `1×`; projected source-time sourceGridLines expose the exact spatial density. The atmosphere is perceptual, while the mapping and sourceGridLines are metric.
 
-All spatial consumers share one effective projection: drawing, contours, hit testing, drag conversion, Step, Refine, adaptive Reach, spatial readouts, and the optional dynamic playback policy.
+All spatial consumers share one effective projection: drawing, sourceGridLines, hit testing, drag conversion, Step, Refine, adaptive Reach, spatial readouts, and the optional dynamic playback policy.
 
 `X` is the auxiliary **Toggle Deformation** action in Operators. With an acquired Timeline Section it temporarily bypasses only that Section; otherwise it bypasses the complete map. Press `X` again on the same scope to restore it. The bypass is source-scoped, transient, absent from Undo and persistence, and never changes the stored Weight. Fixed playback receives no command from `X`; dynamic Shift playback may retune on a later transport tick because that policy explicitly reads the effective map.
 

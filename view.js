@@ -294,7 +294,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     // A bypassed map drawn straight while Step still counted stored Weight
     // would put every landing point somewhere other than where it was drawn.
     return projectionForModel(model(), {
-      deformationBypass: state().deformationBypass ?? null
+      weightRelaxation: state().weightRelaxation ?? null
     });
   }
 
@@ -592,7 +592,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     }
   }
 
-  function deformationInfluence(section, coordinate, projection) {
+  function weightInfluence(section, coordinate, projection) {
     const projected = projection.projectExtent(section);
     if (!projected) return 0;
     const midpoint = projection.sourceToTimeline(section.midpoint);
@@ -624,8 +624,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     return dilution * 0.42 * fade * fade * (3 - 2 * fade);
   }
 
-  function renderTimelineDeformation(projection) {
-    const field = elements["deformation-field"];
+  function renderTemporalTopography(projection) {
+    const field = elements["topography-layer"];
     if (!field) return;
     field.replaceChildren();
     // Atmosphere and geometry consume the same compiled contributors. Reading
@@ -633,7 +633,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     // straightened and would make the map contradict itself.
     const sections = projection.weightedSections;
     const atmosphere = document.createElement("span");
-    atmosphere.className = "deformation-atmosphere";
+    atmosphere.className = "weight-gradient";
     const samples = 80;
     const stops = [];
     let compression = false;
@@ -645,7 +645,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         (sum, section) =>
           sum
           + Math.log2(section.weight)
-          * deformationInfluence(section, coordinate, projection),
+          * weightInfluence(section, coordinate, projection),
         0
       );
       const compressed = signedDensity < -EPSILON;
@@ -668,26 +668,26 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     if (expansion) atmosphere.classList.add("has-expansion");
     atmosphere.style.background = `linear-gradient(90deg, ${stops.join(", ")})`;
 
-    const contours = document.createElement("span");
-    contours.className = "deformation-contours";
-    const contourCount = clamp(
+    const sourceGridLines = document.createElement("span");
+    sourceGridLines.className = "source-time-grid";
+    const sourceGridLineCount = clamp(
       Math.round(Math.max(1, elements.timeline.clientWidth || 1) / 13),
       48,
       112
     );
-    // Contours mark equal source increments, so uneven spacing reads directly
+    // SourceGridLines mark equal source increments, so uneven spacing reads directly
     // as compression or expansion. They span whatever source extent is drawn.
-    const contourSpan = projection.viewExtent.end - projection.viewExtent.start;
-    for (let index = 1; index < contourCount; index += 1) {
-      const contour = document.createElement("i");
-      const source = projection.viewExtent.start + contourSpan * index / contourCount;
-      contour.style.left = `${
+    const sourceGridRange = projection.viewExtent.end - projection.viewExtent.start;
+    for (let index = 1; index < sourceGridLineCount; index += 1) {
+      const gridLine = document.createElement("i");
+      const source = projection.viewExtent.start + sourceGridRange * index / sourceGridLineCount;
+      gridLine.style.left = `${
         clamp(projection.coordinateToFraction(projection.sourceToTimeline(source)), 0, 1)
         * 100
       }%`;
-      contours.appendChild(contour);
+      sourceGridLines.appendChild(gridLine);
     }
-    field.append(atmosphere, contours);
+    field.append(atmosphere, sourceGridLines);
   }
 
   // Cues drawn on the map, and nothing more than drawn. A Cue is a candidate
@@ -736,7 +736,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     if (!sectionLane) return;
     sectionLane.replaceChildren();
     renderTimelineRuler(projection);
-    renderTimelineDeformation(projection);
+    renderTemporalTopography(projection);
     const timelineWidth = Math.max(1, elements.timeline.clientWidth || 1);
 
     const entries = sortedSections(guide())
@@ -2003,31 +2003,31 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       control.disabled = false;
     }
 
-    const bypass = projection.deformationBypass;
-    const deformationTarget = selectedForPreview;
-    const deformationScopeKind = deformationTarget ? "section" : "all";
-    const deformationScopeActive = deformationTarget
-      ? bypass?.kind === "section" && bypass.sectionId === deformationTarget.id
+    const bypass = projection.weightRelaxation;
+    const weightRelaxationTarget = selectedForPreview;
+    const weightRelaxationScopeKind = weightRelaxationTarget ? "section" : "all";
+    const weightRelaxationScopeActive = weightRelaxationTarget
+      ? bypass?.kind === "section" && bypass.sectionId === weightRelaxationTarget.id
       : bypass?.kind === "all";
-    const deformationLabel = deformationScopeActive
-      ? deformationTarget ? "Restore Section" : "Restore Timeline"
-      : deformationTarget ? "Straighten Section" : "Straighten Timeline";
-    const deformationMeta = deformationTarget
-      ? sectionDisplayName(deformationTarget)
+    const weightRelaxationLabel = weightRelaxationScopeActive
+      ? weightRelaxationTarget ? "Restore Section" : "Restore Timeline"
+      : weightRelaxationTarget ? "Straighten Section" : "Straighten Timeline";
+    const weightRelaxationMeta = weightRelaxationTarget
+      ? sectionDisplayName(weightRelaxationTarget)
       : "Complete map";
-    if (elements["deformation-toggle"]) {
-      elements["deformation-toggle"].setAttribute(
+    if (elements["weight-relaxation-toggle"]) {
+      elements["weight-relaxation-toggle"].setAttribute(
         "aria-pressed",
-        String(deformationScopeActive)
+        String(weightRelaxationScopeActive)
       );
-      elements["deformation-toggle"].setAttribute(
+      elements["weight-relaxation-toggle"].setAttribute(
         "aria-label",
-        `${deformationLabel}: ${deformationMeta}`
+        `${weightRelaxationLabel}: ${weightRelaxationMeta}`
       );
-      elements["deformation-toggle"].dataset.scope = deformationScopeKind;
-      elements["deformation-toggle"].dataset.activeScope = bypass?.kind || "none";
-      elements["deformation-toggle-label"].textContent = deformationLabel;
-      elements["deformation-toggle-meta"].textContent = deformationMeta;
+      elements["weight-relaxation-toggle"].dataset.scope = weightRelaxationScopeKind;
+      elements["weight-relaxation-toggle"].dataset.activeScope = bypass?.kind || "none";
+      elements["weight-relaxation-toggle-label"].textContent = weightRelaxationLabel;
+      elements["weight-relaxation-toggle-meta"].textContent = weightRelaxationMeta;
     }
     elements["shift-layer-toggle"].setAttribute("aria-pressed", String(shiftLayer));
     elements["shift-layer-state"].textContent = shiftLayer ? "On" : "Off";
@@ -2108,7 +2108,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "go-range-end", "range-end-here", "full-video-range",
       "field-inner-offset", "field-outer-offset", "field-breath-rate",
       "nudge-seconds", "context-seconds", "playback-rate", "playback-dynamic",
-      "deformation-toggle",
+      "weight-relaxation-toggle",
       "section-source", "section-label", "pin-label",
       "cue-source", "cue-parse", "cue-clear"
     ]) {

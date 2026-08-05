@@ -232,23 +232,23 @@ lacks(appCode, /key\s*===\s*"p"|code\s*===\s*"KeyP"/,
 
 // X is one transient auxiliary bypass, never a Weight edit or a tenth operator.
 const deckIndex = html.indexOf('class="navigation-deck"');
-const bypassIndex = html.indexOf('id="deformation-toggle"');
+const bypassIndex = html.indexOf('id="weight-relaxation-toggle"');
 const historyIndex = html.indexOf('class="history-actions"');
 check(deckIndex >= 0 && deckIndex < bypassIndex && bypassIndex < historyIndex,
   "Toggle Deformation is outside the matrix and before history inside Operators.");
-has(html, /id="deformation-toggle"[^>]*aria-pressed="false"/,
+has(html, /id="weight-relaxation-toggle"[^>]*aria-pressed="false"/,
   "The auxiliary pointer route exposes resolved pressed state.");
-has(html, /id="deformation-toggle"[^>]*aria-keyshortcuts="X"/,
+has(html, /id="weight-relaxation-toggle"[^>]*aria-keyshortcuts="X"/,
   "The auxiliary pointer route exposes X and resolved pressed state.");
 lacks(html, /timeline-normalize|>\s*Normalize\s*</i,
   "Timeline has no Normalize control or product label.");
 lacks(styles, /\.timeline-normalize\b/, "Dead Timeline Normalize CSS is absent.");
-has(appCode, /deformationBypass:\s*null/, "Composition state explicitly owns deformationBypass.");
+has(appCode, /weightRelaxation:\s*null/, "Composition state explicitly owns weightRelaxation.");
 lacks(appCode, /state\.normalize\b|toggleNormalize\b/, "No parallel normalize state or operation remains.");
-has(appCode, /plain && key === "x"[\s\S]{0,120}?toggleDeformation\(\)/,
+has(appCode, /plain && key === "x"[\s\S]{0,120}?toggleWeightRelaxation\(\)/,
   "Plain X reaches the same Toggle Deformation consequence as the button.");
-const toggleDeformation = topLevelFunction(appCode, "toggleDeformation");
-has(toggleDeformation, /directManipulationActive\(\)/,
+const toggleWeightRelaxation = topLevelFunction(appCode, "toggleWeightRelaxation");
+has(toggleWeightRelaxation, /directManipulationActive\(\)/,
   "X refuses a projection change during direct manipulation.");
 // One predicate answers "is a gesture in progress", so no caller can name a
 // subset of the drags by hand and quietly omit one.
@@ -257,17 +257,17 @@ has(manipulation, /state\.dragHandle \|\| state\.guideDrag \|\| state\.currentDr
   "A gesture in progress is every drag, named once.");
 has(topLevelFunction(appCode, "commitNativeGo"), /directManipulationActive\(\)/,
   "The player's own placement is never read back as a native seek mid-gesture.");
-has(toggleDeformation, /settleBeforeAction\(\{ transport: false \}\)/,
+has(toggleWeightRelaxation, /settleBeforeAction\(\{ transport: false \}\)/,
   "X settles pending spatial transactions without stopping playback.");
-has(toggleDeformation, /restoring \? null : scope/,
+has(toggleWeightRelaxation, /restoring \? null : scope/,
   "The same scope restores and another scope transfers the one bypass.");
-lacks(toggleDeformation, /checkpoint|persist|accept\(|player\.(?:pause|play|setRate|place)/,
+lacks(toggleWeightRelaxation, /checkpoint|persist|accept\(|player\.(?:pause|play|setRate|place)/,
   "X creates no history/persistence entry and issues no direct player command.");
-has(topLevelFunction(appCode, "resolvedDeformationBypassScope"), /state\.timelineSelection[\s\S]*?kind === "section"/,
+has(topLevelFunction(appCode, "resolvedWeightRelaxationScope"), /state\.timelineSelection[\s\S]*?kind === "section"/,
   "Only an acquired Timeline Section scopes X.");
-has(appCode, /deleteGuideSection[\s\S]{0,320}?state\.deformationBypass[\s\S]{0,160}?= null/,
+has(appCode, /deleteGuideSection[\s\S]{0,320}?state\.weightRelaxation[\s\S]{0,160}?= null/,
   "Deleting the bypass target clears it.");
-has(topLevelFunction(appCode, "resetSourceScopedState"), /state\.deformationBypass = null/,
+has(topLevelFunction(appCode, "resetSourceScopedState"), /state\.weightRelaxation = null/,
   "Source replacement clears the bypass.");
 lacks(session, /export function deformSection|DEFAULT_DEFORM_WEIGHT|applyDeformWeight/,
   "The dead Deform Session surface is removed.");
@@ -288,12 +288,12 @@ lacks(session, /export function deformSection|DEFAULT_DEFORM_WEIGHT|applyDeformW
   const sectionBypass = createTimelineProjection({
     duration: 10,
     guide,
-    deformationBypass: { kind: "section", sectionId: expanded.id }
+    weightRelaxation: { kind: "section", sectionId: expanded.id }
   });
   const allBypass = createTimelineProjection({
     duration: 10,
     guide,
-    deformationBypass: { kind: "all" }
+    weightRelaxation: { kind: "all" }
   });
   check(weighted.weightAtSource(3) === 2, "Stored active Weight deforms the effective map.");
   check(sectionBypass.weightAtSource(3) === 1, "A Section bypass removes only its target.");
@@ -309,10 +309,10 @@ lacks(session, /export function deformSection|DEFAULT_DEFORM_WEIGHT|applyDeformW
       `Weighted projection remains singly invertible at ${source}.`);
   }
 }
-const deformationRenderer = topLevelFunction(view, "renderTimelineDeformation");
-has(deformationRenderer, /projection\.weightedSections/,
-  "Atmosphere and contours consume effective projection contributors.");
-lacks(deformationRenderer, /sortedSections\(|guide\(\)\.sections|state\(\)\.session\.model\.guide/,
+const topographyRenderer = topLevelFunction(view, "renderTemporalTopography");
+has(topographyRenderer, /projection\.weightedSections/,
+  "Atmosphere and sourceGridLines consume effective projection contributors.");
+lacks(topographyRenderer, /sortedSections\(|guide\(\)\.sections|state\(\)\.session\.model\.guide/,
   "Atmosphere does not reread raw stored Guide weights.");
 for (const api of ["localRefine", "refine", "step", "stepToPin", "switchActiveEnd"]) {
   has(session, new RegExp(`export function ${api}\\([^)]*options = \\{\\}`),
@@ -323,7 +323,7 @@ check(
   (previewTransition.match(/projection:\s*options\.projection/g) || []).length === 9,
   "Every projection-aware operator preview forwards the effective projection used by commit."
 );
-has(appCode, /function timelineProjection\(\)[\s\S]*?deformationBypass:\s*validDeformationBypass\(\)/,
+has(appCode, /function timelineProjection\(\)[\s\S]*?weightRelaxation:\s*validWeightRelaxation\(\)/,
   "The composition root creates one bypass-aware projection.");
 has(topLevelFunction(appCode, "commitNativeGo"), /projection:\s*timelineProjection\(\)/,
   "A paused native seek reconciles through the effective projection.");
@@ -336,7 +336,7 @@ has(topLevelFunction(appCode, "handleTimelineClick"), /state\.timelineSelection 
 const release = topLevelFunction(appCode, "releaseActiveSpan");
 has(release, /releaseSessionInterval\(state\.session\)/, "Release delegates semantic residue to Session.");
 has(release, /state\.timelineSelection = null/, "Release also clears the Timeline operand.");
-lacks(release, /guideSelection\s*=\s*null|deformationBypass\s*=|focus\s*=|setRange/,
+lacks(release, /guideSelection\s*=\s*null|weightRelaxation\s*=|focus\s*=|setRange/,
   "Release does not mutate Guide focus, bypass, Focus, or Range.");
 
 // Playback owns observation, requested policy, and confirmed adapter rate as

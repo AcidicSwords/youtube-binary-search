@@ -214,7 +214,7 @@ The same projection supplies:
 - Range-handle and retained-object spatial movement;
 - section and Pin placement;
 - spatial readouts;
-- exact source-time contours;
+- exact source-time sourceGridLines;
 - deformation atmosphere contributors;
 - optional Dynamic Playback Weight.
 
@@ -225,7 +225,7 @@ An operation or drag captures the projection it begins with. Its geometry cannot
 The only transient bypass state is:
 
 ```ts
-type DeformationBypass =
+type WeightRelaxation =
   | null
   | { kind: "all" }
   | { kind: "section"; sectionId: string };
@@ -245,7 +245,7 @@ The bypass is source-scoped. Source replacement clears it. Deleting its target c
 
 An active Current, Range, Pin, or Section drag causes `X` to refuse safely. Pending Step and Nudge settle before the projection changes. Active playback continues. `X` issues no direct media command; an explicitly dynamic playback may request a new rate later because its policy reads the changed effective projection.
 
-### 4.5 Atmosphere and contours
+### 4.5 Atmosphere and sourceGridLines
 
 The deformation atmosphere is derived only from `projection.weightedSections` or an equivalent effective-contributor output. It never rereads raw active Guide weights independently.
 
@@ -253,9 +253,9 @@ The deformation atmosphere is derived only from `projection.weightedSections` or
 - Weight above `1×` contributes teal expansion influence.
 - Hue states sign; log-magnitude states peak strength; source span diffuses the influence; each contribution fades beyond its bounds.
 - Overlap composes in log space, matching multiplicative geometry.
-- Contours begin at uniform source increments and are projected through the exact map. Their screen spacing is metric evidence.
+- SourceGridLines begin at uniform source increments and are projected through the exact map. Their screen spacing is metric evidence.
 
-With complete-map bypass, segments are identity, contours are evenly spaced, no compression or expansion class is present, and no colored atmosphere remains. Stored Section wires and Guide Weight values remain visible and unchanged. With a Section bypass, only that contribution disappears; overlapping effective Sections remain.
+With complete-map bypass, segments are identity, sourceGridLines are evenly spaced, no compression or expansion class is present, and no colored atmosphere remains. Stored Section wires and Guide Weight values remain visible and unchanged. With a Section bypass, only that contribution disappears; overlapping effective Sections remain.
 
 ## 5. Operator grammar
 

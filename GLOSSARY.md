@@ -10,14 +10,14 @@
 - **Active Span** — the positive contiguous residue left after alternatives have been excluded from Range. It stores bounds, orientation, and endpoint frames, not a persistent path.
 - **Endpoint Frame** — the Resolution and basis associated with one side of a Active Span, restored by Switch End.
 - **Timeline Space** — the positive, continuous, strictly increasing spatial coordinate derived from Source Time and effective Section factors.
-- **Temporal Topography** — the source projected into navigable Timeline Space, including its contours, retained landmarks, and relation wires.
+- **Temporal Topography** — the source projected into navigable Timeline Space, including its sourceGridLines, retained landmarks, and relation wires.
 - **Density** — the product of effective covering Section weights at a source segment; integrating it produces Timeline Space.
 - **Effective Projection** — the single immutable source↔Timeline mapping for one render or operation after Group activity, Weight, and the current deformation bypass have been resolved.
 - **Spatial midpoint** — the source Address halfway between two endpoints in Timeline Space. It need not equal their arithmetic source-time midpoint.
 - **Stretch factor** — a Timeline extent reported relative to the source span it allocates. At `1×`, Timeline and source extent correspond.
 - **Viewport** — the source extent drawn across the Timeline. Focus changes the viewport; operators still consume the same effective projection.
 - **Weight** — one Section’s positive map-scale factor. It changes Timeline density, not source duration. Fixed playback ignores it; optional Dynamic Playback explicitly reads its effective composite.
-- **Deformation Atmosphere** — the perceptual violet/teal field derived from effective contributors. It communicates compression or expansion while contours communicate exact metric density.
+- **Deformation Atmosphere** — the perceptual violet/teal field derived from effective contributors. It communicates compression or expansion while sourceGridLines communicate exact metric density.
 - **Deformation Bypass / Toggle Deformation** — one transient, source-scoped comparison selected with `X`. It bypasses the acquired Timeline Section or, without one, the complete map; it changes no stored Weight and creates no history.
 - **Acquired Timeline Operand** — the exact visible Pin or Section selected from the Timeline for spatial actions. Bare Timeline ground and Release clear it.
 - **Guide Focus** — the Pin or Section being inspected in Guide. It remains distinct from an acquired Timeline operand and does not by itself scope Toggle Deformation.

@@ -108,8 +108,8 @@ bounded Section relationship tree
 ```
 
 Equal source intervals are not necessarily equal Timeline distances. Exact
-source-time contours reveal that difference: closer contours indicate
-compression, wider contours expansion. A continuous violet/teal atmosphere is
+source-time sourceGridLines reveal that difference: closer sourceGridLines indicate
+compression, wider sourceGridLines expansion. A continuous violet/teal atmosphere is
 centered on each effective Section, strengthens with signed Weight magnitude,
 diffuses over broader extents, and fades past Section bounds. Neutral `1×`
 contributes no atmosphere.
@@ -126,7 +126,7 @@ and neither has to be read off the other.
 The main layers remain distinct without relying on colour alone:
 
 - Range is the admissible ground;
-- Resolution is a quiet local contour;
+- Resolution is a quiet local gridLine;
 - Active Span is the surviving directional relation;
 - Current is the semantic Address and carries its own label;
 - Cursor appears only when physical observation has left Current;
@@ -247,7 +247,7 @@ Its contextual label is `Straighten Section`, `Restore Section`, `Straighten
 Timeline`, or `Restore Timeline`, with the exact scope shown beside it.
 
 An acquired Timeline Section scopes the action to that Section. With no acquired
-Section, it scopes the complete map. It changes geometry, contours, atmosphere,
+Section, it scopes the complete map. It changes geometry, sourceGridLines, atmosphere,
 Step, Refine, adaptive Reach, hit testing, and explicitly dynamic Playback
 together, while the stored Weight display remains unchanged. It creates no
 history entry and sends no direct player command.
