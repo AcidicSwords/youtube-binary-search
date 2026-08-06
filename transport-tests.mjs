@@ -13,6 +13,7 @@ import {
   deriveContextWindow,
   createContextTransport,
   createPlaybackTransport,
+  derivePlaybackPolicy,
   isProperRange,
   isTransportActive,
   playbackAllowsPanorama,
@@ -22,6 +23,7 @@ import {
   retryPlaybackTransport,
   transportPanoramaRange,
   withPlaybackActualRate,
+  withDerivedPlaybackPolicy,
   withPlaybackRatePolicy,
   withPlaybackRequestedRate,
   withTransportPhase
@@ -70,6 +72,7 @@ assert.equal(playback.observationPolicy, OBSERVATION_POLICY.PANORAMA);
 assert.deepEqual(playback.ratePolicy, fixedRatePolicy(1));
 assert.equal(playback.requestedRate, 1);
 assert.equal(playback.actualRate, 1);
+assert.equal(playback.shiftPlayback, false);
 assert.equal(Object.hasOwn(TRANSPORT_KIND, "LOOP"), false);
 assert.equal(isTransportActive(idle), false);
 assert.equal(isTransportActive(context), true);
@@ -236,6 +239,98 @@ const LADDER = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
   assert.equal(playbackAllowsPanorama(withPlaybackActualRate(nativeChanged, 1)), true);
   assert.equal(withPlaybackActualRate(nativeChanged, 0), nativeChanged,
     "Invalid adapter events cannot corrupt actual-rate authority.");
+}
+
+// One pure policy relation owns every active Shift reconfiguration. The
+// transition changes observation and rate together while actual-rate evidence
+// alone decides whether Panorama can run.
+{
+  const fixed = derivePlaybackPolicy({
+    shiftPlayback: true,
+    texturedEnabled: false,
+    fixedRateWish: 2,
+    effectiveWeight: 4,
+    offeredRates: LADDER,
+    actualRate: 1
+  });
+  assert.deepEqual(fixed.ratePolicy, fixedRatePolicy(2));
+  assert.equal(fixed.observationPolicy, OBSERVATION_POLICY.CENTER_ONLY);
+  assert.equal(fixed.requestedRate, 2);
+  assert.equal(fixed.panoramaEligibility, false);
+
+  const textured = derivePlaybackPolicy({
+    shiftPlayback: true,
+    texturedEnabled: true,
+    fixedRateWish: 2,
+    effectiveWeight: 4,
+    offeredRates: LADDER,
+    actualRate: 1
+  });
+  assert.deepEqual(textured.ratePolicy, texturedRatePolicy());
+  assert.equal(textured.observationPolicy, OBSERVATION_POLICY.PANORAMA);
+  assert.equal(textured.requestedRate, 0.5);
+  assert.equal(textured.panoramaEligibility, true);
+
+  const unsupportedEdge = derivePlaybackPolicy({
+    shiftPlayback: true,
+    texturedEnabled: true,
+    effectiveWeight: 8,
+    offeredRates: LADDER,
+    actualRate: 0.25
+  });
+  assert.equal(unsupportedEdge.requestedRate, 0.25);
+  assert.equal(unsupportedEdge.panoramaEligibility, false,
+    "A requested edge becomes ineligible only when the adapter confirms it.");
+
+  const delayedEdge = derivePlaybackPolicy({
+    shiftPlayback: true,
+    texturedEnabled: true,
+    effectiveWeight: 8,
+    offeredRates: LADDER,
+    actualRate: 1
+  });
+  assert.equal(delayedEdge.requestedRate, 0.25);
+  assert.equal(delayedEdge.panoramaEligibility, true,
+    "A request cannot impersonate actual-rate evidence.");
+
+  const narrowedOffer = derivePlaybackPolicy({
+    shiftPlayback: true,
+    texturedEnabled: true,
+    effectiveWeight: 1,
+    offeredRates: [0.5, 1, 1.5],
+    actualRate: 1
+  });
+  assert.equal(narrowedOffer.panoramaEligibility, false,
+    "A known ladder missing either adjacent rate cannot sustain Panorama.");
+
+  const active = createPlaybackTransport({
+    departure: 20,
+    shiftPlayback: true,
+    observationPolicy: OBSERVATION_POLICY.CENTER_ONLY,
+    ratePolicy: fixedRatePolicy(2),
+    offeredRates: LADDER,
+    actualRate: 1
+  });
+  const activePlaying = withTransportPhase(active, "playing");
+  const reconfigured = withDerivedPlaybackPolicy(activePlaying, {
+    shiftPlayback: activePlaying.shiftPlayback,
+    texturedEnabled: true,
+    fixedRateWish: 2,
+    effectiveWeight: 4,
+    offeredRates: LADDER,
+    actualRate: activePlaying.actualRate
+  });
+  assert.equal(reconfigured.phase, "playing");
+  assert.equal(reconfigured.startedAt, activePlaying.startedAt);
+  assert.equal(reconfigured.departure, activePlaying.departure);
+  assert.equal(reconfigured.entry, activePlaying.entry);
+  assert.equal(reconfigured.cycles, activePlaying.cycles);
+  assert.equal(reconfigured.retries, activePlaying.retries);
+  assert.equal(reconfigured.enteredPath, activePlaying.enteredPath);
+  assert.equal(reconfigured.shiftPlayback, true);
+  assert.equal(reconfigured.observationPolicy, OBSERVATION_POLICY.PANORAMA);
+  assert.equal(reconfigured.ratePolicy.kind, RATE_POLICY_KIND.TEXTURED);
+  assert.equal(reconfigured.requestedRate, 0.5);
 }
 
 // Fixed wishes survive a provisional [1x] offer and can be resolved again when

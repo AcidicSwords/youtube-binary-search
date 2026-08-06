@@ -97,13 +97,14 @@ import {
   isProperRange,
   createContextTransport,
   createPlaybackTransport,
+  derivePlaybackPolicy,
   fixedRatePolicy,
   texturedRatePolicy,
   resolveOfferedRate,
   resolvePlaybackRate,
   withPlaybackRequestedRate,
   withPlaybackActualRate,
-  withPlaybackRatePolicy,
+  withDerivedPlaybackPolicy,
   retryPlaybackTransport,
   playbackAllowsPanorama,
   rebasePlaybackTransport,
@@ -1764,12 +1765,13 @@ function toggleWeightRelaxation() {
     return false;
   }
   // Pending spatial gestures must become exact before their projection changes.
-  // Playback deliberately continues: X issues no player command, though a
-  // Textured Playback may read the new effective map on its next tick.
+  // Playback deliberately continues; a Textured Shift transaction atomically
+  // reads the new Effective Weight immediately.
   settleBeforeAction({ transport: false });
   const scope = resolvedWeightRelaxationScope();
   const restoring = sameWeightRelaxation(validWeightRelaxation(), scope);
   state.weightRelaxation = restoring ? null : scope;
+  applyActiveShiftPlaybackPolicy({ reason: "weight-relaxation" });
   view.invalidateTimelinePins();
   view.renderGuide();
   view.render();
@@ -2060,7 +2062,8 @@ function startPanoramaPlaybackFromGesture(options = {}) {
     ratePolicy,
     offeredRates: offeredRates(),
     weight: timelineProjection().effectiveWeightAtSource(destination),
-    actualRate: snapshot.rate
+    actualRate: snapshot.rate,
+    shiftPlayback: shifted
   });
   // Tail and Lead hold their offset from Center by sitting one rate rung either
   // side of it, so the Panorama accompanies any Center rate the adapter can
@@ -2253,6 +2256,7 @@ function changeSectionWeighting(sectionId, weight) {
       ? `Restored “${name}” to ordinary timeline density.`
       : `Set “${name}” to ${next.weighting}× timeline weight.`
   });
+  applyActiveShiftPlaybackPolicy({ reason: "section-weighting" });
   return true;
 }
 
@@ -3197,16 +3201,72 @@ function handlePlaybackRateChange(rate) {
   }
   const panoramaWasAvailable = playbackAllowsPanorama(state.transport, { offeredRates: offeredRates() });
   state.transport = withPlaybackActualRate(state.transport, rate);
-  const panoramaIsAvailable = playbackAllowsPanorama(state.transport, { offeredRates: offeredRates() });
+  if (state.transport.shiftPlayback) {
+    applyActiveShiftPlaybackPolicy({
+      issueRate: false,
+      panoramaWasAvailable,
+      reason: "confirmed-playback-rate"
+    });
+    view.render();
+    return;
+  }
+  reconcilePlaybackPanorama(panoramaWasAvailable, "confirmed-playback-rate");
+  view.render();
+}
+
+function reconcilePlaybackPanorama(panoramaWasAvailable, reason) {
+  if (!transportIs(TRANSPORT_KIND.PLAYBACK)) return;
+  const panoramaIsAvailable = playbackAllowsPanorama(
+    state.transport,
+    { offeredRates: offeredRates() }
+  );
   const center = clamp(safeCurrentTime(), activeRange().start, activeRange().end);
-  // Actual-rate events own the compatibility transition, but repeated
-  // confirmations of the same compatibility state own no second Panorama command.
   if (panoramaIsAvailable && !panoramaWasAvailable) {
-    panorama?.resumeAt?.({ center, reason: "confirmed-playback-rate" });
+    panorama?.resumeAt?.({ center, reason });
   } else if (!panoramaIsAvailable && panoramaWasAvailable) {
     panorama?.pause({ center, freeze: false });
   }
-  view.render();
+}
+
+// Reconfigure one live Shift Playback without settling, rebasing, or replacing
+// its transaction. Observation policy, rate policy, and requested rate are one
+// atomic pure result; actual-rate evidence then owns the Panorama edge.
+function applyActiveShiftPlaybackPolicy({
+  issueRate = true,
+  panoramaWasAvailable = null,
+  reason = "playback-policy"
+} = {}) {
+  if (
+    !transportIs(TRANSPORT_KIND.PLAYBACK)
+    || state.transport.shiftPlayback !== true
+  ) return false;
+
+  const priorEligibility = panoramaWasAvailable ?? playbackAllowsPanorama(
+    state.transport,
+    { offeredRates: offeredRates() }
+  );
+  const previousRequestedRate = state.transport.requestedRate;
+  const policyInputs = {
+    shiftPlayback: true,
+    texturedEnabled: state.texturedPlaybackEnabled === true,
+    fixedRateWish: state.playbackRate,
+    effectiveWeight: timelineProjection().effectiveWeightAtSource(safeCurrentTime()),
+    offeredRates: offeredRates(),
+    actualRate: state.transport.actualRate
+  };
+  const policy = derivePlaybackPolicy(policyInputs);
+  state.transport = withDerivedPlaybackPolicy(state.transport, policyInputs);
+
+  if (issueRate && state.transport.requestedRate !== previousRequestedRate) {
+    player.setRate(state.transport.requestedRate);
+  }
+  const center = clamp(safeCurrentTime(), activeRange().start, activeRange().end);
+  if (policy.panoramaEligibility && !priorEligibility) {
+    panorama?.resumeAt?.({ center, reason });
+  } else if (!policy.panoramaEligibility && priorEligibility) {
+    panorama?.pause({ center, freeze: false });
+  }
+  return true;
 }
 
 function handleAutoplayBlocked() {
@@ -3246,20 +3306,19 @@ function pollPlayer() {
   // is not the same as unsupported -- the same rule the Panorama already follows.
   const offered = playerSnapshot().availableRates;
   if (offered.join(",") !== (state.availableRates || []).join(",")) {
+    const panoramaWasAvailable = transportIs(TRANSPORT_KIND.PLAYBACK)
+      ? playbackAllowsPanorama(state.transport, { offeredRates: offeredRates() })
+      : false;
     state.availableRates = offered;
     renderPlaybackRateChoices();
-    if (
-      transportIs(TRANSPORT_KIND.PLAYBACK)
-      && state.transport.observationPolicy === OBSERVATION_POLICY.CENTER_ONLY
-      && state.transport.ratePolicy?.kind === RATE_POLICY_KIND.FIXED
-    ) {
-      const desired = resolvePlaybackRate(state.transport, {
-        offeredRates: offeredRates(),
-        weight: timelineProjection().effectiveWeightAtSource(safeCurrentTime())
-      });
-      if (desired !== state.transport.requestedRate) {
-        state.transport = withPlaybackRequestedRate(state.transport, desired);
-        player.setRate(desired);
+    if (transportIs(TRANSPORT_KIND.PLAYBACK)) {
+      if (state.transport.shiftPlayback) {
+        applyActiveShiftPlaybackPolicy({
+          panoramaWasAvailable,
+          reason: "playback-rate-offer"
+        });
+      } else {
+        reconcilePlaybackPanorama(panoramaWasAvailable, "playback-rate-offer");
       }
     }
   }
@@ -3267,23 +3326,18 @@ function pollPlayer() {
   let transport = state.transport;
   const programmaticPlacementActive = programmaticPlacementOwns(now);
 
-  // A Textured Playback reads its rate off the map it is crossing, so the rate
-  // is re-derived from the Address actually being watched. Only a bucket change
-  // reaches the player: the ladder is coarse on purpose, and asking for a rate
-  // it already has would be a command per poll.
+  // A Textured Shift Playback reads its rate off the map it is crossing. The
+  // complete policy is re-derived even when only Effective Weight changed, so
+  // no event path can partially update a running transaction.
   if (
     transport.kind === TRANSPORT_KIND.PLAYBACK
+    && transport.shiftPlayback === true
     && transport.ratePolicy?.kind === RATE_POLICY_KIND.TEXTURED
   ) {
-    const desired = resolvePlaybackRate(transport, {
-      offeredRates: offeredRates(),
-      weight: timelineProjection().effectiveWeightAtSource(now)
+    applyActiveShiftPlaybackPolicy({
+      reason: "effective-weight"
     });
-    if (desired !== transport.requestedRate) {
-      state.transport = withPlaybackRequestedRate(transport, desired);
-      transport = state.transport;
-      player.setRate(desired);
-    }
+    transport = state.transport;
   }
 
   if (
@@ -5800,33 +5854,11 @@ function renderPlaybackRateChoices() {
       : `${formatRate(state.playbackRate)} wish · ${formatRate(effectivePlaybackRate())} offered`;
 }
 
-function retuneActiveShiftPlayback() {
-  if (
-    !transportIs(TRANSPORT_KIND.PLAYBACK)
-    || state.transport.observationPolicy !== OBSERVATION_POLICY.CENTER_ONLY
-  ) return false;
-  const previousRate = state.transport.requestedRate;
-  state.transport = withPlaybackRatePolicy(
-    state.transport,
-    state.texturedPlaybackEnabled
-      ? texturedRatePolicy()
-      : fixedRatePolicy(state.playbackRate),
-    {
-      offeredRates: offeredRates(),
-      weight: timelineProjection().effectiveWeightAtSource(safeCurrentTime())
-    }
-  );
-  if (state.transport.requestedRate !== previousRate) {
-    player.setRate(state.transport.requestedRate);
-  }
-  return true;
-}
-
 elements["playback-dynamic"].addEventListener("change", event => {
   state.texturedPlaybackEnabled = event.target.checked === true;
   persistPreferences();
   renderPlaybackRateChoices();
-  retuneActiveShiftPlayback();
+  applyActiveShiftPlaybackPolicy({ reason: "textured-playback-toggle" });
   setStatus(state.texturedPlaybackEnabled
     ? "Shift plays Center at a rate that follows Section weight."
     : `Shift plays Center at ${formatRate(effectivePlaybackRate())}.`);
@@ -5837,7 +5869,7 @@ elements["playback-rate"].addEventListener("change", event => {
   state.playbackRate = normalizePlaybackRate(event.target.value, state.playbackRate);
   persistPreferences();
   renderPlaybackRateChoices();
-  retuneActiveShiftPlayback();
+  applyActiveShiftPlaybackPolicy({ reason: "fixed-rate-wish" });
   setStatus(`Shift plays Center at ${formatRate(effectivePlaybackRate())}.`);
   view.render();
 });

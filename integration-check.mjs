@@ -14,6 +14,7 @@ import {
 import {
   OBSERVATION_POLICY,
   createPlaybackTransport,
+  derivePlaybackPolicy,
   texturedRateForWeight,
   resolveTexturedRate,
   panoramaTriplet,
@@ -394,12 +395,27 @@ lacks(release, /guideSelection\s*=\s*null|weightRelaxation\s*=|focus\s*=|setRang
     same(continued.ratePolicy, dynamic.ratePolicy, "Retry/wrap preserves rate policy.");
     check(continued.actualRate === dynamic.actualRate, "Retry/wrap preserves confirmed actual rate.");
   }
+  const activeTextured = derivePlaybackPolicy({
+    shiftPlayback: true,
+    texturedEnabled: true,
+    fixedRateWish: 2,
+    effectiveWeight: 4,
+    offeredRates: LADDER,
+    actualRate: 1
+  });
+  check(activeTextured.observationPolicy === OBSERVATION_POLICY.PANORAMA,
+    "Textured Shift Playback atomically restores Panorama observation.");
+  same(activeTextured.ratePolicy, texturedRatePolicy(),
+    "The same derivation installs Textured rate policy.");
+  check(activeTextured.requestedRate === 0.5 && activeTextured.panoramaEligibility,
+    "Requested rate and confirmed Panorama eligibility come from that one result.");
 }
 for (const symbol of [
   "OBSERVATION_POLICY",
   "RATE_POLICY_KIND",
   "requestedRate",
   "actualRate",
+  "derivePlaybackPolicy",
   "resolveOfferedRate",
   "texturedRateForWeight",
   "resolveTexturedRate",
@@ -437,8 +453,12 @@ has(topLevelFunction(appCode, "wrapPlaybackRange"), /rebasePlaybackTransport[\s\
   "Proper-Range wrap rebases and rederives the active policy.");
 has(appCode, /retryPlaybackTransport\(state\.transport\)[\s\S]{0,500}?resolvePlaybackRate[\s\S]{0,300}?player\.setRate/,
   "Playback retry reapplies the active rate policy.");
-has(appCode, /availableRates[\s\S]{0,500}?RATE_POLICY_KIND\.FIXED[\s\S]{0,500}?resolvePlaybackRate/,
-  "Expanded rate offers retune active fixed Shift playback.");
+has(topLevelFunction(appCode, "applyActiveShiftPlaybackPolicy"),
+  /derivePlaybackPolicy\(policyInputs\)[\s\S]*?withDerivedPlaybackPolicy\(state\.transport, policyInputs\)/,
+  "Active Shift policy is derived once and applied atomically.");
+has(topLevelFunction(appCode, "pollPlayer"),
+  /availableRates[\s\S]*?applyActiveShiftPlaybackPolicy\(\{[\s\S]*?playback-rate-offer/,
+  "Expanded rate offers rederive active Shift playback policy.");
 has(styles, /\.center-transport-overlay\s*\{[^}]*pointer-events:\s*none/,
   "The full iframe overlay is non-blocking.");
 has(styles, /\.center-transport-surface\s*\{[^}]*pointer-events:\s*auto/,
