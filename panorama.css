@@ -378,7 +378,7 @@
    the trailing pane has just received the address Center was showing, so it is
    already settled, while the leading pane is receiving material that was not
    previously visible and rises into place. */
-/* Kept equal to FIELD_TRANSITION_MS in panorama.js, which clears the class. */
+/* Kept equal to PANORAMA_TRANSITION_MS in panorama.js, which clears the class. */
 .panorama { --panorama-transition-ms: 260ms; }
 
 .panorama.is-traversing-forward .step-pane,

@@ -1752,7 +1752,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       // YouTube's controls therefore remain pointer-accessible in every state.
       const surfaceOwnsPointer = currentState.videoLoaded && (!ordinaryPlayback || !centerRunning);
       surface.hidden = !surfaceOwnsPointer;
-      const activation = currentState.field?.activation || null;
+      const activation = currentState.panorama?.activation || null;
       const preparing = Boolean(activation && !activation.ready);
       surface.disabled = !currentState.videoLoaded || preparing;
       const label = contextObservation
@@ -1797,9 +1797,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const currentNeighborhood = resolution();
     const currentSpan = interval();
     const projection = timelineProjection();
-    const field = currentState.field;
-    const panoramaWindow = field?.span?.frozen && field.span.available
-      ? { start: field.span.start, end: field.span.end }
+    const panoramaState = currentState.panorama;
+    const panoramaWindow = panoramaState?.span?.frozen && panoramaState.span.available
+      ? { start: panoramaState.span.start, end: panoramaState.span.end }
       : null;
     const semanticCurrent = currentNeighborhood?.C ?? 0;
     const configuredReach = model().stepDistance;

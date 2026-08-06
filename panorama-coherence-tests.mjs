@@ -242,7 +242,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   assert.match(app, /panoramaFrame:\s*panoramaOperatorPreview\(\)/);
   assert.match(
     app,
-    /function panoramaFrameRequest[\s\S]*FIELD_FRAME_OWNER\.CONTEXT[\s\S]*transport\.start[\s\S]*transport\.end/,
+    /function panoramaFrameRequest[\s\S]*PANORAMA_FRAME_OWNER\.CONTEXT[\s\S]*transport\.start[\s\S]*transport\.end/,
     "Context supplies the frozen observation window as the Frame's fixed edges."
   );
   assert.match(app, /const panoramaFrames = createPanoramaFrameSequencer\(\)/,

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createPanoramaController, PANORAMA_SIDE_MODE } from "./panorama.js";
 import { YOUTUBE_STATE } from "./youtube.js";
-import { FIELD_FRAME_ACTIVATION } from "./panorama-frame.js";
+import { PANORAMA_FRAME_ACTIVATION } from "./panorama-frame.js";
 
 function element(tagName = "DIV") {
   const listeners = new Map();
@@ -403,7 +403,7 @@ function makeHarness({
       panoramaCycle: { inner: 1, outer: 2.5, rate: 0.5 },
       panoramaFrame: {
         kind: "step",
-        activation: { kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS },
+        activation: { kind: PANORAMA_FRAME_ACTIVATION.STEP_TO_ADDRESS },
         start: 35,
         center: 50,
         end: 72,
@@ -521,7 +521,7 @@ function makeHarness({
       ...h.snapshot,
       panoramaFrame: {
         kind: "step",
-        activation: { kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS },
+        activation: { kind: PANORAMA_FRAME_ACTIVATION.STEP_TO_ADDRESS },
         start: 40,
         center: 50,
         end: 60,

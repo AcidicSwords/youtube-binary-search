@@ -122,8 +122,8 @@ import {
   sideRateStepFromResponse
 } from "./panorama-geometry.js";
 import {
-  FIELD_FRAME_OWNER,
-  FIELD_FRAME_ACTIVATION,
+  PANORAMA_FRAME_OWNER,
+  PANORAMA_FRAME_ACTIVATION,
   createPanoramaFrameSequencer
 } from "./panorama-frame.js";
 import {
@@ -324,7 +324,7 @@ const state = {
   weightRelaxation: null,
   shiftLayers: { matrix: false, guide: false },
   shiftKeyHeld: false,
-  field: null,
+  panorama: null,
   // Direct manipulation of Current on the Temporal Topography. It commits a
   // Step, not a Go and not a Pin move, and it owns the Panorama Frame while it runs.
   currentDrag: null,
@@ -509,7 +509,7 @@ function operatorFrameRequest() {
     forward: step.end,
     backwardDistance: step.backwardDistance,
     forwardDistance: step.forwardDistance,
-    activation: { kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS },
+    activation: { kind: PANORAMA_FRAME_ACTIVATION.STEP_TO_ADDRESS },
     range
   };
 }
@@ -519,7 +519,7 @@ function panoramaFrameRequest() {
   // Direct manipulation temporarily supplies an exact Frame and has priority
   // over both Context and operator framing for the gesture's lifetime.
   if (state.directFrame) {
-    return { ...state.directFrame, owner: FIELD_FRAME_OWNER.DIRECT, range: activeRange() };
+    return { ...state.directFrame, owner: PANORAMA_FRAME_OWNER.DIRECT, range: activeRange() };
   }
   const transport = state.transport;
   const contextRunning = transport.kind === TRANSPORT_KIND.CONTEXT;
@@ -551,7 +551,7 @@ function panoramaFrameRequest() {
       );
     if (window) {
       return {
-        owner: FIELD_FRAME_OWNER.CONTEXT,
+        owner: PANORAMA_FRAME_OWNER.CONTEXT,
         start: window.start,
         end: window.end,
         current: currentNeighborhood().C,
@@ -2145,7 +2145,7 @@ function wrapPlaybackRange() {
 }
 
 function frozenPanoramaWindow() {
-  const span = state.field?.span;
+  const span = state.panorama?.span;
   return span?.frozen && span.available ? { start: span.start, end: span.end } : null;
 }
 
@@ -2928,7 +2928,7 @@ function resetSourceScopedState() {
   state.ghostGesture = null;
   state.ghostContinuation = null;
   state.ghostWheel = null;
-  state.field = null;
+  state.panorama = null;
   view.setPreviewAction(null);
   view.setPreviewSection(null);
 }
@@ -3047,7 +3047,7 @@ function initializeVideo(request = pendingLoad) {
   state.guideSelection = null;
   state.selectedPinIds = [];
   state.guideDrag = null;
-  state.field = null;
+  state.panorama = null;
   state.availableRates = snapshot.availableRates;
   renderPlaybackRateChoices();
   state.playerState = snapshot.state;
@@ -5079,7 +5079,7 @@ function initializePlayerApi() {
       persistPreferences();
     },
     onChange: panoramaState => {
-      state.field = panoramaState;
+      state.panorama = panoramaState;
       view.render();
     },
     formatTime

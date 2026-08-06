@@ -7,9 +7,9 @@ import { EPSILON, clamp } from "./range-geometry.js";
 import { playbackAllowsPanorama } from "./transport.js";
 import { YOUTUBE_STATE, createYouTubePlayer, isYouTubeApiReady } from "./youtube.js";
 import {
-  FIELD_FRAME_OWNER,
+  PANORAMA_FRAME_OWNER,
   FIELD_FRAME_DIRECTION,
-  FIELD_FRAME_ACTIVATION,
+  PANORAMA_FRAME_ACTIVATION,
   classifyDirection,
   directFrame
 } from "./panorama-frame.js";
@@ -66,7 +66,7 @@ const RATE_RETRY_MS = 550;
 const PLACE_RETRY_MS = 260;
 const MAX_CENTER_DELTA = 2.5;
 // One directional slideshow transition. The semantic commit never waits for it.
-export const FIELD_TRANSITION_MS = 260;
+export const PANORAMA_TRANSITION_MS = 260;
 
 function defaultPreferences() {
   return {
@@ -176,7 +176,7 @@ export function createPanoramaController({
     restoreRoles: new Set(),
     suspended: false,
     preview: null,
-    field: null,
+    panorama: null,
     panoramaKey: "",
     // Cycling runtime. Frozen until a genuine Center playback gesture begins.
     cycle: createPanoramaCycle(DEFAULT_PANORAMA_CYCLE),
@@ -317,14 +317,14 @@ export function createPanoramaController({
       || !Number.isFinite(lead)
     ) return null;
     const owner = [
-      FIELD_FRAME_OWNER.CONTEXT,
-      FIELD_FRAME_OWNER.OPERATOR,
-      FIELD_FRAME_OWNER.DIRECT
+      PANORAMA_FRAME_OWNER.CONTEXT,
+      PANORAMA_FRAME_OWNER.OPERATOR,
+      PANORAMA_FRAME_OWNER.DIRECT
     ].includes(value.owner)
       ? value.owner
       : value.kind === "context"
-        ? FIELD_FRAME_OWNER.CONTEXT
-        : FIELD_FRAME_OWNER.OPERATOR;
+        ? PANORAMA_FRAME_OWNER.CONTEXT
+        : PANORAMA_FRAME_OWNER.OPERATOR;
     return {
       owner,
       kind: value.kind || "step",
@@ -334,8 +334,8 @@ export function createPanoramaController({
       direction: value.direction || FIELD_FRAME_DIRECTION.NONE,
       revision: Number.isFinite(value.revision) ? value.revision : null,
       outgoing: Number.isFinite(value.outgoing) ? value.outgoing : null,
-      activation: value.activation?.kind === FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS
-        ? { kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS }
+      activation: value.activation?.kind === PANORAMA_FRAME_ACTIVATION.STEP_TO_ADDRESS
+        ? { kind: PANORAMA_FRAME_ACTIVATION.STEP_TO_ADDRESS }
         : null,
       backwardDistance: Number(value.backwardDistance),
       forwardDistance: Number(value.forwardDistance)
@@ -904,8 +904,8 @@ export function createPanoramaController({
           generation,
           at: Date.now()
         };
-        render(getSnapshot?.(), runtime.field);
-      }, FIELD_TRANSITION_MS);
+        render(getSnapshot?.(), runtime.panorama);
+      }, PANORAMA_TRANSITION_MS);
       runtime.transitionTimer?.unref?.();
     }
     return true;
@@ -921,7 +921,7 @@ export function createPanoramaController({
     // Immediate semantic transitions can request a Frame before the next
     // polling render. Make the hosts measurable before creating side players.
     if (Object.values(sides).some(side => !side.adapter)) {
-      render(snapshot, runtime.field);
+      render(snapshot, runtime.panorama);
     }
     ensurePlayers(prefs);
     beginFrameTransition(frame);
@@ -1519,7 +1519,7 @@ export function createPanoramaController({
     const preview = activePreview(snapshot);
     if (preview) {
       if (
-        preview.activation?.kind !== FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS
+        preview.activation?.kind !== PANORAMA_FRAME_ACTIVATION.STEP_TO_ADDRESS
         || !sideIsOperational(role, snapshot)
       ) return null;
       const address = role === "tail" ? preview.start : preview.end;
@@ -1678,7 +1678,7 @@ export function createPanoramaController({
       suspended: runtime.suspended,
       preview: preview?.kind || null
     });
-    runtime.field = observed;
+    runtime.panorama = observed;
     if (key !== runtime.panoramaKey) {
       runtime.panoramaKey = key;
       onChange?.(observed);
@@ -1691,7 +1691,7 @@ export function createPanoramaController({
     if (element) element.textContent = value;
   }
 
-  function render(snapshot = getSnapshot?.(), field = runtime.field) {
+  function render(snapshot = getSnapshot?.(), panoramaState = runtime.panorama) {
     if (!snapshot || !elements["panorama"]) return;
     const prefs = preferences();
     const preview = activePreview(snapshot);
@@ -1747,7 +1747,7 @@ export function createPanoramaController({
     const configuredCycle = snapshotCycle(snapshot);
     for (const role of ["tail", "lead"]) {
       const side = sides[role];
-      const actual = field?.[role]?.offset ?? side.offset;
+      const actual = panoramaState?.[role]?.offset ?? side.offset;
       const availableDistance = effectiveOffset(role, snapshot.current, snapshot);
       const canStep = Boolean(stepSelection(role));
       setText(
@@ -1813,8 +1813,8 @@ export function createPanoramaController({
     );
     setText(elements["panorama-span-label"], preview
       ? `${formatTime(preview.start)}–${formatTime(preview.end)}`
-      : field?.span?.frozen && field.span.available
-      ? `${formatTime(field.span.start)}–${formatTime(field.span.end)}`
+      : panoramaState?.span?.frozen && panoramaState.span.available
+      ? `${formatTime(panoramaState.span.start)}–${formatTime(panoramaState.span.end)}`
       : `Current ${loaded ? formatTime(snapshot.current) : "—"}`);
   }
 
@@ -1991,7 +1991,7 @@ export function createPanoramaController({
     runtime.forceEstablish = true;
     runtime.restoreRoles.clear();
     runtime.suspended = false;
-    runtime.field = null;
+    runtime.panorama = null;
     runtime.panoramaKey = "";
     runtime.frame = null;
     runtime.frameIdentity = null;
@@ -2078,7 +2078,7 @@ export function createPanoramaController({
     },
     snapshot() {
       return {
-        ...(runtime.field || {}),
+        ...(runtime.panorama || {}),
         phase: runtime.phase,
         tailMode: sides.tail.mode,
         leadMode: sides.lead.mode,
