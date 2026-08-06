@@ -298,9 +298,9 @@ assert.equal(rateSelect.value, "2",
   // declare Center-only, so choosing to follow Weight meant choosing to lose the
   // Panorama, and the two could never be used together.
   await flush(2);
-  assert.notEqual(byId.get("field-transport-state").textContent, "Panorama suspended",
+  assert.notEqual(byId.get("panorama-transport-state").textContent, "Panorama suspended",
     "A weighted playback keeps its Panorama.");
-  assert.match(byId.get("field-rate-state").textContent,
+  assert.match(byId.get("panorama-rate-state").textContent,
     /Tail 0\.5× · Center 0\.75× · Lead 1×/,
     "and the sides sit exactly one rung either side of the weighted Center.");
   const insideRate = center.rate;

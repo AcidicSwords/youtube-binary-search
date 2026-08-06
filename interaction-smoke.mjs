@@ -22,9 +22,9 @@ assert.equal(byId.get("duration-time").textContent, "1:40");
 // New shipped defaults never replace an existing valid Panorama preference. A
 // non-preset spread remains a real selectable option and the summary derives
 // the same symmetric rate pair the runtime actually uses.
-assert.equal(byId.get("field-inner-offset").value, "3");
-assert.equal(byId.get("field-outer-offset").value, "12");
-assert.equal(byId.get("field-cycle-rate").value, "0.4");
+assert.equal(byId.get("panorama-inner-offset").value, "3");
+assert.equal(byId.get("panorama-outer-offset").value, "12");
+assert.equal(byId.get("panorama-cycle-rate").value, "0.4");
 assert.equal(byId.get("panorama-setting-value").textContent, "3–12 s · 0.6× / 1.4×");
 assert.deepEqual(
   JSON.parse(env.localStorage.values.get("binary-youtube-reader:preferences:v1")).panoramaCycle,
@@ -34,54 +34,54 @@ assert.deepEqual(
 await poll();
 await flush();
 assert.deepEqual(
-  descendants(byId.get("field-cycle-rate")).map(option => option.value),
+  descendants(byId.get("panorama-cycle-rate")).map(option => option.value),
   ["0.25", "0.4", "0.5", "0.75"],
   "A valid saved non-preset spread remains selectable beside the presets."
 );
 
 // Return to the ordinary interaction fixture while retaining the saved-value
 // proof above. Subsequent controls continue to exercise wide manual settings.
-byId.get("field-inner-offset").value = "0.25";
-byId.get("field-inner-offset").dispatch("change");
-byId.get("field-outer-offset").value = "2.5";
-byId.get("field-outer-offset").dispatch("change");
+byId.get("panorama-inner-offset").value = "0.25";
+byId.get("panorama-inner-offset").dispatch("change");
+byId.get("panorama-outer-offset").value = "2.5";
+byId.get("panorama-outer-offset").dispatch("change");
 await flush();
 
 // Tune rejects an empty/invalid Offset without silently converting it to the
 // minimum or leaving the field showing a value the model did not accept.
-byId.get("field-outer-offset").value = "";
-byId.get("field-outer-offset").dispatch("change");
+byId.get("panorama-outer-offset").value = "";
+byId.get("panorama-outer-offset").dispatch("change");
 await flush();
-assert.equal(byId.get("field-outer-offset").value, "2.5");
+assert.equal(byId.get("panorama-outer-offset").value, "2.5");
 assert.match(byId.get("status").textContent, /positive number/);
 
 // One cycling-rate pair, not two independent side rates.
 await poll();
 await flush();
-const cycleOptions = descendants(byId.get("field-cycle-rate"))
+const cycleOptions = descendants(byId.get("panorama-cycle-rate"))
   .map(option => option.textContent);
 assert.deepEqual(cycleOptions, ["0.75× / 1.25×", "0.6× / 1.4×", "0.5× / 1.5×", "0.25× / 1.75×"],
   "The Panorama exposes one symmetric cycling-rate pair per step.");
-assert.equal(byId.get("field-cycle-rate").value, "0.4");
-byId.get("field-cycle-rate").value = "0.5";
-byId.get("field-cycle-rate").dispatch("change");
+assert.equal(byId.get("panorama-cycle-rate").value, "0.4");
+byId.get("panorama-cycle-rate").value = "0.5";
+byId.get("panorama-cycle-rate").dispatch("change");
 await flush();
 await poll();
-assert.equal(byId.get("field-cycle-rate").value, "0.5");
+assert.equal(byId.get("panorama-cycle-rate").value, "0.5");
 
 // 0 < inner < outer holds strictly. An inner offset that reaches the outer one
 // describes a Panorama with no cycle, so it is repaired to the midpoint rather
 // than accepted as equal.
-byId.get("field-inner-offset").value = "40";
-byId.get("field-inner-offset").dispatch("change");
+byId.get("panorama-inner-offset").value = "40";
+byId.get("panorama-inner-offset").dispatch("change");
 await flush();
-assert.equal(byId.get("field-inner-offset").value, "1.25",
+assert.equal(byId.get("panorama-inner-offset").value, "1.25",
   "The inner offset can never reach or exceed the outer offset.");
-byId.get("field-outer-offset").value = "10";
-byId.get("field-outer-offset").dispatch("change");
+byId.get("panorama-outer-offset").value = "10";
+byId.get("panorama-outer-offset").dispatch("change");
 await flush();
-byId.get("field-inner-offset").value = "2.5";
-byId.get("field-inner-offset").dispatch("change");
+byId.get("panorama-inner-offset").value = "2.5";
+byId.get("panorama-inner-offset").dispatch("change");
 await flush();
 
 // Keep this smoke focused on direct interaction; automatic Context has its own
@@ -107,21 +107,21 @@ await poll();
 await flush(3);
 const previewTail = env.tail();
 const previewLead = env.lead();
-assert.equal(byId.get("field-transport-state").textContent, "Step Frame");
+assert.equal(byId.get("panorama-transport-state").textContent, "Step Frame");
 assert.equal(previewTail.currentTime, 0);
 assert.equal(previewLead.currentTime, 10);
 byId.get("refine-forward").click();
 await flush();
 await poll();
 assert.equal(currentText(), "Current 0:50");
-assert.equal(byId.get("field-transport-state").textContent, "Refine Frame");
+assert.equal(byId.get("panorama-transport-state").textContent, "Refine Frame");
 assert.equal(previewTail.currentTime, 25);
 assert.equal(previewLead.currentTime, 75);
 byId.get("refine-forward").click();
 await flush();
 await poll();
 assert.equal(currentText(), "Current 1:15");
-assert.equal(byId.get("field-transport-state").textContent, "Refine Frame");
+assert.equal(byId.get("panorama-transport-state").textContent, "Refine Frame");
 assert.equal(previewTail.currentTime, 37.5);
 assert.equal(previewLead.currentTime, 87.5);
 byId.get("return-action").click();
@@ -139,7 +139,7 @@ assert.equal(currentText(), "Current 0:10");
 byId.get("reopen").click();
 await flush();
 await poll();
-assert.equal(byId.get("field-transport-state").textContent, "Reopen Frame");
+assert.equal(byId.get("panorama-transport-state").textContent, "Reopen Frame");
 assert.equal(previewTail.currentTime, 5);
 assert.equal(previewLead.currentTime, 55);
 byId.get("return-action").click();
@@ -147,7 +147,7 @@ byId.get("return-action").click();
 await flush();
 await poll();
 assert.equal(currentText(), "Current 0:00");
-assert.equal(byId.get("field-transport-state").textContent, "Step Frame");
+assert.equal(byId.get("panorama-transport-state").textContent, "Step Frame");
 assert.equal(previewTail.currentTime, 0);
 assert.equal(previewLead.currentTime, 10);
 
@@ -537,7 +537,7 @@ await flush(4);
 assert.ok(players.has("player-tail") && players.has("player-lead"));
 const tail = env.tail();
 const lead = env.lead();
-assert.equal(byId.get("field-transport-state").textContent, "Section Frame");
+assert.equal(byId.get("panorama-transport-state").textContent, "Section Frame");
 assert.equal(tail.currentTime, 25, "Tail must preview the selected Section start.");
 assert.equal(lead.currentTime, 50, "Lead must preview the selected Section end.");
 assert.equal(byId.get("center-transport-surface").disabled, false);
@@ -588,8 +588,8 @@ dispatchDocument("pointermove", {
   buttons: 1
 });
 await flush();
-assert.equal(byId.get("field-transport-state").textContent, "Section Frame");
-assert.equal(byId.get("field-span-label").textContent, "0:15–0:50");
+assert.equal(byId.get("panorama-transport-state").textContent, "Section Frame");
+assert.equal(byId.get("panorama-span-label").textContent, "0:15–0:50");
 assert.match(
   byId.get("section-window").textContent,
   /0:15–0:50/,
@@ -605,7 +605,7 @@ assert.ok(
 dispatchDocument("pointerup", { target: startEndpoint, pointerId: 41 });
 await flush();
 assert.equal(
-  byId.get("field-transport-state").textContent,
+  byId.get("panorama-transport-state").textContent,
   "Step Frame",
   "After an endpoint edit displaces the retained midpoint from Current, the Viewer must return to Current-centered Step."
 );
@@ -713,8 +713,8 @@ dispatchDocument("pointermove", {
   buttons: 1
 });
 await flush();
-assert.equal(byId.get("field-transport-state").textContent, "Section Frame");
-assert.equal(byId.get("field-span-label").textContent, "0:35–1:00");
+assert.equal(byId.get("panorama-transport-state").textContent, "Section Frame");
+assert.equal(byId.get("panorama-span-label").textContent, "0:35–1:00");
 assert.match(
   byId.get("section-window").textContent,
   /0:35–1:00/,
@@ -725,7 +725,7 @@ assert.equal(center.currentTime, 47.5);
 assert.equal(lead.currentTime, 60);
 dispatchDocument("pointercancel", { target: sectionProfile, pointerId: 42 });
 await flush();
-assert.equal(byId.get("field-transport-state").textContent, "Section Frame");
+assert.equal(byId.get("panorama-transport-state").textContent, "Section Frame");
 assert.equal(tail.currentTime, 25);
 assert.equal(lead.currentTime, 50);
 assert.ok(
@@ -742,7 +742,7 @@ await flush();
 await poll();
 assert.equal(byId.get("tail-pane").classList.contains("is-collapsed"), true);
 assert.equal(byId.get("tail-restore").hidden, false);
-assert.equal(byId.get("field-both-toggle-label").textContent, "Resume Panorama");
+assert.equal(byId.get("panorama-both-toggle-label").textContent, "Resume Panorama");
 assert.equal(lead.currentTime, leadBeforeCollapse);
 assert.equal(lead.commands.filter(command => command[0] === "place").length, leadPlacesBeforeCollapse);
 byId.get("tail-restore").click();
@@ -798,21 +798,21 @@ assert.notEqual(tailOffsetText, offsetBeforeCycleing,
 assert.equal(tailOffsetText, byId.get("lead-offset-state").textContent,
   "and both sides stay equally displaced from Center.");
 assert.match(tailOffsetText, /in 2\.5s–10s$/, "inside the configured bounds.");
-assert.equal(byId.get("field-transport-state").textContent, "Cycling out");
+assert.equal(byId.get("panorama-transport-state").textContent, "Cycling out");
 assert.equal(byId.get("section-window").textContent, intervalBeforeStretch,
   "Cycling must never rewrite the semantic Interval.");
 
 // Hold alone stops the cycle. It preserves the attained relation, sets every
 // held side to Center rate, and writes no configuration and no Session state.
-byId.get("field-both-toggle").click();
+byId.get("panorama-both-toggle").click();
 await flush();
 assert.equal(center.state, 1, "Holding the Panorama must not interrupt Center playback.");
 assert.equal(tail.rate, 1, "Every held side matches Center at 1x.");
 assert.equal(lead.rate, 1);
-assert.equal(byId.get("field-both-toggle-label").textContent, "Resume Panorama");
-assert.equal(byId.get("field-transport-state").textContent, "Held");
-assert.equal(byId.get("field-outer-offset").value, "10", "Hold must not overwrite the configured Outer Offset.");
-assert.equal(byId.get("field-inner-offset").value, "2.5", "Hold must not overwrite the configured Inner Offset.");
+assert.equal(byId.get("panorama-both-toggle-label").textContent, "Resume Panorama");
+assert.equal(byId.get("panorama-transport-state").textContent, "Held");
+assert.equal(byId.get("panorama-outer-offset").value, "10", "Hold must not overwrite the configured Outer Offset.");
+assert.equal(byId.get("panorama-inner-offset").value, "2.5", "Hold must not overwrite the configured Inner Offset.");
 assert.equal(byId.get("step-distance").value, "10", "Hold must not overwrite semantic Step size.");
 assert.equal(byId.get("section-window").textContent, intervalBeforeStretch,
   "Hold must update neither semantic Step Distance nor Interval.");
@@ -828,7 +828,7 @@ await poll();
 assert.equal(byId.get("center-transport-surface").hidden, false, "Paused Center must restore the shared activation surface.");
 assert.equal(currentText(), "Current 0:58");
 assert.match(byId.get("section-window").textContent, /0:25–0:58/);
-assert.equal(byId.get("field-transport-state").textContent, "Step Frame");
+assert.equal(byId.get("panorama-transport-state").textContent, "Step Frame");
 assert.equal(tail.currentTime, 48, "Paused Tail must preview the exact Step Backward destination.");
 assert.equal(lead.currentTime, 68, "Paused Lead must preview the exact Step Forward destination.");
 assert.equal(tail.state, 2);
@@ -951,7 +951,7 @@ dispatchDocument("pointermove", {
   buttons: 1
 });
 await flush();
-assert.equal(byId.get("field-transport-state").textContent, "Pin Frame");
+assert.equal(byId.get("panorama-transport-state").textContent, "Pin Frame");
 dispatchDocument("pointerup", {
   target: selectedClusterDrag,
   clientX: 690,
@@ -1030,7 +1030,7 @@ dispatchDocument("pointermove", {
   buttons: 1
 });
 await flush();
-assert.equal(byId.get("field-transport-state").textContent, "Pin Frame");
+assert.equal(byId.get("panorama-transport-state").textContent, "Pin Frame");
 assert.equal(center.currentTime, 68);
 dispatchDocument("pointerup", {
   target: timelinePinMarker,
@@ -1040,7 +1040,7 @@ dispatchDocument("pointerup", {
   buttons: 0
 });
 await flush();
-assert.notEqual(byId.get("field-transport-state").textContent, "Pin Frame");
+assert.notEqual(byId.get("panorama-transport-state").textContent, "Pin Frame");
 
 // The Guide Address field commits the same Session transaction.
 const movedPinAddress = descendants(byId.get("pins-list"))
@@ -1071,7 +1071,7 @@ byId.get("timeline").dispatch("click", {
 });
 await flush();
 const sectionsBeforeHotkey = Number(byId.get("sections-list-count").textContent);
-byId.get("section-source").value = "field-span";
+byId.get("section-source").value = "panorama-span";
 byId.get("section-label").value = "Stale Section Title";
 dispatchDocument("keydown", {
   key: "T",

@@ -41,7 +41,7 @@
     <div class="workspace">
       <section id="reader-column" class="reader-column" aria-label="Video reader">
         <section id="player-panel" class="player-panel" aria-label="Panorama">
-          <div id="panorama" class="panorama field-off" data-phase="off" aria-label="Panorama">
+          <div id="panorama" class="panorama panorama-off" data-phase="off" aria-label="Panorama">
             <section id="tail-pane" class="step-pane step-pane-side tail-pane" aria-label="Tail panorama view">
               <div class="step-pane-bar">
                 <div class="pane-identity">
@@ -53,8 +53,8 @@
                 </div>
               </div>
               <div id="tail-player-surface" class="player-wrap side-player-surface" role="button" tabindex="0" aria-label="Step Backward"><div id="player-tail"></div></div>
-              <div class="pane-field-controls tail-field-controls" aria-label="Tail panorama state">
-                <p class="field-side-state"><span>Tail</span><small id="tail-offset-state">0 s in 0.25–2.5 s</small></p>
+              <div class="pane-panorama-controls tail-panorama-controls" aria-label="Tail panorama state">
+                <p class="panorama-side-state"><span>Tail</span><small id="tail-offset-state">0 s in 0.25–2.5 s</small></p>
               </div>
               <button id="tail-restore" class="step-pane-restore" type="button" aria-label="Show Tail" hidden>
                 <span aria-hidden="true">←</span><span>Tail</span>
@@ -68,11 +68,11 @@
                   <span id="center-meta" class="step-pane-meta">—</span>
                 </div>
                 <div class="pane-bar-actions center-bar-actions">
-                  <div class="field-state-readout center-field-summary">
-                    <strong id="field-transport-state">Off</strong>
-                    <small id="field-rate-state">Tail — · Center 1× · Lead —</small>
+                  <div class="panorama-state-readout center-panorama-summary">
+                    <strong id="panorama-transport-state">Off</strong>
+                    <small id="panorama-rate-state">Tail — · Center 1× · Lead —</small>
                   </div>
-                  <button id="panorama-toggle" class="field-toggle" type="button" aria-pressed="true" aria-label="Hide Panorama">
+                  <button id="panorama-toggle" class="panorama-visibility-toggle" type="button" aria-pressed="true" aria-label="Hide Panorama">
                     <span>Panorama</span><span id="panorama-meta">Ready</span>
                   </button>
                 </div>
@@ -86,9 +86,9 @@
                   </button>
                 </div>
               </div>
-              <div class="pane-field-controls center-field-controls" aria-label="Panorama controls">
-                <button id="field-both-toggle" class="field-mode-toggle field-both-toggle" type="button" aria-pressed="false" disabled>
-                  <span id="field-both-toggle-label">Resume Panorama</span><small id="field-span-label">Current —</small>
+              <div class="pane-panorama-controls center-panorama-controls" aria-label="Panorama controls">
+                <button id="panorama-both-toggle" class="panorama-mode-toggle panorama-both-toggle" type="button" aria-pressed="false" disabled>
+                  <span id="panorama-both-toggle-label">Resume Panorama</span><small id="panorama-span-label">Current —</small>
                 </button>
               </div>
             </section>
@@ -104,8 +104,8 @@
                 </div>
               </div>
               <div id="lead-player-surface" class="player-wrap side-player-surface" role="button" tabindex="0" aria-label="Step Forward"><div id="player-lead"></div></div>
-              <div class="pane-field-controls" aria-label="Lead panorama state">
-                <p class="field-side-state"><span>Lead</span><small id="lead-offset-state">0 s in 0.25–2.5 s</small></p>
+              <div class="pane-panorama-controls" aria-label="Lead panorama state">
+                <p class="panorama-side-state"><span>Lead</span><small id="lead-offset-state">0 s in 0.25–2.5 s</small></p>
               </div>
               <button id="lead-restore" class="step-pane-restore" type="button" aria-label="Show Lead" hidden>
                 <span>Lead</span><span aria-hidden="true">→</span>
@@ -127,7 +127,7 @@
               <span id="timeline-key-range" class="timeline-key key-range" title="Range: navigable boundary"><i aria-hidden="true"></i>Range</span>
               <span id="timeline-key-resolution" class="timeline-key key-resolution" title="Current Neighborhood: current neighborhood"><i aria-hidden="true"></i>Current Neighborhood</span>
               <span id="timeline-key-active-span" class="timeline-key key-interval" title="Active Span: ordered movement extent"><i aria-hidden="true"></i>Active Span</span>
-              <span id="timeline-key-field" class="timeline-key key-field" title="Panorama span: held spread"><i aria-hidden="true"></i>Panorama span</span>
+              <span id="timeline-key-panorama" class="timeline-key key-panorama" title="Panorama span: held spread"><i aria-hidden="true"></i>Panorama span</span>
               <span id="timeline-key-pins" class="timeline-key key-pins" title="Pins: retained source Addresses"><i aria-hidden="true"></i>Pins</span>
             </div>
             <div class="timeline-header">
@@ -266,23 +266,23 @@
             <details id="panorama-settings" class="tool-disclosure panorama-settings">
               <summary><span>Panorama</span><span id="panorama-setting-value">0.25–2.5 s · 0.75× / 1.25×</span></summary>
               <div class="compact-settings">
-                <label class="compact-setting" for="field-inner-offset">
+                <label class="compact-setting" for="panorama-inner-offset">
                   <span>Inner offset</span>
                   <span class="number-with-unit">
-                    <input id="field-inner-offset" type="number" min="0.25" max="300" step="0.25" value="0.25" inputmode="decimal" disabled>
+                    <input id="panorama-inner-offset" type="number" min="0.25" max="300" step="0.25" value="0.25" inputmode="decimal" disabled>
                     <span>s</span>
                   </span>
                 </label>
-                <label class="compact-setting" for="field-outer-offset">
+                <label class="compact-setting" for="panorama-outer-offset">
                   <span>Outer offset</span>
                   <span class="number-with-unit">
-                    <input id="field-outer-offset" type="number" min="0.25" max="300" step="0.25" value="2.5" inputmode="decimal" disabled>
+                    <input id="panorama-outer-offset" type="number" min="0.25" max="300" step="0.25" value="2.5" inputmode="decimal" disabled>
                     <span>s</span>
                   </span>
                 </label>
-                <label class="compact-setting" for="field-cycle-rate">
+                <label class="compact-setting" for="panorama-cycle-rate">
                   <span>Cycle rate</span>
-                  <select id="field-cycle-rate" aria-label="Panorama cycling rate pair" disabled><option value="0.25">0.75× / 1.25×</option></select>
+                  <select id="panorama-cycle-rate" aria-label="Panorama cycling rate pair" disabled><option value="0.25">0.75× / 1.25×</option></select>
                 </label>
                 <p class="setting-note">Tail and Lead cycle between these offsets around Current. Showing or hiding the Panorama, collapsing a side, and holding a span stay on the Panorama itself, because those act on what you are looking at rather than being remembered settings.</p>
               </div>
@@ -432,7 +432,7 @@
                 <label for="section-source">Source
                   <select id="section-source" disabled>
                     <option value="interval">Active Span</option>
-                    <option value="field-span">Held Panorama span</option>
+                    <option value="panorama-span">Held Panorama span</option>
                     <option value="selected-pins">Two selected Pins</option>
                   </select>
                 </label>

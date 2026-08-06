@@ -2311,7 +2311,7 @@ function selectedSectionExtent(source = null) {
   const kind = source || elements["section-source"]?.value || "interval";
   return {
     kind,
-    extent: kind === "field-span"
+    extent: kind === "panorama-span"
       ? heldPanoramaWindow()
       : kind === "selected-pins"
         ? selectedPinExtent()
@@ -2333,7 +2333,7 @@ function retainActiveSpanAsSection(event = null, options = {}) {
       state.session,
       extent,
       label,
-      kind === "selected-pins" ? "selected-pins" : "field-span"
+      kind === "selected-pins" ? "selected-pins" : "panorama-span"
     );
   if (!result.changed) {
     const existing = result.value?.section;
@@ -5727,8 +5727,8 @@ const sideStep = role => event => {
 for (const binding of [
   [elements["step-backward"], "matrix:backward", directionalStep("backward"), true],
   [elements["step-forward"], "matrix:forward", directionalStep("forward"), true],
-  [elements["tail-player-surface"], "field-surface:tail", sideStep("tail"), true],
-  [elements["lead-player-surface"], "field-surface:lead", sideStep("lead"), true]
+  [elements["tail-player-surface"], "panorama-surface:tail", sideStep("tail"), true],
+  [elements["lead-player-surface"], "panorama-surface:lead", sideStep("lead"), true]
 ]) {
   const [control, id, resolveStep, keyboardActivation] = binding;
   bindStepPress(control, {
@@ -5843,10 +5843,10 @@ for (const control of document.querySelectorAll("[data-preview-action]")) {
 }
 
 // Step Panorama geometry
-elements["field-inner-offset"].addEventListener("change", event => {
+elements["panorama-inner-offset"].addEventListener("change", event => {
   changePanoramaBoundary("inner", event.target.value);
 });
-elements["field-outer-offset"].addEventListener("change", event => {
+elements["panorama-outer-offset"].addEventListener("change", event => {
   changePanoramaBoundary("outer", event.target.value);
 });
 elements["nudge-seconds"].addEventListener("change", event => {

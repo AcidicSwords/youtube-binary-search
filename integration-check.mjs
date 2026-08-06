@@ -566,9 +566,9 @@ same(panoramaSideRates(DEFAULT_PANORAMA_CYCLE.rate), {
   tailRate: 0.75,
   leadRate: 1.25
 }, "Default Panorama rates are 0.75x / 1x / 1.25x.");
-has(html, /id="field-inner-offset"[^>]*max="300"[^>]*value="0\.25"/,
+has(html, /id="panorama-inner-offset"[^>]*max="300"[^>]*value="0\.25"/,
   "Panorama defaults do not restrict the selectable inner-offset range.");
-has(html, /id="field-outer-offset"[^>]*max="300"[^>]*value="2\.5"/,
+has(html, /id="panorama-outer-offset"[^>]*max="300"[^>]*value="2\.5"/,
   "Panorama defaults do not restrict the selectable outer-offset range.");
 has(interactionSmoke, /savedPanoramaCycle = \{ inner: 3, outer: 12, rate: 0\.4 \}/,
   "Saved Panorama coverage uses values wider than the shipped defaults.");

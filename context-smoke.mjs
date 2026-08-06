@@ -22,7 +22,7 @@ assert.equal(byId.get("context-setting-value").textContent, "5 s centered on Cur
 
 // Arm the Panorama while Center is paused. A traversal must run Context only in
 // Center; the sides remain suspended even though the Panorama is armed to cycle.
-byId.get("field-both-toggle").click();
+byId.get("panorama-both-toggle").click();
 const tailPlaysBeforeContext = tail.commands.filter(command => command[0] === "play").length;
 center.deferNextPlacement = true;
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 500 });
@@ -35,10 +35,10 @@ assert.equal(center.state, 1, "Automatic Context must play Center.");
 assert.equal(byId.get("current-marker").style.left, "50%", "Context must not displace semantic Current.");
 
 await poll();
-assert.equal(byId.get("field-transport-state").textContent, "Context Frame");
+assert.equal(byId.get("panorama-transport-state").textContent, "Context Frame");
 assert.equal(tail.currentTime, 47.5, "Tail must preview the first Context frame.");
 assert.equal(lead.currentTime, 52.5, "Lead must preview the last Context frame.");
-assert.equal(byId.get("field-span-label").textContent, "0:47.5–0:52.5");
+assert.equal(byId.get("panorama-span-label").textContent, "0:47.5–0:52.5");
 assert.equal(byId.get("tail-player-surface")["aria-disabled"], "true");
 assert.equal(byId.get("lead-player-surface")["aria-disabled"], "true");
 assert.equal(
@@ -61,7 +61,7 @@ assert.equal(byId.get("cursor-marker").hidden, true);
 // Context ending is not a reframing. While Context is enabled its bounded edges
 // own Tail and Lead before, during, and after transport; only Center returns
 // from Cursor to Current.
-assert.equal(byId.get("field-transport-state").textContent, "Context Frame");
+assert.equal(byId.get("panorama-transport-state").textContent, "Context Frame");
 assert.equal(tail.currentTime, 47.5, "Context Start must survive Context stopping.");
 assert.equal(lead.currentTime, 52.5, "Context End must survive Context stopping.");
 
@@ -72,14 +72,14 @@ await flush();
 assert.equal(currentText(), "Current 1:15");
 assert.equal(center.currentTime, 72.5);
 await poll();
-assert.equal(byId.get("field-transport-state").textContent, "Context Frame");
+assert.equal(byId.get("panorama-transport-state").textContent, "Context Frame");
 assert.equal(tail.currentTime, 72.5);
 assert.equal(lead.currentTime, 77.5);
 center.currentTime = 78;
 await poll();
 await flush();
 assert.equal(center.currentTime, 75);
-assert.equal(byId.get("field-transport-state").textContent, "Context Frame");
+assert.equal(byId.get("panorama-transport-state").textContent, "Context Frame");
 assert.equal(tail.currentTime, 72.5, "Context settlement changes no side-frame ownership.");
 assert.equal(lead.currentTime, 77.5);
 
@@ -89,14 +89,14 @@ byId.get("context-seconds").value = "0";
 byId.get("context-seconds").dispatch("change");
 await flush();
 await poll();
-assert.equal(byId.get("field-transport-state").textContent, "Refine Frame");
+assert.equal(byId.get("panorama-transport-state").textContent, "Refine Frame");
 assert.equal(tail.currentTime, 37.5);
 assert.equal(lead.currentTime, 87.5);
 byId.get("context-seconds").value = "5";
 byId.get("context-seconds").dispatch("change");
 await flush();
 await poll();
-assert.equal(byId.get("field-transport-state").textContent, "Context Frame");
+assert.equal(byId.get("panorama-transport-state").textContent, "Context Frame");
 
 // Undo restores both the semantic frame and its prior preview owner; its own
 // observation remains temporary as well.
@@ -108,7 +108,7 @@ center.currentTime = 54;
 await poll();
 await flush();
 assert.equal(center.currentTime, 50);
-assert.equal(byId.get("field-transport-state").textContent, "Context Frame");
+assert.equal(byId.get("panorama-transport-state").textContent, "Context Frame");
 
 // Held Step owns its repeat cadence instead of trusting browser key-repeat.
 // Native repeat events are ignored, the app advances after its initial delay,

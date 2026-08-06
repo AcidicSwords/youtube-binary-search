@@ -221,7 +221,7 @@ try {
   // while the button did nothing.
   await focusById("guide-toggle");
   assert.equal(await activeId(), "guide-toggle");
-  const transportBefore = await text("#field-transport-state");
+  const transportBefore = await text("#panorama-transport-state");
   const expandedBefore = await page.getAttribute("#guide-toggle", "aria-expanded");
   await page.keyboard.press("Space");
   await settle();
@@ -230,14 +230,14 @@ try {
     expandedBefore,
     "Space activates the control that holds focus."
   );
-  assert.equal(await text("#field-transport-state"), transportBefore,
+  assert.equal(await text("#panorama-transport-state"), transportBefore,
     "and does not also start observation behind it.");
 
   // With focus on the reader background, Space is the reader's again.
   await page.evaluate(() => document.activeElement?.blur());
   await page.keyboard.press("Space");
   await settle(300);
-  assert.notEqual(await text("#field-transport-state"), transportBefore,
+  assert.notEqual(await text("#panorama-transport-state"), transportBefore,
     "With nothing focused, Space observes.");
   await page.keyboard.press("Space");
   await settle(300);
@@ -411,10 +411,10 @@ try {
     // Space still opens the list rather than starting playback behind it: a
     // <select> gives up the letters it was hoarding, not the key it acts on.
     await (await page.$("#sections-list [data-section-weighting]")).focus();
-    const transportBeforeList = await text("#field-transport-state");
+    const transportBeforeList = await text("#panorama-transport-state");
     await page.keyboard.press("Space");
     await settle(300);
-    assert.equal(await text("#field-transport-state"), transportBeforeList,
+    assert.equal(await text("#panorama-transport-state"), transportBeforeList,
       "Space on a focused selector belongs to the selector, not to playback.");
     await page.keyboard.press("Escape");
     await settle(250);
@@ -433,10 +433,10 @@ try {
 
     // It keeps Space, though: that is the one key it does answer to.
     const drawnBefore = await page.getAttribute("#sections-list input[type=checkbox]", "checked");
-    const transportHeld = await text("#field-transport-state");
+    const transportHeld = await text("#panorama-transport-state");
     await page.keyboard.press("Space");
     await settle(300);
-    assert.equal(await text("#field-transport-state"), transportHeld,
+    assert.equal(await text("#panorama-transport-state"), transportHeld,
       "and Space still belongs to the control, not to playback behind it.");
     if (drawnBefore !== null) await page.keyboard.press("Space");
     await settle(250);

@@ -152,13 +152,13 @@ finding(
   "side-step-enabled-at-hard-range-boundary",
   environment.byId.get("step-backward").disabled === true
     && (
-      environment.byId.get("field-both-toggle").disabled === false
+      environment.byId.get("panorama-both-toggle").disabled === false
       || environment.byId.get("tail-player-surface")["aria-disabled"] !== "true"
       || environment.byId.get("tail-player-surface").tabIndex !== -1
     ),
   {
     matrixStepBackwardDisabled: environment.byId.get("step-backward").disabled,
-    combinedPanoramaToggleDisabled: environment.byId.get("field-both-toggle").disabled,
+    combinedPanoramaToggleDisabled: environment.byId.get("panorama-both-toggle").disabled,
     tailSurfaceDisabled: environment.byId.get("tail-player-surface")["aria-disabled"],
     tailSurfaceTabIndex: environment.byId.get("tail-player-surface").tabIndex,
     tailMeta: environment.byId.get("tail-meta").textContent
@@ -181,8 +181,8 @@ await environment.poll();
 environment.center().pauseVideo();
 await environment.flush(8);
 await environment.poll();
-const configuredInnerOffset = environment.byId.get("field-inner-offset").value;
-const configuredOuterOffset = environment.byId.get("field-outer-offset").value;
+const configuredInnerOffset = environment.byId.get("panorama-inner-offset").value;
+const configuredOuterOffset = environment.byId.get("panorama-outer-offset").value;
 
 // Start Context at 60 and advance only the Center Cursor. The visible side
 // geometry must remain the exact 2.5-second Context preview while its source
@@ -201,18 +201,18 @@ await environment.poll();
 const secondSuspendedTail = environment.byId.get("tail-meta").textContent;
 const secondSuspendedLead = environment.byId.get("lead-meta").textContent;
 finding(
-  "context-mutates-configured-field-offset",
+  "context-mutates-configured-panorama-offset",
   firstSuspendedTail !== secondSuspendedTail
     || firstSuspendedLead !== secondSuspendedLead
-    || environment.byId.get("field-outer-offset").value !== configuredOuterOffset
-    || environment.byId.get("field-inner-offset").value !== configuredInnerOffset,
+    || environment.byId.get("panorama-outer-offset").value !== configuredOuterOffset
+    || environment.byId.get("panorama-inner-offset").value !== configuredInnerOffset,
   {
     afterFirstContextTick: firstSuspendedTail,
     afterSecondContextTick: secondSuspendedTail,
     firstLead: firstSuspendedLead,
     secondLead: secondSuspendedLead,
-    configuredInnerOffset: environment.byId.get("field-inner-offset").value,
-    configuredOuterOffset: environment.byId.get("field-outer-offset").value
+    configuredInnerOffset: environment.byId.get("panorama-inner-offset").value,
+    configuredOuterOffset: environment.byId.get("panorama-outer-offset").value
   }
 );
 

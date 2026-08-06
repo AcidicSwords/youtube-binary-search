@@ -190,25 +190,25 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   const readme = readFileSync("README.md", "utf8");
 
   for (const id of [
-    "field-inner-offset", "field-outer-offset", "field-cycle-rate",
+    "panorama-inner-offset", "panorama-outer-offset", "panorama-cycle-rate",
     "tail-player-surface", "lead-player-surface",
-    "field-both-toggle", "nudge-seconds",
-    "field-transport-state", "field-rate-state"
+    "panorama-both-toggle", "nudge-seconds",
+    "panorama-transport-state", "panorama-rate-state"
   ]) assert.match(html, new RegExp(`id=["']${id}["']`));
 
   for (const retired of ["step-link", "continue", "context-action", "skim", "speed-select"]) {
     assert.doesNotMatch(html, new RegExp(`id=["']${retired}["']`));
   }
-  assert.equal((html.match(/id=["']field-cycle-rate["']/g) || []).length, 1,
+  assert.equal((html.match(/id=["']panorama-cycle-rate["']/g) || []).length, 1,
     "One cycling-rate pair replaces the two independent side rate controls.");
-  assert.equal((html.match(/id=["']field-both-toggle["']/g) || []).length, 1);
+  assert.equal((html.match(/id=["']panorama-both-toggle["']/g) || []).length, 1);
   assert.match(html, /id=["']tail-pane["'][\s\S]*id=["']player-tail["']/);
   assert.match(html, /id=["']lead-pane["'][\s\S]*id=["']player-lead["']/);
   assert.doesNotMatch(panoramaCss, /\.step-pane-action/, "Side players must not use a transparent overlay element.");
   assert.match(panoramaCss, /\.side-player-surface iframe[\s\S]*pointer-events:\s*none/);
   assert.match(
     panoramaCss,
-    /\.pane-field-controls\s*\{[\s\S]*display:\s*flex[\s\S]*justify-content:\s*center/
+    /\.pane-panorama-controls\s*\{[\s\S]*display:\s*flex[\s\S]*justify-content:\s*center/
   );
   // The Nudge quantum and the Panorama's offsets are both remembered settings,
   // so both are State & Settings. They used to be split across a Tune popover on the
@@ -216,16 +216,16 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   // setting?" depended on which setting.
   assert.match(
     html,
-    /id="parameter-panel"[\s\S]*id="nudge-seconds"[\s\S]*id="field-inner-offset"[\s\S]*id="field-outer-offset"[\s\S]*id="field-cycle-rate"/,
+    /id="parameter-panel"[\s\S]*id="nudge-seconds"[\s\S]*id="panorama-inner-offset"[\s\S]*id="panorama-outer-offset"[\s\S]*id="panorama-cycle-rate"/,
     "Every remembered setting lives in State & Settings."
   );
-  assert.doesNotMatch(html, /center-field-settings/,
+  assert.doesNotMatch(html, /center-panorama-settings/,
     "The Panorama keeps no settings popover of its own.");
   assert.doesNotMatch(field, /bindSideStepSurface/,
     "Step Panorama must expose geometry while the application owns the shared Step gesture.");
   assert.match(app, /tail-player-surface[\s\S]*bindStepPress\(control/);
   assert.match(app, /lead-player-surface[\s\S]*bindStepPress\(control/);
-  assert.match(panoramaCss, /\.pane-field-controls\s*\{[\s\S]*z-index:\s*7/);
+  assert.match(panoramaCss, /\.pane-panorama-controls\s*\{[\s\S]*z-index:\s*7/);
   assert.match(
     panoramaCss,
     /@container \(max-width: 680px\)[\s\S]*grid-template-areas:\s*"center"\s*"tail"\s*"lead"/,

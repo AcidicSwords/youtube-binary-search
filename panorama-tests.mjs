@@ -124,8 +124,8 @@ assert.equal(resolvePanoramaPhase({
   for (const id of [
     "panorama", "player-tail", "player", "player-lead", "center-transport-surface",
     "tail-player-surface", "lead-player-surface",
-    "field-both-toggle", "field-cycle-rate",
-    "field-inner-offset", "field-outer-offset", "nudge-seconds",
+    "panorama-both-toggle", "panorama-cycle-rate",
+    "panorama-inner-offset", "panorama-outer-offset", "nudge-seconds",
     "current-marker", "current-departure-marker",
     "tail-collapse", "lead-collapse", "tail-restore", "lead-restore", "panorama-toggle"
   ]) {
@@ -164,7 +164,7 @@ assert.equal(resolvePanoramaPhase({
   assert.match(panoramaSource, /function toggleBoth\(\)/);
   assert.doesNotMatch(panoramaSource, /function toggleSide\(/,
     "Cycling is one coordinated relation; independent side Stretch/Hold controls are removed.");
-  assert.doesNotMatch(html, /id="(?:tail|lead)-field-toggle"/,
+  assert.doesNotMatch(html, /id="(?:tail|lead)-panorama-visibility-toggle"/,
     "There is one combined Stretch/Hold control.");
   assert.doesNotMatch(html, /id="(?:tail|lead)-rate-select"/,
     "The interface exposes one cycling-rate pair, not two independent side rates.");
@@ -201,15 +201,15 @@ assert.equal(resolvePanoramaPhase({
   // a span act on what you are looking at, so they stay on it.
   assert.match(
     html,
-    /id="parameter-panel"[\s\S]*id="field-inner-offset"[\s\S]*id="field-outer-offset"[\s\S]*id="field-cycle-rate"/,
+    /id="parameter-panel"[\s\S]*id="panorama-inner-offset"[\s\S]*id="panorama-outer-offset"[\s\S]*id="panorama-cycle-rate"/,
     "Persisted Panorama tuning belongs to State & Settings."
   );
   assert.match(
     html,
-    /id="player-panel"[\s\S]*id="panorama-toggle"[\s\S]*id="field-both-toggle"[\s\S]*id="parameter-panel"/,
+    /id="player-panel"[\s\S]*id="panorama-toggle"[\s\S]*id="panorama-both-toggle"[\s\S]*id="parameter-panel"/,
     "and the momentary Panorama controls stay on the Panorama."
   );
-  assert.doesNotMatch(html, /class="field-settings-popover"/,
+  assert.doesNotMatch(html, /class="panorama-settings-popover"/,
     "The Tune popover is gone: its contents are State & Settings now.");
   assert.doesNotMatch(html, /id="(?:tail|lead)-step-button"/,
     "The side video surfaces already own Step; duplicate footer buttons must not return.");
@@ -224,17 +224,17 @@ assert.equal(resolvePanoramaPhase({
     "Every pane must force its implicit content track to shrink instead of clipping the Lead controls.");
   assert.match(layoutCss, /\.player-panel\s*\{[\s\S]*container-type:\s*inline-size/,
     "Step Panorama responsive geometry must measure its containing panel.");
-  assert.match(css, /\.panorama\.field-off[\s\S]*grid-template-areas:\s*"center"[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/,
+  assert.match(css, /\.panorama\.panorama-off[\s\S]*grid-template-areas:\s*"center"[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/,
     "Panorama-off projection must remain Center-only even when collapsed preferences persist.");
-  assert.match(css, /\.panorama\.tail-collapsed:not\(\.lead-collapsed\):not\(\.field-off\)[\s\S]*grid-template-columns:\s*48px minmax\(0, 1fr\)/,
+  assert.match(css, /\.panorama\.tail-collapsed:not\(\.lead-collapsed\):not\(\.panorama-off\)[\s\S]*grid-template-columns:\s*48px minmax\(0, 1fr\)/,
     "A collapsed Tail must release medium-layout width to Lead.");
-  assert.match(css, /\.panorama\.lead-collapsed:not\(\.tail-collapsed\):not\(\.field-off\)[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 48px/,
+  assert.match(css, /\.panorama\.lead-collapsed:not\(\.tail-collapsed\):not\(\.panorama-off\)[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 48px/,
     "A collapsed Lead must release medium-layout width to Tail.");
   assert.match(css, /@container \(max-width: 1440px\)[\s\S]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/,
     "Three-pane controls must fold before their four-column minimum can clip a side pane.");
   assert.match(
     css,
-    /@container \(max-width: 680px\)[\s\S]*\.panorama\.tail-collapsed\.lead-collapsed:not\(\.field-off\)[\s\S]*grid-template-areas:\s*"center"\s*"tail"\s*"lead"/,
+    /@container \(max-width: 680px\)[\s\S]*\.panorama\.tail-collapsed\.lead-collapsed:not\(\.panorama-off\)[\s\S]*grid-template-areas:\s*"center"\s*"tail"\s*"lead"/,
     "Phone stacking must override the more-specific collapsed medium layout."
   );
   assert.match(panoramaSource, /const availableRoles = controllableRoles\(snapshot, prefs\)[\s\S]*const held = runtime\.cycle\.held/,

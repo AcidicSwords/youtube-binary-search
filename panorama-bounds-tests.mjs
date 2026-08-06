@@ -192,7 +192,7 @@ function makeControllerHarness() {
       tail: harness.controller.snapshot().tailMode,
       lead: harness.controller.snapshot().leadMode
     };
-    harness.elements.get("field-both-toggle").click();
+    harness.elements.get("panorama-both-toggle").click();
     assert.deepEqual(
       {
         tail: harness.controller.snapshot().tailMode,
@@ -201,7 +201,7 @@ function makeControllerHarness() {
       suspendedModes,
       "Hold/Stretch controls must not reinterpret a transient Context cursor."
     );
-    assert.equal(harness.elements.get("field-both-toggle").disabled, true);
+    assert.equal(harness.elements.get("panorama-both-toggle").disabled, true);
 
     harness.snapshot = {
       ...harness.snapshot,

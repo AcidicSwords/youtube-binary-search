@@ -61,13 +61,13 @@ assert.equal(resolvePanoramaPhase({
 }), PANORAMA_STATE.HELD);
 
 let session = createSession({ duration: 100, current: 50 });
-const retained = saveExtentAsSection(session, { start: 40, end: 60 }, "Panorama reading", "field-span");
+const retained = saveExtentAsSection(session, { start: 40, end: 60 }, "Panorama reading", "panorama-span");
 assert.equal(retained.changed, true);
 session = retained.session;
 assert.equal(session.model.activeSpan, null, "Retaining a Panorama span must not manufacture a movement Interval.");
 assert.equal(session.model.guide.sections.length, 1);
 assert.equal(session.model.guide.pins.length, 2);
-assert.equal(session.model.guide.sections[0].provenance, "field-span");
+assert.equal(session.model.guide.sections[0].provenance, "panorama-span");
 
 const html = readFileSync("index.html", "utf8");
 const app = readFileSync("app.js", "utf8");
@@ -75,12 +75,12 @@ const panoramaSource = readFileSync("panorama.js", "utf8");
 const css = readFileSync("panorama-layout.css", "utf8");
 const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 
-for (const retired of ["continue", "context-action", "skim", "speed-select", "field-span-loop", "field-span-retain", "loop"]) {
+for (const retired of ["continue", "context-action", "skim", "speed-select", "panorama-span-loop", "panorama-span-retain", "loop"]) {
   assert.doesNotMatch(html, new RegExp(`id=["']${retired}["']`), `Retired playback control remains: ${retired}`);
 }
 for (const id of [
-  "field-transport-state", "field-both-toggle", "panorama-window-fill",
-  "field-inner-offset", "field-outer-offset", "field-cycle-rate",
+  "panorama-transport-state", "panorama-both-toggle", "panorama-window-fill",
+  "panorama-inner-offset", "panorama-outer-offset", "panorama-cycle-rate",
   "section-retain-form", "section-source", "pin-retain-form", "pin-current",
   "release", "retain", "focus-toggle", "shift-layer-toggle",
   "step-distance", "step-mode-fixed", "step-mode-adaptive"

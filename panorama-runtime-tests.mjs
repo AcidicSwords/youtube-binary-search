@@ -48,7 +48,7 @@ function makeHarness({
   };
   let snapshot = {
     videoLoaded: true,
-    videoId: "field-state-test",
+    videoId: "panorama-state-test",
     current: 50,
     range: { start: 0, end: 100 },
     stepDistance: { backward: 10, forward: 10, linked: true },
@@ -272,7 +272,7 @@ function makeHarness({
     assert.equal(h.controller.cycle().sides.tail.offset, 3);
     assert.equal(h.controller.cycle().sides.lead.offset, 3,
       "Equal rate distance through Center must produce equal offsets.");
-    assert.match(h.elements.get("field-rate-state").textContent, /Center 1\.5×/,
+    assert.match(h.elements.get("panorama-rate-state").textContent, /Center 1\.5×/,
       "The Panorama readout reports the observed Center rate, not a fixed 1×.");
 
     h.controller.hold("both");
@@ -414,7 +414,7 @@ function makeHarness({
     h.controller.tick();
     assert.equal(h.tail().time, 35, "Step preview must use the semantic Backward destination, not Panorama Offset.");
     assert.equal(h.lead().time, 72, "Step preview must use the semantic Forward destination, not Panorama Offset.");
-    assert.equal(h.elements.get("field-transport-state").textContent, "Step Frame");
+    assert.equal(h.elements.get("panorama-transport-state").textContent, "Step Frame");
     assert.equal(h.controller.snapshot().span.held, false, "A temporary preview must not become a Held Panorama span.");
     assert.equal(h.controller.getStepSelection("tail").distance, 15);
     assert.equal(h.controller.getStepSelection("tail").address, 35);
@@ -422,7 +422,7 @@ function makeHarness({
     assert.equal(h.controller.getStepSelection("lead").address, 72);
     assert.equal(h.elements.get("tail-player-surface").getAttribute("aria-disabled"), "false");
     assert.equal(h.elements.get("lead-player-surface").getAttribute("aria-disabled"), "false");
-    assert.equal(h.elements.get("field-both-toggle").disabled, true,
+    assert.equal(h.elements.get("panorama-both-toggle").disabled, true,
       "A Panorama Frame makes the combined Stretch/Hold control non-actionable.");
 
     h.snapshot = {
@@ -453,7 +453,7 @@ function makeHarness({
     h.controller.tick();
     assert.equal(h.tail().time, 42);
     assert.equal(h.lead().time, 63);
-    assert.equal(h.elements.get("field-transport-state").textContent, "Refine Frame");
+    assert.equal(h.elements.get("panorama-transport-state").textContent, "Refine Frame");
     assert.equal(h.controller.getStepSelection("tail"), null);
     assert.equal(h.controller.getStepSelection("lead"), null);
 
@@ -469,7 +469,7 @@ function makeHarness({
     h.controller.tick();
     assert.equal(h.tail().time, 25);
     assert.equal(h.lead().time, 75);
-    assert.equal(h.elements.get("field-transport-state").textContent, "Reopen Frame");
+    assert.equal(h.elements.get("panorama-transport-state").textContent, "Reopen Frame");
     assert.equal(h.controller.getStepSelection("tail"), null);
     assert.equal(h.controller.getStepSelection("lead"), null);
 
@@ -492,7 +492,7 @@ function makeHarness({
     assert.equal(h.tail().time, 47.5, "Context preview must park Tail on the first observed frame.");
     assert.equal(h.lead().time, 52.5, "Context preview must park Lead on the last observed frame.");
     assert.equal(h.elements.get("center-meta").textContent, "48.25", "Context Center meta must follow the playing Cursor.");
-    assert.equal(h.elements.get("field-transport-state").textContent, "Context Frame");
+    assert.equal(h.elements.get("panorama-transport-state").textContent, "Context Frame");
     assert.equal(h.controller.getStepSelection("tail"), null);
     assert.equal(h.controller.getStepSelection("lead"), null);
     assert.equal(h.elements.get("tail-player-surface").getAttribute("aria-disabled"), "true");
@@ -530,7 +530,7 @@ function makeHarness({
       }
     };
     h.controller.tick();
-    assert.equal(h.elements.get("field-transport-state").textContent, "Step Frame");
+    assert.equal(h.elements.get("panorama-transport-state").textContent, "Step Frame");
 
     const started = h.controller.playFromGesture({ center: 50 });
     assert.deepEqual(
@@ -552,13 +552,13 @@ function makeHarness({
     h.lead().setTime(54);
     h.controller.tick();
     assert.doesNotMatch(
-      h.elements.get("field-transport-state").textContent,
+      h.elements.get("panorama-transport-state").textContent,
       /preview/,
       "Stretch/Hold playback must not retain the preceding operator-preview presentation."
     );
     assert.equal(h.tail().rate, 0.5);
     assert.equal(h.lead().rate, 1.5);
-    assert.equal(h.elements.get("field-both-toggle").disabled, false,
+    assert.equal(h.elements.get("panorama-both-toggle").disabled, false,
       "Ordinary playback restores the combined Stretch/Hold control.");
   } finally {
     h.restore();
@@ -648,11 +648,11 @@ function makeHarness({
     assert.equal(h.elements.get("center-meta").textContent, "50");
     assert.equal(h.elements.get("tail-meta").textContent, "20");
     assert.equal(h.elements.get("lead-meta").textContent, "90");
-    assert.equal(h.elements.get("field-transport-state").textContent, "Section Frame");
+    assert.equal(h.elements.get("panorama-transport-state").textContent, "Section Frame");
     h.controller.tick();
     assert.equal(h.tail().time, 20, "Polling must not dislodge an active Section preview.");
     assert.equal(h.lead().time, 90, "Polling must preserve the exact preview End.");
-    assert.equal(h.elements.get("field-span-label").textContent, "20–90");
+    assert.equal(h.elements.get("panorama-span-label").textContent, "20–90");
 
     assert.doesNotThrow(() => {
       h.controller.previewExtent({
@@ -688,7 +688,7 @@ function makeHarness({
     });
     assert.equal(h.tail().time, 0, "Pin preview Panorama must clamp Tail at Range Start.");
     assert.equal(h.lead().time, 3.5, "Pin preview Panorama must use its supplied spatial Step target.");
-    assert.equal(h.elements.get("field-transport-state").textContent, "Pin Frame");
+    assert.equal(h.elements.get("panorama-transport-state").textContent, "Pin Frame");
   } finally {
     h.restore();
   }

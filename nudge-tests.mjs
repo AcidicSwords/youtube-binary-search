@@ -117,7 +117,7 @@ assert.equal(byId.get("current-departure-marker").hidden, false,
   "The original Current remains as a faint departure marker.");
 assert.equal(byId.get("current-marker").style.left, "65%",
   "The Current marker follows the candidate Timeline position.");
-assert.equal(byId.get("field-transport-state").textContent, "Current Frame",
+assert.equal(byId.get("panorama-transport-state").textContent, "Current Frame",
   "Direct manipulation temporarily supplies an exact Panorama Frame.");
 assert.equal(env.center().currentTime, 65, "Center displays the candidate frame.");
 // The drag commits a Step, so it must show the Step it will commit. Without a
@@ -409,7 +409,7 @@ const addressBeforePreview = committedPinAddress();
 previewInput.value = "0:20";
 byId.get("pins-list").dispatch("input", { target: previewInput });
 await flush();
-assert.equal(byId.get("field-transport-state").textContent, "Pin Frame",
+assert.equal(byId.get("panorama-transport-state").textContent, "Pin Frame",
   "Typing an Address previews the candidate Panorama Frame.");
 assert.equal(env.center().currentTime, 20);
 assert.equal(committedPinAddress(), addressBeforePreview,
@@ -417,7 +417,7 @@ assert.equal(committedPinAddress(), addressBeforePreview,
 byId.get("pins-list").dispatch("keydown", { target: previewInput, key: "Escape" });
 await flush();
 await poll();
-assert.notEqual(byId.get("field-transport-state").textContent, "Pin Frame",
+assert.notEqual(byId.get("panorama-transport-state").textContent, "Pin Frame",
   "Escape cancels the candidate Frame.");
 assert.equal(committedPinAddress(), addressBeforePreview);
 

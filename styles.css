@@ -16,7 +16,7 @@
   --range-rgb: 137 151 171;
   --resolution-rgb: 121 168 255;
   --interval-rgb: 246 200 110;
-  --field-rgb: 159 217 184;
+  --panorama-rgb: 159 217 184;
   --preview-rgb: 188 154 255;
   --section-preview-rgb: 247 178 103;
   --danger: #ff9b9b;
@@ -413,7 +413,7 @@ kbd {
 .timeline-key.key-resolution i { background: rgba(121, 168, 255, 0.76); }
 .timeline-key.key-interval i { background: rgba(246, 200, 110, 0.88); }
 
-.timeline-key.key-field i {
+.timeline-key.key-panorama i {
   border: 1px solid rgba(159, 217, 184, 0.82);
   background: rgba(159, 217, 184, 0.12);
 }

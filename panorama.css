@@ -1,12 +1,12 @@
 /* Panoramic physical projection of Step Backward | Current | Step Forward. */
 .panorama {
-  --field-gap: clamp(7px, 0.72vw, 12px);
+  --panorama-gap: clamp(7px, 0.72vw, 12px);
   display: grid;
   grid-template-areas: "tail center lead";
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr);
-  gap: var(--field-gap);
+  gap: var(--panorama-gap);
   align-items: center;
-  padding: var(--field-gap);
+  padding: var(--panorama-gap);
   background: #080c11;
 }
 
@@ -117,7 +117,7 @@
 }
 
 .pane-collapse,
-.field-toggle {
+.panorama-visibility-toggle {
   min-height: var(--compact-control-height);
   border-color: rgba(116, 134, 157, 0.62);
   background: #111823;
@@ -141,7 +141,7 @@
   justify-content: flex-end;
 }
 
-.field-toggle {
+.panorama-visibility-toggle {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -149,15 +149,15 @@
   font-size: 0.67rem;
 }
 
-.field-toggle span:last-child { color: var(--muted); }
-.field-toggle[aria-pressed="true"] { border-color: rgba(121, 168, 255, 0.62); }
+.panorama-visibility-toggle span:last-child { color: var(--muted); }
+.panorama-visibility-toggle[aria-pressed="true"] { border-color: rgba(121, 168, 255, 0.62); }
 
 .step-pane .player-wrap {
   min-height: 200px;
   aspect-ratio: 16 / 9;
 }
 
-.pane-field-controls {
+.pane-panorama-controls {
   position: relative;
   z-index: 7;
   display: flex;
@@ -169,7 +169,7 @@
   background: #0b1119;
 }
 
-.field-state-readout {
+.panorama-state-readout {
   display: grid;
   min-width: 0;
   gap: 3px;
@@ -182,7 +182,7 @@
   font-size: 0.62rem;
 }
 
-.field-mode-toggle {
+.panorama-mode-toggle {
   display: flex;
   width: min(100%, 210px);
   min-width: 0;
@@ -194,18 +194,18 @@
   text-align: center;
 }
 
-.field-mode-toggle {
+.panorama-mode-toggle {
   border-color: rgba(159, 217, 184, 0.48);
   background: rgba(159, 217, 184, 0.08);
 }
 
-.field-mode-toggle[aria-pressed="false"] {
+.panorama-mode-toggle[aria-pressed="false"] {
   border-color: rgba(121, 168, 255, 0.52);
   background: rgba(121, 168, 255, 0.08);
 }
 
-.field-mode-toggle small,
-.field-state-readout small {
+.panorama-mode-toggle small,
+.panorama-state-readout small {
   overflow: hidden;
   color: var(--muted);
   font-size: 0.62rem;
@@ -219,12 +219,12 @@
   box-shadow: inset 0 0 0 1px rgba(121, 168, 255, 0.34);
 }
 
-.field-state-readout strong {
+.panorama-state-readout strong {
   color: var(--text);
   font-size: 0.82rem;
 }
 
-.center-field-summary {
+.center-panorama-summary {
   display: flex;
   min-width: 0;
   min-height: var(--compact-control-height);
@@ -233,7 +233,7 @@
   padding: 3px 7px;
 }
 
-.center-field-summary small {
+.center-panorama-summary small {
   max-width: clamp(120px, 18vw, 260px);
 }
 
@@ -256,25 +256,25 @@
 .step-pane.is-collapsed { min-height: 180px; }
 .step-pane.is-collapsed .player-wrap,
 .step-pane.is-collapsed .step-pane-bar,
-.step-pane.is-collapsed .pane-field-controls { display: none; }
+.step-pane.is-collapsed .pane-panorama-controls { display: none; }
 
-.panorama.field-off {
+.panorama.panorama-off {
   grid-template-areas: "center";
   grid-template-columns: minmax(0, 1fr);
 }
-.panorama.field-off .step-pane-side { display: none; }
-.panorama.field-off .step-pane-center {
+.panorama.panorama-off .step-pane-side { display: none; }
+.panorama.panorama-off .step-pane-center {
   width: min(1100px, 100%);
   justify-self: center;
 }
 
-.panorama.tail-collapsed:not(.field-off) {
+.panorama.tail-collapsed:not(.panorama-off) {
   grid-template-columns: 48px minmax(0, 1.1fr) minmax(0, 1fr);
 }
-.panorama.lead-collapsed:not(.field-off) {
+.panorama.lead-collapsed:not(.panorama-off) {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) 48px;
 }
-.panorama.tail-collapsed.lead-collapsed:not(.field-off) {
+.panorama.tail-collapsed.lead-collapsed:not(.panorama-off) {
   grid-template-columns: 48px minmax(0, 1fr) 48px;
 }
 
@@ -287,11 +287,11 @@
 }
 
 @container (max-width: 1440px) {
-  .center-field-summary small { max-width: 150px; }
+  .center-panorama-summary small { max-width: 150px; }
 }
 
 @media (min-width: 1240px) {
-  .panorama:not(.field-off) {
+  .panorama:not(.panorama-off) {
     grid-template-columns:
       minmax(220px, 0.96fr)
       minmax(340px, 1.08fr)
@@ -304,22 +304,22 @@
 }
 
 @container (max-width: 860px) {
-  .panorama:not(.field-off) {
+  .panorama:not(.panorama-off) {
     grid-template-areas:
       "center center"
       "tail lead";
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .panorama.tail-collapsed:not(.lead-collapsed):not(.field-off) {
+  .panorama.tail-collapsed:not(.lead-collapsed):not(.panorama-off) {
     grid-template-columns: 48px minmax(0, 1fr);
   }
 
-  .panorama.lead-collapsed:not(.tail-collapsed):not(.field-off) {
+  .panorama.lead-collapsed:not(.tail-collapsed):not(.panorama-off) {
     grid-template-columns: minmax(0, 1fr) 48px;
   }
 
-  .panorama.tail-collapsed.lead-collapsed:not(.field-off) {
+  .panorama.tail-collapsed.lead-collapsed:not(.panorama-off) {
     grid-template-areas:
       "center center center"
       "tail . lead";
@@ -336,10 +336,10 @@
 }
 
 @container (max-width: 680px) {
-  .panorama:not(.tail-collapsed):not(.lead-collapsed):not(.field-off),
-  .panorama.tail-collapsed:not(.lead-collapsed):not(.field-off),
-  .panorama.lead-collapsed:not(.tail-collapsed):not(.field-off),
-  .panorama.tail-collapsed.lead-collapsed:not(.field-off) {
+  .panorama:not(.tail-collapsed):not(.lead-collapsed):not(.panorama-off),
+  .panorama.tail-collapsed:not(.lead-collapsed):not(.panorama-off),
+  .panorama.lead-collapsed:not(.tail-collapsed):not(.panorama-off),
+  .panorama.tail-collapsed.lead-collapsed:not(.panorama-off) {
     grid-template-areas:
       "center"
       "tail"
@@ -352,13 +352,13 @@
   .step-pane-side .player-wrap { min-height: 200px; aspect-ratio: auto; }
   .step-pane-bar { min-height: 50px; }
   .step-pane-meta { font-size: 0.59rem; }
-  .center-field-summary small { display: none; }
+  .center-panorama-summary small { display: none; }
 }
 
 @media (pointer: coarse) {
   .pane-collapse,
-  .field-toggle,
-  .field-mode-toggle {
+  .panorama-visibility-toggle,
+  .panorama-mode-toggle {
     min-height: var(--touch);
   }
   .pane-collapse { width: var(--touch); }
@@ -379,50 +379,50 @@
    already settled, while the leading pane is receiving material that was not
    previously visible and rises into place. */
 /* Kept equal to FIELD_TRANSITION_MS in panorama.js, which clears the class. */
-.panorama { --field-transition-ms: 260ms; }
+.panorama { --panorama-transition-ms: 260ms; }
 
 .panorama.is-traversing-forward .step-pane,
 .panorama.is-traversing-backward .step-pane {
-  animation-duration: var(--field-transition-ms);
+  animation-duration: var(--panorama-transition-ms);
   animation-timing-function: ease-out;
   animation-fill-mode: both;
 }
 
 .panorama.is-traversing-forward .tail-pane,
 .panorama.is-traversing-backward .lead-pane {
-  animation-name: field-role-settled;
+  animation-name: panorama-role-settled;
 }
 
 .panorama.is-traversing-forward .step-pane-center,
 .panorama.is-traversing-backward .step-pane-center {
-  animation-name: field-role-center;
+  animation-name: panorama-role-center;
 }
 
 .panorama.is-traversing-forward .lead-pane,
 .panorama.is-traversing-backward .tail-pane {
-  animation-name: field-role-arriving;
+  animation-name: panorama-role-arriving;
 }
 
-@keyframes field-role-settled {
+@keyframes panorama-role-settled {
   from { opacity: 1; }
   to { opacity: 0.96; }
 }
-@keyframes field-role-center {
+@keyframes panorama-role-center {
   from { opacity: 0.82; }
   to { opacity: 1; }
 }
-@keyframes field-role-arriving {
+@keyframes panorama-role-arriving {
   from { opacity: 0.55; }
   to { opacity: 1; }
 }
 
 /* The Panorama cycles between its inner and outer offsets during ordinary
    playback. The marker is informational; the relation itself is physical. */
-.panorama.is-cycling .center-field-summary strong {
+.panorama.is-cycling .center-panorama-summary strong {
   color: var(--accent, #79a8ff);
 }
 
-.field-side-state {
+.panorama-side-state {
   display: flex;
   min-width: 0;
   align-items: center;
@@ -436,7 +436,7 @@
   text-transform: uppercase;
 }
 
-.field-side-state small {
+.panorama-side-state small {
   overflow: hidden;
   font-family: var(--mono, ui-monospace, monospace);
   font-size: 0.62rem;

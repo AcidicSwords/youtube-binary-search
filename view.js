@@ -1920,7 +1920,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["timeline-key-range"].dataset.active = String(loaded);
     elements["timeline-key-resolution"].dataset.active = String(Boolean(currentNeighborhood));
     elements["timeline-key-active-span"].dataset.active = String(Boolean(currentSpan));
-    elements["timeline-key-field"].dataset.active = String(Boolean(panoramaWindow));
+    elements["timeline-key-panorama"].dataset.active = String(Boolean(panoramaWindow));
     elements["timeline-key-pins"].dataset.active = String(
       Boolean(orderedPins(guide()).length)
     );
@@ -1957,13 +1957,13 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
     // One bounded cycling relation: 0 < inner < outer.
     const panoramaCycle = currentState.panoramaCycle || { inner: 0.25, outer: 2.5, rate: 0.25 };
-    elements["field-inner-offset"].value = String(panoramaCycle.inner);
-    elements["field-outer-offset"].value = String(panoramaCycle.outer);
-    elements["field-inner-offset"].max = String(panoramaCycle.outer);
-    elements["field-outer-offset"].min = String(panoramaCycle.inner);
+    elements["panorama-inner-offset"].value = String(panoramaCycle.inner);
+    elements["panorama-outer-offset"].value = String(panoramaCycle.outer);
+    elements["panorama-inner-offset"].max = String(panoramaCycle.outer);
+    elements["panorama-outer-offset"].min = String(panoramaCycle.inner);
     if (elements["panorama-setting-value"]) {
       const configuredPair = panoramaSideRates(panoramaCycle.rate);
-      const pair = elements["field-cycle-rate"]?.selectedOptions?.[0]?.textContent
+      const pair = elements["panorama-cycle-rate"]?.selectedOptions?.[0]?.textContent
         || `${configuredPair.tailRate}× / ${configuredPair.leadRate}×`;
       elements["panorama-setting-value"].textContent =
         `${panoramaCycle.inner}–${panoramaCycle.outer} s · ${pair}`;
@@ -2056,17 +2056,17 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const selectedPinExtent = selectedPins.length === 2
       ? { start: selectedPins[0].t, end: selectedPins[1].t }
       : null;
-    let sectionExtent = sectionKind === "field-span"
+    let sectionExtent = sectionKind === "panorama-span"
       ? panoramaWindow
       : sectionKind === "selected-pins"
         ? selectedPinExtent
         : currentSpan;
     const sourceOptions = [...elements["section-source"].options];
-    const panoramaOption = sourceOptions.find(option => option.value === "field-span");
+    const panoramaOption = sourceOptions.find(option => option.value === "panorama-span");
     if (panoramaOption) panoramaOption.disabled = !panoramaWindow;
     const selectedPinsOption = sourceOptions.find(option => option.value === "selected-pins");
     if (selectedPinsOption) selectedPinsOption.disabled = !selectedPinExtent;
-    if (sectionKind === "field-span" && !panoramaWindow && currentSpan) {
+    if (sectionKind === "panorama-span" && !panoramaWindow && currentSpan) {
       elements["section-source"].value = "interval";
       sectionKind = "interval";
       sectionExtent = currentSpan;
@@ -2078,14 +2078,14 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     }
     elements["section-window"].textContent = sectionExtent
       ? `${
-          sectionKind === "field-span"
+          sectionKind === "panorama-span"
             ? "Panorama"
             : sectionKind === "selected-pins"
               ? "Selected Pins"
               : "Active Span"
         } ${formatRange(sectionExtent)}`
       : `No ${
-          sectionKind === "field-span"
+          sectionKind === "panorama-span"
             ? "Held Panorama span"
             : sectionKind === "selected-pins"
               ? "two selected Pins"
@@ -2106,7 +2106,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     for (const id of [
       "go-range-start", "range-start-here", "range-midpoint",
       "go-range-end", "range-end-here", "full-video-range",
-      "field-inner-offset", "field-outer-offset", "field-cycle-rate",
+      "panorama-inner-offset", "panorama-outer-offset", "panorama-cycle-rate",
       "nudge-seconds", "context-seconds", "playback-rate", "playback-dynamic",
       "weight-relaxation-toggle",
       "section-source", "section-label", "pin-label",

@@ -434,7 +434,7 @@ try {
   await page.evaluate(() => document.activeElement?.blur());
   await page.keyboard.press("Space");
   await settle(500);
-  const playingBefore = await text("#field-transport-state");
+  const playingBefore = await text("#panorama-transport-state");
   const currentBefore = await currentAddress();
   const undoBeforeTwitch = await undoTop();
 
@@ -448,7 +448,7 @@ try {
   await page.keyboard.up("g");
   await settle(300);
   assert.equal(await undoTop(), undoBeforeTwitch, "writes no history,");
-  assert.equal(await text("#field-transport-state"), playingBefore,
+  assert.equal(await text("#panorama-transport-state"), playingBefore,
     "and does not settle what was already running.");
   await page.keyboard.press("Space");
   await settle(400);

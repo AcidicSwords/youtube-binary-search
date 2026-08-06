@@ -156,8 +156,8 @@ export function createPanoramaController({
     "tail-pane", "tail-meta", "tail-player-surface", "tail-collapse", "tail-restore",
     "lead-pane", "lead-meta", "lead-player-surface", "lead-collapse", "lead-restore",
     "center-meta", "tail-offset-state", "lead-offset-state",
-    "field-both-toggle", "field-both-toggle-label", "field-transport-state", "field-rate-state",
-    "field-span-label", "field-cycle-rate"
+    "panorama-both-toggle", "panorama-both-toggle-label", "panorama-transport-state", "panorama-rate-state",
+    "panorama-span-label", "panorama-cycle-rate"
   ];
   const elements = Object.fromEntries(ids.map(id => [id, document?.getElementById?.(id) || null]));
 
@@ -444,10 +444,10 @@ export function createPanoramaController({
       changePreferences({ leadVisible: true, panoramaEnabled: true });
     });
     // One cycling-rate pair, not two conceptually independent side rates.
-    elements["field-cycle-rate"]?.addEventListener?.("change", event => {
+    elements["panorama-cycle-rate"]?.addEventListener?.("change", event => {
       changePreferences({ sideRateStep: Number(event.target.value) });
     });
-    elements["field-both-toggle"]?.addEventListener?.("click", toggleBoth);
+    elements["panorama-both-toggle"]?.addEventListener?.("click", toggleBoth);
   }
 
   function createSide(role) {
@@ -684,7 +684,7 @@ export function createPanoramaController({
   // fraction of Center rate; the inward phase exchanges the sides without
   // rewriting that relation.
   function populateCycleRateControl(prefs) {
-    const select = elements["field-cycle-rate"];
+    const select = elements["panorama-cycle-rate"];
     if (!select) return;
     const current = normalizePanoramaCycle({ rate: prefs.sideRateStep }).rate;
     // A valid saved spread remains an available choice even when it predates or
@@ -1698,7 +1698,7 @@ export function createPanoramaController({
     const loaded = Boolean(snapshot.videoLoaded);
     const root = elements["panorama"];
     const shown = loaded && prefs.panoramaEnabled;
-    root.classList.toggle("field-off", !shown);
+    root.classList.toggle("panorama-off", !shown);
     root.classList.toggle("tail-collapsed", !prefs.tailVisible);
     root.classList.toggle("lead-collapsed", !prefs.leadVisible);
     root.classList.toggle("is-suspended", runtime.suspended);
@@ -1776,13 +1776,13 @@ export function createPanoramaController({
     const bothLabel = availableRoles.length === 1
       ? visibleRoles.length === 1 ? "visible side" : "available side"
       : "both";
-    setText(elements["field-both-toggle-label"], held ? "Resume Panorama" : "Freeze Panorama");
-    elements["field-both-toggle"]?.setAttribute?.("aria-pressed", String(held));
-    if (elements["field-both-toggle"]) {
-      elements["field-both-toggle"].disabled = runtime.suspended
+    setText(elements["panorama-both-toggle-label"], held ? "Resume Panorama" : "Freeze Panorama");
+    elements["panorama-both-toggle"]?.setAttribute?.("aria-pressed", String(held));
+    if (elements["panorama-both-toggle"]) {
+      elements["panorama-both-toggle"].disabled = runtime.suspended
         || !shown
         || !availableRoles.length;
-      elements["field-both-toggle"].setAttribute(
+      elements["panorama-both-toggle"].setAttribute(
         "aria-label",
         `${held ? "Panorama is frozen; resume" : "Panorama is cycling; freeze"} ${bothLabel}`
       );
@@ -1798,7 +1798,7 @@ export function createPanoramaController({
       pin: "Pin",
       section: "Section"
     }[preview?.kind] || "Step";
-    setText(elements["field-transport-state"], preview
+    setText(elements["panorama-transport-state"], preview
       ? `${frameLabel} Frame`
       : runtime.suspended
       ? "Panorama suspended"
@@ -1808,10 +1808,10 @@ export function createPanoramaController({
           ? "Cycling in"
           : "Cycling out");
     setText(
-      elements["field-rate-state"],
+      elements["panorama-rate-state"],
       `Tail ${sides.tail.actualRate}× · Center ${snapshotCenterRate(snapshot)}× · Lead ${sides.lead.actualRate}×`
     );
-    setText(elements["field-span-label"], preview
+    setText(elements["panorama-span-label"], preview
       ? `${formatTime(preview.start)}–${formatTime(preview.end)}`
       : field?.span?.held && field.span.available
       ? `${formatTime(field.span.start)}–${formatTime(field.span.end)}`
