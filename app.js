@@ -98,7 +98,7 @@ import {
   createContextTransport,
   createPlaybackTransport,
   fixedRatePolicy,
-  dynamicRatePolicy,
+  texturedRatePolicy,
   resolveOfferedRate,
   resolvePlaybackRate,
   withPlaybackRequestedRate,
@@ -249,7 +249,7 @@ function readPreferences() {
       panoramaCycle: normalizePanoramaCycle(savedPanoramaCycle(value)),
       nudgeSeconds: normalizeNudgeSeconds(value?.nudgeSeconds),
       playbackRate: normalizePlaybackRate(value?.playbackRate),
-      dynamicPlaybackRate: value?.dynamicPlaybackRate === true,
+      texturedPlaybackEnabled: value?.texturedPlaybackEnabled === true || value?.dynamicPlaybackRate === true,
       panoramaEnabled: value?.panoramaEnabled !== false,
       tailVisible: value?.tailVisible !== false,
       leadVisible: value?.leadVisible !== false
@@ -261,7 +261,7 @@ function readPreferences() {
       panoramaCycle: { ...DEFAULT_PANORAMA_CYCLE },
       nudgeSeconds: DEFAULT_NUDGE_SECONDS,
       playbackRate: DEFAULT_PLAYBACK_RATE,
-      dynamicPlaybackRate: false,
+      texturedPlaybackEnabled: false,
       panoramaEnabled: true,
       tailVisible: true,
       leadVisible: true
@@ -285,7 +285,7 @@ const state = {
   nudgeSeconds: normalizeNudgeSeconds(preferences.nudgeSeconds),
   contextSeconds: preferences.contextSeconds,
   playbackRate: preferences.playbackRate,
-  dynamicPlaybackRate: preferences.dynamicPlaybackRate,
+  texturedPlaybackEnabled: preferences.texturedPlaybackEnabled,
   panoramaEnabled: preferences.panoramaEnabled,
   tailVisible: preferences.tailVisible,
   leadVisible: preferences.leadVisible,
@@ -745,7 +745,7 @@ function persistPreferences() {
     preferences.nudgeSeconds = normalizeNudgeSeconds(state.nudgeSeconds);
     preferences.contextSeconds = state.contextSeconds;
     preferences.playbackRate = normalizePlaybackRate(state.playbackRate);
-    preferences.dynamicPlaybackRate = state.dynamicPlaybackRate === true;
+    preferences.texturedPlaybackEnabled = state.texturedPlaybackEnabled === true;
     preferences.panoramaEnabled = state.panoramaEnabled;
     preferences.tailVisible = state.tailVisible;
     preferences.leadVisible = state.leadVisible;
@@ -756,7 +756,7 @@ function persistPreferences() {
       panoramaCycle: preferences.panoramaCycle,
       nudgeSeconds: preferences.nudgeSeconds,
       playbackRate: preferences.playbackRate,
-      dynamicPlaybackRate: preferences.dynamicPlaybackRate,
+      texturedPlaybackEnabled: preferences.texturedPlaybackEnabled,
       panoramaEnabled: preferences.panoramaEnabled,
       tailVisible: preferences.tailVisible,
       leadVisible: preferences.leadVisible
@@ -2019,9 +2019,9 @@ function startPanoramaPlaybackFromGesture(options = {}) {
     placePlayer(destination);
   }
   const shifted = options.shifted === true;
-  const dynamic = shifted && state.dynamicPlaybackRate === true;
+  const dynamic = shifted && state.texturedPlaybackEnabled === true;
   const ratePolicy = dynamic
-    ? dynamicRatePolicy()
+    ? texturedRatePolicy()
     : fixedRatePolicy(shifted ? state.playbackRate : 1);
   const snapshot = playerSnapshot();
   state.transport = createPlaybackTransport({
@@ -3264,7 +3264,7 @@ function pollPlayer() {
   // it already has would be a command per poll.
   if (
     transport.kind === TRANSPORT_KIND.PLAYBACK
-    && transport.ratePolicy?.kind === RATE_POLICY_KIND.DYNAMIC
+    && transport.ratePolicy?.kind === RATE_POLICY_KIND.TEXTURED
   ) {
     const desired = resolvePlaybackRate(transport, {
       offeredRates: offeredRates(),
@@ -5781,7 +5781,7 @@ function renderPlaybackRateChoices() {
     }));
   }
   select.value = String(state.playbackRate);
-  const dynamic = state.dynamicPlaybackRate === true;
+  const dynamic = state.texturedPlaybackEnabled === true;
   const check = elements["playback-dynamic"];
   if (check) check.checked = dynamic;
   elements["playback-rate-value"].textContent = dynamic
@@ -5799,8 +5799,8 @@ function retuneActiveShiftPlayback() {
   const previousRate = state.transport.requestedRate;
   state.transport = withPlaybackRatePolicy(
     state.transport,
-    state.dynamicPlaybackRate
-      ? dynamicRatePolicy()
+    state.texturedPlaybackEnabled
+      ? texturedRatePolicy()
       : fixedRatePolicy(state.playbackRate),
     {
       offeredRates: offeredRates(),
@@ -5814,11 +5814,11 @@ function retuneActiveShiftPlayback() {
 }
 
 elements["playback-dynamic"].addEventListener("change", event => {
-  state.dynamicPlaybackRate = event.target.checked === true;
+  state.texturedPlaybackEnabled = event.target.checked === true;
   persistPreferences();
   renderPlaybackRateChoices();
   retuneActiveShiftPlayback();
-  setStatus(state.dynamicPlaybackRate
+  setStatus(state.texturedPlaybackEnabled
     ? "Shift plays Center at a rate that follows Section weight."
     : `Shift plays Center at ${formatRate(effectivePlaybackRate())}.`);
   view.render();

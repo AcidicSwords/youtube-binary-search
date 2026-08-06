@@ -2120,7 +2120,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     // returns as soon as the box is cleared.
     if (elements["playback-rate"]) {
       elements["playback-rate"].disabled = interactionLocked
-        || state().dynamicPlaybackRate === true;
+        || state().texturedPlaybackEnabled === true;
     }
 
     elements["save-section"].disabled = interactionLocked || !sectionExtent;

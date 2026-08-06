@@ -14,10 +14,10 @@ import {
 import {
   OBSERVATION_POLICY,
   createPlaybackTransport,
-  desiredCenterRate,
-  resolveCenterRate,
+  texturedRateForWeight,
+  resolveTexturedRate,
   panoramaTriplet,
-  dynamicRatePolicy,
+  texturedRatePolicy,
   fixedRatePolicy,
   playbackAllowsPanorama,
   rebasePlaybackTransport,
@@ -329,7 +329,7 @@ has(topLevelFunction(appCode, "commitNativeGo"), /projection:\s*timelineProjecti
   "A paused native seek reconciles through the effective projection.");
 has(topLevelFunction(appCode, "startNativePlaybackSession"), /projection:\s*timelineProjection\(\)/,
   "Native Play reconciles its starting Address through the effective projection.");
-has(appCode, /dynamicRatePolicy|RATE_POLICY_KIND\.DYNAMIC[\s\S]*?timelineProjection\(\)\.effectiveWeightAtSource/,
+has(appCode, /texturedRatePolicy|RATE_POLICY_KIND\.DYNAMIC[\s\S]*?timelineProjection\(\)\.effectiveWeightAtSource/,
   "Explicit dynamic playback reads the effective projection.");
 has(topLevelFunction(appCode, "handleTimelineClick"), /state\.timelineSelection = null[\s\S]*?moveToAddress\(/,
   "Bare Timeline Go clears the acquired operand before moving.");
@@ -371,9 +371,9 @@ lacks(release, /guideSelection\s*=\s*null|weightRelaxation\s*=|focus\s*=|setRang
     "A ladder without quarter steps cannot hold a triplet, and is not faked.");
   check(playbackAllowsPanorama(withPlaybackActualRate(panorama, 1), onLadder),
     "Confirmed return to 1x restores only Panorama-owned observation.");
-  check(desiredCenterRate(8) === 0.25 && desiredCenterRate(0.125) === 1.75,
+  check(texturedRateForWeight(8) === 0.25 && texturedRateForWeight(0.125) === 1.75,
     "Weight is read as one rate step per octave, not as an inverse.");
-  check(resolveCenterRate(4, LADDER) === 0.5 && resolveCenterRate(0.25, LADDER) === 1.5,
+  check(resolveTexturedRate(4, LADDER) === 0.5 && resolveTexturedRate(0.25, LADDER) === 1.5,
     "and resolved onto the ladder the adapter offers.");
   same(panoramaTriplet(1.25, LADDER), { tail: 1, center: 1.25, lead: 1.5 },
     "Every Panorama-capable Center has an exact adjacent triplet.");
@@ -383,7 +383,7 @@ lacks(release, /guideSelection\s*=\s*null|weightRelaxation\s*=|focus\s*=|setRang
   const dynamic = createPlaybackTransport({
     departure: 2,
     observationPolicy: OBSERVATION_POLICY.CENTER_ONLY,
-    ratePolicy: dynamicRatePolicy(),
+    ratePolicy: texturedRatePolicy(),
     offeredRates: [0.25, 0.5, 1, 2, 4],
     weighting: 2,
     actualRate: 0.5
@@ -401,8 +401,8 @@ for (const symbol of [
   "requestedRate",
   "actualRate",
   "resolveOfferedRate",
-  "desiredCenterRate",
-  "resolveCenterRate",
+  "texturedRateForWeight",
+  "resolveTexturedRate",
   "panoramaTriplet"
 ]) has(transportSource, new RegExp(`\\b${symbol}\\b`), `Transport exposes ${symbol}.`);
 // User time is written by the routes that actually move the reader, and by no

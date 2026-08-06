@@ -213,7 +213,7 @@ for (const entry of [
   "Deformation Bypass / Toggle Deformation",
   "Drawn Group",
   "Release",
-  "Dynamic Playback",
+  "Textured Playback",
   "Load Generation",
   "Source-transition boundary",
   "Guide Recovery"
@@ -225,7 +225,7 @@ has(docs["GLOSSARY.md"], /Drawn Group[\s\S]{0,240}?At most one Group is drawn[\s
   "Glossary defines zero-or-one drawn Group.");
 has(docs["GLOSSARY.md"], /Release[\s\S]{0,300}?Active Span[\s\S]{0,120}?acquired Timeline operand[\s\S]{0,220}?preserves Current/i,
   "Glossary defines Release's exact cleared and preserved dimensions.");
-has(docs["GLOSSARY.md"], /Dynamic Playback[\s\S]{0,400}?Section Weight[\s\S]{0,200}?playback-rate step/i,
+has(docs["GLOSSARY.md"], /Textured Playback[\s\S]{0,400}?Section Weight[\s\S]{0,200}?playback-rate step/i,
   "Glossary qualifies the optional dynamic Weight read-through as one rate step per octave.");
 // The law is a log-compressed texture, not a correction of the map. Naming it as
 // an inverse would advertise a relation the implementation does not provide --

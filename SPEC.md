@@ -216,7 +216,7 @@ The same projection supplies:
 - spatial readouts;
 - exact source-time sourceGridLines;
 - deformation atmosphere contributors;
-- optional Dynamic Playback Weight.
+- optional Textured Playback Weight.
 
 An operation or drag captures the projection it begins with. Its geometry cannot change underneath its pointer or repeat sequence. A projection-changing action must wait for, settle, cancel, or refuse an active direct-manipulation owner.
 
@@ -589,13 +589,13 @@ The actual-rate event updates only transport runtime and Panorama availability. 
 
 Fixed wishes resolve against positive offered rates in logarithmic distance, because rate distance is multiplicative. An exact tie prefers the offer nearer `1×`, then a deterministic numeric tie. If available rates expand, the fixed wish is retained and an active fixed Shift playback retunes when a closer offer appears.
 
-Dynamic Playback requests:
+Textured Playback requests:
 
 ```text
 wish = 1 / effective Weight at Current
 ```
 
-The inverse is unconstrained. The media adapter’s offered rates provide the real bounds. Dynamic Playback is Center only and is the sole playback mode that reads effective projection Weight.
+The inverse is unconstrained. The media adapter’s offered rates provide the real bounds. Textured Playback is Center only and is the sole playback mode that reads effective projection Weight.
 
 ### 8.4 Retry, wrap, and settlement
 
@@ -605,7 +605,7 @@ A proper-Range wrap:
 
 1. rebases the same transport at Range Start;
 2. preserves observation policy;
-3. resolves the stored fixed wish again or derives Dynamic Playback Weight at Range Start;
+3. resolves the stored fixed wish again or derives Textured Playback Weight at Range Start;
 4. requests that rate;
 5. preserves Panorama availability or suspension from explicit ownership and actual compatibility;
 6. adds no history.
@@ -740,7 +740,7 @@ Every visible route is an adapter to one semantic consequence:
 - typed Address and pointer movement differ only in candidate acquisition and boundary policy, then converge on the same canonical move;
 - Tag duplicate detection has one identity rule;
 - Group deletion copy and mutation consume one deletion plan;
-- geometry, atmosphere, navigation, preview, and Dynamic Playback consume one effective projection.
+- geometry, atmosphere, navigation, preview, and Textured Playback consume one effective projection.
 
 Previews are dry runs or pure projections. They cannot maintain parallel target arithmetic. When commit occurs, the same operation that supplied the preview consequence owns the canonical state transition.
 

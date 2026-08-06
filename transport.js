@@ -18,7 +18,7 @@ export const RATE_POLICY_KIND = Object.freeze({
   // does not cancel the map's deformation and must not be named as though it
   // did: compressed regions play faster and expanded regions play slower, by
   // one rate step per octave, which is a fraction of exact inversion.
-  DYNAMIC: "dynamic-weight-texture"
+  TEXTURED: "textured"
 });
 
 // One playback-rate step per octave of Weight, and one step between adjacent
@@ -105,13 +105,13 @@ export function fixedRatePolicy(wish = 1) {
   };
 }
 
-export function dynamicRatePolicy() {
-  return { kind: RATE_POLICY_KIND.DYNAMIC };
+export function texturedRatePolicy() {
+  return { kind: RATE_POLICY_KIND.TEXTURED };
 }
 
 function normalizeRatePolicy(policy) {
-  return policy?.kind === RATE_POLICY_KIND.DYNAMIC
-    ? dynamicRatePolicy()
+  return policy?.kind === RATE_POLICY_KIND.TEXTURED
+    ? texturedRatePolicy()
     : fixedRatePolicy(policy?.wish);
 }
 
@@ -163,7 +163,7 @@ export function resolveOfferedRate(wish, rates) {
 // and every halving accelerates it by one. This deliberately falls far short of
 // inverting the map — W = 4 plays at 0.5×, not 0.25× — because the aim is a
 // readable texture over a continuous playback, not constant Timeline velocity.
-export function desiredCenterRate(weight) {
+export function texturedRateForWeight(weight) {
   const value = Number(weight);
   if (!Number.isFinite(value) || value <= 0) return 1;
   return 1 - CENTER_RATE_OCTAVE_STEP * Math.log2(value);
@@ -178,8 +178,8 @@ export function desiredCenterRate(weight) {
 // nearest is measured linearly. An exact tie — which lands precisely on a
 // half-octave of Weight — resolves toward 1×, so the boundaries of the buckets
 // belong to the calmer of the two rates.
-export function resolveCenterRate(weight, rates) {
-  const target = desiredCenterRate(weight);
+export function resolveTexturedRate(weight, rates) {
+  const target = texturedRateForWeight(weight);
   const offered = normalizedOfferedRates(rates);
   return offered.reduce((best, candidate) => {
     const distance = Math.abs(candidate - target);
@@ -224,8 +224,8 @@ export function resolvePlaybackRate(
   { offeredRates = [1], weight = 1 } = {}
 ) {
   if (transport?.kind !== TRANSPORT_KIND.PLAYBACK) return 1;
-  return transport.ratePolicy?.kind === RATE_POLICY_KIND.DYNAMIC
-    ? resolveCenterRate(weight, offeredRates)
+  return transport.ratePolicy?.kind === RATE_POLICY_KIND.TEXTURED
+    ? resolveTexturedRate(weight, offeredRates)
     : resolveOfferedRate(positiveRate(transport.ratePolicy?.wish), offeredRates);
 }
 

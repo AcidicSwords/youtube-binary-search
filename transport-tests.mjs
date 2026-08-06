@@ -3,11 +3,11 @@ import {
   OBSERVATION_POLICY,
   RATE_POLICY_KIND,
   TRANSPORT_KIND,
-  desiredCenterRate,
-  resolveCenterRate,
+  texturedRateForWeight,
+  resolveTexturedRate,
   panoramaTriplet,
   offerIsKnown,
-  dynamicRatePolicy,
+  texturedRatePolicy,
   fixedRatePolicy,
   idleTransport,
   deriveContextWindow,
@@ -101,21 +101,21 @@ assert.deepEqual(
 // inside what the Panorama can hold.
 const LADDER = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 {
-  assert.equal(desiredCenterRate(1), 1, "Neutral plays at 1x.");
-  assert.equal(desiredCenterRate(2), 0.75, "A doubling costs exactly one step.");
-  assert.equal(desiredCenterRate(0.5), 1.25, "A halving gains exactly one step.");
-  assert.equal(desiredCenterRate(4), 0.5, "Two octaves, two steps.");
-  assert.equal(desiredCenterRate(0.125), 1.75);
-  assert.equal(desiredCenterRate(8), 0.25);
-  assert.equal(desiredCenterRate(0), 1, "A nonsense weight changes nothing.");
-  assert.equal(desiredCenterRate(Number.NaN), 1);
+  assert.equal(texturedRateForWeight(1), 1, "Neutral plays at 1x.");
+  assert.equal(texturedRateForWeight(2), 0.75, "A doubling costs exactly one step.");
+  assert.equal(texturedRateForWeight(0.5), 1.25, "A halving gains exactly one step.");
+  assert.equal(texturedRateForWeight(4), 0.5, "Two octaves, two steps.");
+  assert.equal(texturedRateForWeight(0.125), 1.75);
+  assert.equal(texturedRateForWeight(8), 0.25);
+  assert.equal(texturedRateForWeight(0), 1, "A nonsense weight changes nothing.");
+  assert.equal(texturedRateForWeight(Number.NaN), 1);
 
   // Every canonical Weight, resolved onto the ladder a player actually offers.
   for (const [weight, expected] of [
     [0.125, 1.75], [0.25, 1.5], [0.5, 1.25], [0.75, 1], [1, 1],
     [1.25, 1], [1.5, 0.75], [1.75, 0.75], [2, 0.75], [4, 0.5], [8, 0.25]
   ]) {
-    assert.equal(resolveCenterRate(weight, LADDER), expected,
+    assert.equal(resolveTexturedRate(weight, LADDER), expected,
       `Weight ${weight} plays Center at ${expected}x.`);
   }
 
@@ -125,7 +125,7 @@ const LADDER = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
     [[0.25, 0.5], 1.75], [[2, 2, 2], 0.25]
   ]) {
     const composed = factors.reduce((product, factor) => product * factor, 1);
-    assert.equal(resolveCenterRate(composed, LADDER), expected,
+    assert.equal(resolveTexturedRate(composed, LADDER), expected,
       `${factors.join(" x ")} composes to Center ${expected}x.`);
   }
 
@@ -134,22 +134,22 @@ const LADDER = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
   // of the two rates.
   for (const octave of [-3, -2, -1, 0, 1, 2]) {
     const boundary = Math.pow(2, octave + 0.5);
-    const desired = desiredCenterRate(boundary);
+    const desired = texturedRateForWeight(boundary);
     const lower = Math.round((desired - 0.125) * 4) / 4;
     const upper = lower + 0.25;
     const toward = Math.abs(lower - 1) < Math.abs(upper - 1) ? lower : upper;
-    assert.equal(resolveCenterRate(boundary, LADDER), toward,
+    assert.equal(resolveTexturedRate(boundary, LADDER), toward,
       `An exact tie at W = 2^${octave + 0.5} resolves toward 1x.`);
     assert.notEqual(
-      resolveCenterRate(boundary * (1 - 1e-6), LADDER),
-      resolveCenterRate(boundary * (1 + 1e-6), LADDER),
+      resolveTexturedRate(boundary * (1 - 1e-6), LADDER),
+      resolveTexturedRate(boundary * (1 + 1e-6), LADDER),
       `W = 2^${octave + 0.5} is a genuine bucket boundary.`
     );
   }
 
   // Monotone: more map always means more time on it, never less.
   const weights = [0.125, 0.2, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4, 8];
-  const rates = weights.map(weight => resolveCenterRate(weight, LADDER));
+  const rates = weights.map(weight => resolveTexturedRate(weight, LADDER));
   for (let index = 1; index < rates.length; index += 1) {
     assert.ok(rates[index] <= rates[index - 1],
       `Rate must not rise with Weight (${weights[index - 1]} -> ${weights[index]}).`);
@@ -277,19 +277,19 @@ const LADDER = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
   const dynamic = createPlaybackTransport({
     departure: 20,
     observationPolicy: OBSERVATION_POLICY.CENTER_ONLY,
-    ratePolicy: dynamicRatePolicy(),
+    ratePolicy: texturedRatePolicy(),
     offeredRates: LADDER,
     weight: 4,
     actualRate: 0.5
   });
-  assert.equal(dynamic.ratePolicy.kind, RATE_POLICY_KIND.DYNAMIC);
+  assert.equal(dynamic.ratePolicy.kind, RATE_POLICY_KIND.TEXTURED);
   assert.equal(dynamic.requestedRate, 0.5, "Two octaves of Weight cost two rate steps.");
 
   const wrapped = rebasePlaybackTransport(dynamic, 10, 1234);
   assert.equal(wrapped.cycles, 1);
   assert.equal(wrapped.entry, 10);
   assert.equal(wrapped.observationPolicy, OBSERVATION_POLICY.CENTER_ONLY);
-  assert.equal(wrapped.ratePolicy.kind, RATE_POLICY_KIND.DYNAMIC);
+  assert.equal(wrapped.ratePolicy.kind, RATE_POLICY_KIND.TEXTURED);
   assert.equal(wrapped.actualRate, 0.5);
   assert.equal(resolvePlaybackRate(wrapped, {
     offeredRates: LADDER,
@@ -326,7 +326,7 @@ const LADDER = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
   const dynamicAt = (weight, actualRate) => createPlaybackTransport({
     departure: 40,
     observationPolicy: OBSERVATION_POLICY.PANORAMA,
-    ratePolicy: dynamicRatePolicy(),
+    ratePolicy: texturedRatePolicy(),
     offeredRates: LADDER,
     weight,
     actualRate
@@ -357,7 +357,7 @@ const LADDER = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
   const confirmed = withPlaybackActualRate(requestedOnly, 0.25);
   assert.equal(playbackAllowsPanorama(confirmed, { offeredRates: LADDER }), false,
     "Confirmation is what suspends it.");
-  assert.equal(confirmed.ratePolicy.kind, RATE_POLICY_KIND.DYNAMIC,
+  assert.equal(confirmed.ratePolicy.kind, RATE_POLICY_KIND.TEXTURED,
     "and suspension is a presentation consequence, not the end of the policy.");
   assert.equal(confirmed.requestedRate, 0.25, "nor a rewrite of the request.");
 
@@ -366,7 +366,7 @@ const LADDER = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
   // policy, and re-resolving it against the offer still yields the Weight's
   // answer rather than what the reader picked by hand.
   const native = withPlaybackActualRate(dynamicAt(4, 0.5), 2);
-  assert.equal(native.ratePolicy.kind, RATE_POLICY_KIND.DYNAMIC);
+  assert.equal(native.ratePolicy.kind, RATE_POLICY_KIND.TEXTURED);
   assert.equal(native.requestedRate, 0.5, "Two octaves of Weight still ask for two steps down,");
   assert.equal(playbackAllowsPanorama(native, { offeredRates: LADDER }), false,
     "and the top of the ladder has no Lead, so Center plays alone.");
@@ -390,11 +390,11 @@ const LADDER = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
   // 5. Both extremes of the texture. Eight octaves apart, both outside the
   // Panorama window, and neither ends the Playback transaction.
   for (const [weight, rate] of [[8, 0.25], [0.03125, 2]]) {
-    const extreme = dynamicAt(weight, resolveCenterRate(weight, LADDER));
+    const extreme = dynamicAt(weight, resolveTexturedRate(weight, LADDER));
     assert.equal(extreme.requestedRate, rate, `Weight ${weight} asks for ${rate}x,`);
     assert.equal(playbackAllowsPanorama(extreme, { offeredRates: LADDER }), false,
       "which has no complete triplet,");
-    assert.equal(extreme.ratePolicy.kind, RATE_POLICY_KIND.DYNAMIC,
+    assert.equal(extreme.ratePolicy.kind, RATE_POLICY_KIND.TEXTURED,
       "and Center goes on playing under the same policy.");
   }
 }

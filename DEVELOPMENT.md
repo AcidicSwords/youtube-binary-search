@@ -94,7 +94,7 @@ owner. Do not reach through the media adapter from application or Panorama code.
 - Deformation bypass is passed into projection construction and is never
   written into Guide or history.
 - A focused viewport changes drawing only; operator metrics cannot observe it.
-- Dynamic Playback may read effective Weight only when its explicit rate policy
+- Textured Playback may read effective Weight only when its explicit rate policy
   requests that relation.
 
 ### Transactions and interaction
