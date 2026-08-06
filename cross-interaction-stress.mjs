@@ -109,15 +109,15 @@ const weight = inSections("sectionWeighting")[0];
 weight.value = "4";
 await changeIn("sections-list", weight);
 const deformedDuration = byId.get("duration-time").textContent;
-assert.match(deformedDuration, /spatial/,
-  "A Weight above 1 deforms the map.");
+assert.match(deformedDuration, /Timeline allocation/,
+  "A Weight above 1 changes the map's Timeline Allocation Factor.");
 assert.equal(deformed(), true);
 assert.equal(drawnBars(), 2);
 assert.equal(drawnPins(), 4);
 
 // Inactive: the terrain flattens, the topology stays.
 await setGroupState("group-default", "weightsEnabled", false);
-assert.doesNotMatch(byId.get("duration-time").textContent, /spatial/,
+assert.doesNotMatch(byId.get("duration-time").textContent, /Timeline allocation/,
   "An inactive Group's Weights deform nothing.");
 assert.equal(deformed(), false, "and draw no gradient.");
 assert.equal(drawnBars(), 2, "while its Sections stay on the map.");

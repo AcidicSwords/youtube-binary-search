@@ -33,7 +33,10 @@ import {
   sortedSections,
   clusterPinsByPixels
 } from "./guide.js";
-import { projectionForModel } from "./timeline-projection.js";
+import {
+  projectionForModel,
+  timelineAllocationFactor
+} from "./timeline-projection.js";
 import {
   TRANSPORT_KIND,
   isTransportActive
@@ -58,24 +61,17 @@ const TIMELINE_PIN_HIT_SIZE = 52;
 const COARSE_TIMELINE_PIN_HIT_SIZE = 56;
 
 // Spatial time is not a duration. It is how much map a source span is given,
-// and it only means anything against the source span it stretches. Reporting
-// it as an absolute figure invites reading it as real elapsed time, so every
-// spatial span is reported as the factor it applies to its own source — and
-// only when that factor is not 1, because at 1 the map and the source already
-// correspond and there is nothing to say.
-const STRETCH_TOLERANCE = 1e-6;
+// Timeline Allocation is meaningful only relative to the Source-Time extent it
+// qualifies. Neutral allocation is omitted because map and source already
+// correspond exactly at 1×.
+const TIMELINE_ALLOCATION_TOLERANCE = 1e-6;
 
-function stretchFactor(spatialSpan, sourceSpan) {
-  if (!Number.isFinite(spatialSpan) || !Number.isFinite(sourceSpan)) return null;
-  if (!(sourceSpan > STRETCH_TOLERANCE)) return null;
-  const factor = spatialSpan / sourceSpan;
-  if (!Number.isFinite(factor) || factor <= 0) return null;
-  return Math.abs(factor - 1) <= STRETCH_TOLERANCE ? null : factor;
-}
-
-function formatStretchFactor(spatialSpan, sourceSpan) {
-  const factor = stretchFactor(spatialSpan, sourceSpan);
-  return factor === null ? null : `${Number(factor.toFixed(3))}×`;
+function formatTimelineAllocationFactor(projectedExtent, sourceExtent) {
+  const factor = timelineAllocationFactor(projectedExtent, sourceExtent);
+  if (factor === null || Math.abs(factor - 1) <= TIMELINE_ALLOCATION_TOLERANCE) {
+    return null;
+  }
+  return `${Number(factor.toFixed(3))}×`;
 }
 
 export function formatDuration(seconds) {
@@ -1924,9 +1920,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["timeline-key-pins"].dataset.active = String(
       Boolean(orderedPins(guide()).length)
     );
-    const overallStretchFactor = formatStretchFactor(projection.timelineExtent, model().duration);
-    elements["duration-time"].textContent = overallStretchFactor
-      ? `${formatTime(model().duration)} · ${overallStretchFactor} spatial`
+    const overallTimelineAllocationFactor = formatTimelineAllocationFactor(
+      projection.timelineExtent,
+      model().duration
+    );
+    elements["duration-time"].textContent = overallTimelineAllocationFactor
+      ? `${formatTime(model().duration)} · ${overallTimelineAllocationFactor} Timeline allocation`
       : formatTime(model().duration);
     elements["range-label"].textContent = loaded ? formatRange(activeRange) : "—";
     const resolutionTimelineExtent = currentNeighborhood
@@ -1935,7 +1934,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const resolutionSourceDuration = currentNeighborhood
       ? currentNeighborhood.R - currentNeighborhood.L
       : null;
-    const neighborhoodStretchFactor = formatStretchFactor(
+    const neighborhoodTimelineAllocationFactor = formatTimelineAllocationFactor(
       resolutionTimelineExtent,
       resolutionSourceDuration
     );
@@ -1943,7 +1942,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? `${
           formatDuration(resolutionSourceDuration)
         }${
-          neighborhoodStretchFactor ? ` · ${neighborhoodStretchFactor} spatial` : ""
+          neighborhoodTimelineAllocationFactor
+            ? ` · ${neighborhoodTimelineAllocationFactor} Timeline allocation`
+            : ""
         } · ${
           currentState.session.model.neighborhoodBasis === NEIGHBORHOOD_BASIS.MOVEMENT
             ? "Movement scale"
@@ -2241,13 +2242,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           : `${classifyRetainedRefineRelation(currentSpan, semanticCurrent, targets.forward) === "full" ? "full movement" : "retain anchor"} · to ${formatTime(targets.forward)}`
     );
     const rangeSourceSpan = activeRange.end - activeRange.start;
-    const rangeStretchFactor = formatStretchFactor(
+    const rangeTimelineAllocationFactor = formatTimelineAllocationFactor(
       projection.timelineDistance(activeRange.start, activeRange.end),
       rangeSourceSpan
     );
     elements["reopen-meta"].textContent = actionModel?.reopen
       ? `${formatDuration(rangeSourceSpan)} Range${
-          rangeStretchFactor ? ` · ${rangeStretchFactor} spatial` : ""
+          rangeTimelineAllocationFactor
+            ? ` · ${rangeTimelineAllocationFactor} Timeline allocation`
+            : ""
         }`
       : "Range-level resolution";
     // Step Distance is a distance on the map, and inside a weighted Section a

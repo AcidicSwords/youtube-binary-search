@@ -13,7 +13,8 @@ import {
 } from "./guide.js";
 import {
   createTimelineProjection,
-  projectionForModel
+  projectionForModel,
+  timelineAllocationFactor
 } from "./timeline-projection.js";
 import {
   createRoot,
@@ -35,6 +36,11 @@ const close = (actual, expected, message = "values differ") => {
     `${message}: ${actual} !== ${expected}`
   );
 };
+
+close(timelineAllocationFactor(15, 10), 1.5,
+  "Timeline Allocation Factor is projected extent divided by Source-Time extent");
+assert.equal(timelineAllocationFactor(0, 0), null);
+assert.equal(timelineAllocationFactor(Number.NaN, 10), null);
 
 assert.deepEqual(
   SECTION_WEIGHTING_VALUES,
@@ -60,6 +66,14 @@ const projection = createTimelineProjection({ duration: 100, guide });
 
 assert.equal(validateGuide(guide, 100), true);
 assert.equal(projection.timelineExtent, 90);
+assert.equal(compressed.weighting, 0.5, "Section Weighting is the stored attribute.");
+assert.equal(projection.effectiveWeightAtSource(40), 0.5,
+  "Effective Weight is the operative pointwise product.");
+close(
+  timelineAllocationFactor(projection.timelineExtent, 100),
+  0.9,
+  "Timeline Allocation Factor is the derived average across the qualified extent"
+);
 assert.equal(projection.sourceToTimeline(29), 29);
 assert.equal(projection.sourceToTimeline(30), 30);
 assert.equal(projection.sourceToTimeline(40), 35);
