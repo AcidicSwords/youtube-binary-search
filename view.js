@@ -203,10 +203,20 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
   const state = () => getState();
   const model = () => state().session.model;
-  const resolution = () => model().neighborhood;
+  const presentationModel = () => {
+    const accepted = model();
+    const ghost = state().ghostGesture;
+    if (!ghost?.changed) return accepted;
+    return {
+      ...accepted,
+      neighborhood: ghost.previewNeighborhood || accepted.neighborhood,
+      activeSpan: ghost.previewActiveSpan ?? null
+    };
+  };
+  const resolution = () => presentationModel().neighborhood;
   const range = () => model().range;
   const guide = () => model().guide;
-  const interval = () => model().activeSpan;
+  const interval = () => presentationModel().activeSpan;
   const focusedSectionId = () => (
     model().focus?.kind === "active-span"
       ? null
@@ -1679,7 +1689,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         })
       : null;
     const livePlayback = Boolean(playbackProjection?.changed);
-    const projectedModel = livePlayback ? playbackProjection.model : model();
+    const projectedModel = livePlayback
+      ? playbackProjection.model
+      : presentationModel();
     const projectedNeighborhood = canonicalNeighborhoodDirections(
       projectedModel?.neighborhood
     );
@@ -1802,6 +1814,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? { start: panoramaState.span.start, end: panoramaState.span.end }
       : null;
     const semanticCurrent = currentNeighborhood?.C ?? 0;
+    const acceptedCurrent = model().neighborhood?.C ?? 0;
+    const ghostCandidateActive = currentState.ghostGesture?.changed === true;
     const configuredReach = model().stepDistance;
     const effectiveReach = effectiveStepDistance(
       configuredReach,
@@ -1955,7 +1969,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
             : "Range scale"
         }`
       : "—";
-    elements["pin-current-position"].textContent = currentNeighborhood ? `Current ${formatTime(semanticCurrent)}` : "Current —";
+    elements["pin-current-position"].textContent = currentNeighborhood
+      ? `${ghostCandidateActive ? "Ghost Candidate" : "Current"} ${formatTime(semanticCurrent)}`
+      : "Current —";
     elements["context-setting-value"].textContent = currentState.contextDuration > 0
       ? `${currentState.contextDuration} s centered on Current`
       : "Off";
@@ -2107,7 +2123,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       elements["focused-section-range"].textContent = "—";
     }
 
-    const interactionLocked = !loaded;
+    const interactionLocked = !loaded || ghostCandidateActive;
     for (const id of [
       "go-range-start", "range-start-here", "range-midpoint",
       "go-range-end", "range-end-here", "full-video-range",
@@ -2341,6 +2357,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const currentDrag = state().currentDrag;
     const dragging = Boolean(currentDrag?.moved);
     const candidate = dragging ? currentDrag.candidate : semanticCurrent;
+    elements["current-marker"].dataset.acceptedAddress = String(acceptedCurrent);
+    elements["current-marker"].dataset.ghostCandidate = ghostCandidateActive
+      ? String(candidate)
+      : "";
     setMarkerPosition(elements["current-marker"], candidate);
     elements["current-marker"].classList.toggle("is-dragging", dragging);
     elements["current-marker"].classList.toggle(
@@ -2353,7 +2373,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     );
     elements["current-marker"].setAttribute(
       "aria-valuetext",
-      `${formatTime(candidate)}; Current${dragging ? " candidate" : ""}`
+      `${formatTime(candidate)}; ${
+        ghostCandidateActive ? "Ghost Candidate" : `Current${dragging ? " candidate" : ""}`
+      }`
     );
     // Current reads its own source Address on the map, where it is looked at.
     if (!currentMarkerTime.parentElement) {

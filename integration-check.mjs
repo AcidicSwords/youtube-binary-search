@@ -254,8 +254,10 @@ has(toggleWeightRelaxation, /directManipulationActive\(\)/,
 // One predicate answers "is a gesture in progress", so no caller can name a
 // subset of the drags by hand and quietly omit one.
 const manipulation = topLevelFunction(appCode, "directManipulationActive");
-has(manipulation, /state\.dragHandle \|\| state\.guideDrag \|\| state\.currentDrag/,
-  "A gesture in progress is every drag, named once.");
+for (const owner of ["dragHandle", "guideDrag", "currentDrag", "ghostGesture"]) {
+  has(manipulation, new RegExp(`state\\.${owner}`),
+    `Direct manipulation includes ${owner}.`);
+}
 has(topLevelFunction(appCode, "commitNativeGo"), /directManipulationActive\(\)/,
   "The player's own placement is never read back as a native seek mid-gesture.");
 has(toggleWeightRelaxation, /settleBeforeAction\(\{ transport: false \}\)/,
@@ -562,6 +564,28 @@ check((appCode.match(/addEventListener\("wheel"/g) || []).length === 1,
 has(topLevelFunction(appCode, "handleReaderWheel"),
   /state\.ghostKeyHeld && handleGhostWheel\(event\)[\s\S]*handleNudgeWheel\(event\)/,
   "Ghost owns the wheel while G is held; Nudge owns it otherwise.");
+const beginGhost = topLevelFunction(appCode, "beginGhostGesture");
+for (const field of [
+  "anchor",
+  "candidate",
+  "previewActiveSpan",
+  "previewNeighborhood",
+  "readKind",
+  "readId",
+  "frozenTraceRead"
+]) {
+  has(beginGhost, new RegExp(`\\b${field}\\b`),
+    `Ghost provisional state owns ${field}.`);
+}
+const scanGhost = topLevelFunction(appCode, "handleGhostWheel");
+lacks(scanGhost, /state\.session\s*=/,
+  "Ghost scanning never replaces the accepted Session.");
+has(scanGhost,
+  /gesture\.previewSession = result\.session[\s\S]*?gesture\.candidate = candidate\.address/,
+  "Ghost scanning updates only its provisional Candidate and preview Session.");
+has(topLevelFunction(appCode, "settleGhostGesture"),
+  /state\.session = gesture\.previewSession[\s\S]*?checkpoint\(/,
+  "Ghost settlement performs the first semantic assignment and one checkpoint.");
 const nudgeWheel = topLevelFunction(appCode, "handleNudgeWheel");
 has(topLevelFunction(appCode, "wheelPixels"), /Math\.abs\(event\.deltaX\) > Math\.abs\(event\.deltaY\)/,
   "Nudge selects the dominant wheel axis.");

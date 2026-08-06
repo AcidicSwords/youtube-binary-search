@@ -173,9 +173,22 @@ try {
   // =========================================================================
   // 4. A wheel notch recalls where the reader was
   // =========================================================================
+  const acceptedBeforeGhost = await page.getAttribute(
+    "#current-marker",
+    "data-accepted-address"
+  );
   const release = await ghostWheel("backward", 1);
   const recalled = await currentAddress();
   assert.notEqual(recalled, arrived, "A notch reaches an earlier moment,");
+  assert.equal(
+    await page.getAttribute("#current-marker", "data-accepted-address"),
+    acceptedBeforeGhost,
+    "while accepted Session Current remains at the Anchor."
+  );
+  assert.ok(
+    await page.getAttribute("#current-marker", "data-ghost-candidate"),
+    "The moving address is explicitly presented as a Ghost Candidate."
+  );
 
   const anchor = await anchorShown();
   assert.equal(anchor.hidden, false, "the Anchor appears,");
@@ -191,6 +204,16 @@ try {
 
   await release();
   assert.equal(await currentAddress(), recalled, "Releasing keeps the recalled Address,");
+  assert.notEqual(
+    await page.getAttribute("#current-marker", "data-accepted-address"),
+    acceptedBeforeGhost,
+    "and only release replaces accepted Session Current."
+  );
+  assert.equal(
+    await page.getAttribute("#current-marker", "data-ghost-candidate"),
+    "",
+    "Settlement clears provisional Candidate presentation."
+  );
   assert.match(await undoTop(), /Ghost Traverse/, "and writes exactly one transaction.");
   assert.equal((await anchorShown()).hidden, true, "The Anchor is a gesture, not a mark.");
 

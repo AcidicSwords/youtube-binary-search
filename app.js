@@ -563,7 +563,7 @@ function panoramaFrameRequest() {
         owner: PANORAMA_FRAME_OWNER.CONTEXT,
         start: window.start,
         end: window.end,
-        current: currentNeighborhood().C,
+        current: contextRunning ? transport.anchor : currentNeighborhood().C,
         cursor: contextRunning ? safeCurrentTime() : undefined,
         range: activeRange()
       };
@@ -931,10 +931,16 @@ function clearProgrammaticPlacement() {
 // carried on measuring from an anchor that no longer meant anything. Releasing
 // then drew a Active Span nobody had asked for.
 //
-// A gesture is a state, not a duration. It lasts exactly as long as the pointer
-// is down, however long the reader pauses to think.
+// A gesture is a state, not a duration. Pointer drags last while the pointer is
+// down; a Ghost scan lasts while its Candidate is provisional. Neither can be
+// reinterpreted as a native seek however long the reader pauses to think.
 function directManipulationActive() {
-  return Boolean(state.dragHandle || state.guideDrag || state.currentDrag);
+  return Boolean(
+    state.dragHandle
+    || state.guideDrag
+    || state.currentDrag
+    || state.ghostGesture
+  );
 }
 
 function placePlayer(address) {
@@ -1349,9 +1355,12 @@ function settleTransport(options = {}) {
   if (issuePause) player.pause();
 
   if (active.kind === TRANSPORT_KIND.CONTEXT) {
-    if (restoreObservation && !handoffPanorama && currentNeighborhood()) {
-      placePlayer(currentNeighborhood().C);
-      panorama?.translateToCurrent(currentNeighborhood().C, { preserve: true });
+    const observationCenter = Number.isFinite(active.anchor)
+      ? active.anchor
+      : currentNeighborhood()?.C;
+    if (restoreObservation && !handoffPanorama && Number.isFinite(observationCenter)) {
+      placePlayer(observationCenter);
+      panorama?.translateToCurrent(observationCenter, { preserve: true });
     }
     if (shouldRender) view.render();
     return true;
@@ -5230,11 +5239,29 @@ function beginGhostGesture({ initialDirection } = {}) {
   });
   state.ghostGesture = {
     anchor,
+    candidate: anchor,
+    previewActiveSpan: originModel.activeSpan
+      ? copy(originModel.activeSpan)
+      : null,
+    previewNeighborhood: copy(originModel.neighborhood),
+    readKind: resumable ? "historical-successor" : "live-occurrence",
+    readId: (
+      resumable
+        ? state.ghostContinuation?.recordId
+        : read.index >= 0
+          ? read.positions[read.index]?.recordId
+          : null
+    ),
+    frozenTraceRead: read,
     originModel,
     originHistory: state.session.history,
     originFuture: state.session.future,
+    previewSession: {
+      model: snapshotModel(originModel),
+      history: state.session.history,
+      future: state.session.future
+    },
     anchorPosition: read.index >= 0 ? read.positions[read.index] : null,
-    read,
     projection,
     stepDistance,
     initialDirection,
@@ -5282,13 +5309,17 @@ function handleGhostWheel(event) {
   let moved = false;
   let blocked = null;
   for (let index = 0; index < Math.abs(count); index += 1) {
-    const candidate = moveGhostRead(state.traversalTrace, gesture.read, userDirection);
+    const candidate = moveGhostRead(
+      state.traversalTrace,
+      gesture.frozenTraceRead,
+      userDirection
+    );
     if (!candidate.changed) {
       blocked = candidate.reason;
       break;
     }
-    const previous = currentNeighborhood().C;
-    const result = ghostTraverse(state.session, candidate.address, {
+    const previous = gesture.candidate;
+    const result = ghostTraverse(gesture.previewSession, candidate.address, {
       anchor: gesture.anchor,
       direction: userDirection,
       originResolution: gesture.originModel.neighborhood,
@@ -5300,8 +5331,13 @@ function handleGhostWheel(event) {
       blocked = result.reason;
       break;
     }
-    state.session = result.session;
-    gesture.read = candidate.read;
+    gesture.previewSession = result.session;
+    gesture.candidate = candidate.address;
+    gesture.previewActiveSpan = result.session.model.activeSpan
+      ? copy(result.session.model.activeSpan)
+      : null;
+    gesture.previewNeighborhood = copy(result.session.model.neighborhood);
+    gesture.frozenTraceRead = candidate.read;
     gesture.visited.push({
       address: candidate.address,
       sourcePosition: candidate.cursor,
@@ -5331,13 +5367,12 @@ function handleGhostWheel(event) {
     // wheel instead of being torn down and rebuilt at every notch.
     //
     // With Context off, the recall stays a silent frame-by-frame scan.
-    const landing = currentNeighborhood().C;
+    const landing = gesture.candidate;
     if (state.contextDuration > 0) {
       startContext(landing, { retarget: transportIs(TRANSPORT_KIND.CONTEXT) });
     } else {
       locateAddress(landing, { preservePanorama: true });
     }
-    syncIntervalPinSelection();
     // A recall is otherwise almost silent -- Current moves and an Interval
     // appears, both of which many other operators also do -- so it says how far
     // back through its own path the reader now is. Without it there is no way to
@@ -5346,11 +5381,11 @@ function handleGhostWheel(event) {
     // have turned. Depth alone cannot say how much further there is to go, and
     // a reader who cannot see that has no way to tell a working recall from one
     // that has quietly run out -- which is most of what made this feel broken.
-    const place = gesture.read.index + 1;
-    const total = gesture.read.positions.length;
+    const place = gesture.frozenTraceRead.index + 1;
+    const total = gesture.frozenTraceRead.positions.length;
     setStatus(
       `Ghost ${userDirection === "backward" ? "back" : "on"} · ${
-        formatTime(currentNeighborhood().C)
+        formatTime(gesture.candidate)
       } · ${place} of ${total} · anchored at ${formatTime(gesture.anchor)}.`
     );
     view.render();
@@ -5373,6 +5408,9 @@ function settleGhostGesture() {
   state.ghostGesture = null;
   state.ghostWheel = null;
   if (!gesture?.changed) return false;
+  // This is the first semantic assignment in the gesture. Every wheel notch
+  // before release lived only in the Ghost Candidate preview above.
+  state.session = gesture.previewSession;
   const settled = settleGhostSequence(state.session, gesture);
   if (settled.changed) state.session = settled.session;
   state.session = checkpoint(state.session, "Ghost Traverse", gesture.originModel).session;
@@ -5383,7 +5421,7 @@ function settleGhostGesture() {
   const ghostReturn = appendGhostReturn(state.traversalTrace, {
     anchor: gesture.anchor,
     anchorPosition: gesture.anchorPosition,
-    landing: currentNeighborhood().C,
+    landing: gesture.candidate,
     recalledPosition: finalVisit?.sourcePosition || null,
     scan: {
       candidateCount: gesture.visited.length,
@@ -5415,11 +5453,8 @@ function cancelGhostGesture({ restore = true } = {}) {
   state.ghostKeyHeld = false;
   if (!gesture) return false;
   if (restore && gesture.changed) {
-    state.session = {
-      model: snapshotModel(gesture.originModel),
-      history: gesture.originHistory,
-      future: gesture.originFuture
-    };
+    // Session never left the accepted Anchor; only physical candidate
+    // presentation needs to be restored.
     locateAddress(gesture.anchor);
     syncIntervalPinSelection();
     view.renderGuide();
