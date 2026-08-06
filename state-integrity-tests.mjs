@@ -33,7 +33,7 @@ const clone = value => structuredClone(value);
     weight: 2,
     groupId: terrain.id
   }).section;
-  setGroupState(source, terrain.id, { visible: false, active: true });
+  setGroupState(source, terrain.id, { visible: false, weightsEnabled: true });
 
   const recovered = sanitizeGuide(clone(source), "video-a", 60);
   assert.equal(validateGuide(recovered, 60), true);
@@ -41,7 +41,7 @@ const clone = value => structuredClone(value);
   // Compared by identity rather than by position: "the drawn Group is first" is
   // the ordering law, and with nothing drawn it makes no claim about order.
   const shape = groups => groups
-    .map(group => ({ id: group.id, label: group.label, active: group.active }))
+    .map(group => ({ id: group.id, label: group.label, weightsEnabled: group.weightsEnabled }))
     .sort((first, second) => first.id.localeCompare(second.id));
   assert.deepEqual(shape(recovered.groups), shape(source.groups));
   assert.equal(recovered.shownGroupId, source.shownGroupId,
@@ -64,7 +64,7 @@ const clone = value => structuredClone(value);
     id: "",
     label: "Broken",
     visible: "yes",
-    active: true,
+    weightsEnabled: true,
     createdAt: 1,
     updatedAt: 1
   });
@@ -90,7 +90,7 @@ const clone = value => structuredClone(value);
   assert.equal(validateGuide(duplicateGroup, 10), false);
 
   const malformedState = clone(valid);
-  malformedState.groups[0].active = "true";
+  malformedState.groups[0].weightsEnabled = "true";
   assert.equal(validateGuide(malformedState, 10), false);
 
   const invalidMembership = clone(valid);

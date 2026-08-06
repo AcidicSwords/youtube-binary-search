@@ -136,13 +136,13 @@ export function shownGroup(guide) {
 export function createGroup(
   guide,
   label = "",
-  { id = null, visible = true, active = true } = {}
+  { id = null, visible = true, weightsEnabled = true } = {}
 ) {
   const changedAt = now();
   const group = {
     id: id || makeId("group"),
     label: String(label || "").trim(),
-    active: active !== false,
+    weightsEnabled: weightsEnabled !== false,
     createdAt: changedAt,
     updatedAt: changedAt
   };
@@ -167,7 +167,7 @@ function groupForSection(guide, section) {
 }
 
 export function sectionWeightIsUsed(guide, section) {
-  return groupForSection(guide, section)?.active !== false;
+  return groupForSection(guide, section)?.weightsEnabled !== false;
 }
 
 export function sectionIsVisible(guide, section) {
@@ -179,7 +179,7 @@ export function setGroupState(guide, groupId, changes = {}) {
   if (!group) return null;
   const before = guide.groups.map(entry => ({
     id: entry.id,
-    active: entry.active,
+    weightsEnabled: entry.weightsEnabled,
     label: entry.label
   }));
   const visibleBefore = shownGroup(guide)?.id || null;
@@ -194,7 +194,7 @@ export function setGroupState(guide, groupId, changes = {}) {
       guide.shownGroupId = null;
     }
   }
-  if (typeof changes.active === "boolean") group.active = changes.active;
+  if (typeof changes.weightsEnabled === "boolean") group.weightsEnabled = changes.weightsEnabled;
   if (typeof changes.label === "string") group.label = changes.label.trim();
 
   const changedAt = now();
@@ -202,7 +202,7 @@ export function setGroupState(guide, groupId, changes = {}) {
   for (const entry of guide.groups) {
     const previous = before.find(item => item.id === entry.id);
     if (!previous) continue;
-    if (previous.active !== entry.active || previous.label !== entry.label) {
+    if (previous.weightsEnabled !== entry.weightsEnabled || previous.label !== entry.label) {
       entry.updatedAt = changedAt;
       changed = true;
     }
@@ -1022,9 +1022,11 @@ export function normalizeGuide(parsed, videoId) {
   const defaultGroup = guide.groups.find(group => group.id === DEFAULT_GROUP_ID);
   if (defaultSource && defaultGroup) {
     defaultGroup.label = String(defaultSource.label || "Map").trim();
-    defaultGroup.active = typeof defaultSource.active === "boolean"
-      ? defaultSource.active
-      : true;
+    defaultGroup.weightsEnabled = typeof defaultSource.weightsEnabled === "boolean"
+      ? defaultSource.weightsEnabled
+      : typeof defaultSource.active === "boolean"
+        ? defaultSource.active
+        : true;
     defaultGroup.createdAt = Number(defaultSource.createdAt) || defaultGroup.createdAt;
     defaultGroup.updatedAt = Number(defaultSource.updatedAt) || defaultGroup.createdAt;
   }
@@ -1040,7 +1042,9 @@ export function normalizeGuide(parsed, videoId) {
     const group = createGroup(guide, label, {
       id: source.id,
       visible: false,
-      active: typeof source.active === "boolean" ? source.active : true
+      weightsEnabled: typeof source.weightsEnabled === "boolean"
+        ? source.weightsEnabled
+        : typeof source.active === "boolean" ? source.active : true
     });
     group.createdAt = Number(source.createdAt) || group.createdAt;
     group.updatedAt = Number(source.updatedAt) || group.createdAt;
@@ -1152,7 +1156,7 @@ export function validateGuide(guide, duration) {
       !group?.id
       || ids.has(group.id)
       || typeof group.label !== "string"
-      || typeof group.active !== "boolean"
+      || typeof group.weightsEnabled !== "boolean"
       || !Number.isFinite(group.createdAt)
       || !Number.isFinite(group.updatedAt)
     ) return false;
@@ -1235,9 +1239,9 @@ export function sanitizeGuide(input, videoId, duration) {
         sourceGroup?.label
         || (id === DEFAULT_GROUP_ID ? "Map" : "")
       ).trim(),
-      active: typeof sourceGroup?.active === "boolean"
-        ? sourceGroup.active
-        : true,
+      weightsEnabled: typeof sourceGroup?.weightsEnabled === "boolean"
+        ? sourceGroup.weightsEnabled
+        : typeof sourceGroup?.active === "boolean" ? sourceGroup.active : true,
       createdAt,
       updatedAt: Number(sourceGroup?.updatedAt) || createdAt
     };

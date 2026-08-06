@@ -242,7 +242,7 @@ assert.equal(drawnBars(), allSections - 1,
 assert.ok(
   inSections("groupToggle").some(node =>
     node.dataset.groupToggle === layerId
-    && node.dataset.groupState === "active"
+    && node.dataset.groupState === "weightsEnabled"
     && node.checked === true),
   "and the hidden layer stays active, which is what baking means."
 );

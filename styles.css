@@ -81,7 +81,7 @@ summary:hover {
   background: var(--surface-3);
 }
 
-button:active:not(:disabled) { transform: translateY(1px); }
+button:weightsEnabled:not(:disabled) { transform: translateY(1px); }
 button:disabled { cursor: default; opacity: 0.42; }
 
 button:focus-visible,
@@ -289,7 +289,7 @@ kbd {
 }
 
 .center-transport-surface:hover:not(:disabled),
-.center-transport-surface:active:not(:disabled),
+.center-transport-surface:weightsEnabled:not(:disabled),
 .center-transport-surface:focus-visible {
   border-color: transparent;
   background: transparent;
@@ -480,7 +480,7 @@ kbd {
 .range-fill,
 .topography-layer,
 .neighborhood-fill,
-.active-span-fill,
+.weightsEnabled-span-fill,
 .section-preview-fill,
 .action-preview-fill {
   position: absolute;
@@ -553,7 +553,7 @@ kbd {
   );
 }
 
-.active-span-fill {
+.weightsEnabled-span-fill {
   z-index: 3;
   top: 11px;
   bottom: 11px;
@@ -567,7 +567,7 @@ kbd {
   box-shadow: 0 0 9px rgb(var(--interval-rgb) / 0.18);
 }
 
-.active-span-fill[data-direction="backward"] {
+.weightsEnabled-span-fill[data-direction="backward"] {
   background: linear-gradient(
     90deg,
     rgb(var(--interval-rgb) / 0.9),
@@ -575,7 +575,7 @@ kbd {
   );
 }
 .neighborhood-fill[data-live="true"],
-.active-span-fill[data-live="true"] {
+.weightsEnabled-span-fill[data-live="true"] {
   transition: left 90ms linear, width 90ms linear;
 }
 .neighborhood-marker[data-live="true"] {
@@ -589,7 +589,7 @@ kbd {
     rgb(var(--resolution-rgb) / 0.035)
   );
 }
-.active-span-fill[data-live="true"] {
+.weightsEnabled-span-fill[data-live="true"] {
   filter: saturate(1.18) brightness(1.06);
 }
 
@@ -1039,7 +1039,7 @@ kbd {
 
 /* The generic pressed-button translation would replace the centering
    transform and snap the hit target down/right on pointer-down. */
-.timeline-pin:active:not(:disabled) {
+.timeline-pin:weightsEnabled:not(:disabled) {
   transform: translate(-50%, -50%);
   cursor: grabbing;
 }
@@ -1706,7 +1706,7 @@ kbd {
   font-size: 0.75rem;
 }
 
-.guide-tab.active {
+.guide-tab.weightsEnabled {
   border-color: rgba(121, 168, 255, 0.5);
   color: var(--text);
   background: var(--accent-soft);
@@ -2770,7 +2770,7 @@ kbd {
   font-size: 0.74rem;
 }
 
-.guide-compose-toggle.active {
+.guide-compose-toggle.weightsEnabled {
   border-color: rgba(188, 154, 255, 0.72);
   color: var(--text);
   background: rgba(188, 154, 255, 0.16);

@@ -5921,7 +5921,7 @@ elements["sections-list"].addEventListener("change", event => {
   const toggle = event.target.closest?.("[data-group-toggle]");
   if (!toggle) return;
   const key = toggle.dataset.groupState;
-  if (key !== "visible" && key !== "active") return;
+  if (key !== "visible" && key !== "weightsEnabled") return;
   settleBeforeAction({ transport: false });
   const result = setGuideGroupState(state.session, toggle.dataset.groupToggle, {
     [key]: toggle.checked === true

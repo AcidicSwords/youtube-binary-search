@@ -58,7 +58,7 @@ function worldFingerprint(model) {
       section.id, section.startPinId, section.endPinId, section.weight, section.label || null
     ]).sort(),
     groups: model.guide.groups.map(group => [
-      group.id, group.label || null, group.active
+      group.id, group.label || null, group.weightsEnabled
     ]).sort(),
     shownGroupId: model.guide.shownGroupId,
     range: [model.range.start, model.range.end],

@@ -87,9 +87,9 @@ const close = (actual, expected, tolerance = 1e-9) => {
 // every Section appears in exactly one block.
 {
   const groups = [
-    { id: DEFAULT_GROUP_ID, label: "Map", visible: true, active: true },
-    { id: "group-empty", label: "Empty", visible: true, active: true },
-    { id: "group-b", label: "B", visible: false, active: true }
+    { id: DEFAULT_GROUP_ID, label: "Map", visible: true, weightsEnabled: true },
+    { id: "group-empty", label: "Empty", visible: true, weightsEnabled: true },
+    { id: "group-b", label: "B", visible: false, weightsEnabled: true }
   ];
   const sections = [
     { id: "a", groupId: DEFAULT_GROUP_ID },

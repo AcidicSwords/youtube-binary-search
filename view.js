@@ -182,7 +182,7 @@ export function projectCueExtent(cue, projection) {
 export function partitionGuideSections(groups, sections) {
   const sourceGroups = Array.isArray(groups) && groups.length
     ? groups
-    : [{ id: DEFAULT_GROUP_ID, label: "Map", active: true }];
+    : [{ id: DEFAULT_GROUP_ID, label: "Map", weightsEnabled: true }];
   const blocks = sourceGroups.map(group => ({ group, sections: [] }));
   const byId = new Map(blocks.map(block => [block.group.id, block]));
   const fallback = byId.get(DEFAULT_GROUP_ID) || blocks[0];
@@ -1437,7 +1437,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       block.dataset.groupId = group.id;
       const visible = groupIsShown(guide(), group);
       block.classList.toggle("is-hidden", !visible);
-      block.classList.toggle("is-inactive", !group.active);
+      block.classList.toggle("is-inactive", !group.weightsEnabled);
 
       const row = document.createElement("div");
       row.className = "guide-group-row";
@@ -1451,7 +1451,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       toggles.className = "guide-group-toggles";
       for (const [key, text, title] of [
         ["visible", "On Timeline", "Make this the one Group whose Sections and endpoint Pins are on the Timeline"],
-        ["active", "Active", "Let this Group's Weights change Timeline distance"]
+        ["weightsEnabled", "Active", "Let this Group's Weights change Timeline distance"]
       ]) {
         const label = document.createElement("label");
         label.className = "guide-group-toggle";

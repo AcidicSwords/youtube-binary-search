@@ -51,7 +51,7 @@ function readCanonical(env) {
         ];
       })
       .sort((a, b) => a[0] - b[0] || a[1] - b[1]),
-    groups: [...guide.groups].map(group => [group.label, group.active]).sort(),
+    groups: [...guide.groups].map(group => [group.label, group.weightsEnabled]).sort(),
     shownGroupLabel:
       guide.groups.find(group => group.id === guide.shownGroupId)?.label ?? null,
     current: byId.get("pin-current-position").textContent,

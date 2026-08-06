@@ -116,15 +116,15 @@ const visibleIds = guide => guide.groups
 // --- 3. Switching the visible Group does not alter activity -------------------
 {
   const { guide, terrain } = build();
-  setGroupState(guide, terrain.id, { active: false });
-  setGroupState(guide, DEFAULT_GROUP_ID, { active: true });
+  setGroupState(guide, terrain.id, { weightsEnabled: false });
+  setGroupState(guide, DEFAULT_GROUP_ID, { weightsEnabled: true });
   const activityBefore = Object.fromEntries(
-    guide.groups.map(group => [group.id, group.active])
+    guide.groups.map(group => [group.id, group.weightsEnabled])
   );
 
   setGroupState(guide, DEFAULT_GROUP_ID, { visible: true });
   assert.deepEqual(
-    Object.fromEntries(guide.groups.map(group => [group.id, group.active])),
+    Object.fromEntries(guide.groups.map(group => [group.id, group.weightsEnabled])),
     activityBefore,
     "Changing which layer is drawn changes no layer's activity."
   );
@@ -132,7 +132,7 @@ const visibleIds = guide => guide.groups
 
   setGroupState(guide, terrain.id, { visible: true });
   assert.deepEqual(
-    Object.fromEntries(guide.groups.map(group => [group.id, group.active])),
+    Object.fromEntries(guide.groups.map(group => [group.id, group.weightsEnabled])),
     activityBefore,
     "and switching back changes none either."
   );
@@ -141,7 +141,7 @@ const visibleIds = guide => guide.groups
 // --- 4. Hidden active Groups still deform the projection ----------------------
 {
   const { guide, terrain } = build();
-  // Terrain is visible and active: its 20 s Section at 2x adds 20 s of map.
+  // Terrain is visible and weightsEnabled: its 20 s Section at 2x adds 20 s of map.
   const bothDrawn = extentOf(guide);
   assert.equal(bothDrawn, DURATION + 20);
 
@@ -153,7 +153,7 @@ const visibleIds = guide => guide.groups
   assert.equal(sectionWeightIsUsed(guide, guide.sections.find(s => s.groupId === terrain.id)), true,
     "while remaining part of the density product. That is a baked layer.");
 
-  setGroupState(guide, terrain.id, { active: false });
+  setGroupState(guide, terrain.id, { weightsEnabled: false });
   assert.equal(extentOf(guide), DURATION,
     "Deactivating it is the separate decision that flattens the map.");
 }
@@ -334,7 +334,7 @@ const visibleIds = guide => guide.groups
     "Every Group identity survives."
   );
   assert.deepEqual(
-    Object.fromEntries(migrated.groups.map(group => [group.id, group.active])),
+    Object.fromEntries(migrated.groups.map(group => [group.id, group.weightsEnabled])),
     { [DEFAULT_GROUP_ID]: true, "group-terrain": false, "group-spare": true },
     "Activity is carried across exactly, and is independent of visibility."
   );
@@ -368,8 +368,8 @@ const visibleIds = guide => guide.groups
   const again = normalizeGuide(JSON.parse(JSON.stringify(migrated)), "legacy");
   assert.equal(again.shownGroupId, migrated.shownGroupId);
   assert.deepEqual(
-    again.groups.map(group => [group.id, group.active, group.label]),
-    migrated.groups.map(group => [group.id, group.active, group.label])
+    again.groups.map(group => [group.id, group.weightsEnabled, group.label]),
+    migrated.groups.map(group => [group.id, group.weightsEnabled, group.label])
   );
   assert.deepEqual(
     again.sections.map(entry => [entry.id, entry.groupId, entry.weight]),
@@ -406,7 +406,7 @@ const visibleIds = guide => guide.groups
     "The drawn Group is read from the v9 visibleGroupId key.");
   assert.equal(migrated.groups[0].id, "group-terrain", "and rendered first.");
   assert.deepEqual(
-    Object.fromEntries(migrated.groups.map(group => [group.id, group.active])),
+    Object.fromEntries(migrated.groups.map(group => [group.id, group.weightsEnabled])),
     { [DEFAULT_GROUP_ID]: true, "group-terrain": false },
     "Activity crosses unchanged.");
   assert.equal(migrated.sections.find(entry => entry.id === "sec-1").weight, 2,
@@ -440,7 +440,7 @@ const visibleIds = guide => guide.groups
   assert.equal(extentOf(guide), DURATION - 20 + 80,
     "and which of them is drawn does not enter that arithmetic.");
 
-  setGroupState(guide, overlay.id, { active: false });
+  setGroupState(guide, overlay.id, { weightsEnabled: false });
   assert.equal(extentOf(guide), drawnFirst,
     "Only activity does.");
 }
@@ -454,7 +454,7 @@ const visibleIds = guide => guide.groups
   const before = addresses();
 
   setGroupState(guide, DEFAULT_GROUP_ID, { visible: true });
-  setGroupState(guide, DEFAULT_GROUP_ID, { active: false });
+  setGroupState(guide, DEFAULT_GROUP_ID, { weightsEnabled: false });
   deleteGroup(guide, guide.groups.find(group => group.label === "Terrain").id);
 
   assert.deepEqual(addresses(), before,

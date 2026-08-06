@@ -74,11 +74,11 @@ function build() {
     guide.groups.map(entry => ({
       id: entry.id,
       visible: groupIsShown(guide, entry),
-      active: entry.active
+      weightsEnabled: entry.weightsEnabled
     })),
     [
-      { id: group.id, visible: true, active: true },
-      { id: DEFAULT_GROUP_ID, visible: false, active: true }
+      { id: group.id, visible: true, weightsEnabled: true },
+      { id: DEFAULT_GROUP_ID, visible: false, weightsEnabled: true }
     ],
     "Creating a Group makes it the sole visible working layer without deactivating the layer below."
   );
@@ -124,7 +124,7 @@ function build() {
   assert.equal(moved.changed, false);
   assert.equal(moved.reason, "duplicate-section",
     "Moving a Section cannot create an accidental duplicate inside the destination Group.");
-  assert.equal(terrain.active, true);
+  assert.equal(terrain.weightsEnabled, true);
 }
 
 // --- Group deletion cannot collapse layered identities -------------------------
@@ -193,7 +193,7 @@ function build() {
   assert.deepEqual(orderedPins(guide).map(pin => pin.t), [20, 60],
     "and naming one draws exactly that one.");
 
-  setGroupState(guide, terrain.id, { visible: true, active: false });
+  setGroupState(guide, terrain.id, { visible: true, weightsEnabled: false });
   assert.equal(extentOf(guide), undeformed + 40,
     "An inactive Group stops contributing to the density product.");
   assert.deepEqual(orderedPins(guide).map(pin => pin.t), [70, 90],
@@ -207,7 +207,7 @@ function build() {
   assert.equal(sortedSections(guide).length, 2,
     "and every Section remains retained.");
 
-  setGroupState(guide, terrain.id, { visible: true, active: true });
+  setGroupState(guide, terrain.id, { visible: true, weightsEnabled: true });
   assert.equal(extentOf(guide), bothActive);
   assert.deepEqual(orderedPins(guide).map(pin => pin.t), [70, 90]);
 }
@@ -230,7 +230,7 @@ function build() {
   assert.equal(shown.changed, true);
   session = shown.session;
   assert.equal(session.model.guide.groups[0].id, DEFAULT_GROUP_ID);
-  assert.equal(session.model.guide.groups.find(group => group.id === detail.id).active, true,
+  assert.equal(session.model.guide.groups.find(group => group.id === detail.id).weightsEnabled, true,
     "Showing another layer does not deactivate hidden terrain.");
 
   // Hiding the only Group is not impossible, it is how you look at the map
@@ -378,7 +378,7 @@ function build() {
   const { guide, terrain } = build();
   const landmark = { id: "pin-standalone", t: 80, label: "Worth reaching", createdAt: 1 };
   guide.pins.push(landmark);
-  setGroupState(guide, terrain.id, { visible: false, active: true });
+  setGroupState(guide, terrain.id, { visible: false, weightsEnabled: true });
   setGroupState(guide, DEFAULT_GROUP_ID, { visible: true });
 
   const visible = orderedPins(guide).map(pin => pin.id);
@@ -463,13 +463,13 @@ function build() {
   assert.equal(round.groups.length, 1);
   const withGroups = createGuide("rt");
   const extra = createGroup(withGroups, "Terrain");
-  setGroupState(withGroups, extra.id, { visible: false, active: false });
+  setGroupState(withGroups, extra.id, { visible: false, weightsEnabled: false });
   const restored = normalizeGuide(JSON.parse(JSON.stringify(withGroups)), "rt");
   const restoredExtra = restored.groups.find(group => group.label === "Terrain");
   assert.ok(restoredExtra, "A named Group survives persistence.");
   assert.deepEqual(
-    { visible: groupIsShown(restored, restoredExtra), active: restoredExtra.active },
-    { visible: false, active: false },
+    { visible: groupIsShown(restored, restoredExtra), weightsEnabled: restoredExtra.weightsEnabled },
+    { visible: false, weightsEnabled: false },
     "and so do both of its states."
   );
 }
@@ -503,7 +503,7 @@ function build() {
   assert.equal(migrated.groups[0].id, migrated.shownGroupId,
     "which is rendered first.");
   assert.equal(
-    migrated.groups.find(group => group.id === "group-second").active,
+    migrated.groups.find(group => group.id === "group-second").weightsEnabled,
     false,
     "Activity crosses the migration untouched."
   );
@@ -551,13 +551,13 @@ function build() {
   const drawnBars = () => sortedSections(guide).filter(section => sectionIsVisible(guide, section));
   const gradientSources = () => sortedSections(guide).filter(section => sectionWeightIsUsed(guide, section));
 
-  setGroupState(guide, terrain.id, { visible: false, active: true });
+  setGroupState(guide, terrain.id, { visible: false, weightsEnabled: true });
   assert.equal(drawnBars().some(section => section.groupId === terrain.id), false,
     "A hidden Group draws no Section bar.");
   assert.equal(gradientSources().some(section => section.groupId === terrain.id), true,
     "while still contributing the deformation its gradient shows.");
 
-  setGroupState(guide, terrain.id, { visible: true, active: false });
+  setGroupState(guide, terrain.id, { visible: true, weightsEnabled: false });
   assert.equal(drawnBars().some(section => section.groupId === terrain.id), true,
     "An inactive Group still draws its Section bar.");
   assert.equal(gradientSources().some(section => section.groupId === terrain.id), false,

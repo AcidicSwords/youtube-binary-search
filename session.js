@@ -1462,16 +1462,16 @@ export function setGuideGroupState(session, groupId, changes) {
   const wasVisible = groupIsShown(session.model.guide, group);
   const next = {
     visible: typeof changes?.visible === "boolean" ? changes.visible : wasVisible,
-    active: typeof changes?.active === "boolean" ? changes.active : group.active
+    weightsEnabled: typeof changes?.weightsEnabled === "boolean" ? changes.weightsEnabled : group.weightsEnabled
   };
-  if (next.visible === wasVisible && next.active === group.active) {
+  if (next.visible === wasVisible && next.weightsEnabled === group.weightsEnabled) {
     return unchanged(session, "unchanged-group");
   }
   const name = group.label?.trim() || "Group";
-  const changed = next.visible !== wasVisible ? "visible" : "active";
+  const changed = next.visible !== wasVisible ? "visible" : "weightsEnabled";
   const label = changed === "visible"
     ? `${next.visible ? "Show" : "Hide"} “${name}”`
-    : `${next.active ? "Activate" : "Deactivate"} “${name}”`;
+    : `${next.weightsEnabled ? "Activate" : "Deactivate"} “${name}”`;
   return commit(session, label, draft => {
     const applied = setGroupState(draft.guide, groupId, next);
     if (!applied) return { changed: false, reason: "missing-group" };

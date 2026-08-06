@@ -116,7 +116,7 @@ assert.equal(drawnBars(), 2);
 assert.equal(drawnPins(), 4);
 
 // Inactive: the terrain flattens, the topology stays.
-await setGroupState("group-default", "active", false);
+await setGroupState("group-default", "weightsEnabled", false);
 assert.doesNotMatch(byId.get("duration-time").textContent, /spatial/,
   "An inactive Group's Weights deform nothing.");
 assert.equal(deformed(), false, "and draw no gradient.");
@@ -131,7 +131,7 @@ assert.equal(drawnPins(), 0);
 assert.equal(deformed(), false);
 
 // Hidden and active is the background terrain: Weight with no landmarks.
-await setGroupState("group-default", "active", true);
+await setGroupState("group-default", "weightsEnabled", true);
 assert.equal(drawnBars(), 0, "A hidden active Group draws no Section bar.");
 assert.equal(drawnPins(), 0, "and no endpoint Pin.");
 assert.equal(deformed(), true, "while still deforming the Timeline.");
@@ -151,7 +151,7 @@ assert.equal(pinRows().length, 4,
 // was being kept by the widget rather than by the transaction.
 assert.equal(groupToggle(emptyLayer, "visible").type, "checkbox",
   "Visibility is a checkbox, because drawing nothing is a state the Guide can hold.");
-assert.equal(groupToggle(emptyLayer, "active").type, "checkbox",
+assert.equal(groupToggle(emptyLayer, "weightsEnabled").type, "checkbox",
   "Activity remains an independent stackable choice.");
 assert.match(rowText(byId.get("pins-list")), /Hidden/,
   "The Guide names hidden Pins instead of dropping them from inventory.");
@@ -242,13 +242,13 @@ assert.notDeepEqual(
 );
 
 // Flatten the map and the marks return to their source fractions.
-await setGroupState("group-default", "active", false);
+await setGroupState("group-default", "weightsEnabled", false);
 assert.deepEqual(
   positions(),
   ["0%", "20%", "50%", "80%"],
   "Deactivating the Group flattens Cue marks with everything else."
 );
-await setGroupState("group-default", "active", true);
+await setGroupState("group-default", "weightsEnabled", true);
 assert.deepEqual(positions(), deformedPositions,
   "and reactivating restores them, because nothing about a Cue was stored.");
 
