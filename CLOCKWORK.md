@@ -73,14 +73,15 @@ relation. Detailed behavior remains in `SPEC.md` and `IMPLEMENTATION.md`.
 
 ## Ghost scan and settlement
 
-- **Owner** `app.js`; historical evidence in `traversal-trace.js`
-- **Inputs** fixed Anchor, frozen read, wheel direction
+- **Owner** `app.js`; historical evidence in `traversal-trace.js`; future
+  addresses in `traversal-prospects.js`
+- **Inputs** fixed Anchor, one frozen Trace or Prospect read, wheel direction
 - **Relation** scan a provisional Ghost Candidate; commit only on settlement
 - **Outputs** preview Active Span/Neighborhood, then one settled movement
 - **Allowed mutations** preview state during scan; one canonical settlement
 - **Protected non-effects** scan and cancellation change neither Current,
   history, nor Traversal Trace
-- **Tests** `ghost-tests.mjs`, `ghost-smoke.mjs`
+- **Tests** `ghost-tests.mjs`, `ghost-smoke.mjs`, `ripple-smoke.mjs`
 
 ## Traversal Prospect
 
@@ -91,7 +92,8 @@ relation. Detailed behavior remains in `SPEC.md` and `IMPLEMENTATION.md`.
 - **Outputs** Ripple Start Prospect and Ripple End Prospect
 - **Allowed mutations** transient source-scoped prospect collection
 - **Protected non-effects** no persistence, Guide, history, or Traversal Trace
-- **Tests** `traversal-prospects-tests.mjs`, Ripple semantic/browser proofs
+- **Tests** `traversal-prospects-tests.mjs`, `ripple-random-tests.mjs`, Ripple
+  semantic/browser proofs
 
 ## Ripple observation
 
@@ -106,7 +108,8 @@ relation. Detailed behavior remains in `SPEC.md` and `IMPLEMENTATION.md`.
 - **Allowed mutations** transient Ripple observation and prospect state
 - **Protected non-effects** Current, Neighborhood, Active Span, Focus, Guide,
   selections, Weightings, relaxation, history, Traversal Trace
-- **Tests** Ripple pure, semantic, transport, browser, and render proofs
+- **Tests** Ripple pure, randomized, semantic, transport, browser, and render
+  proofs
 
 ## Ripple prospect settlement
 

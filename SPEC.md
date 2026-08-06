@@ -31,7 +31,7 @@ A loaded Session owns:
 - an optional Active Span with bounds, orientation, and endpoint frames;
 - optional Focus and its return Range;
 - configured Step Distance;
-- Guide version 9 Groups, Pins, Sections, labels, membership, activity, drawn Group, and Section Weight;
+- Guide version 10 Groups, Pins, Sections, labels, membership, activity, drawn Group, and Section Weighting;
 - bounded Undo history and Redo future.
 
 The application owns the loaded source identity and the current Session. Guide persistence is keyed by source identity. Session history never crosses a source boundary.
@@ -65,6 +65,9 @@ The following are intentionally absent from Session history and Guide persistenc
 - offered Chapters and Chapter-lane visibility;
 - open panels, dialogs, cluster menus, hover, focus, and preview state;
 - Panorama Frame transition revision, Panorama Cycle phase, and side-player synchronization.
+- active Ripple identity, Ripple Observation Address, and Ripple Context Window;
+- source-generation-scoped Traversal Prospects;
+- Ghost Anchor, Ghost Candidate, frozen Trace/Prospect read, and wheel accumulator.
 
 Each transient has one owner and one settlement or cancellation boundary. A timer cannot checkpoint state after its source or gesture owner has changed.
 
@@ -419,6 +422,12 @@ No channel may erase another state’s meaning.
 
 Section wire roles come from its end regions and middle. The Timeline does not draw redundant Start/midpoint/End node controls.
 
+`Shift+click` modifies only bare Timeline ground: it acquires Ripple instead of
+ordinary Go. Retained Pins, Sections, Range handles, Current, cluster menus, and
+their descendants keep their own Shift meanings. Ripple pointer inversion uses
+the same effective Timeline Projection as Go; there is no second hit-testing
+map.
+
 A click that does not cross the drag threshold remains a click. Drag settlement suppresses the synthetic trailing click. Each gesture captures its origin model, history, future, and effective projection; cancellation restores that origin exactly.
 
 Pin and Section manipulation previews through the Panorama. A Pin uses its Step neighborhood; a Section uses its Start, midpoint, and End. Active Span bounds that coincide with a moved Pin follow the same canonical Pin transaction.
@@ -544,6 +553,31 @@ Context is transient source-contiguous Center observation around a semantic anch
 
 Context duration and Panorama offsets are independent. Similar numeric displacement does not create shared state ownership.
 
+### 8.1b Ripple observation and Traversal Prospects
+
+Ripple is acquired by `Shift+click` on bare Timeline ground. The pointed
+coordinate is inverted through the current effective Timeline Projection into a
+Ripple Observation Address. That Address does not become Current. The shared
+Context derivation independently clips `address - duration/2` and
+`address + duration/2` to the active Range; the resulting exact boundaries form
+the Ripple Context Window.
+
+Ripple reuses the one Context transport and Panorama Context Frame. Repeated
+Ripple acquisition while its Context is playing retargets that owner without a
+stop/start seam. Current, Current Neighborhood, Active Span, Range, Focus,
+Guide, both selections, Section Weightings, weight relaxation, semantic history,
+and Traversal Trace remain unchanged. The Timeline simultaneously distinguishes
+Current, Cursor, Ripple Observation Address, Ripple Context Window, Ripple Start
+Prospect, Ripple End Prospect, and any Ghost Candidate.
+
+The Start entry is appended before End, so newest-first forward reading offers
+End then Start. Entries carry unique identity, Ripple batch identity, and source
+generation; coincident Addresses remain distinct occurrences. Availability is
+filtered by the active Range without deletion. Completion clears active Ripple
+identity and retains both prospects. Retarget, Escape, or source replacement
+removes an uncompleted batch. No prospect is persisted, stored in Session,
+entered into semantic history, or appended to Traversal Trace.
+
 ### 8.2 Explicit Playback ownership
 
 A Playback transport contains:
@@ -569,8 +603,8 @@ ratePolicy = fixed 1×
 `Shift+Space` creates:
 
 ```text
-observationPolicy = center-only
-ratePolicy = configured fixed wish or dynamic
+configured fixed wish: observationPolicy = center-only, ratePolicy = fixed
+Textured Playback:     observationPolicy = panorama,    ratePolicy = dynamic
 ```
 
 Observation policy does not derive from numeric rate. A fixed Shift wish that resolves to `1×` remains Center only.
@@ -581,7 +615,7 @@ A native Center Play event may create an ordinary Panorama Playback session at t
 
 Three rate facts remain distinct:
 
-- **wish** — persisted fixed intent, or the dynamic inverse target;
+- **wish** — persisted fixed intent, or the dynamic log-compressed target;
 - **requested** — the nearest currently offered rate sent to the adapter;
 - **actual** — the rate confirmed by the adapter’s playback-rate event.
 
@@ -592,10 +626,13 @@ Fixed wishes resolve against positive offered rates in logarithmic distance, bec
 Textured Playback requests:
 
 ```text
-wish = 1 / effective Weight at Current
+wish = 1 - 0.25 × log₂(effective Weight at Current)
 ```
 
-The inverse is unconstrained. The media adapter’s offered rates provide the real bounds. Textured Playback is Center only and is the sole playback mode that reads effective projection Weight.
+The media adapter’s offered rates provide the real bounds. Textured Playback is
+the sole playback mode that reads effective projection Weight. Its Panorama
+remains eligible wherever the offered ladder supplies the adjacent Tail/Center/
+Lead rate triplet; at ladder ends Center continues alone.
 
 ### 8.4 Retry, wrap, and settlement
 
@@ -622,17 +659,43 @@ Traversal Trace is an append-only, source-scoped ledger of traversal records. A 
 
 Semantic history and the Traversal Trace are different orders, and traversing one is a route through the other: an Undo or Redo that puts the reader at a different Address writes one occurrence like any other movement, and one that only changes the world writes nothing. A held or coalesced gesture writes one sequence that keeps its reversals, because collapsing a Step run to its endpoints erases the shape the reader remembers. A Current drag writes one movement: the ground under the pointer is a search for a place, exactly as a Ghost scan is, and only the release is an arrival.
 
-Ghost Traversal is held `G` plus the wheel. Arming costs nothing: no Anchor, no history, no settled playback. The first wheel quantum settles pending work, captures Current as a fixed Anchor, and freezes the projection, the effective Step Distance and the readable extent of the stream, so the gesture reads a world that cannot change underneath it and can never follow its own output.
+Ghost Traversal is held `G` plus the wheel. Arming costs nothing: no Anchor, no history, no settled playback. The first wheel quantum settles pending work, captures Current as a fixed Anchor, and freezes the projection, effective Step Distance, and exactly one readable source, so the gesture reads a world that cannot change underneath it and can never follow its own output.
 
-Each quantum moves a read cursor one occurrence backward or forward through the Traversal Trace and applies the recalled Address as an amendment against one captured origin. Backward and forward name directions in the Traversal Trace; either may move either way through source time. Watched spans are subdivided by the frozen Step law, so expanded ground yields finer recall while the watched boundaries stay exact. An Address the active Range excludes is unavailable rather than clamped, and Ghost never leaves Focus, widens Range, or opens Full Video to reach one.
+Backward opens a frozen Traversal Trace read. Forward first opens a frozen,
+newest-first Traversal Prospect read; when none is available it may open the
+valid historical continuation. Once acquired, reversing the wheel retraces that
+same frozen source instead of switching sources mid-gesture. Trace directions
+may move either way through source time. Watched passages are subdivided by the
+frozen Step law, so expanded ground yields finer recall while watched boundaries
+stay exact. An Address the active Range excludes is unavailable rather than
+clamped, and Ghost never leaves Focus, widens Range, or opens Full Video.
 
 Ghost restores no historical Pins, Sections, Groups, Weights, titles, visibility, Focus, Range, Step Distance, topography state or Guide selection. What it produces is an ordinary Active Span between the Anchor and the recalled Address, so Switch End, Tag, Release and Focus act on it exactly as they would on any other.
 
 Where automatic Context is enabled, each recalled Address plays: the stop condition for a recall is recognition, and a still frame is a poor thing to recognise a moment from. Successive candidates retarget one Context window rather than opening a new one, so the window follows the wheel instead of being torn down and rebuilt at every notch. Automatic Context verifies a Current or Ghost Candidate already reached; whether superseded, completed, or still running when the gesture ends, it appends no Traversal Trace evidence. Escape stops it with everything else the scan did. With Context off, recall remains a silent frame-by-frame scan.
 
-Scanning and injection are different events. The scan is transient: accepted Session Current and semantic history remain at the Anchor while a Ghost Candidate, preview Active Span, and preview Current Neighborhood follow the frozen Trace read. The scan is never written as a path, because copying the search motion into the stream mirrors paths already in it. Releasing first settles the Candidate, then appends exactly one occurrence — a jump from the live Anchor to the Address re-entered — carrying provenance to the Anchor occurrence, to the historical occurrence re-entered, and to the scan as evidence. A gesture that returns to its Anchor appends nothing, though the Session may still retain the ground crossed. The whole gesture commits as one semantic transaction; one Undo returns to the Anchor with all structure intact.
+Scanning and Ghost Return are different events. The scan is transient: accepted
+Session Current and semantic history remain at the Anchor while a Ghost
+Candidate, preview Active Span, and preview Current Neighborhood follow the
+frozen read. Cancellation changes nothing and consumes nothing. Releasing a
+historical Candidate commits one Ghost transaction, then appends exactly one
+Ghost Return from the live Anchor to the Address re-entered, carrying
+provenance to the Anchor occurrence, historical occurrence, and scan. A gesture
+that returns to its Anchor appends nothing, though Session may retain the ground
+crossed.
 
-An injected occurrence has two relations, and direction chooses between them. Backward follows the live predecessor and asks what led to this re-entry. Forward may resume the historical successors of the occurrence re-entered and asks what originally followed it. The choice is made once, from the direction the gesture opens with, and reversing the wheel afterwards retraces the cursor already chosen rather than switching streams mid-gesture. A gesture begins only once a whole wheel quantum is earned, so input below the threshold settles nothing and captures no Anchor. A gesture that returns to its Anchor retains the positive extent it crossed, on the same principle as Step Reversal. The historical read cursor survives Release, so severing the Active Span and Ghosting forward replays the recalled point's original successors as a newly informed traversal.
+A Ghost Return has two relations. Backward follows the live predecessor and asks
+what led to this re-entry. Forward may resume the historical successors of the
+occurrence re-entered and asks what originally followed it. Its continuation
+survives Release until an ordinary route withdraws it.
+
+Releasing over a Traversal Prospect is not historical recall and never appends a
+Ghost Return. The application reruns canonical Go against the accepted Session.
+Only successful Go commits Current, ordinary Neighborhood and Active Span, one
+semantic-history entry, and one ordinary Traversal Trace movement; only then is
+the selected prospect consumed by exact identity. A refused or cancelled Go
+leaves both semantic state and the prospect unchanged. The other Ripple
+endpoint remains available.
 
 ### 8.5 Native-player accessibility
 
@@ -719,6 +782,8 @@ Before chaptering a new identity, one boundary resolves every old-source owner:
 - settle Nudge before its timer can checkpoint;
 - cancel Current, Pin, Section, and Range drags to their origins;
 - settle old Playback when safe and cancel Context;
+- cancel active Ripple, remove its uncompleted batch, and clear all
+  source-scoped Traversal Prospects;
 - clear native Go, programmatic placement, player-pause claims, and metadata retry;
 - close dialogs and Pin-cluster menus;
 - persist safe settled Guide changes;
@@ -741,6 +806,8 @@ Every visible route is an adapter to one semantic consequence:
 - Tag duplicate detection has one identity rule;
 - Group deletion copy and mutation consume one deletion plan;
 - geometry, atmosphere, navigation, preview, and Textured Playback consume one effective projection.
+- bare Shift-click Ripple and bare click Go consume the same pointer inversion;
+- prospect settlement consumes canonical Go and ordinary traversal recording.
 
 Previews are dry runs or pure projections. They cannot maintain parallel target arithmetic. When commit occurs, the same operation that supplied the preview consequence owns the canonical state transition.
 

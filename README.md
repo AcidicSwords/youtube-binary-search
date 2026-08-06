@@ -73,6 +73,32 @@ All spatial consumers share one effective projection: drawing, sourceGridLines, 
 
 `X` is the auxiliary **Relax Weights** action in Operators. With an acquired Timeline Section it temporarily bypasses only that Section; otherwise it bypasses the complete map. Press `X` again on the same scope to restore it. The bypass is source-scoped, transient, absent from Undo and persistence, and never changes the stored Weight. Fixed playback receives no command from `X`; dynamic Shift playback may retune on a later transport tick because that policy explicitly reads the effective map.
 
+Section Weighting is the stored value on one retained Section. Effective Weight
+is the positive product currently acting at an Address. Timeline Allocation
+Factor is a readout comparing projected extent with Source-Time extent. These
+three values are related but never interchangeable. Panorama Stretch is a
+playback presentation and is unrelated to all three.
+
+## Ripple and Ghost futures
+
+`Shift+click` bare Timeline ground to **Ripple**-observe an Address without
+moving Current. Ripple uses the same weighted inverse map and automatic Context
+transport as the rest of the instrument. The Timeline distinguishes Current,
+moving Cursor, Ripple Observation Address, clipped Ripple Context Window, and
+its Start/End Traversal Prospects. Status and accessibility text explicitly say
+that Current did not move.
+
+When observation completes, hold `G` and wheel forward to inspect the newest
+prospect; wheel backward still reads where you have actually been. The moving
+mark is a Ghost Candidate until release. Releasing over a prospect performs
+ordinary Go, creates the ordinary Active Span/history/Traversal Trace movement,
+and consumes only that endpoint. Escape consumes nothing. Prospects are
+transient, filtered rather than deleted by Focus, and cleared with the source.
+
+Automatic Context recognizes a Current already reached. Ripple observation
+recognizes a non-Current Address. Neither is traversal and neither appends
+Traversal Trace evidence; prospect Go is traversal.
+
 ## Active Span and operators
 
 Range is the admissible source universe. Refine, Step, Go, playback, and direct manipulation exclude alternatives from the current relation. The **Active Span** is the surviving positive, contiguous residue, stored as two source bounds with orientation and endpoint frames—not as a path log.
@@ -92,7 +118,7 @@ R  Release            T  Tag               F  Focus / Unfocus
 - `W` restores Range-level Current Neighborhood without discarding Current or the Active Span.
 - `S` moves to the opposite endpoint and restores that endpoint’s saved viewpoint.
 - `R` clears the Active Span and the Timeline Selection. Current, Guide Selection, retained topology, Weight, Focus, and weight relaxation remain.
-- `T` tags Current as a Pin. `Shift+T` tags a positive Active Span as a Section. Plain Tag remains a Pin action even while an Interval exists; an exact duplicate is selected rather than recreated.
+- `T` tags Current as a Pin. `Shift+T` tags a positive Active Span as a Section. Plain Tag remains a Pin action even while an Active Span exists; an exact duplicate is selected rather than recreated.
 - `F` focuses an acquired Section or the Active Span as Range and viewport; the same action unfocuses to the containing Range.
 
 The Matrix Shift button is a one-shot layer owned only by Matrix actions. Guide **Extend** is a separate one-shot layer owned only by Guide composition. Holding the physical Shift key modifies the current action without consuming either latch.
@@ -122,6 +148,7 @@ Nudge is exact source-time adjustment. `Shift`+wheel uses the dominant wheel axi
 | --- | --- |
 | `Space` | Play/pause `1×` Panorama |
 | `Shift+Space` | Play/pause Center-only fixed or Textured Playback |
+| `Shift+click` bare Timeline | Ripple observation without moving Current |
 | `Q` / `E` | Refine backward / forward |
 | `Shift+Q` / `Shift+E` | Local Refine backward / forward |
 | `A` / `D`, `←` / `→` | Step backward / forward |
@@ -133,7 +160,7 @@ Nudge is exact source-time adjustment. `Shift`+wheel uses the dominant wheel axi
 | `[` / `]` | Decrease / increase Step Distance preset |
 | `,` / `.` | Nudge backward / forward |
 | `I` / `O` | Open Guide / Operators and State & Settings |
-| Hold `G` + wheel | Ghost Traversal: backward and forward through the order you encountered Addresses in |
+| Hold `G` + wheel | Ghost: backward through Trace; forward through prospects, then valid historical continuation |
 | `Alt+Q/W/E/A/S/D` or `Alt` + an arrow Step | Carry the acquired retained object with Current |
 | `Esc` | Cancel the active manipulation or close the transient surface |
 | `?` | Shortcut help |

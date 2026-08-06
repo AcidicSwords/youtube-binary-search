@@ -19,7 +19,8 @@ is a module and ownership map, not a history of earlier designs.
 | `panorama-geometry.js` | Pure Panorama offsets, cycling phases, bounds, and rate pairs |
 | `panorama.js` | Tail/Lead players, placement, Panorama transitions, Cycle runtime, Freeze/Stretch, and stale-event rejection |
 | `chapters.js` | Parsing offered chapter Addresses into transient candidate extents |
-| `traversal-trace.js` | The append-only encounter ledger: traversal records, the frozen readable stream, read cursors, and Ghost injection |
+| `traversal-trace.js` | The append-only encounter ledger: traversal records, the frozen readable stream, read cursors, and Ghost Return |
+| `traversal-prospects.js` | Immutable, transient Ripple endpoint identity, newest-first availability, frozen reads, exact consumption, batch removal, and clearing |
 | `view.js` | DOM projection, timeline atmosphere and sourceGridLines, Guide rows, operator labels, and accessible state |
 | `app.js` | Composition, interaction acquisition, source generations, persistence, transient ownership, and adapter effects |
 
@@ -41,7 +42,7 @@ A semantic mutation follows one route:
 ```text
 snapshot the current model
 → apply one pure candidate mutation
-→ reconcile Focus and Working-Interval endpoint frames
+→ reconcile Focus and Active-Span endpoint frames
 → validate Range and Guide invariants
 → append at most one history checkpoint
 → publish adapter effects from the accepted result
@@ -224,7 +225,8 @@ Before chaptering a new identity, `transitionSourceBoundary()` resolves all owne
 of the old source in one place. It cancels Current, Pin, Section, and Range
 drags to their origins; settles Nudge and pending Step; safely settles active
 Context or Playback; persists settled Guide changes; clears native Go and
-programmatic placement; closes transient dialogs and Pin clusters; clears Chapters,
+programmatic placement; closes transient dialogs and Pin clusters; cancels active
+Ripple and clears every Traversal Prospect; clears Chapters,
 selection, Guide Selection, Shift latches, Panorama runtime, and weight relaxation;
 then creates a fresh Session and chapters the new source. Player errors use the same
 boundary. No source Address, identity, timer, or history checkpoint may cross it.
@@ -270,26 +272,50 @@ of the stream without every caller having to test for it. Undo and Redo write
 when they move the reader and not otherwise: semantic history and the Traversal Trace are
 different orders, and traversing one is a route through the other.
 
-A gesture resolves the whole readable sequence once, at the moment it begins:
-the frozen stream end, the active Range, the projection, and the effective Step
-Reach. That single decision settles three separate requirements — the gesture
-cannot follow its own newly injected output, a mid-gesture Weight change cannot
-move candidates already passed, and the Range in force at the start is the Range
-the whole gesture obeys.
+A gesture resolves one readable source once, at the moment it begins: backward
+uses the frozen Traversal Trace; forward uses a newest-first frozen Traversal
+Prospect read and falls back to valid historical continuation only when no
+prospect exists. It also freezes active Range, projection, and effective Step
+Distance. Reversing retraces that source rather than switching readers.
 
 `session.js` supplies `ghostTraverse`, which amends one captured origin per
 notch, and `settleGhostSequence`, which commits the gesture as one transaction.
-Releasing appends exactly one occurrence — Anchor to landing — with the scan
-kept as provenance rather than as traversal. A resume cursor lets an
+Releasing a historical Candidate appends exactly one Ghost Return — Anchor to
+landing — with the scan kept as provenance rather than as traversal. A
+continuation lets an
 immediately-forward gesture replay the historical successors of the moment
 re-entered; it is refused once the reader is standing anywhere else, once its
 record or unit is gone, once its Address is not one the unit actually occupied,
 and once the active Range excludes it. Any route that moves the reader also
 withdraws it outright, so stepping away and back does not revive it.
 
-Where automatic Context is enabled, each Ghost candidate retargets one Context
-window rather than opening a new one. A window superseded or run out during the
-scan writes no observation; the one still running when the gesture ended does.
+Where automatic Context is enabled, each Ghost Candidate retargets one Context
+Window rather than opening a new one. Recognition is observation rather than
+traversal and appends no Traversal Trace evidence.
+
+## Ripple observation and prospect settlement
+
+`app.js` acquires Ripple only from bare Timeline `Shift+click`, after retained
+objects have kept their own pointer ownership. It uses the effective
+`timelineProjection()` inverse, then `deriveContextWindow()` and `startContext()`;
+there is no Ripple-specific projection, transport, or player path. Its active
+identity holds source generation, Observation Address, exact clipped start/end,
+and phase. Repeated acquisition retargets one playing Context and removes only
+the superseded incomplete batch.
+
+`traversal-prospects.js` appends Start then End with unique IDs. Availability
+reverses insertion order and filters generation and active Range without
+deletion. A Ghost gesture freezes the returned entries. During scan, canonical
+`goTo()` runs against a copied origin only for Ghost Candidate presentation.
+On release, `goTo()` runs again against accepted Session; successful `accept()`
+creates one ordinary Go history/Active Span/Trace consequence, then
+`consumeTraversalProspect()` removes the exact selected ID. Cancellation or
+refusal restores Current and consumes nothing.
+
+Ripple completion clears active identity but keeps prospects. Escape settles
+the shared Context, removes the incomplete batch, and restores Current-centred
+media/Panorama. Focus only filters availability. Source replacement cancels
+active Ripple and clears the complete source-scoped collection.
 
 ## Playback and media authority
 
@@ -315,8 +341,8 @@ from `observationPolicy === "panorama"` and confirmed actual `1×`; a native rat
 change suspends or restores the sides without opening another semantic
 transaction.
 
-Dynamic policy reads `1 / effectiveWeight` without transport-level bounds; the
-adapter offer supplies real limits. When offers expand, a fixed Center-only
+Dynamic policy reads `1 - 0.25 * log2(effectiveWeight)` before offered-rate
+resolution; the adapter supplies real limits. When offers expand, a fixed Center-only
 playback re-resolves its stored wish. Retry preserves both policies and reapplies
 their current requested rate. Proper-Range wrap rebases the same transport,
 preserves observation, resolves fixed wish or dynamic effective Weight at Range

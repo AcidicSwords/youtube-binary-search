@@ -97,11 +97,27 @@ The Timeline’s violet/teal atmosphere shows the sign and perceptual strength o
 
 There are four temporal orders here, and only three of them are about the work. Source time is what the video is. Timeline Space is what the map makes of it. Semantic history is what the reader did to the map. **Traversal Trace** is the fourth: the order in which the reader actually encountered source Addresses. It is the only one that records where they have been, as opposed to what the world was.
 
-It is an append-only, source-scoped ledger. A record holds directed units: a **jump** was a movement between two Addresses and only those two were occupied; a **span** was watched continuously and any Address inside it was genuinely seen. Every route that moves the reader writes one — Go, Step, Nudge, a Current drag, Playback, an automatic Context window watched to its end, and an Undo or Redo that puts them somewhere else. Editing the world without moving writes nothing: a rename, a Weight, a new Pin, a Group toggled, an Undo of any of those. Programmatic placement never writes, because the player being told where to sit is a consequence of a movement rather than a movement of its own.
+It is an append-only, source-scoped ledger. A record holds directed units: a **jump** was a movement between two Addresses and only those two were occupied; a **span** was watched continuously and any Address inside it was genuinely seen. Every route that moves the reader writes one — Go, Step, Nudge, a Current drag, voluntary Playback, and an Undo or Redo that puts them somewhere else. Editing the world without moving writes nothing: a rename, a Weight, a new Pin, a Group toggled, an Undo of any of those. Automatic Context and Ripple observation recognize without traversing and write nothing. Programmatic placement never writes, because the player being told where to sit is a consequence of a movement rather than a movement of its own.
 
-**Ghost Traversal** — held `G` plus the wheel — reads that ledger while the semantic world stands still. The Address the reader began at becomes a fixed Anchor; each wheel quantum recalls one occurrence backward or forward through their own path, which may run either way through source time. What it produces is an ordinary Active Span between the two, so every operator that acts on one acts on this. It restores no historical Guide, Weight, Group, Focus or Range: it recalls where they were, not what the world was then.
+**Ghost Traversal** — held `G` plus the wheel — reads while the semantic world
+stands still. Backward reads the Traversal Trace. Forward first reads available
+**Traversal Prospects**, newest first, then a valid historical continuation when
+no prospect is available. The Address the reader began at becomes a fixed
+Anchor. A historical landing produces an ordinary Active Span and one Ghost
+Return. A prospect landing settles through ordinary Go, writes ordinary history
+and Traversal Trace movement, and consumes only that prospect. It restores no
+historical Guide, Weight, Group, Focus, or Range.
 
 Searching and arriving are different events. The scan is transient — it may cross many moments and reverse direction, and none of that is a path anybody walked. Releasing appends exactly one occurrence: a jump from the live Anchor to the moment re-entered, carrying provenance to both and to the scan as evidence. So repeated recall accumulates the moments returned to, never mirrored copies of the searching.
+
+**Ripple** is observation rather than traversal. `Shift+click` on bare Timeline
+ground resolves an observation Address through the same effective projection
+used by ordinary Go, derives one independently Range-clipped Context Window,
+and observes it through the shared Context transport while Current, Active Span,
+semantic history, and Traversal Trace remain unchanged. Successful completion
+leaves distinct Start and End Traversal Prospects. They are transient,
+source-scoped futures: Focus can make one unavailable without deleting it, and
+source replacement clears them all.
 
 ## Guide
 
@@ -156,6 +172,11 @@ Observation and rate are separate dimensions. Plain `Space` requests a `1×` Pan
 
 The Panorama never confiscates ordinary player controls. If the confirmed actual Center rate cannot preserve Panorama, the side views suspend rather than drift.
 
+Automatic Context recognizes a Current already reached. Ripple observes a
+non-Current Address without reaching it. Neither is traversal and neither writes
+Traversal Trace evidence. Only a successful ordinary movement—such as Go from a
+Ripple prospect—changes Current and enters the Trace.
+
 ## Operational cycle
 
 ```text
@@ -168,6 +189,7 @@ load a source and use ordinary playback
 → assign Section Weight in Guide
 → optionally compare with Relax Weights
 → optionally Focus the relation
+→ optionally Ripple-observe bare Timeline ground and Ghost forward to a prospect
 → re-enter the resulting map
 ```
 

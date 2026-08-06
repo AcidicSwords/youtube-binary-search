@@ -77,12 +77,9 @@ The complete gate must prove all of the following.
   same transport, resolves fixed wish or dynamic Weight at Range Start, applies
   that request, preserves Panorama eligibility, and adds no history. Each wrap
   rebases each available side at most once.
-- Both transports say where the watching began, so settling either records the
-  source time actually crossed. A Context window enters at its own start rather
-  than at the Address that anchored it; a window that never played records
-  nothing, since a span of no extent is not an occurrence.
-- A Context window played through by a Ghost scan is search: only the window
-  still running when the gesture ended is written as observed source time.
+- Playback says where voluntary watching began and records the source time
+  actually crossed. Automatic Context recognizes Current or a Ghost Candidate
+  already reached and never appends Traversal Trace evidence.
 - Native seek, captions/settings, volume, and fullscreen hit regions remain
   pointer-accessible while paused and idle.
 
@@ -92,7 +89,7 @@ The complete gate must prove all of the following.
 and `ghost-smoke.mjs` the gesture in a real browser.
 
 - Every route that moves the reader writes one occurrence: Go, Step, Nudge, a
-  Current drag, Playback, a watched Context window, and an Undo or Redo that
+  Current drag, Playback, and an Undo or Redo that
   puts them somewhere else. A rename, a Weight, a Group toggle, a new Pin, and
   an Undo of any of those write nothing. Programmatic placement never writes.
 - A held or coalesced gesture writes one sequence that keeps its reversals; a
@@ -110,7 +107,7 @@ and `ghost-smoke.mjs` the gesture in a real browser.
   moments and a forward scan settled short of the live end each append exactly
   one occurrence, the landing. Escape appends nothing and restores the origin,
   history and future exactly.
-- Backward from an injected occurrence follows its live predecessor; forward may
+- Backward from a Ghost Return follows its live predecessor; forward may
   resume the historical successors of the moment re-entered. The choice is made
   once from the direction the gesture opens with. Any route the reader takes of
   their own withdraws that offer, including one that leaves and returns to the
@@ -118,6 +115,32 @@ and `ghost-smoke.mjs` the gesture in a real browser.
 - A recalled Address the active Range excludes is unavailable rather than
   clamped; Ghost never leaves Focus, widens Range, or opens Full Video.
 - One Undo returns to the Anchor with all structure intact.
+
+### Ripple and Traversal Prospects
+
+`traversal-prospects-tests.mjs`, `ripple-random-tests.mjs`,
+`ripple-smoke.mjs`, and `ripple-render-smoke.mjs` jointly prove:
+
+- bare `Shift+click` uses the effective Timeline inverse; retained objects keep
+  their own Shift ownership and no ordinary Go leaks through;
+- shared Context derivation independently clips both Ripple Window boundaries
+  to full or focused Range, and published Start/End Addresses equal those
+  resolved boundaries;
+- acquisition, retarget, observation, completion, cancellation, and source
+  replacement change no Current, Neighborhood, Active Span, semantic history,
+  or Traversal Trace unless a prospect later settles through ordinary Go;
+- completed batches coexist newest first, End before Start; identity remains
+  exact under duplicate Addresses, Focus filtering, consumption, and generation
+  invalidation;
+- forward Ghost freezes prospects before historical continuation; preview and
+  Escape commit nothing, successful Go writes one ordinary history/Trace
+  movement and consumes only its selected endpoint;
+- Chromium proves Current/Cursor/Ripple/Ghost channels, weighted inversion,
+  focused clipping, existing-layer non-collapse, responsive layout, reduced
+  motion, forced high contrast, accessible announcements, Escape, and source
+  replacement;
+- 20,000 deterministic lifecycle operations and 2,000 Go settlements preserve
+  all prospect, Session, history, and Trace invariants.
 
 ### Source and Guide integrity
 
@@ -128,7 +151,7 @@ rewrite-refusal coverage.
 - Request A, then B, then stale A CUED or duration cannot initialize B. Adapter
   identity and current generation must both match.
 - Replacing a source during Nudge, Step, Current/Pin/Section/Range drag,
-  Playback, Context, or weight relaxation leaves no old-source Address,
+  Playback, Context, Ripple, Ghost, or weight relaxation leaves no old-source Address,
   identity, timer, Panorama owner, or history checkpoint in the fresh Session.
 - The old semantic Guide is persisted only after pending ownership is resolved.
 - An unreadable current Guide plus valid older fallback preserves the unreadable
@@ -186,6 +209,8 @@ rewrite-refusal coverage.
 ### Documentation and gauges
 
 - Package and specification versions agree.
+- Canonical documents state that automatic Context and Ripple observation are
+  not traversal, while successful prospect Go is ordinary traversal.
 - No canonical document or visible control advertises retired keys, operators,
   or a Timeline header action for `X`.
 - Every executable suite is mapped in `DEVELOPMENT.md`; no removed suite is

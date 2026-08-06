@@ -74,6 +74,7 @@ runs the same complete `npm run verify` gate before publishing.
 | Panorama Frame identity or transition | `panorama-frame.js` | application owner selection and Panorama runtime |
 | Panorama bounds or cycling policy | `panorama-geometry.js` | controller lifecycle and browser presentation |
 | Tail/Lead player behavior | `panorama.js` | stale events, dormant panes, user activation, native-player isolation |
+| Ripple future identity and frozen prospect reads | `traversal-prospects.js` | application acquisition, Ghost settlement, random stress, and browser proof |
 | DOM projection and visual state | `view.js` | source audit plus Chromium proof |
 | Interaction acquisition, persistence, source boundary | `app.js` | route convergence and whole-system journeys |
 | Physical layout and accessibility | `index.html`, `styles.css`, `panorama.css`, `panorama-layout.css` | integration audit and Chromium proof |
@@ -134,6 +135,8 @@ owner. Do not reach through the media adapter from application or Panorama code.
 - Every source replacement runs the one transition boundary before chaptering.
 - No old-source drag, timer, selection, Panorama owner, transport, or checkpoint may
   reach the fresh Session.
+- Active Ripple is cancelled at the boundary; its incomplete batch and every
+  completed source-scoped Traversal Prospect are cleared.
 - Version-9 Guide evidence is inspected before older fallbacks.
 - An unreadable higher-priority record must be quarantined before a fallback may
   overwrite its current key. A failed quarantine disables that rewrite.
@@ -150,7 +153,7 @@ Every executable suite is listed here by the current behavior it protects.
 - `timeline-projection-tests.mjs` — positive factors, overlap products, forward/inverse round trips, effective contributors, bypass scope, Pin order, and migration.
 - `ghost-smoke.mjs` — Ghost in a real browser: the Guide on `I` while Tab stays the browser's, G arming without cost, a wheel notch recalling behind a fixed Anchor, one transaction on release, exact cancellation, wheel ownership between Ghost and Nudge, and Context playing through the recall as one retargeted window whose scan writes no observation.
 - `ghost-tests.mjs` — Ghost Traverse against a live Session: a preserved semantic world, Focus/Range bounds, one Undo per held gesture, the reversal envelope, recorded rather than recomputed Addresses, and a Section retained entirely in the past.
-- `traversal-trace-tests.mjs` — the append-only encounter ledger: records that keep reversals, direction in the Traversal Trace independent of source order, watched spans subdivided by the frozen Step law and clipped to the active Range, a frozen readable stream, and injection with provenance.
+- `traversal-trace-tests.mjs` — the append-only encounter ledger: records that keep reversals, direction in the Traversal Trace independent of source order, watched passages subdivided by the frozen Step law and clipped to the active Range, a frozen readable stream, and Ghost Return provenance.
 - `traversal-prospects-tests.mjs` — transient future Addresses: Ripple batch order, newest-first frozen Ghost reading and reversal, stable acquisition, exact endpoint consumption, duplicate identity, generation invalidation, Focus filtering, removal, and clearing.
 - `ripple-random-tests.mjs` — 20,000 deterministic prospect lifecycle operations with frozen-read races plus 2,000 canonical Go/history/Trace settlement trials.
 - `section-topography-tests.mjs` — Section Weight, nested/overlapping Guide geometry, Pin movement, and spatial traversal consequences.
@@ -167,7 +170,7 @@ Every executable suite is listed here by the current behavior it protects.
 
 ### Transport, media, and Panorama
 
-- `transport-tests.mjs` — explicit observation/rate policies, actual-rate authority, policy-preserving retry/rebase, log-space offers, and unbounded inverse Weight.
+- `transport-tests.mjs` — explicit observation/rate policies, actual-rate authority, policy-preserving retry/rebase, log-space offers, and log-compressed Textured Playback Weight.
 - `youtube-tests.mjs` — URL/time parsing, loaded-source identity in snapshots, and actual playback-rate event delivery.
 - `step-gesture-tests.mjs` — repeat cadence, release batching, boundary stop, cancellation, and takeover.
 - `panorama-tests.mjs` — Panorama geometry, suspension, Freeze/Stretch, side activation, user activation, and panoramic layout contracts.

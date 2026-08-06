@@ -487,6 +487,8 @@ Each canonical term carries:
 - **Definition** Configured nearby observation after eligible traversal.
 - **Code stem** `automaticContext` · **UI label** Automatic Context
 - **Qualifiers** Context Window, Context Playback, Context Duration.
+- **Non-effects** Recognizes a Current already reached; it is observation, not
+  traversal, and appends no Traversal Trace evidence.
 
 ### Context Window
 - **Class** object · **Owner** `transport.js`
@@ -506,6 +508,19 @@ Each canonical term carries:
 - **Code stem** `contextDuration` · **UI label** Context Duration
 - **Forbidden synonyms** Center-only duration, `contextSeconds` (legacy
   persisted key; read-only compatibility).
+
+### Ripple
+- **Class** operator · observation · **Owner** `app.js` · **Gesture**
+  `Shift+click` on bare Timeline ground
+- **Definition** Observe a non-Current Timeline Address through the shared
+  Context transport and publish its resolved Context boundaries as future
+  Traversal Prospects.
+- **Code stem** `ripple` / `rippleObservation` · **UI label** Ripple
+- **Qualifiers** Ripple Observation Address, Ripple Context Window, Ripple Start
+  Prospect, Ripple End Prospect.
+- **Non-effects** Ripple observation is not traversal. It changes neither
+  Current, Current Neighborhood, Active Span, semantic history, nor Traversal
+  Trace. A later Go to one of its prospects is ordinary traversal.
 
 ### Ripple Observation Address
 - **Class** address · **Owner** `app.js`
@@ -685,8 +700,10 @@ Each canonical term carries:
 ### Ghost
 - **Class** operator · **Owner** `app.js`, `session.js` · **Key** held `G` +
   wheel
-- **Definition** Operator that replays the Traversal Trace while preserving the
-  current semantic environment.
+- **Definition** Operator that reads historical Traversal Trace backward and
+  reads available Traversal Prospects forward, falling back to a valid
+  historical continuation when no prospect is available, while preserving the
+  current semantic environment during its scan.
 - **Code stem** `ghost` · **UI label** Ghost
 - **Non-effects** Restores no historical Range, Guide, Groups, Section
   Weightings, Focus, or semantic history.
@@ -713,7 +730,8 @@ Each canonical term carries:
 
 ### Ghost Scan
 - **Class** state · **Owner** `app.js`
-- **Definition** Transient movement through the frozen Trace.
+- **Definition** Transient movement through one frozen read source: Traversal
+  Trace or Traversal Prospects.
 - **Code stem** `ghostScan` · **UI label** Ghost Scan
 
 ### Ghost Return
