@@ -43,6 +43,7 @@ import {
 } from "./transport.js";
 import {
   STEP_DISTANCE_MODE,
+  canonicalNeighborhoodDirections,
   focusOwnsRangeBoundaries,
   effectiveStepDistance,
   projectPlayback,
@@ -1679,6 +1680,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : null;
     const livePlayback = Boolean(playbackProjection?.changed);
     const projectedModel = livePlayback ? playbackProjection.model : model();
+    const projectedNeighborhood = canonicalNeighborhoodDirections(
+      projectedModel?.neighborhood
+    );
     elements["timeline-key-active-span"].dataset.active = String(
       Boolean(projectedModel?.activeSpan)
     );
@@ -1690,14 +1694,14 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     ]) {
       elements[id].dataset.live = String(livePlayback);
     }
-    if (state().videoLoaded && projectedModel?.neighborhood) {
+    if (state().videoLoaded && projectedNeighborhood) {
       setSegment(
         elements["neighborhood-fill"],
-        projectedModel.neighborhood.L,
-        projectedModel.neighborhood.R
+        projectedNeighborhood.backward,
+        projectedNeighborhood.forward
       );
-      setMarkerPosition(elements["neighborhood-backward-bound"], projectedModel.neighborhood.L);
-      setMarkerPosition(elements["neighborhood-forward-bound"], projectedModel.neighborhood.R);
+      setMarkerPosition(elements["neighborhood-backward-bound"], projectedNeighborhood.backward);
+      setMarkerPosition(elements["neighborhood-forward-bound"], projectedNeighborhood.forward);
       elements["active-span-fill"].hidden = !projectedModel.activeSpan;
       if (projectedModel.activeSpan) {
         elements["active-span-fill"].dataset.direction = projectedModel.activeSpan.direction;
@@ -2204,8 +2208,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? currentState.session.future.at(-1).label
       : "Nothing to redo";
     const destinationFrame = currentSpan?.departureNeighborhood;
-    const destinationScale = destinationFrame?.neighborhood
-      ? formatDuration(destinationFrame.neighborhood.R - destinationFrame.neighborhood.L)
+    const destinationNeighborhood = canonicalNeighborhoodDirections(
+      destinationFrame?.neighborhood
+    );
+    const destinationScale = destinationNeighborhood
+      ? formatDuration(destinationNeighborhood.forward - destinationNeighborhood.backward)
       : null;
     setActionMeta(
       "switch-end",

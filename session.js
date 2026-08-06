@@ -399,6 +399,19 @@ export function snapshotModel(model, options = {}) {
   };
 }
 
+// Pure geometry retains its compact L/C/R keys internally. Every consumer that
+// projects the Session outside that kernel crosses this named directional
+// boundary instead of exporting those implementation keys as product language.
+export function canonicalNeighborhoodDirections(neighborhood) {
+  if (!neighborhood) return null;
+  return Object.freeze({
+    backward: neighborhood.L,
+    current: neighborhood.C,
+    forward: neighborhood.R,
+    level: neighborhood.level
+  });
+}
+
 function unchanged(session, reason = null, detail = {}) {
   return { session, changed: false, reason, ...detail };
 }

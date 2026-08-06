@@ -8,6 +8,7 @@ import {
   deleteGroup
 } from "./guide.js";
 import {
+  canonicalNeighborhoodDirections,
   createSession,
   snapshotModel,
   planGuideGroupDeletion,
@@ -17,6 +18,12 @@ import {
   switchActiveEnd,
   undo
 } from "./session.js";
+
+assert.deepEqual(
+  canonicalNeighborhoodDirections({ L: 10, C: 20, R: 30, level: 4 }),
+  { backward: 10, current: 20, forward: 30, level: 4 },
+  "Session exposes canonical Neighborhood directions at its presentation boundary."
+);
 
 function buildGroups() {
   const guide = createGuide("completion-groups");
