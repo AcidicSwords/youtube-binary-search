@@ -46,7 +46,7 @@ import {
   previewTransition
 } from "./session.js";
 import { YOUTUBE_STATE } from "./youtube.js";
-import { panoramaSideRates } from "./step-field-geometry.js";
+import { panoramaSideRates } from "./panorama-geometry.js";
 
 const TIMELINE_SECTION_HIT_WIDTH = 28;
 const TIMELINE_SECTION_LANE_HEIGHT = 20;
@@ -1955,7 +1955,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? `${currentState.contextSeconds} s centered on Current`
       : "Off";
 
-    // One bounded breathing relation: 0 < inner < outer.
+    // One bounded cycling relation: 0 < inner < outer.
     const panoramaCycle = currentState.panoramaCycle || { inner: 0.25, outer: 2.5, rate: 0.25 };
     elements["field-inner-offset"].value = String(panoramaCycle.inner);
     elements["field-outer-offset"].value = String(panoramaCycle.outer);
@@ -1963,7 +1963,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["field-outer-offset"].min = String(panoramaCycle.inner);
     if (elements["panorama-setting-value"]) {
       const configuredPair = panoramaSideRates(panoramaCycle.rate);
-      const pair = elements["field-breath-rate"]?.selectedOptions?.[0]?.textContent
+      const pair = elements["field-cycle-rate"]?.selectedOptions?.[0]?.textContent
         || `${configuredPair.tailRate}× / ${configuredPair.leadRate}×`;
       elements["panorama-setting-value"].textContent =
         `${panoramaCycle.inner}–${panoramaCycle.outer} s · ${pair}`;
@@ -2106,7 +2106,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     for (const id of [
       "go-range-start", "range-start-here", "range-midpoint",
       "go-range-end", "range-end-here", "full-video-range",
-      "field-inner-offset", "field-outer-offset", "field-breath-rate",
+      "field-inner-offset", "field-outer-offset", "field-cycle-rate",
       "nudge-seconds", "context-seconds", "playback-rate", "playback-dynamic",
       "weight-relaxation-toggle",
       "section-source", "section-label", "pin-label",

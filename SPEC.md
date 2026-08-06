@@ -42,7 +42,7 @@ Preferences may persist independently from a source:
 
 - Context duration;
 - Step Reach mode and values;
-- Field Inner Offset, Outer Offset, and breathing-rate spread;
+- Field Inner Offset, Outer Offset, and cycling-rate spread;
 - Nudge quantum when no exact media frame is available;
 - Shift playback fixed wish and dynamic-policy choice;
 - Panorama enabled state and side visibility.
@@ -64,7 +64,7 @@ The following are intentionally absent from Session history and Guide persistenc
 - deformation bypass;
 - offered Cues and Cue-lane visibility;
 - open panels, dialogs, cluster menus, hover, focus, and preview state;
-- Field Frame transition revision, Field Breath phase, and side-player synchronization.
+- Field Frame transition revision, Field Cycle phase, and side-player synchronization.
 
 Each transient has one owner and one settlement or cancellation boundary. A timer cannot checkpoint state after its source or gesture owner has changed.
 
@@ -385,7 +385,7 @@ A Guide destination outside a focused Range may leave Focus or open Full Video a
 
 Every semantic operator commits the smallest complete transaction. Undo restores the checkpoint immediately before it; Redo restores the displaced state. A new semantic transaction clears the Redo future.
 
-Metadata-only presentation, deformation bypass, panel state, previews, Cues, transport ticks, rate events, Field Breath, and playback wraps do not enter Session history. A changed Guide transaction is persisted after acceptance when recovery permits safe writing.
+Metadata-only presentation, deformation bypass, panel state, previews, Cues, transport ticks, rate events, Field Cycle, and playback wraps do not enter Session history. A changed Guide transaction is persisted after acceptance when recovery permits safe writing.
 
 ## 6. Selection and direct manipulation
 
@@ -478,7 +478,7 @@ Frame ownership has one priority order:
 1. active direct manipulation supplies its exact candidate Frame;
 2. otherwise enabled Context supplies its bounded Context Frame;
 3. otherwise the last applicable operator supplies its Frame;
-4. ordinary playback hands presentation to Field Breath rather than Field Frame.
+4. ordinary playback hands presentation to Field Cycle rather than Field Frame.
 
 Operator Frames use the effective projection:
 
@@ -501,9 +501,9 @@ When Context duration is positive, Context owns Tail and Lead before, during, an
 
 Tail is the first Context Address, Lead is the last, and Center is Current while idle or Cursor while running. Starting, pausing, stopping, or settling Context does not reassign the edges. Setting Context duration to zero returns ownership to operator framing.
 
-### Field Breath
+### Field Cycle
 
-Field Breath is the live Tail/Lead relation during ordinary Panorama playback. Its configured relation is:
+Field Cycle is the live Tail/Lead relation during ordinary Panorama playback. Its configured relation is:
 
 ```text
 0 < Inner Offset x < Outer Offset y
@@ -530,9 +530,9 @@ outward Tail = Center × (1 - rate)
 outward Lead = Center × (1 + rate)
 ```
 
-During contraction the side roles exchange. A side reaching a boundary first follows Center at Center rate while preserving the attained offset. When every operational side reaches the same boundary, the phase reverses. A collapsed, hidden, unavailable, or Range-clipped side is excluded from this synchronization barrier. If a side has less room than Inner Offset, the minimum is not reduced; the side is parked within available room and does not breathe.
+During contraction the side roles exchange. A side reaching a boundary first follows Center at Center rate while preserving the attained offset. When every operational side reaches the same boundary, the phase reverses. A collapsed, hidden, unavailable, or Range-clipped side is excluded from this synchronization barrier. If a side has less room than Inner Offset, the minimum is not reduced; the side is parked within available room and does not cycle.
 
-Hold freezes attained offsets, clears waiting state, and places held sides at Center rate without rewriting the configured bounds or phase direction. Stretch resumes from that exact relation. Field Hold and Breath phase create no Session checkpoint.
+Hold freezes attained offsets, clears waiting state, and places held sides at Center rate without rewriting the configured bounds or phase direction. Stretch resumes from that exact relation. Field Hold and Cycle phase create no Session checkpoint.
 
 Field runtime suspends while Context, pending Step, direct manipulation, or an incompatible Playback policy/actual rate owns observation. Stale side-player events cannot revive a hidden, collapsed, unavailable, or superseded side.
 

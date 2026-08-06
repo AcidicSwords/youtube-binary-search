@@ -19,8 +19,8 @@ import {
   deriveFieldBounds,
   fieldPreferenceRequiresEstablish,
   createPanoramaController
-} from "./step-field.js";
-import { chooseNearestRate, breathRateFromResponse } from "./step-field-geometry.js";
+} from "./panorama.js";
+import { chooseNearestRate, sideRateStepFromResponse } from "./panorama-geometry.js";
 
 assert.deepEqual(normalizeStepReach(8), {
   backward: 8,
@@ -49,9 +49,9 @@ assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: true }), true);
 assert.equal(fieldPreferenceRequiresEstablish({ panoramaEnabled: false }), false);
 assert.equal(fieldPreferenceRequiresEstablish({ panoramaEnabled: true }), true);
 // A legacy saved side-rate pair migrates once into the nearest symmetric
-// breathing rate; the two sides are never configured independently again.
-assert.equal(breathRateFromResponse({ tailRate: 0.75, leadRate: 1.25 }), 0.25);
-assert.equal(breathRateFromResponse({ tailRate: 0.5, leadRate: 2 }), 0.75);
+// cycling rate; the two sides are never configured independently again.
+assert.equal(sideRateStepFromResponse({ tailRate: 0.75, leadRate: 1.25 }), 0.25);
+assert.equal(sideRateStepFromResponse({ tailRate: 0.5, leadRate: 2 }), 0.75);
 
 {
   let session = createSession({ duration: 200, current: 100, stepReach: { backward: 5, forward: 15, linked: false } });
@@ -129,7 +129,7 @@ assert.equal(breathRateFromResponse({ tailRate: 0.5, leadRate: 2 }), 0.75);
   assert.equal(actions.stepForward.destination, 65);
 }
 
-// Breathing asks for the rate its current phase intends and takes the nearest
+// Cycling asks for the rate its current phase intends and takes the nearest
 // the source actually offers, so direction-filtered selection is not a separate
 // policy any more.
 assert.equal(chooseNearestRate([0.25, 0.5, 1, 1.5, 2], 0.5), 0.5);
@@ -182,15 +182,15 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
 {
   const html = readFileSync("index.html", "utf8");
   const app = readFileSync("app.js", "utf8");
-  const field = readFileSync("step-field.js", "utf8");
-  const fieldCss = readFileSync("step-field.css", "utf8");
+  const field = readFileSync("panorama.js", "utf8");
+  const fieldCss = readFileSync("panorama.css", "utf8");
   const styles = readFileSync("styles.css", "utf8");
   const view = readFileSync("view.js", "utf8");
   const implementation = readFileSync("IMPLEMENTATION.md", "utf8");
   const readme = readFileSync("README.md", "utf8");
 
   for (const id of [
-    "field-inner-offset", "field-outer-offset", "field-breath-rate",
+    "field-inner-offset", "field-outer-offset", "field-cycle-rate",
     "tail-player-surface", "lead-player-surface",
     "field-both-toggle", "nudge-seconds",
     "field-transport-state", "field-rate-state"
@@ -199,8 +199,8 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   for (const retired of ["step-link", "continue", "context-action", "skim", "speed-select"]) {
     assert.doesNotMatch(html, new RegExp(`id=["']${retired}["']`));
   }
-  assert.equal((html.match(/id=["']field-breath-rate["']/g) || []).length, 1,
-    "One breathing-rate pair replaces the two independent side rate controls.");
+  assert.equal((html.match(/id=["']field-cycle-rate["']/g) || []).length, 1,
+    "One cycling-rate pair replaces the two independent side rate controls.");
   assert.equal((html.match(/id=["']field-both-toggle["']/g) || []).length, 1);
   assert.match(html, /id=["']tail-pane["'][\s\S]*id=["']player-tail["']/);
   assert.match(html, /id=["']lead-pane["'][\s\S]*id=["']player-lead["']/);
@@ -216,7 +216,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   // setting?" depended on which setting.
   assert.match(
     html,
-    /id="parameter-panel"[\s\S]*id="nudge-seconds"[\s\S]*id="field-inner-offset"[\s\S]*id="field-outer-offset"[\s\S]*id="field-breath-rate"/,
+    /id="parameter-panel"[\s\S]*id="nudge-seconds"[\s\S]*id="field-inner-offset"[\s\S]*id="field-outer-offset"[\s\S]*id="field-cycle-rate"/,
     "Every remembered setting lives in Parameters."
   );
   assert.doesNotMatch(html, /center-field-settings/,
@@ -259,7 +259,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   );
   assert.doesNotMatch(app, /onHoldOffsets:/);
   assert.doesNotMatch(field, /onHoldOffsets/);
-  assert.match(app, /function changeFieldBoundary[\s\S]*state\.panoramaCycle = normalizeFieldBreath/);
+  assert.match(app, /function changeFieldBoundary[\s\S]*state\.panoramaCycle = normalizePanoramaCycle/);
   assert.match(app, /seconds:\s*state\.contextSeconds/);
   assert.doesNotMatch(
     app,
@@ -268,7 +268,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   );
   assert.match(
     app,
-    /function changeFieldBoundary[\s\S]*boundary === "inner"[\s\S]*Math\.min\(amount, breath\.outer\)[\s\S]*Math\.max\(amount, breath\.inner\)[\s\S]*panorama\?\.reconfigureOffset\?\.\(\)/,
+    /function changeFieldBoundary[\s\S]*boundary === "inner"[\s\S]*Math\.min\(amount, cycle\.outer\)[\s\S]*Math\.max\(amount, cycle\.inner\)[\s\S]*panorama\?\.reconfigureOffset\?\.\(\)/,
     "0 < inner < outer is enforced against the sibling bound and reconciled once."
   );
   assert.doesNotMatch(
@@ -284,12 +284,12 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   assert.match(app, /panorama\?\.translateToCurrent/);
   assert.match(field, /PANORAMA_DIRECTION/);
   assert.doesNotMatch(field, /chooseDirectionalRate|requestStretchRate/,
-    "The breathing runtime resolves rates from its phase, not from a side policy.");
+    "The cycling runtime resolves rates from its phase, not from a side policy.");
   assert.match(field, /onAutoplayBlocked:[\s\S]*playback = "blocked"/);
   assert.match(field, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*side\.adapter\?\.play/,
     "Playback must refold and prime each side at 1× before directional divergence.");
-  assert.match(field, /function driveSide\(role, center, snapshot, centerRunning, breathSide, participation\)[\s\S]*requestBreathRate\(side, breathSide\.rate\)/,
-    "A breathing side must reconcile to the nearest supported rate for its current phase.");
+  assert.match(field, /function driveSide\(role, center, snapshot, centerRunning, cycleSide, participation\)[\s\S]*requestSideRateStep\(side, cycleSide\.rate\)/,
+    "A cycling side must reconcile to the nearest supported rate for its current phase.");
   assert.match(view, /effectiveStepReach/);
   assert.match(app, /preferences\.stepReach = normalizeStepReach/);
   assert.match(implementation, /^# Video Cartography — Canonical Implementation/m);

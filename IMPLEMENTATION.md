@@ -15,9 +15,9 @@ is a module and ownership map, not a history of earlier designs.
 | `transport.js` | Transient Context and Playback state, observation policy, requested-rate policy, and retry/wrap rebasing |
 | `youtube.js` | YouTube player construction, actual media snapshots, actual-rate events, and adapter commands |
 | `step-gesture.js` | Step press, repeat, release, and one-transaction gesture timing |
-| `field-frame.js` | Pure Field Frame ownership, identity, direction, and transition descriptions |
-| `step-field-geometry.js` | Pure Field offsets, breathing phases, bounds, and rate pairs |
-| `step-field.js` | Tail/Lead players, placement, Field transitions, Breath runtime, Hold, and stale-event rejection |
+| `panorama-frame.js` | Pure Field Frame ownership, identity, direction, and transition descriptions |
+| `panorama-geometry.js` | Pure Field offsets, cycling phases, bounds, and rate pairs |
+| `panorama.js` | Tail/Lead players, placement, Field transitions, Cycle runtime, Hold, and stale-event rejection |
 | `cues.js` | Parsing offered chapter Addresses into transient candidate extents |
 | `user-time.js` | The append-only encounter ledger: traversal records, the frozen readable stream, read cursors, and Ghost injection |
 | `view.js` | DOM projection, timeline atmosphere and sourceGridLines, Guide rows, operator labels, and accessible state |
@@ -326,7 +326,7 @@ The centered parent overlay is non-blocking. Only its compact Play/Panorama
 button receives pointer events, leaving native YouTube seek, captions, settings,
 volume, and fullscreen controls reachable while paused or idle.
 
-## Field Frame and Field Breath
+## Field Frame and Field Cycle
 
 Outside ordinary playback, the application resolves one Field Frame per
 semantic movement. Ownership priority is direct manipulation, then enabled
@@ -337,12 +337,12 @@ the Pin between weighted Step destinations, and Section manipulation supplies
 its exact three-point extent. The Field controller receives only those source
 Addresses.
 
-`field-frame.js` gives each Frame a stable identity and direction. The runtime
+`panorama-frame.js` gives each Frame a stable identity and direction. The runtime
 uses opacity-only transitions and coalesces rapid movement; semantic commits do
 not wait for animation. Superseded media callbacks are rejected by current
 placement ownership.
 
-During ordinary Panorama playback, Frame ownership yields to Field Breath. The
+During ordinary Panorama playback, Frame ownership yields to Field Cycle. The
 conservative default is:
 
 ```js
@@ -350,8 +350,8 @@ conservative default is:
 ```
 
 At Center `1×`, Tail/Center/Lead therefore request `0.75× / 1× / 1.25×` while
-breathing between 0.25 and 2.5 source seconds. The available settings remain
-wider; saved valid preferences are not replaced. The pure breathing state
+cycling between 0.25 and 2.5 source seconds. The available settings remain
+wider; saved valid preferences are not replaced. The pure cycling state
 machine clamps against Range, excludes a side without the minimum room from its
 synchronization barrier, reverses only after every operational side arrives,
 and preserves phase through deliberate Hold/Stretch. Hold changes no semantic

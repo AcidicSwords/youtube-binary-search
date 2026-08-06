@@ -28,7 +28,7 @@ import {
 import {
   DEFAULT_PANORAMA_CYCLE,
   panoramaSideRates
-} from "./step-field-geometry.js";
+} from "./panorama-geometry.js";
 
 const read = path => readFileSync(new URL(`./${path}`, import.meta.url), "utf8")
   .replace(/\r\n?/g, "\n");
@@ -570,11 +570,11 @@ has(html, /id="field-inner-offset"[^>]*max="300"[^>]*value="0\.25"/,
   "Field defaults do not restrict the selectable inner-offset range.");
 has(html, /id="field-outer-offset"[^>]*max="300"[^>]*value="2\.5"/,
   "Field defaults do not restrict the selectable outer-offset range.");
-has(interactionSmoke, /savedFieldBreath = \{ inner: 3, outer: 12, rate: 0\.4 \}/,
+has(interactionSmoke, /savedPanoramaCycle = \{ inner: 3, outer: 12, rate: 0\.4 \}/,
   "Saved Field coverage uses values wider than the shipped defaults.");
 has(interactionSmoke, /3–12 s · 0\.6× \/ 1\.4×/,
   "Saved non-preset Field rates have truthful presentation coverage.");
-has(interactionSmoke, /panoramaCycle,[\s\S]*savedFieldBreath/,
+has(interactionSmoke, /panoramaCycle,[\s\S]*savedPanoramaCycle/,
   "Saved Field coverage proves the valid persisted preference remains unchanged.");
 
 // Required completion suites must exist and be executed by a package script.
@@ -585,7 +585,7 @@ for (const suite of [
   "section-weight-smoke.mjs",
   "transport-tests.mjs",
   "youtube-tests.mjs",
-  "field-breath-tests.mjs",
+  "panorama-cycle-tests.mjs",
   "guide-session-completion-tests.mjs",
   "nudge-tests.mjs",
   "browser-smoke.mjs"

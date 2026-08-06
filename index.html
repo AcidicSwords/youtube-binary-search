@@ -9,8 +9,8 @@
   <title>Video Cartography</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="step-field.css">
-  <link rel="stylesheet" href="field-grammar.css">
+  <link rel="stylesheet" href="panorama.css">
+  <link rel="stylesheet" href="panorama-layout.css">
 </head>
 <body>
   <main class="app-shell">
@@ -41,7 +41,7 @@
     <div class="workspace">
       <section id="reader-column" class="reader-column" aria-label="Video reader">
         <section id="player-panel" class="player-panel" aria-label="Panorama">
-          <div id="step-field" class="step-field field-off" data-phase="off" aria-label="Panorama">
+          <div id="panorama" class="panorama field-off" data-phase="off" aria-label="Panorama">
             <section id="tail-pane" class="step-pane step-pane-side tail-pane" aria-label="Tail panorama view">
               <div class="step-pane-bar">
                 <div class="pane-identity">
@@ -72,8 +72,8 @@
                     <strong id="field-transport-state">Off</strong>
                     <small id="field-rate-state">Tail — · Center 1× · Lead —</small>
                   </div>
-                  <button id="step-field-toggle" class="field-toggle" type="button" aria-pressed="true" aria-label="Hide Panorama">
-                    <span>Panorama</span><span id="step-field-meta">Ready</span>
+                  <button id="panorama-toggle" class="field-toggle" type="button" aria-pressed="true" aria-label="Hide Panorama">
+                    <span>Panorama</span><span id="panorama-meta">Ready</span>
                   </button>
                 </div>
               </div>
@@ -258,8 +258,8 @@
                   <span>Follow Section weight</span>
                   <input id="playback-dynamic" type="checkbox" disabled>
                 </label>
-                <p class="setting-note"><kbd>Space</kbd> plays Center at <span class="unit-mark">1×</span> with the Panorama breathing. <kbd>Shift</kbd> + <kbd>Space</kbd> plays Center alone at the Shift rate: the Panorama cannot hold its ratio at a changed rate, so Tail and Lead suspend for the duration. The fixed list offers exactly the rates this player reports it can play.</p>
-                <p class="setting-note">Following weight reads the map as a playback texture rather than correcting it: every doubling or halving of cumulative weight shifts the rate by one step. Weight <span class="unit-mark">2×</span> plays at <span class="unit-mark">0.75×</span>, weight <span class="unit-mark">4×</span> at <span class="unit-mark">0.5×</span>, weight <span class="unit-mark">0.5×</span> at <span class="unit-mark">1.25×</span>, and ground you never deformed plays at <span class="unit-mark">1×</span>. The Panorama keeps breathing alongside, one step either side of Center, and stands aside only at the ends of the rates this player offers. The rate changes as playback crosses Section boundaries.</p>
+                <p class="setting-note"><kbd>Space</kbd> plays Center at <span class="unit-mark">1×</span> with the Panorama cycling. <kbd>Shift</kbd> + <kbd>Space</kbd> plays Center alone at the Shift rate: the Panorama cannot hold its ratio at a changed rate, so Tail and Lead suspend for the duration. The fixed list offers exactly the rates this player reports it can play.</p>
+                <p class="setting-note">Following weight reads the map as a playback texture rather than correcting it: every doubling or halving of cumulative weight shifts the rate by one step. Weight <span class="unit-mark">2×</span> plays at <span class="unit-mark">0.75×</span>, weight <span class="unit-mark">4×</span> at <span class="unit-mark">0.5×</span>, weight <span class="unit-mark">0.5×</span> at <span class="unit-mark">1.25×</span>, and ground you never deformed plays at <span class="unit-mark">1×</span>. The Panorama keeps cycling alongside, one step either side of Center, and stands aside only at the ends of the rates this player offers. The rate changes as playback crosses Section boundaries.</p>
               </div>
             </details>
 
@@ -280,11 +280,11 @@
                     <span>s</span>
                   </span>
                 </label>
-                <label class="compact-setting" for="field-breath-rate">
-                  <span>Breath rate</span>
-                  <select id="field-breath-rate" aria-label="Panorama breathing rate pair" disabled><option value="0.25">0.75× / 1.25×</option></select>
+                <label class="compact-setting" for="field-cycle-rate">
+                  <span>Cycle rate</span>
+                  <select id="field-cycle-rate" aria-label="Panorama cycling rate pair" disabled><option value="0.25">0.75× / 1.25×</option></select>
                 </label>
-                <p class="setting-note">Tail and Lead breathe between these offsets around Current. Showing or hiding the Panorama, collapsing a side, and holding a span stay on the Panorama itself, because those act on what you are looking at rather than being remembered settings.</p>
+                <p class="setting-note">Tail and Lead cycle between these offsets around Current. Showing or hiding the Panorama, collapsing a side, and holding a span stay on the Panorama itself, because those act on what you are looking at rather than being remembered settings.</p>
               </div>
             </details>
 

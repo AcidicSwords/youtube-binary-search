@@ -7,7 +7,7 @@
 //
 // This module is DOM-free and I/O-free. It never mutates Session, never seeks a
 // player, never derives semantic operator targets of its own, and owns neither
-// Context transport nor breathing.
+// Context transport nor cycling.
 import { clamp } from "./range-geometry.js";
 
 export const FIELD_FRAME_OWNER = Object.freeze({
@@ -216,7 +216,7 @@ export function frameTransition(previous, next, options = {}) {
 }
 
 // One sequencer owns stable Frame identity for a Field. `revision` advances only
-// when the settled Frame changes, so Context transport, breathing, and repeated
+// when the settled Frame changes, so Context transport, cycling, and repeated
 // republishing of the same state never look like new movements.
 export function createFieldFrameSequencer(options = {}) {
   const tolerance = Number.isFinite(options.tolerance)

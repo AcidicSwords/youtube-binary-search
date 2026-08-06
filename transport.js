@@ -198,7 +198,7 @@ export function resolveCenterRate(weight, rates) {
 // Tail and one above for Lead. Both must actually be offered. A missing
 // neighbour yields no triplet rather than an asymmetric substitute, because
 // unequal side steps would break the one relation the Field rests on — Tail and
-// Lead equally displaced from Center, breathing at one shared speed.
+// Lead equally displaced from Center, cycling at one shared speed.
 export function panoramaTriplet(centerRate, rates) {
   const center = positiveRate(centerRate);
   const tail = center - PANORAMA_SIDE_STEP;

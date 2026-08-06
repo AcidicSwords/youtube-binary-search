@@ -115,17 +115,17 @@ import {
   isYouTubeApiReady,
   parseYouTubeUrl
 } from "./youtube.js";
-import { createPanoramaController } from "./step-field.js";
+import { createPanoramaController } from "./panorama.js";
 import {
   DEFAULT_PANORAMA_CYCLE,
-  normalizeFieldBreath,
-  breathRateFromResponse
-} from "./step-field-geometry.js";
+  normalizePanoramaCycle,
+  sideRateStepFromResponse
+} from "./panorama-geometry.js";
 import {
   FIELD_FRAME_OWNER,
   FIELD_FRAME_ACTIVATION,
   createFieldFrameSequencer
-} from "./field-frame.js";
+} from "./panorama-frame.js";
 import {
   DEFAULT_STEP_GESTURE_TIMING,
   bindStepPress,
@@ -187,7 +187,7 @@ function normalizeNudgeSeconds(value, fallback = DEFAULT_NUDGE_SECONDS) {
   return clamp(numeric, MIN_NUDGE_SECONDS, MAX_NUDGE_SECONDS);
 }
 
-function legacyFieldBreath(value) {
+function legacyFieldCycle(value) {
   const legacy = value?.fieldOffsets;
   const outer = Math.max(
     Number(legacy?.backward) || 0,
@@ -197,7 +197,7 @@ function legacyFieldBreath(value) {
     inner: Math.max(MIN_NUDGE_SECONDS, outer / 4),
     outer,
     rate: value?.fieldResponse
-      ? breathRateFromResponse(value.fieldResponse)
+      ? sideRateStepFromResponse(value.fieldResponse)
       : DEFAULT_PANORAMA_CYCLE.rate
   };
 }
@@ -228,9 +228,9 @@ function effectivePlaybackRate() {
   return resolveOfferedRate(state.playbackRate, offeredRates());
 }
 
-function savedFieldBreath(value) {
+function savedPanoramaCycle(value) {
   if (value?.panoramaCycle) return value.panoramaCycle;
-  if (value?.fieldOffsets || value?.fieldResponse) return legacyFieldBreath(value);
+  if (value?.fieldOffsets || value?.fieldResponse) return legacyFieldCycle(value);
   return DEFAULT_PANORAMA_CYCLE;
 }
 
@@ -243,10 +243,10 @@ function readPreferences() {
     return {
       contextSeconds: normalizeContextSeconds(value?.contextSeconds),
       stepReach: normalizeStepReach(value?.stepReach ?? legacyStep),
-      // One bounded breathing relation replaces the two independent side
+      // One bounded cycling relation replaces the two independent side
       // Offsets. A legacy pair migrates once: its widest side becomes the outer
-      // offset and its saved rates become the nearest symmetric breathing pair.
-      panoramaCycle: normalizeFieldBreath(savedFieldBreath(value)),
+      // offset and its saved rates become the nearest symmetric cycling pair.
+      panoramaCycle: normalizePanoramaCycle(savedPanoramaCycle(value)),
       nudgeSeconds: normalizeNudgeSeconds(value?.nudgeSeconds),
       playbackRate: normalizePlaybackRate(value?.playbackRate),
       dynamicPlaybackRate: value?.dynamicPlaybackRate === true,
@@ -281,7 +281,7 @@ const state = {
   availableRates: [1],
   transport: idleTransport(),
   pendingStep: null,
-  panoramaCycle: normalizeFieldBreath(preferences.panoramaCycle),
+  panoramaCycle: normalizePanoramaCycle(preferences.panoramaCycle),
   nudgeSeconds: normalizeNudgeSeconds(preferences.nudgeSeconds),
   contextSeconds: preferences.contextSeconds,
   playbackRate: preferences.playbackRate,
@@ -403,17 +403,17 @@ function configuredStepReach() {
   return normalizeStepReach(model()?.stepReach ?? preferences.stepReach);
 }
 
-function currentFieldBreath() {
-  return normalizeFieldBreath(state.panoramaCycle ?? preferences.panoramaCycle);
+function currentPanoramaCycle() {
+  return normalizePanoramaCycle(state.panoramaCycle ?? preferences.panoramaCycle);
 }
 
 // Field Offsets remain physical observation settings that are independent from
-// the semantic Step Reach. The outer offset is the Field's breathing bound.
+// the semantic Step Reach. The outer offset is the Field's cycling bound.
 function currentFieldOffsets() {
-  const breath = currentFieldBreath();
+  const cycle = currentPanoramaCycle();
   return normalizeStepReach({
-    backward: breath.outer,
-    forward: breath.outer,
+    backward: cycle.outer,
+    forward: cycle.outer,
     linked: true,
     mode: STEP_REACH_MODE.FIXED
   });
@@ -533,7 +533,7 @@ function fieldFrameRequest() {
       )
     )
   ) {
-    // Ordinary Center playback hands presentation to the Field Breath.
+    // Ordinary Center playback hands presentation to the Field Cycle.
     return null;
   }
   // Context has priority over operator framing whenever Context is *enabled* —
@@ -741,7 +741,7 @@ function persistPreferences() {
       model()?.stepReach ?? preferences.stepReach,
       preferences.stepReach
     );
-    preferences.panoramaCycle = normalizeFieldBreath(state.panoramaCycle);
+    preferences.panoramaCycle = normalizePanoramaCycle(state.panoramaCycle);
     preferences.nudgeSeconds = normalizeNudgeSeconds(state.nudgeSeconds);
     preferences.contextSeconds = state.contextSeconds;
     preferences.playbackRate = normalizePlaybackRate(state.playbackRate);
@@ -4222,12 +4222,12 @@ function changeFieldBoundary(boundary, value) {
     view.render();
     return false;
   }
-  const breath = currentFieldBreath();
+  const cycle = currentPanoramaCycle();
   const amount = clamp(parsed, 0.25, 300);
   const next = boundary === "inner"
-    ? { ...breath, inner: Math.min(amount, breath.outer) }
-    : { ...breath, outer: Math.max(amount, breath.inner) };
-  state.panoramaCycle = normalizeFieldBreath(next);
+    ? { ...cycle, inner: Math.min(amount, cycle.outer) }
+    : { ...cycle, outer: Math.max(amount, cycle.inner) };
+  state.panoramaCycle = normalizePanoramaCycle(next);
   persistPreferences();
   panorama?.reconfigureOffset?.();
   setStatus(
@@ -5040,7 +5040,7 @@ function initializePlayerApi() {
       // Step Field offsets are physical observation settings. They are
       // intentionally independent from the semantic Step Reach.
       stepReach: currentFieldOffsets(),
-      panoramaCycle: currentFieldBreath(),
+      panoramaCycle: currentPanoramaCycle(),
       // The application resolves the ambient Frame owner and supplies exact
       // source Addresses. The Field controller never imports timeline
       // projection, operator arithmetic, or Context math.
@@ -5062,17 +5062,17 @@ function initializePlayerApi() {
       panoramaEnabled: state.panoramaEnabled,
       tailVisible: state.tailVisible,
       leadVisible: state.leadVisible,
-      breathRate: currentFieldBreath().rate,
+      sideRateStep: currentPanoramaCycle().rate,
       reducedMotion: prefersReducedMotion()
     }),
     setPreferences: patch => {
       if (Object.hasOwn(patch, "panoramaEnabled")) state.panoramaEnabled = Boolean(patch.panoramaEnabled);
       if (Object.hasOwn(patch, "tailVisible")) state.tailVisible = Boolean(patch.tailVisible);
       if (Object.hasOwn(patch, "leadVisible")) state.leadVisible = Boolean(patch.leadVisible);
-      if (Object.hasOwn(patch, "breathRate")) {
-        state.panoramaCycle = normalizeFieldBreath({
-          ...currentFieldBreath(),
-          rate: patch.breathRate
+      if (Object.hasOwn(patch, "sideRateStep")) {
+        state.panoramaCycle = normalizePanoramaCycle({
+          ...currentPanoramaCycle(),
+          rate: patch.sideRateStep
         });
       }
       persistPreferences();

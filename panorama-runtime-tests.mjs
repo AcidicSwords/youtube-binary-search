@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { createPanoramaController, FIELD_SIDE_MODE } from "./step-field.js";
+import { createPanoramaController, FIELD_SIDE_MODE } from "./panorama.js";
 import { YOUTUBE_STATE } from "./youtube.js";
-import { FIELD_FRAME_ACTIVATION } from "./field-frame.js";
+import { FIELD_FRAME_ACTIVATION } from "./panorama-frame.js";
 
 function element(tagName = "DIV") {
   const listeners = new Map();
@@ -119,7 +119,7 @@ function makeHarness({
 
   const previousYT = globalThis.YT;
   globalThis.YT = { Player: function Player() {} };
-  // The breath runs on the wall clock, so the suite supplies its own and moves
+  // The cycle runs on the wall clock, so the suite supplies its own and moves
   // it deliberately. Nothing here depends on how long the test took to run.
   let clock = 0;
   const controller = createPanoramaController({
@@ -180,13 +180,13 @@ function makeHarness({
     assert.deepEqual(started, { tail: true, lead: true }, "A Context settled in the same gesture stack must not leave stale suspension behind.");
     assert.deepEqual(h.snapshot.activeSpan, semanticInterval, "Physical Field activation must not mutate semantic Interval.");
     assert.ok(["cue", "place"].includes(h.tail().commands.at(-2)?.[0]));
-    assert.equal(h.tail().commands.at(-2)?.[1], 48, "A fresh breath begins at the inner offset behind Center.");
+    assert.equal(h.tail().commands.at(-2)?.[1], 48, "A fresh cycle begins at the inner offset behind Center.");
     assert.deepEqual(h.tail().commands.at(-1), ["play"]);
     assert.ok(["cue", "place"].includes(h.lead().commands.at(-2)?.[0]));
-    assert.equal(h.lead().commands.at(-2)?.[1], 52, "A fresh breath begins at the inner offset ahead of Center.");
+    assert.equal(h.lead().commands.at(-2)?.[1], 52, "A fresh cycle begins at the inner offset ahead of Center.");
     assert.deepEqual(h.lead().commands.at(-1), ["play"]);
-    assert.equal(h.controller.breath().phase, "expanding");
-    assert.equal(h.controller.breath().held, false);
+    assert.equal(h.controller.cycle().phase, "expanding");
+    assert.equal(h.controller.cycle().held, false);
 
     h.snapshot = {
       ...h.snapshot,
@@ -196,24 +196,24 @@ function makeHarness({
     h.controller.tick();
     assert.equal(h.tail().rate, 0.5, "Expansion applies the outward Tail rate z < c.");
     assert.equal(h.lead().rate, 1.5, "Expansion applies the outward Lead rate w > c.");
-    // The breath opens against the wall clock, not against elapsed Center source
+    // The cycle opens against the wall clock, not against elapsed Center source
     // time, so it takes the same real seconds at every Center rate. With a 0.5
     // step, one real second grows each side by 0.5 s.
     h.clock += 2000;
     h.controller.tick();
-    assert.equal(h.controller.breath().sides.tail.offset, 3);
-    assert.equal(h.controller.breath().sides.lead.offset, 3);
+    assert.equal(h.controller.cycle().sides.tail.offset, 3);
+    assert.equal(h.controller.cycle().sides.lead.offset, 3);
     assert.ok(h.tail().time < 52, "Tail must remain behind Center while it expands.");
     assert.ok(h.lead().time > 52, "Lead must remain ahead of Center while it expands.");
 
     h.controller.hold("both");
     assert.equal(h.controller.snapshot().tailMode, FIELD_SIDE_MODE.HELD);
     assert.equal(h.controller.snapshot().leadMode, FIELD_SIDE_MODE.HELD);
-    assert.equal(h.controller.breath().held, true, "Hold alone changes Stretching into Held.");
-    assert.equal(h.controller.breath().phase, "expanding", "Hold preserves the breathing direction.");
+    assert.equal(h.controller.cycle().held, true, "Hold alone changes Stretching into Held.");
+    assert.equal(h.controller.cycle().phase, "expanding", "Hold preserves the cycling direction.");
     assert.deepEqual(h.snapshot.activeSpan, semanticInterval, "Hold changes runtime Field state only; it must not redefine Interval.");
-    const heldTail = h.controller.breath().sides.tail.offset;
-    const heldLead = h.controller.breath().sides.lead.offset;
+    const heldTail = h.controller.cycle().sides.tail.offset;
+    const heldLead = h.controller.cycle().sides.lead.offset;
     assert.ok(heldTail >= 2 && heldTail <= 10, "A held offset stays inside the configured [x, y] bounds.");
 
     h.snapshot = {
@@ -261,7 +261,7 @@ function makeHarness({
     // The step either side of Center is an interval, not a fraction of it.
     // Scaling it with Center -- tail = C(1-z), lead = C(1+z) -- is identical at
     // 1x and wrong everywhere else: the gap would open faster the faster you
-    // played, so a breath would last a different number of seconds at every
+    // played, so a cycle would last a different number of seconds at every
     // rate. A fixed step keeps the difference at one rung wherever Center sits.
     assert.equal(h.tail().rate, 1,
       "At Center 1.5×, a 0.5 step puts Tail one step below at 1×.");
@@ -269,8 +269,8 @@ function makeHarness({
       "and Lead one step above at 2×.");
     h.clock += 2000;
     h.controller.tick();
-    assert.equal(h.controller.breath().sides.tail.offset, 3);
-    assert.equal(h.controller.breath().sides.lead.offset, 3,
+    assert.equal(h.controller.cycle().sides.tail.offset, 3);
+    assert.equal(h.controller.cycle().sides.lead.offset, 3,
       "Equal rate distance through Center must produce equal offsets.");
     assert.match(h.elements.get("field-rate-state").textContent, /Center 1\.5×/,
       "The Panorama readout reports the observed Center rate, not a fixed 1×.");
@@ -316,19 +316,19 @@ function makeHarness({
     h.clock += 4000;
     h.controller.tick();
     h.controller.hold("both");
-    const partial = h.controller.breath().sides.tail.offset;
-    assert.ok(partial > 2 && partial < 20, "The Field was Held part-way through its breath.");
+    const partial = h.controller.cycle().sides.tail.offset;
+    assert.ok(partial > 2 && partial < 20, "The Field was Held part-way through its cycle.");
     h.snapshot = {
       ...h.snapshot,
       panoramaCycle: { inner: 2, outer: 30, rate: 0.5 }
     };
     h.controller.reconfigureOffset();
     assert.equal(
-      h.controller.breath().sides.tail.offset,
+      h.controller.cycle().sides.tail.offset,
       partial,
       "A partial held relation must remain held when only its configured Outer Offset changes."
     );
-    assert.equal(h.controller.breath().held, true, "Configuration edits are not a Hold or a Stretch.");
+    assert.equal(h.controller.cycle().held, true, "Configuration edits are not a Hold or a Stretch.");
   } finally {
     h.restore();
   }
@@ -372,7 +372,7 @@ function makeHarness({
       "A delayed CUED event must not revive a pane hidden after Play was requested."
     );
 
-    h.elements.get("step-field-toggle").click();
+    h.elements.get("panorama-toggle").click();
     assert.equal(h.controller.snapshot().phase, "off");
     assert.equal(h.controller.snapshot().span.available, false);
     assert.equal(h.controller.getStepSelection("lead"), null);
@@ -599,14 +599,14 @@ function makeHarness({
     };
     h.controller.tick();
     const field = h.controller.snapshot();
-    assert.equal(field.tailRuntime.rateAvailable, false, "A 1x-only source cannot supply breathing rates.");
+    assert.equal(field.tailRuntime.rateAvailable, false, "A 1x-only source cannot supply cycling rates.");
     assert.equal(field.leadRuntime.rateAvailable, false);
-    // The pure breathing state machine still owns the relation, so a source
+    // The pure cycling state machine still owns the relation, so a source
     // without directional rates degrades to placement rather than getting stuck.
     h.clock += 1000;
     h.controller.tick();
-    assert.equal(h.controller.breath().sides.tail.offset, 2.5);
-    assert.equal(h.controller.breath().sides.lead.offset, 2.5);
+    assert.equal(h.controller.cycle().sides.tail.offset, 2.5);
+    assert.equal(h.controller.cycle().sides.lead.offset, 2.5);
     assert.ok(h.tail().time < 51, "Tail must remain behind Center.");
     assert.ok(h.lead().time > 51, "Lead must remain ahead of Center.");
   } finally {
@@ -765,4 +765,4 @@ function makeHarness({
   }
 }
 
-console.log("Field runtime tests passed: decoded paused frames, Field Frame placement, one-rung side steps that keep the breath the same length at every Center rate, Hold isolation, Field-level Offset reconciliation, dormant hidden/off panes, stale-event rejection, exact pause, whole-Field Step geometry, direct-manipulation Frames, unsupported-rate fallback, and boundary recovery.");
+console.log("Field runtime tests passed: decoded paused frames, Field Frame placement, one-rung side steps that keep the cycle the same length at every Center rate, Hold isolation, Field-level Offset reconciliation, dormant hidden/off panes, stale-event rejection, exact pause, whole-Field Step geometry, direct-manipulation Frames, unsupported-rate fallback, and boundary recovery.");

@@ -40,7 +40,7 @@ around Current:
 
 When Context is enabled, its bounded source window owns the Frame: Tail and Lead remain at the window edges while Center observes within it. Context duration and Field offsets are independent settings.
 
-During ordinary Panorama playback, the Field breathes continuously between inner
+During ordinary Panorama playback, the Field cycles continuously between inner
 and outer offsets until Hold preserves the attained relation. The conservative shipped defaults are:
 
 ```text
@@ -48,7 +48,7 @@ Inner 0.25 s · Outer 2.5 s
 Tail 0.75× | Center 1× | Lead 1.25×
 ```
 
-These values favor one coherent local horizon; they are not a restriction. Wider offsets and stronger symmetric rate pairs remain available, and existing saved preferences are preserved. A collapsed, hidden, unavailable, or Range-clipped side does not participate in the breathing barrier. **Hold** freezes the attained offsets at Center rate; **Stretch** resumes from that relation.
+These values favor one coherent local horizon; they are not a restriction. Wider offsets and stronger symmetric rate pairs remain available, and existing saved preferences are preserved. A collapsed, hidden, unavailable, or Range-clipped side does not participate in the cycling barrier. **Hold** freezes the attained offsets at Center rate; **Stretch** resumes from that relation.
 
 ## Temporal Topography
 

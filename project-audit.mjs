@@ -266,7 +266,7 @@ for (const implementationLaw of [
   /## Source-generation boundary/,
   /## Nudge and direct manipulation/,
   /## Playback and media authority/,
-  /## Field Frame and Field Breath/
+  /## Field Frame and Field Cycle/
 ]) has(docs["IMPLEMENTATION.md"], implementationLaw,
   `IMPLEMENTATION describes ${implementationLaw}.`);
 has(docs["IMPLEMENTATION.md"], /projection\.weightContributors|effective contributors/i,

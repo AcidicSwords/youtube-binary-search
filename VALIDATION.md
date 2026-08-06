@@ -173,7 +173,7 @@ rewrite-refusal coverage.
 - Frame identity is stable across republish, movement direction is truthful,
   rapid transitions coalesce, stale media callbacks cannot restore an obsolete
   frame, and reduced motion preserves the result.
-- Breath remains within effective Inner/Outer bounds, excludes unavailable
+- Cycle remains within effective Inner/Outer bounds, excludes unavailable
   sides from the barrier, reverses only when every operational side arrives,
   and resumes the preserved phase after Hold.
 - A turn reports the direction it is heading in, not the one it arrived by, so
@@ -277,7 +277,7 @@ Operators outside the matrix, and no Timeline-header control duplicates it.
 1. Confirm the initial Parameters read `0.25–2.5 s` and
    `0.75× / 1× / 1.25×`.
 2. Start plain playback. Tail must remain behind, Lead ahead, and both must
-   breathe through a complete expansion/contraction cycle.
+   cycle through a complete expansion/contraction cycle.
 3. Hold partway through expansion, resume, then repeat during contraction.
    Direction and attained relation must survive.
 4. Collapse each side in turn and restore it. The other side must not stall.
@@ -289,7 +289,7 @@ Operators outside the matrix, and no Timeline-header control duplicates it.
    last applicable operator frame after Context is turned off.
 
 Accept when Context duration, Step Reach, Field offsets, Weight, and playback
-rate policy remain independent and no preview breaks live Breath behavior.
+rate policy remain independent and no preview breaks live Cycle behavior.
 
 ### Journey F — source and recovery integrity
 

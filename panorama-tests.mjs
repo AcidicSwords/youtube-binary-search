@@ -6,12 +6,12 @@ import {
   derivePanorama,
   chooseNearestRate,
   resolveFieldPhase
-} from "./step-field-geometry.js";
+} from "./panorama-geometry.js";
 import {
   FIELD_SIDE_MODE,
   fieldShouldSuspend,
   fieldPreferenceRequiresEstablish
-} from "./step-field.js";
+} from "./panorama.js";
 import {
   OBSERVATION_POLICY,
   createPlaybackTransport,
@@ -114,20 +114,20 @@ assert.equal(resolveFieldPhase({
 
 {
   const html = readFileSync("index.html", "utf8");
-  const css = readFileSync("step-field.css", "utf8");
+  const css = readFileSync("panorama.css", "utf8");
   const layoutCss = readFileSync("styles.css", "utf8");
   const app = readFileSync("app.js", "utf8");
-  const fieldSource = readFileSync("step-field.js", "utf8");
+  const fieldSource = readFileSync("panorama.js", "utf8");
   const youtubeSource = readFileSync("youtube.js", "utf8");
   const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 
   for (const id of [
-    "step-field", "player-tail", "player", "player-lead", "center-transport-surface",
+    "panorama", "player-tail", "player", "player-lead", "center-transport-surface",
     "tail-player-surface", "lead-player-surface",
-    "field-both-toggle", "field-breath-rate",
+    "field-both-toggle", "field-cycle-rate",
     "field-inner-offset", "field-outer-offset", "nudge-seconds",
     "current-marker", "current-departure-marker",
-    "tail-collapse", "lead-collapse", "tail-restore", "lead-restore", "step-field-toggle"
+    "tail-collapse", "lead-collapse", "tail-restore", "lead-restore", "panorama-toggle"
   ]) {
     assert.match(html, new RegExp(`id=["']${id}["']`), `Missing Step Field DOM id: ${id}`);
   }
@@ -163,11 +163,11 @@ assert.equal(resolveFieldPhase({
   assert.match(fieldSource, /function hold\(role = "both"\)/);
   assert.match(fieldSource, /function toggleBoth\(\)/);
   assert.doesNotMatch(fieldSource, /function toggleSide\(/,
-    "Breathing is one coordinated relation; independent side Stretch/Hold controls are removed.");
+    "Cycling is one coordinated relation; independent side Stretch/Hold controls are removed.");
   assert.doesNotMatch(html, /id="(?:tail|lead)-field-toggle"/,
     "There is one combined Stretch/Hold control.");
   assert.doesNotMatch(html, /id="(?:tail|lead)-rate-select"/,
-    "The interface exposes one breathing-rate pair, not two independent side rates.");
+    "The interface exposes one cycling-rate pair, not two independent side rates.");
   assert.match(fieldSource, /function freezeSideForPause\(side, center, snapshot\)/);
   assert.match(fieldSource, /function translateToCurrent\(current, \{ preserve = true \} = \{\}\)/);
   assert.match(fieldSource, /const retained = side\.offset > REACH_TOLERANCE[\s\S]*side\.offset[\s\S]*side\.configuredOffset/,
@@ -196,17 +196,17 @@ assert.equal(resolveFieldPhase({
   assert.match(html, /id="tail-player-surface"[\s\S]*role="button"[\s\S]*id="player-tail"/);
   assert.match(html, /id="lead-player-surface"[\s\S]*role="button"[\s\S]*id="player-lead"/);
   // Settings have one home: Parameters owns what is remembered, and the surface
-  // owns what is momentary. The Panorama's offsets and breathing pair persist,
+  // owns what is momentary. The Panorama's offsets and cycling pair persist,
   // so they are Parameters; showing the Panorama, collapsing a side and holding
   // a span act on what you are looking at, so they stay on it.
   assert.match(
     html,
-    /id="parameter-panel"[\s\S]*id="field-inner-offset"[\s\S]*id="field-outer-offset"[\s\S]*id="field-breath-rate"/,
+    /id="parameter-panel"[\s\S]*id="field-inner-offset"[\s\S]*id="field-outer-offset"[\s\S]*id="field-cycle-rate"/,
     "Persisted Panorama tuning belongs to Parameters."
   );
   assert.match(
     html,
-    /id="player-panel"[\s\S]*id="step-field-toggle"[\s\S]*id="field-both-toggle"[\s\S]*id="parameter-panel"/,
+    /id="player-panel"[\s\S]*id="panorama-toggle"[\s\S]*id="field-both-toggle"[\s\S]*id="parameter-panel"/,
     "and the momentary Panorama controls stay on the Panorama."
   );
   assert.doesNotMatch(html, /class="field-settings-popover"/,
@@ -224,21 +224,21 @@ assert.equal(resolveFieldPhase({
     "Every pane must force its implicit content track to shrink instead of clipping the Lead controls.");
   assert.match(layoutCss, /\.player-panel\s*\{[\s\S]*container-type:\s*inline-size/,
     "Step Field responsive geometry must measure its containing panel.");
-  assert.match(css, /\.step-field\.field-off[\s\S]*grid-template-areas:\s*"center"[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/,
+  assert.match(css, /\.panorama\.field-off[\s\S]*grid-template-areas:\s*"center"[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/,
     "Field-off projection must remain Center-only even when collapsed preferences persist.");
-  assert.match(css, /\.step-field\.tail-collapsed:not\(\.lead-collapsed\):not\(\.field-off\)[\s\S]*grid-template-columns:\s*48px minmax\(0, 1fr\)/,
+  assert.match(css, /\.panorama\.tail-collapsed:not\(\.lead-collapsed\):not\(\.field-off\)[\s\S]*grid-template-columns:\s*48px minmax\(0, 1fr\)/,
     "A collapsed Tail must release medium-layout width to Lead.");
-  assert.match(css, /\.step-field\.lead-collapsed:not\(\.tail-collapsed\):not\(\.field-off\)[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 48px/,
+  assert.match(css, /\.panorama\.lead-collapsed:not\(\.tail-collapsed\):not\(\.field-off\)[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 48px/,
     "A collapsed Lead must release medium-layout width to Tail.");
   assert.match(css, /@container \(max-width: 1440px\)[\s\S]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/,
     "Three-pane controls must fold before their four-column minimum can clip a side pane.");
   assert.match(
     css,
-    /@container \(max-width: 680px\)[\s\S]*\.step-field\.tail-collapsed\.lead-collapsed:not\(\.field-off\)[\s\S]*grid-template-areas:\s*"center"\s*"tail"\s*"lead"/,
+    /@container \(max-width: 680px\)[\s\S]*\.panorama\.tail-collapsed\.lead-collapsed:not\(\.field-off\)[\s\S]*grid-template-areas:\s*"center"\s*"tail"\s*"lead"/,
     "Phone stacking must override the more-specific collapsed medium layout."
   );
-  assert.match(fieldSource, /const availableRoles = controllableRoles\(snapshot, prefs\)[\s\S]*const held = runtime\.breath\.held/,
-    "Combined Field state must derive from one breathing relation over currently operational projections.");
+  assert.match(fieldSource, /const availableRoles = controllableRoles\(snapshot, prefs\)[\s\S]*const held = runtime\.cycle\.held/,
+    "Combined Field state must derive from one cycling relation over currently operational projections.");
   assert.match(fieldSource, /function sideIsOperational\([\s\S]*sideIsVisible[\s\S]*side\.sourceReady[\s\S]*effectiveOffset/,
     "One operational predicate must govern side controls, side Step, and combined Field actions.");
   assert.match(fieldSource, /function sidePlaybackAllowed\([\s\S]*runtime\.centerWasRunning[\s\S]*!runtime\.suspended/,
@@ -253,8 +253,8 @@ assert.equal(resolveFieldPhase({
   assert.match(css, /@container \(max-width: 680px\)/);
   assert.match(css, /@media \(min-width: 1240px\)/);
   assert.match(layoutCss, /@media \(min-width: 1240px\)/);
-  assert.match(packageJson.scripts.check, /step-field\.js/);
-  assert.match(packageJson.scripts.test, /step-field-tests\.mjs/);
+  assert.match(packageJson.scripts.check, /panorama\.js/);
+  assert.match(packageJson.scripts.test, /panorama-tests\.mjs/);
 }
 
 console.log("All Step Field tests passed: geometry, suspension, Hold/Stretch, side Step, visible bootstrap, shared user activation, autoplay delegation, cue-based parking, rate priming, and panoramic layout.");

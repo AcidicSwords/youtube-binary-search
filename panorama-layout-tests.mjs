@@ -6,7 +6,7 @@ import {
   derivePanorama,
   resolveFieldPhase,
   deriveObservedField
-} from "./step-field-geometry.js";
+} from "./panorama-geometry.js";
 import { createSession, saveExtentAsSection } from "./session.js";
 
 const targets = derivePanorama(50, { backward: 10, forward: 10, linked: true }, { start: 0, end: 100 });
@@ -71,8 +71,8 @@ assert.equal(session.model.guide.sections[0].provenance, "field-span");
 
 const html = readFileSync("index.html", "utf8");
 const app = readFileSync("app.js", "utf8");
-const fieldSource = readFileSync("step-field.js", "utf8");
-const css = readFileSync("field-grammar.css", "utf8");
+const fieldSource = readFileSync("panorama.js", "utf8");
+const css = readFileSync("panorama-layout.css", "utf8");
 const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 
 for (const retired of ["continue", "context-action", "skim", "speed-select", "field-span-loop", "field-span-retain", "loop"]) {
@@ -80,7 +80,7 @@ for (const retired of ["continue", "context-action", "skim", "speed-select", "fi
 }
 for (const id of [
   "field-transport-state", "field-both-toggle", "panorama-window-fill",
-  "field-inner-offset", "field-outer-offset", "field-breath-rate",
+  "field-inner-offset", "field-outer-offset", "field-cycle-rate",
   "section-retain-form", "section-source", "pin-retain-form", "pin-current",
   "release", "retain", "focus-toggle", "shift-layer-toggle",
   "step-size-seconds", "step-mode-fixed", "step-mode-adaptive"
@@ -111,35 +111,35 @@ assert.doesNotMatch(app, /createSkimTransport|completeSkim|reachSkimDestination/
 assert.match(fieldSource, /FIELD_SIDE_MODE/);
 assert.match(
   fieldSource,
-  /function stretch\(role = "both"\)[\s\S]*suspendedNow = suspensionRequired\(snapshot\)[\s\S]*resumeBreath\(runtime\.breath[\s\S]*beginStretch\(sides\[name\], center, snapshot, \{ play: centerRunning && !suspendedNow \}\)/,
-  "Stretch must use live suspension state and resume the breathing cycle from its attained relation."
+  /function stretch\(role = "both"\)[\s\S]*suspendedNow = suspensionRequired\(snapshot\)[\s\S]*resumeCycle\(runtime\.cycle[\s\S]*beginStretch\(sides\[name\], center, snapshot, \{ play: centerRunning && !suspendedNow \}\)/,
+  "Stretch must use live suspension state and resume the cycling cycle from its attained relation."
 );
 // A fresh leg is for discontinuities only: a scrub, a Range wrap, or Panorama
 // returning after Center played alone. It restarts the phase, which is what
 // makes an ordinary Weight-bucket change -- which never arrives here -- keep its
 // direction, its offset and its deadline.
-assert.match(fieldSource, /function startBreathCycle\(center, snapshot[\s\S]*restartPanoramaCycle\(runtime\.breath, configured, now\(\)\)[\s\S]*Math\.min\(bounds\.inner, bounds\.outer\)/,
-  "A discontinuity must begin a fresh breath leg at the inner boundary and expand outward.");
+assert.match(fieldSource, /function startCycleCycle\(center, snapshot[\s\S]*restartPanoramaCycle\(runtime\.cycle, configured, now\(\)\)[\s\S]*Math\.min\(bounds\.inner, bounds\.outer\)/,
+  "A discontinuity must begin a fresh cycle leg at the inner boundary and expand outward.");
 assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*(?:adapter\?\.place|adapter\?\.cue)[\s\S]*side\.adapter\?\.play/,
-  "Every running breath must prime its side at 1× before directional-rate discovery.");
+  "Every running cycle must prime its side at 1× before directional-rate discovery.");
 assert.doesNotMatch(fieldSource, /onHoldOffsets/,
   "Hold and Stretch must never persist a measured runtime offset.");
 assert.doesNotMatch(app, /onHoldOffsets:/,
   "The application must not expose a Hold-to-configuration write path.");
-assert.match(app, /function changeFieldBoundary[\s\S]*state\.panoramaCycle = normalizeFieldBreath/,
+assert.match(app, /function changeFieldBoundary[\s\S]*state\.panoramaCycle = normalizePanoramaCycle/,
   "Only explicit Inner/Outer Offset input may update the configured Field relation.");
 assert.doesNotMatch(app, /state\.fieldOffsets\s*=/,
-  "Two independent side Offsets are replaced by one bounded breathing relation.");
+  "Two independent side Offsets are replaced by one bounded cycling relation.");
 assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*side\.adapter\?\.play/,
   "Side playback must prime at 1× inside the same Stretch transition.");
-assert.match(fieldSource, /function driveField\(center, centerDelta, snapshot, centerRunning\)[\s\S]*advanceBreath\(runtime\.breath/,
-  "The whole Field breathes as one relation, so the state machine advances once per tick.");
-assert.match(fieldSource, /function driveSide\(role, center, snapshot, centerRunning, breathSide, participation\)[\s\S]*ensureSidePlaying\(side\);\s*requestBreathRate\(side, breathSide\.rate\)/,
-  "Breathing rate must be requested only after a side is running and its capabilities are observable.");
+assert.match(fieldSource, /function driveField\(center, centerDelta, snapshot, centerRunning\)[\s\S]*advanceCycle\(runtime\.cycle/,
+  "The whole Field cycles as one relation, so the state machine advances once per tick.");
+assert.match(fieldSource, /function driveSide\(role, center, snapshot, centerRunning, cycleSide, participation\)[\s\S]*ensureSidePlaying\(side\);\s*requestSideRateStep\(side, cycleSide\.rate\)/,
+  "Cycling rate must be requested only after a side is running and its capabilities are observable.");
 assert.match(css, /data-phase="unfolding"/);
 assert.match(css, /data-phase="held"/);
 assert.match(css, /panorama-window-fill/);
-assert.match(packageJson.scripts.test, /field-grammar-tests\.mjs/);
-assert.match(packageJson.scripts.check, /step-field-geometry\.js/);
+assert.match(packageJson.scripts.test, /panorama-layout-tests\.mjs/);
+assert.match(packageJson.scripts.check, /panorama-geometry\.js/);
 
 console.log("Field grammar tests passed: automatic Context, independent Hold/Stretch offsets, Range looping, side Step, and Guide retention.");

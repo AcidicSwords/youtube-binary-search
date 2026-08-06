@@ -192,7 +192,7 @@ assert.equal(sidePlays(), sidePlaysBeforeShift,
   "and the Panorama suspends rather than drifting: no side is asked to play.");
 
 // Suspension is a condition, not a single command. Later ticks must not find
-// Center running and start the sides breathing behind it.
+// Center running and start the sides cycling behind it.
 await settle();
 await settle();
 assert.equal(sidePlays(), sidePlaysBeforeShift,
@@ -339,4 +339,4 @@ assert.equal(rateSelect.value, "2",
   assert.equal(center.state, 2, "Ending dynamic playback still pauses Center exactly.");
 }
 
-console.log("Transport coherence smoke passed: live projection, exact settlement, Focus-owned proper-Range looping, one-pass Field rebasing, wrap history isolation, Unfocus restoration, full-video completion, a fixed Shift rate that stays Center-only, and a rate that follows Section weight across the map while the Panorama breathes one rung either side of it.");
+console.log("Transport coherence smoke passed: live projection, exact settlement, Focus-owned proper-Range looping, one-pass Field rebasing, wrap history isolation, Unfocus restoration, full-video completion, a fixed Shift rate that stays Center-only, and a rate that follows Section weight across the map while the Panorama cycles one rung either side of it.");

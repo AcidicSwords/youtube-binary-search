@@ -215,7 +215,7 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
   byId.get("section-source").value = "interval";
   addOption(byId.get("section-source"), "interval", "Active Span");
   addOption(byId.get("section-source"), "field-span", "Held Field span");
-  addOption(byId.get("field-breath-rate"), "0.25", "0.75\u00d7 / 1.25\u00d7");
+  addOption(byId.get("field-cycle-rate"), "0.25", "0.75\u00d7 / 1.25\u00d7");
 
   const documentListeners = new Map();
   const body = new FakeElement("body", "BODY");
@@ -291,7 +291,7 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
       this.deferNextPlayState = false;
       this.pendingPlayState = false;
       this.iframe = new FakeElement(`${id}-iframe`, "IFRAME");
-      this.createdWhileFieldOff = byId.get("step-field")?.classList?.contains("field-off") === true;
+      this.createdWhileFieldOff = byId.get("panorama")?.classList?.contains("field-off") === true;
       players.set(id, this);
       queueMicrotask(() => this.events.onReady?.({ target: this }));
     }

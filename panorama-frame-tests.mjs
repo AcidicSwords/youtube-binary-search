@@ -11,7 +11,7 @@ import {
   frameIdentity,
   frameTransition,
   createFieldFrameSequencer
-} from "./field-frame.js";
+} from "./panorama-frame.js";
 
 const range = { start: 0, end: 100 };
 

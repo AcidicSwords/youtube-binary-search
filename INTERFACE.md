@@ -68,9 +68,9 @@ offers a Step-to-Address activation or a live playback relation. Context,
 Refine, Reopen, and direct-edit Frames remain informative; their side images do
 not disguise another operator.
 
-### Field Breath
+### Field Cycle
 
-During ordinary Panorama playback, Tail and Lead breathe between one Inner and
+During ordinary Panorama playback, Tail and Lead cycle between one Inner and
 one Outer source-time offset around Center. The conservative shipped setting is:
 
 ```text
@@ -323,7 +323,7 @@ answers:
 - source-time Fine Nudge distance;
 - source-time Automatic Context duration;
 - fixed or effective-Weight-following Shift playback;
-- Panorama Inner/Outer offsets and symmetric Breath rate.
+- Panorama Inner/Outer offsets and symmetric Cycle rate.
 
 Step distance is Timeline Space; at neutral Weight one unit equals one source
 second. Nudge and Context are source time. Panorama offsets are physical

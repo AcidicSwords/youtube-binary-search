@@ -21,7 +21,7 @@ assert.ok(center && tail && lead, "Center and side players must exist for Contex
 assert.equal(byId.get("context-setting-value").textContent, "5 s centered on Current");
 
 // Arm the Field while Center is paused. A traversal must run Context only in
-// Center; the sides remain suspended even though the Field is armed to breathe.
+// Center; the sides remain suspended even though the Field is armed to cycle.
 byId.get("field-both-toggle").click();
 const tailPlaysBeforeContext = tail.commands.filter(command => command[0] === "play").length;
 center.deferNextPlacement = true;
@@ -44,7 +44,7 @@ assert.equal(byId.get("lead-player-surface")["aria-disabled"], "true");
 assert.equal(
   tail.commands.filter(command => command[0] === "play").length,
   tailPlaysBeforeContext,
-  "Context must not activate an armed Field breath."
+  "Context must not activate an armed Field cycle."
 );
 
 // A stale pre-placement Cursor cannot terminate Context. Once the player enters

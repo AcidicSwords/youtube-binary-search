@@ -13,11 +13,11 @@ export const PANORAMA_STATE = Object.freeze({
 
 export const FIELD_REACH_TOLERANCE = 0.16;
 // Retained only to migrate a legacy saved side-rate pair into one symmetric
-// breathing rate. Nothing at runtime configures the two sides independently.
+// cycling rate. Nothing at runtime configures the two sides independently.
 export const DEFAULT_FIELD_RESPONSE = Object.freeze({ tailRate: 0.5, leadRate: 2 });
 
-// Field Breath: bounded expansion and contraction during ordinary Center
-// playback. The relation is symmetric, so one breathing-rate pair is configured
+// Field Cycle: bounded expansion and contraction during ordinary Center
+// playback. The relation is symmetric, so one cycling-rate pair is configured
 // rather than two conceptually independent side rates.
 export const PANORAMA_DIRECTION = Object.freeze({
   EXPANDING: "expanding",
@@ -32,10 +32,10 @@ export const DEFAULT_PANORAMA_CYCLE = Object.freeze({
 });
 const BREATH_BOUND_TOLERANCE = 0.02;
 
-// The configured relation is 0 < x < y. A pair that collapses has no breath to
+// The configured relation is 0 < x < y. A pair that collapses has no cycle to
 // describe, so the inner offset is pushed strictly inside the outer one rather
 // than being accepted as equal.
-export function normalizeFieldBreath(value = DEFAULT_PANORAMA_CYCLE) {
+export function normalizePanoramaCycle(value = DEFAULT_PANORAMA_CYCLE) {
   const rawOuter = Number(value?.outer);
   const outer = Number.isFinite(rawOuter) && rawOuter > 0
     ? rawOuter
@@ -57,13 +57,13 @@ export function normalizeFieldBreath(value = DEFAULT_PANORAMA_CYCLE) {
 //
 // This used to scale with Center — tail = C·(1−r), lead = C·(1+r) — which is
 // identical at 1x and wrong everywhere else: the gap between Center and a side
-// would grow with Center, so the breath would open faster the faster you
+// would grow with Center, so the cycle would open faster the faster you
 // played, and the cycle would last a different number of seconds at every rate.
 // Because the ladder is evenly spaced, an additive step keeps the difference
-// fixed at exactly one rung, which is what makes the breath take the same nine
+// fixed at exactly one rung, which is what makes the cycle take the same nine
 // seconds at every Center rate the Panorama can hold.
 export function panoramaSideRates(rate, centerRate = 1) {
-  const step = normalizeFieldBreath({ rate }).rate;
+  const step = normalizePanoramaCycle({ rate }).rate;
   const center = Number.isFinite(centerRate) && centerRate > 0 ? centerRate : 1;
   return {
     center,
@@ -74,7 +74,7 @@ export function panoramaSideRates(rate, centerRate = 1) {
 
 // Because a side differs from Center by exactly one rung, the offset between
 // them opens at that many source-seconds per real second — whatever Center is
-// doing. The breath is therefore measured against the wall clock, not against
+// doing. The cycle is therefore measured against the wall clock, not against
 // elapsed Center source time.
 export const BREATH_DRIFT_RATE = PANORAMA_SIDE_STEP;
 
@@ -83,13 +83,13 @@ export const BREATH_DRIFT_RATE = PANORAMA_SIDE_STEP;
 // Three players free-running and a per-tick sum of their progress drifts apart:
 // iframe latency, a rate the adapter has not confirmed yet, and a browser that
 // stopped scheduling timers in a background tab all quietly change how far the
-// sum thinks the breath has travelled. Recording when the current leg began and
+// sum thinks the cycle has travelled. Recording when the current leg began and
 // where it began means the intended offset can be recomputed exactly at any
 // later moment, and the players are corrected toward it rather than consulted
 // about it.
 //
 // It also gives the transitions their meaning for free. A Weight bucket change
-// touches nothing here, so the breath keeps its phase and still reaches maximum
+// touches nothing here, so the cycle keeps its phase and still reaches maximum
 // at the moment it was always going to. Only a genuine discontinuity — Panorama
 // returning after an extreme rate, or a Range wrap — restarts the leg.
 export function panoramaTargetOffset({
@@ -123,7 +123,7 @@ export function panoramaTargetOffset({
     : { offset: inner + (lap - position), direction: PANORAMA_DIRECTION.CONTRACTING };
 }
 
-export function breathRateFromResponse(response = DEFAULT_FIELD_RESPONSE) {
+export function sideRateStepFromResponse(response = DEFAULT_FIELD_RESPONSE) {
   const { tailRate, leadRate } = normalizeFieldResponse(response);
   const symmetric = ((1 - tailRate) + (leadRate - 1)) / 2;
   return PANORAMA_SIDE_RATE_STEPS.reduce(
@@ -136,11 +136,11 @@ export function breathRateFromResponse(response = DEFAULT_FIELD_RESPONSE) {
 
 // Effective bounds are Range-clipped, but the minimum offset is a law, not a
 // preference: Tail must stay at least x behind Center and Lead at least x ahead.
-// A side with less room than x therefore cannot breathe at all. It is marked
+// A side with less room than x therefore cannot cycle at all. It is marked
 // non-operational, excluded from the synchronization barrier, and parked at
 // whatever room remains — the inner offset is never silently reduced.
-export function effectiveBreathBounds(breath, available) {
-  const { inner, outer } = normalizeFieldBreath(breath);
+export function effectiveCycleBounds(cycle, available) {
+  const { inner, outer } = normalizePanoramaCycle(cycle);
   const room = Number.isFinite(available) ? Math.max(0, available) : 0;
   const effectiveOuter = Math.min(outer, room);
   const operational = room >= inner - FIELD_REACH_TOLERANCE
@@ -148,14 +148,14 @@ export function effectiveBreathBounds(breath, available) {
   return {
     inner,
     outer: effectiveOuter,
-    // What the side may still display while it cannot breathe.
+    // What the side may still display while it cannot cycle.
     parked: effectiveOuter,
     operational
   };
 }
 
-export function createPanoramaCycle(breath = DEFAULT_PANORAMA_CYCLE, startedAt = 0) {
-  const { inner } = normalizeFieldBreath(breath);
+export function createPanoramaCycle(cycle = DEFAULT_PANORAMA_CYCLE, startedAt = 0) {
+  const { inner } = normalizePanoramaCycle(cycle);
   return {
     phase: PANORAMA_DIRECTION.EXPANDING,
     held: true,
@@ -173,13 +173,13 @@ export function createPanoramaCycle(breath = DEFAULT_PANORAMA_CYCLE, startedAt =
 // after Center played alone at an extreme rate and the sides hold positions that
 // no longer relate to anything. Begin a fresh leg at the inner offset rather
 // than restoring a stale relation.
-export function restartPanoramaCycle(runtime, breath = DEFAULT_PANORAMA_CYCLE, startedAt = 0) {
-  const fresh = createPanoramaCycle(breath, startedAt);
+export function restartPanoramaCycle(runtime, cycle = DEFAULT_PANORAMA_CYCLE, startedAt = 0) {
+  const fresh = createPanoramaCycle(cycle, startedAt);
   return { ...fresh, held: Boolean(runtime?.held) };
 }
 
 // Holding rebases the leg onto the offset actually attained, so resuming
-// continues from the relation on screen rather than from where an unheld breath
+// continues from the relation on screen rather than from where an unheld cycle
 // would have arrived.
 export function rebasePanoramaCycle(runtime, startedAt = 0, startingOffset = null) {
   if (!runtime) return runtime;
@@ -219,7 +219,7 @@ function sideAtOffset(offset, bounds, operational) {
   if (!operational) {
     return { offset: clamp(offset, 0, bounds.outer), waiting: false, excluded: true };
   }
-  // A side "waits" only when it cannot follow the shared breath -- its own
+  // A side "waits" only when it cannot follow the shared cycle -- its own
   // Range-clipped bound is nearer than the offset the phase is asking for. It
   // then sits at that bound and runs at Center rate. Being at the inner offset
   // is not waiting: that is simply where every leg begins.
@@ -231,35 +231,35 @@ function sideAtOffset(offset, bounds, operational) {
   };
 }
 
-// One breathing step. The offset is derived from the shared phase against the
+// One cycling step. The offset is derived from the shared phase against the
 // wall clock, then clamped into each side's own Range-clipped bounds.
 //
 // It used to be accumulated: each tick added `centerDelta × rate`, where
-// centerDelta is elapsed *Center source* time. That made the breath speed
+// centerDelta is elapsed *Center source* time. That made the cycle speed
 // proportional to the Center rate, so playing at 1.5x opened the Field half
 // again as fast and a cycle lasted a different number of seconds at every rate.
 // It also meant a tick that never ran — a background tab, a slow frame — was
 // simply lost. Deriving from the phase fixes both: the drift is per real
 // second, and a missed tick corrects itself on the next one.
-export function advanceBreath(runtime, {
-  breath,
+export function advanceCycle(runtime, {
+  cycle,
   now = 0,
   centerRate = 1,
   running = true,
   sides = {}
 } = {}) {
-  const configured = normalizeFieldBreath(breath);
+  const configured = normalizePanoramaCycle(cycle);
   const state = runtime || createPanoramaCycle(configured, now);
   const bounds = {
-    tail: effectiveBreathBounds(configured, sides.tail?.available),
-    lead: effectiveBreathBounds(configured, sides.lead?.available)
+    tail: effectiveCycleBounds(configured, sides.tail?.available),
+    lead: effectiveCycleBounds(configured, sides.lead?.available)
   };
   const operational = {
     tail: Boolean(sides.tail?.operational) && bounds.tail.operational,
     lead: Boolean(sides.lead?.operational) && bounds.lead.operational
   };
 
-  // The pair breathes as one relation, so the shared bound is the room the more
+  // The pair cycles as one relation, so the shared bound is the room the more
   // constrained operational side actually has.
   const participating = ["tail", "lead"].filter(role => operational[role]);
   const sharedOuter = participating.length
@@ -298,9 +298,9 @@ export function advanceBreath(runtime, {
     sides: {}
   };
   for (const role of ["tail", "lead"]) {
-    // A frozen breath governs nothing: each side keeps whatever relation it was
-    // established or held at, which can be far wider than the breathing bounds
-    // because Step geometry placed it. Only a running breath shares one offset.
+    // A frozen cycle governs nothing: each side keeps whatever relation it was
+    // established or held at, which can be far wider than the cycling bounds
+    // because Step geometry placed it. Only a running cycle shares one offset.
     const target = frozen
       ? (Number.isFinite(state.sides?.[role]?.offset)
         ? state.sides[role].offset
@@ -335,10 +335,10 @@ export function advanceBreath(runtime, {
 }
 
 // Hold alone stops the cycle. It preserves each attained offset, sets every
-// held side to Center rate, and preserves the breathing direction so Stretch
+// held side to Center rate, and preserves the cycling direction so Stretch
 // resumes from the attained relation.
-export function holdBreath(runtime, breath = DEFAULT_PANORAMA_CYCLE) {
-  const state = runtime || createPanoramaCycle(breath);
+export function holdCycle(runtime, cycle = DEFAULT_PANORAMA_CYCLE) {
+  const state = runtime || createPanoramaCycle(cycle);
   return {
     ...state,
     held: true,
@@ -349,8 +349,8 @@ export function holdBreath(runtime, breath = DEFAULT_PANORAMA_CYCLE) {
   };
 }
 
-export function resumeBreath(runtime, breath = DEFAULT_PANORAMA_CYCLE) {
-  const state = runtime || createPanoramaCycle(breath);
+export function resumeCycle(runtime, cycle = DEFAULT_PANORAMA_CYCLE) {
+  const state = runtime || createPanoramaCycle(cycle);
   return { ...state, held: false };
 }
 

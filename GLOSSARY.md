@@ -45,13 +45,13 @@
 - **Carry** — translate the acquired Timeline Pin or Section through the same Timeline-space displacement as a navigation action, within its structural boundary.
 - **Panoramic Phase Field / Field** — Tail, Center, and Lead presented as one local perceptual surface.
 - **Field Frame** — the stable Context, operator, or direct-manipulation Tail–Center–Lead presentation used outside ordinary Panorama playback.
-- **Field Breath** — bounded expansion and contraction of operational Tail and Lead offsets during Panorama playback.
+- **Field Cycle** — bounded expansion and contraction of operational Tail and Lead offsets during Panorama playback.
 - **Tail** — the optional muted source phase at or behind Center.
 - **Center** — the audible primary player; Current while settled and Cursor during active observation.
 - **Lead** — the optional muted source phase at or ahead of Center.
-- **Inner Offset** — the minimum Tail/Lead separation from Center during Field Breath.
-- **Outer Offset** — the maximum Tail/Lead separation from Center during Field Breath.
-- **Stretch** — begin or resume Field Breath from its current relation.
+- **Inner Offset** — the minimum Tail/Lead separation from Center during Field Cycle.
+- **Outer Offset** — the maximum Tail/Lead separation from Center during Field Cycle.
+- **Stretch** — begin or resume Field Cycle from its current relation.
 - **Hold** — preserve the attained Field offsets and direction while every held side follows Center at Center rate.
 - **Context** — bounded source-contiguous Center observation around Current. While enabled, its stable edges own the Field Frame.
 - **Playback** — source-contiguous observation that settles watched coverage into the Active Span without shortening existing coverage.

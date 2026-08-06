@@ -19,7 +19,7 @@ import {
   framesEqual,
   frameIdentity,
   createFieldFrameSequencer
-} from "./field-frame.js";
+} from "./panorama-frame.js";
 import {
   createSession,
   focusSection,

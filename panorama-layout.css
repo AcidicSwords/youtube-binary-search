@@ -1,10 +1,10 @@
 /* Field phase and temporal Field-span presentation. */
-.step-field {
+.panorama {
   position: relative;
   isolation: isolate;
 }
 
-.step-field::before {
+.panorama::before {
   content: "";
   position: absolute;
   z-index: 0;
@@ -23,13 +23,13 @@
   pointer-events: none;
 }
 
-.step-field[data-phase="unfolding"]::before,
-.step-field[data-phase="partially-held"]::before {
+.panorama[data-phase="unfolding"]::before,
+.panorama[data-phase="partially-held"]::before {
   opacity: 0.34;
   transform: scaleX(0.88);
 }
 
-.step-field[data-phase="held"]::before {
+.panorama[data-phase="held"]::before {
   opacity: 0.13;
   transform: scaleX(1);
 }
@@ -40,10 +40,10 @@
   will-change: transform;
 }
 
-.step-field[data-phase="coincident"] .step-pane-side { opacity: 0.82; }
-.step-field[data-phase="unfolding"] .tail-pane { transform: translateX(-3px) scale(.994); }
-.step-field[data-phase="unfolding"] .lead-pane { transform: translateX(3px) scale(.994); }
-.step-field[data-phase="held"] .step-pane-side {
+.panorama[data-phase="coincident"] .step-pane-side { opacity: 0.82; }
+.panorama[data-phase="unfolding"] .tail-pane { transform: translateX(-3px) scale(.994); }
+.panorama[data-phase="unfolding"] .lead-pane { transform: translateX(3px) scale(.994); }
+.panorama[data-phase="held"] .step-pane-side {
   opacity: 0.98;
   transform: translateX(0) scale(1);
 }

@@ -6,7 +6,7 @@ import {
   createPanoramaController,
   deriveFieldBounds,
   fieldShouldSuspend
-} from "./step-field.js";
+} from "./panorama.js";
 import { YOUTUBE_STATE } from "./youtube.js";
 
 function assertContained(bounds, range) {
@@ -153,7 +153,7 @@ function makeControllerHarness() {
     harness.controller.stretch("both");
     assert.equal(harness.controller.snapshot().tailMode, FIELD_SIDE_MODE.STRETCHING);
     assert.equal(harness.adapters.get("player-tail").read().time, 40,
-      "Stretch resumes the breath from its attained relation, never crossing Center.");
+      "Stretch resumes the cycle from its attained relation, never crossing Center.");
 
     harness.snapshot = {
       ...harness.snapshot,
@@ -165,14 +165,14 @@ function makeControllerHarness() {
     assert.ok(tailCommands.some(command => command[0] === "play"), "Native Center playback starts the muted Tail.");
     // Stretch resumed at the attained outer bound, so both sides arrive at the
     // outer synchronization barrier at once and the Field contracts.
-    assert.equal(harness.controller.breath().phase, "contracting");
+    assert.equal(harness.controller.cycle().phase, "contracting");
     assert.ok(
       tailCommands.some(command => command[0] === "rate" && command[1] > 1),
       "Contraction gives Tail the faster rate so it catches Center while remaining behind it."
     );
     assert.ok(
       harness.adapters.get("player-tail").read().time < 50,
-      "Tail remains behind Center throughout the breath."
+      "Tail remains behind Center throughout the cycle."
     );
 
     harness.adapters.get("player-tail").place(47);
@@ -228,7 +228,7 @@ function makeControllerHarness() {
 
 {
   const app = readFileSync("app.js", "utf8");
-  const fieldSource = readFileSync("step-field.js", "utf8");
+  const fieldSource = readFileSync("panorama.js", "utf8");
   assert.match(app, /function setRange\([\s\S]*?settleBeforeAction\(\);[\s\S]*?setSessionRange/);
   assert.match(app, /function focusSection\([\s\S]*?settleBeforeAction\(\);[\s\S]*?focusSessionSection/);
   assert.match(app, /function leaveSection\([\s\S]*?settleBeforeAction\(\);[\s\S]*?leaveSessionSection/);

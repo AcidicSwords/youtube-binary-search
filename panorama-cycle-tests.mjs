@@ -3,27 +3,27 @@ import {
   PANORAMA_DIRECTION,
   PANORAMA_SIDE_RATE_STEPS,
   DEFAULT_PANORAMA_CYCLE,
-  normalizeFieldBreath,
+  normalizePanoramaCycle,
   panoramaSideRates,
   panoramaTargetOffset,
-  breathRateFromResponse,
-  effectiveBreathBounds,
+  sideRateStepFromResponse,
+  effectiveCycleBounds,
   createPanoramaCycle,
   panoramaSideRate,
-  advanceBreath,
-  holdBreath,
-  resumeBreath,
+  advanceCycle,
+  holdCycle,
+  resumeCycle,
   rebasePanoramaCycle,
   restartPanoramaCycle
-} from "./step-field-geometry.js";
+} from "./panorama-geometry.js";
 
-const breath = { inner: 2, outer: 10, rate: 0.5 };
+const cycle = { inner: 2, outer: 10, rate: 0.5 };
 const bothOperational = {
   tail: { operational: true, available: 1000 },
   lead: { operational: true, available: 1000 }
 };
 
-// The breath opens against the wall clock, so a step here is one real second
+// The cycle opens against the wall clock, so a step here is one real second
 // rather than one second of elapsed Center source time. That is the whole point
 // of the change: at 1.5x, a source second is not a second.
 let clock = 0;
@@ -32,8 +32,8 @@ function run(runtime, steps, options = {}) {
   const seen = [];
   for (let index = 0; index < steps; index += 1) {
     clock += (options.seconds ?? 1) * 1000;
-    state = advanceBreath(state, {
-      breath: options.breath || breath,
+    state = advanceCycle(state, {
+      cycle: options.cycle || cycle,
       now: clock,
       sides: options.sides || bothOperational
     });
@@ -41,8 +41,8 @@ function run(runtime, steps, options = {}) {
   }
   return { state, seen };
 }
-function begin(configured = breath) {
-  const started = resumeBreath(createPanoramaCycle(configured, clock), configured);
+function begin(configured = cycle) {
+  const started = resumeCycle(createPanoramaCycle(configured, clock), configured);
   return { ...started, startedAt: clock, startingOffset: configured.inner, offset: configured.inner };
 }
 
@@ -57,12 +57,12 @@ function begin(configured = breath) {
     panoramaSideRates(DEFAULT_PANORAMA_CYCLE.rate),
     { center: 1, tailRate: 0.75, leadRate: 1.25 }
   );
-  assert.deepEqual(normalizeFieldBreath({ inner: 3, outer: 12, rate: 0.25 }),
+  assert.deepEqual(normalizePanoramaCycle({ inner: 3, outer: 12, rate: 0.25 }),
     { inner: 3, outer: 12, rate: 0.25 });
-  assert.ok(normalizeFieldBreath({ inner: 30, outer: 12 }).inner < 12,
+  assert.ok(normalizePanoramaCycle({ inner: 30, outer: 12 }).inner < 12,
     "The inner offset can never reach or exceed the outer offset.");
-  assert.deepEqual(normalizeFieldBreath(null), DEFAULT_PANORAMA_CYCLE);
-  assert.equal(normalizeFieldBreath({ rate: 4 }).rate, DEFAULT_PANORAMA_CYCLE.rate);
+  assert.deepEqual(normalizePanoramaCycle(null), DEFAULT_PANORAMA_CYCLE);
+  assert.equal(normalizePanoramaCycle({ rate: 4 }).rate, DEFAULT_PANORAMA_CYCLE.rate);
 
   // z < c < w with c − z = w − c
   for (const rate of PANORAMA_SIDE_RATE_STEPS) {
@@ -70,7 +70,7 @@ function begin(configured = breath) {
     assert.ok(pair.tailRate < pair.center && pair.center < pair.leadRate);
     assert.ok(
       Math.abs((pair.center - pair.tailRate) - (pair.leadRate - pair.center)) < 1e-9,
-      "The breathing rate pair must be symmetric about Center rate."
+      "The cycling rate pair must be symmetric about Center rate."
     );
   }
   assert.deepEqual(panoramaSideRates(0.25), { center: 1, tailRate: 0.75, leadRate: 1.25 });
@@ -79,7 +79,7 @@ function begin(configured = breath) {
   // fraction of Center. Scaling it -- tail = C(1-z), lead = C(1+z) -- is
   // identical at 1x and wrong everywhere else: the gap between Center and a side
   // would grow with Center, so the Field would open faster the faster you played
-  // and a breath would last a different number of seconds at every rate.
+  // and a cycle would last a different number of seconds at every rate.
   assert.deepEqual(panoramaSideRates(0.5, 2), { center: 2, tailRate: 1.5, leadRate: 2.5 },
     "Changing Center rate moves the whole relation without changing its size.");
   for (const centerRate of [0.5, 0.75, 1, 1.25, 1.5, 1.75]) {
@@ -99,33 +99,33 @@ function begin(configured = breath) {
   const wide = panoramaSideRates(0.75, 2);
   assert.ok(Math.abs((wide.center - wide.tailRate) - (wide.leadRate - wide.center)) < 1e-9,
     "Wherever both sides fit, the relation stays symmetric about Center.");
-  assert.equal(breathRateFromResponse({ tailRate: 0.5, leadRate: 2 }), 0.75);
-  assert.equal(breathRateFromResponse({ tailRate: 0.75, leadRate: 1.25 }), 0.25);
+  assert.equal(sideRateStepFromResponse({ tailRate: 0.5, leadRate: 2 }), 0.75);
+  assert.equal(sideRateStepFromResponse({ tailRate: 0.75, leadRate: 1.25 }), 0.25);
 }
 
 // Range clipping never reduces the minimum offset. x is a law, not a preference.
 {
-  const clipped = effectiveBreathBounds(breath, 4);
+  const clipped = effectiveCycleBounds(cycle, 4);
   assert.deepEqual({ inner: clipped.inner, outer: clipped.outer }, { inner: 2, outer: 4 });
-  assert.equal(clipped.operational, true, "Room for x and more than x is breathable.");
+  assert.equal(clipped.operational, true, "Room for x and more than x is cycleable.");
 
-  const tooTight = effectiveBreathBounds(breath, 1);
+  const tooTight = effectiveCycleBounds(cycle, 1);
   assert.equal(tooTight.inner, 2, "The configured inner offset is never silently reduced.");
   assert.equal(tooTight.operational, false,
-    "A side with less room than x cannot preserve the minimum offset and must not breathe.");
+    "A side with less room than x cannot preserve the minimum offset and must not cycle.");
   assert.equal(tooTight.parked, 1, "It still shows the frame its remaining room allows.");
 
-  assert.equal(effectiveBreathBounds(breath, 0).operational, false);
-  assert.equal(effectiveBreathBounds(breath, 1000).operational, true);
+  assert.equal(effectiveCycleBounds(cycle, 0).operational, false);
+  assert.equal(effectiveCycleBounds(cycle, 1000).operational, true);
 }
 
 // 0 < inner < outer is enforced, never merely clamped to equality.
 {
-  const collapsed = normalizeFieldBreath({ inner: 10, outer: 10, rate: 0.5 });
+  const collapsed = normalizePanoramaCycle({ inner: 10, outer: 10, rate: 0.5 });
   assert.ok(collapsed.inner < collapsed.outer,
     "A collapsed pair must be pushed strictly inside the outer offset.");
   assert.ok(collapsed.inner > 0);
-  const inverted = normalizeFieldBreath({ inner: 30, outer: 12 });
+  const inverted = normalizePanoramaCycle({ inner: 30, outer: 12 });
   assert.ok(inverted.inner < inverted.outer && inverted.inner > 0);
 }
 
@@ -137,7 +137,7 @@ function begin(configured = breath) {
     "Contraction exchanges the side rates so Tail catches Center.");
   assert.equal(panoramaSideRate({ role: "lead", phase: PANORAMA_DIRECTION.CONTRACTING, rate: 0.5 }), 0.5);
   assert.equal(panoramaSideRate({ role: "lead", phase: PANORAMA_DIRECTION.EXPANDING, rate: 0.5, waiting: true }), 1,
-    "A side waiting at a breathing boundary runs at Center rate.");
+    "A side waiting at a cycling boundary runs at Center rate.");
   assert.equal(panoramaSideRate({ role: "tail", phase: PANORAMA_DIRECTION.EXPANDING, rate: 0.5, held: true }), 1);
 }
 
@@ -145,7 +145,7 @@ function begin(configured = breath) {
 {
   let state = begin();
   state = run(state, 0).state || state;
-  assert.equal(state.startingOffset, 2, "Breathing starts at the inner boundary.");
+  assert.equal(state.startingOffset, 2, "Cycling starts at the inner boundary.");
   const expanded = run(state, 4);
   state = expanded.state;
   assert.equal(state.sides.tail.offset, 4, "Offset grows by the configured fractional spread.");
@@ -155,13 +155,13 @@ function begin(configured = breath) {
   for (let index = 0; index < 80; index += 1) {
     const previous = state.phase;
     clock += 1000;
-    state = advanceBreath(state, { breath, now: clock, sides: bothOperational });
+    state = advanceCycle(state, { cycle, now: clock, sides: bothOperational });
     if (state.phase !== previous) phases.push(state.phase);
   }
   assert.equal(phases[0], PANORAMA_DIRECTION.CONTRACTING,
     "Reaching the outer boundary on every operational side begins contraction.");
   assert.equal(phases[1], PANORAMA_DIRECTION.EXPANDING, "The cycle repeats: x → expand → y → contract → x.");
-  assert.ok(phases.length >= 3, "Breathing continues until Hold is deliberately chosen.");
+  assert.ok(phases.length >= 3, "Cycling continues until Hold is deliberately chosen.");
 }
 
 // A turn reports the direction it is heading in, not the one it arrived by
@@ -176,37 +176,37 @@ function begin(configured = breath) {
   const atOuter = panoramaTargetOffset({
     direction: PANORAMA_DIRECTION.EXPANDING,
     startedAt: 5000,
-    startingOffset: breath.outer,
-    inner: breath.inner,
-    outer: breath.outer,
+    startingOffset: cycle.outer,
+    inner: cycle.inner,
+    outer: cycle.outer,
     now: 5000,
-    driftRate: breath.rate
+    driftRate: cycle.rate
   });
-  assert.deepEqual(atOuter, { offset: breath.outer, direction: PANORAMA_DIRECTION.CONTRACTING });
+  assert.deepEqual(atOuter, { offset: cycle.outer, direction: PANORAMA_DIRECTION.CONTRACTING });
 
   // The inner turn is the mirror of it, and already reads this way: a
   // contraction that has arrived turns outward.
   const atInner = panoramaTargetOffset({
     direction: PANORAMA_DIRECTION.CONTRACTING,
     startedAt: 5000,
-    startingOffset: breath.inner,
-    inner: breath.inner,
-    outer: breath.outer,
+    startingOffset: cycle.inner,
+    inner: cycle.inner,
+    outer: cycle.outer,
     now: 5000,
-    driftRate: breath.rate
+    driftRate: cycle.rate
   });
-  assert.deepEqual(atInner, { offset: breath.inner, direction: PANORAMA_DIRECTION.EXPANDING });
+  assert.deepEqual(atInner, { offset: cycle.inner, direction: PANORAMA_DIRECTION.EXPANDING });
 
   // Nothing between the turns changes: an ordinary outward leg is still outward
   // right up to the bound.
   const midway = panoramaTargetOffset({
     direction: PANORAMA_DIRECTION.EXPANDING,
     startedAt: 0,
-    startingOffset: breath.inner,
-    inner: breath.inner,
-    outer: breath.outer,
+    startingOffset: cycle.inner,
+    inner: cycle.inner,
+    outer: cycle.outer,
     now: 15000,
-    driftRate: breath.rate
+    driftRate: cycle.rate
   });
   assert.deepEqual(midway, { offset: 9.5, direction: PANORAMA_DIRECTION.EXPANDING });
 }
@@ -216,19 +216,19 @@ function begin(configured = breath) {
   let state = begin();
   for (let index = 0; index < 400; index += 1) {
     clock += 700;
-    state = advanceBreath(state, { breath, now: clock, sides: bothOperational });
+    state = advanceCycle(state, { cycle, now: clock, sides: bothOperational });
     for (const role of ["tail", "lead"]) {
-      assert.ok(state.sides[role].offset >= breath.inner - 1e-9,
-        "Breathing must never reach or cross Center.");
-      assert.ok(state.sides[role].offset <= breath.outer + 1e-9,
-        "Breathing must stay within the configured outer offset.");
+      assert.ok(state.sides[role].offset >= cycle.inner - 1e-9,
+        "Cycling must never reach or cross Center.");
+      assert.ok(state.sides[role].offset <= cycle.outer + 1e-9,
+        "Cycling must stay within the configured outer offset.");
     }
   }
 }
 
 // A clipped side lowers the shared bound; it does not desynchronize the pair
 {
-  // Tail has room for x but not for y. The Field breathes as one relation, so
+  // Tail has room for x but not for y. The Field cycles as one relation, so
   // the pair turns around at the room the more constrained side actually has.
   // Letting the unclipped side run on to its own bound -- which is what a
   // per-side barrier did -- would leave Tail and Lead unequally displaced from
@@ -249,7 +249,7 @@ function begin(configured = breath) {
   let contracted = state;
   for (let index = 0; index < 12; index += 1) {
     clock += 1000;
-    contracted = advanceBreath(contracted, { breath, now: clock, sides: asymmetric });
+    contracted = advanceCycle(contracted, { cycle, now: clock, sides: asymmetric });
   }
   assert.equal(contracted.sides.tail.offset, contracted.sides.lead.offset,
     "Both sides remain equally displaced from Center throughout.");
@@ -275,20 +275,20 @@ function begin(configured = breath) {
   let state = begin();
   state = run(state, 6).state;
   const attained = state.sides.lead.offset;
-  assert.ok(attained > breath.inner && attained < breath.outer, "Hold is taken mid-breath.");
-  const held = holdBreath(state, breath);
+  assert.ok(attained > cycle.inner && attained < cycle.outer, "Hold is taken mid-cycle.");
+  const held = holdCycle(state, cycle);
   assert.equal(held.held, true);
   clock += 5000;
-  const stillHeld = advanceBreath(held, { breath, now: clock, sides: bothOperational });
+  const stillHeld = advanceCycle(held, { cycle, now: clock, sides: bothOperational });
   assert.equal(stillHeld.sides.lead.offset, attained, "Hold preserves each attained offset.");
   assert.equal(stillHeld.sides.tail.rate, 1, "Every held side runs at Center rate.");
-  assert.equal(stillHeld.phase, PANORAMA_DIRECTION.EXPANDING, "Hold preserves the breathing direction.");
+  assert.equal(stillHeld.phase, PANORAMA_DIRECTION.EXPANDING, "Hold preserves the cycling direction.");
 
   // Resuming rebases the leg onto the relation actually on screen, so the held
-  // seconds cost nothing: the breath continues from where it stopped.
-  const restarted = rebasePanoramaCycle(resumeBreath(stillHeld, breath), clock, attained);
+  // seconds cost nothing: the cycle continues from where it stopped.
+  const restarted = rebasePanoramaCycle(resumeCycle(stillHeld, cycle), clock, attained);
   clock += 1000;
-  const resumed = advanceBreath(restarted, { breath, now: clock, sides: bothOperational });
+  const resumed = advanceCycle(restarted, { cycle, now: clock, sides: bothOperational });
   assert.ok(resumed.sides.lead.offset > attained, "Stretch resumes from the attained relation.");
 }
 
@@ -297,16 +297,16 @@ function begin(configured = breath) {
   let state = begin();
   while (state.phase === PANORAMA_DIRECTION.EXPANDING) {
     clock += 1000;
-    state = advanceBreath(state, { breath, now: clock, sides: bothOperational });
+    state = advanceCycle(state, { cycle, now: clock, sides: bothOperational });
   }
   state = run(state, 2).state;
   assert.equal(state.phase, PANORAMA_DIRECTION.CONTRACTING);
-  const held = holdBreath(state, breath);
+  const held = holdCycle(state, cycle);
   const restarted = rebasePanoramaCycle(
-    resumeBreath(held, breath), clock, state.sides.tail.offset
+    resumeCycle(held, cycle), clock, state.sides.tail.offset
   );
   clock += 1000;
-  const resumed = advanceBreath(restarted, { breath, now: clock, sides: bothOperational });
+  const resumed = advanceCycle(restarted, { cycle, now: clock, sides: bothOperational });
   assert.equal(resumed.phase, PANORAMA_DIRECTION.CONTRACTING);
   assert.ok(resumed.sides.tail.offset < state.sides.tail.offset);
 }
@@ -317,27 +317,27 @@ function begin(configured = breath) {
   let state = begin();
   while (state.phase === PANORAMA_DIRECTION.EXPANDING) {
     clock += 1000;
-    state = advanceBreath(state, { breath, now: clock, sides: bothOperational });
+    state = advanceCycle(state, { cycle, now: clock, sides: bothOperational });
   }
   assert.equal(state.phase, PANORAMA_DIRECTION.CONTRACTING);
   for (const role of ["tail", "lead"]) {
     const resumed = panoramaSideRate({
       role,
       phase: state.phase,
-      rate: breath.rate,
+      rate: cycle.rate,
       waiting: state.sides[role].waiting,
       held: false
     });
     const outward = panoramaSideRate({
       role,
       phase: PANORAMA_DIRECTION.EXPANDING,
-      rate: breath.rate
+      rate: cycle.rate
     });
     assert.notEqual(resumed, outward,
       `Resuming a contracting ${role} must not command the outward rate.`);
   }
   assert.equal(
-    panoramaSideRate({ role: "tail", phase: state.phase, rate: breath.rate }),
+    panoramaSideRate({ role: "tail", phase: state.phase, rate: cycle.rate }),
     1.5,
     "A contracting Tail catches Center."
   );
@@ -348,21 +348,21 @@ function begin(configured = breath) {
   // Center crossing into another Weight bucket changes the triplet, and nothing
   // else. The sides still differ from Center by one rung, so the offset still
   // opens at the same speed and still reaches maximum at the moment it was
-  // always going to. Restarting here -- which a per-rate breath would have to do
+  // always going to. Restarting here -- which a per-rate cycle would have to do
   // -- would make the Field twitch at every Section boundary.
   clock = 0;
   let state = begin();
   state = run(state, 4).state;                       // four real seconds in
   const midOffset = state.sides.tail.offset;
-  const deadline = state.startedAt + ((breath.outer - breath.inner) / breath.rate) * 1000;
-  assert.ok(midOffset > breath.inner && midOffset < breath.outer, "Taken mid-breath.");
+  const deadline = state.startedAt + ((cycle.outer - cycle.inner) / cycle.rate) * 1000;
+  assert.ok(midOffset > cycle.inner && midOffset < cycle.outer, "Taken mid-cycle.");
 
   // The bucket changes: Center moves 1x -> 0.75x -> 1.25x. Nothing touches the
   // phase, so the same call with a different centerRate continues the same leg.
   for (const centerRate of [0.75, 1.25]) {
     clock += 1000;
     const before = state;
-    state = advanceBreath(state, { breath, now: clock, centerRate, sides: bothOperational });
+    state = advanceCycle(state, { cycle, now: clock, centerRate, sides: bothOperational });
     assert.equal(state.startedAt, before.startedAt, "The leg is not restarted.");
     assert.equal(state.startingOffset, before.startingOffset, "nor rebased.");
     assert.equal(state.phase, PANORAMA_DIRECTION.EXPANDING, "and it keeps its direction.");
@@ -371,14 +371,14 @@ function begin(configured = breath) {
     assert.equal(state.sides.tail.offset, state.sides.lead.offset,
       "Both sides remain symmetric across the change.");
     // The sides still sit exactly one rung either side of the new Center.
-    assert.ok(Math.abs((centerRate - state.sides.tail.rate) - breath.rate) < 1e-9);
-    assert.ok(Math.abs((state.sides.lead.rate - centerRate) - breath.rate) < 1e-9);
+    assert.ok(Math.abs((centerRate - state.sides.tail.rate) - cycle.rate) < 1e-9);
+    assert.ok(Math.abs((state.sides.lead.rate - centerRate) - cycle.rate) < 1e-9);
   }
 
   // The originally scheduled arrival is unchanged by either crossing.
   clock = deadline;
-  state = advanceBreath(state, { breath, now: clock, centerRate: 1.25, sides: bothOperational });
-  assert.equal(state.sides.tail.offset, breath.outer,
+  state = advanceCycle(state, { cycle, now: clock, centerRate: 1.25, sides: bothOperational });
+  assert.equal(state.sides.tail.offset, cycle.outer,
     "Maximum arrives when it was always going to, whatever the buckets did.");
 }
 
@@ -391,22 +391,22 @@ function begin(configured = breath) {
   clock = 0;
   let state = begin();
   state = run(state, 6).state;
-  assert.ok(state.sides.tail.offset > breath.inner, "The Field was open when Panorama was lost.");
+  assert.ok(state.sides.tail.offset > cycle.inner, "The Field was open when Panorama was lost.");
   // The leg it was on genuinely started somewhere other than the inner offset,
   // so a restart is something that can be observed rather than assumed.
   state = rebasePanoramaCycle(state, clock, state.sides.tail.offset);
-  assert.ok(state.startingOffset > breath.inner);
+  assert.ok(state.startingOffset > cycle.inner);
 
   clock += 30000;
-  const resumed = restartPanoramaCycle(state, breath, clock);
-  assert.equal(resumed.startingOffset, breath.inner, "It resumes at the inner offset,");
+  const resumed = restartPanoramaCycle(state, cycle, clock);
+  assert.equal(resumed.startingOffset, cycle.inner, "It resumes at the inner offset,");
   assert.equal(resumed.startedAt, clock, "on a fresh leg,");
   assert.equal(resumed.phase, PANORAMA_DIRECTION.EXPANDING, "expanding outward.");
 
-  clock += ((breath.outer - breath.inner) / breath.rate) * 1000;
-  const reopened = advanceBreath(resumed, { breath, now: clock, sides: bothOperational });
-  assert.equal(reopened.sides.tail.offset, breath.outer,
+  clock += ((cycle.outer - cycle.inner) / cycle.rate) * 1000;
+  const reopened = advanceCycle(resumed, { cycle, now: clock, sides: bothOperational });
+  assert.equal(reopened.sides.tail.offset, cycle.outer,
     "and takes the full outward duration from there, exactly as any other leg.");
 }
 
-console.log("Field Breath tests passed: one-rung side steps that keep the breath the same length at every Center rate, a wall-clock phase, turns that report the direction they are heading in, bounded expansion/contraction, Range clipping that lowers the shared bound rather than desynchronizing the pair, exclusion, deliberate Hold, phase-aware resumption, Weight-bucket crossings that keep both phase and deadline, and a fresh inner-offset leg when Panorama returns.");
+console.log("Field Cycle tests passed: one-rung side steps that keep the cycle the same length at every Center rate, a wall-clock phase, turns that report the direction they are heading in, bounded expansion/contraction, Range clipping that lowers the shared bound rather than desynchronizing the pair, exclusion, deliberate Hold, phase-aware resumption, Weight-bucket crossings that keep both phase and deadline, and a fresh inner-offset leg when Panorama returns.");

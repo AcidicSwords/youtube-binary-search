@@ -2,7 +2,7 @@
 // These tests drive the real controller with a deterministic iframe stub so the
 // transition lifecycle, coalescing, and stale-event rejection are observable.
 import assert from "node:assert/strict";
-import { createPanoramaController } from "./step-field.js";
+import { createPanoramaController } from "./panorama.js";
 import { YOUTUBE_STATE } from "./youtube.js";
 
 function element() {
@@ -98,7 +98,7 @@ function makeHarness({ deferredCue = false, reducedMotion = false } = {}) {
       panoramaEnabled: true,
       tailVisible: true,
       leadVisible: true,
-      breathRate: 0.5,
+      sideRateStep: 0.5,
       reducedMotion
     }),
     setPreferences: () => {},
@@ -130,7 +130,7 @@ function makeHarness({ deferredCue = false, reducedMotion = false } = {}) {
     controller,
     elements,
     commit,
-    root: () => elements.get("step-field"),
+    root: () => elements.get("panorama"),
     tail: () => adapters.get("player-tail"),
     lead: () => adapters.get("player-lead"),
     get snapshot() { return snapshot; },
@@ -281,13 +281,13 @@ function makeHarness({ deferredCue = false, reducedMotion = false } = {}) {
 }
 
 // Direct manipulation temporarily owns the Frame, then one transition restores
-// the ambient Frame. It never mutates the configured breathing relation.
+// the ambient Frame. It never mutates the configured cycling relation.
 {
   const h = makeHarness();
   try {
     h.controller.tick();
     h.commit({ center: 50, tail: 40, lead: 60 });
-    const configured = h.controller.breath().configured;
+    const configured = h.controller.cycle().configured;
     assert.equal(h.controller.previewExtent({
       kind: "current",
       start: 65,
@@ -296,7 +296,7 @@ function makeHarness({ deferredCue = false, reducedMotion = false } = {}) {
     }), true);
     assert.equal(h.tail().time, 65);
     assert.equal(h.lead().time, 75);
-    assert.deepEqual(h.controller.breath().configured, configured,
+    assert.deepEqual(h.controller.cycle().configured, configured,
       "A direct Frame must not rewrite the configured Field relation.");
     h.controller.clearPreview();
     assert.equal(h.tail().time, 40, "Ending the gesture restores the ambient Frame.");

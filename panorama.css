@@ -1,5 +1,5 @@
 /* Panoramic physical projection of Step Backward | Current | Step Forward. */
-.step-field {
+.panorama {
   --field-gap: clamp(7px, 0.72vw, 12px);
   display: grid;
   grid-template-areas: "tail center lead";
@@ -258,31 +258,31 @@
 .step-pane.is-collapsed .step-pane-bar,
 .step-pane.is-collapsed .pane-field-controls { display: none; }
 
-.step-field.field-off {
+.panorama.field-off {
   grid-template-areas: "center";
   grid-template-columns: minmax(0, 1fr);
 }
-.step-field.field-off .step-pane-side { display: none; }
-.step-field.field-off .step-pane-center {
+.panorama.field-off .step-pane-side { display: none; }
+.panorama.field-off .step-pane-center {
   width: min(1100px, 100%);
   justify-self: center;
 }
 
-.step-field.tail-collapsed:not(.field-off) {
+.panorama.tail-collapsed:not(.field-off) {
   grid-template-columns: 48px minmax(0, 1.1fr) minmax(0, 1fr);
 }
-.step-field.lead-collapsed:not(.field-off) {
+.panorama.lead-collapsed:not(.field-off) {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) 48px;
 }
-.step-field.tail-collapsed.lead-collapsed:not(.field-off) {
+.panorama.tail-collapsed.lead-collapsed:not(.field-off) {
   grid-template-columns: 48px minmax(0, 1fr) 48px;
 }
 
-.step-field.is-suspended .step-pane-side .player-wrap {
+.panorama.is-suspended .step-pane-side .player-wrap {
   filter: grayscale(0.4) brightness(0.58);
 }
 
-.step-field.is-preview .step-pane-side .player-wrap {
+.panorama.is-preview .step-pane-side .player-wrap {
   filter: saturate(0.95) brightness(0.95);
 }
 
@@ -291,7 +291,7 @@
 }
 
 @media (min-width: 1240px) {
-  .step-field:not(.field-off) {
+  .panorama:not(.field-off) {
     grid-template-columns:
       minmax(220px, 0.96fr)
       minmax(340px, 1.08fr)
@@ -304,22 +304,22 @@
 }
 
 @container (max-width: 860px) {
-  .step-field:not(.field-off) {
+  .panorama:not(.field-off) {
     grid-template-areas:
       "center center"
       "tail lead";
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .step-field.tail-collapsed:not(.lead-collapsed):not(.field-off) {
+  .panorama.tail-collapsed:not(.lead-collapsed):not(.field-off) {
     grid-template-columns: 48px minmax(0, 1fr);
   }
 
-  .step-field.lead-collapsed:not(.tail-collapsed):not(.field-off) {
+  .panorama.lead-collapsed:not(.tail-collapsed):not(.field-off) {
     grid-template-columns: minmax(0, 1fr) 48px;
   }
 
-  .step-field.tail-collapsed.lead-collapsed:not(.field-off) {
+  .panorama.tail-collapsed.lead-collapsed:not(.field-off) {
     grid-template-areas:
       "center center center"
       "tail . lead";
@@ -336,10 +336,10 @@
 }
 
 @container (max-width: 680px) {
-  .step-field:not(.tail-collapsed):not(.lead-collapsed):not(.field-off),
-  .step-field.tail-collapsed:not(.lead-collapsed):not(.field-off),
-  .step-field.lead-collapsed:not(.tail-collapsed):not(.field-off),
-  .step-field.tail-collapsed.lead-collapsed:not(.field-off) {
+  .panorama:not(.tail-collapsed):not(.lead-collapsed):not(.field-off),
+  .panorama.tail-collapsed:not(.lead-collapsed):not(.field-off),
+  .panorama.lead-collapsed:not(.tail-collapsed):not(.field-off),
+  .panorama.tail-collapsed.lead-collapsed:not(.field-off) {
     grid-template-areas:
       "center"
       "tail"
@@ -378,28 +378,28 @@
    the trailing pane has just received the address Center was showing, so it is
    already settled, while the leading pane is receiving material that was not
    previously visible and rises into place. */
-/* Kept equal to FIELD_TRANSITION_MS in step-field.js, which clears the class. */
-.step-field { --field-transition-ms: 260ms; }
+/* Kept equal to FIELD_TRANSITION_MS in panorama.js, which clears the class. */
+.panorama { --field-transition-ms: 260ms; }
 
-.step-field.is-traversing-forward .step-pane,
-.step-field.is-traversing-backward .step-pane {
+.panorama.is-traversing-forward .step-pane,
+.panorama.is-traversing-backward .step-pane {
   animation-duration: var(--field-transition-ms);
   animation-timing-function: ease-out;
   animation-fill-mode: both;
 }
 
-.step-field.is-traversing-forward .tail-pane,
-.step-field.is-traversing-backward .lead-pane {
+.panorama.is-traversing-forward .tail-pane,
+.panorama.is-traversing-backward .lead-pane {
   animation-name: field-role-settled;
 }
 
-.step-field.is-traversing-forward .step-pane-center,
-.step-field.is-traversing-backward .step-pane-center {
+.panorama.is-traversing-forward .step-pane-center,
+.panorama.is-traversing-backward .step-pane-center {
   animation-name: field-role-center;
 }
 
-.step-field.is-traversing-forward .lead-pane,
-.step-field.is-traversing-backward .tail-pane {
+.panorama.is-traversing-forward .lead-pane,
+.panorama.is-traversing-backward .tail-pane {
   animation-name: field-role-arriving;
 }
 
@@ -416,9 +416,9 @@
   to { opacity: 1; }
 }
 
-/* The Field breathes between its inner and outer offsets during ordinary
+/* The Field cycles between its inner and outer offsets during ordinary
    playback. The marker is informational; the relation itself is physical. */
-.step-field.is-breathing .center-field-summary strong {
+.panorama.is-cycling .center-field-summary strong {
   color: var(--accent, #79a8ff);
 }
 
@@ -449,8 +449,8 @@
 /* Reduced motion settles directly on the resulting Frame. The controller also
    stops emitting the directional classes, so this is a second guarantee. */
 @media (prefers-reduced-motion: reduce) {
-  .step-field.is-traversing-forward .step-pane,
-  .step-field.is-traversing-backward .step-pane {
+  .panorama.is-traversing-forward .step-pane,
+  .panorama.is-traversing-backward .step-pane {
     animation: none;
   }
 }

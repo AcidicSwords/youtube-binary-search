@@ -1,6 +1,6 @@
 // Step Field execution controller. Tail and Lead are muted physical projections of Session state.
 // Session owns semantic Current/Interval. This controller owns only physical Tail/Lead players,
-// Field Frame placement, the slideshow transition lifecycle, the breathing runtime, boundary
+// Field Frame placement, the slideshow transition lifecycle, the cycling runtime, boundary
 // synchronization, Hold, and stale-event rejection. It imports neither operator arithmetic nor
 // Guide topology.
 import { EPSILON, clamp } from "./range-geometry.js";
@@ -12,21 +12,21 @@ import {
   FIELD_FRAME_ACTIVATION,
   classifyDirection,
   directFrame
-} from "./field-frame.js";
+} from "./panorama-frame.js";
 import {
   PANORAMA_STATE,
   FIELD_REACH_TOLERANCE,
   PANORAMA_DIRECTION,
   PANORAMA_SIDE_RATE_STEPS,
   DEFAULT_PANORAMA_CYCLE,
-  normalizeFieldBreath,
+  normalizePanoramaCycle,
   panoramaSideRates,
   panoramaSideRate,
-  effectiveBreathBounds,
+  effectiveCycleBounds,
   createPanoramaCycle,
-  advanceBreath,
-  holdBreath,
-  resumeBreath,
+  advanceCycle,
+  holdCycle,
+  resumeCycle,
   rebasePanoramaCycle,
   restartPanoramaCycle,
   deriveFieldBounds,
@@ -36,14 +36,14 @@ import {
   hasCenterDiscontinuity,
   resolveFieldPhase,
   deriveObservedField
-} from "./step-field-geometry.js";
+} from "./panorama-geometry.js";
 
 export {
   PANORAMA_STATE,
   DEFAULT_PANORAMA_CYCLE,
   PANORAMA_DIRECTION,
   PANORAMA_SIDE_RATE_STEPS,
-  normalizeFieldBreath,
+  normalizePanoramaCycle,
   panoramaSideRates,
   deriveFieldBounds,
   derivePanorama,
@@ -51,7 +51,7 @@ export {
   chooseNearestRate,
   resolveFieldPhase,
   deriveObservedField
-} from "./step-field-geometry.js";
+} from "./panorama-geometry.js";
 
 export const FIELD_SIDE_MODE = Object.freeze({
   HELD: "held",
@@ -74,7 +74,7 @@ function defaultPreferences() {
     tailVisible: true,
     leadVisible: true,
     reducedMotion: false,
-    breathRate: DEFAULT_PANORAMA_CYCLE.rate
+    sideRateStep: DEFAULT_PANORAMA_CYCLE.rate
   };
 }
 
@@ -82,14 +82,14 @@ function snapshotReach(snapshot) {
   return normalizeFieldReach(snapshot?.stepReach);
 }
 
-// The configured breathing relation. A snapshot without an explicit Field
-// Breath still describes one: its outer offset is the legacy configured Offset
+// The configured cycling relation. A snapshot without an explicit Field
+// Cycle still describes one: its outer offset is the legacy configured Offset
 // and its inner offset is a proportional fraction of it.
-function snapshotBreath(snapshot) {
-  if (snapshot?.panoramaCycle) return normalizeFieldBreath(snapshot.panoramaCycle);
+function snapshotCycle(snapshot) {
+  if (snapshot?.panoramaCycle) return normalizePanoramaCycle(snapshot.panoramaCycle);
   const reach = snapshotReach(snapshot);
   const outer = Math.max(reach.backward, reach.forward);
-  return normalizeFieldBreath({
+  return normalizePanoramaCycle({
     inner: Math.max(EPSILON, outer / 4),
     outer,
     rate: DEFAULT_PANORAMA_CYCLE.rate
@@ -147,17 +147,17 @@ export function createPanoramaController({
   onChange = () => {},
   formatTime = value => String(value),
   createPlayer = createYouTubePlayer,
-  // The breath is measured against the wall clock, so the clock is a dependency
-  // like every other. A suite that needs a deterministic breath supplies its own.
+  // The cycle is measured against the wall clock, so the clock is a dependency
+  // like every other. A suite that needs a deterministic cycle supplies its own.
   now = () => Date.now()
 }) {
   const ids = [
-    "step-field", "step-field-toggle", "step-field-meta",
+    "panorama", "panorama-toggle", "panorama-meta",
     "tail-pane", "tail-meta", "tail-player-surface", "tail-collapse", "tail-restore",
     "lead-pane", "lead-meta", "lead-player-surface", "lead-collapse", "lead-restore",
     "center-meta", "tail-offset-state", "lead-offset-state",
     "field-both-toggle", "field-both-toggle-label", "field-transport-state", "field-rate-state",
-    "field-span-label", "field-breath-rate"
+    "field-span-label", "field-cycle-rate"
   ];
   const elements = Object.fromEntries(ids.map(id => [id, document?.getElementById?.(id) || null]));
 
@@ -178,8 +178,8 @@ export function createPanoramaController({
     preview: null,
     field: null,
     fieldKey: "",
-    // Breathing runtime. Held until a genuine Center playback gesture begins.
-    breath: createPanoramaCycle(DEFAULT_PANORAMA_CYCLE),
+    // Cycling runtime. Held until a genuine Center playback gesture begins.
+    cycle: createPanoramaCycle(DEFAULT_PANORAMA_CYCLE),
     // Field Frame placement and its one directional transition. The generation
     // token discards player callbacks belonging to a superseded Frame.
     frame: null,
@@ -260,10 +260,10 @@ export function createPanoramaController({
     return role === "tail" ? "backward" : "forward";
   }
 
-  // The configured Outer Offset is the Field-level breathing bound. Both sides
+  // The configured Outer Offset is the Field-level cycling bound. Both sides
   // share it; there is no independent per-side configured Offset.
   function configuredOffset(role, snapshot = getSnapshot?.()) {
-    return snapshotBreath(snapshot).outer;
+    return snapshotCycle(snapshot).outer;
   }
 
   function effectiveOffset(role, center, snapshot = getSnapshot?.()) {
@@ -425,7 +425,7 @@ export function createPanoramaController({
   }
 
   function bind() {
-    elements["step-field-toggle"]?.addEventListener?.("click", () => {
+    elements["panorama-toggle"]?.addEventListener?.("click", () => {
       const prefs = preferences();
       changePreferences({ panoramaEnabled: !prefs.panoramaEnabled });
     });
@@ -443,9 +443,9 @@ export function createPanoramaController({
     elements["lead-restore"]?.addEventListener?.("click", () => {
       changePreferences({ leadVisible: true, panoramaEnabled: true });
     });
-    // One breathing-rate pair, not two conceptually independent side rates.
-    elements["field-breath-rate"]?.addEventListener?.("change", event => {
-      changePreferences({ breathRate: Number(event.target.value) });
+    // One cycling-rate pair, not two conceptually independent side rates.
+    elements["field-cycle-rate"]?.addEventListener?.("change", event => {
+      changePreferences({ sideRateStep: Number(event.target.value) });
     });
     elements["field-both-toggle"]?.addEventListener?.("click", toggleBoth);
   }
@@ -490,7 +490,7 @@ export function createPanoramaController({
             side.activated = true;
             side.blocked = false;
             refreshSideSnapshot(side);
-            populateBreathRateControl(preferences());
+            populateCycleRateControl(preferences());
             // Delayed iframe events cannot revive a hidden, disabled, suspended,
             // or no-longer-playing projection after its owner has changed.
             if (!sidePlaybackAllowed(role)) {
@@ -680,13 +680,13 @@ export function createPanoramaController({
     }
   }
 
-  // One combined breathing-rate pair. The configured value is the symmetric
+  // One combined cycling-rate pair. The configured value is the symmetric
   // fraction of Center rate; the inward phase exchanges the sides without
   // rewriting that relation.
-  function populateBreathRateControl(prefs) {
-    const select = elements["field-breath-rate"];
+  function populateCycleRateControl(prefs) {
+    const select = elements["field-cycle-rate"];
     if (!select) return;
-    const current = normalizeFieldBreath({ rate: prefs.breathRate }).rate;
+    const current = normalizePanoramaCycle({ rate: prefs.sideRateStep }).rate;
     // A valid saved spread remains an available choice even when it predates or
     // falls between the provided presets. Otherwise assigning `select.value`
     // would leave a real HTML select with no selected option while the Field
@@ -710,9 +710,9 @@ export function createPanoramaController({
   }
 
   function establishSide(side, center, snapshot) {
-    // A fresh Field is Held at its configured outer offset. Breathing begins at
+    // A fresh Field is Held at its configured outer offset. Cycling begins at
     // the inner boundary only when Center playback resumes the cycle.
-    const bounds = sideBreathBounds(side.role, center, snapshot);
+    const bounds = sideCycleBounds(side.role, center, snapshot);
     const offset = bounds.outer;
     side.mode = FIELD_SIDE_MODE.HELD;
     side.offset = offset;
@@ -720,8 +720,8 @@ export function createPanoramaController({
     side.waiting = false;
     side.configuredOffset = configuredOffset(side.role, snapshot);
     side.beforeStretchOffset = offset;
-    runtime.breath.sides[side.role].offset = offset;
-    runtime.breath.sides[side.role].waiting = false;
+    runtime.cycle.sides[side.role].offset = offset;
+    runtime.cycle.sides[side.role].waiting = false;
     if (sideIsVisible(side.role)) {
       pauseSide(side);
       parkAtRelation(side, center, snapshot, { force: true });
@@ -732,10 +732,10 @@ export function createPanoramaController({
 
   function establish(snapshot, address = snapshot.current) {
     const center = clamp(address, snapshot.range.start, snapshot.range.end);
-    runtime.breath = rebasePanoramaCycle(
-      holdBreath(runtime.breath, snapshotBreath(snapshot)),
+    runtime.cycle = rebasePanoramaCycle(
+      holdCycle(runtime.cycle, snapshotCycle(snapshot)),
       now(),
-      attainedBreathOffset()
+      attainedCycleOffset()
     );
     for (const side of Object.values(sides)) establishSide(side, center, snapshot);
     runtime.structuralKey = structuralKey(snapshot);
@@ -761,7 +761,7 @@ export function createPanoramaController({
         side.pendingPlay = false;
         continue;
       }
-      const bounds = sideBreathBounds(side.role, nextCenter, snapshot);
+      const bounds = sideCycleBounds(side.role, nextCenter, snapshot);
       const retained = side.offset > REACH_TOLERANCE
         ? side.offset
         : side.configuredOffset;
@@ -771,8 +771,8 @@ export function createPanoramaController({
       side.progressOffset = offset;
       side.waiting = false;
       side.configuredOffset = configuredOffset(side.role, snapshot);
-      runtime.breath.sides[side.role].offset = offset;
-      runtime.breath.sides[side.role].waiting = false;
+      runtime.cycle.sides[side.role].offset = offset;
+      runtime.cycle.sides[side.role].waiting = false;
       pauseSide(side);
       if (!preview) {
         parkAtRelation(side, nextCenter, snapshot, { force: true });
@@ -821,7 +821,7 @@ export function createPanoramaController({
       const followedConfiguredTarget = Math.abs(
         side.offset - previousMaximum
       ) <= REACH_TOLERANCE;
-      const bounds = sideBreathBounds(name, center, snapshot);
+      const bounds = sideCycleBounds(name, center, snapshot);
       side.configuredOffset = configuredOffset(name, snapshot);
       const attained = followedConfiguredTarget
         ? bounds.outer
@@ -829,7 +829,7 @@ export function createPanoramaController({
       side.offset = attained;
       side.progressOffset = attained;
       side.beforeStretchOffset = clamp(side.beforeStretchOffset, 0, bounds.outer);
-      runtime.breath.sides[name].offset = attained;
+      runtime.cycle.sides[name].offset = attained;
       if (side.mode === FIELD_SIDE_MODE.HELD && sideIsVisible(name, prefs) && !preview) {
         pauseSide(side);
         parkAtRelation(side, center, snapshot, { force: true });
@@ -844,7 +844,7 @@ export function createPanoramaController({
   }
 
   // Direct manipulation temporarily supplies an exact Field Frame. It never
-  // mutates the configured breathing relation or the ambient Frame.
+  // mutates the configured cycling relation or the ambient Frame.
   function previewExtent(config = {}) {
     const snapshot = getSnapshot?.();
     if (!snapshot?.videoLoaded || !snapshot.range) return false;
@@ -986,10 +986,10 @@ export function createPanoramaController({
     return true;
   }
 
-  // Effective breathing bounds for one side, clipped by the room Range leaves it.
-  function sideBreathBounds(role, center, snapshot = getSnapshot?.()) {
-    return effectiveBreathBounds(
-      snapshotBreath(snapshot),
+  // Effective cycling bounds for one side, clipped by the room Range leaves it.
+  function sideCycleBounds(role, center, snapshot = getSnapshot?.()) {
+    return effectiveCycleBounds(
+      snapshotCycle(snapshot),
       effectiveOffset(role, center, snapshot)
     );
   }
@@ -1004,10 +1004,10 @@ export function createPanoramaController({
   // these and must never arrive here: it keeps its phase and its deadline.
   // What the sides are actually showing, which is what a Hold or a Stretch must
   // continue from. The two are symmetric, so either answers for the pair.
-  function attainedBreathOffset() {
-    // The side's own offset, not the breath's mirror of it. Establishing a Field
+  function attainedCycleOffset() {
+    // The side's own offset, not the cycle's mirror of it. Establishing a Field
     // places the sides from Step geometry, which can be much wider than the
-    // breath's inner bound; resuming from the mirror would snap them inward and
+    // cycle's inner bound; resuming from the mirror would snap them inward and
     // read as the Field collapsing the moment Stretch was pressed.
     for (const role of ["tail", "lead"]) {
       const offset = sides[role]?.offset;
@@ -1016,45 +1016,45 @@ export function createPanoramaController({
     return null;
   }
 
-  function startBreathCycle(center, snapshot = getSnapshot?.()) {
-    const configured = snapshotBreath(snapshot);
-    const fresh = restartPanoramaCycle(runtime.breath, configured, now());
-    runtime.breath = {
+  function startCycleCycle(center, snapshot = getSnapshot?.()) {
+    const configured = snapshotCycle(snapshot);
+    const fresh = restartPanoramaCycle(runtime.cycle, configured, now());
+    runtime.cycle = {
       ...fresh,
       held: false,
       sides: Object.fromEntries(["tail", "lead"].map(role => {
-        const bounds = sideBreathBounds(role, center, snapshot);
+        const bounds = sideCycleBounds(role, center, snapshot);
         return [role, { offset: Math.min(bounds.inner, bounds.outer), waiting: false }];
       }))
     };
     return configured;
   }
 
-  // Breathing begins at the inner boundary and expands outward. Tail is always
+  // Cycling begins at the inner boundary and expands outward. Tail is always
   // behind Center and Lead always ahead; neither reaches Center.
   function beginStretch(side, center, snapshot, { play = false } = {}) {
     if (!sideCanRun(side)) return false;
     side.beforeStretchOffset = side.offset;
     side.mode = FIELD_SIDE_MODE.STRETCHING;
-    const bounds = sideBreathBounds(side.role, center, snapshot);
+    const bounds = sideCycleBounds(side.role, center, snapshot);
     const offset = clamp(
-      runtime.breath.sides[side.role].offset > EPSILON
-        ? runtime.breath.sides[side.role].offset
+      runtime.cycle.sides[side.role].offset > EPSILON
+        ? runtime.cycle.sides[side.role].offset
         : bounds.inner,
       Math.min(bounds.inner, bounds.outer),
       bounds.outer
     );
-    runtime.breath.sides[side.role].offset = offset;
-    runtime.breath.sides[side.role].waiting = false;
+    runtime.cycle.sides[side.role].offset = offset;
+    runtime.cycle.sides[side.role].waiting = false;
     side.offset = offset;
     side.progressOffset = offset;
     side.configuredOffset = configuredOffset(side.role, snapshot);
     side.waiting = false;
     side.blocked = false;
     side.adapter?.mute?.();
-    // Until the first breathing tick assigns the directional side rate, follow
+    // Until the first cycling tick assigns the directional side rate, follow
     // Center exactly so acquiring the Panorama cannot alter the attained offset.
-    requestBreathRate(side, snapshotCenterRate(snapshot), true);
+    requestSideRateStep(side, snapshotCenterRate(snapshot), true);
 
     // The source must already be cued before the trusted play gesture; a cue and
     // play issued together race in the YouTube iframe.
@@ -1097,11 +1097,11 @@ export function createPanoramaController({
     );
     const started = { tail: false, lead: false };
     runtime.centerWasRunning = true;
-    // Ordinary playback hands presentation to the Field Breath. Preview and
-    // Breath are mutually exclusive presentation owners. A fresh play gesture
+    // Ordinary playback hands presentation to the Field Cycle. Preview and
+    // Cycle are mutually exclusive presentation owners. A fresh play gesture
     // starts the cycle at the inner boundary and expands outward.
     runtime.preview = null;
-    startBreathCycle(center, snapshot);
+    startCycleCycle(center, snapshot);
     for (const role of ["tail", "lead"]) {
       const side = sides[role];
       if (
@@ -1146,7 +1146,7 @@ export function createPanoramaController({
     // which no longer describe anything, so the leg restarts at the inner offset
     // rather than restoring a stale relation. This is the one resumption that
     // discards phase; an ordinary Weight-bucket change never reaches here.
-    startBreathCycle(center, snapshot);
+    startCycleCycle(center, snapshot);
 
     for (const role of ["tail", "lead"]) {
       const side = sides[role];
@@ -1168,20 +1168,20 @@ export function createPanoramaController({
       );
       side.adapter?.mute?.();
       side.adapter?.place?.(side.desiredAddress);
-      // Resuming after a wrap continues the preserved breathing phase. The
+      // Resuming after a wrap continues the preserved cycling phase. The
       // outward pair is only correct while expanding; a contracting Field needs
       // the exchanged rates immediately, not one controller tick later.
       if (side.mode === FIELD_SIDE_MODE.STRETCHING) {
-        requestBreathRate(side, panoramaSideRate({
+        requestSideRateStep(side, panoramaSideRate({
           role,
-          phase: runtime.breath.phase,
-          rate: snapshotBreath(snapshot).rate,
-          waiting: runtime.breath.sides[role].waiting,
-          held: runtime.breath.held,
+          phase: runtime.cycle.phase,
+          rate: snapshotCycle(snapshot).rate,
+          waiting: runtime.cycle.sides[role].waiting,
+          held: runtime.cycle.held,
           centerRate
         }), true);
       } else {
-        requestBreathRate(side, centerRate, true);
+        requestSideRateStep(side, centerRate, true);
       }
       side.pendingPlay = true;
       side.adapter?.play?.();
@@ -1221,7 +1221,7 @@ export function createPanoramaController({
     };
   }
 
-  // Breathing is one coordinated Field relation, so Stretch resumes the cycle on
+  // Cycling is one coordinated Field relation, so Stretch resumes the cycle on
   // every operational side at once. A dormant side is simply not an operand.
   function stretch(role = "both") {
     const snapshot = getSnapshot?.();
@@ -1236,11 +1236,11 @@ export function createPanoramaController({
     if (centerRunning) runtime.centerWasRunning = true;
     // Stretch resumes from the attained relation and the preserved direction, so
     // the leg is rebased onto the offset actually on screen rather than onto
-    // where an unheld breath would have arrived while it was held.
-    runtime.breath = rebasePanoramaCycle(
-      resumeBreath(runtime.breath, snapshotBreath(snapshot)),
+    // where an unheld cycle would have arrived while it was held.
+    runtime.cycle = rebasePanoramaCycle(
+      resumeCycle(runtime.cycle, snapshotCycle(snapshot)),
       now(),
-      attainedBreathOffset()
+      attainedCycleOffset()
     );
     for (const name of roles) {
       beginStretch(sides[name], center, snapshot, { play: centerRunning && !suspendedNow });
@@ -1263,9 +1263,9 @@ export function createPanoramaController({
     return plausible ? measured : clamp(side.progressOffset, 0, maximum);
   }
 
-  // Hold alone stops the breathing cycle. It preserves each attained offset
+  // Hold alone stops the cycling cycle. It preserves each attained offset
   // within [x, y], sets every held side to Center rate, and preserves the
-  // breathing direction for later resumption. It writes no Session state.
+  // cycling direction for later resumption. It writes no Session state.
   function hold(role = "both") {
     const snapshot = getSnapshot?.();
     if (suspensionRequired(snapshot) || !snapshot?.range) return null;
@@ -1278,7 +1278,7 @@ export function createPanoramaController({
     let attained = null;
     for (const name of roles) {
       const side = sides[name];
-      const bounds = sideBreathBounds(name, center, snapshot);
+      const bounds = sideCycleBounds(name, center, snapshot);
       let offset = side.mode === FIELD_SIDE_MODE.STRETCHING
         ? measuredOffset(side, center, snapshot)
         : clamp(side.offset, 0, bounds.outer);
@@ -1292,13 +1292,13 @@ export function createPanoramaController({
         offset = clamp(side.beforeStretchOffset, 0, bounds.outer);
       }
       offset = clamp(offset, Math.min(bounds.inner, bounds.outer), bounds.outer);
-      runtime.breath.sides[name].offset = offset;
+      runtime.cycle.sides[name].offset = offset;
       side.offset = offset;
       side.progressOffset = offset;
       side.configuredOffset = configuredOffset(name, snapshot);
       side.waiting = false;
       if (runtime.centerWasRunning) {
-        requestBreathRate(side, centerRate, true);
+        requestSideRateStep(side, centerRate, true);
       } else {
         requestRate(side, 1, true);
       }
@@ -1313,10 +1313,10 @@ export function createPanoramaController({
       }
       attained = attained === null ? offset : attained;
     }
-    runtime.breath = rebasePanoramaCycle(
-      holdBreath(runtime.breath, snapshotBreath(snapshot)),
+    runtime.cycle = rebasePanoramaCycle(
+      holdCycle(runtime.cycle, snapshotCycle(snapshot)),
       now(),
-      attainedBreathOffset()
+      attainedCycleOffset()
     );
     for (const name of roles) sides[name].mode = FIELD_SIDE_MODE.HELD;
     publish(snapshot);
@@ -1342,21 +1342,21 @@ export function createPanoramaController({
     side.offset = offset;
     side.progressOffset = offset;
     side.waiting = false;
-    // Native pause freezes the attained breathing relation without changing the
+    // Native pause freezes the attained cycling relation without changing the
     // configured pair or the direction the cycle would resume in.
-    runtime.breath.sides[side.role].offset = offset;
-    runtime.breath.sides[side.role].waiting = false;
+    runtime.cycle.sides[side.role].offset = offset;
+    runtime.cycle.sides[side.role].waiting = false;
     requestRate(side, 1, true);
     parkAtRelation(side, center, snapshot, { force: true });
   }
 
-  // One combined Stretch/Hold control. Breathing is a coordinated Field
+  // One combined Stretch/Hold control. Cycling is a coordinated Field
   // relation, so there is no independent per-side Stretch/Hold gesture.
   function toggleBoth() {
     if (suspensionRequired()) return;
     const roles = controllableRoles(getSnapshot?.(), preferences());
     if (!roles.length) return;
-    if (runtime.breath.held) stretch("both");
+    if (runtime.cycle.held) stretch("both");
     else hold("both");
   }
 
@@ -1393,9 +1393,9 @@ export function createPanoramaController({
     return false;
   }
 
-  // Breathing rates change with the phase, so the request is a nearest match to
+  // Cycling rates change with the phase, so the request is a nearest match to
   // the state machine's intent rather than a fixed per-side preference.
-  function requestBreathRate(side, desiredRate, force = false) {
+  function requestSideRateStep(side, desiredRate, force = false) {
     refreshSideSnapshot(side);
     const rates = [...new Set(side.availableRates || [1])]
       .filter(rate => Number.isFinite(rate) && rate > 0);
@@ -1409,33 +1409,33 @@ export function createPanoramaController({
     return chosen;
   }
 
-  // The whole Field breathes as one relation, so the state machine advances once
+  // The whole Field cycles as one relation, so the state machine advances once
   // per tick and both sides are placed from its authoritative offsets.
   function driveField(center, centerDelta, snapshot, centerRunning) {
     const prefs = preferences();
-    const configured = snapshotBreath(snapshot);
+    const configured = snapshotCycle(snapshot);
     const participation = Object.fromEntries(["tail", "lead"].map(role => {
       const available = effectiveOffset(role, center, snapshot);
       return [role, {
         operational: Boolean(
           prefs[`${role}Visible`]
           && sideCanRun(sides[role])
-          && effectiveBreathBounds(configured, available).operational
+          && effectiveCycleBounds(configured, available).operational
         ),
         available
       }];
     }));
-    // The breath is measured against the wall clock, so it opens at the same
+    // The cycle is measured against the wall clock, so it opens at the same
     // speed whatever rate Center is playing at, and a tick that never ran costs
     // nothing: the next one derives the offset the phase always intended.
-    const advanced = advanceBreath(runtime.breath, {
-      breath: configured,
+    const advanced = advanceCycle(runtime.cycle, {
+      cycle: configured,
       now: now(),
       running: centerRunning,
       centerRate: snapshotCenterRate(snapshot),
       sides: participation
     });
-    runtime.breath = {
+    runtime.cycle = {
       phase: advanced.phase,
       held: advanced.held,
       startedAt: advanced.startedAt,
@@ -1458,7 +1458,7 @@ export function createPanoramaController({
     ]));
   }
 
-  function driveSide(role, center, snapshot, centerRunning, breathSide, participation) {
+  function driveSide(role, center, snapshot, centerRunning, cycleSide, participation) {
     const side = sides[role];
     const prefs = preferences();
     if (!prefs[`${role}Visible`] || !sideCanRun(side)) {
@@ -1467,23 +1467,23 @@ export function createPanoramaController({
     }
     if (!participation.operational) {
       // The side cannot preserve the configured inner offset, so it does not
-      // breathe and takes no part in the barrier. It still shows the frame the
+      // cycle and takes no part in the barrier. It still shows the frame the
       // remaining room allows rather than collapsing onto Center.
-      const parked = Math.max(0, breathSide.bounds.parked ?? 0);
+      const parked = Math.max(0, cycleSide.bounds.parked ?? 0);
       side.mode = FIELD_SIDE_MODE.HELD;
       side.offset = parked;
       side.progressOffset = parked;
       side.waiting = false;
       side.configuredOffset = configuredOffset(role, snapshot);
-      runtime.breath.sides[role].offset = parked;
+      runtime.cycle.sides[role].offset = parked;
       pauseSide(side);
       parkSide(side, exactAddress(role, center, parked, snapshot.range));
       return { available: false, held: true, offset: parked };
     }
 
     side.configuredOffset = configuredOffset(role, snapshot);
-    side.waiting = Boolean(breathSide.waiting);
-    side.mode = runtime.breath.held
+    side.waiting = Boolean(cycleSide.waiting);
+    side.mode = runtime.cycle.held
       ? FIELD_SIDE_MODE.HELD
       : FIELD_SIDE_MODE.STRETCHING;
 
@@ -1497,11 +1497,11 @@ export function createPanoramaController({
     }
 
     ensureSidePlaying(side);
-    requestBreathRate(side, breathSide.rate);
+    requestSideRateStep(side, cycleSide.rate);
     // The pure state machine owns the offset; the physical side is corrected
     // toward it, so a missing directional rate degrades to placement instead of
     // leaving the relation stuck at a boundary.
-    const offset = clamp(breathSide.offset, 0, breathSide.bounds.outer);
+    const offset = clamp(cycleSide.offset, 0, cycleSide.bounds.outer);
     side.offset = offset;
     side.progressOffset = offset;
     const desired = exactAddress(role, center, offset, snapshot.range);
@@ -1509,7 +1509,7 @@ export function createPanoramaController({
     correctRunningSide(side, desired);
     return {
       available: true,
-      held: runtime.breath.held || Boolean(breathSide.waiting),
+      held: runtime.cycle.held || Boolean(cycleSide.waiting),
       offset
     };
   }
@@ -1692,11 +1692,11 @@ export function createPanoramaController({
   }
 
   function render(snapshot = getSnapshot?.(), field = runtime.field) {
-    if (!snapshot || !elements["step-field"]) return;
+    if (!snapshot || !elements["panorama"]) return;
     const prefs = preferences();
     const preview = activePreview(snapshot);
     const loaded = Boolean(snapshot.videoLoaded);
-    const root = elements["step-field"];
+    const root = elements["panorama"];
     const shown = loaded && prefs.panoramaEnabled;
     root.classList.toggle("field-off", !shown);
     root.classList.toggle("tail-collapsed", !prefs.tailVisible);
@@ -1720,7 +1720,7 @@ export function createPanoramaController({
       "is-traversing-backward",
       transitionDirection === FIELD_FRAME_DIRECTION.BACKWARD
     );
-    root.classList.toggle("is-breathing", !runtime.breath.held && !preview);
+    root.classList.toggle("is-cycling", !runtime.cycle.held && !preview);
 
     elements["tail-pane"]?.classList?.toggle("is-collapsed", !prefs.tailVisible);
     elements["lead-pane"]?.classList?.toggle("is-collapsed", !prefs.leadVisible);
@@ -1729,10 +1729,10 @@ export function createPanoramaController({
     if (elements["tail-collapse"]) elements["tail-collapse"].hidden = !prefs.tailVisible;
     if (elements["lead-collapse"]) elements["lead-collapse"].hidden = !prefs.leadVisible;
 
-    if (elements["step-field-toggle"]) elements["step-field-toggle"].disabled = !loaded;
-    elements["step-field-toggle"]?.setAttribute?.("aria-pressed", String(shown));
-    elements["step-field-toggle"]?.setAttribute?.("aria-label", `${shown ? "Hide" : "Show"} Panorama`);
-    setText(elements["step-field-meta"], !loaded ? "Load video" : shown ? "On" : "Off");
+    if (elements["panorama-toggle"]) elements["panorama-toggle"].disabled = !loaded;
+    elements["panorama-toggle"]?.setAttribute?.("aria-pressed", String(shown));
+    elements["panorama-toggle"]?.setAttribute?.("aria-label", `${shown ? "Hide" : "Show"} Panorama`);
+    setText(elements["panorama-meta"], !loaded ? "Load video" : shown ? "On" : "Off");
     setText(
       elements["center-meta"],
       loaded
@@ -1744,7 +1744,7 @@ export function createPanoramaController({
         : "—"
     );
 
-    const configuredBreath = snapshotBreath(snapshot);
+    const configuredCycle = snapshotCycle(snapshot);
     for (const role of ["tail", "lead"]) {
       const side = sides[role];
       const actual = field?.[role]?.offset ?? side.offset;
@@ -1752,7 +1752,7 @@ export function createPanoramaController({
       const canStep = Boolean(stepSelection(role));
       setText(
         elements[`${role}-offset-state`],
-        `${formatOffset(actual)} in ${formatOffset(configuredBreath.inner)}–${formatOffset(configuredBreath.outer)}`
+        `${formatOffset(actual)} in ${formatOffset(configuredCycle.inner)}–${formatOffset(configuredCycle.outer)}`
       );
       const surface = elements[`${role}-player-surface`];
       surface?.setAttribute?.("aria-disabled", String(!canStep));
@@ -1771,8 +1771,8 @@ export function createPanoramaController({
       sideIsVisible(role, prefs)
     );
     const availableRoles = controllableRoles(snapshot, prefs);
-    // Breathing is one Field relation, so the combined control reports one state.
-    const held = runtime.breath.held;
+    // Cycling is one Field relation, so the combined control reports one state.
+    const held = runtime.cycle.held;
     const bothLabel = availableRoles.length === 1
       ? visibleRoles.length === 1 ? "visible side" : "available side"
       : "both";
@@ -1802,11 +1802,11 @@ export function createPanoramaController({
       ? `${frameLabel} Frame`
       : runtime.suspended
       ? "Panorama suspended"
-      : runtime.breath.held
+      : runtime.cycle.held
         ? "Held"
-        : runtime.breath.phase === PANORAMA_DIRECTION.CONTRACTING
-          ? "Breathing in"
-          : "Breathing out");
+        : runtime.cycle.phase === PANORAMA_DIRECTION.CONTRACTING
+          ? "Cycling in"
+          : "Cycling out");
     setText(
       elements["field-rate-state"],
       `Tail ${sides.tail.actualRate}× · Center ${snapshotCenterRate(snapshot)}× · Lead ${sides.lead.actualRate}×`
@@ -1826,7 +1826,7 @@ export function createPanoramaController({
     render(snapshot);
     if (snapshot.videoLoaded) ensurePlayers(prefs);
     syncVideo(snapshot);
-    populateBreathRateControl(prefs);
+    populateCycleRateControl(prefs);
 
     if (!snapshot.videoLoaded || !snapshot.videoId) {
       const idlePhase = fieldIsEnabled(prefs)
@@ -1894,9 +1894,9 @@ export function createPanoramaController({
       // transient Context cursor or an in-flight placement.
       pauseSides({ center: snapshot.current, freeze: false });
     } else if (discontinuity) {
-      // A native scrub or clock jump starts a fresh breathing cycle at the new
+      // A native scrub or clock jump starts a fresh cycling cycle at the new
       // Center without creating a semantic Interval here.
-      startBreathCycle(center, snapshot);
+      startCycleCycle(center, snapshot);
       for (const role of ["tail", "lead"]) {
         const side = sides[role];
         if (sideIsOperational(role, snapshot, prefs)) {
@@ -2017,7 +2017,7 @@ export function createPanoramaController({
     render(snapshot);
     ensurePlayers(prefs);
     syncVideo(snapshot);
-    populateBreathRateControl(prefs);
+    populateCycleRateControl(prefs);
     establish(snapshot, snapshot.current);
     runtime.suspended = suspensionRequired(snapshot);
     runtime.phase = !prefs.panoramaEnabled || (!prefs.tailVisible && !prefs.leadVisible)
@@ -2059,14 +2059,14 @@ export function createPanoramaController({
     hold,
     stretch,
     toggleField: toggleBoth,
-    breath() {
+    cycle() {
       return {
-        phase: runtime.breath.phase,
-        held: runtime.breath.held,
-        configured: snapshotBreath(getSnapshot?.()),
+        phase: runtime.cycle.phase,
+        held: runtime.cycle.held,
+        configured: snapshotCycle(getSnapshot?.()),
         sides: {
-          tail: { ...runtime.breath.sides.tail },
-          lead: { ...runtime.breath.sides.lead }
+          tail: { ...runtime.cycle.sides.tail },
+          lead: { ...runtime.cycle.sides.lead }
         }
       };
     },

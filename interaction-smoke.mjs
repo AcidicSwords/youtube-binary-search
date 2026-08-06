@@ -3,10 +3,10 @@ import { createSmokeEnvironment, descendants } from "./smoke-harness.mjs";
 
 const env = createSmokeEnvironment();
 const { byId, players, flush, poll, dispatchDocument, currentText } = env;
-const savedFieldBreath = { inner: 3, outer: 12, rate: 0.4 };
+const savedPanoramaCycle = { inner: 3, outer: 12, rate: 0.4 };
 env.localStorage.values.set(
   "binary-youtube-reader:preferences:v1",
-  JSON.stringify({ panoramaCycle: savedFieldBreath })
+  JSON.stringify({ panoramaCycle: savedPanoramaCycle })
 );
 
 await import("./app.js");
@@ -24,17 +24,17 @@ assert.equal(byId.get("duration-time").textContent, "1:40");
 // the same symmetric rate pair the runtime actually uses.
 assert.equal(byId.get("field-inner-offset").value, "3");
 assert.equal(byId.get("field-outer-offset").value, "12");
-assert.equal(byId.get("field-breath-rate").value, "0.4");
+assert.equal(byId.get("field-cycle-rate").value, "0.4");
 assert.equal(byId.get("panorama-setting-value").textContent, "3–12 s · 0.6× / 1.4×");
 assert.deepEqual(
   JSON.parse(env.localStorage.values.get("binary-youtube-reader:preferences:v1")).panoramaCycle,
-  savedFieldBreath,
+  savedPanoramaCycle,
   "Booting with new defaults must not rewrite a valid saved Field relation."
 );
 await poll();
 await flush();
 assert.deepEqual(
-  descendants(byId.get("field-breath-rate")).map(option => option.value),
+  descendants(byId.get("field-cycle-rate")).map(option => option.value),
   ["0.25", "0.4", "0.5", "0.75"],
   "A valid saved non-preset spread remains selectable beside the presets."
 );
@@ -55,22 +55,22 @@ await flush();
 assert.equal(byId.get("field-outer-offset").value, "2.5");
 assert.match(byId.get("status").textContent, /positive number/);
 
-// One breathing-rate pair, not two independent side rates.
+// One cycling-rate pair, not two independent side rates.
 await poll();
 await flush();
-const breathOptions = descendants(byId.get("field-breath-rate"))
+const cycleOptions = descendants(byId.get("field-cycle-rate"))
   .map(option => option.textContent);
-assert.deepEqual(breathOptions, ["0.75× / 1.25×", "0.6× / 1.4×", "0.5× / 1.5×", "0.25× / 1.75×"],
-  "The Field exposes one symmetric breathing-rate pair per step.");
-assert.equal(byId.get("field-breath-rate").value, "0.4");
-byId.get("field-breath-rate").value = "0.5";
-byId.get("field-breath-rate").dispatch("change");
+assert.deepEqual(cycleOptions, ["0.75× / 1.25×", "0.6× / 1.4×", "0.5× / 1.5×", "0.25× / 1.75×"],
+  "The Field exposes one symmetric cycling-rate pair per step.");
+assert.equal(byId.get("field-cycle-rate").value, "0.4");
+byId.get("field-cycle-rate").value = "0.5";
+byId.get("field-cycle-rate").dispatch("change");
 await flush();
 await poll();
-assert.equal(byId.get("field-breath-rate").value, "0.5");
+assert.equal(byId.get("field-cycle-rate").value, "0.5");
 
 // 0 < inner < outer holds strictly. An inner offset that reaches the outer one
-// describes a Field with no breath, so it is repaired to the midpoint rather
+// describes a Field with no cycle, so it is repaired to the midpoint rather
 // than accepted as equal.
 byId.get("field-inner-offset").value = "40";
 byId.get("field-inner-offset").dispatch("change");
@@ -765,8 +765,8 @@ byId.get("center-transport-surface").click();
 assert.equal(center.commands.filter(command => command[0] === "play").length, playCounts.center + 1);
 assert.equal(tail.commands.filter(command => command[0] === "play").length, playCounts.tail + 1);
 assert.equal(lead.commands.filter(command => command[0] === "play").length, playCounts.lead + 1);
-assert.deepEqual(tail.commands.slice(-2).map(command => command[0]), ["place", "play"], "Activated Tail must start its breath behind Center.");
-assert.deepEqual(lead.commands.slice(-2).map(command => command[0]), ["place", "play"], "Activated Lead must start its breath ahead of Center.");
+assert.deepEqual(tail.commands.slice(-2).map(command => command[0]), ["place", "play"], "Activated Tail must start its cycle behind Center.");
+assert.deepEqual(lead.commands.slice(-2).map(command => command[0]), ["place", "play"], "Activated Lead must start its cycle ahead of Center.");
 await flush();
 assert.equal(byId.get("center-transport-surface").hidden, true, "Native Center controls must be exposed while ordinary playback is running.");
 
@@ -778,29 +778,29 @@ for (let elapsed = 1; elapsed <= 8; elapsed += 1) {
   lead.currentTime = 50 + elapsed * 2;
   await poll();
 }
-// The Field breathes outward from its inner offset: Tail falls behind Center at
+// The Field cycles outward from its inner offset: Tail falls behind Center at
 // z < c while Lead advances at w > c, and both stay inside [x, y].
 //
 // The offset opens against the wall clock rather than against elapsed Center
 // source time, so that it takes the same nine seconds at every Center rate the
 // Panorama can hold. Advancing Center's position therefore proves the rates but
 // not the growth; real time has to pass for that. The exact schedule is proven
-// against an injected clock in field-breath-tests and field-runtime-tests.
+// against an injected clock in panorama-cycle-tests and panorama-runtime-tests.
 assert.equal(tail.rate, 0.5, "Expansion applies the outward Tail rate z < c.");
 assert.equal(lead.rate, 1.5, "Expansion applies the outward Lead rate w > c.");
-const offsetBeforeBreathing = byId.get("tail-offset-state").textContent;
+const offsetBeforeCycleing = byId.get("tail-offset-state").textContent;
 await env.delay(1100);
 await poll();
 await flush();
 const tailOffsetText = byId.get("tail-offset-state").textContent;
-assert.notEqual(tailOffsetText, offsetBeforeBreathing,
+assert.notEqual(tailOffsetText, offsetBeforeCycleing,
   "A second of real time opens the Field.");
 assert.equal(tailOffsetText, byId.get("lead-offset-state").textContent,
   "and both sides stay equally displaced from Center.");
 assert.match(tailOffsetText, /in 2\.5s–10s$/, "inside the configured bounds.");
-assert.equal(byId.get("field-transport-state").textContent, "Breathing out");
+assert.equal(byId.get("field-transport-state").textContent, "Cycling out");
 assert.equal(byId.get("section-window").textContent, intervalBeforeStretch,
-  "Breathing must never rewrite the semantic Interval.");
+  "Cycling must never rewrite the semantic Interval.");
 
 // Hold alone stops the cycle. It preserves the attained relation, sets every
 // held side to Center rate, and writes no configuration and no Session state.
@@ -875,7 +875,7 @@ const focusedSpace = dispatchDocument("keydown", { key: " ", code: "Space" });
 assert.equal(focusedSpace.defaultPrevented, true, "Space must remain playback while a button has focus.");
 assert.equal(tail.commands.filter(command => command[0] === "play").length, tailPlayBeforeSpace + 1);
 assert.equal(lead.commands.filter(command => command[0] === "play").length, leadPlayBeforeSpace + 1);
-// A fresh play gesture begins the breath at the inner offset on each side.
+// A fresh play gesture begins the cycle at the inner offset on each side.
 assert.deepEqual(tail.commands.slice(-2), [["place", 55.5], ["play"]]);
 assert.deepEqual(lead.commands.slice(-2), [["place", 60.5], ["play"]]);
 await flush();
@@ -1225,4 +1225,4 @@ assert.equal(env.document.activeElement, null, "Pointer activation must not leav
   );
 }
 
-console.log("Interaction smoke passed: direct T/Shift+T tagging, retained Section editing, spatial Pin unlink/link, Timeline Section node dragging, Guide exact Address editing, operational clustered Pins, Shift Pin traversal, local Refine preview, unsaved Working Focus, Switch involution, Undo/Redo ownership, composable Step intervals, shared activation, bounded Field breathing, immutable configured offsets, whole-Field side Step, universal Space playback, and coherent focus release.");
+console.log("Interaction smoke passed: direct T/Shift+T tagging, retained Section editing, spatial Pin unlink/link, Timeline Section node dragging, Guide exact Address editing, operational clustered Pins, Shift Pin traversal, local Refine preview, unsaved Working Focus, Switch involution, Undo/Redo ownership, composable Step intervals, shared activation, bounded Field cycling, immutable configured offsets, whole-Field side Step, universal Space playback, and coherent focus release.");

@@ -18,7 +18,7 @@ import {
 } from "./session.js";
 import { projectionForModel } from "./timeline-projection.js";
 import { deriveContextWindow, createContextTransport } from "./transport.js";
-import { effectiveBreathBounds, derivePanorama } from "./step-field-geometry.js";
+import { effectiveCycleBounds, derivePanorama } from "./panorama-geometry.js";
 
 const DURATION = 100;
 const RANGE = { start: 0, end: DURATION };
@@ -260,16 +260,16 @@ function addresses(model) {
     "Context transport carries those same source edges."
   );
 
-  // Field geometry is physical: offsets and breathing bounds are source seconds.
+  // Field geometry is physical: offsets and cycling bounds are source seconds.
   assert.deepEqual(
     derivePanorama(50, { backward: 10, forward: 10, linked: true }, RANGE).envelope,
     { start: 40, end: 60 },
     "Field offsets are source-time displacements from Center."
   );
   assert.deepEqual(
-    effectiveBreathBounds({ inner: 2.5, outer: 10, rate: 0.5 }, 50),
+    effectiveCycleBounds({ inner: 2.5, outer: 10, rate: 0.5 }, 50),
     { inner: 2.5, outer: 10, parked: 10, operational: true },
-    "Breathing bounds are source seconds, bounded only by source room."
+    "Cycling bounds are source seconds, bounded only by source room."
   );
 }
 

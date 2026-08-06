@@ -33,7 +33,7 @@ import {
   createTimelineProjection,
   projectionForModel
 } from "./timeline-projection.js";
-import { derivePanorama } from "./step-field-geometry.js";
+import { derivePanorama } from "./panorama-geometry.js";
 import {
   createPlaybackTransport,
   rebasePlaybackTransport

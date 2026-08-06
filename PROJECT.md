@@ -64,13 +64,13 @@ When Context is enabled, its bounded source window owns the Field Frame. Tail an
 
 Each committed movement produces at most one directional presentation transition. The semantic operation commits first; the transition merely makes its direction legible.
 
-### Field Breath
+### Field Cycle
 
 During ordinary Panorama playback, Tail and Lead travel between an Inner Offset `x` and Outer Offset `y`, where `0 < x < y`. Their outward rates are symmetric around Center’s rate. At a boundary, a side follows Center while preserving its attained offset until every operational side arrives; the cycle then reverses.
 
-The minimum offset is a law rather than a preference. A side without enough Range room to preserve `x` is excluded from the breathing barrier instead of silently weakening the relation. Hidden, collapsed, unavailable, and Range-clipped sides are likewise excluded.
+The minimum offset is a law rather than a preference. A side without enough Range room to preserve `x` is excluded from the cycling barrier instead of silently weakening the relation. Hidden, collapsed, unavailable, and Range-clipped sides are likewise excluded.
 
-Hold preserves the attained relation at Center rate and keeps the breath direction for later resumption. Reaching the outer boundary starts contraction; it does not choose Hold.
+Hold preserves the attained relation at Center rate and keeps the cycle direction for later resumption. Reaching the outer boundary starts contraction; it does not choose Hold.
 
 The conservative shipped relation is `0.25–2.5 s` with `Tail 0.75× | Center 1× | Lead 1.25×`. It favors local coherence without limiting the settings a reader may choose or replacing previously saved preferences.
 

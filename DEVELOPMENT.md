@@ -71,12 +71,12 @@ runs the same complete `npm run verify` gate before publishing.
 | Effective density, inverse map, spatial midpoint | `timeline-projection.js` | every spatial consumer and atmosphere |
 | Context/Playback policy, offer resolution, wrap | `transport.js` | adapter actual-rate and application playback tests |
 | YouTube source identity or actual media state | `youtube.js` | source-generation and stale-event tests |
-| Field Frame identity or transition | `field-frame.js` | application owner selection and Field runtime |
-| Field bounds or breathing policy | `step-field-geometry.js` | controller lifecycle and browser presentation |
-| Tail/Lead player behavior | `step-field.js` | stale events, dormant panes, user activation, native-player isolation |
+| Field Frame identity or transition | `panorama-frame.js` | application owner selection and Field runtime |
+| Field bounds or cycling policy | `panorama-geometry.js` | controller lifecycle and browser presentation |
+| Tail/Lead player behavior | `panorama.js` | stale events, dormant panes, user activation, native-player isolation |
 | DOM projection and visual state | `view.js` | source audit plus Chromium proof |
 | Interaction acquisition, persistence, source boundary | `app.js` | route convergence and whole-system journeys |
-| Physical layout and accessibility | `index.html`, `styles.css`, `step-field.css`, `field-grammar.css` | integration audit and Chromium proof |
+| Physical layout and accessibility | `index.html`, `styles.css`, `panorama.css`, `panorama-layout.css` | integration audit and Chromium proof |
 
 Do not branch inside an operator on Section coverage. Extend or consume the
 shared projection. Do not make a view-only fix by adding another semantic state
@@ -123,7 +123,7 @@ owner. Do not reach through the media adapter from application or Field code.
 - The parent Play control may not cover native YouTube controls.
 - Field suspension derives from observation policy and confirmed compatibility,
   not a numeric shortcut.
-- Field Breath defaults to `0.25–2.5 s` and `0.75× / 1× / 1.25×`, while saved
+- Field Cycle defaults to `0.25–2.5 s` and `0.75× / 1× / 1.25×`, while saved
   valid preferences and wider available settings remain valid.
 - Hold/Stretch changes neither preferences, Guide, Step Reach, nor history.
 
@@ -168,14 +168,14 @@ Every executable suite is listed here by the current behavior it protects.
 - `transport-tests.mjs` — explicit observation/rate policies, actual-rate authority, policy-preserving retry/rebase, log-space offers, and unbounded inverse Weight.
 - `youtube-tests.mjs` — URL/time parsing, loaded-source identity in snapshots, and actual playback-rate event delivery.
 - `step-gesture-tests.mjs` — repeat cadence, release batching, boundary stop, cancellation, and takeover.
-- `step-field-tests.mjs` — Field geometry, suspension, Hold/Stretch, side activation, user activation, and panoramic layout contracts.
-- `field-bounds-tests.mjs` — Range-contained side geometry, unavailable sides, Context suspension, and side Step.
-- `field-breath-tests.mjs` — conservative defaults, symmetric rates, expansion/contraction, Range clipping, synchronization, Hold, and resume.
-- `field-coherence-tests.mjs` — semantic Step Reach and physical Field offsets remain independent.
-- `field-frame-tests.mjs` — Frame ownership priority, stable identity, direction, Context edges, and direct-frame validation.
-- `field-grammar-tests.mjs` — Field UI ownership and the separation of Context, Hold/Stretch, Range loop, side Step, and Guide retention.
-- `field-runtime-tests.mjs` — real controller placement, proportional breathing, dormant panes, stale events, rate fallback, direct previews, and boundary recovery.
-- `field-slideshow-tests.mjs` — directional opacity transitions, rapid coalescing, reversal, stale callback rejection, and reduced motion.
+- `panorama-tests.mjs` — Field geometry, suspension, Hold/Stretch, side activation, user activation, and panoramic layout contracts.
+- `panorama-bounds-tests.mjs` — Range-contained side geometry, unavailable sides, Context suspension, and side Step.
+- `panorama-cycle-tests.mjs` — conservative defaults, symmetric rates, expansion/contraction, Range clipping, synchronization, Hold, and resume.
+- `panorama-coherence-tests.mjs` — semantic Step Reach and physical Field offsets remain independent.
+- `panorama-frame-tests.mjs` — Frame ownership priority, stable identity, direction, Context edges, and direct-frame validation.
+- `panorama-layout-tests.mjs` — Field UI ownership and the separation of Context, Hold/Stretch, Range loop, side Step, and Guide retention.
+- `panorama-runtime-tests.mjs` — real controller placement, proportional cycling, dormant panes, stale events, rate fallback, direct previews, and boundary recovery.
+- `panorama-transition-tests.mjs` — directional opacity transitions, rapid coalescing, reversal, stale callback rejection, and reduced motion.
 
 ### Guide, Groups, Cues, modifiers, and routes
 
