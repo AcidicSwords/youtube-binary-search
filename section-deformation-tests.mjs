@@ -8,7 +8,7 @@ import {
   nextPin,
   previousPin,
   resolveSection,
-  setSectionWeight,
+  setSectionWeighting,
   translateSection,
   validateGuide
 } from "./guide.js";
@@ -39,10 +39,10 @@ const close = (actual, expected, message) => {
 
 function weightedGuide(...definitions) {
   const guide = createGuide("section-deformation-tests");
-  const sections = definitions.map(([start, end, weight, label = ""]) =>
+  const sections = definitions.map(([start, end, weighting, label = ""]) =>
     createSectionFromTimes(guide, start, end, {
       label,
-      weight,
+      weighting,
       provenance: "test"
     }).section
   );
@@ -58,15 +58,15 @@ function weightedGuide(...definitions) {
   );
   assert.equal(validateGuide(guide, 100), true);
   let projection = createTimelineProjection({ duration: 100, guide });
-  assert.equal(projection.weightAtSource(30), 0.5);
-  assert.equal(projection.weightAtSource(40), 1);
-  assert.equal(projection.weightAtSource(47), 0.5);
-  assert.equal(projection.weightAtSource(60), 2);
+  assert.equal(projection.effectiveWeightAtSource(30), 0.5);
+  assert.equal(projection.effectiveWeightAtSource(40), 1);
+  assert.equal(projection.effectiveWeightAtSource(47), 0.5);
+  assert.equal(projection.effectiveWeightAtSource(60), 2);
 
-  setSectionWeight(guide, sections[1].id, 1);
+  setSectionWeighting(guide, sections[1].id, 1);
   projection = createTimelineProjection({ duration: 100, guide });
-  assert.equal(projection.weightAtSource(40), 0.5);
-  assert.equal(projection.weightAtSource(47), 0.25);
+  assert.equal(projection.effectiveWeightAtSource(40), 0.5);
+  assert.equal(projection.effectiveWeightAtSource(47), 0.25);
 }
 
 // Pins stay distinct and ordered at ordinary positive distances.
@@ -95,8 +95,8 @@ function weightedGuide(...definitions) {
 // atomically when the user confirms the cascade.
 {
   const guide = createGuide("delete-shared");
-  createSectionFromTimes(guide, 10, 20, { label: "First", weight: 0.5 });
-  createSectionFromTimes(guide, 20, 30, { label: "Second", weight: 2 });
+  createSectionFromTimes(guide, 10, 20, { label: "First", weighting: 0.5 });
+  createSectionFromTimes(guide, 20, 30, { label: "Second", weighting: 2 });
   const shared = guide.pins.find(pin => Math.abs(pin.t - 20) < 1e-6);
   const session = createSession({ duration: 100, guide });
   assert.equal(deleteGuidePin(session, shared.id).reason, "pin-in-use");
@@ -118,7 +118,7 @@ function weightedGuide(...definitions) {
   assert.equal(moved.changed, true);
   assert.equal(moved.session.model.neighborhood.C, 37);
   assert.equal(
-    resolveSection(moved.session.model.guide, sections[0].id).weight,
+    resolveSection(moved.session.model.guide, sections[0].id).weighting,
     0.25
   );
 }
@@ -172,7 +172,7 @@ function weightedGuide(...definitions) {
   assert.equal(tagged.changed, true);
   assert.equal(tagged.value.created, true);
   assert.equal(tagged.value.section.label, "");
-  assert.equal(tagged.value.section.weight, 1,
+  assert.equal(tagged.value.section.weighting, 1,
     "Tag retains topology without bundling a Weight mutation.");
   const weighted = setGuideSectionWeight(
     tagged.session,
@@ -180,7 +180,7 @@ function weightedGuide(...definitions) {
     0.75
   );
   assert.equal(weighted.changed, true);
-  assert.equal(weighted.value.weight, 0.75);
+  assert.equal(weighted.value.weighting, 0.75);
   assert.deepEqual(
     {
       start: weighted.session.model.activeSpan.start,
@@ -204,9 +204,9 @@ function weightedGuide(...definitions) {
   const selected = setGuideSectionWeight(session, second.id, 2);
   assert.equal(selected.changed, true);
   assert.equal(selected.value.id, second.id);
-  assert.equal(selected.value.weight, 2);
+  assert.equal(selected.value.weighting, 2);
   assert.equal(
-    resolveSection(selected.session.model.guide, first.id).weight,
+    resolveSection(selected.session.model.guide, first.id).weighting,
     1
   );
 }
@@ -217,7 +217,7 @@ function weightedGuide(...definitions) {
   const guide = createGuide("translate");
   const section = createSectionFromTimes(guide, 20, 40, {
     label: "",
-    weight: 1.5
+    weighting: 1.5
   }).section;
   const interior = ensurePin(guide, 30, {
     kind: PIN_KIND.EXPLICIT,
@@ -228,10 +228,10 @@ function weightedGuide(...definitions) {
     {
       start: resolveSection(guide, section.id).start,
       end: resolveSection(guide, section.id).end,
-      weight: resolveSection(guide, section.id).weight,
+      weighting: resolveSection(guide, section.id).weighting,
       interior: interior.t
     },
-    { start: 25, end: 45, weight: 1.5, interior: 30 }
+    { start: 25, end: 45, weighting: 1.5, interior: 30 }
   );
   assert.equal(movePin(guide, interior.id, 31, 100).changed, true);
 }

@@ -111,10 +111,10 @@ segment product is positive. Timeline Space is therefore continuous, strictly
 increasing, and singly invertible. Overlaps compose by multiplication without
 priority or stored hierarchy.
 
-The projection exposes its effective `segments`, `weightedSections`, and
+The projection exposes its effective `segments`, `weightContributors`, and
 resolved `weightRelaxation`, together with source/timeline conversion,
 distance, midpoint, Step target, Pin-stop ordering, projected extents, and
-`weightAtSource()`. Step, Refine, adaptive Reach, hit testing, drag conversion,
+`effectiveWeightAtSource()`. Step, Refine, adaptive Reach, hit testing, drag conversion,
 spatial readouts, exact sourceGridLines, atmosphere, and explicitly dynamic Playback
 all consume this same object. No consumer rereads raw Guide Weight to decide
 what counts.
@@ -141,7 +141,7 @@ settle before the map changes. Playback continues. The command itself issues no
 player command, although a dynamic rate policy may read the changed projection
 on a later tick.
 
-Because `view.js` draws atmosphere from `projection.weightedSections`, a whole-
+Because `view.js` draws atmosphere from `projection.weightContributors`, a whole-
 map bypass yields even sourceGridLines and no compression/expansion atmosphere while
 stored Section wires and Guide Weight values remain intact. A Section-scoped
 bypass removes only that contributor; overlapping contributors remain.

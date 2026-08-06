@@ -92,7 +92,7 @@ assert.deepEqual(
   const metricGuide = createGuide("movement-frame-weight");
   createSectionFromTimes(metricGuide, 430, 445, {
     label: "Weighted Section",
-    weight: 0.5
+    weighting: 0.5
   });
   const metricSession = createSession({
     duration: 1000,
@@ -251,7 +251,7 @@ for (const [action, direct] of [
   const guide = createGuide("bypassed-preview");
   createSectionFromTimes(guide, 30, 50, {
     label: "Compressed",
-    weight: 0.5
+    weighting: 0.5
   });
   const source = createSession({ duration: 100, current: 29, guide });
   const projection = createTimelineProjection({
@@ -298,7 +298,7 @@ for (const [action, direct] of [
 const weightedGuide = createGuide("coherence-weight");
 createSectionFromTimes(weightedGuide, 30, 45, {
   label: "Compressed",
-  weight: 0.5
+  weighting: 0.5
 });
 const weightedSession = createSession({
   duration: 100,

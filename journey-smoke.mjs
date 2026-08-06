@@ -138,7 +138,7 @@ assert.ok(sectionRows().some(row => rowText(row).includes("The argument")),
 // 6. Give it weight. The map deforms and says so as a factor.
 // ==============================================================================
 await clickIn("sections-list", sectionRows()[0]);
-const weight = inSections("sectionWeight")[0];
+const weight = inSections("sectionWeighting")[0];
 assert.ok(weight, "A selected Section exposes its Weight.");
 weight.value = "4";
 await changeIn("sections-list", weight);

@@ -396,7 +396,7 @@ try {
   // typed into. This needs a real focus model and real controls, so it can only
   // be asked here.
   const bypassState = () => page.getAttribute("#weight-relaxation-toggle", "aria-pressed");
-  const weightSelect = await page.$("#sections-list [data-section-weight]");
+  const weightSelect = await page.$("#sections-list [data-section-weighting]");
   if (weightSelect) {
     const beforeCommit = await bypassState();
     await weightSelect.selectOption("2");
@@ -410,7 +410,7 @@ try {
 
     // Space still opens the list rather than starting playback behind it: a
     // <select> gives up the letters it was hoarding, not the key it acts on.
-    await (await page.$("#sections-list [data-section-weight]")).focus();
+    await (await page.$("#sections-list [data-section-weighting]")).focus();
     const transportBeforeList = await text("#field-transport-state");
     await page.keyboard.press("Space");
     await settle(300);

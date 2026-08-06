@@ -105,7 +105,7 @@ await setGroupState("group-default", "visible", true);
 // 1. A Group's two states are independent, and each governs exactly one thing.
 // ==============================================================================
 await selectSection(0);
-const weight = inSections("sectionWeight")[0];
+const weight = inSections("sectionWeighting")[0];
 weight.value = "4";
 await changeIn("sections-list", weight);
 const deformedDuration = byId.get("duration-time").textContent;
@@ -346,7 +346,7 @@ assert.equal(byId.get("guide-compose-toggle")["aria-pressed"], "false",
 // flattened first so a pixel means a known Address again -- the deformation is
 // the subject of other blocks, not this one.
 await selectSection(0);
-const flatten = inSections("sectionWeight")[0];
+const flatten = inSections("sectionWeighting")[0];
 flatten.value = "1";
 await changeIn("sections-list", flatten);
 byId.get("release").click();

@@ -30,7 +30,7 @@ const clone = value => structuredClone(value);
   const section = createSectionFromTimes(source, 10, 30, {
     id: "section-terrain",
     label: "Terrain Section",
-    weight: 2,
+    weighting: 2,
     groupId: terrain.id
   }).section;
   setGroupState(source, terrain.id, { visible: false, weightsEnabled: true });
@@ -182,11 +182,11 @@ const clone = value => structuredClone(value);
   const guide = createGuide("video-f");
   createSectionFromTimes(guide, 0, 30, {
     id: "section-expanded",
-    weight: 2
+    weighting: 2
   });
   createSectionFromTimes(guide, 15, 45, {
     id: "section-compressed",
-    weight: 0.5
+    weighting: 0.5
   });
   const session = createSession({
     duration: 60,

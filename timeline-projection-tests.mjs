@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {
-  SECTION_WEIGHT_VALUES,
+  SECTION_WEIGHTING_VALUES,
   createGuide,
   createSectionFromTimes,
   ensurePin,
@@ -8,7 +8,7 @@ import {
   normalizeGuide,
   previousPin,
   resolveSection,
-  setSectionWeight,
+  setSectionWeighting,
   validateGuide
 } from "./guide.js";
 import {
@@ -37,12 +37,12 @@ const close = (actual, expected, message = "values differ") => {
 };
 
 assert.deepEqual(
-  SECTION_WEIGHT_VALUES,
+  SECTION_WEIGHTING_VALUES,
   [0.125, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 4]
 );
 const invalidGuide = createGuide("invalid-weight");
 assert.throws(
-  () => createSectionFromTimes(invalidGuide, 10, 20, { weight: 0.6 }),
+  () => createSectionFromTimes(invalidGuide, 10, 20, { weighting: 0.6 }),
   /canonical timeline weight/
 );
 assert.deepEqual(
@@ -54,7 +54,7 @@ assert.deepEqual(
 const guide = createGuide("weighted-video");
 const compressed = createSectionFromTimes(guide, 30, 50, {
   label: "Compressed",
-  weight: 0.5
+  weighting: 0.5
 }).section;
 const projection = createTimelineProjection({ duration: 100, guide });
 
@@ -116,13 +116,13 @@ const compressedOverlap = createSectionFromTimes(
   overlapGuide,
   20,
   60,
-  { weight: 0.5 }
+  { weighting: 0.5 }
 ).section;
 const expandedOverlap = createSectionFromTimes(
   overlapGuide,
   40,
   80,
-  { weight: 2 }
+  { weighting: 2 }
 ).section;
 const overlap = createTimelineProjection({ duration: 100, guide: overlapGuide });
 assert.deepEqual(
@@ -142,7 +142,7 @@ assert.deepEqual(
 assert.equal(overlap.timelineExtent, 110);
 assert.deepEqual(
   [...new Set(overlap.segments.flatMap(segment => segment.sectionIds))].sort(),
-  overlap.weightedSections.map(section => section.id).sort(),
+  overlap.weightContributors.map(section => section.id).sort(),
   "The projection exposes the exact effective contributors used by its segments."
 );
 
@@ -158,7 +158,7 @@ const sectionBypass = createTimelineProjection({
   }
 });
 assert.deepEqual(
-  sectionBypass.weightedSections.map(section => section.id),
+  sectionBypass.weightContributors.map(section => section.id),
   [expandedOverlap.id]
 );
 assert.deepEqual(
@@ -173,15 +173,15 @@ assert.deepEqual(
     [80, 100, 1]
   ]
 );
-assert.equal(resolveSection(overlapGuide, compressedOverlap.id).weight, 0.5);
-assert.equal(resolveSection(overlapGuide, expandedOverlap.id).weight, 2);
+assert.equal(resolveSection(overlapGuide, compressedOverlap.id).weighting, 0.5);
+assert.equal(resolveSection(overlapGuide, expandedOverlap.id).weighting, 2);
 
 const wholeBypass = createTimelineProjection({
   duration: 100,
   guide: overlapGuide,
   weightRelaxation: { kind: "all" }
 });
-assert.deepEqual(wholeBypass.weightedSections, []);
+assert.deepEqual(wholeBypass.weightContributors, []);
 assert.deepEqual(
   wholeBypass.segments.map(segment => [
     segment.start,
@@ -207,11 +207,11 @@ assert.equal(staleBypass.weightRelaxation, null);
 assert.deepEqual(staleBypass.segments, overlap.segments);
 
 const coextensiveGuide = createGuide("coextensive");
-createSectionFromTimes(coextensiveGuide, 20, 60, { weight: 0.5 });
-createSectionFromTimes(coextensiveGuide, 20, 60, { weight: 0.5, label: "Second" });
+createSectionFromTimes(coextensiveGuide, 20, 60, { weighting: 0.5 });
+createSectionFromTimes(coextensiveGuide, 20, 60, { weighting: 0.5, label: "Second" });
 assert.equal(
   createTimelineProjection({ duration: 100, guide: coextensiveGuide })
-    .weightAtSource(40),
+    .effectiveWeightAtSource(40),
   0.25
 );
 
@@ -229,9 +229,9 @@ assert.equal(nextPin(guide, before.t, { start: 0, end: 100 }, projection).t, 30)
 assert.equal(previousPin(guide, after.t, { start: 0, end: 100 }, projection).t, 50);
 
 // Weight edits are the only Section deformation mutation.
-assert.equal(setSectionWeight(guide, compressed.id, 2).changed, true);
-assert.equal(resolveSection(guide, compressed.id).weight, 2);
-assert.equal(setSectionWeight(guide, compressed.id, 3).changed, false);
+assert.equal(setSectionWeighting(guide, compressed.id, 2).changed, true);
+assert.equal(resolveSection(guide, compressed.id).weighting, 2);
+assert.equal(setSectionWeighting(guide, compressed.id, 3).changed, false);
 
 let session = createSession({ duration: 100, current: 29 });
 let saved = saveExtentAsSection(session, { start: 30, end: 50 }, "Weighted");
@@ -247,7 +247,7 @@ const exactPin = ensurePin(session.model.guide, 40, { label: "Exact" }).pin;
 const navigated = goToGuidePin(session, exactPin.id);
 assert.equal(navigated.session.model.neighborhood.C, 40);
 assert.equal(
-  resolveSection(navigated.session.model.guide, saved.value.section.id).weight,
+  resolveSection(navigated.session.model.guide, saved.value.section.id).weighting,
   0.5,
   "Direct Guide navigation never mutates Section weight."
 );
@@ -289,8 +289,8 @@ const migrated = normalizeGuide({
 assert.equal(migrated.version, 10);
 assert.deepEqual(migrated.groups.map(group => group.id), ["group-default"]);
 assert.ok(migrated.sections.every(section => section.groupId === "group-default"));
-assert.equal(migrated.sections[0].weight, 0.25);
-assert.equal(migrated.sections[1].weight, 1);
+assert.equal(migrated.sections[0].weighting, 0.25);
+assert.equal(migrated.sections[1].weighting, 1);
 assert.equal("collapsed" in migrated.sections[0], false);
 assert.equal("collapsed" in migrated.sections[1], false);
 
@@ -313,10 +313,10 @@ assert.equal("collapsed" in migrated.sections[1], false);
   const nested = createGuide("round-trip");
   // Two compressions composing to 1/64, against an expansion of 16, so segments
   // on both sides are far shorter than the tolerance that used to be added.
-  createSectionFromTimes(nested, 3.2, 102.56, { weight: 0.125 });
-  createSectionFromTimes(nested, 83.98, 102.56, { weight: 0.125 });
-  createSectionFromTimes(nested, 102.56, 126.8, { weight: 4 });
-  createSectionFromTimes(nested, 103.37, 123.23, { weight: 4 });
+  createSectionFromTimes(nested, 3.2, 102.56, { weighting: 0.125 });
+  createSectionFromTimes(nested, 83.98, 102.56, { weighting: 0.125 });
+  createSectionFromTimes(nested, 102.56, 126.8, { weighting: 4 });
+  createSectionFromTimes(nested, 103.37, 123.23, { weighting: 4 });
   const projection = projectionForModel({
     duration, guide: nested, range, neighborhood: { C: 0 }, stepReach: null
   });

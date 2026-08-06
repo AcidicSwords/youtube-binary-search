@@ -5,7 +5,7 @@ import {
   createSectionFromTimes,
   groupDeletionPlan,
   setGroupState,
-  setSectionWeight
+  setSectionWeighting
 } from "./guide.js";
 import { OPERATOR_MATRIX, operatorCells } from "./operator-grammar.js";
 import {
@@ -278,11 +278,11 @@ lacks(session, /export function deformSection|DEFAULT_DEFORM_WEIGHT|applyDeformW
   const guide = createGuide("projection-audit");
   const expanded = createSectionFromTimes(guide, 2, 8, {
     id: "expanded",
-    weight: 2
+    weighting: 2
   }).section;
   const compressed = createSectionFromTimes(guide, 4, 6, {
     id: "compressed",
-    weight: 0.5
+    weighting: 0.5
   }).section;
   const weighted = createTimelineProjection({ duration: 10, guide });
   const sectionBypass = createTimelineProjection({
@@ -295,13 +295,13 @@ lacks(session, /export function deformSection|DEFAULT_DEFORM_WEIGHT|applyDeformW
     guide,
     weightRelaxation: { kind: "all" }
   });
-  check(weighted.weightAtSource(3) === 2, "Stored active Weight deforms the effective map.");
-  check(sectionBypass.weightAtSource(3) === 1, "A Section bypass removes only its target.");
-  check(sectionBypass.weightAtSource(5) === compressed.weight,
+  check(weighted.effectiveWeightAtSource(3) === 2, "Stored active Weight deforms the effective map.");
+  check(sectionBypass.effectiveWeightAtSource(3) === 1, "A Section bypass removes only its target.");
+  check(sectionBypass.effectiveWeightAtSource(5) === compressed.weighting,
     "An overlapping Section still contributes while its neighbor is bypassed.");
-  same(sectionBypass.weightedSections.map(section => section.id), [compressed.id],
+  same(sectionBypass.weightContributors.map(section => section.id), [compressed.id],
     "Projection exposes exactly its effective contributors.");
-  same(allBypass.weightedSections, [], "Whole-map bypass exposes no weighted contributors.");
+  same(allBypass.weightContributors, [], "Whole-map bypass exposes no weighted contributors.");
   check(allBypass.timelineExtent === 10 && allBypass.sourceToTimeline(7.25) === 7.25,
     "Whole-map bypass is the positive identity projection.");
   for (const source of [0, 1.25, 4.5, 8.75, 10]) {
@@ -310,7 +310,7 @@ lacks(session, /export function deformSection|DEFAULT_DEFORM_WEIGHT|applyDeformW
   }
 }
 const topographyRenderer = topLevelFunction(view, "renderTemporalTopography");
-has(topographyRenderer, /projection\.weightedSections/,
+has(topographyRenderer, /projection\.weightContributors/,
   "Atmosphere and sourceGridLines consume effective projection contributors.");
 lacks(topographyRenderer, /sortedSections\(|guide\(\)\.sections|state\(\)\.session\.model\.guide/,
   "Atmosphere does not reread raw stored Guide weights.");
@@ -329,7 +329,7 @@ has(topLevelFunction(appCode, "commitNativeGo"), /projection:\s*timelineProjecti
   "A paused native seek reconciles through the effective projection.");
 has(topLevelFunction(appCode, "startNativePlaybackSession"), /projection:\s*timelineProjection\(\)/,
   "Native Play reconciles its starting Address through the effective projection.");
-has(appCode, /dynamicRatePolicy|RATE_POLICY_KIND\.DYNAMIC[\s\S]*?timelineProjection\(\)\.weightAtSource/,
+has(appCode, /dynamicRatePolicy|RATE_POLICY_KIND\.DYNAMIC[\s\S]*?timelineProjection\(\)\.effectiveWeightAtSource/,
   "Explicit dynamic playback reads the effective projection.");
 has(topLevelFunction(appCode, "handleTimelineClick"), /state\.timelineSelection = null[\s\S]*?moveToAddress\(/,
   "Bare Timeline Go clears the acquired operand before moving.");
@@ -385,7 +385,7 @@ lacks(release, /guideSelection\s*=\s*null|weightRelaxation\s*=|focus\s*=|setRang
     observationPolicy: OBSERVATION_POLICY.CENTER_ONLY,
     ratePolicy: dynamicRatePolicy(),
     offeredRates: [0.25, 0.5, 1, 2, 4],
-    weight: 2,
+    weighting: 2,
     actualRate: 0.5
   });
   for (const continued of [retryPlaybackTransport(dynamic), rebasePlaybackTransport(dynamic, 0)]) {
@@ -508,11 +508,11 @@ has(appCode, /No saved Guide|no saved Guide|No Guide was saved|unreadable|damage
   setGroupState(guide, other.id, { visible: false, weightsEnabled: true });
   const hiddenActive = createTimelineProjection({ duration: 5, guide });
   check(guide.shownGroupId === null, "No Group drawn is a valid Guide state.");
-  check(hiddenActive.weightAtSource(2) === 1,
+  check(hiddenActive.effectiveWeightAtSource(2) === 1,
     "A hidden active 1x Section remains an effective contributor without changing density.");
-  setSectionWeight(guide, section.id, 2);
+  setSectionWeighting(guide, section.id, 2);
   const hiddenWeighted = createTimelineProjection({ duration: 5, guide });
-  check(hiddenWeighted.weightAtSource(2) === 2,
+  check(hiddenWeighted.effectiveWeightAtSource(2) === 2,
     "Hidden Group activity remains independent and contributes Weight.");
 }
 has(guideSource, /export function groupDeletionPlan\([\s\S]*?allowed[\s\S]*?reason[\s\S]*?heirGroupId[\s\S]*?movedSectionIds/,

@@ -26,9 +26,9 @@ import {
   renamePin,
   deletePin,
   sectionsForPin,
-  isSectionWeight,
-  normalizeSectionWeight,
-  setSectionWeight,
+  isSectionWeighting,
+  normalizeSectionWeighting,
+  setSectionWeighting,
   DEFAULT_GROUP_ID,
   shownGroup,
   createGroup,
@@ -1565,13 +1565,13 @@ export function deleteGuideGroup(session, groupId) {
 export function setGuideSectionWeight(session, sectionId, weight) {
   const section = resolveSection(session.model.guide, sectionId);
   if (!section) return unchanged(session, "missing-section");
-  if (!isSectionWeight(weight)) {
-    return unchanged(session, "invalid-section-weight");
+  if (!isSectionWeighting(weight)) {
+    return unchanged(session, "invalid-section-weighting");
   }
-  const nextWeight = normalizeSectionWeight(weight);
+  const nextWeight = normalizeSectionWeighting(weight);
   const label = `Set “${sectionDisplayName(section)}” to ${nextWeight}×`;
   return commit(session, label, draft => {
-    const value = setSectionWeight(draft.guide, sectionId, nextWeight);
+    const value = setSectionWeighting(draft.guide, sectionId, nextWeight);
     if (!value.changed) return value;
     return {
       changed: true,

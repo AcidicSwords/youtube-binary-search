@@ -54,11 +54,11 @@ function build() {
   const guide = createGuide("groups");
   const terrain = createGroup(guide, "Terrain");
   const detail = createSectionFromTimes(guide, 20, 60, {
-    weight: 2,
+    weighting: 2,
     groupId: DEFAULT_GROUP_ID
   }).section;
   const dead = createSectionFromTimes(guide, 70, 90, {
-    weight: 0.5,
+    weighting: 0.5,
     groupId: terrain.id
   }).section;
   return { guide, terrain, detail, dead };
@@ -86,7 +86,7 @@ function build() {
 
   const authored = createSectionFromTimes(guide, 10, 20, {
     label: "Authored here",
-    weight: 2
+    weighting: 2
   }).section;
   assert.equal(authored.groupId, group.id,
     "A new Section belongs to the visible working Group unless another Group is named explicitly.");
@@ -98,24 +98,24 @@ function build() {
   const terrain = createGroup(guide, "Terrain");
   const first = createSectionFromTimes(guide, 10, 30, {
     label: "Same",
-    weight: 0.5
+    weighting: 0.5
   });
   assert.equal(first.created, true);
   const detail = createGroup(guide, "Detail");
   const second = createSectionFromTimes(guide, 10, 30, {
     label: "Same",
-    weight: 0.5
+    weighting: 0.5
   });
   assert.equal(second.created, true,
     "The same retained relation in another Group is a separate deformation layer.");
   assert.notEqual(first.section.id, second.section.id);
   assert.notEqual(first.section.groupId, second.section.groupId);
-  assert.equal(createTimelineProjection({ duration: 40, guide }).weightAtSource(20), 0.25,
+  assert.equal(createTimelineProjection({ duration: 40, guide }).effectiveWeightAtSource(20), 0.25,
     "Active identical layers multiply rather than one replacing the other.");
 
   const duplicate = createSectionFromTimes(guide, 10, 30, {
     label: "Same",
-    weight: 0.5
+    weighting: 0.5
   });
   assert.equal(duplicate.created, false,
     "Repeating the same Section inside one Group resolves to its existing identity.");
@@ -260,7 +260,7 @@ function build() {
   createSectionFromTimes(guide, 10, 30, {
     label: "Same",
     groupId: terrain.id,
-    weight: 0.5
+    weighting: 0.5
   });
   const detail = createGroup(guide, "Detail");
   const session = createSession({ duration: DURATION, current: 20, guide });
@@ -278,10 +278,10 @@ function build() {
   const hidden = weighted.session.model.guide.sections.find(section =>
     section.groupId === terrain.id
   );
-  assert.equal(hidden.weight, 0.5);
+  assert.equal(hidden.weighting, 0.5);
   assert.equal(
     createTimelineProjection({ duration: DURATION, guide: weighted.session.model.guide })
-      .weightAtSource(20),
+      .effectiveWeightAtSource(20),
     1,
     "Guide Weight on the visible detail multiplies with hidden 0.5× terrain."
   );
@@ -303,10 +303,10 @@ function build() {
   const background = createGroup(guide, "Background");
   const hidden = createSectionFromTimes(guide, 10, 20, {
     groupId: background.id,
-    weight: 0.125
+    weighting: 0.125
   }).section;
   const visible = createGroup(guide, "Detail");
-  createSectionFromTimes(guide, 40, 60, { groupId: visible.id, weight: 2 });
+  createSectionFromTimes(guide, 40, 60, { groupId: visible.id, weighting: 2 });
   const hiddenStart = resolveSection(guide, hidden.id).startPin;
 
   assert.equal(orderedPins(guide).some(pin => pin.id === hiddenStart.id), false,
@@ -326,16 +326,16 @@ function build() {
 {
   const guide = createGuide("layered-topography");
   const terrain = createGroup(guide, "Terrain");
-  createSectionFromTimes(guide, 0, 15, { groupId: terrain.id, weight: 0.125 });
-  createSectionFromTimes(guide, 15, 45, { groupId: terrain.id, weight: 4 });
-  createSectionFromTimes(guide, 45, 60, { groupId: terrain.id, weight: 0.125 });
+  createSectionFromTimes(guide, 0, 15, { groupId: terrain.id, weighting: 0.125 });
+  createSectionFromTimes(guide, 15, 45, { groupId: terrain.id, weighting: 4 });
+  createSectionFromTimes(guide, 45, 60, { groupId: terrain.id, weighting: 0.125 });
   const detail = createGroup(guide, "Detail");
-  createSectionFromTimes(guide, 20, 30, { groupId: detail.id, weight: 2 });
+  createSectionFromTimes(guide, 20, 30, { groupId: detail.id, weighting: 2 });
 
   const projection = createTimelineProjection({ duration: 60, guide });
-  assert.equal(projection.weightAtSource(10), 0.125);
-  assert.equal(projection.weightAtSource(17), 4);
-  assert.equal(projection.weightAtSource(25), 8,
+  assert.equal(projection.effectiveWeightAtSource(10), 0.125);
+  assert.equal(projection.effectiveWeightAtSource(17), 4);
+  assert.equal(projection.effectiveWeightAtSource(25), 8,
     "Visible detail multiplies against hidden active terrain rather than replacing it.");
   const target = projection.stepTarget(14, 2.5, "forward", { start: 0, end: 60 });
   assert.ok(target > 15 && target < 16,
@@ -365,7 +365,7 @@ function build() {
 {
   const { guide, dead } = build();
   const before = extentOf(guide);
-  dead.weight = 0.125;
+  dead.weighting = 0.125;
   assert.notEqual(extentOf(guide), before,
     "A live Group has no stale state to reconcile.");
 }
@@ -395,11 +395,11 @@ function build() {
   const guide = createGuide("shared");
   const other = createGroup(guide, "Other");
   const first = createSectionFromTimes(guide, 10, 50, {
-    weight: 2,
+    weighting: 2,
     groupId: DEFAULT_GROUP_ID
   }).section;
   // A second Section reusing the same end Pin, in a different Group.
-  createSectionFromTimes(guide, 50, 90, { weight: 2, groupId: other.id });
+  createSectionFromTimes(guide, 50, 90, { weighting: 2, groupId: other.id });
   setGroupState(guide, DEFAULT_GROUP_ID, { visible: false });
   const visible = orderedPins(guide).map(pin => pin.t);
   assert.ok(visible.includes(50),

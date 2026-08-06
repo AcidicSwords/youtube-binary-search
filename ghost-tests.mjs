@@ -55,7 +55,7 @@ function worldFingerprint(model) {
   return JSON.stringify({
     pins: model.guide.pins.map(pin => [pin.id, pin.t, pin.kind]).sort(),
     sections: model.guide.sections.map(section => [
-      section.id, section.startPinId, section.endPinId, section.weight, section.label || null
+      section.id, section.startPinId, section.endPinId, section.weighting, section.label || null
     ]).sort(),
     groups: model.guide.groups.map(group => [
       group.id, group.label || null, group.weightsEnabled

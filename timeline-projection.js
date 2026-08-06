@@ -7,15 +7,15 @@
 // multiplication.
 import { EPSILON, clamp } from "./range-geometry.js";
 import {
-  DEFAULT_SECTION_WEIGHT,
-  normalizeSectionWeight,
+  DEFAULT_SECTION_WEIGHTING,
+  normalizeSectionWeighting,
   sortedSections,
   orderedPins,
   sectionWeightIsUsed
 } from "./guide.js";
 
 function activeWeight(section) {
-  return normalizeSectionWeight(section?.weight, DEFAULT_SECTION_WEIGHT);
+  return normalizeSectionWeighting(section?.weighting, DEFAULT_SECTION_WEIGHTING);
 }
 
 function sectionActsOnSegment(section, start, end) {
@@ -106,7 +106,7 @@ function buildSegments(duration, guide, weightRelaxation = null) {
   return {
     segments: Object.freeze(segments),
     timelineExtent: timeline,
-    weightedSections: Object.freeze(sections),
+    weightContributors: Object.freeze(sections),
     weightRelaxation: bypass
   };
 }
@@ -160,7 +160,7 @@ export function createTimelineProjection({
   const {
     segments,
     timelineExtent,
-    weightedSections,
+    weightContributors,
     weightRelaxation: effectiveWeightRelaxation
   } = buildSegments(end, guide, weightRelaxation);
 
@@ -227,7 +227,7 @@ export function createTimelineProjection({
     );
   }
 
-  function weightAtSource(value) {
+  function effectiveWeightAtSource(value) {
     const source = clamp(Number(value) || 0, 0, end);
     return findSourceSegment(segments, source)?.weight ?? 1;
   }
@@ -313,7 +313,7 @@ export function createTimelineProjection({
     fractionToDistance,
     withinView,
     segments,
-    weightedSections,
+    weightContributors,
     weightRelaxation: effectiveWeightRelaxation,
     sourceToTimeline,
     timelineToSource,
@@ -321,7 +321,7 @@ export function createTimelineProjection({
     timelineMidpoint,
     stepSourceByTimeline,
     stepTarget: stepSourceByTimeline,
-    weightAtSource,
+    effectiveWeightAtSource,
     projectExtent,
     orderedPinStops,
     metric

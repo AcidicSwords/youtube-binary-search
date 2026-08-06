@@ -247,7 +247,7 @@ An active Current, Range, Pin, or Section drag causes `X` to refuse safely. Pend
 
 ### 4.5 Atmosphere and sourceGridLines
 
-The deformation atmosphere is derived only from `projection.weightedSections` or an equivalent effective-contributor output. It never rereads raw active Guide weights independently.
+The deformation atmosphere is derived only from `projection.weightContributors` or an equivalent effective-contributor output. It never rereads raw active Guide weights independently.
 
 - Weight below `1×` contributes violet compression influence.
 - Weight above `1×` contributes teal expansion influence.

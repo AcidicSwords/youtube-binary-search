@@ -48,13 +48,13 @@ byId.get("section-retain-form").dispatch("submit");
 await flush();
 
 let sectionNodes = descendants(byId.get("sections-list"));
-let weightControl = sectionNodes.find(node => node.dataset.sectionWeight);
+let weightControl = sectionNodes.find(node => node.dataset.sectionWeighting);
 assert.ok(weightControl, "Every retained Section must expose its timeline weight.");
-const sectionId = weightControl.dataset.sectionWeight;
+const sectionId = weightControl.dataset.sectionWeighting;
 const guideWeightControl = () => descendants(byId.get("sections-list")).find(node =>
-  node.dataset.sectionWeight === sectionId
+  node.dataset.sectionWeighting === sectionId
 );
-const setSectionWeight = async value => {
+const setSectionWeighting = async value => {
   let control = guideWeightControl();
   if (!control) {
     const sectionMain = descendants(byId.get("sections-list")).find(node =>
@@ -77,7 +77,7 @@ assert.deepEqual(
 
 let timelineNodes = descendants(byId.get("section-lane"));
 assert.equal(
-  timelineNodes.some(node => node.dataset.sectionWeight === sectionId),
+  timelineNodes.some(node => node.dataset.sectionWeighting === sectionId),
   false,
   "Persistent tuning controls must not inflate Timeline Section lanes."
 );
@@ -275,7 +275,7 @@ assert.deepEqual(
 // Expansion uses the same control and the opposite field while preserving
 // exact source duration and invertibility.
 commandsBeforeWeight = playerCommandCounts();
-await setSectionWeight("2");
+await setSectionWeighting("2");
 await flush();
 assert.deepEqual(
   playerCommandCounts(),
@@ -296,7 +296,7 @@ assert.ok(
 
 // Restoring 1× recovers the identity timeline exactly.
 commandsBeforeWeight = playerCommandCounts();
-await setSectionWeight("1");
+await setSectionWeighting("1");
 await flush();
 assert.deepEqual(
   playerCommandCounts(),
@@ -333,7 +333,7 @@ await flush();
 dispatchDocument("keydown", { key: "x", code: "KeyX", altKey: true });
 await flush();
 assert.equal(byId.get("sections-list-count").textContent, "1");
-await setSectionWeight("1");
+await setSectionWeighting("1");
 await flush();
 
 // Tag creates a Section; its Weight is then assigned in Guide without handing
@@ -352,7 +352,7 @@ byId.get("section-retain-form").dispatch("submit");
 await flush(3);
 {
   const select = descendants(byId.get("sections-list"))
-    .find(node => node.dataset.sectionWeight !== undefined);
+    .find(node => node.dataset.sectionWeighting !== undefined);
   select.value = "0.75";
   byId.get("sections-list").dispatch("change", { target: select });
   await env.delay(350);
@@ -372,7 +372,7 @@ assert.equal(
 // X bypasses deformation: the complete map is drawn and measured as if the
 // Weights were neutral while every stored Weight remains untouched.
 const weightsBeforeBypass = descendants(byId.get("sections-list"))
-  .filter(node => node.dataset.sectionWeight !== undefined)
+  .filter(node => node.dataset.sectionWeighting !== undefined)
   .map(node => node.value);
 const historyBeforeBypass = byId.get("return-meta").textContent;
 
@@ -382,7 +382,7 @@ assert.equal(byId.get("duration-time").textContent, "1:40",
   "A complete deformation bypass draws the map straight.");
 assert.deepEqual(
   descendants(byId.get("sections-list"))
-    .filter(node => node.dataset.sectionWeight !== undefined)
+    .filter(node => node.dataset.sectionWeighting !== undefined)
     .map(node => node.value),
   weightsBeforeBypass,
   "and changes no Weight, because it is a way of looking rather than an edit.");
@@ -414,7 +414,7 @@ byId.get("center-transport-surface").click();
 await flush(3);
 assert.equal(center().state, 1);
 commandsBeforeWeight = playerCommandCounts();
-await setSectionWeight("0.5");
+await setSectionWeighting("0.5");
 await flush();
 assert.equal(center().state, 1);
 assert.deepEqual(
@@ -427,7 +427,7 @@ assert.deepEqual(
 // retention position; deformation bypass is a separate auxiliary operation.
 {
   const select = () => descendants(byId.get("sections-list"))
-    .find(node => node.dataset.sectionWeight !== undefined);
+    .find(node => node.dataset.sectionWeighting !== undefined);
   const before = select().value;
   const control = select();
   control.value = "1.5";
@@ -462,7 +462,7 @@ assert.deepEqual(
 
   // At neutral Weight the map and the source correspond, so the announced span
   // is the plain configured distance.
-  await setSectionWeight("1");
+  await setSectionWeighting("1");
   await flush();
   byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 100 });
   await flush();
@@ -476,7 +476,7 @@ assert.deepEqual(
 
   // Inside a 2x Section the same map distance covers half the source time, and
   // the announced span must follow the destination rather than the setting.
-  await setSectionWeight("2");
+  await setSectionWeighting("2");
   await flush();
   byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 400 });
   await flush();
@@ -512,8 +512,8 @@ assert.deepEqual(
   byId.get("retain").dispatch("click", { shiftKey: true });
   await flush(3);
   const overlapWeight = descendants(byId.get("sections-list")).find(node =>
-    node.dataset.sectionWeight
-    && node.dataset.sectionWeight !== sectionId
+    node.dataset.sectionWeighting
+    && node.dataset.sectionWeighting !== sectionId
   );
   assert.ok(overlapWeight, "The asymmetric overlap must be retained.");
   overlapWeight.value = "4";

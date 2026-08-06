@@ -50,7 +50,7 @@ function build() {
   const terrain = createGroup(guide, "Terrain");
   const terrainSection = createSectionFromTimes(guide, 70, 90, {
     groupId: terrain.id,
-    weight: 2
+    weighting: 2
   }).section;
 
   return {
@@ -308,7 +308,7 @@ const visibleIds = guide => guide.groups
         startPinId: "pin-a",
         endPinId: "pin-b",
         label: "Argument",
-        weight: 2,
+        weighting: 2,
         groupId: "group-terrain",
         createdAt: 7,
         updatedAt: 7
@@ -352,7 +352,7 @@ const visibleIds = guide => guide.groups
   const section = migrated.sections.find(entry => entry.id === "sec-1");
   assert.ok(section, "The Section identity survives.");
   assert.equal(section.groupId, "group-terrain", "with its Group membership,");
-  assert.equal(section.weight, 2, "its Weight,");
+  assert.equal(section.weighting, 2, "its Weight,");
   assert.equal(section.label, "Argument", "and its title.");
   assert.equal(section.startPinId, "pin-a", "Its endpoints are the same Pins.");
   assert.equal(section.endPinId, "pin-b");
@@ -372,8 +372,8 @@ const visibleIds = guide => guide.groups
     migrated.groups.map(group => [group.id, group.weightsEnabled, group.label])
   );
   assert.deepEqual(
-    again.sections.map(entry => [entry.id, entry.groupId, entry.weight]),
-    migrated.sections.map(entry => [entry.id, entry.groupId, entry.weight])
+    again.sections.map(entry => [entry.id, entry.groupId, entry.weighting]),
+    migrated.sections.map(entry => [entry.id, entry.groupId, entry.weighting])
   );
 }
 
@@ -409,7 +409,7 @@ const visibleIds = guide => guide.groups
     Object.fromEntries(migrated.groups.map(group => [group.id, group.weightsEnabled])),
     { [DEFAULT_GROUP_ID]: true, "group-terrain": false },
     "Activity crosses unchanged.");
-  assert.equal(migrated.sections.find(entry => entry.id === "sec-1").weight, 2,
+  assert.equal(migrated.sections.find(entry => entry.id === "sec-1").weighting, 2,
     "and Weight crosses unchanged.");
 
   // "Draw nothing" is a choice, written as a null id; it survives under either
@@ -430,7 +430,7 @@ const visibleIds = guide => guide.groups
 
   // A second active layer over the same source multiplies with the first.
   const overlay = createGroup(guide, "Overlay");
-  createSectionFromTimes(guide, 70, 90, { groupId: overlay.id, weight: 2 });
+  createSectionFromTimes(guide, 70, 90, { groupId: overlay.id, weighting: 2 });
   // 20 s of source under two active 2x layers is drawn at 4x: 80 s of map in
   // place of 20 s, so the whole map is 100 - 20 + 80.
   assert.equal(extentOf(guide), DURATION - 20 + 80,

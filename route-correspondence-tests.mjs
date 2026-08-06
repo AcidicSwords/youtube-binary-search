@@ -45,7 +45,7 @@ function readCanonical(env) {
         return [
           Number(start.toFixed(4)),
           Number(end.toFixed(4)),
-          section.weight,
+          section.weighting,
           section.label || "",
           group?.label || ""
         ];

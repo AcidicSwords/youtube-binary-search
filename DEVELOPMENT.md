@@ -89,7 +89,7 @@ owner. Do not reach through the media adapter from application or Field code.
 - Every effective factor is positive.
 - Active overlapping Section factors compose by multiplication without
   priority.
-- `projection.weightedSections` is the authority for atmosphere as well as
+- `projection.weightContributors` is the authority for atmosphere as well as
   geometry.
 - Deformation bypass is passed into projection construction and is never
   written into Guide or history.

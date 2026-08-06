@@ -315,7 +315,7 @@ await flush();
 assert.equal(byId.get("sections-list-count").textContent, "1");
 const sectionNodes = descendants(byId.get("sections-list"));
 assert.ok(sectionNodes.some(node => node.textContent.startsWith("Quarter to middle")));
-assert.ok(sectionNodes.some(node => node.dataset.sectionWeight), "Saved Sections must expose timeline weight.");
+assert.ok(sectionNodes.some(node => node.dataset.sectionWeighting), "Saved Sections must expose timeline weight.");
 assert.ok(sectionNodes.some(node => node.dataset.focusSection), "Saved Sections must expose Focus.");
 assert.ok(sectionNodes.some(node => node.dataset.renameSection), "Rename must sit beside the Section title.");
 assert.ok(sectionNodes.some(node => node.dataset.deleteSection), "Delete must sit beside the Section title.");
@@ -331,25 +331,25 @@ assert.equal(
 
 // Editing a selected Section must preserve its operational selection so another
 // weight, endpoint, Focus, Rename, or Delete action remains immediately available.
-const weightControl = sectionNodes.find(node => node.dataset.sectionWeight);
+const weightControl = sectionNodes.find(node => node.dataset.sectionWeighting);
 weightControl.value = "0.75";
 byId.get("sections-list").dispatch("change", { target: weightControl });
 await flush();
 const controlsAfterWeight = descendants(byId.get("sections-list"));
-assert.ok(controlsAfterWeight.some(node => node.dataset.sectionWeight));
+assert.ok(controlsAfterWeight.some(node => node.dataset.sectionWeighting));
 assert.ok(controlsAfterWeight.some(node => node.dataset.addressInput === "section-start"),
   "A selected Section keeps its exact Address controls across consecutive edits.");
 assert.match(
-  controlsAfterWeight.find(node => node.dataset.sectionWeight).value,
+  controlsAfterWeight.find(node => node.dataset.sectionWeighting).value,
   /0\.75/
 );
-const secondWeightControl = controlsAfterWeight.find(node => node.dataset.sectionWeight);
+const secondWeightControl = controlsAfterWeight.find(node => node.dataset.sectionWeighting);
 secondWeightControl.value = "1";
 byId.get("sections-list").dispatch("change", { target: secondWeightControl });
 await flush();
 assert.equal(
   descendants(byId.get("sections-list"))
-    .find(node => node.dataset.sectionWeight)
+    .find(node => node.dataset.sectionWeighting)
     .value,
   "1",
   "A selected Section must accept consecutive edits without reselection."
@@ -610,7 +610,7 @@ assert.equal(
   "After an endpoint edit displaces the retained midpoint from Current, the Viewer must return to Current-centered Step."
 );
 assert.ok(
-  descendants(byId.get("sections-list")).some(node => node.dataset.sectionWeight),
+  descendants(byId.get("sections-list")).some(node => node.dataset.sectionWeighting),
   "Endpoint drag must preserve the parent Section's operational controls."
 );
 dispatchDocument("keydown", { key: "z", code: "KeyZ" });
@@ -642,7 +642,7 @@ assert.ok(
   "An exact Address edit commits the same extent the Timeline drag would."
 );
 assert.ok(
-  descendants(byId.get("sections-list")).some(node => node.dataset.sectionWeight),
+  descendants(byId.get("sections-list")).some(node => node.dataset.sectionWeighting),
   "Exact editing must retain the Section as the operational object."
 );
 dispatchDocument("keydown", { key: "z", code: "KeyZ" });

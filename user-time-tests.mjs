@@ -197,7 +197,7 @@ function walk(userTime, ghostRead, direction, limit = 40) {
   // the reader is looking at now, while the endpoints it was watched between
   // remain exactly what they were.
   const guide = createGuide("weighted");
-  createSectionFromTimes(guide, 30, 40, { weight: 4 });
+  createSectionFromTimes(guide, 30, 40, { weighting: 4 });
   const weighted = projectionForModel({
     duration: DURATION,
     guide,

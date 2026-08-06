@@ -10,7 +10,7 @@ export const PIN_KIND = Object.freeze({
 // nearly out of the way, 4 to open one far past ordinary inspection. Nothing
 // between 2 and 4, or below 0.125, earns its place on a ladder that must stay
 // steppable one press at a time.
-export const SECTION_WEIGHT_VALUES = Object.freeze([
+export const SECTION_WEIGHTING_VALUES = Object.freeze([
   0.125,
   0.25,
   0.5,
@@ -22,25 +22,25 @@ export const SECTION_WEIGHT_VALUES = Object.freeze([
   2,
   4
 ]);
-export const DEFAULT_SECTION_WEIGHT = 1;
+export const DEFAULT_SECTION_WEIGHTING = 1;
 
-export function isSectionWeight(value) {
+export function isSectionWeighting(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric)
-    && SECTION_WEIGHT_VALUES.some(weight => Math.abs(weight - numeric) <= EPSILON);
+    && SECTION_WEIGHTING_VALUES.some(weight => Math.abs(weight - numeric) <= EPSILON);
 }
 
-export function normalizeSectionWeight(value, fallback = DEFAULT_SECTION_WEIGHT) {
+export function normalizeSectionWeighting(value, fallback = DEFAULT_SECTION_WEIGHTING) {
   const numeric = Number(value);
   if (Number.isFinite(numeric)) {
-    const exact = SECTION_WEIGHT_VALUES.find(
+    const exact = SECTION_WEIGHTING_VALUES.find(
       weight => Math.abs(weight - numeric) <= EPSILON
     );
     if (exact !== undefined) return exact;
   }
-  return isSectionWeight(fallback)
+  return isSectionWeighting(fallback)
     ? Number(fallback)
-    : DEFAULT_SECTION_WEIGHT;
+    : DEFAULT_SECTION_WEIGHTING;
 }
 
 function makeId(prefix) {
@@ -658,8 +658,8 @@ export function createSection(guide, startPinId, endPinId, options = {}) {
   const [start, end] = first.t < second.t ? [first, second] : [second, first];
   if (!(end.t > start.t + EPSILON)) throw new RangeError("A Section requires distinct Pins.");
 
-  const requestedWeight = options.weight ?? DEFAULT_SECTION_WEIGHT;
-  if (!isSectionWeight(requestedWeight)) {
+  const requestedWeight = options.weighting ?? DEFAULT_SECTION_WEIGHTING;
+  if (!isSectionWeighting(requestedWeight)) {
     throw new RangeError("A Section requires a canonical timeline weight.");
   }
   const label = String(options.label || options.title || "").trim();
@@ -682,7 +682,7 @@ export function createSection(guide, startPinId, endPinId, options = {}) {
     startPinId: start.id,
     endPinId: end.id,
     label,
-    weight: normalizeSectionWeight(requestedWeight),
+    weighting: normalizeSectionWeighting(requestedWeight),
     groupId: group.id,
     provenance: options.provenance || null,
     createdAt,
@@ -697,7 +697,7 @@ export function createSectionFromTimes(guide, start, end, options = {}) {
   const A = clamp(Math.min(start, end), 0, Number.POSITIVE_INFINITY);
   const B = clamp(Math.max(start, end), 0, Number.POSITIVE_INFINITY);
   if (!(B > A + EPSILON)) throw new RangeError("A Section requires positive duration.");
-  if (options.weight !== undefined && !isSectionWeight(options.weight)) {
+  if (options.weighting !== undefined && !isSectionWeighting(options.weighting)) {
     throw new RangeError("A Section requires a canonical timeline weight.");
   }
 
@@ -735,21 +735,21 @@ export function renameSection(guide, sectionId, label) {
   return section;
 }
 
-export function setSectionWeight(guide, sectionId, weight) {
+export function setSectionWeighting(guide, sectionId, weight) {
   const section = guide.sections.find(item => item.id === sectionId);
   if (!section) return { changed: false, reason: "missing-section" };
-  if (!isSectionWeight(weight)) {
-    return { changed: false, reason: "invalid-section-weight" };
+  if (!isSectionWeighting(weight)) {
+    return { changed: false, reason: "invalid-section-weighting" };
   }
-  const next = normalizeSectionWeight(weight);
-  if (Math.abs(section.weight - next) <= EPSILON) {
+  const next = normalizeSectionWeighting(weight);
+  if (Math.abs(section.weighting - next) <= EPSILON) {
     return {
       changed: false,
-      reason: "unchanged-section-weight",
+      reason: "unchanged-section-weighting",
       section: resolveSection(guide, section)
     };
   }
-  section.weight = next;
+  section.weighting = next;
   section.updatedAt = now();
   guide.updatedAt = section.updatedAt;
   return {
@@ -1086,11 +1086,11 @@ export function normalizeGuide(parsed, videoId) {
       startPinId,
       endPinId,
       label: String(source.label || "").trim(),
-      weight: sourceVersion >= 7
-        ? normalizeSectionWeight(source.weight)
+      weighting: sourceVersion >= 7
+        ? normalizeSectionWeighting(source.weighting ?? source.weight)
         : source.collapsed === true
           ? 0.25
-          : normalizeSectionWeight(source.weight),
+          : normalizeSectionWeighting(source.weighting ?? source.weight),
       groupId: source.groupId || DEFAULT_GROUP_ID,
       provenance: source.provenance || null,
       createdAt: Number(source.createdAt) || now(),
@@ -1201,7 +1201,7 @@ export function validateGuide(guide, duration) {
       || !section.endPinId
       || !section.groupId
       || !groupIds.has(section.groupId)
-      || !isSectionWeight(section.weight)
+      || !isSectionWeighting(section.weighting)
       || !Number.isFinite(section.createdAt)
       || !Number.isFinite(section.updatedAt)
       || !resolveSection(guide, section)
@@ -1352,9 +1352,9 @@ export function sanitizeGuide(input, videoId, duration) {
       startPinId,
       endPinId,
       label,
-      weight: normalizeSectionWeight(
-        sourceSection.weight,
-        sourceSection.collapsed === true ? 0.25 : DEFAULT_SECTION_WEIGHT
+      weighting: normalizeSectionWeighting(
+        sourceSection.weighting ?? sourceSection.weight,
+        sourceSection.collapsed === true ? 0.25 : DEFAULT_SECTION_WEIGHTING
       ),
       groupId,
       provenance: sourceSection.provenance || null,

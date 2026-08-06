@@ -16,7 +16,7 @@ import {
 } from "./range-geometry.js";
 import {
   PIN_KIND,
-  SECTION_WEIGHT_VALUES,
+  SECTION_WEIGHTING_VALUES,
   DEFAULT_GROUP_ID,
   findPinAt,
   getPin,
@@ -631,7 +631,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     // Atmosphere and geometry consume the same compiled contributors. Reading
     // raw Guide weights here would leave colour behind after geometry had been
     // straightened and would make the map contradict itself.
-    const sections = projection.weightedSections;
+    const sections = projection.weightContributors;
     const atmosphere = document.createElement("span");
     atmosphere.className = "weight-gradient";
     const samples = 80;
@@ -644,7 +644,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       const signedDensity = sections.reduce(
         (sum, section) =>
           sum
-          + Math.log2(section.weight)
+          + Math.log2(section.weighting)
           * weightInfluence(section, coordinate, projection),
         0
       );
@@ -885,7 +885,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       }));
     const sectionKey = sortedSections(guide())
       .map(section =>
-        `${section.id}:${section.start}:${section.end}:${section.weight}:${section.label}`
+        `${section.id}:${section.start}:${section.end}:${section.weighting}:${section.label}`
         + `:${sectionIsVisible(guide(), section) ? "v" : "h"}`
         + `:${sectionWeightIsUsed(guide(), section) ? "a" : "i"}`
       )
@@ -1023,7 +1023,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     for (const key of [
       "nudgeTarget",
       "addressInput",
-      "sectionWeight",
+      "sectionWeighting",
       "sectionGroup",
       "sectionGo",
       "pinGo",
@@ -1140,8 +1140,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         item.className = "guide-item section-item";
         item.dataset.sectionPreviewId = section.id;
         if (section.id === focusedId) item.classList.add("focused");
-        if (section.weight < 1 - EPSILON) item.classList.add("compressed");
-        else if (section.weight > 1 + EPSILON) item.classList.add("expanded");
+        if (section.weighting < 1 - EPSILON) item.classList.add("compressed");
+        else if (section.weighting > 1 + EPSILON) item.classList.add("expanded");
         if (selected) item.classList.add("retained-selected");
         if (endpointSelected && !selected) item.classList.add("extent-selected");
         setStyleProperty(item, "--section-color", sectionColor(section.id));
@@ -1161,7 +1161,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         time.textContent = [
           formatRange(section),
           formatDuration(section.end - section.start),
-          `${section.weight}×`
+          `${section.weighting}×`
         ].join(" · ");
         const profile = document.createElement("span");
         profile.className = "guide-section-profile";
@@ -1199,22 +1199,22 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           focus.textContent = "Focus";
         }
         const weightControl = document.createElement("label");
-        weightControl.className = "guide-section-weight";
+        weightControl.className = "guide-section-weighting";
         const weightLabel = document.createElement("span");
         weightLabel.textContent = "Weight";
         const weightSelect = document.createElement("select");
-        weightSelect.dataset.sectionWeight = section.id;
+        weightSelect.dataset.sectionWeighting = section.id;
         weightSelect.setAttribute(
           "aria-label",
           `${sectionLabel(section)} timeline weight`
         );
-        for (const optionWeight of SECTION_WEIGHT_VALUES) {
+        for (const optionWeight of SECTION_WEIGHTING_VALUES) {
           const option = document.createElement("option");
           option.value = String(optionWeight);
           option.textContent = `${optionWeight}×`;
           weightSelect.appendChild(option);
         }
-        weightSelect.value = String(section.weight);
+        weightSelect.value = String(section.weighting);
         weightControl.append(weightLabel, weightSelect);
         // A Section's Group sits with its Weight: both say how this Section
         // takes part in the map, and both are chosen from a fixed set.

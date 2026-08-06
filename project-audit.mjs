@@ -269,7 +269,7 @@ for (const implementationLaw of [
   /## Field Frame and Field Breath/
 ]) has(docs["IMPLEMENTATION.md"], implementationLaw,
   `IMPLEMENTATION describes ${implementationLaw}.`);
-has(docs["IMPLEMENTATION.md"], /projection\.weightedSections|effective contributors/i,
+has(docs["IMPLEMENTATION.md"], /projection\.weightContributors|effective contributors/i,
   "IMPLEMENTATION says atmosphere consumes effective projection contributors.");
 has(docs["IMPLEMENTATION.md"], /Guide persistence is source-keyed under version 10/i,
   "IMPLEMENTATION names the exact current Guide persistence version.");

@@ -241,7 +241,7 @@ assert.deepEqual(rateSelect.options.map(option => Number(option.value)),
 assert.equal(rateSelect.value, "2",
   "and the remembered wish returns to the rate it asked for.");
 
-// Following weight: the rate is read off the map at the Address being watched,
+// Following weighting: the rate is read off the map at the Address being watched,
 // so it changes as playback crosses Section boundaries. Weight says how much
 // attention ground is owed; rate runs opposite to it.
 {
@@ -262,7 +262,7 @@ assert.equal(rateSelect.value, "2",
   await env.delay(350); await flush(3);
   // Weight is assigned in the Guide, where the value lives.
   const weightSelect = descendants(byId.get("sections-list"))
-    .find(node => node.dataset.sectionWeight !== undefined);
+    .find(node => node.dataset.sectionWeighting !== undefined);
   weightSelect.value = "2";
   byId.get("sections-list").dispatch("change", { target: weightSelect });
   await env.delay(350);

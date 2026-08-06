@@ -55,11 +55,11 @@ const close = (actual, expected, tolerance = 1e-9) => {
   const guide = createGuide("midpoint-video");
   const whole = createSectionFromTimes(guide, 0, 20, {
     label: "Whole",
-    weight: 1
+    weighting: 1
   }).section;
   createSectionFromTimes(guide, 0, 10, {
     label: "Compressed first half",
-    weight: 0.5
+    weighting: 0.5
   });
   const projection = createTimelineProjection({ duration: 20, guide });
   const resolved = resolveSection(guide, whole.id);

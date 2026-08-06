@@ -23,7 +23,7 @@ const sectionRows = () => descendants(byId.get("sections-list"))
   .filter(node => node.dataset.sectionGo);
 const inSections = key => descendants(byId.get("sections-list"))
   .filter(node => node.dataset[key] !== undefined);
-const weightValue = () => inSections("sectionWeight")[0]?.value;
+const weightValue = () => inSections("sectionWeighting")[0]?.value;
 const undoTop = () => byId.get("return-meta").textContent;
 const press = async (key, options = {}) => {
   dispatchDocument("keydown", {
@@ -155,7 +155,7 @@ await flush();
 assert.equal(weightValue(), "1", "The Section starts at neutral Weight.");
 
 {
-  const selector = inSections("sectionWeight")[0];
+  const selector = inSections("sectionWeighting")[0];
   selector.value = "4";
   byId.get("sections-list").dispatch("change", { target: selector });
   await delay(350);

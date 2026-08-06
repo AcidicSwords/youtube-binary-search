@@ -2050,7 +2050,7 @@ function startFieldPlaybackFromGesture(options = {}) {
       : OBSERVATION_POLICY.PANORAMA,
     ratePolicy,
     offeredRates: offeredRates(),
-    weight: timelineProjection().weightAtSource(destination),
+    weight: timelineProjection().effectiveWeightAtSource(destination),
     actualRate: snapshot.rate
   });
   // Tail and Lead hold their offset from Center by sitting one rate rung either
@@ -2129,7 +2129,7 @@ function wrapPlaybackRange() {
     state.transport,
     resolvePlaybackRate(state.transport, {
       offeredRates: offeredRates(),
-      weight: timelineProjection().weightAtSource(range.start)
+      weight: timelineProjection().effectiveWeightAtSource(range.start)
     })
   );
   placePlayer(range.start);
@@ -2217,7 +2217,7 @@ function leaveSection() {
   });
 }
 
-function changeSectionWeight(sectionId, weight) {
+function changeSectionWeighting(sectionId, weight) {
   const section = resolveSection(guide(), sectionId);
   if (!section) return false;
   const name = sectionName(section);
@@ -2227,8 +2227,8 @@ function changeSectionWeight(sectionId, weight) {
     Number(weight)
   );
   if (!result.changed) {
-    if (result.reason === "unchanged-section-weight") {
-      setStatus(`“${name}” already has ${section.weight}× timeline weight.`);
+    if (result.reason === "unchanged-section-weighting") {
+      setStatus(`“${name}” already has ${section.weighting}× timeline weight.`);
     } else {
       setStatus("Choose a valid Section weight.", true);
     }
@@ -2240,9 +2240,9 @@ function changeSectionWeight(sectionId, weight) {
   accept(result, {
     effect: false,
     renderGuide: true,
-    status: next.weight === 1
+    status: next.weighting === 1
       ? `Restored “${name}” to ordinary timeline density.`
-      : `Set “${name}” to ${next.weight}× timeline weight.`
+      : `Set “${name}” to ${next.weighting}× timeline weight.`
   });
   return true;
 }
@@ -3246,7 +3246,7 @@ function pollPlayer() {
     ) {
       const desired = resolvePlaybackRate(state.transport, {
         offeredRates: offeredRates(),
-        weight: timelineProjection().weightAtSource(safeCurrentTime())
+        weight: timelineProjection().effectiveWeightAtSource(safeCurrentTime())
       });
       if (desired !== state.transport.requestedRate) {
         state.transport = withPlaybackRequestedRate(state.transport, desired);
@@ -3268,7 +3268,7 @@ function pollPlayer() {
   ) {
     const desired = resolvePlaybackRate(transport, {
       offeredRates: offeredRates(),
-      weight: timelineProjection().weightAtSource(now)
+      weight: timelineProjection().effectiveWeightAtSource(now)
     });
     if (desired !== transport.requestedRate) {
       state.transport = withPlaybackRequestedRate(transport, desired);
@@ -3314,7 +3314,7 @@ function pollPlayer() {
           state.transport,
           resolvePlaybackRate(state.transport, {
             offeredRates: offeredRates(),
-            weight: timelineProjection().weightAtSource(entry)
+            weight: timelineProjection().effectiveWeightAtSource(entry)
           })
         );
         transport = state.transport;
@@ -5804,7 +5804,7 @@ function retuneActiveShiftPlayback() {
       : fixedRatePolicy(state.playbackRate),
     {
       offeredRates: offeredRates(),
-      weight: timelineProjection().weightAtSource(safeCurrentTime())
+      weight: timelineProjection().effectiveWeightAtSource(safeCurrentTime())
     }
   );
   if (state.transport.requestedRate !== previousRate) {
@@ -6313,9 +6313,9 @@ function handleGuideClick(event) {
 
 elements["sections-list"].addEventListener("click", handleGuideClick);
 elements["sections-list"].addEventListener("change", event => {
-  const control = event.target.closest("[data-section-weight]");
+  const control = event.target.closest("[data-section-weighting]");
   if (control) {
-    changeSectionWeight(control.dataset.sectionWeight, control.value);
+    changeSectionWeighting(control.dataset.sectionWeighting, control.value);
     return;
   }
   applyGuideAddressInput(event.target.closest("[data-address-input]"));
