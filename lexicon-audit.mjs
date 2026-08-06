@@ -29,7 +29,9 @@ const SCANNED_EXTENSIONS = new Set([".js", ".mjs", ".css", ".html", ".md"]);
 // Files that are allowed to name retired terms, because naming them is their
 // job: the authority that lists them as forbidden, and this audit that hunts
 // for them.
-const EXEMPT_FILES = new Set(["LEXICON.md", "lexicon-audit.mjs"]);
+// HANDOFF.md documents the not-yet-renamed retired terms on purpose; it is
+// exempt like LEXICON.md, and is deleted (with this entry) when that work lands.
+const EXEMPT_FILES = new Set(["LEXICON.md", "lexicon-audit.mjs", "HANDOFF.md"]);
 
 const SKIP_DIRS = new Set(["node_modules", ".git"]);
 
