@@ -1291,22 +1291,17 @@ function retainedCarryStatus(result) {
     : "";
 }
 
-// What the reader actually watched, as directed spans.
+// What the reader voluntarily watched in ordinary Playback, as directed spans.
 //
 // The span is built from the transport's own departure and cycles, not from the
 // Active Span it happened to leave behind: an Interval describes an extent
 // and a wrapped playback crosses its material repeatedly, so inferring one span
 // from the final geometry would lose both the repetition and the direction.
 //
-// The programmatic return from Context back to semantic Current is deliberately
-// not recorded. The adapter being told where to sit afterwards is a consequence
-// of the observation, not a second observation.
-function recordObservedSpans(transport, current) {
-  if (!isTransportActive(transport)) return false;
-  // A Context window superseded by the next Ghost candidate is part of the scan,
-  // not a watched span. The reader is sweeping through moments to find one; only
-  // what they were still watching when the gesture ended is an observation they
-  // actually made.
+// Automatic Context recognizes a Current already reached. Neither its window
+// nor the programmatic return from Cursor to Current is another traversal.
+function recordPlaybackSpans(transport, current) {
+  if (transport?.kind !== TRANSPORT_KIND.PLAYBACK) return false;
   if (state.ghostGesture) return false;
   const departure = Number(transport.entry ?? transport.departure);
   const end = Number(current);
@@ -1326,10 +1321,7 @@ function recordObservedSpans(transport, current) {
   } else {
     spans.push({ from: departure, to: end });
   }
-  return recordTraversalSpans(
-    spans,
-    transport.kind === TRANSPORT_KIND.CONTEXT ? "context" : "playback"
-  );
+  return recordTraversalSpans(spans, "playback");
 }
 
 function settleTransport(options = {}) {
@@ -1341,10 +1333,6 @@ function settleTransport(options = {}) {
   const handoffPanorama = options.handoffPanorama === true;
   const shouldRender = options.render !== false;
   const current = clamp(safeCurrentTime(), activeRange().start, activeRange().end);
-  // Watched source time, recorded as what was actually observed rather than as
-  // one span inferred from where it finished. A wrapped Range crosses its
-  // material more than once, and each crossing is its own directed span.
-  recordObservedSpans(active, current);
   const cancelPendingStart = issuePause && active.phase === "starting";
   if (cancelPendingStart) {
     centerPauseRequest = {
@@ -1370,6 +1358,9 @@ function settleTransport(options = {}) {
   }
 
   if (active.kind === TRANSPORT_KIND.PLAYBACK) {
+    // Voluntary watched source time enters the Trace. A wrapped Range crosses
+    // its material more than once, and each crossing remains directed.
+    recordPlaybackSpans(active, current);
     // Ordinary pause freezes the visible Panorama once. A direct handoff skips
     // that intermediate formation because the next transport will establish
     // its own Panorama around the newly settled Current in the same action.

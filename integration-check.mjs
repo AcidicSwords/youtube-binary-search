@@ -433,10 +433,15 @@ has(topLevelFunction(appCode, "flushPendingStep"), /recordTraversalSequence\(pen
 has(topLevelFunction(appCode, "settleNudgeGesture"),
   /target\?\.kind === "current"[\s\S]{0,160}?recordTraversalSequence\(gesture\.traversalPoints/,
   "A Nudge writes a traversal only when Current itself moved.");
-has(topLevelFunction(appCode, "settleTransport"), /recordObservedSpans\(active, current\)/,
-  "Watched source time is recorded as spans, so Ghost can recall inside it.");
-has(topLevelFunction(appCode, "recordObservedSpans"), /transport\.cycles[\s\S]*spans\.push/,
-  "and a wrapped Range contributes one directed span per crossing.");
+const settleTransport = topLevelFunction(appCode, "settleTransport");
+has(settleTransport,
+  /active\.kind === TRANSPORT_KIND\.PLAYBACK[\s\S]*?recordPlaybackSpans\(active, current\)/,
+  "Voluntary Playback writes watched spans.");
+has(settleTransport,
+  /active\.kind === TRANSPORT_KIND\.CONTEXT[\s\S]*?return true;[\s\S]*?active\.kind === TRANSPORT_KIND\.PLAYBACK[\s\S]*?recordPlaybackSpans/,
+  "Automatic Context returns before the Playback-only Trace write.");
+has(topLevelFunction(appCode, "recordPlaybackSpans"), /transport\.cycles[\s\S]*spans\.push/,
+  "A wrapped Playback contributes one directed span per crossing.");
 // Being told where to sit is a consequence of a movement, never a movement.
 lacks(topLevelFunction(appCode, "placePlayer"), /recordTraversal/,
   "Programmatic placement writes no occurrence.");

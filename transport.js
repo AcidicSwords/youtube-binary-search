@@ -83,10 +83,8 @@ export function createContextTransport({ anchor, range, seconds }) {
     anchor: clamp(anchor, range.start, range.end),
     start: window.start,
     end: window.end,
-    // Where the watching began, which for a Context is the window's own start
-    // rather than the Address that anchored it. Playback carries the same field
-    // so that settling either transport can say what source time was actually
-    // crossed; without it a Context window is watched and never recorded.
+    // Physical Cursor entry. This can describe Context presentation without
+    // turning automatic recognition into Traversal Trace evidence.
     entry: window.start,
     enteredWindow: false,
     startedAt: Date.now()
