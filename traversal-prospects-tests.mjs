@@ -3,9 +3,11 @@ import {
   TRAVERSAL_PROSPECT_KIND,
   appendRippleProspects,
   availableTraversalProspects,
+  beginTraversalProspectRead,
   clearTraversalProspects,
   consumeTraversalProspect,
   createTraversalProspects,
+  moveTraversalProspectRead,
   removeRippleProspects
 } from "./traversal-prospects.js";
 
@@ -71,6 +73,49 @@ assert.deepEqual(
     "ripple-1:ripple-start"
   ],
   "Completed batches coexist in newest-first order."
+);
+
+let prospectRead = beginTraversalProspectRead(state, {
+  generation: 4,
+  range: { start: 0, end: 100 }
+});
+const firstForward = moveTraversalProspectRead(prospectRead, "forward");
+assert.equal(firstForward.changed, true);
+assert.equal(firstForward.prospect.rippleId, "ripple-2");
+assert.equal(firstForward.prospect.kind, TRAVERSAL_PROSPECT_KIND.RIPPLE_END,
+  "A forward read chooses the newest valid prospect first.");
+prospectRead = firstForward.read;
+const secondForward = moveTraversalProspectRead(prospectRead, "forward");
+assert.equal(secondForward.prospect.kind, TRAVERSAL_PROSPECT_KIND.RIPPLE_START,
+  "The other endpoint remains next in the frozen read.");
+const retraced = moveTraversalProspectRead(secondForward.read, "backward");
+assert.equal(retraced.prospect.id, firstForward.prospect.id,
+  "Reversing retraces the frozen prospect source instead of switching readers.");
+
+const frozenRead = beginTraversalProspectRead(state, {
+  generation: 4,
+  range: { start: 0, end: 100 }
+});
+const later = appendRippleProspects(state, {
+  rippleId: "ripple-later",
+  generation: 4,
+  start: 70,
+  end: 75
+});
+assert.equal(
+  moveTraversalProspectRead(frozenRead, "forward").prospect.rippleId,
+  "ripple-2",
+  "A batch arriving after gesture acquisition cannot enter its frozen source."
+);
+assert.equal(later.state.entries.length, state.entries.length + 2);
+assert.equal(
+  beginTraversalProspectRead(state, {
+    generation: 4,
+    range: { start: 0, end: 100 },
+    excludeAddress: 45
+  }).entries[0].kind,
+  TRAVERSAL_PROSPECT_KIND.RIPPLE_START,
+  "A prospect already at Current remains stored but cannot block the next movable prospect."
 );
 
 const newestEnd = availableTraversalProspects(state, {
@@ -145,4 +190,4 @@ assert.equal(
   "Invalid batches cannot manufacture partial prospects."
 );
 
-console.log("Traversal Prospect tests passed: Start-before-End append, newest-first reading, End-before-Start within a Ripple, coexisting batches, exact consumption, duplicate occurrence identity, generation invalidation, Focus filtering without deletion, batch removal, and transient clearing.");
+console.log("Traversal Prospect tests passed: Start-before-End append, newest-first frozen Ghost reading, reversal within one source, stable acquisition, Current exclusion without deletion, coexisting batches, exact consumption, duplicate occurrence identity, generation invalidation, Focus filtering without deletion, batch removal, and transient clearing.");

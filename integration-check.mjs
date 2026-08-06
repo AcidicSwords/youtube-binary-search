@@ -603,12 +603,18 @@ for (const field of [
   has(beginGhost, new RegExp(`\\b${field}\\b`),
     `Ghost provisional state owns ${field}.`);
 }
+has(beginGhost,
+  /initialDirection === "forward"[\s\S]*?beginTraversalProspectRead\([\s\S]*?readsProspects[\s\S]*?tracePositionIsValid/,
+  "Forward Ghost freezes Traversal Prospects first and falls back to valid historical continuation.");
 const scanGhost = topLevelFunction(appCode, "handleGhostWheel");
 lacks(scanGhost, /state\.session\s*=/,
   "Ghost scanning never replaces the accepted Session.");
 has(scanGhost,
   /gesture\.previewSession = result\.session[\s\S]*?gesture\.candidate = candidate\.address/,
   "Ghost scanning updates only its provisional Candidate and preview Session.");
+has(scanGhost,
+  /moveTraversalProspectRead\([\s\S]*?goTo\([\s\S]*?gesture\.selectedProspect = candidate\.prospect/,
+  "Prospect scanning uses a frozen reader and canonical Go only for provisional presentation.");
 has(topLevelFunction(appCode, "settleGhostGesture"),
   /state\.session = gesture\.previewSession[\s\S]*?checkpoint\(/,
   "Ghost settlement performs the first semantic assignment and one checkpoint.");

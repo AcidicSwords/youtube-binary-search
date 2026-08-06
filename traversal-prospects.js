@@ -80,6 +80,50 @@ export function availableTraversalProspects(state, {
     );
 }
 
+function createProspectRead(entries, index = -1) {
+  return Object.freeze({
+    entries: Object.freeze([...entries]),
+    index
+  });
+}
+
+// A Ghost gesture freezes one prospect stream when it opens. Later Ripple
+// batches, Focus changes, or consumption cannot rewrite what that held gesture
+// is already reading.
+export function beginTraversalProspectRead(state, options = {}) {
+  const excluded = Number(options.excludeAddress);
+  const exclusionTolerance = Math.max(0, Number(options.excludeTolerance) || 0);
+  const entries = availableTraversalProspects(state, options)
+    .filter(entry =>
+      !Number.isFinite(excluded)
+      || Math.abs(entry.address - excluded) > exclusionTolerance
+    );
+  return createProspectRead(entries);
+}
+
+export function moveTraversalProspectRead(read, direction) {
+  if (!read?.entries || !["forward", "backward"].includes(direction)) {
+    return { changed: false, reason: "invalid-read", read };
+  }
+  const nextIndex = read.index + (direction === "forward" ? 1 : -1);
+  if (nextIndex < 0 || nextIndex >= read.entries.length) {
+    return {
+      changed: false,
+      reason: direction === "forward" ? "prospect-end" : "prospect-start",
+      read
+    };
+  }
+  const nextRead = createProspectRead(read.entries, nextIndex);
+  const prospect = nextRead.entries[nextIndex];
+  return {
+    changed: true,
+    read: nextRead,
+    prospect,
+    address: prospect.address,
+    cursor: nextIndex
+  };
+}
+
 export function consumeTraversalProspect(state, id) {
   const source = state?.entries ? state : createTraversalProspects();
   const index = source.entries.findIndex(entry => entry.id === id);
