@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { createPanoramaController, FIELD_SIDE_MODE } from "./panorama.js";
+import { createPanoramaController, PANORAMA_SIDE_MODE } from "./panorama.js";
 import { YOUTUBE_STATE } from "./youtube.js";
-import { FIELD_FRAME_ACTIVATION } from "./panorama-frame.js";
+import { PANORAMA_FRAME_ACTIVATION } from "./panorama-frame.js";
 
 function element(tagName = "DIV") {
   const listeners = new Map();
@@ -186,7 +186,7 @@ function makeHarness({
     assert.equal(h.lead().commands.at(-2)?.[1], 52, "A fresh cycle begins at the inner offset ahead of Center.");
     assert.deepEqual(h.lead().commands.at(-1), ["play"]);
     assert.equal(h.controller.cycle().phase, "expanding");
-    assert.equal(h.controller.cycle().held, false);
+    assert.equal(h.controller.cycle().frozen, false);
 
     h.snapshot = {
       ...h.snapshot,
@@ -206,15 +206,15 @@ function makeHarness({
     assert.ok(h.tail().time < 52, "Tail must remain behind Center while it expands.");
     assert.ok(h.lead().time > 52, "Lead must remain ahead of Center while it expands.");
 
-    h.controller.hold("both");
-    assert.equal(h.controller.snapshot().tailMode, FIELD_SIDE_MODE.HELD);
-    assert.equal(h.controller.snapshot().leadMode, FIELD_SIDE_MODE.HELD);
-    assert.equal(h.controller.cycle().held, true, "Hold alone changes Stretching into Held.");
-    assert.equal(h.controller.cycle().phase, "expanding", "Hold preserves the cycling direction.");
-    assert.deepEqual(h.snapshot.activeSpan, semanticInterval, "Hold changes runtime Panorama state only; it must not redefine Interval.");
-    const heldTail = h.controller.cycle().sides.tail.offset;
-    const heldLead = h.controller.cycle().sides.lead.offset;
-    assert.ok(heldTail >= 2 && heldTail <= 10, "A held offset stays inside the configured [x, y] bounds.");
+    h.controller.freeze("both");
+    assert.equal(h.controller.snapshot().tailMode, PANORAMA_SIDE_MODE.FROZEN);
+    assert.equal(h.controller.snapshot().leadMode, PANORAMA_SIDE_MODE.FROZEN);
+    assert.equal(h.controller.cycle().frozen, true, "Freeze alone changes Stretching into Frozen.");
+    assert.equal(h.controller.cycle().phase, "expanding", "Freeze preserves the cycling direction.");
+    assert.deepEqual(h.snapshot.activeSpan, semanticInterval, "Freeze changes runtime Panorama state only; it must not redefine Interval.");
+    const frozenTail = h.controller.cycle().sides.tail.offset;
+    const frozenLead = h.controller.cycle().sides.lead.offset;
+    assert.ok(frozenTail >= 2 && frozenTail <= 10, "A frozen offset stays inside the configured [x, y] bounds.");
 
     h.snapshot = {
       ...h.snapshot,
@@ -224,13 +224,13 @@ function makeHarness({
     h.controller.pause({ center: 52, freeze: true });
     assert.equal(h.tail().state, YOUTUBE_STATE.PAUSED);
     assert.equal(h.lead().state, YOUTUBE_STATE.PAUSED);
-    assert.equal(h.tail().time, 52 - heldTail);
-    assert.equal(h.lead().time, 52 + heldLead);
+    assert.equal(h.tail().time, 52 - frozenTail);
+    assert.equal(h.lead().time, 52 + frozenLead);
 
     h.controller.translateToCurrent(60, { preserve: true });
-    assert.equal(h.tail().time, 60 - heldTail, "Whole-Panorama translation must preserve Tail's attained offset.");
-    assert.equal(h.lead().time, 60 + heldLead, "Whole-Panorama translation must preserve Lead's attained offset.");
-    assert.equal(h.controller.getStepSelection("tail").distance, heldTail);
+    assert.equal(h.tail().time, 60 - frozenTail, "Whole-Panorama translation must preserve Tail's attained offset.");
+    assert.equal(h.lead().time, 60 + frozenLead, "Whole-Panorama translation must preserve Lead's attained offset.");
+    assert.equal(h.controller.getStepSelection("tail").distance, frozenTail);
   } finally {
     h.restore();
   }
@@ -275,17 +275,17 @@ function makeHarness({
     assert.match(h.elements.get("panorama-rate-state").textContent, /Center 1\.5×/,
       "The Panorama readout reports the observed Center rate, not a fixed 1×.");
 
-    h.controller.hold("both");
+    h.controller.freeze("both");
     assert.equal(h.tail().rate, 1.5);
     assert.equal(h.lead().rate, 1.5,
-      "Held sides follow Center exactly so the attained offsets remain fixed.");
+      "Frozen sides follow Center exactly so the attained offsets remain fixed.");
   } finally {
     h.restore();
   }
 }
 
 // The Outer Offset is one Panorama-level configuration. Editing it reconciles the
-// live relation without becoming a Hold and without writing Session state.
+// live relation without becoming a Freeze and without writing Session state.
 {
   const h = makeHarness();
   try {
@@ -315,9 +315,9 @@ function makeHarness({
     h.controller.tick();
     h.clock += 4000;
     h.controller.tick();
-    h.controller.hold("both");
+    h.controller.freeze("both");
     const partial = h.controller.cycle().sides.tail.offset;
-    assert.ok(partial > 2 && partial < 20, "The Panorama was Held part-way through its cycle.");
+    assert.ok(partial > 2 && partial < 20, "The Panorama was Frozen part-way through its cycle.");
     h.snapshot = {
       ...h.snapshot,
       panoramaCycle: { inner: 2, outer: 30, rate: 0.5 }
@@ -326,9 +326,9 @@ function makeHarness({
     assert.equal(
       h.controller.cycle().sides.tail.offset,
       partial,
-      "A partial held relation must remain held when only its configured Outer Offset changes."
+      "A partial frozen relation must remain frozen when only its configured Outer Offset changes."
     );
-    assert.equal(h.controller.cycle().held, true, "Configuration edits are not a Hold or a Stretch.");
+    assert.equal(h.controller.cycle().frozen, true, "Configuration edits are not a Freeze or a Stretch.");
   } finally {
     h.restore();
   }
@@ -403,7 +403,7 @@ function makeHarness({
       panoramaCycle: { inner: 1, outer: 2.5, rate: 0.5 },
       panoramaFrame: {
         kind: "step",
-        activation: { kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS },
+        activation: { kind: PANORAMA_FRAME_ACTIVATION.STEP_TO_ADDRESS },
         start: 35,
         center: 50,
         end: 72,
@@ -415,7 +415,7 @@ function makeHarness({
     assert.equal(h.tail().time, 35, "Step preview must use the semantic Backward destination, not Panorama Offset.");
     assert.equal(h.lead().time, 72, "Step preview must use the semantic Forward destination, not Panorama Offset.");
     assert.equal(h.elements.get("panorama-transport-state").textContent, "Step Frame");
-    assert.equal(h.controller.snapshot().span.held, false, "A temporary preview must not become a Held Panorama span.");
+    assert.equal(h.controller.snapshot().span.frozen, false, "A temporary preview must not become a Frozen Panorama span.");
     assert.equal(h.controller.getStepSelection("tail").distance, 15);
     assert.equal(h.controller.getStepSelection("tail").address, 35);
     assert.equal(h.controller.getStepSelection("lead").distance, 22);
@@ -423,7 +423,7 @@ function makeHarness({
     assert.equal(h.elements.get("tail-player-surface").getAttribute("aria-disabled"), "false");
     assert.equal(h.elements.get("lead-player-surface").getAttribute("aria-disabled"), "false");
     assert.equal(h.elements.get("panorama-both-toggle").disabled, true,
-      "A Panorama Frame makes the combined Stretch/Hold control non-actionable.");
+      "A Panorama Frame makes the combined Stretch/Freeze control non-actionable.");
 
     h.snapshot = {
       ...h.snapshot,
@@ -521,7 +521,7 @@ function makeHarness({
       ...h.snapshot,
       panoramaFrame: {
         kind: "step",
-        activation: { kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS },
+        activation: { kind: PANORAMA_FRAME_ACTIVATION.STEP_TO_ADDRESS },
         start: 40,
         center: 50,
         end: 60,
@@ -554,12 +554,12 @@ function makeHarness({
     assert.doesNotMatch(
       h.elements.get("panorama-transport-state").textContent,
       /preview/,
-      "Stretch/Hold playback must not retain the preceding operator-preview presentation."
+      "Stretch/Freeze playback must not retain the preceding operator-preview presentation."
     );
     assert.equal(h.tail().rate, 0.5);
     assert.equal(h.lead().rate, 1.5);
     assert.equal(h.elements.get("panorama-both-toggle").disabled, false,
-      "Ordinary playback restores the combined Stretch/Hold control.");
+      "Ordinary playback restores the combined Stretch/Freeze control.");
   } finally {
     h.restore();
   }
@@ -748,8 +748,8 @@ function makeHarness({
       center: { ...h.snapshot.center, time: 50.5, state: YOUTUBE_STATE.PLAYING }
     };
     h.controller.tick();
-    assert.equal(h.controller.snapshot().tailMode, FIELD_SIDE_MODE.STRETCHING, "Temporary 1× availability must not collapse Tail before playback confirms rates.");
-    assert.equal(h.controller.snapshot().leadMode, FIELD_SIDE_MODE.STRETCHING, "Temporary 1× availability must not collapse Lead before playback confirms rates.");
+    assert.equal(h.controller.snapshot().tailMode, PANORAMA_SIDE_MODE.STRETCHING, "Temporary 1× availability must not collapse Tail before playback confirms rates.");
+    assert.equal(h.controller.snapshot().leadMode, PANORAMA_SIDE_MODE.STRETCHING, "Temporary 1× availability must not collapse Lead before playback confirms rates.");
 
     h.tail().finishPlay();
     h.lead().finishPlay();
@@ -765,4 +765,4 @@ function makeHarness({
   }
 }
 
-console.log("Panorama runtime tests passed: decoded paused frames, Panorama Frame placement, one-rung side steps that keep the cycle the same length at every Center rate, Hold isolation, Panorama-level Offset reconciliation, dormant hidden/off panes, stale-event rejection, exact pause, whole-Panorama Step geometry, direct-manipulation Frames, unsupported-rate fallback, and boundary recovery.");
+console.log("Panorama runtime tests passed: decoded paused frames, Panorama Frame placement, one-rung side steps that keep the cycle the same length at every Center rate, Freeze isolation, Panorama-level Offset reconciliation, dormant hidden/off panes, stale-event rejection, exact pause, whole-Panorama Step geometry, direct-manipulation Frames, unsupported-rate fallback, and boundary recovery.");

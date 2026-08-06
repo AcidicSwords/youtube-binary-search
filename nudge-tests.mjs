@@ -16,13 +16,13 @@ await flush();
 byId.get("youtube-url").value = "https://youtu.be/dQw4w9WgXcQ";
 byId.get("load-video").click();
 await flush(5);
-byId.get("context-seconds").value = "0";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "0";
+byId.get("context-duration").dispatch("change");
 await flush();
 
 // A verified frame duration is unavailable from the YouTube adapter, so the
 // quantum is displayed and applied as seconds and never called a frame step.
-assert.equal(byId.get("nudge-seconds").value, "0.042");
+assert.equal(byId.get("nudge-distance").value, "0.042");
 
 // The default quantum must actually move Current. A quantum at or below the
 // kernel's semantic equality tolerance would resolve to the same Address and
@@ -40,14 +40,14 @@ await env.delay(600);
 await flush();
 
 // Rejecting a quantum that would be swallowed by semantic equality.
-byId.get("nudge-seconds").value = "0.001";
-byId.get("nudge-seconds").dispatch("change");
+byId.get("nudge-distance").value = "0.001";
+byId.get("nudge-distance").dispatch("change");
 await flush();
-assert.ok(Number(byId.get("nudge-seconds").value) > 0.04,
+assert.ok(Number(byId.get("nudge-distance").value) > 0.04,
   "A configured quantum may never fall to or below the semantic tolerance.");
 
-byId.get("nudge-seconds").value = "0.5";
-byId.get("nudge-seconds").dispatch("change");
+byId.get("nudge-distance").value = "0.5";
+byId.get("nudge-distance").dispatch("change");
 await flush();
 assert.match(byId.get("status").textContent, /Nudge set to 0\.5s/);
 
@@ -502,7 +502,7 @@ assert.equal(offMap.defaultPrevented, true,
 // A form control the pointer is over keeps its own wheel, and a plain wheel is
 // never claimed anywhere.
 const overPanorama = dispatchDocument("wheel", {
-  target: byId.get("context-seconds"), deltaY: -120, deltaX: 0, shiftKey: true
+  target: byId.get("context-duration"), deltaY: -120, deltaX: 0, shiftKey: true
 });
 await flush(2);
 assert.ok(!overPanorama.defaultPrevented,

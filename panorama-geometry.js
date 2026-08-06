@@ -6,8 +6,8 @@ export const PANORAMA_STATE = Object.freeze({
   OFF: "off",
   COINCIDENT: "coincident",
   UNFOLDING: "unfolding",
-  PARTIAL: "partially-held",
-  HELD: "held",
+  PARTIAL: "partially-frozen",
+  FROZEN: "frozen",
   SUSPENDED: "suspended"
 });
 
@@ -61,7 +61,7 @@ export function normalizePanoramaCycle(value = DEFAULT_PANORAMA_CYCLE) {
 // played, and the cycle would last a different number of seconds at every rate.
 // Because the ladder is evenly spaced, an additive step keeps the difference
 // fixed at exactly one rung, which is what makes the cycle take the same nine
-// seconds at every Center rate the Panorama can hold.
+// seconds at every Center rate the Panorama can freeze.
 export function panoramaSideRates(rate, centerRate = 1) {
   const step = normalizePanoramaCycle({ rate }).rate;
   const center = Number.isFinite(centerRate) && centerRate > 0 ? centerRate : 1;
@@ -116,7 +116,7 @@ export function panoramaTargetOffset({
   // Both bounds give the same offset either way, so only the direction is at
   // stake -- and a Panorama sitting exactly at its outer bound is about to come
   // back, which is what the side rates must be told. Reading the outer turn as
-  // still expanding made a leg resumed from a fully attained Hold depend on
+  // still expanding made a leg resumed from a fully attained Freeze depend on
   // whether the resume and the next tick landed in the same millisecond.
   return position < span
     ? { offset: inner + position, direction: PANORAMA_DIRECTION.EXPANDING }
@@ -158,7 +158,7 @@ export function createPanoramaCycle(cycle = DEFAULT_PANORAMA_CYCLE, startedAt = 
   const { inner } = normalizePanoramaCycle(cycle);
   return {
     phase: PANORAMA_DIRECTION.EXPANDING,
-    held: true,
+    frozen: true,
     startedAt,
     startingOffset: inner,
     offset: inner,
@@ -170,12 +170,12 @@ export function createPanoramaCycle(cycle = DEFAULT_PANORAMA_CYCLE, startedAt = 
 }
 
 // A discontinuity: the source itself has jumped, or the Panorama is returning
-// after Center played alone at an extreme rate and the sides hold positions that
+// after Center played alone at an extreme rate and the sides freeze positions that
 // no longer relate to anything. Begin a fresh leg at the inner offset rather
 // than restoring a stale relation.
 export function restartPanoramaCycle(runtime, cycle = DEFAULT_PANORAMA_CYCLE, startedAt = 0) {
   const fresh = createPanoramaCycle(cycle, startedAt);
-  return { ...fresh, held: Boolean(runtime?.held) };
+  return { ...fresh, frozen: Boolean(runtime?.frozen) };
 }
 
 // Holding rebases the leg onto the offset actually attained, so resuming
@@ -184,7 +184,7 @@ export function restartPanoramaCycle(runtime, cycle = DEFAULT_PANORAMA_CYCLE, st
 export function rebasePanoramaCycle(runtime, startedAt = 0, startingOffset = null) {
   if (!runtime) return runtime;
   // The relation on screen is the one to continue from. A caller that knows
-  // what the sides actually attained -- Hold and Resume Panorama do -- says so;
+  // what the sides actually attained -- Freeze and Stretch Panorama do -- says so;
   // otherwise the phase's own last derived offset stands.
   const attained = Number.isFinite(startingOffset)
     ? startingOffset
@@ -194,18 +194,18 @@ export function rebasePanoramaCycle(runtime, startedAt = 0, startingOffset = nul
   return { ...runtime, startedAt, startingOffset: attained, offset: attained };
 }
 
-// A held or boundary-waiting side runs at Center rate so it follows Center
+// A frozen or boundary-waiting side runs at Center rate so it follows Center
 // while preserving its attained offset.
 export function panoramaSideRate({
   role,
   phase,
   rate,
   waiting = false,
-  held = false,
+  frozen = false,
   centerRate = 1
 }) {
   const pair = panoramaSideRates(rate, centerRate);
-  if (held || waiting) return pair.center;
+  if (frozen || waiting) return pair.center;
   const outward = phase !== PANORAMA_DIRECTION.CONTRACTING;
   if (role === "tail") return outward ? pair.tailRate : pair.leadRate;
   return outward ? pair.leadRate : pair.tailRate;
@@ -213,7 +213,7 @@ export function panoramaSideRate({
 
 // Both sides share one offset, so they arrive at the bounds together by
 // construction rather than by waiting for each other at a barrier. A side with
-// no room is parked at whatever it has and excluded; it does not hold the other
+// no room is parked at whatever it has and excluded; it does not freeze the other
 // side back, and it does not stop the phase.
 function sideAtOffset(offset, bounds, operational) {
   if (!operational) {
@@ -223,10 +223,10 @@ function sideAtOffset(offset, bounds, operational) {
   // Range-clipped bound is nearer than the offset the phase is asking for. It
   // then sits at that bound and runs at Center rate. Being at the inner offset
   // is not waiting: that is simply where every leg begins.
-  const held = clamp(offset, bounds.inner, bounds.outer);
+  const frozen = clamp(offset, bounds.inner, bounds.outer);
   return {
-    offset: held,
-    waiting: Math.abs(held - offset) > BREATH_BOUND_TOLERANCE,
+    offset: frozen,
+    waiting: Math.abs(frozen - offset) > BREATH_BOUND_TOLERANCE,
     excluded: false
   };
 }
@@ -266,7 +266,7 @@ export function advanceCycle(runtime, {
     ? Math.min(...participating.map(role => bounds[role].outer))
     : configured.outer;
 
-  const frozen = state.held || !running;
+  const frozen = state.frozen || !running;
   const derived = frozen
     ? {
       offset: clamp(
@@ -291,7 +291,7 @@ export function advanceCycle(runtime, {
 
   const next = {
     phase: derived.direction,
-    held: Boolean(state.held),
+    frozen: Boolean(state.frozen),
     startedAt: state.startedAt,
     startingOffset: state.startingOffset,
     offset: derived.offset,
@@ -299,7 +299,7 @@ export function advanceCycle(runtime, {
   };
   for (const role of ["tail", "lead"]) {
     // A frozen cycle governs nothing: each side keeps whatever relation it was
-    // established or held at, which can be far wider than the cycling bounds
+    // established or frozen at, which can be far wider than the cycling bounds
     // because Step geometry placed it. Only a running cycle shares one offset.
     const target = frozen
       ? (Number.isFinite(state.sides?.[role]?.offset)
@@ -324,7 +324,7 @@ export function advanceCycle(runtime, {
       phase: next.phase,
       rate: configured.rate,
       waiting: next.sides[role].waiting || !operational[role],
-      held: next.held,
+      frozen: next.frozen,
       centerRate
     });
   }
@@ -334,14 +334,14 @@ export function advanceCycle(runtime, {
   return next;
 }
 
-// Hold alone stops the cycle. It preserves each attained offset, sets every
-// held side to Center rate, and preserves the cycling direction so Stretch
+// Freeze alone stops the cycle. It preserves each attained offset, sets every
+// frozen side to Center rate, and preserves the cycling direction so Stretch
 // resumes from the attained relation.
-export function holdCycle(runtime, cycle = DEFAULT_PANORAMA_CYCLE) {
+export function freezeCycle(runtime, cycle = DEFAULT_PANORAMA_CYCLE) {
   const state = runtime || createPanoramaCycle(cycle);
   return {
     ...state,
-    held: true,
+    frozen: true,
     sides: {
       tail: { ...state.sides.tail, waiting: false },
       lead: { ...state.sides.lead, waiting: false }
@@ -349,9 +349,9 @@ export function holdCycle(runtime, cycle = DEFAULT_PANORAMA_CYCLE) {
   };
 }
 
-export function resumeCycle(runtime, cycle = DEFAULT_PANORAMA_CYCLE) {
+export function stretchCycle(runtime, cycle = DEFAULT_PANORAMA_CYCLE) {
   const state = runtime || createPanoramaCycle(cycle);
-  return { ...state, held: false };
+  return { ...state, frozen: false };
 }
 
 function normalizePanoramaResponse(value = DEFAULT_FIELD_RESPONSE) {
@@ -404,7 +404,7 @@ export function derivePanoramaBounds({ current, stepDistance, range }) {
 
   const center = clamp(current, range.start, range.end);
   // Panorama offsets are physical source-time relations. Timeline weighting does
-  // not alter Tail/Lead placement or Hold/Stretch measurement.
+  // not alter Tail/Lead placement or Freeze/Stretch measurement.
   const backwardTarget = Math.max(range.start, center - requested.backward);
   const forwardTarget = Math.min(range.end, center + requested.forward);
   const backwardReach = Math.max(0, center - backwardTarget);
@@ -486,9 +486,9 @@ export function resolvePanoramaPhase({ enabled, suspended, sides }) {
   const active = (sides || []).filter(side => side.visible && side.available);
   if (!active.length) return PANORAMA_STATE.COINCIDENT;
   if (active.every(side => !(side.offset > FIELD_REACH_TOLERANCE))) return PANORAMA_STATE.COINCIDENT;
-  const held = active.filter(side => side.held).length;
-  if (held === active.length) return PANORAMA_STATE.HELD;
-  if (held > 0) return PANORAMA_STATE.PARTIAL;
+  const frozen = active.filter(side => side.frozen).length;
+  if (frozen === active.length) return PANORAMA_STATE.FROZEN;
+  if (frozen > 0) return PANORAMA_STATE.PARTIAL;
   return PANORAMA_STATE.UNFOLDING;
 }
 
@@ -500,8 +500,8 @@ export function deriveObservedPanorama({
   leadAddress,
   tailVisible = true,
   leadVisible = true,
-  tailHeld = false,
-  leadHeld = false
+  tailFrozen = false,
+  leadFrozen = false
 }) {
   const center = Number.isFinite(centerAddress) ? centerAddress : targets.center;
   const tail = Number.isFinite(tailAddress) ? tailAddress : center;
@@ -530,7 +530,7 @@ export function deriveObservedPanorama({
       constrained: Boolean(targets.tail.constrained),
       available: targets.tail.available,
       visible: tailVisible,
-      held: Boolean(tailHeld)
+      frozen: Boolean(tailFrozen)
     },
     lead: {
       address: lead,
@@ -542,14 +542,14 @@ export function deriveObservedPanorama({
       constrained: Boolean(targets.lead.constrained),
       available: targets.lead.available,
       visible: leadVisible,
-      held: Boolean(leadHeld)
+      frozen: Boolean(leadFrozen)
     },
     span: {
       start: tail,
       end: lead,
       duration: Math.max(0, lead - tail),
       available: spanAvailable,
-      held: spanAvailable && phase === PANORAMA_STATE.HELD
+      frozen: spanAvailable && phase === PANORAMA_STATE.FROZEN
     }
   };
 }

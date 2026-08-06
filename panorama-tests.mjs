@@ -8,7 +8,7 @@ import {
   resolvePanoramaPhase
 } from "./panorama-geometry.js";
 import {
-  FIELD_SIDE_MODE,
+  PANORAMA_SIDE_MODE,
   panoramaShouldSuspend,
   panoramaPreferenceRequiresEstablish
 } from "./panorama.js";
@@ -59,8 +59,8 @@ assert.equal(chooseNearestRate([0.25, 0.5, 1, 1.5, 2], 0.5), 0.5);
 assert.equal(chooseNearestRate([1, 1.25, 1.5], 2), 1.5);
 assert.equal(chooseNearestRate([], 2), 1);
 
-assert.equal(FIELD_SIDE_MODE.HELD, "held");
-assert.equal(FIELD_SIDE_MODE.STRETCHING, "stretching");
+assert.equal(PANORAMA_SIDE_MODE.FROZEN, "frozen");
+assert.equal(PANORAMA_SIDE_MODE.STRETCHING, "stretching");
 assert.equal(panoramaShouldSuspend({ transportKind: "context" }), true);
 assert.equal(panoramaShouldSuspend({ transportKind: "playback" }), false);
 const panoramaPlayback = createPlaybackTransport({
@@ -91,26 +91,26 @@ assert.equal(resolvePanoramaPhase({
   enabled: true,
   suspended: false,
   sides: [
-    { visible: true, available: true, held: false, offset: 2 },
-    { visible: true, available: true, held: false, offset: 3 }
+    { visible: true, available: true, frozen: false, offset: 2 },
+    { visible: true, available: true, frozen: false, offset: 3 }
   ]
 }), PANORAMA_STATE.UNFOLDING);
 assert.equal(resolvePanoramaPhase({
   enabled: true,
   suspended: false,
   sides: [
-    { visible: true, available: true, held: true, offset: 10 },
-    { visible: true, available: true, held: false, offset: 6 }
+    { visible: true, available: true, frozen: true, offset: 10 },
+    { visible: true, available: true, frozen: false, offset: 6 }
   ]
 }), PANORAMA_STATE.PARTIAL);
 assert.equal(resolvePanoramaPhase({
   enabled: true,
   suspended: false,
   sides: [
-    { visible: true, available: true, held: true, offset: 10 },
-    { visible: true, available: true, held: true, offset: 10 }
+    { visible: true, available: true, frozen: true, offset: 10 },
+    { visible: true, available: true, frozen: true, offset: 10 }
   ]
-}), PANORAMA_STATE.HELD);
+}), PANORAMA_STATE.FROZEN);
 
 {
   const html = readFileSync("index.html", "utf8");
@@ -125,7 +125,7 @@ assert.equal(resolvePanoramaPhase({
     "panorama", "player-tail", "player", "player-lead", "center-transport-surface",
     "tail-player-surface", "lead-player-surface",
     "panorama-both-toggle", "panorama-cycle-rate",
-    "panorama-inner-offset", "panorama-outer-offset", "nudge-seconds",
+    "panorama-inner-offset", "panorama-outer-offset", "nudge-distance",
     "current-marker", "current-departure-marker",
     "tail-collapse", "lead-collapse", "tail-restore", "lead-restore", "panorama-toggle"
   ]) {
@@ -158,20 +158,20 @@ assert.equal(resolvePanoramaPhase({
   assert.match(panoramaSource, /function playFromGesture\(options = \{\}\)/);
   assert.doesNotMatch(app, /onHoldOffsets:/);
   assert.doesNotMatch(panoramaSource, /onHoldOffsets/);
-  assert.match(panoramaSource, /const FIELD_SIDE_MODE/);
+  assert.match(panoramaSource, /const PANORAMA_SIDE_MODE/);
   assert.match(panoramaSource, /function stretch\(role = "both"\)/);
-  assert.match(panoramaSource, /function hold\(role = "both"\)/);
+  assert.match(panoramaSource, /function freeze\(role = "both"\)/);
   assert.match(panoramaSource, /function toggleBoth\(\)/);
   assert.doesNotMatch(panoramaSource, /function toggleSide\(/,
-    "Cycling is one coordinated relation; independent side Stretch/Hold controls are removed.");
+    "Cycling is one coordinated relation; independent side Stretch/Freeze controls are removed.");
   assert.doesNotMatch(html, /id="(?:tail|lead)-panorama-visibility-toggle"/,
-    "There is one combined Stretch/Hold control.");
+    "There is one combined Stretch/Freeze control.");
   assert.doesNotMatch(html, /id="(?:tail|lead)-rate-select"/,
     "The interface exposes one cycling-rate pair, not two independent side rates.");
   assert.match(panoramaSource, /function freezeSideForPause\(side, center, snapshot\)/);
   assert.match(panoramaSource, /function translateToCurrent\(current, \{ preserve = true \} = \{\}\)/);
   assert.match(panoramaSource, /const retained = side\.offset > REACH_TOLERANCE[\s\S]*side\.offset[\s\S]*side\.configuredOffset/,
-    "Semantic traversal must translate a live held relation, falling back only to its distinct configured Offset.");
+    "Semantic traversal must translate a live frozen relation, falling back only to its distinct configured Offset.");
   assert.match(panoramaSource, /Context and semantic gestures are Center-only/);
   assert.match(panoramaSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*side\.adapter\?\.play\?\.\(\)/,
     "Every play must refold and prime a side at 1× before directional-rate discovery.");
@@ -191,7 +191,7 @@ assert.equal(resolvePanoramaPhase({
   assert.match(youtubeSource, /setAttribute\?\.\("allow", options\.iframeAllow \|\| DEFAULT_IFRAME_ALLOW\)/);
   assert.match(youtubeSource, /setAttribute\?\.\("tabindex", "-1"\)/);
   assert.match(youtubeSource, /options\.accessible === false[\s\S]*setAttribute\?\.\("aria-hidden", "true"\)/);
-  assert.doesNotMatch(html, /class="step-pane-action"/,
+  assert.doesNotMatch(html, /class="panorama-pane-action"/,
     "YouTube side iframes must not be covered by a transparent action element.");
   assert.match(html, /id="tail-player-surface"[\s\S]*role="button"[\s\S]*id="player-tail"/);
   assert.match(html, /id="lead-player-surface"[\s\S]*role="button"[\s\S]*id="player-lead"/);
@@ -220,7 +220,7 @@ assert.equal(resolvePanoramaPhase({
   assert.match(layoutCss, /\.center-transport-surface[\s\S]*position:\s*absolute/);
   assert.match(css, /grid-template-areas:\s*"tail center lead"[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1\.1fr\) minmax\(0, 1fr\)/,
     "Wide panes must occupy explicit Tail | Center | Lead areas without fixed minima that clip the containing panel.");
-  assert.match(css, /\.step-pane\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/,
+  assert.match(css, /\.panorama-pane\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/,
     "Every pane must force its implicit content track to shrink instead of clipping the Lead controls.");
   assert.match(layoutCss, /\.player-panel\s*\{[\s\S]*container-type:\s*inline-size/,
     "Step Panorama responsive geometry must measure its containing panel.");
@@ -237,7 +237,7 @@ assert.equal(resolvePanoramaPhase({
     /@container \(max-width: 680px\)[\s\S]*\.panorama\.tail-collapsed\.lead-collapsed:not\(\.panorama-off\)[\s\S]*grid-template-areas:\s*"center"\s*"tail"\s*"lead"/,
     "Phone stacking must override the more-specific collapsed medium layout."
   );
-  assert.match(panoramaSource, /const availableRoles = controllableRoles\(snapshot, prefs\)[\s\S]*const held = runtime\.cycle\.held/,
+  assert.match(panoramaSource, /const availableRoles = controllableRoles\(snapshot, prefs\)[\s\S]*const frozen = runtime\.cycle\.frozen/,
     "Combined Panorama state must derive from one cycling relation over currently operational projections.");
   assert.match(panoramaSource, /function sideIsOperational\([\s\S]*sideIsVisible[\s\S]*side\.sourceReady[\s\S]*effectiveOffset/,
     "One operational predicate must govern side controls, side Step, and combined Panorama actions.");
@@ -249,7 +249,7 @@ assert.equal(resolvePanoramaPhase({
   assert.match(panoramaSource, /resetSources/);
   assert.match(app, /panorama\?\.resetSources\?\.\(\)/,
     "Reloading a video must release stale side-source errors, including same-video reloads.");
-  assert.match(css, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);
+  assert.match(css, /\.panorama-pane \.player-wrap[\s\S]*min-height:\s*200px/);
   assert.match(css, /@container \(max-width: 680px\)/);
   assert.match(css, /@media \(min-width: 1240px\)/);
   assert.match(layoutCss, /@media \(min-width: 1240px\)/);
@@ -257,4 +257,4 @@ assert.equal(resolvePanoramaPhase({
   assert.match(packageJson.scripts.test, /panorama-tests\.mjs/);
 }
 
-console.log("All Step Panorama tests passed: geometry, suspension, Hold/Stretch, side Step, visible bootstrap, shared user activation, autoplay delegation, chapter-based parking, rate priming, and panoramic layout.");
+console.log("All Step Panorama tests passed: geometry, suspension, Freeze/Stretch, side Step, visible bootstrap, shared user activation, autoplay delegation, chapter-based parking, rate priming, and panoramic layout.");

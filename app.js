@@ -10,6 +10,15 @@ import {
   tracePositionIsValid
 } from "./traversal-trace.js";
 import {
+  appendRippleProspects,
+  beginTraversalProspectRead,
+  clearTraversalProspects,
+  consumeTraversalProspect,
+  createTraversalProspects,
+  moveTraversalProspectRead,
+  removeRippleProspects
+} from "./traversal-prospects.js";
+import {
   EPSILON,
   clamp,
   contains,
@@ -59,7 +68,7 @@ import {
   effectiveStepDistance,
   reopen as reopenSession,
   switchActiveEnd as switchSessionEndpoint,
-  releaseInterval as releaseSessionInterval,
+  releaseActiveSpan as releaseSessionActiveSpan,
   setRange as setSessionRange,
   previewRange,
   checkpoint,
@@ -67,17 +76,17 @@ import {
   settleGhostSequence,
   settleStepSequence,
   focusSection as focusSessionSection,
-  focusWorkingSection as focusSessionWorkingSection,
-  leaveSection as leaveSessionSection,
+  focusActiveSpan as focusSessionActiveSpan,
+  unfocus as unfocusSession,
   completePlayback,
   retainCurrentAsPin as pinSessionCurrent,
-  retainSpanAsSection,
+  retainActiveSpanAsSection as retainSessionActiveSpanAsSection,
   saveExtentAsSection,
   renameGuidePin,
   deleteGuidePin,
   renameGuideSection,
   deleteGuideSection,
-  setGuideSectionWeight,
+  setGuideSectionWeighting,
   moveGuidePin,
   moveGuideSection,
   unlinkGuideSectionEndpoint,
@@ -97,13 +106,14 @@ import {
   isProperRange,
   createContextTransport,
   createPlaybackTransport,
+  derivePlaybackPolicy,
   fixedRatePolicy,
   texturedRatePolicy,
   resolveOfferedRate,
   resolvePlaybackRate,
   withPlaybackRequestedRate,
   withPlaybackActualRate,
-  withPlaybackRatePolicy,
+  withDerivedPlaybackPolicy,
   retryPlaybackTransport,
   playbackAllowsPanorama,
   rebasePlaybackTransport,
@@ -122,8 +132,8 @@ import {
   sideRateStepFromResponse
 } from "./panorama-geometry.js";
 import {
-  FIELD_FRAME_OWNER,
-  FIELD_FRAME_ACTIVATION,
+  PANORAMA_FRAME_OWNER,
+  PANORAMA_FRAME_ACTIVATION,
   createPanoramaFrameSequencer
 } from "./panorama-frame.js";
 import {
@@ -158,7 +168,7 @@ const METADATA_GRACE_MS = 4000;
 const METADATA_RETRY_MS = 150;
 const PROGRAMMATIC_PLACEMENT_GRACE_MS = 2000;
 const NATIVE_POSITION_TOLERANCE_SECONDS = 0.25;
-const MAX_CONTEXT_SECONDS = 300;
+const MAX_CONTEXT_DURATION = 300;
 // Bounds for the stored Shift rate. They bound the wish, not the offer: what is
 // actually played is always a rate the player reported.
 const MIN_PLAYBACK_RATE = 0.25;
@@ -173,18 +183,18 @@ const PIN_SNAP_ARM_MS = 450;
 // the Session kernel uses, or a single Nudge would resolve to the Address it
 // started from and move nothing. 1/24 s is the smallest frame-like increment
 // that clears EPSILON.
-const DEFAULT_NUDGE_SECONDS = 1 / 24;
-const MIN_NUDGE_SECONDS = EPSILON * 1.02;
-const MAX_NUDGE_SECONDS = 10;
+const DEFAULT_NUDGE_DISTANCE = 1 / 24;
+const MIN_NUDGE_DISTANCE = EPSILON * 1.02;
+const MAX_NUDGE_DISTANCE = 10;
 const NUDGE_WHEEL_THRESHOLD = 24;
 const NUDGE_GESTURE_SETTLE_MS = 420;
 const PRECISION_DRAG_GAIN = 0.2;
 
-function normalizeNudgeSeconds(value, fallback = DEFAULT_NUDGE_SECONDS) {
+function normalizeNudgeDistance(value, fallback = DEFAULT_NUDGE_DISTANCE) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric <= 0) return fallback;
   // A configured quantum at or below EPSILON would silently disable Nudge.
-  return clamp(numeric, MIN_NUDGE_SECONDS, MAX_NUDGE_SECONDS);
+  return clamp(numeric, MIN_NUDGE_DISTANCE, MAX_NUDGE_DISTANCE);
 }
 
 function legacyPanoramaCycle(value) {
@@ -194,7 +204,7 @@ function legacyPanoramaCycle(value) {
     Number(legacy?.forward) || 0
   ) || DEFAULT_PANORAMA_CYCLE.outer;
   return {
-    inner: Math.max(MIN_NUDGE_SECONDS, outer / 4),
+    inner: Math.max(MIN_NUDGE_DISTANCE, outer / 4),
     outer,
     rate: value?.panoramaResponse
       ? sideRateStepFromResponse(value.panoramaResponse)
@@ -202,11 +212,11 @@ function legacyPanoramaCycle(value) {
   };
 }
 
-function normalizeContextSeconds(value, fallback = 5) {
+function normalizeContextDuration(value, fallback = 5) {
   if (value === null || value === undefined || String(value).trim() === "") return fallback;
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
-  return clamp(numeric, 0, MAX_CONTEXT_SECONDS);
+  return clamp(numeric, 0, MAX_CONTEXT_DURATION);
 }
 
 // The rate Shift+Space plays Center at. Stored as a wish, not as a command: the
@@ -242,13 +252,21 @@ function readPreferences() {
       ? Number(value.stepSeconds)
       : 10;
     return {
-      contextSeconds: normalizeContextSeconds(value?.contextSeconds),
+      // Canonical key first; the legacy seconds-named key remains read-only.
+      contextDuration: normalizeContextDuration(
+        value?.contextDuration
+        ?? value?.contextSeconds // lexicon-allow: legacy preference back-compat
+      ),
       stepDistance: normalizeStepDistance(value?.stepDistance ?? legacyStep),
       // One bounded cycling relation replaces the two independent side
       // Offsets. A legacy pair migrates once: its widest side becomes the outer
       // offset and its saved rates become the nearest symmetric cycling pair.
       panoramaCycle: normalizePanoramaCycle(savedPanoramaCycle(value)),
-      nudgeSeconds: normalizeNudgeSeconds(value?.nudgeSeconds),
+      // Canonical key first; the legacy seconds-named key remains read-only.
+      nudgeDistance: normalizeNudgeDistance(
+        value?.nudgeDistance
+        ?? value?.nudgeSeconds // lexicon-allow: legacy preference back-compat
+      ),
       playbackRate: normalizePlaybackRate(value?.playbackRate),
       texturedPlaybackEnabled: value?.texturedPlaybackEnabled === true || value?.dynamicPlaybackRate === true,
       panoramaEnabled: (value?.panoramaEnabled ?? value?.stepFieldEnabled) !== false, // lexicon-allow: v8 preference back-compat
@@ -257,10 +275,10 @@ function readPreferences() {
     };
   } catch {
     return {
-      contextSeconds: 5,
+      contextDuration: 5,
       stepDistance: normalizeStepDistance(10),
       panoramaCycle: { ...DEFAULT_PANORAMA_CYCLE },
-      nudgeSeconds: DEFAULT_NUDGE_SECONDS,
+      nudgeDistance: DEFAULT_NUDGE_DISTANCE,
       playbackRate: DEFAULT_PLAYBACK_RATE,
       texturedPlaybackEnabled: false,
       panoramaEnabled: true,
@@ -283,8 +301,8 @@ const state = {
   transport: idleTransport(),
   pendingStep: null,
   panoramaCycle: normalizePanoramaCycle(preferences.panoramaCycle),
-  nudgeSeconds: normalizeNudgeSeconds(preferences.nudgeSeconds),
-  contextSeconds: preferences.contextSeconds,
+  nudgeDistance: normalizeNudgeDistance(preferences.nudgeDistance),
+  contextDuration: preferences.contextDuration,
   playbackRate: preferences.playbackRate,
   texturedPlaybackEnabled: preferences.texturedPlaybackEnabled,
   panoramaEnabled: preferences.panoramaEnabled,
@@ -324,7 +342,7 @@ const state = {
   weightRelaxation: null,
   shiftLayers: { matrix: false, guide: false },
   shiftKeyHeld: false,
-  field: null,
+  panorama: null,
   // Direct manipulation of Current on the Temporal Topography. It commits a
   // Step, not a Go and not a Pin move, and it owns the Panorama Frame while it runs.
   currentDrag: null,
@@ -345,6 +363,15 @@ const state = {
   // not history: history records what the world was, this records where the
   // reader was. Source-scoped and session-local.
   traversalTrace: createTraversalTrace(0),
+  // Known future Addresses contributed by completed Ripple observations.
+  // Transient, source-scoped, and deliberately outside Session/history/Trace.
+  traversalProspects: createTraversalProspects(),
+  // The loaded source identity exposed to presentation and prospect filtering.
+  // This is lifecycle state, not semantic Session state.
+  sourceGeneration: null,
+  // Identity and presentation for the one Ripple currently being observed.
+  // Context remains the transport owner; this state never replaces it.
+  rippleObservation: null,
   // Where the last Ghost gesture left the historical read cursor, so the next
   // one can continue through the original pattern rather than restarting from
   // the occurrence that gesture itself appended.
@@ -361,6 +388,7 @@ let panorama = null;
 let pendingLoad = null;
 let loadGeneration = 0;
 let chapterdGeneration = 0;
+let rippleSequence = 0;
 let pollTimer = null;
 let metadataTimer = null;
 let stepGesture = null;
@@ -509,7 +537,7 @@ function operatorFrameRequest() {
     forward: step.end,
     backwardDistance: step.backwardDistance,
     forwardDistance: step.forwardDistance,
-    activation: { kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS },
+    activation: { kind: PANORAMA_FRAME_ACTIVATION.STEP_TO_ADDRESS },
     range
   };
 }
@@ -519,7 +547,7 @@ function panoramaFrameRequest() {
   // Direct manipulation temporarily supplies an exact Frame and has priority
   // over both Context and operator framing for the gesture's lifetime.
   if (state.directFrame) {
-    return { ...state.directFrame, owner: FIELD_FRAME_OWNER.DIRECT, range: activeRange() };
+    return { ...state.directFrame, owner: PANORAMA_FRAME_OWNER.DIRECT, range: activeRange() };
   }
   const transport = state.transport;
   const contextRunning = transport.kind === TRANSPORT_KIND.CONTEXT;
@@ -541,20 +569,20 @@ function panoramaFrameRequest() {
   // not merely while its transport is running. The edges are the bounded
   // observation window before, during, and after transport, so beginning,
   // pausing, stopping, or settling Context reassigns neither side.
-  if (state.contextSeconds > EPSILON) {
+  if (state.contextDuration > EPSILON) {
     const window = contextRunning
       ? { start: transport.start, end: transport.end }
       : deriveContextWindow(
         currentNeighborhood().C,
         activeRange(),
-        state.contextSeconds
+        state.contextDuration
       );
     if (window) {
       return {
-        owner: FIELD_FRAME_OWNER.CONTEXT,
+        owner: PANORAMA_FRAME_OWNER.CONTEXT,
         start: window.start,
         end: window.end,
-        current: currentNeighborhood().C,
+        current: contextRunning ? transport.anchor : currentNeighborhood().C,
         cursor: contextRunning ? safeCurrentTime() : undefined,
         range: activeRange()
       };
@@ -743,8 +771,8 @@ function persistPreferences() {
       preferences.stepDistance
     );
     preferences.panoramaCycle = normalizePanoramaCycle(state.panoramaCycle);
-    preferences.nudgeSeconds = normalizeNudgeSeconds(state.nudgeSeconds);
-    preferences.contextSeconds = state.contextSeconds;
+    preferences.nudgeDistance = normalizeNudgeDistance(state.nudgeDistance);
+    preferences.contextDuration = state.contextDuration;
     preferences.playbackRate = normalizePlaybackRate(state.playbackRate);
     preferences.texturedPlaybackEnabled = state.texturedPlaybackEnabled === true;
     preferences.panoramaEnabled = state.panoramaEnabled;
@@ -752,10 +780,10 @@ function persistPreferences() {
     preferences.leadVisible = state.leadVisible;
 
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify({
-      contextSeconds: preferences.contextSeconds,
+      contextDuration: preferences.contextDuration,
       stepDistance: preferences.stepDistance,
       panoramaCycle: preferences.panoramaCycle,
-      nudgeSeconds: preferences.nudgeSeconds,
+      nudgeDistance: preferences.nudgeDistance,
       playbackRate: preferences.playbackRate,
       texturedPlaybackEnabled: preferences.texturedPlaybackEnabled,
       panoramaEnabled: preferences.panoramaEnabled,
@@ -922,10 +950,16 @@ function clearProgrammaticPlacement() {
 // carried on measuring from an anchor that no longer meant anything. Releasing
 // then drew a Active Span nobody had asked for.
 //
-// A gesture is a state, not a duration. It lasts exactly as long as the pointer
-// is down, however long the reader pauses to think.
+// A gesture is a state, not a duration. Pointer drags last while the pointer is
+// down; a Ghost scan lasts while its Candidate is provisional. Neither can be
+// reinterpreted as a native seek however long the reader pauses to think.
 function directManipulationActive() {
-  return Boolean(state.dragHandle || state.guideDrag || state.currentDrag);
+  return Boolean(
+    state.dragHandle
+    || state.guideDrag
+    || state.currentDrag
+    || state.ghostGesture
+  );
 }
 
 function placePlayer(address) {
@@ -1037,7 +1071,7 @@ function startContext(anchor, options = {}) {
   const transport = createContextTransport({
     anchor,
     range: activeRange(),
-    seconds: state.contextSeconds
+    seconds: state.contextDuration
   });
 
   if (transport.kind === TRANSPORT_KIND.IDLE) {
@@ -1064,6 +1098,81 @@ function startContext(anchor, options = {}) {
   if (!options.retarget || state.playerState !== YOUTUBE_STATE.PLAYING) player.play();
 }
 
+function removeActiveRippleProspects() {
+  const ripple = state.rippleObservation;
+  if (!ripple) return false;
+  const removed = removeRippleProspects(state.traversalProspects, ripple.id);
+  if (removed.changed) state.traversalProspects = removed.state;
+  return removed.changed;
+}
+
+function rippleOwnsContext(transport = state.transport) {
+  const ripple = state.rippleObservation;
+  return Boolean(
+    ripple
+    && ripple.generation === loadGeneration
+    && transport?.kind === TRANSPORT_KIND.CONTEXT
+    && Math.abs(transport.anchor - ripple.observationAddress) <= EPSILON
+  );
+}
+
+function beginRippleObservation(observationAddress) {
+  if (
+    !state.videoLoaded
+    || !Number.isFinite(observationAddress)
+    || !contains(activeRange(), observationAddress)
+  ) return false;
+
+  const window = deriveContextWindow(
+    observationAddress,
+    activeRange(),
+    state.contextDuration
+  );
+  if (!window) {
+    setStatus("Ripple needs a positive Context Duration.", true);
+    view.render();
+    return false;
+  }
+
+  const retarget = rippleOwnsContext()
+    && state.playerState === YOUTUBE_STATE.PLAYING;
+  if (retarget) {
+    // Settle every non-transport owner, but preserve the one running Context so
+    // the next Ripple can retarget it without a stop/start seam.
+    settleBeforeAction({ transport: false });
+    removeActiveRippleProspects();
+    state.rippleObservation = null;
+  } else {
+    settleBeforeAction({ replacingContext: true });
+  }
+
+  const id = `ripple-${loadGeneration}-${++rippleSequence}`;
+  const appended = appendRippleProspects(state.traversalProspects, {
+    rippleId: id,
+    generation: loadGeneration,
+    start: window.start,
+    end: window.end
+  });
+  if (!appended.changed) return false;
+  state.traversalProspects = appended.state;
+  state.rippleObservation = {
+    id,
+    generation: loadGeneration,
+    observationAddress,
+    contextStart: window.start,
+    contextEnd: window.end,
+    phase: "observing"
+  };
+  startContext(observationAddress, { retarget });
+  setStatus(
+    `Ripple observing ${formatTime(observationAddress)}. Current remains ${
+      formatTime(currentNeighborhood().C)
+    }.`
+  );
+  view.render();
+  return true;
+}
+
 function applyPlayerEffect(result, options = {}) {
   if (!state.videoLoaded || !player) return;
   const observe = options.observe !== false;
@@ -1072,7 +1181,7 @@ function applyPlayerEffect(result, options = {}) {
     : result?.activeSpan?.arrival;
   if (!Number.isFinite(destination)) return;
 
-  if (observe && state.contextSeconds > 0 && result?.activeSpan) {
+  if (observe && state.contextDuration > 0 && result?.activeSpan) {
     if (!options.panoramaAligned) {
       panorama?.translateToCurrent(destination, { preserve: true });
     }
@@ -1282,22 +1391,17 @@ function retainedCarryStatus(result) {
     : "";
 }
 
-// What the reader actually watched, as directed spans.
+// What the reader voluntarily watched in ordinary Playback, as directed spans.
 //
 // The span is built from the transport's own departure and cycles, not from the
 // Active Span it happened to leave behind: an Interval describes an extent
 // and a wrapped playback crosses its material repeatedly, so inferring one span
 // from the final geometry would lose both the repetition and the direction.
 //
-// The programmatic return from Context back to semantic Current is deliberately
-// not recorded. The adapter being told where to sit afterwards is a consequence
-// of the observation, not a second observation.
-function recordObservedSpans(transport, current) {
-  if (!isTransportActive(transport)) return false;
-  // A Context window superseded by the next Ghost candidate is part of the scan,
-  // not a watched span. The reader is sweeping through moments to find one; only
-  // what they were still watching when the gesture ended is an observation they
-  // actually made.
+// Automatic Context recognizes a Current already reached. Neither its window
+// nor the programmatic return from Cursor to Current is another traversal.
+function recordPlaybackSpans(transport, current) {
+  if (transport?.kind !== TRANSPORT_KIND.PLAYBACK) return false;
   if (state.ghostGesture) return false;
   const departure = Number(transport.entry ?? transport.departure);
   const end = Number(current);
@@ -1317,10 +1421,7 @@ function recordObservedSpans(transport, current) {
   } else {
     spans.push({ from: departure, to: end });
   }
-  return recordTraversalSpans(
-    spans,
-    transport.kind === TRANSPORT_KIND.CONTEXT ? "context" : "playback"
-  );
+  return recordTraversalSpans(spans, "playback");
 }
 
 function settleTransport(options = {}) {
@@ -1332,10 +1433,6 @@ function settleTransport(options = {}) {
   const handoffPanorama = options.handoffPanorama === true;
   const shouldRender = options.render !== false;
   const current = clamp(safeCurrentTime(), activeRange().start, activeRange().end);
-  // Watched source time, recorded as what was actually observed rather than as
-  // one span inferred from where it finished. A wrapped Range crosses its
-  // material more than once, and each crossing is its own directed span.
-  recordObservedSpans(active, current);
   const cancelPendingStart = issuePause && active.phase === "starting";
   if (cancelPendingStart) {
     centerPauseRequest = {
@@ -1352,15 +1449,42 @@ function settleTransport(options = {}) {
   if (issuePause) player.pause();
 
   if (active.kind === TRANSPORT_KIND.CONTEXT) {
-    if (restoreObservation && !handoffPanorama && currentNeighborhood()) {
-      placePlayer(currentNeighborhood().C);
-      panorama?.translateToCurrent(currentNeighborhood().C, { preserve: true });
+    const ripple = rippleOwnsContext(active)
+      ? state.rippleObservation
+      : null;
+    if (ripple) {
+      if (options.completeRipple === true && ripple.generation === loadGeneration) {
+        ripple.phase = "completed";
+        state.rippleObservation = null;
+      } else {
+        removeActiveRippleProspects();
+        state.rippleObservation = null;
+      }
+    }
+    const observationCenter = ripple
+      ? currentNeighborhood()?.C
+      : Number.isFinite(active.anchor)
+      ? active.anchor
+      : currentNeighborhood()?.C;
+    if (restoreObservation && !handoffPanorama && Number.isFinite(observationCenter)) {
+      placePlayer(observationCenter);
+      panorama?.translateToCurrent(observationCenter, { preserve: true });
     }
     if (shouldRender) view.render();
+    if (ripple && options.completeRipple === true) {
+      setStatus(
+        `Ripple added futures at ${formatTime(ripple.contextStart)} and ${
+          formatTime(ripple.contextEnd)
+        }.`
+      );
+    }
     return true;
   }
 
   if (active.kind === TRANSPORT_KIND.PLAYBACK) {
+    // Voluntary watched source time enters the Trace. A wrapped Range crosses
+    // its material more than once, and each crossing remains directed.
+    recordPlaybackSpans(active, current);
     // Ordinary pause freezes the visible Panorama once. A direct handoff skips
     // that intermediate formation because the next transport will establish
     // its own Panorama around the newly settled Current in the same action.
@@ -1695,7 +1819,7 @@ function releaseActiveSpan() {
   if (!state.videoLoaded) return false;
   settleBeforeAction();
   const hadTimelineOperand = Boolean(state.timelineSelection);
-  const result = releaseSessionInterval(state.session);
+  const result = releaseSessionActiveSpan(state.session);
   if (!result.changed) {
     if (hadTimelineOperand) {
       state.timelineSelection = null;
@@ -1756,12 +1880,13 @@ function toggleWeightRelaxation() {
     return false;
   }
   // Pending spatial gestures must become exact before their projection changes.
-  // Playback deliberately continues: X issues no player command, though a
-  // Textured Playback may read the new effective map on its next tick.
+  // Playback deliberately continues; a Textured Shift transaction atomically
+  // reads the new Effective Weight immediately.
   settleBeforeAction({ transport: false });
   const scope = resolvedWeightRelaxationScope();
   const restoring = sameWeightRelaxation(validWeightRelaxation(), scope);
   state.weightRelaxation = restoring ? null : scope;
+  applyActiveShiftPlaybackPolicy({ reason: "weight-relaxation" });
   view.invalidateTimelinePins();
   view.renderGuide();
   view.render();
@@ -1782,7 +1907,7 @@ function toggleWeightRelaxation() {
 
 function focusOrUnfocus() {
   if (!state.videoLoaded) return false;
-  if (model().focus) return leaveSection();
+  if (model().focus) return unfocus();
   const working = currentSpan();
   const selected = state.timelineSelection?.kind === "section"
     ? resolveSection(guide(), state.timelineSelection.id)
@@ -1801,7 +1926,7 @@ function focusOrUnfocus() {
       return focusSection(selected.id);
     }
   }
-  if (working) return focusWorkingSection();
+  if (working) return focusActiveSpan();
   setStatus("Establish a Active Span or select a Section before Focus.");
   return false;
 }
@@ -1832,7 +1957,7 @@ function traverseHistory(transform, emptyMessage, completedVerb, cause) {
   const currentMoved = Math.abs(destination - departure) > EPSILON;
   const rangeChanged = Math.abs(previousModel.range.start - activeRange().start) > EPSILON
     || Math.abs(previousModel.range.end - activeRange().end) > EPSILON;
-  if (currentMoved && state.contextSeconds > 0) {
+  if (currentMoved && state.contextDuration > 0) {
     if (rangeChanged) panorama?.resetAtCurrent?.();
     else panorama?.translateToCurrent(destination, { preserve: true });
     startContext(destination);
@@ -2052,7 +2177,8 @@ function startPanoramaPlaybackFromGesture(options = {}) {
     ratePolicy,
     offeredRates: offeredRates(),
     weight: timelineProjection().effectiveWeightAtSource(destination),
-    actualRate: snapshot.rate
+    actualRate: snapshot.rate,
+    shiftPlayback: shifted
   });
   // Tail and Lead hold their offset from Center by sitting one rate rung either
   // side of it, so the Panorama accompanies any Center rate the adapter can
@@ -2144,9 +2270,9 @@ function wrapPlaybackRange() {
   return true;
 }
 
-function heldPanoramaWindow() {
-  const span = state.field?.span;
-  return span?.held && span.available ? { start: span.start, end: span.end } : null;
+function frozenPanoramaWindow() {
+  const span = state.panorama?.span;
+  return span?.frozen && span.available ? { start: span.start, end: span.end } : null;
 }
 
 function acceptRangeTransition(result, { status, closeGuide = false } = {}) {
@@ -2192,14 +2318,14 @@ function focusSection(sectionId) {
   });
 }
 
-function focusWorkingSection() {
+function focusActiveSpan() {
   settleBeforeAction();
   const interval = currentSpan();
   if (!interval) {
     setStatus("Establish a Active Span before focusing it.", true);
     return;
   }
-  const result = focusSessionWorkingSection(state.session);
+  const result = focusSessionActiveSpan(state.session);
   if (!result.changed) {
     setStatus("The Active Span already owns the active Range.");
     return;
@@ -2209,9 +2335,9 @@ function focusWorkingSection() {
   });
 }
 
-function leaveSection() {
+function unfocus() {
   settleBeforeAction();
-  const result = leaveSessionSection(state.session);
+  const result = unfocusSession(state.session);
   if (!result.changed) return;
   acceptRangeTransition(result, {
     status: `Restored Range ${formatRange(result.session.model.range)}.`
@@ -2222,7 +2348,7 @@ function changeSectionWeighting(sectionId, weight) {
   const section = resolveSection(guide(), sectionId);
   if (!section) return false;
   const name = sectionName(section);
-  const result = setGuideSectionWeight(
+  const result = setGuideSectionWeighting(
     state.session,
     sectionId,
     Number(weight)
@@ -2245,6 +2371,7 @@ function changeSectionWeighting(sectionId, weight) {
       ? `Restored “${name}” to ordinary timeline density.`
       : `Set “${name}” to ${next.weighting}× timeline weight.`
   });
+  applyActiveShiftPlaybackPolicy({ reason: "section-weighting" });
   return true;
 }
 
@@ -2312,14 +2439,14 @@ function selectedSectionExtent(source = null) {
   return {
     kind,
     extent: kind === "panorama-span"
-      ? heldPanoramaWindow()
+      ? frozenPanoramaWindow()
       : kind === "selected-pins"
         ? selectedPinExtent()
         : currentSpan()
   };
 }
 
-function retainActiveSpanAsSection(event = null, options = {}) {
+function retainSectionFromSource(event = null, options = {}) {
   event?.preventDefault?.();
   const label = options.useFormLabel === false
     ? ""
@@ -2328,7 +2455,7 @@ function retainActiveSpanAsSection(event = null, options = {}) {
   if (!extent) return setStatus("Establish the selected Extent before saving a Section.", true);
   settleBeforeAction();
   const result = kind === "interval"
-    ? retainSpanAsSection(state.session, label)
+    ? retainSessionActiveSpanAsSection(state.session, label)
     : saveExtentAsSection(
       state.session,
       extent,
@@ -2924,11 +3051,14 @@ function resetSourceScopedState() {
   // discarded, and the ledger starts empty.
   cancelGhostGesture({ restore: false });
   state.traversalTrace = createTraversalTrace(0);
+  state.traversalProspects = clearTraversalProspects();
+  state.sourceGeneration = null;
+  state.rippleObservation = null;
   state.ghostKeyHeld = false;
   state.ghostGesture = null;
   state.ghostContinuation = null;
   state.ghostWheel = null;
-  state.field = null;
+  state.panorama = null;
   view.setPreviewAction(null);
   view.setPreviewSection(null);
 }
@@ -3036,6 +3166,7 @@ function initializeVideo(request = pendingLoad) {
     guide: recovery.guide,
     stepDistance: preferences.stepDistance
   });
+  state.sourceGeneration = request.generation;
   state.videoLoaded = true;
   centerPauseRequest = null;
   state.transport = idleTransport();
@@ -3047,7 +3178,7 @@ function initializeVideo(request = pendingLoad) {
   state.guideSelection = null;
   state.selectedPinIds = [];
   state.guideDrag = null;
-  state.field = null;
+  state.panorama = null;
   state.availableRates = snapshot.availableRates;
   renderPlaybackRateChoices();
   state.playerState = snapshot.state;
@@ -3189,16 +3320,72 @@ function handlePlaybackRateChange(rate) {
   }
   const panoramaWasAvailable = playbackAllowsPanorama(state.transport, { offeredRates: offeredRates() });
   state.transport = withPlaybackActualRate(state.transport, rate);
-  const panoramaIsAvailable = playbackAllowsPanorama(state.transport, { offeredRates: offeredRates() });
+  if (state.transport.shiftPlayback) {
+    applyActiveShiftPlaybackPolicy({
+      issueRate: false,
+      panoramaWasAvailable,
+      reason: "confirmed-playback-rate"
+    });
+    view.render();
+    return;
+  }
+  reconcilePlaybackPanorama(panoramaWasAvailable, "confirmed-playback-rate");
+  view.render();
+}
+
+function reconcilePlaybackPanorama(panoramaWasAvailable, reason) {
+  if (!transportIs(TRANSPORT_KIND.PLAYBACK)) return;
+  const panoramaIsAvailable = playbackAllowsPanorama(
+    state.transport,
+    { offeredRates: offeredRates() }
+  );
   const center = clamp(safeCurrentTime(), activeRange().start, activeRange().end);
-  // Actual-rate events own the compatibility transition, but repeated
-  // confirmations of the same compatibility state own no second Panorama command.
   if (panoramaIsAvailable && !panoramaWasAvailable) {
-    panorama?.resumeAt?.({ center, reason: "confirmed-playback-rate" });
+    panorama?.resumeAt?.({ center, reason });
   } else if (!panoramaIsAvailable && panoramaWasAvailable) {
     panorama?.pause({ center, freeze: false });
   }
-  view.render();
+}
+
+// Reconfigure one live Shift Playback without settling, rebasing, or replacing
+// its transaction. Observation policy, rate policy, and requested rate are one
+// atomic pure result; actual-rate evidence then owns the Panorama edge.
+function applyActiveShiftPlaybackPolicy({
+  issueRate = true,
+  panoramaWasAvailable = null,
+  reason = "playback-policy"
+} = {}) {
+  if (
+    !transportIs(TRANSPORT_KIND.PLAYBACK)
+    || state.transport.shiftPlayback !== true
+  ) return false;
+
+  const priorEligibility = panoramaWasAvailable ?? playbackAllowsPanorama(
+    state.transport,
+    { offeredRates: offeredRates() }
+  );
+  const previousRequestedRate = state.transport.requestedRate;
+  const policyInputs = {
+    shiftPlayback: true,
+    texturedEnabled: state.texturedPlaybackEnabled === true,
+    fixedRateWish: state.playbackRate,
+    effectiveWeight: timelineProjection().effectiveWeightAtSource(safeCurrentTime()),
+    offeredRates: offeredRates(),
+    actualRate: state.transport.actualRate
+  };
+  const policy = derivePlaybackPolicy(policyInputs);
+  state.transport = withDerivedPlaybackPolicy(state.transport, policyInputs);
+
+  if (issueRate && state.transport.requestedRate !== previousRequestedRate) {
+    player.setRate(state.transport.requestedRate);
+  }
+  const center = clamp(safeCurrentTime(), activeRange().start, activeRange().end);
+  if (policy.panoramaEligibility && !priorEligibility) {
+    panorama?.resumeAt?.({ center, reason });
+  } else if (!policy.panoramaEligibility && priorEligibility) {
+    panorama?.pause({ center, freeze: false });
+  }
+  return true;
 }
 
 function handleAutoplayBlocked() {
@@ -3238,20 +3425,19 @@ function pollPlayer() {
   // is not the same as unsupported -- the same rule the Panorama already follows.
   const offered = playerSnapshot().availableRates;
   if (offered.join(",") !== (state.availableRates || []).join(",")) {
+    const panoramaWasAvailable = transportIs(TRANSPORT_KIND.PLAYBACK)
+      ? playbackAllowsPanorama(state.transport, { offeredRates: offeredRates() })
+      : false;
     state.availableRates = offered;
     renderPlaybackRateChoices();
-    if (
-      transportIs(TRANSPORT_KIND.PLAYBACK)
-      && state.transport.observationPolicy === OBSERVATION_POLICY.CENTER_ONLY
-      && state.transport.ratePolicy?.kind === RATE_POLICY_KIND.FIXED
-    ) {
-      const desired = resolvePlaybackRate(state.transport, {
-        offeredRates: offeredRates(),
-        weight: timelineProjection().effectiveWeightAtSource(safeCurrentTime())
-      });
-      if (desired !== state.transport.requestedRate) {
-        state.transport = withPlaybackRequestedRate(state.transport, desired);
-        player.setRate(desired);
+    if (transportIs(TRANSPORT_KIND.PLAYBACK)) {
+      if (state.transport.shiftPlayback) {
+        applyActiveShiftPlaybackPolicy({
+          panoramaWasAvailable,
+          reason: "playback-rate-offer"
+        });
+      } else {
+        reconcilePlaybackPanorama(panoramaWasAvailable, "playback-rate-offer");
       }
     }
   }
@@ -3259,23 +3445,18 @@ function pollPlayer() {
   let transport = state.transport;
   const programmaticPlacementActive = programmaticPlacementOwns(now);
 
-  // A Textured Playback reads its rate off the map it is crossing, so the rate
-  // is re-derived from the Address actually being watched. Only a bucket change
-  // reaches the player: the ladder is coarse on purpose, and asking for a rate
-  // it already has would be a command per poll.
+  // A Textured Shift Playback reads its rate off the map it is crossing. The
+  // complete policy is re-derived even when only Effective Weight changed, so
+  // no event path can partially update a running transaction.
   if (
     transport.kind === TRANSPORT_KIND.PLAYBACK
+    && transport.shiftPlayback === true
     && transport.ratePolicy?.kind === RATE_POLICY_KIND.TEXTURED
   ) {
-    const desired = resolvePlaybackRate(transport, {
-      offeredRates: offeredRates(),
-      weight: timelineProjection().effectiveWeightAtSource(now)
+    applyActiveShiftPlaybackPolicy({
+      reason: "effective-weight"
     });
-    if (desired !== transport.requestedRate) {
-      state.transport = withPlaybackRequestedRate(transport, desired);
-      transport = state.transport;
-      player.setRate(desired);
-    }
+    transport = state.transport;
   }
 
   if (
@@ -3298,7 +3479,7 @@ function pollPlayer() {
         player.play();
       }
     } else if (!inside) {
-      settleTransport();
+      settleTransport({ completeRipple: rippleOwnsContext(transport) });
       return;
     }
   } else if (transport.kind === TRANSPORT_KIND.PLAYBACK && state.playerState === YOUTUBE_STATE.PLAYING) {
@@ -3887,9 +4068,9 @@ function updateCurrentDrag(event) {
 // Context is enabled, otherwise the exact Go/operator Frame around the
 // candidate Address.
 function showCurrentDragFrame(candidate) {
-  const contextHalf = state.contextSeconds / 2;
+  const contextHalf = state.contextDuration / 2;
   const range = activeRange();
-  const frame = state.contextSeconds > 0
+  const frame = state.contextDuration > 0
     ? {
         kind: "current",
         start: Math.max(range.start, candidate - contextHalf),
@@ -3960,17 +4141,30 @@ function finishCurrentDrag(event, options = {}) {
 }
 
 function handleTimelineClick(event) {
-  if (!state.videoLoaded || state.dragHandle) return;
+  if (
+    !state.videoLoaded
+    || state.dragHandle
+    || state.guideDrag
+    || state.currentDrag
+    || state.ghostGesture
+  ) return;
   if (
     event.target.closest(".range-handle")
     || event.target.closest(".timeline-pin")
     || event.target.closest(".pin-cluster-menu")
     || event.target.closest("[data-section-go]")
+    || event.target.closest("#current-marker")
+    || event.target.closest("[data-ripple-address]")
+    || event.target.closest("[data-traversal-prospect]")
   ) return;
   view.closePinClusterMenu();
   const time = timeFromPointer(event, timelineProjection(), true);
   if (!contains(activeRange(), time)) {
     setStatus("That Address is outside Range.", true);
+    return;
+  }
+  if (event.shiftKey === true) {
+    beginRippleObservation(time);
     return;
   }
   // Bare map ground acquires no retained object. Clear the spatial operand
@@ -4248,7 +4442,7 @@ function frameDuration() {
 }
 
 function nudgeQuantum() {
-  return frameDuration() ?? normalizeNudgeSeconds(state.nudgeSeconds);
+  return frameDuration() ?? normalizeNudgeDistance(state.nudgeDistance);
 }
 
 function formatQuantum(value) {
@@ -4631,7 +4825,7 @@ function handleNudgeWheel(event) {
 }
 
 function syncContextControl() {
-  elements["context-seconds"].value = String(state.contextSeconds);
+  elements["context-duration"].value = String(state.contextDuration);
   renderPlaybackRateChoices();
 }
 
@@ -4908,15 +5102,27 @@ function toggleRangeTools() {
   elements["range-state"].setAttribute("aria-expanded", String(elements["range-tools"].open));
 }
 
+function cancelActiveRippleObservation() {
+  const ripple = state.rippleObservation;
+  if (!ripple) return false;
+  if (rippleOwnsContext()) {
+    settleTransport();
+  } else {
+    removeActiveRippleProspects();
+    state.rippleObservation = null;
+    locateAddress(currentNeighborhood().C, { preservePanorama: true });
+    view.render();
+  }
+  setStatus(
+    `Ripple cancelled. Current remains ${formatTime(currentNeighborhood().C)}.`
+  );
+  return true;
+}
+
 // Escape is the universal cancel. A live direct manipulation owns it first, so
 // the same key that abandons a drag never also closes the surface behind it.
 function cancelActiveManipulation() {
-  // Ghost first: it is the only manipulation that can be in flight while no
-  // pointer is down, so nothing else would recognise it as cancellable.
-  if (state.ghostGesture) {
-    cancelGhostGesture({ restore: true });
-    return true;
-  }
+  // Pointer-owned direct manipulation is physically topmost while held.
   if (state.currentDrag) {
     finishCurrentDrag({ pointerId: state.currentDrag.pointerId }, { cancel: true });
     return true;
@@ -4929,14 +5135,24 @@ function cancelActiveManipulation() {
     cancelRangeDrag();
     return true;
   }
+  // Ghost is next because its Candidate is still provisional. An active Ripple
+  // follows it; ordinary observation belongs to the transport tier below.
+  if (state.ghostGesture) {
+    cancelGhostGesture({ restore: true });
+    return true;
+  }
+  if (state.rippleObservation) return cancelActiveRippleObservation();
   return false;
 }
 
 function stopOrClose() {
   // Escape resolves only the topmost active layer. Repeated presses move outward
   // predictably instead of collapsing unrelated state in one action.
-  if (state.dragHandle) return cancelRangeDrag();
-  if (state.guideDrag) return finishGuideDrag(null, { cancel: true });
+  if (isTransportActive(state.transport)) {
+    settleTransport();
+    setStatus("Observation stopped.");
+    return true;
+  }
   if (guideDialogOpen()) return closeGuideDialog();
   if (!elements["pin-cluster-menu"].hidden) {
     view.closePinClusterMenu({ restoreFocus: true });
@@ -4945,11 +5161,6 @@ function stopOrClose() {
   }
   if (compactGuideLayout() && state.guideOpen) {
     closeGuide();
-    return true;
-  }
-  if (isTransportActive(state.transport)) {
-    settleTransport();
-    setStatus("Observation stopped.");
     return true;
   }
   view.setPreviewAction(null);
@@ -5079,7 +5290,7 @@ function initializePlayerApi() {
       persistPreferences();
     },
     onChange: panoramaState => {
-      state.field = panoramaState;
+      state.panorama = panoramaState;
       view.render();
     },
     formatTime
@@ -5156,36 +5367,74 @@ function beginGhostGesture({ initialDirection } = {}) {
   const projection = timelineProjection();
   const stepDistance = effectiveStepDistance(model().stepDistance, activeRange(), projection);
   // Which stream this gesture reads is decided once, by the direction it opens
-  // with. Forward from a re-entered moment asks what originally followed it, so
-  // it resumes the historical occurrence. Backward asks what led to the present
-  // re-entry, which is the live stream. Reversing the wheel later retraces the
-  // cursor already chosen rather than switching streams underneath the reader.
+  // with. Forward first reads completed Ripple futures, newest first; without
+  // one it asks what historically followed a re-entered moment. Backward asks
+  // what led to the present re-entry. Reversing later retraces the frozen
+  // cursor already chosen rather than switching sources underneath the reader.
+  const prospectRead = initialDirection === "forward"
+    ? beginTraversalProspectRead(state.traversalProspects, {
+        generation: state.sourceGeneration,
+        range: activeRange(),
+        excludeAddress: anchor,
+        excludeTolerance: EPSILON
+      })
+    : null;
+  const readsProspects = Boolean(prospectRead?.entries.length);
   const resumable = initialDirection === "forward"
+    && !readsProspects
     && tracePositionIsValid(state.traversalTrace, state.ghostContinuation, {
       current: anchor,
       range: activeRange()
     });
-  const read = beginGhostRead(state.traversalTrace, {
-    current: anchor,
-    continuationPosition: resumable ? state.ghostContinuation : null,
-    // The boundary is where the stream stands now, so the gesture can never
-    // read the replay it is itself about to append.
-    frozenStreamEnd: state.traversalTrace.records.length,
-    range: activeRange(),
-    projection,
-    stepDistance
-  });
+  const read = readsProspects
+    ? null
+    : beginGhostRead(state.traversalTrace, {
+        current: anchor,
+        continuationPosition: resumable ? state.ghostContinuation : null,
+        // The boundary is where the stream stands now, so the gesture can never
+        // read the replay it is itself about to append.
+        frozenStreamEnd: state.traversalTrace.records.length,
+        range: activeRange(),
+        projection,
+        stepDistance
+      });
   state.ghostGesture = {
     anchor,
+    candidate: anchor,
+    previewActiveSpan: originModel.activeSpan
+      ? copy(originModel.activeSpan)
+      : null,
+    previewNeighborhood: copy(originModel.neighborhood),
+    readKind: readsProspects
+      ? "traversal-prospect"
+      : resumable ? "historical-successor" : "live-occurrence",
+    readId: (
+      readsProspects
+        ? null
+        : resumable
+        ? state.ghostContinuation?.recordId
+        : read?.index >= 0
+          ? read.positions[read.index]?.recordId
+          : null
+    ),
+    frozenTraceRead: read,
+    frozenProspectRead: prospectRead,
+    selectedProspect: null,
     originModel,
     originHistory: state.session.history,
     originFuture: state.session.future,
-    anchorPosition: read.index >= 0 ? read.positions[read.index] : null,
-    read,
+    previewSession: {
+      model: snapshotModel(originModel),
+      history: state.session.history,
+      future: state.session.future
+    },
+    anchorPosition: read?.index >= 0 ? read.positions[read.index] : null,
     projection,
     stepDistance,
     initialDirection,
-    readOrigin: resumable ? "historical-successor" : "live-occurrence",
+    readOrigin: readsProspects
+      ? "traversal-prospect"
+      : resumable ? "historical-successor" : "live-occurrence",
     visited: [],
     directionChanges: 0,
     visitedMinimum: anchor,
@@ -5229,29 +5478,59 @@ function handleGhostWheel(event) {
   let moved = false;
   let blocked = null;
   for (let index = 0; index < Math.abs(count); index += 1) {
-    const candidate = moveGhostRead(state.traversalTrace, gesture.read, userDirection);
+    const readsProspects = gesture.readKind === "traversal-prospect";
+    const candidate = readsProspects
+      ? moveTraversalProspectRead(gesture.frozenProspectRead, userDirection)
+      : moveGhostRead(
+          state.traversalTrace,
+          gesture.frozenTraceRead,
+          userDirection
+        );
     if (!candidate.changed) {
       blocked = candidate.reason;
       break;
     }
-    const previous = currentNeighborhood().C;
-    const result = ghostTraverse(state.session, candidate.address, {
-      anchor: gesture.anchor,
-      direction: userDirection,
-      originResolution: gesture.originModel.neighborhood,
-      originResolutionBasis: gesture.originModel.neighborhoodBasis,
-      projection: gesture.projection,
-      amend: true
-    });
+    const previous = gesture.candidate;
+    const result = readsProspects
+      ? goTo({
+          model: snapshotModel(gesture.originModel),
+          history: gesture.originHistory,
+          future: gesture.originFuture
+        }, candidate.address, {
+          operator: "go",
+          label: "Go to Traversal Prospect",
+          projection: gesture.projection
+        })
+      : ghostTraverse(gesture.previewSession, candidate.address, {
+          anchor: gesture.anchor,
+          direction: userDirection,
+          originResolution: gesture.originModel.neighborhood,
+          originResolutionBasis: gesture.originModel.neighborhoodBasis,
+          projection: gesture.projection,
+          amend: true
+        });
     if (!result.changed) {
       blocked = result.reason;
       break;
     }
-    state.session = result.session;
-    gesture.read = candidate.read;
+    gesture.previewSession = result.session;
+    gesture.candidate = candidate.address;
+    gesture.previewActiveSpan = result.session.model.activeSpan
+      ? copy(result.session.model.activeSpan)
+      : null;
+    gesture.previewNeighborhood = copy(result.session.model.neighborhood);
+    if (readsProspects) {
+      gesture.frozenProspectRead = candidate.read;
+      gesture.selectedProspect = candidate.prospect;
+      gesture.readId = candidate.prospect.id;
+    } else {
+      gesture.frozenTraceRead = candidate.read;
+    }
     gesture.visited.push({
       address: candidate.address,
-      sourcePosition: candidate.cursor,
+      sourcePosition: readsProspects
+        ? { prospectId: candidate.prospect.id, index: candidate.cursor }
+        : candidate.cursor,
       userDirection
     });
     gesture.visitedMinimum = Math.min(gesture.visitedMinimum, candidate.address);
@@ -5278,13 +5557,12 @@ function handleGhostWheel(event) {
     // wheel instead of being torn down and rebuilt at every notch.
     //
     // With Context off, the recall stays a silent frame-by-frame scan.
-    const landing = currentNeighborhood().C;
-    if (state.contextSeconds > 0) {
+    const landing = gesture.candidate;
+    if (state.contextDuration > 0) {
       startContext(landing, { retarget: transportIs(TRANSPORT_KIND.CONTEXT) });
     } else {
       locateAddress(landing, { preservePanorama: true });
     }
-    syncIntervalPinSelection();
     // A recall is otherwise almost silent -- Current moves and an Interval
     // appears, both of which many other operators also do -- so it says how far
     // back through its own path the reader now is. Without it there is no way to
@@ -5293,22 +5571,40 @@ function handleGhostWheel(event) {
     // have turned. Depth alone cannot say how much further there is to go, and
     // a reader who cannot see that has no way to tell a working recall from one
     // that has quietly run out -- which is most of what made this feel broken.
-    const place = gesture.read.index + 1;
-    const total = gesture.read.positions.length;
-    setStatus(
-      `Ghost ${userDirection === "backward" ? "back" : "on"} · ${
-        formatTime(currentNeighborhood().C)
-      } · ${place} of ${total} · anchored at ${formatTime(gesture.anchor)}.`
-    );
+    if (gesture.readKind === "traversal-prospect") {
+      const boundary = gesture.selectedProspect?.kind === "ripple-start"
+        ? "Start"
+        : "End";
+      const place = gesture.frozenProspectRead.index + 1;
+      const total = gesture.frozenProspectRead.entries.length;
+      setStatus(
+        `Ghost future · Ripple ${boundary} Prospect ${formatTime(gesture.candidate)
+        } · ${place} of ${total} · Current remains ${formatTime(gesture.anchor)}.`
+      );
+    } else {
+      const place = gesture.frozenTraceRead.index + 1;
+      const total = gesture.frozenTraceRead.positions.length;
+      setStatus(
+        `Ghost ${userDirection === "backward" ? "back" : "on"} · ${
+          formatTime(gesture.candidate)
+        } · ${place} of ${total} · anchored at ${formatTime(gesture.anchor)}.`
+      );
+    }
     view.render();
   } else if (blocked === "range-blocked") {
     setStatus("Ghost history continues outside the active Range. Unfocus or widen Range to continue.");
   } else if (blocked) {
     // Running out is the common case at the live end, and it is not a failure:
     // say which end was reached and how to leave it.
-    setStatus(userDirection === "backward"
-      ? "Ghost is at the beginning of your path; there is nothing earlier to recall."
-      : "Ghost is at the most recent moment of your path; scroll the other way to look back.");
+    if (gesture.readKind === "traversal-prospect") {
+      setStatus(userDirection === "backward"
+        ? "Ghost is at the newest Traversal Prospect in this frozen scan."
+        : "Ghost reached the last Traversal Prospect in this frozen scan.");
+    } else {
+      setStatus(userDirection === "backward"
+        ? "Ghost is at the beginning of your path; there is nothing earlier to recall."
+        : "Ghost is at the most recent moment of your path; scroll the other way to look back.");
+    }
   }
   return true;
 }
@@ -5320,6 +5616,39 @@ function settleGhostGesture() {
   state.ghostGesture = null;
   state.ghostWheel = null;
   if (!gesture?.changed) return false;
+  if (gesture.readKind === "traversal-prospect") {
+    const prospect = gesture.selectedProspect;
+    const result = goTo(state.session, prospect?.address, {
+      operator: "go",
+      label: "Go to Traversal Prospect",
+      projection: gesture.projection
+    });
+    if (!result.changed) {
+      locateAddress(gesture.anchor);
+      view.render();
+      return false;
+    }
+    const boundary = prospect.kind === "ripple-start" ? "Start" : "End";
+    const accepted = accept(result, {
+      effect: false,
+      status: `Moved by Go to Ripple ${boundary} Prospect ${formatTime(prospect.address)}.`
+    });
+    if (!accepted) {
+      locateAddress(gesture.anchor);
+      view.render();
+      return false;
+    }
+    const consumed = consumeTraversalProspect(
+      state.traversalProspects,
+      prospect.id
+    );
+    if (consumed.changed) state.traversalProspects = consumed.state;
+    view.render();
+    return true;
+  }
+  // This is the first semantic assignment in the gesture. Every wheel notch
+  // before release lived only in the Ghost Candidate preview above.
+  state.session = gesture.previewSession;
   const settled = settleGhostSequence(state.session, gesture);
   if (settled.changed) state.session = settled.session;
   state.session = checkpoint(state.session, "Ghost Traverse", gesture.originModel).session;
@@ -5330,7 +5659,7 @@ function settleGhostGesture() {
   const ghostReturn = appendGhostReturn(state.traversalTrace, {
     anchor: gesture.anchor,
     anchorPosition: gesture.anchorPosition,
-    landing: currentNeighborhood().C,
+    landing: gesture.candidate,
     recalledPosition: finalVisit?.sourcePosition || null,
     scan: {
       candidateCount: gesture.visited.length,
@@ -5362,11 +5691,8 @@ function cancelGhostGesture({ restore = true } = {}) {
   state.ghostKeyHeld = false;
   if (!gesture) return false;
   if (restore && gesture.changed) {
-    state.session = {
-      model: snapshotModel(gesture.originModel),
-      history: gesture.originHistory,
-      future: gesture.originFuture
-    };
+    // Session never left the accepted Anchor; only physical candidate
+    // presentation needs to be restored.
     locateAddress(gesture.anchor);
     syncIntervalPinSelection();
     view.renderGuide();
@@ -5658,7 +5984,7 @@ elements.release.addEventListener("click", releaseActiveSpan);
 elements.retain.addEventListener("click", event => {
   const latchedMatrix = event.shiftKey !== true && state.shiftLayers.matrix;
   if (event.shiftKey || latchedMatrix) {
-    retainActiveSpanAsSection(event, { source: "interval", useFormLabel: false });
+    retainSectionFromSource(event, { source: "interval", useFormLabel: false });
     if (latchedMatrix) consumeShiftLayer("matrix");
     return;
   }
@@ -5744,18 +6070,18 @@ for (const binding of [
 // the ensuing click. Keyboard focus remains intact for Tab and Enter.
 document.addEventListener("pointerup", releasePointerControlFocus);
 
-elements["context-seconds"].addEventListener("change", event => {
-  const previous = state.contextSeconds;
-  state.contextSeconds = normalizeContextSeconds(event.target.value, previous);
-  event.target.value = String(state.contextSeconds);
+elements["context-duration"].addEventListener("change", event => {
+  const previous = state.contextDuration;
+  state.contextDuration = normalizeContextDuration(event.target.value, previous);
+  event.target.value = String(state.contextDuration);
   persistPreferences();
   if (transportIs(TRANSPORT_KIND.CONTEXT)) {
-    if (state.contextSeconds === 0) {
+    if (state.contextDuration === 0) {
       settleTransport();
       setStatus("Automatic Context turned off.");
     } else {
       startContext(currentNeighborhood().C, { retarget: true });
-      setStatus(`Automatic Context updated to ${state.contextSeconds}s.`);
+      setStatus(`Automatic Context updated to ${state.contextDuration}s.`);
     }
   }
   view.render();
@@ -5792,33 +6118,11 @@ function renderPlaybackRateChoices() {
       : `${formatRate(state.playbackRate)} wish · ${formatRate(effectivePlaybackRate())} offered`;
 }
 
-function retuneActiveShiftPlayback() {
-  if (
-    !transportIs(TRANSPORT_KIND.PLAYBACK)
-    || state.transport.observationPolicy !== OBSERVATION_POLICY.CENTER_ONLY
-  ) return false;
-  const previousRate = state.transport.requestedRate;
-  state.transport = withPlaybackRatePolicy(
-    state.transport,
-    state.texturedPlaybackEnabled
-      ? texturedRatePolicy()
-      : fixedRatePolicy(state.playbackRate),
-    {
-      offeredRates: offeredRates(),
-      weight: timelineProjection().effectiveWeightAtSource(safeCurrentTime())
-    }
-  );
-  if (state.transport.requestedRate !== previousRate) {
-    player.setRate(state.transport.requestedRate);
-  }
-  return true;
-}
-
 elements["playback-dynamic"].addEventListener("change", event => {
   state.texturedPlaybackEnabled = event.target.checked === true;
   persistPreferences();
   renderPlaybackRateChoices();
-  retuneActiveShiftPlayback();
+  applyActiveShiftPlaybackPolicy({ reason: "textured-playback-toggle" });
   setStatus(state.texturedPlaybackEnabled
     ? "Shift plays Center at a rate that follows Section weight."
     : `Shift plays Center at ${formatRate(effectivePlaybackRate())}.`);
@@ -5829,7 +6133,7 @@ elements["playback-rate"].addEventListener("change", event => {
   state.playbackRate = normalizePlaybackRate(event.target.value, state.playbackRate);
   persistPreferences();
   renderPlaybackRateChoices();
-  retuneActiveShiftPlayback();
+  applyActiveShiftPlaybackPolicy({ reason: "fixed-rate-wish" });
   setStatus(`Shift plays Center at ${formatRate(effectivePlaybackRate())}.`);
   view.render();
 });
@@ -5849,16 +6153,16 @@ elements["panorama-inner-offset"].addEventListener("change", event => {
 elements["panorama-outer-offset"].addEventListener("change", event => {
   changePanoramaBoundary("outer", event.target.value);
 });
-elements["nudge-seconds"].addEventListener("change", event => {
+elements["nudge-distance"].addEventListener("change", event => {
   const parsed = Number(event.target.value);
   if (!String(event.target.value).trim() || !Number.isFinite(parsed) || parsed <= 0) {
     setStatus("Nudge must be a positive number of seconds.", true);
     view.render();
     return;
   }
-  state.nudgeSeconds = normalizeNudgeSeconds(parsed);
+  state.nudgeDistance = normalizeNudgeDistance(parsed);
   persistPreferences();
-  setStatus(`Nudge set to ${formatQuantum(state.nudgeSeconds)}.`);
+  setStatus(`Nudge set to ${formatQuantum(state.nudgeDistance)}.`);
   view.render();
 });
 elements["step-distance"].addEventListener("change", event => {
@@ -5877,17 +6181,17 @@ for (const control of document.querySelectorAll("[data-step-fraction]")) {
 }
 
 // Guide creation and Range affordances
-elements["section-retain-form"].addEventListener("submit", retainActiveSpanAsSection);
+elements["section-retain-form"].addEventListener("submit", retainSectionFromSource);
 elements["section-label"].addEventListener("input", view.render);
 elements["section-source"].addEventListener("change", view.render);
-elements["focus-active-span"].addEventListener("click", focusWorkingSection);
+elements["focus-active-span"].addEventListener("click", focusActiveSpan);
 elements["pin-retain-form"].addEventListener("submit", retainCurrentAsPin);
 elements["pin-label"].addEventListener("input", view.render);
 elements["range-state"].addEventListener("click", toggleRangeTools);
 elements["range-tools"].addEventListener("toggle", () => {
   elements["range-state"].setAttribute("aria-expanded", String(elements["range-tools"].open));
 });
-elements["leave-section"].addEventListener("click", leaveSection);
+elements["unfocus"].addEventListener("click", unfocus);
 
 // Guide
 elements["guide-toggle"].addEventListener("click", () => toggleGuide());
@@ -6293,8 +6597,8 @@ function handleGuideClick(event) {
   if (reveal) return revealPin(reveal.dataset.revealPin);
   const focus = event.target.closest("[data-focus-section]");
   if (focus) return focusSection(focus.dataset.focusSection);
-  const leave = event.target.closest("[data-leave-section]");
-  if (leave) return leaveSection();
+  const leave = event.target.closest("[data-unfocus]");
+  if (leave) return unfocus();
   const renamePinButton = event.target.closest("[data-rename-pin]");
   if (renamePinButton) return renamePinById(renamePinButton.dataset.renamePin);
   const deletePinButton = event.target.closest("[data-delete-pin]");
@@ -6567,7 +6871,7 @@ document.addEventListener("keydown", event => {
   // transactions used by their pointer controls.
   else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && key === "t") {
     event.preventDefault();
-    retainActiveSpanAsSection(event, {
+    retainSectionFromSource(event, {
       source: "interval",
       useFormLabel: false
     });

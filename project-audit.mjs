@@ -22,6 +22,7 @@ const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const canonicalNames = [
   "README.md",
+  "CLOCKWORK.md",
   "PROJECT.md",
   "GLOSSARY.md",
   "SPEC.md",
@@ -38,6 +39,9 @@ const view = read("view.js");
 const styles = read("styles.css");
 const session = read("session.js");
 const projection = read("timeline-projection.js");
+const trace = read("traversal-trace.js");
+const prospects = read("traversal-prospects.js");
+const transport = read("transport.js");
 const workflow = read(".github/workflows/verify.yml");
 const deployWorkflow = existsSync(new URL("./.github/workflows/deploy-pages.yml", import.meta.url))
   ? read(".github/workflows/deploy-pages.yml")
@@ -51,6 +55,7 @@ for (const retired of [
   ".v5.2-patch-backup",
   "BRANCH_INSTALL.md",
   "DELETE_FILES.txt",
+  "HANDOFF.md",
   "MANUAL_SMOKE.md",
   "PATCHSET.md",
   "SHA256SUMS",
@@ -67,7 +72,7 @@ for (const retired of [
 ]) check(!existsSync(new URL(`./${retired}`, import.meta.url)), `Retired artifact remains: ${retired}.`);
 
 check(pkg.name === "video-cartography", "package.json retains the canonical package name.");
-check(pkg.version === "9.0.0", "Completion release is package version 9.0.0.");
+check(pkg.version === "9.1.0", "Completion release is package version 9.1.0.");
 check(pkg.private === true && pkg.type === "module", "The static private ES-module package boundary is explicit.");
 check(pkg.scripts?.verify === "npm run check && npm run test:browser",
   "verify composes the DOM-free and Chromium gates.");
@@ -75,10 +80,57 @@ check(pkg.scripts?.audit === "node integration-check.mjs && node project-audit.m
   "The integration, project, and strict lexicon gauges are all part of check.");
 // Everything that needs a real browser runs from one route, so there is no way
 // to satisfy the release gate while skipping a suite that needs Chromium.
-check(pkg.scripts?.["test:browser"] === "node browser-smoke.mjs && node ghost-smoke.mjs && node timeline-render-smoke.mjs",
+check(pkg.scripts?.["test:browser"] === "node browser-smoke.mjs && node ghost-smoke.mjs && node timeline-render-smoke.mjs && node ripple-render-smoke.mjs && node panorama-render-smoke.mjs",
   "The browser proof has one package route covering every browser-backed suite.");
 has(pkg.scripts?.check || "", /npm run test:semantic/, "The extended semantic state-space proof runs in check.");
+has(pkg.scripts?.test || "", /ripple-random-tests\.mjs/,
+  "The pure gate includes randomized Ripple prospect and settlement stress.");
+has(pkg.scripts?.test || "", /traversal-prospects-tests\.mjs/,
+  "The pure gate includes the Traversal Prospect owner proof.");
+has(pkg.scripts?.["test:browser"] || "", /ripple-render-smoke\.mjs/,
+  "The browser gate includes Ripple presentation and interaction proof.");
 has(pkg.scripts?.check || "", /npm run audit/, "The validation gauges run in check.");
+
+// Ripple adds one transient future-state object, not a parallel application
+// architecture. The pure owner stays DOM- and persistence-free; app.js owns its
+// lifecycle and view.js owns its projection.
+check(existsSync(new URL("./traversal-prospects.js", import.meta.url)),
+  "The Traversal Prospect owner exists.");
+has(app, /from "\.\/traversal-prospects\.js"/,
+  "The application lifecycle reaches the Traversal Prospect owner.");
+has(view, /from "\.\/traversal-prospects\.js"/,
+  "The presentation layer reaches Traversal Prospect read helpers.");
+lacks(prospects, /\b(?:document|window|localStorage|sessionStorage|history)\b|from "\.\/(?:app|view|session|guide|transport)\.js"/,
+  "The Traversal Prospect owner has no DOM, persistence, or higher-layer dependency.");
+has(app, /traversalProspects:[\s\S]*?rippleObservation:\s*null/,
+  "Ripple observation and futures are explicit transient application state.");
+has(app, /function persistPreferences\(\)[\s\S]*?JSON\.stringify\(\{[\s\S]*?\}\)\)[\s\S]*?\n\}/,
+  "Preference persistence remains an explicit allowlist.");
+lacks(
+  app.match(/function persistPreferences\(\)[\s\S]*?\n\}\n\n/)?.[0] || "",
+  /\bripple/i,
+  "Ripple has no preference persistence key."
+);
+
+const jsSources = readdirSync(new URL("./", import.meta.url))
+  .filter(name => name.endsWith(".js"))
+  .map(name => [name, read(name)]);
+const ownerCount = pattern => jsSources.reduce(
+  (sum, [, source]) => sum + count(source, pattern),
+  0
+);
+check(ownerCount(/export function createContextTransport\b/) === 1
+  && /export function createContextTransport\b/.test(transport),
+  "There is one Context transport owner.");
+check(ownerCount(/export function createTimelineProjection\b/) === 1
+  && /export function createTimelineProjection\b/.test(projection),
+  "There is one Timeline Projection owner.");
+check(ownerCount(/export function createSession\b/) === 1
+  && /export function createSession\b/.test(session),
+  "There is one Session owner.");
+check(ownerCount(/export function createTraversalTrace\b/) === 1
+  && /export function createTraversalTrace\b/.test(trace),
+  "There is one Traversal Trace owner.");
 
 // Reproducibility is a release law. Dependency selection happens once in the
 // lockfile, both verification jobs install it exactly, and Chromium follows the
@@ -389,7 +441,7 @@ lacks(styles, /\.timeline-normalize\b|grid-area:\s*deform\b|\.deform-action\b/,
 has(styles, /\.timeline-pin\.retained-selected::before\s*\{[^}]*outline:/,
   "Acquired Pin identity uses its own outline channel.");
 has(styles, /\.timeline-pin\.section-endpoint-pin\.extent-selected::before\s*\{[^}]*box-shadow:/,
-  "Working-Interval endpoint relation remains visible beside acquisition.");
+  "Active Span endpoint relation remains visible beside acquisition.");
 has(styles, /\.timeline-pin\.snap-target\.snap-armed::before\s*\{[^}]*outline:/,
   "Transient armed snap state has a separate outline/glow channel.");
 

@@ -31,8 +31,8 @@ byId.get("load-video").click();
 await flush(5);
 await poll();
 await flush(3);
-byId.get("context-seconds").value = "0";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "0";
+byId.get("context-duration").dispatch("change");
 
 // Establish and retain 30–50 as an ordinary Section.
 for (const clientX of [300, 500]) {
@@ -100,7 +100,7 @@ dispatchDocument("keydown", { key: "c", code: "KeyC" });
 await flush();
 assert.equal(
   byId.get("duration-time").textContent,
-  "1:40 · 0.9× spatial"
+  "1:40 · 0.9× Timeline allocation"
 );
 assert.deepEqual(
   playerCommandCounts(),
@@ -110,7 +110,7 @@ assert.deepEqual(
 
 assert.equal(
   byId.get("duration-time").textContent,
-  "1:40 · 0.9× spatial"
+  "1:40 · 0.9× Timeline allocation"
 );
 timelineNodes = descendants(byId.get("topography-layer"));
 const gradient = timelineNodes.find(node =>
@@ -152,7 +152,7 @@ assert.equal(byId.get("return-meta").textContent, sectionBypassHistory,
   "A transient bypass creates no history transaction.");
 dispatchDocument("keydown", { key: "x", code: "KeyX" });
 await flush();
-assert.match(byId.get("duration-time").textContent, /^1:40 .*0\.9.* spatial$/);
+assert.match(byId.get("duration-time").textContent, /^1:40 .*0\.9.* Timeline allocation$/);
 
 // One spatial second reaches the Section boundary; the next consumes two
 // source seconds at 0.5× density.
@@ -214,7 +214,7 @@ await flush();
 assert.equal(byId.get("range-label").textContent, "0:30–0:50");
 assert.equal(
   byId.get("duration-time").textContent,
-  "1:40 · 0.9× spatial"
+  "1:40 · 0.9× Timeline allocation"
 );
 // Focus makes the relation the world, so the focused extent is drawn across
 // the whole timeline whatever its Weight.
@@ -284,7 +284,7 @@ assert.deepEqual(
 );
 assert.equal(
   byId.get("duration-time").textContent,
-  "1:40 · 1.2× spatial"
+  "1:40 · 1.2× Timeline allocation"
 );
 assert.ok(
   descendants(byId.get("topography-layer"))
@@ -366,7 +366,7 @@ assert.deepEqual(
 assert.equal(byId.get("sections-list-count").textContent, "2");
 assert.equal(
   byId.get("duration-time").textContent,
-  "1:40 · 0.975× spatial"
+  "1:40 · 0.975× Timeline allocation"
 );
 
 // X bypasses topography: the complete map is drawn and measured as if the
@@ -393,7 +393,7 @@ dispatchDocument("keydown", { key: "x", code: "KeyX" });
 await flush();
 assert.equal(
   byId.get("duration-time").textContent,
-  "1:40 · 0.975× spatial",
+  "1:40 · 0.975× Timeline allocation",
   "Pressing it again restores every Weight exactly."
 );
 
@@ -445,8 +445,8 @@ assert.deepEqual(
 // readout that announces a movement must state the source time it will actually
 // cross, or the interface reads "10s · to 0:43" beside a Current of 0:38.
 {
-  byId.get("context-seconds").value = "0";
-  byId.get("context-seconds").dispatch("change");
+  byId.get("context-duration").value = "0";
+  byId.get("context-duration").dispatch("change");
   byId.get("step-mode-fixed").dispatch("click", { detail: 1 });
   byId.get("step-distance").value = "10";
   byId.get("step-distance").dispatch("change");

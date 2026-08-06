@@ -32,7 +32,7 @@ unrelated players.
 
 Each pane's top bar contains only identity, Address, and a local visibility
 action. Center's bar also reports Panorama state. The sole bottom action is the
-centered `Resume Panorama` / `Freeze Panorama` control. Remembered tuning lives in
+centered `Stretch Panorama` / `Freeze Panorama` control. Remembered tuning lives in
 State & Settings, not around the video.
 
 Center is the audible ordinary YouTube player. Tail and Lead are muted
@@ -83,7 +83,7 @@ stronger provided rate pairs remain selectable, and existing saved values remain
 unchanged.
 
 `Freeze Panorama` preserves the attained relation and phase while Center continues.
-`Resume Panorama` resumes from it. A side without enough Range room for the Inner
+`Stretch Panorama` continues from it. A side without enough Range room for the Inner
 Offset becomes non-operational rather than crossing Center or silently shrinking
 the configured minimum. Collapsed, hidden, or unavailable panes do not stall the
 other side.
@@ -102,7 +102,7 @@ The Timeline is one weighted map with this visual order:
 
 ```text
 free and shared Pins
-main Range / Current Neighborhood / Working-Interval track
+main Range / Current Neighborhood / Active-Span track
 source ruler
 bounded Section relationship tree
 ```
@@ -130,12 +130,15 @@ The main layers remain distinct without relying on colour alone:
 - Active Span is the surviving directional relation;
 - Current is the semantic Address and carries its own label;
 - Cursor appears only when physical observation has left Current;
-- Panorama span is the held Panorama relation;
+- Ripple Observation Address is a teal outlined channel, never Current;
+- Ripple Context Window is a dashed observation fill;
+- Ripple Start and End Prospects are distinct future markers;
+- Panorama Window is the frozen Panorama relation;
 - Pins and Section wires are retained topology;
 - operator and direct-manipulation previews are transient.
 
 One visual channel has one meaning. Object identity uses a marker, an acquired
-Timeline operand uses background fill, Working-Interval participation uses a
+Timeline operand uses background fill, Active-Span participation uses a
 separate inset edge, keyboard focus uses the focus ring, and Link candidate or
 armed state uses an outline/glow. These channels compose instead of overwriting
 one another.
@@ -144,47 +147,49 @@ one another.
 
 - Bare ground clears the acquired retained operand, then Goes to the addressed
   source position through the effective inverse map.
+- `Shift+click` on bare ground acquires Ripple at the addressed position,
+  observes one clipped Context Window, and leaves Current unchanged. Shift on a
+  retained object remains owned by that object.
 - A Pin click acquires that Pin and moves Current to its exact Address. Dragging
   past the threshold moves the Pin instead.
-- A Section click acquires that Section, makes its complete extent the Working
-  Interval, and returns Current to its weighted midpoint.
+- A Section click acquires that Section, makes its complete extent the Active
+  Span, and returns Current to its weighted midpoint.
 - A Section wire is its own control. Pressing its first or last quarter moves
   the corresponding endpoint Pin; pressing the middle translates the complete
   Section. The wire has no additional node controls.
 - Current drag is Step, not Go. It preserves the traversal relation and commits
   only on release.
 - Range handles edit Range only when Focus does not own those boundaries.
-- Escape cancels the active drag to its origin before closing or stopping
-  anything behind it.
-- Holding `G` and scrolling is Ghost Traversal: the wheel moves backward and
-  forward through the order the reader encountered Addresses in, rather than
-  through source time. Holding the key alone does nothing at all.
+- Escape resolves one tier per press: active direct drag, Ghost gesture, active
+  Ripple, ordinary Context or Playback, then menu/dialog/panel.
+- Holding `G` and scrolling is Ghost Traversal. Backward reads the reader's
+  Traversal Trace; forward reads newest available Ripple prospects before a
+  valid historical continuation. Holding the key alone does nothing at all.
 
 ### Ghost Traversal
 
 Ghost is drawn with what is already there. The Address the reader began at
-becomes the fixed Anchor and reuses the departure marker; the recalled Address
-is ordinary Current; the relation between them is an ordinary Active Span
-marked as recalled. The Anchor is solid because it is the thing being measured
-against, while Current and the interval read as transient — a gesture still in
-the hand.
+becomes the fixed Anchor and reuses the departure marker; the moving Address is
+explicitly a Ghost Candidate while accepted Current remains at the Anchor. Its
+preview relation is an Active Span. Historical recall marks that relation as
+recalled; prospect preview uses ordinary Go presentation.
 
 The recalled path itself is never drawn. It exists operationally and becomes
 perceptible by scrolling through it. Drawing every occurrence would confuse
 source order with encounter order, and would turn an invisible recognition
 operator into a history editor.
 
-Scanning and landing are different events. The wheel motion used to find a
-moment is search and leaves no trace; releasing records that the reader
-re-entered that moment, once. So repeated recall accumulates the moments
-returned to, never mirrored copies of the searching.
+Scanning and landing are different events. Historical release records one Ghost
+Return. Prospect release uses ordinary Go and consumes that exact future only
+after success. Escape changes no semantic state and consumes nothing.
 
 With automatic Context on, the recall is heard as well as seen: each candidate
 plays, because a second of motion and sound is what actually places a moment
 and a still frame is not. It is one window following the wheel, not a new one at
 every notch, so the scan sweeps rather than stutters. What the scan played
-through is still search — only the window still running when the gesture ended
-counts as watched. With Context off, recall stays a silent frame-by-frame scan.
+through is still recognition rather than traversal: superseded, completed, and
+cancelled windows alike enter no Traversal Trace evidence. With Context off,
+recall stays a silent frame-by-frame scan.
 
 Section wires are greedily lane-packed. The visible relationship band is bounded
 to five lanes; deeper overlap scrolls inside it, and no two Sections share a
@@ -350,7 +355,8 @@ observation. Changing one setting does not rewrite another dimension.
 | Shift+drag | Precision direct manipulation |
 | [ / ] | Previous / next Step preset |
 | Z / C | Undo / Redo |
-| G / O | Guide / Operators and State & Settings |
+| I / O | Guide / Operators and State & Settings |
+| Shift+click bare Timeline | Ripple observation without moving Current |
 | ? | Keyboard reference |
 | Escape | Cancel active gesture, then stop or close the topmost transient layer |
 

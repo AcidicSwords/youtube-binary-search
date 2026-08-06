@@ -14,8 +14,8 @@ await flush(5);
 await poll();
 await flush(3);
 
-byId.get("context-seconds").value = "0";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "0";
+byId.get("context-duration").dispatch("change");
 for (const clientX of [250, 500]) {
   byId.get("timeline").dispatch("click", {
     target: byId.get("timeline"),
@@ -217,6 +217,30 @@ assert.equal(
   1.5,
   "The chosen rate is remembered."
 );
+
+// Active policy changes stay inside this one Playback transaction. Switching
+// from fixed Shift to Textured changes both policy dimensions together, and
+// switching back suspends only Panorama rather than settling Playback.
+const historyBeforePolicyChanges = byId.get("return-meta").textContent;
+const sidePlaysBeforeTextured = sidePlays();
+byId.get("playback-dynamic").checked = true;
+byId.get("playback-dynamic").dispatch("change", { target: byId.get("playback-dynamic") });
+await flush(4); await poll(); await flush(2);
+assert.equal(center.state, 1, "Fixed to Textured keeps the active Playback running.");
+assert.equal(center.rate, 1, "Neutral Effective Weight resolves the Textured rate to 1x.");
+assert.ok(sidePlays() > sidePlaysBeforeTextured,
+  "The same atomic transition restores Panorama when the confirmed rate is eligible.");
+assert.equal(byId.get("return-meta").textContent, historyBeforePolicyChanges,
+  "Reconfiguring an active Playback creates no Session history.");
+
+byId.get("playback-dynamic").checked = false;
+byId.get("playback-dynamic").dispatch("change", { target: byId.get("playback-dynamic") });
+await flush(4); await poll(); await flush(2);
+assert.equal(center.state, 1, "Textured to fixed also keeps the Playback transaction running.");
+assert.equal(center.rate, 1.5, "The retained fixed wish is restored.");
+assert.equal(byId.get("panorama-transport-state").textContent, "Panorama suspended",
+  "Returning to fixed Shift changes observation policy back to Center-only.");
+assert.equal(byId.get("return-meta").textContent, historyBeforePolicyChanges);
 
 // YouTube commonly reports only 1x until the iframe has entered playback, so an
 // offer read once at load would strand the control at 1x for the session.

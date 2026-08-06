@@ -14,6 +14,7 @@ import {
 import {
   OBSERVATION_POLICY,
   createPlaybackTransport,
+  derivePlaybackPolicy,
   texturedRateForWeight,
   resolveTexturedRate,
   panoramaTriplet,
@@ -207,9 +208,9 @@ has(appCode, /plain && key === "f"[\s\S]{0,100}?focusOrUnfocus\(\)/,
   "F reaches Focus / Unfocus.");
 
 // Tag has one grammar on pointer, keyboard, preview, and Guide surfaces.
-has(appCode, /elements\.retain\.addEventListener\("click"[\s\S]*?retainActiveSpanAsSection\([\s\S]*?source:\s*"interval"[\s\S]*?retainCurrentAsPin\(/,
+has(appCode, /elements\.retain\.addEventListener\("click"[\s\S]*?retainSectionFromSource\([\s\S]*?source:\s*"interval"[\s\S]*?retainCurrentAsPin\(/,
   "The Tag button routes Shift to Section and plain input to Current Pin.");
-has(appCode, /event\.shiftKey[\s\S]{0,180}?key === "t"[\s\S]{0,220}?retainActiveSpanAsSection\(/,
+has(appCode, /event\.shiftKey[\s\S]{0,180}?key === "t"[\s\S]{0,220}?retainSectionFromSource\(/,
   "Shift+T tags the Active Span as a Section.");
 has(appCode, /plain && key === "t"[\s\S]{0,120}?retainCurrentAsPin\(/,
   "Plain T tags Current as a Pin.");
@@ -223,7 +224,7 @@ has(view, /retain:\s*shiftLayer\s*\?\s*positiveActiveSpan\s*:\s*\{ start: semant
   "Tag preview follows the same Pin/Section operand law.");
 has(topLevelFunction(appCode, "retainCurrentAsPin"), /!result\.changed[\s\S]*?result\.value\?\.pin[\s\S]*?selectTimelineRetained\(\{ kind: "pin"/,
   "Duplicate Retain Pin acquires the existing exact Pin.");
-has(topLevelFunction(appCode, "retainActiveSpanAsSection"), /reason === "duplicate-section"[\s\S]*?selectTimelineRetained\(\{ kind: "section"/,
+has(topLevelFunction(appCode, "retainSectionFromSource"), /reason === "duplicate-section"[\s\S]*?selectTimelineRetained\(\{ kind: "section"/,
   "Duplicate Retain Section acquires the existing exact Section.");
 lacks(html, /<kbd>\s*P\s*<\/kbd>|Shift\s*\+\s*P|aria-keyshortcuts="[^"]*(?:^|\s)(?:Shift\+)?P(?:\s|$)/i,
   "No visible or accessible P binding remains.");
@@ -253,8 +254,10 @@ has(toggleWeightRelaxation, /directManipulationActive\(\)/,
 // One predicate answers "is a gesture in progress", so no caller can name a
 // subset of the drags by hand and quietly omit one.
 const manipulation = topLevelFunction(appCode, "directManipulationActive");
-has(manipulation, /state\.dragHandle \|\| state\.guideDrag \|\| state\.currentDrag/,
-  "A gesture in progress is every drag, named once.");
+for (const owner of ["dragHandle", "guideDrag", "currentDrag", "ghostGesture"]) {
+  has(manipulation, new RegExp(`state\\.${owner}`),
+    `Direct manipulation includes ${owner}.`);
+}
 has(topLevelFunction(appCode, "commitNativeGo"), /directManipulationActive\(\)/,
   "The player's own placement is never read back as a native seek mid-gesture.");
 has(toggleWeightRelaxation, /settleBeforeAction\(\{ transport: false \}\)/,
@@ -334,7 +337,7 @@ has(appCode, /texturedRatePolicy|RATE_POLICY_KIND\.DYNAMIC[\s\S]*?timelineProjec
 has(topLevelFunction(appCode, "handleTimelineClick"), /state\.timelineSelection = null[\s\S]*?moveToAddress\(/,
   "Bare Timeline Go clears the acquired operand before moving.");
 const release = topLevelFunction(appCode, "releaseActiveSpan");
-has(release, /releaseSessionInterval\(state\.session\)/, "Release delegates semantic residue to Session.");
+has(release, /releaseSessionActiveSpan\(state\.session\)/, "Release delegates semantic residue to Session.");
 has(release, /state\.timelineSelection = null/, "Release also clears the Timeline operand.");
 lacks(release, /guideSelection\s*=\s*null|weightRelaxation\s*=|focus\s*=|setRange/,
   "Release does not mutate Guide Selection, bypass, Focus, or Range.");
@@ -394,12 +397,27 @@ lacks(release, /guideSelection\s*=\s*null|weightRelaxation\s*=|focus\s*=|setRang
     same(continued.ratePolicy, dynamic.ratePolicy, "Retry/wrap preserves rate policy.");
     check(continued.actualRate === dynamic.actualRate, "Retry/wrap preserves confirmed actual rate.");
   }
+  const activeTextured = derivePlaybackPolicy({
+    shiftPlayback: true,
+    texturedEnabled: true,
+    fixedRateWish: 2,
+    effectiveWeight: 4,
+    offeredRates: LADDER,
+    actualRate: 1
+  });
+  check(activeTextured.observationPolicy === OBSERVATION_POLICY.PANORAMA,
+    "Textured Shift Playback atomically restores Panorama observation.");
+  same(activeTextured.ratePolicy, texturedRatePolicy(),
+    "The same derivation installs Textured rate policy.");
+  check(activeTextured.requestedRate === 0.5 && activeTextured.panoramaEligibility,
+    "Requested rate and confirmed Panorama eligibility come from that one result.");
 }
 for (const symbol of [
   "OBSERVATION_POLICY",
   "RATE_POLICY_KIND",
   "requestedRate",
   "actualRate",
+  "derivePlaybackPolicy",
   "resolveOfferedRate",
   "texturedRateForWeight",
   "resolveTexturedRate",
@@ -417,10 +435,15 @@ has(topLevelFunction(appCode, "flushPendingStep"), /recordTraversalSequence\(pen
 has(topLevelFunction(appCode, "settleNudgeGesture"),
   /target\?\.kind === "current"[\s\S]{0,160}?recordTraversalSequence\(gesture\.traversalPoints/,
   "A Nudge writes a traversal only when Current itself moved.");
-has(topLevelFunction(appCode, "settleTransport"), /recordObservedSpans\(active, current\)/,
-  "Watched source time is recorded as spans, so Ghost can recall inside it.");
-has(topLevelFunction(appCode, "recordObservedSpans"), /transport\.cycles[\s\S]*spans\.push/,
-  "and a wrapped Range contributes one directed span per crossing.");
+const settleTransport = topLevelFunction(appCode, "settleTransport");
+has(settleTransport,
+  /active\.kind === TRANSPORT_KIND\.PLAYBACK[\s\S]*?recordPlaybackSpans\(active, current\)/,
+  "Voluntary Playback writes watched spans.");
+has(settleTransport,
+  /active\.kind === TRANSPORT_KIND\.CONTEXT[\s\S]*?return true;[\s\S]*?active\.kind === TRANSPORT_KIND\.PLAYBACK[\s\S]*?recordPlaybackSpans/,
+  "Automatic Context returns before the Playback-only Trace write.");
+has(topLevelFunction(appCode, "recordPlaybackSpans"), /transport\.cycles[\s\S]*spans\.push/,
+  "A wrapped Playback contributes one directed span per crossing.");
 // Being told where to sit is a consequence of a movement, never a movement.
 lacks(topLevelFunction(appCode, "placePlayer"), /recordTraversal/,
   "Programmatic placement writes no occurrence.");
@@ -437,8 +460,31 @@ has(topLevelFunction(appCode, "wrapPlaybackRange"), /rebasePlaybackTransport[\s\
   "Proper-Range wrap rebases and rederives the active policy.");
 has(appCode, /retryPlaybackTransport\(state\.transport\)[\s\S]{0,500}?resolvePlaybackRate[\s\S]{0,300}?player\.setRate/,
   "Playback retry reapplies the active rate policy.");
-has(appCode, /availableRates[\s\S]{0,500}?RATE_POLICY_KIND\.FIXED[\s\S]{0,500}?resolvePlaybackRate/,
-  "Expanded rate offers retune active fixed Shift playback.");
+has(topLevelFunction(appCode, "applyActiveShiftPlaybackPolicy"),
+  /derivePlaybackPolicy\(policyInputs\)[\s\S]*?withDerivedPlaybackPolicy\(state\.transport, policyInputs\)/,
+  "Active Shift policy is derived once and applied atomically.");
+has(topLevelFunction(appCode, "pollPlayer"),
+  /availableRates[\s\S]*?applyActiveShiftPlaybackPolicy\(\{[\s\S]*?playback-rate-offer/,
+  "Expanded rate offers rederive active Shift playback policy.");
+const timelineClick = topLevelFunction(appCode, "handleTimelineClick");
+has(timelineClick,
+  /timeFromPointer\(event, timelineProjection\(\), true\)[\s\S]*?event\.shiftKey === true[\s\S]*?beginRippleObservation\(time\)/,
+  "Bare Shift-click Ripple reuses canonical Timeline inversion.");
+has(timelineClick,
+  /if \(event\.shiftKey === true\) \{\s*beginRippleObservation\(time\);\s*return;\s*\}/,
+  "Ripple acquisition returns before ordinary Go.");
+const beginRipple = topLevelFunction(appCode, "beginRippleObservation");
+has(beginRipple,
+  /deriveContextWindow\([\s\S]*?observationAddress[\s\S]*?activeRange\(\)[\s\S]*?state\.contextDuration/,
+  "Ripple derives the shared independently clipped Context Window.");
+has(beginRipple,
+  /appendRippleProspects\(state\.traversalProspects[\s\S]*?start: window\.start[\s\S]*?end: window\.end/,
+  "Ripple publishes the actual clipped Context boundaries.");
+has(beginRipple, /startContext\(observationAddress, \{ retarget \}\)/,
+  "Ripple observation uses the one Context transport route.");
+has(topLevelFunction(appCode, "settleTransport"),
+  /options\.completeRipple === true[\s\S]*?state\.rippleObservation = null/,
+  "Successful Context completion clears active Ripple identity while preserving its batch.");
 has(styles, /\.center-transport-overlay\s*\{[^}]*pointer-events:\s*none/,
   "The full iframe overlay is non-blocking.");
 has(styles, /\.center-transport-surface\s*\{[^}]*pointer-events:\s*auto/,
@@ -523,10 +569,17 @@ has(appCode, /function consumeShiftLayer\(owner\)[\s\S]*?state\.shiftLayers\?\.\
   "Latched Shift is consumed by named owner.");
 has(appCode, /shiftLayers:\s*\{ matrix: false, guide: false \}/,
   "Matrix and Guide own separate Shift latches.");
+has(appCode, /traversalProspects:\s*createTraversalProspects\(\)/,
+  "Application state owns one transient Traversal Prospect collection.");
+has(appCode, /rippleObservation:\s*null/,
+  "Application state owns one nullable active Ripple observation.");
 lacks(appCode, /consumeShiftLayer\(\s*\)/,
   "No ownerless Shift-layer consumption remains.");
 has(topLevelFunction(appCode, "resetSourceScopedState"), /state\.shiftLayers = \{ matrix: false, guide: false \}/,
   "Source reset clears both surface latches.");
+has(topLevelFunction(appCode, "resetSourceScopedState"),
+  /state\.traversalProspects = clearTraversalProspects\(\)[\s\S]*?state\.rippleObservation = null/,
+  "Source reset clears Ripple identity and every Traversal Prospect.");
 // One wheel, two readers, one registration. Ghost takes precedence while G is
 // held; otherwise the wheel is Nudge's exactly as before. A second listener
 // would let both act on one notch.
@@ -537,6 +590,48 @@ check((appCode.match(/addEventListener\("wheel"/g) || []).length === 1,
 has(topLevelFunction(appCode, "handleReaderWheel"),
   /state\.ghostKeyHeld && handleGhostWheel\(event\)[\s\S]*handleNudgeWheel\(event\)/,
   "Ghost owns the wheel while G is held; Nudge owns it otherwise.");
+const beginGhost = topLevelFunction(appCode, "beginGhostGesture");
+for (const field of [
+  "anchor",
+  "candidate",
+  "previewActiveSpan",
+  "previewNeighborhood",
+  "readKind",
+  "readId",
+  "frozenTraceRead"
+]) {
+  has(beginGhost, new RegExp(`\\b${field}\\b`),
+    `Ghost provisional state owns ${field}.`);
+}
+has(beginGhost,
+  /initialDirection === "forward"[\s\S]*?beginTraversalProspectRead\([\s\S]*?readsProspects[\s\S]*?tracePositionIsValid/,
+  "Forward Ghost freezes Traversal Prospects first and falls back to valid historical continuation.");
+const scanGhost = topLevelFunction(appCode, "handleGhostWheel");
+lacks(scanGhost, /state\.session\s*=/,
+  "Ghost scanning never replaces the accepted Session.");
+has(scanGhost,
+  /gesture\.previewSession = result\.session[\s\S]*?gesture\.candidate = candidate\.address/,
+  "Ghost scanning updates only its provisional Candidate and preview Session.");
+has(scanGhost,
+  /moveTraversalProspectRead\([\s\S]*?goTo\([\s\S]*?gesture\.selectedProspect = candidate\.prospect/,
+  "Prospect scanning uses a frozen reader and canonical Go only for provisional presentation.");
+has(topLevelFunction(appCode, "settleGhostGesture"),
+  /state\.session = gesture\.previewSession[\s\S]*?checkpoint\(/,
+  "Ghost settlement performs the first semantic assignment and one checkpoint.");
+has(topLevelFunction(appCode, "settleGhostGesture"),
+  /readKind === "traversal-prospect"[\s\S]*?goTo\(state\.session[\s\S]*?accept\(result[\s\S]*?consumeTraversalProspect\([\s\S]*?return true/,
+  "Prospect settlement commits canonical Go before consuming exactly its selected transient entry.");
+const cancelActive = topLevelFunction(appCode, "cancelActiveManipulation");
+has(cancelActive,
+  /state\.currentDrag[\s\S]*?state\.guideDrag[\s\S]*?state\.dragHandle[\s\S]*?state\.ghostGesture[\s\S]*?state\.rippleObservation/,
+  "Escape priority is direct drag, Ghost Candidate, then active Ripple.");
+const stopOrClose = topLevelFunction(appCode, "stopOrClose");
+has(stopOrClose,
+  /isTransportActive\(state\.transport\)[\s\S]*?guideDialogOpen\(\)[\s\S]*?pin-cluster-menu[\s\S]*?state\.guideOpen/,
+  "Ordinary Context or Playback settles before menus, dialogs, and panels.");
+has(topLevelFunction(appCode, "cancelActiveRippleObservation"),
+  /settleTransport\(\)[\s\S]*?Ripple cancelled[\s\S]*?Current remains/,
+  "Ripple Escape uses transport settlement and explicitly restores Current.");
 const nudgeWheel = topLevelFunction(appCode, "handleNudgeWheel");
 has(topLevelFunction(appCode, "wheelPixels"), /Math\.abs\(event\.deltaX\) > Math\.abs\(event\.deltaY\)/,
   "Nudge selects the dominant wheel axis.");

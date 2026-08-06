@@ -19,8 +19,8 @@ byId.get("youtube-url").value = "https://youtu.be/dQw4w9WgXcQ";
 byId.get("load-video").click();
 await flush(5);
 await poll();
-byId.get("context-seconds").value = "0";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "0";
+byId.get("context-duration").dispatch("change");
 await flush();
 
 // --- helpers ------------------------------------------------------------------
@@ -109,15 +109,15 @@ const weight = inSections("sectionWeighting")[0];
 weight.value = "4";
 await changeIn("sections-list", weight);
 const deformedDuration = byId.get("duration-time").textContent;
-assert.match(deformedDuration, /spatial/,
-  "A Weight above 1 deforms the map.");
+assert.match(deformedDuration, /Timeline allocation/,
+  "A Weight above 1 changes the map's Timeline Allocation Factor.");
 assert.equal(deformed(), true);
 assert.equal(drawnBars(), 2);
 assert.equal(drawnPins(), 4);
 
 // Inactive: the terrain flattens, the topology stays.
 await setGroupState("group-default", "weightsEnabled", false);
-assert.doesNotMatch(byId.get("duration-time").textContent, /spatial/,
+assert.doesNotMatch(byId.get("duration-time").textContent, /Timeline allocation/,
   "An inactive Group's Weights deform nothing.");
 assert.equal(deformed(), false, "and draw no gradient.");
 assert.equal(drawnBars(), 2, "while its Sections stay on the map.");
@@ -219,7 +219,7 @@ assert.equal(drawnBars(), focusedBars,
   "and restoring visibility restores exactly what Focus was drawing.");
 assert.equal(drawnPins(), focusedPins);
 
-await clickIn("sections-list", inSections("leaveSection")[0]);
+await clickIn("sections-list", inSections("unfocus")[0]);
 assert.match(status(), /Restored Range/);
 
 // ==============================================================================
@@ -262,7 +262,7 @@ for (const mark of chapterMarks()) {
   assert.ok(fraction >= 0 && fraction <= 100,
     "and every drawn mark lands inside the drawn map.");
 }
-await clickIn("sections-list", inSections("leaveSection")[0]);
+await clickIn("sections-list", inSections("unfocus")[0]);
 assert.equal(chapterMarks().length, 4, "Unfocus restores the whole set.");
 
 // Through all of that, no Chapter became an operand.

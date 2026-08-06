@@ -161,7 +161,7 @@ export async function loadVideo(page, url = "https://youtu.be/dQw4w9WgXcQ") {
   // fact the DOM-free harness cannot represent and these tests should not
   // work around by opening panels they are not testing.
   await page.evaluate(() => {
-    const field = document.getElementById("context-seconds");
+    const field = document.getElementById("context-duration");
     field.value = "0";
     field.dispatchEvent(new Event("change", { bubbles: true }));
   });

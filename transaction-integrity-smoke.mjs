@@ -47,8 +47,8 @@ const storedGuide = () => {
 };
 
 await loadVideo("https://youtu.be/dQw4w9WgXcQ");
-byId.get("context-seconds").value = "0";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "0";
+byId.get("context-duration").dispatch("change");
 await flush();
 
 // ==============================================================================

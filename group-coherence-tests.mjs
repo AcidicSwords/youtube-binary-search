@@ -486,8 +486,8 @@ const visibleIds = guide => guide.groups
   byId.get("load-video").click();
   await flush(6);
   await poll();
-  byId.get("context-seconds").value = "0";
-  byId.get("context-seconds").dispatch("change");
+  byId.get("context-duration").value = "0";
+  byId.get("context-duration").dispatch("change");
   await flush();
 
   const inSections = key => descendants(byId.get("sections-list"))

@@ -15,7 +15,7 @@
 // final phase turns on --strict in the audit gate. Keeping the term data here,
 // beside the scan, makes this the single structured source the audit checks
 // against; LEXICON.md is its prose twin.
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, extname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -29,9 +29,13 @@ const SCANNED_EXTENSIONS = new Set([".js", ".mjs", ".css", ".html", ".md"]);
 // Files that are allowed to name retired terms, because naming them is their
 // job: the authority that lists them as forbidden, and this audit that hunts
 // for them.
-// HANDOFF.md documents the not-yet-renamed retired terms on purpose; it is
-// exempt like LEXICON.md, and is deleted (with this entry) when that work lands.
-const EXEMPT_FILES = new Set(["LEXICON.md", "lexicon-audit.mjs", "HANDOFF.md"]);
+const EXEMPT_FILES = new Set(["LEXICON.md", "lexicon-audit.mjs"]);
+if (EXEMPT_FILES.has("HANDOFF.md")) {
+  throw new Error("HANDOFF.md is retired and cannot be exempted from the lexicon audit.");
+}
+if (existsSync(new URL("./HANDOFF.md", import.meta.url))) {
+  throw new Error("HANDOFF.md is a retired delivery artifact and must not ship.");
+}
 
 const SKIP_DIRS = new Set(["node_modules", ".git"]);
 
@@ -72,7 +76,7 @@ export const RETIRED_TERMS = [
   term("resolution-limit", "refinement-limit", { category: "neighborhood" }),
 
   // Phase 3 — Active Span
-  term("Working Interval", "Active Span", { caseInsensitive: true, category: "active-span" }),
+  term("Working[- ]Interval", "Active Span", { caseInsensitive: true, category: "active-span" }),
   term("No Interval", "No Active Span", { category: "active-span" }),
   term("working-section", "active-span", { category: "active-span" }),
   term("positiveWorkingInterval", "positiveActiveSpan", { category: "active-span" }),
@@ -118,7 +122,6 @@ export const RETIRED_TERMS = [
   term("Field Breath", "Panorama Cycle", { caseInsensitive: true, category: "panorama" }),
   term("Breath Rate", "Side Rate Step", { caseInsensitive: true, category: "panorama" }),
   term("Hold both", "Freeze Panorama", { category: "panorama" }),
-  term("Stretch both", "Resume Panorama", { caseInsensitive: true, category: "panorama" }),
   term("stepField", "panorama", { category: "panorama" }),
   term("STEP_FIELD_PHASE", "PANORAMA_STATE", { category: "panorama" }),
   term("BREATH_PHASE", "PANORAMA_DIRECTION", { category: "panorama" }),
@@ -126,7 +129,6 @@ export const RETIRED_TERMS = [
   term("DEFAULT_FIELD_BREATH", "DEFAULT_PANORAMA_CYCLE", { category: "panorama" }),
   term("breathRatePair", "panoramaSideRates", { category: "panorama" }),
   term("holdPanorama", "freezePanorama", { category: "panorama" }),
-  term("stretchPanorama", "resumePanorama", { category: "panorama" }),
 
   // Phase 6 — Traversal Trace / Ghost
   term("User Time", "Traversal Trace", { caseInsensitive: true, category: "trace" }),
@@ -140,7 +142,7 @@ export const RETIRED_TERMS = [
   term("GHOST_INJECTION", "GHOST_RETURN", { category: "trace" }),
   term("ghost-injection", "ghost-return", { category: "trace" }),
   term("appendGhostInjection", "appendGhostReturn", { category: "trace" }),
-  term("Ghost Injection", "Ghost Return", { category: "trace" }),
+  term("Ghost Injection", "Ghost Return", { caseInsensitive: true, category: "trace" }),
   term("Ghost Current", "Ghost Position", { caseInsensitive: true, category: "trace" }),
 
   // Phase 7 — Chapters
@@ -155,7 +157,27 @@ export const RETIRED_TERMS = [
   term("Dynamic Playback", "Textured Playback", { caseInsensitive: true, category: "playback" }),
   term("dynamicRatePolicy", "texturedRatePolicy", { category: "playback" }),
   term("desiredCenterRate", "texturedRateForWeight", { category: "playback" }),
-  term("dynamic-weight-texture", "textured", { category: "playback" })
+  term("dynamic-weight-texture", "textured", { category: "playback" }),
+
+  // Clockwork completion — internal correspondence and persisted settings.
+  // The only permitted appearances of old preference keys are individual
+  // `lexicon-allow` lines that prove read-only migration.
+  term("contextSeconds", "contextDuration", { category: "settings" }),
+  term("nudgeSeconds", "nudgeDistance", { category: "settings" }),
+  term("FIELD_SIDE_MODE", "PANORAMA_SIDE_MODE", { category: "panorama" }),
+  term("runtime\\.cycle\\.held", "runtime.cycle.frozen", { category: "panorama" }),
+  term("side\\.held", "side.frozen", { category: "panorama" }),
+  term("resumePanorama", "stretchPanorama", { category: "panorama" }),
+  term("resumeCycle", "stretchCycle", { category: "panorama" }),
+  term("step-pane", "panorama-pane", { category: "panorama" }),
+  term("Section Stretch Factor", "Section Weighting / Timeline Allocation Factor", {
+    caseInsensitive: true,
+    category: "topography"
+  }),
+  term("Stretch Factor", "Timeline Allocation Factor", {
+    caseInsensitive: true,
+    category: "topography"
+  })
 ];
 
 function walk(dir, out = []) {
@@ -180,6 +202,7 @@ function compile(entry) {
 const files = walk(ROOT);
 const perTerm = new Map();
 const perFile = new Map();
+const consistencyFailures = [];
 let total = 0;
 
 for (const file of files) {
@@ -201,6 +224,102 @@ for (const file of files) {
   }
 }
 
+// Canonical Ripple language must bind to the same product objects everywhere:
+// one transient model, one presentation family, one accessible distinction
+// from Current, and no persistence schema of its own.
+const requiredRippleSurfaces = {
+  "index.html": [
+    /id="ripple-context-window-fill"/,
+    /id="ripple-address-marker"/,
+    /id="traversal-prospect-layer"[^>]*aria-label="Traversal Prospects"/
+  ],
+  "styles.css": [
+    /\.ripple-context-window-fill\b/,
+    /\.ripple-address-marker\b/,
+    /\.traversal-prospect-marker\b/,
+    /@media \(forced-colors: active\)[\s\S]*?\.ripple-context-window-fill/
+  ],
+  "view.js": [
+    /Ripple Observation Address[\s\S]*?Current did not move/,
+    /Ripple \$\{boundary\} Prospect[\s\S]*?future Address[\s\S]*?Current did not move/
+  ],
+  "app.js": [
+    /rippleObservation/,
+    /traversalProspects/,
+    /beginRippleObservation/,
+    /cancelActiveRippleObservation/
+  ],
+  "traversal-prospects.js": [
+    /TRAVERSAL_PROSPECT_KIND/,
+    /beginTraversalProspectRead/,
+    /moveTraversalProspectRead/
+  ]
+};
+for (const [name, patterns] of Object.entries(requiredRippleSurfaces)) {
+  const url = new URL(`./${name}`, import.meta.url);
+  if (!existsSync(url)) {
+    consistencyFailures.push(`required Ripple surface is missing: ${name}`);
+    continue;
+  }
+  const source = readFileSync(url, "utf8");
+  for (const pattern of patterns) {
+    pattern.lastIndex = 0;
+    if (!pattern.test(source)) {
+      consistencyFailures.push(`${name} lacks canonical Ripple seam ${pattern}`);
+    }
+  }
+}
+
+for (const name of [
+  "CLOCKWORK.md",
+  "PROJECT.md",
+  "SPEC.md",
+  "IMPLEMENTATION.md",
+  "INTERFACE.md",
+  "GLOSSARY.md",
+  "DEVELOPMENT.md",
+  "VALIDATION.md",
+  "README.md"
+]) {
+  const source = readFileSync(new URL(`./${name}`, import.meta.url), "utf8");
+  if (!/\bRipple\b/.test(source)) {
+    consistencyFailures.push(`${name} does not name Ripple.`);
+  }
+}
+
+const appSource = readFileSync(new URL("./app.js", import.meta.url), "utf8")
+  .replace(/\r\n?/g, "\n");
+const preferenceWriter = appSource.match(
+  /function persistPreferences\(\)\s*\{[\s\S]*?\n\}\n\n/
+)?.[0] || "";
+if (!preferenceWriter || /\bripple/i.test(preferenceWriter)) {
+  consistencyFailures.push("Ripple must not enter the preference persistence schema.");
+}
+const guideSource = readFileSync(new URL("./guide.js", import.meta.url), "utf8");
+if (/\bripple/i.test(guideSource)) {
+  consistencyFailures.push("Ripple must not enter the Guide persistence owner.");
+}
+
+const allowedCompatibilityReasons = [
+  "v8 preference back-compat",
+  "legacy preference back-compat",
+  "v9 Guide back-compat",
+  "legacy preference migration fixture",
+  "legacy preference migration assertion"
+];
+for (const file of files) {
+  const relative = file.slice(ROOT.length);
+  const lines = readFileSync(file, "utf8").split("\n");
+  lines.forEach((line, index) => {
+    if (!line.includes("lexicon-allow")) return;
+    if (!allowedCompatibilityReasons.some(reason => line.includes(reason))) {
+      consistencyFailures.push(
+        `${relative}:${index + 1} has an undocumented lexicon compatibility exception.`
+      );
+    }
+  });
+}
+
 const byCount = (a, b) => b[1] - a[1];
 
 console.log(`Lexicon audit — ${STRICT ? "STRICT" : "report only"}`);
@@ -219,9 +338,24 @@ if (total > 0) {
   }
 }
 
-if (STRICT && total > 0) {
-  console.error(`\nLexicon audit FAILED: ${total} retired-term occurrences remain.`);
+if (consistencyFailures.length > 0) {
+  console.log("Canonical-surface failures:");
+  for (const failure of consistencyFailures) console.log(`  - ${failure}`);
+}
+
+if (STRICT && (total > 0 || consistencyFailures.length > 0)) {
+  console.error(
+    `\nLexicon audit FAILED: ${total} retired-term occurrences and ${
+      consistencyFailures.length
+    } canonical-surface failures remain.`
+  );
   process.exit(1);
 }
 
-console.log(`\nLexicon audit ${total === 0 ? "clean" : "reported (report-only mode)"}.`);
+console.log(
+  `\nLexicon audit ${
+    total === 0 && consistencyFailures.length === 0
+      ? "clean"
+      : "reported (report-only mode)"
+  }.`
+);

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   PANORAMA_STATE,
-  FIELD_SIDE_MODE,
+  PANORAMA_SIDE_MODE,
   createPanoramaController,
   derivePanoramaBounds,
   panoramaShouldSuspend
@@ -148,10 +148,10 @@ function makeControllerHarness() {
     harness.controller.tick();
     assert.equal(harness.adapters.get("player-tail").read().time, 40, "Paused Tail must display its represented backward Step frame.");
     assert.equal(harness.adapters.get("player-lead").read().time, 60, "Paused Lead must display its represented forward Step frame.");
-    assert.equal(harness.controller.snapshot().phase, PANORAMA_STATE.HELD);
+    assert.equal(harness.controller.snapshot().phase, PANORAMA_STATE.FROZEN);
 
     harness.controller.stretch("both");
-    assert.equal(harness.controller.snapshot().tailMode, FIELD_SIDE_MODE.STRETCHING);
+    assert.equal(harness.controller.snapshot().tailMode, PANORAMA_SIDE_MODE.STRETCHING);
     assert.equal(harness.adapters.get("player-tail").read().time, 40,
       "Stretch resumes the cycle from its attained relation, never crossing Center.");
 
@@ -176,8 +176,8 @@ function makeControllerHarness() {
     );
 
     harness.adapters.get("player-tail").place(47);
-    harness.controller.hold("both");
-    assert.equal(harness.controller.snapshot().tailMode, FIELD_SIDE_MODE.HELD);
+    harness.controller.freeze("both");
+    assert.equal(harness.controller.snapshot().tailMode, PANORAMA_SIDE_MODE.FROZEN);
 
     const tailStep = harness.controller.getStepSelection("tail");
     assert.equal(tailStep.direction, "backward");
@@ -199,7 +199,7 @@ function makeControllerHarness() {
         lead: harness.controller.snapshot().leadMode
       },
       suspendedModes,
-      "Hold/Stretch controls must not reinterpret a transient Context cursor."
+      "Freeze/Stretch controls must not reinterpret a transient Context cursor."
     );
     assert.equal(harness.elements.get("panorama-both-toggle").disabled, true);
 
@@ -231,7 +231,7 @@ function makeControllerHarness() {
   const panoramaSource = readFileSync("panorama.js", "utf8");
   assert.match(app, /function setRange\([\s\S]*?settleBeforeAction\(\);[\s\S]*?setSessionRange/);
   assert.match(app, /function focusSection\([\s\S]*?settleBeforeAction\(\);[\s\S]*?focusSessionSection/);
-  assert.match(app, /function leaveSection\([\s\S]*?settleBeforeAction\(\);[\s\S]*?leaveSessionSection/);
+  assert.match(app, /function unfocus\([\s\S]*?settleBeforeAction\(\);[\s\S]*?unfocusSession/);
   assert.match(panoramaSource, /export function panoramaShouldSuspend\(snapshot\)/);
   assert.match(panoramaSource, /transportKind === "context"/);
   assert.doesNotMatch(panoramaSource, /transportKind === "loop"/);
@@ -240,4 +240,4 @@ function makeControllerHarness() {
   assert.doesNotMatch(panoramaSource, /snapshot\.neighborhood/, "Panorama bounds must not depend on Current Neighborhood.");
 }
 
-console.log("Panorama bounds tests passed: Range containment, Context suspension, native playback, Hold, and side Step.");
+console.log("Panorama bounds tests passed: Range containment, Context suspension, native playback, Freeze, and side Step.");

@@ -42,11 +42,11 @@
       <section id="reader-column" class="reader-column" aria-label="Video reader">
         <section id="player-panel" class="player-panel" aria-label="Panorama">
           <div id="panorama" class="panorama panorama-off" data-phase="off" aria-label="Panorama">
-            <section id="tail-pane" class="step-pane step-pane-side tail-pane" aria-label="Tail panorama view">
-              <div class="step-pane-bar">
+            <section id="tail-pane" class="panorama-pane panorama-pane-side tail-pane" aria-label="Tail panorama view">
+              <div class="panorama-pane-bar">
                 <div class="pane-identity">
-                  <span class="step-pane-role">Tail</span>
-                  <span id="tail-meta" class="step-pane-meta">—</span>
+                  <span class="panorama-pane-role">Tail</span>
+                  <span id="tail-meta" class="panorama-pane-meta">—</span>
                 </div>
                 <div class="pane-bar-actions">
                   <button id="tail-collapse" class="pane-collapse" type="button" aria-label="Collapse Tail" title="Collapse Tail"><span aria-hidden="true">‹</span></button>
@@ -56,16 +56,16 @@
               <div class="pane-panorama-controls tail-panorama-controls" aria-label="Tail panorama state">
                 <p class="panorama-side-state"><span>Tail</span><small id="tail-offset-state">0 s in 0.25–2.5 s</small></p>
               </div>
-              <button id="tail-restore" class="step-pane-restore" type="button" aria-label="Show Tail" hidden>
+              <button id="tail-restore" class="panorama-pane-restore" type="button" aria-label="Show Tail" hidden>
                 <span aria-hidden="true">←</span><span>Tail</span>
               </button>
             </section>
 
-            <section class="step-pane step-pane-center" aria-label="Center video">
-              <div class="step-pane-bar center-bar">
+            <section class="panorama-pane panorama-pane-center" aria-label="Center video">
+              <div class="panorama-pane-bar center-bar">
                 <div class="pane-identity">
-                  <span class="step-pane-role">Center</span>
-                  <span id="center-meta" class="step-pane-meta">—</span>
+                  <span class="panorama-pane-role">Center</span>
+                  <span id="center-meta" class="panorama-pane-meta">—</span>
                 </div>
                 <div class="pane-bar-actions center-bar-actions">
                   <div class="panorama-state-readout center-panorama-summary">
@@ -88,16 +88,16 @@
               </div>
               <div class="pane-panorama-controls center-panorama-controls" aria-label="Panorama controls">
                 <button id="panorama-both-toggle" class="panorama-mode-toggle panorama-both-toggle" type="button" aria-pressed="false" disabled>
-                  <span id="panorama-both-toggle-label">Resume Panorama</span><small id="panorama-span-label">Current —</small>
+                  <span id="panorama-both-toggle-label">Stretch Panorama</span><small id="panorama-span-label">Current —</small>
                 </button>
               </div>
             </section>
 
-            <section id="lead-pane" class="step-pane step-pane-side lead-pane" aria-label="Lead panorama view">
-              <div class="step-pane-bar">
+            <section id="lead-pane" class="panorama-pane panorama-pane-side lead-pane" aria-label="Lead panorama view">
+              <div class="panorama-pane-bar">
                 <div class="pane-identity">
-                  <span class="step-pane-role">Lead</span>
-                  <span id="lead-meta" class="step-pane-meta">—</span>
+                  <span class="panorama-pane-role">Lead</span>
+                  <span id="lead-meta" class="panorama-pane-meta">—</span>
                 </div>
                 <div class="pane-bar-actions">
                   <button id="lead-collapse" class="pane-collapse" type="button" aria-label="Collapse Lead" title="Collapse Lead"><span aria-hidden="true">›</span></button>
@@ -107,7 +107,7 @@
               <div class="pane-panorama-controls" aria-label="Lead panorama state">
                 <p class="panorama-side-state"><span>Lead</span><small id="lead-offset-state">0 s in 0.25–2.5 s</small></p>
               </div>
-              <button id="lead-restore" class="step-pane-restore" type="button" aria-label="Show Lead" hidden>
+              <button id="lead-restore" class="panorama-pane-restore" type="button" aria-label="Show Lead" hidden>
                 <span>Lead</span><span aria-hidden="true">→</span>
               </button>
             </section>
@@ -127,7 +127,7 @@
               <span id="timeline-key-range" class="timeline-key key-range" title="Range: navigable boundary"><i aria-hidden="true"></i>Range</span>
               <span id="timeline-key-resolution" class="timeline-key key-resolution" title="Current Neighborhood: current neighborhood"><i aria-hidden="true"></i>Current Neighborhood</span>
               <span id="timeline-key-active-span" class="timeline-key key-interval" title="Active Span: ordered movement extent"><i aria-hidden="true"></i>Active Span</span>
-              <span id="timeline-key-panorama" class="timeline-key key-panorama" title="Panorama span: held spread"><i aria-hidden="true"></i>Panorama span</span>
+              <span id="timeline-key-panorama" class="timeline-key key-panorama" title="Panorama Window: frozen relation"><i aria-hidden="true"></i>Panorama Window</span>
               <span id="timeline-key-pins" class="timeline-key key-pins" title="Pins: retained source Addresses"><i aria-hidden="true"></i>Pins</span>
             </div>
             <div class="timeline-header">
@@ -147,6 +147,7 @@
               <div id="pin-preview-marker" class="pin-preview-marker" hidden></div>
               <div id="action-preview-fill" class="action-preview-fill" hidden></div>
               <div id="panorama-window-fill" class="panorama-window-fill" hidden></div>
+              <div id="ripple-context-window-fill" class="ripple-context-window-fill" aria-hidden="true" hidden></div>
             </div>
             <div id="chapter-lane" class="chapter-lane" aria-hidden="true"></div>
             <div id="section-lane" class="section-lane" aria-label="Sections"></div>
@@ -163,6 +164,8 @@
             <button id="current-marker" class="marker current-marker" type="button" role="slider" aria-label="Current; drag to Step, Shift-drag for precision" aria-orientation="horizontal" aria-valuemin="0" aria-valuenow="0"></button>
             <span id="cursor-marker" class="marker cursor-marker" aria-hidden="true" hidden></span>
             <span id="preview-current-marker" class="marker preview-current-marker" aria-hidden="true" hidden></span>
+            <div id="traversal-prospect-layer" class="traversal-prospect-layer" aria-label="Traversal Prospects"></div>
+            <span id="ripple-address-marker" class="marker ripple-address-marker" role="img" data-ripple-address hidden></span>
           </div>
         </section>
 
@@ -205,10 +208,10 @@
                   <button id="step-fraction-8" type="button" data-step-fraction="0.125" aria-pressed="false">1/8</button>
                 </div>
                 <p class="setting-note">Step distance is measured across the Timeline: one unit equals one source second at <span class="unit-mark">1×</span> Weight and covers proportionally less inside an expanded Section. Range-relative size follows the active Range’s weighted Timeline width. Every Step readout states the source time the movement will actually cross.</p>
-                <label class="compact-setting" for="nudge-seconds">
+                <label class="compact-setting" for="nudge-distance">
                   <span>Fine Nudge distance</span>
                   <span class="number-with-unit">
-                    <input id="nudge-seconds" type="number" min="0.042" max="10" step="0.001"
+                    <input id="nudge-distance" type="number" min="0.042" max="10" step="0.001"
                       value="0.042" inputmode="decimal" disabled>
                     <span>s</span>
                   </span>
@@ -232,9 +235,9 @@
             <details id="observation-settings" class="tool-disclosure observation-settings">
               <summary><span>Automatic Context</span><span id="context-setting-value">5 s centered on Current</span></summary>
               <div class="compact-settings">
-                <label class="compact-setting" for="context-seconds">
-                  <span>Center-only duration</span>
-                  <input id="context-seconds" type="number" min="0" max="300" step="0.25"
+                <label class="compact-setting" for="context-duration">
+                  <span>Context Duration</span>
+                  <input id="context-duration" type="number" min="0" max="300" step="0.25"
                     value="5" list="context-presets" inputmode="decimal" disabled>
                   <datalist id="context-presets">
                     <option value="0" label="Off"></option>
@@ -418,7 +421,7 @@
                 <strong id="focused-section-title">—</strong>
                 <span id="focused-section-range">—</span>
               </div>
-              <button id="leave-section" type="button" disabled>Leave</button>
+              <button id="unfocus" type="button" disabled>Unfocus</button>
             </section>
 
             <section id="guide-sections-panel" class="guide-tab-panel" role="tabpanel" aria-labelledby="guide-tab-sections">
@@ -432,7 +435,7 @@
                 <label for="section-source">Source
                   <select id="section-source" disabled>
                     <option value="interval">Active Span</option>
-                    <option value="panorama-span">Held Panorama span</option>
+                    <option value="panorama-span">Panorama Window</option>
                     <option value="selected-pins">Two selected Pins</option>
                   </select>
                 </label>

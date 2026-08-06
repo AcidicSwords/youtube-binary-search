@@ -83,10 +83,8 @@ export function createContextTransport({ anchor, range, seconds }) {
     anchor: clamp(anchor, range.start, range.end),
     start: window.start,
     end: window.end,
-    // Where the watching began, which for a Context is the window's own start
-    // rather than the Address that anchored it. Playback carries the same field
-    // so that settling either transport can say what source time was actually
-    // crossed; without it a Context window is watched and never recorded.
+    // Physical Cursor entry. This can describe Context presentation without
+    // turning automatic recognition into Traversal Trace evidence.
     entry: window.start,
     enteredWindow: false,
     startedAt: Date.now()
@@ -219,6 +217,44 @@ export function offerIsKnown(rates) {
     && rates.filter(rate => Number.isFinite(Number(rate)) && Number(rate) > 0).length > 1;
 }
 
+// All mutable policy inputs for one running Playback resolve through this one
+// relation. Shift selects the operator family; Textured then changes both the
+// rate law and the observation law together. Panorama eligibility remains
+// grounded in the adapter-confirmed actual rate, never the requested candidate.
+export function derivePlaybackPolicy({
+  shiftPlayback = false,
+  texturedEnabled = false,
+  fixedRateWish = 1,
+  effectiveWeight = 1,
+  offeredRates = [1],
+  actualRate = 1
+} = {}) {
+  const textured = shiftPlayback === true && texturedEnabled === true;
+  const observationPolicy = shiftPlayback === true && !textured
+    ? OBSERVATION_POLICY.CENTER_ONLY
+    : OBSERVATION_POLICY.PANORAMA;
+  const ratePolicy = textured
+    ? texturedRatePolicy()
+    : fixedRatePolicy(shiftPlayback === true ? fixedRateWish : 1);
+  const requestedRate = ratePolicy.kind === RATE_POLICY_KIND.TEXTURED
+    ? resolveTexturedRate(effectiveWeight, offeredRates)
+    : resolveOfferedRate(ratePolicy.wish, offeredRates);
+  const confirmedRate = positiveRate(actualRate);
+  const panoramaEligibility = observationPolicy === OBSERVATION_POLICY.PANORAMA
+    && (
+      offerIsKnown(offeredRates)
+        ? panoramaTriplet(confirmedRate, offeredRates) !== null
+        : Math.abs(confirmedRate - 1) <= RATE_EPSILON
+    );
+
+  return {
+    observationPolicy,
+    ratePolicy,
+    requestedRate,
+    panoramaEligibility
+  };
+}
+
 export function resolvePlaybackRate(
   transport,
   { offeredRates = [1], weight = 1 } = {}
@@ -240,7 +276,8 @@ export function createPlaybackTransport({
   ratePolicy = fixedRatePolicy(1),
   offeredRates = [1],
   weight = 1,
-  actualRate = 1
+  actualRate = 1,
+  shiftPlayback = false
 }) {
   const transport = {
     kind: TRANSPORT_KIND.PLAYBACK,
@@ -252,6 +289,10 @@ export function createPlaybackTransport({
     returnModel,
     label,
     operator,
+    // This is operator provenance, not a preference snapshot. It lets a
+    // running Shift transaction be reconfigured without mistaking ordinary or
+    // native Playback for Shift when preferences change.
+    shiftPlayback: shiftPlayback === true,
     observationPolicy: normalizeObservationPolicy(observationPolicy),
     ratePolicy: normalizeRatePolicy(ratePolicy),
     // requestedRate is the current offer's resolution of ratePolicy. It is a
@@ -290,6 +331,17 @@ export function withPlaybackRatePolicy(transport, ratePolicy, options = {}) {
   if (transport?.kind !== TRANSPORT_KIND.PLAYBACK) return transport;
   const next = { ...transport, ratePolicy: normalizeRatePolicy(ratePolicy) };
   return withPlaybackRequestedRate(next, resolvePlaybackRate(next, options));
+}
+
+export function withDerivedPlaybackPolicy(transport, inputs = {}) {
+  if (transport?.kind !== TRANSPORT_KIND.PLAYBACK) return transport;
+  const policy = derivePlaybackPolicy(inputs);
+  return {
+    ...transport,
+    observationPolicy: policy.observationPolicy,
+    ratePolicy: policy.ratePolicy,
+    requestedRate: policy.requestedRate
+  };
 }
 
 // Panorama is an observation policy, not a synonym for 1x. It runs wherever the

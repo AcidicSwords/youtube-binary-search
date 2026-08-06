@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {
-  FIELD_FRAME_OWNER,
+  PANORAMA_FRAME_OWNER,
   FIELD_FRAME_DIRECTION,
   classifyDirection,
   contextFrame,
@@ -28,7 +28,7 @@ const range = { start: 0, end: 100 };
   const frame = contextFrame({ start: 40, end: 60, current: 50, range });
   assert.deepEqual(
     { owner: frame.owner, tail: frame.tail, center: frame.center, lead: frame.lead },
-    { owner: FIELD_FRAME_OWNER.CONTEXT, tail: 40, center: 50, lead: 60 }
+    { owner: PANORAMA_FRAME_OWNER.CONTEXT, tail: 40, center: 50, lead: 60 }
   );
   const moving = contextFrame({ start: 40, end: 60, current: 50, cursor: 55, range });
   assert.equal(moving.center, 55, "Context Center follows Cursor.");
@@ -47,7 +47,7 @@ const range = { start: 0, end: 100 };
     forward: 75,
     range
   });
-  assert.equal(frame.owner, FIELD_FRAME_OWNER.OPERATOR);
+  assert.equal(frame.owner, PANORAMA_FRAME_OWNER.OPERATOR);
   assert.equal(frame.kind, "refine");
   assert.deepEqual([frame.tail, frame.center, frame.lead], [25, 50, 75]);
 
@@ -65,7 +65,7 @@ const range = { start: 0, end: 100 };
 // Direct manipulation validation
 {
   assert.equal(directFrame({ kind: "pin", start: 1, center: 2, end: 3, range }).owner,
-    FIELD_FRAME_OWNER.DIRECT);
+    PANORAMA_FRAME_OWNER.DIRECT);
   assert.equal(directFrame({ kind: "current", start: 1, center: 2, end: 3, range }).kind, "current");
   assert.equal(directFrame({ kind: "made-up", start: 1, center: 2, end: 3, range }), null);
   assert.equal(directFrame({ kind: "pin", center: 2, end: 3, range }), null,
@@ -131,14 +131,14 @@ const range = { start: 0, end: 100 };
 {
   const sequencer = createPanoramaFrameSequencer();
   const before = sequencer.resolve({
-    owner: FIELD_FRAME_OWNER.CONTEXT,
+    owner: PANORAMA_FRAME_OWNER.CONTEXT,
     start: 45,
     end: 55,
     current: 50,
     range
   });
   const during = sequencer.resolve({
-    owner: FIELD_FRAME_OWNER.CONTEXT,
+    owner: PANORAMA_FRAME_OWNER.CONTEXT,
     start: 45,
     end: 55,
     current: 50,
@@ -146,7 +146,7 @@ const range = { start: 0, end: 100 };
     range
   });
   const after = sequencer.resolve({
-    owner: FIELD_FRAME_OWNER.CONTEXT,
+    owner: PANORAMA_FRAME_OWNER.CONTEXT,
     start: 45,
     end: 55,
     current: 52,
@@ -165,17 +165,17 @@ const range = { start: 0, end: 100 };
   const sequencer = createPanoramaFrameSequencer();
   sequencer.resolve({ kind: "step", center: 50, backward: 40, forward: 60, range });
   const dragging = sequencer.resolve({
-    owner: FIELD_FRAME_OWNER.DIRECT,
+    owner: PANORAMA_FRAME_OWNER.DIRECT,
     kind: "current",
     start: 65,
     center: 70,
     end: 75,
     range
   });
-  assert.equal(dragging.owner, FIELD_FRAME_OWNER.DIRECT);
+  assert.equal(dragging.owner, PANORAMA_FRAME_OWNER.DIRECT);
   assert.equal(dragging.revision, 2);
   const restored = sequencer.resolve({ kind: "step", center: 50, backward: 40, forward: 60, range });
-  assert.equal(restored.owner, FIELD_FRAME_OWNER.OPERATOR);
+  assert.equal(restored.owner, PANORAMA_FRAME_OWNER.OPERATOR);
   assert.equal(restored.revision, 3, "Ending a gesture is exactly one transition back.");
   sequencer.reset();
   assert.equal(sequencer.revision(), 0);

@@ -18,7 +18,7 @@ import {
   completePlayback,
   projectPlayback,
   previewTransition,
-  releaseInterval,
+  releaseActiveSpan,
   undo,
   redo
 } from "./session.js";
@@ -234,7 +234,7 @@ for (const [action, direct] of [
   ["refineBackward", source => refine(source, "backward")],
   ["localRefineBackward", source => localRefine(source, "backward")],
   ["switchActiveEnd", source => switchActiveEnd(source)],
-  ["release", source => releaseInterval(source)]
+  ["release", source => releaseActiveSpan(source)]
 ]) {
   const before = structuredClone(retained.model);
   const preview = previewTransition(retained, action);

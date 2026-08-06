@@ -10,7 +10,7 @@
 // Context transport nor cycling.
 import { clamp } from "./range-geometry.js";
 
-export const FIELD_FRAME_OWNER = Object.freeze({
+export const PANORAMA_FRAME_OWNER = Object.freeze({
   CONTEXT: "context",
   OPERATOR: "operator",
   DIRECT: "direct"
@@ -22,7 +22,7 @@ export const FIELD_FRAME_DIRECTION = Object.freeze({
   FORWARD: "forward"
 });
 
-export const FIELD_FRAME_ACTIVATION = Object.freeze({
+export const PANORAMA_FRAME_ACTIVATION = Object.freeze({
   STEP_TO_ADDRESS: "step-to-address"
 });
 
@@ -50,8 +50,8 @@ function finite(value) {
 }
 
 function normalizeActivation(activation) {
-  return activation?.kind === FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS
-    ? Object.freeze({ kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS })
+  return activation?.kind === PANORAMA_FRAME_ACTIVATION.STEP_TO_ADDRESS
+    ? Object.freeze({ kind: PANORAMA_FRAME_ACTIVATION.STEP_TO_ADDRESS })
     : null;
 }
 
@@ -116,7 +116,7 @@ export function contextFrame({ start, end, current, cursor, range }) {
     edgeEnd
   );
   const frame = orderFrame({
-    owner: FIELD_FRAME_OWNER.CONTEXT,
+    owner: PANORAMA_FRAME_OWNER.CONTEXT,
     kind: "context",
     tail: edgeStart,
     center,
@@ -136,7 +136,7 @@ export function operatorFrame({
   activation = null
 }) {
   return orderFrame({
-    owner: FIELD_FRAME_OWNER.OPERATOR,
+    owner: PANORAMA_FRAME_OWNER.OPERATOR,
     kind: OPERATOR_FRAME_KINDS.includes(kind) ? kind : "step",
     tail: backward,
     center,
@@ -154,7 +154,7 @@ export function directFrame({ kind, start, center, end, range }) {
     return null;
   }
   return orderFrame({
-    owner: FIELD_FRAME_OWNER.DIRECT,
+    owner: PANORAMA_FRAME_OWNER.DIRECT,
     kind,
     tail: start,
     center,
@@ -165,8 +165,8 @@ export function directFrame({ kind, start, center, end, range }) {
 
 export function resolvePanoramaFrame(request) {
   if (!request || typeof request !== "object") return null;
-  if (request.owner === FIELD_FRAME_OWNER.CONTEXT) return contextFrame(request);
-  if (request.owner === FIELD_FRAME_OWNER.DIRECT) return directFrame(request);
+  if (request.owner === PANORAMA_FRAME_OWNER.CONTEXT) return contextFrame(request);
+  if (request.owner === PANORAMA_FRAME_OWNER.DIRECT) return directFrame(request);
   return operatorFrame(request);
 }
 

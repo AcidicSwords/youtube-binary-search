@@ -173,9 +173,22 @@ try {
   // =========================================================================
   // 4. A wheel notch recalls where the reader was
   // =========================================================================
+  const acceptedBeforeGhost = await page.getAttribute(
+    "#current-marker",
+    "data-accepted-address"
+  );
   const release = await ghostWheel("backward", 1);
   const recalled = await currentAddress();
   assert.notEqual(recalled, arrived, "A notch reaches an earlier moment,");
+  assert.equal(
+    await page.getAttribute("#current-marker", "data-accepted-address"),
+    acceptedBeforeGhost,
+    "while accepted Session Current remains at the Anchor."
+  );
+  assert.ok(
+    await page.getAttribute("#current-marker", "data-ghost-candidate"),
+    "The moving address is explicitly presented as a Ghost Candidate."
+  );
 
   const anchor = await anchorShown();
   assert.equal(anchor.hidden, false, "the Anchor appears,");
@@ -191,6 +204,16 @@ try {
 
   await release();
   assert.equal(await currentAddress(), recalled, "Releasing keeps the recalled Address,");
+  assert.notEqual(
+    await page.getAttribute("#current-marker", "data-accepted-address"),
+    acceptedBeforeGhost,
+    "and only release replaces accepted Session Current."
+  );
+  assert.equal(
+    await page.getAttribute("#current-marker", "data-ghost-candidate"),
+    "",
+    "Settlement clears provisional Candidate presentation."
+  );
   assert.match(await undoTop(), /Ghost Traverse/, "and writes exactly one transaction.");
   assert.equal((await anchorShown()).hidden, true, "The Anchor is a gesture, not a mark.");
 
@@ -461,14 +484,14 @@ try {
   // and it is the same window following the wheel, not a new observation torn
   // down and rebuilt at every notch.
   await page.evaluate(() => {
-    document.getElementById("context-seconds").value = "4";
-    document.getElementById("context-seconds").dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("context-duration").value = "4";
+    document.getElementById("context-duration").dispatchEvent(new Event("change", { bubbles: true }));
     document.activeElement?.blur();
   });
   await settle(260);
 
-  // Walk somewhere with Context on and let the window play out, so the path
-  // contains a watched span and not only jumps.
+  // Walk somewhere with Context on and let the recognition window play out.
+  // The movement enters the path; automatic Context does not add evidence.
   await page.mouse.click(timeline.x + timeline.width * 0.5, timeline.y + timeline.height * 0.55);
   await settle(360);
   await playWindowOut();
@@ -531,8 +554,8 @@ try {
   assert.equal(pathAfter, pathBefore,
     "and a Context window the scan ran through is not one of them: it was swept past, not watched.");
 
-  // Released with the window still running, the reader is watching. That one is
-  // an observation, and it joins the path.
+  // Released with the window still running, Ghost settles its one landing.
+  // Automatic Context remains recognition and adds no watched passage.
   await page.evaluate(() => document.activeElement?.blur());
   await page.keyboard.down("g");
   await page.mouse.wheel(0, 100);
@@ -552,15 +575,13 @@ try {
   await page.keyboard.press("Escape");
   await page.keyboard.up("g");
   await settle(340);
-  // The injection contributes exactly one new moment -- its landing -- so any
-  // growth beyond that is the span the reader actually watched.
-  assert.ok(watchedTotal - heldTotal > 1,
-    "and the window watched to its end joins the path as watched source time.");
+  assert.equal(watchedTotal - heldTotal, 1,
+    "and automatic Context adds zero Trace units beyond the one Ghost Return.");
 
   // Back off, so nothing downstream inherits a playing window.
   await page.evaluate(() => {
-    document.getElementById("context-seconds").value = "0";
-    document.getElementById("context-seconds").dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("context-duration").value = "0";
+    document.getElementById("context-duration").dispatchEvent(new Event("change", { bubbles: true }));
     document.activeElement?.blur();
   });
   await settle(300);
@@ -832,7 +853,7 @@ try {
   // 16. Nothing logged an error along the way
   // =========================================================================
   assert.deepEqual(failures, [], `Console/page errors: ${failures.join(" | ")}`);
-  console.log("Ghost smoke passed: the Guide is on I while Tab stays the browser's and G no longer touches either; holding G moves nothing, writes no history and draws no Anchor; a wheel notch recalls an earlier moment behind a fixed Anchor and an ordinary Active Span; releasing writes one transaction that one Undo reverses; Escape cancels exactly; Ghost owns the wheel only while G is held; one detent recalls exactly one moment; the recall says where in the path it is and what it is anchored to; Ghost interleaves with ordinary operators without ever landing where the reader has not been; releasing records the moment re-entered rather than the search that found it, so backward from it asks what led there; input below the threshold costs nothing at all; and with Context on the recall plays where it lands, one window following the wheel rather than a new one at every notch, with only the window still running when the gesture ended joining the path; a forward scan settled short of the live end lands exactly once; stepping out and back onto a re-entered moment does not revive the offer the Step withdrew; dragging Current records one movement rather than the ground it crossed; and an Undo that moves the reader is itself a route they took, while one that moves nobody writes nothing.");
+  console.log("Ghost smoke passed: the Guide is on I while Tab stays the browser's and G no longer touches either; holding G moves nothing, writes no history and draws no Anchor; a wheel notch recalls an earlier moment behind a fixed Anchor and an ordinary Active Span; releasing writes one transaction that one Undo reverses; Escape cancels exactly; Ghost owns the wheel only while G is held; one detent recalls exactly one moment; the recall says where in the path it is and what it is anchored to; Ghost interleaves with ordinary operators without ever landing where the reader has not been; releasing records the moment re-entered rather than the search that found it, so backward from it asks what led there; input below the threshold costs nothing at all; and with Context on the recall plays where it lands through one retargeted window while automatic recognition adds no Trace evidence; a forward scan settled short of the live end lands exactly once; stepping out and back onto a re-entered moment does not revive the offer the Step withdrew; dragging Current records one movement rather than the ground it crossed; and an Undo that moves the reader is itself a route they took, while one that moves nobody writes nothing.");
 } finally {
   await close();
 }

@@ -192,7 +192,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   for (const id of [
     "panorama-inner-offset", "panorama-outer-offset", "panorama-cycle-rate",
     "tail-player-surface", "lead-player-surface",
-    "panorama-both-toggle", "nudge-seconds",
+    "panorama-both-toggle", "nudge-distance",
     "panorama-transport-state", "panorama-rate-state"
   ]) assert.match(html, new RegExp(`id=["']${id}["']`));
 
@@ -204,7 +204,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   assert.equal((html.match(/id=["']panorama-both-toggle["']/g) || []).length, 1);
   assert.match(html, /id=["']tail-pane["'][\s\S]*id=["']player-tail["']/);
   assert.match(html, /id=["']lead-pane["'][\s\S]*id=["']player-lead["']/);
-  assert.doesNotMatch(panoramaCss, /\.step-pane-action/, "Side players must not use a transparent overlay element.");
+  assert.doesNotMatch(panoramaCss, /\.panorama-pane-action/, "Side players must not use a transparent overlay element.");
   assert.match(panoramaCss, /\.side-player-surface iframe[\s\S]*pointer-events:\s*none/);
   assert.match(
     panoramaCss,
@@ -216,7 +216,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   // setting?" depended on which setting.
   assert.match(
     html,
-    /id="parameter-panel"[\s\S]*id="nudge-seconds"[\s\S]*id="panorama-inner-offset"[\s\S]*id="panorama-outer-offset"[\s\S]*id="panorama-cycle-rate"/,
+    /id="parameter-panel"[\s\S]*id="nudge-distance"[\s\S]*id="panorama-inner-offset"[\s\S]*id="panorama-outer-offset"[\s\S]*id="panorama-cycle-rate"/,
     "Every remembered setting lives in State & Settings."
   );
   assert.doesNotMatch(html, /center-panorama-settings/,
@@ -231,7 +231,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
     /@container \(max-width: 680px\)[\s\S]*grid-template-areas:\s*"center"\s*"tail"\s*"lead"/,
     "Phone layout must explicitly stack Center, Tail, Lead without relying on auto-placement."
   );
-  assert.match(panoramaCss, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);
+  assert.match(panoramaCss, /\.panorama-pane \.player-wrap[\s\S]*min-height:\s*200px/);
   assert.match(
     styles,
     /\.center-transport-surface:hover:not\(:disabled\),[\s\S]*background:\s*transparent[\s\S]*transform:\s*none/,
@@ -242,7 +242,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   assert.match(app, /panoramaFrame:\s*panoramaOperatorPreview\(\)/);
   assert.match(
     app,
-    /function panoramaFrameRequest[\s\S]*FIELD_FRAME_OWNER\.CONTEXT[\s\S]*transport\.start[\s\S]*transport\.end/,
+    /function panoramaFrameRequest[\s\S]*PANORAMA_FRAME_OWNER\.CONTEXT[\s\S]*transport\.start[\s\S]*transport\.end/,
     "Context supplies the frozen observation window as the Frame's fixed edges."
   );
   assert.match(app, /const panoramaFrames = createPanoramaFrameSequencer\(\)/,
@@ -260,10 +260,10 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   assert.doesNotMatch(app, /onHoldOffsets:/);
   assert.doesNotMatch(field, /onHoldOffsets/);
   assert.match(app, /function changePanoramaBoundary[\s\S]*state\.panoramaCycle = normalizePanoramaCycle/);
-  assert.match(app, /seconds:\s*state\.contextSeconds/);
+  assert.match(app, /seconds:\s*state\.contextDuration/);
   assert.doesNotMatch(
     app,
-    /panoramaCycle\s*=\s*[^;\n]*contextSeconds|contextSeconds\s*=\s*[^;\n]*panoramaCycle/,
+    /panoramaCycle\s*=\s*[^;\n]*contextDuration|contextDuration\s*=\s*[^;\n]*panoramaCycle/,
     "Context duration and the physical Panorama relation must remain independently owned."
   );
   assert.match(

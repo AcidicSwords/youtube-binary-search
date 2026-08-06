@@ -14,7 +14,7 @@ import {
   partitionGuideSections
 } from "./view.js";
 import {
-  FIELD_FRAME_ACTIVATION,
+  PANORAMA_FRAME_ACTIVATION,
   operatorFrame,
   framesEqual,
   frameIdentity,
@@ -134,11 +134,11 @@ const close = (actual, expected, tolerance = 1e-9) => {
     center: 50,
     backward: 40,
     forward: 60,
-    activation: { kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS },
+    activation: { kind: PANORAMA_FRAME_ACTIVATION.STEP_TO_ADDRESS },
     range
   });
   assert.equal(observed.activation, null);
-  assert.equal(actionable.activation.kind, FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS);
+  assert.equal(actionable.activation.kind, PANORAMA_FRAME_ACTIVATION.STEP_TO_ADDRESS);
   assert.equal(framesEqual(observed, actionable), false);
   assert.notEqual(frameIdentity(observed), frameIdentity(actionable));
 
@@ -148,12 +148,12 @@ const close = (actual, expected, tolerance = 1e-9) => {
   });
   const second = sequencer.resolve({
     kind: "step", center: 50, backward: 40, forward: 60,
-    activation: { kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS },
+    activation: { kind: PANORAMA_FRAME_ACTIVATION.STEP_TO_ADDRESS },
     range
   });
   assert.equal(first.revision, 1);
   assert.equal(second.revision, 2);
-  assert.equal(second.activation.kind, FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS);
+  assert.equal(second.activation.kind, PANORAMA_FRAME_ACTIVATION.STEP_TO_ADDRESS);
 }
 
 // The interface names the usable surfaces. The deeper constraints remain in

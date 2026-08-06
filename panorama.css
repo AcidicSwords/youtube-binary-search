@@ -10,7 +10,7 @@
   background: #080c11;
 }
 
-.step-pane {
+.panorama-pane {
   position: relative;
   display: grid;
   min-width: 0;
@@ -22,20 +22,20 @@
   background: #05070a;
 }
 
-.step-pane-center {
+.panorama-pane-center {
   grid-area: center;
   border-color: var(--line-strong);
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
 }
 
-.step-pane-side {
+.panorama-pane-side {
   opacity: 0.96;
 }
 
 .tail-pane { grid-area: tail; }
 .lead-pane { grid-area: lead; }
 
-.lead-pane .step-pane-bar,
+.lead-pane .panorama-pane-bar,
 .lead-pane .pane-identity,
 .lead-pane .pane-bar-actions {
   flex-direction: row-reverse;
@@ -45,13 +45,13 @@
   text-align: right;
 }
 
-.step-pane-side .player-wrap {
+.panorama-pane-side .player-wrap {
   filter: saturate(0.88) brightness(0.88);
   transition: filter 120ms ease;
 }
 
-.step-pane-side:hover .player-wrap,
-.step-pane-side:focus-within .player-wrap {
+.panorama-pane-side:hover .player-wrap,
+.panorama-pane-side:focus-within .player-wrap {
   filter: saturate(0.98) brightness(0.98);
 }
 
@@ -74,7 +74,7 @@
   opacity: 0.72;
 }
 
-.step-pane-bar {
+.panorama-pane-bar {
   position: relative;
   /* This bar creates a stacking context, so its Tune popover is capped by this
      value rather than by its own z-index. It must therefore out-rank
@@ -98,7 +98,7 @@
   gap: 7px;
 }
 
-.step-pane-role {
+.panorama-pane-role {
   flex: 0 0 auto;
   color: var(--text);
   font-size: 0.66rem;
@@ -107,7 +107,7 @@
   text-transform: uppercase;
 }
 
-.step-pane-meta {
+.panorama-pane-meta {
   min-width: 0;
   overflow: hidden;
   color: #c0cad6;
@@ -152,7 +152,7 @@
 .panorama-visibility-toggle span:last-child { color: var(--muted); }
 .panorama-visibility-toggle[aria-pressed="true"] { border-color: rgba(121, 168, 255, 0.62); }
 
-.step-pane .player-wrap {
+.panorama-pane .player-wrap {
   min-height: 200px;
   aspect-ratio: 16 / 9;
 }
@@ -213,7 +213,7 @@
   white-space: nowrap;
 }
 
-.side-player-surface.is-step-held {
+.side-player-surface.is-step-frozen {
   border-color: rgba(121, 168, 255, 0.92);
   background: rgba(121, 168, 255, 0.18);
   box-shadow: inset 0 0 0 1px rgba(121, 168, 255, 0.34);
@@ -237,7 +237,7 @@
   max-width: clamp(120px, 18vw, 260px);
 }
 
-.step-pane-restore {
+.panorama-pane-restore {
   position: absolute;
   inset: 0;
   display: flex;
@@ -253,17 +253,17 @@
   writing-mode: vertical-rl;
 }
 
-.step-pane.is-collapsed { min-height: 180px; }
-.step-pane.is-collapsed .player-wrap,
-.step-pane.is-collapsed .step-pane-bar,
-.step-pane.is-collapsed .pane-panorama-controls { display: none; }
+.panorama-pane.is-collapsed { min-height: 180px; }
+.panorama-pane.is-collapsed .player-wrap,
+.panorama-pane.is-collapsed .panorama-pane-bar,
+.panorama-pane.is-collapsed .pane-panorama-controls { display: none; }
 
 .panorama.panorama-off {
   grid-template-areas: "center";
   grid-template-columns: minmax(0, 1fr);
 }
-.panorama.panorama-off .step-pane-side { display: none; }
-.panorama.panorama-off .step-pane-center {
+.panorama.panorama-off .panorama-pane-side { display: none; }
+.panorama.panorama-off .panorama-pane-center {
   width: min(1100px, 100%);
   justify-self: center;
 }
@@ -278,11 +278,11 @@
   grid-template-columns: 48px minmax(0, 1fr) 48px;
 }
 
-.panorama.is-suspended .step-pane-side .player-wrap {
+.panorama.is-suspended .panorama-pane-side .player-wrap {
   filter: grayscale(0.4) brightness(0.58);
 }
 
-.panorama.is-preview .step-pane-side .player-wrap {
+.panorama.is-preview .panorama-pane-side .player-wrap {
   filter: saturate(0.95) brightness(0.95);
 }
 
@@ -298,7 +298,7 @@
       minmax(220px, 0.96fr);
   }
 
-  .step-pane-side .player-wrap {
+  .panorama-pane-side .player-wrap {
     min-height: 0;
   }
 }
@@ -326,13 +326,13 @@
     grid-template-columns: 48px minmax(0, 1fr) 48px;
   }
 
-  .step-pane-center {
+  .panorama-pane-center {
     width: min(920px, 100%);
     justify-self: center;
   }
 
-  .step-pane.is-collapsed { min-height: 64px; }
-  .step-pane-restore { writing-mode: horizontal-tb; }
+  .panorama-pane.is-collapsed { min-height: 64px; }
+  .panorama-pane-restore { writing-mode: horizontal-tb; }
 }
 
 @container (max-width: 680px) {
@@ -349,9 +349,9 @@
     padding: 7px;
   }
 
-  .step-pane-side .player-wrap { min-height: 200px; aspect-ratio: auto; }
-  .step-pane-bar { min-height: 50px; }
-  .step-pane-meta { font-size: 0.59rem; }
+  .panorama-pane-side .player-wrap { min-height: 200px; aspect-ratio: auto; }
+  .panorama-pane-bar { min-height: 50px; }
+  .panorama-pane-meta { font-size: 0.59rem; }
   .center-panorama-summary small { display: none; }
 }
 
@@ -378,11 +378,11 @@
    the trailing pane has just received the address Center was showing, so it is
    already settled, while the leading pane is receiving material that was not
    previously visible and rises into place. */
-/* Kept equal to FIELD_TRANSITION_MS in panorama.js, which clears the class. */
+/* Kept equal to PANORAMA_TRANSITION_MS in panorama.js, which clears the class. */
 .panorama { --panorama-transition-ms: 260ms; }
 
-.panorama.is-traversing-forward .step-pane,
-.panorama.is-traversing-backward .step-pane {
+.panorama.is-traversing-forward .panorama-pane,
+.panorama.is-traversing-backward .panorama-pane {
   animation-duration: var(--panorama-transition-ms);
   animation-timing-function: ease-out;
   animation-fill-mode: both;
@@ -393,8 +393,8 @@
   animation-name: panorama-role-settled;
 }
 
-.panorama.is-traversing-forward .step-pane-center,
-.panorama.is-traversing-backward .step-pane-center {
+.panorama.is-traversing-forward .panorama-pane-center,
+.panorama.is-traversing-backward .panorama-pane-center {
   animation-name: panorama-role-center;
 }
 
@@ -449,8 +449,8 @@
 /* Reduced motion settles directly on the resulting Frame. The controller also
    stops emitting the directional classes, so this is a second guarantee. */
 @media (prefers-reduced-motion: reduce) {
-  .panorama.is-traversing-forward .step-pane,
-  .panorama.is-traversing-backward .step-pane {
+  .panorama.is-traversing-forward .panorama-pane,
+  .panorama.is-traversing-backward .panorama-pane {
     animation: none;
   }
 }

@@ -33,13 +33,17 @@ import {
   sortedSections,
   clusterPinsByPixels
 } from "./guide.js";
-import { projectionForModel } from "./timeline-projection.js";
+import {
+  projectionForModel,
+  timelineAllocationFactor
+} from "./timeline-projection.js";
 import {
   TRANSPORT_KIND,
   isTransportActive
 } from "./transport.js";
 import {
   STEP_DISTANCE_MODE,
+  canonicalNeighborhoodDirections,
   focusOwnsRangeBoundaries,
   effectiveStepDistance,
   projectPlayback,
@@ -47,6 +51,10 @@ import {
 } from "./session.js";
 import { YOUTUBE_STATE } from "./youtube.js";
 import { panoramaSideRates } from "./panorama-geometry.js";
+import {
+  availableTraversalProspects,
+  TRAVERSAL_PROSPECT_KIND
+} from "./traversal-prospects.js";
 
 const TIMELINE_SECTION_HIT_WIDTH = 28;
 const TIMELINE_SECTION_LANE_HEIGHT = 20;
@@ -58,24 +66,17 @@ const TIMELINE_PIN_HIT_SIZE = 52;
 const COARSE_TIMELINE_PIN_HIT_SIZE = 56;
 
 // Spatial time is not a duration. It is how much map a source span is given,
-// and it only means anything against the source span it stretches. Reporting
-// it as an absolute figure invites reading it as real elapsed time, so every
-// spatial span is reported as the factor it applies to its own source — and
-// only when that factor is not 1, because at 1 the map and the source already
-// correspond and there is nothing to say.
-const STRETCH_TOLERANCE = 1e-6;
+// Timeline Allocation is meaningful only relative to the Source-Time extent it
+// qualifies. Neutral allocation is omitted because map and source already
+// correspond exactly at 1×.
+const TIMELINE_ALLOCATION_TOLERANCE = 1e-6;
 
-function stretchFactor(spatialSpan, sourceSpan) {
-  if (!Number.isFinite(spatialSpan) || !Number.isFinite(sourceSpan)) return null;
-  if (!(sourceSpan > STRETCH_TOLERANCE)) return null;
-  const factor = spatialSpan / sourceSpan;
-  if (!Number.isFinite(factor) || factor <= 0) return null;
-  return Math.abs(factor - 1) <= STRETCH_TOLERANCE ? null : factor;
-}
-
-function formatStretchFactor(spatialSpan, sourceSpan) {
-  const factor = stretchFactor(spatialSpan, sourceSpan);
-  return factor === null ? null : `${Number(factor.toFixed(3))}×`;
+function formatTimelineAllocationFactor(projectedExtent, sourceExtent) {
+  const factor = timelineAllocationFactor(projectedExtent, sourceExtent);
+  if (factor === null || Math.abs(factor - 1) <= TIMELINE_ALLOCATION_TOLERANCE) {
+    return null;
+  }
+  return `${Number(factor.toFixed(3))}×`;
 }
 
 export function formatDuration(seconds) {
@@ -206,10 +207,20 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
   const state = () => getState();
   const model = () => state().session.model;
-  const resolution = () => model().neighborhood;
+  const presentationModel = () => {
+    const accepted = model();
+    const ghost = state().ghostGesture;
+    if (!ghost?.changed) return accepted;
+    return {
+      ...accepted,
+      neighborhood: ghost.previewNeighborhood || accepted.neighborhood,
+      activeSpan: ghost.previewActiveSpan ?? null
+    };
+  };
+  const resolution = () => presentationModel().neighborhood;
   const range = () => model().range;
   const guide = () => model().guide;
-  const interval = () => model().activeSpan;
+  const interval = () => presentationModel().activeSpan;
   const focusedSectionId = () => (
     model().focus?.kind === "active-span"
       ? null
@@ -328,6 +339,58 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const right = percent(end);
     element.style.left = `${left}%`;
     element.style.width = `${Math.max(0, right - left)}%`;
+  }
+
+  function renderRippleProjection(activeRange, semanticCurrent) {
+    const currentState = state();
+    const ripple = currentState.rippleObservation;
+    const activeRipple = ripple
+      && ripple.generation === currentState.sourceGeneration
+      ? ripple
+      : null;
+    const addressMarker = elements["ripple-address-marker"];
+    const contextFill = elements["ripple-context-window-fill"];
+
+    addressMarker.hidden = !activeRipple;
+    contextFill.hidden = !activeRipple;
+    if (activeRipple) {
+      setMarkerPosition(addressMarker, activeRipple.observationAddress);
+      setSegment(contextFill, activeRipple.contextStart, activeRipple.contextEnd);
+      addressMarker.setAttribute(
+        "aria-label",
+        `Ripple Observation Address ${formatTime(activeRipple.observationAddress)}; Current did not move and remains ${formatTime(semanticCurrent)}`
+      );
+      contextFill.dataset.rippleId = activeRipple.id;
+    } else {
+      addressMarker.removeAttribute("aria-label");
+      delete contextFill.dataset.rippleId;
+    }
+
+    const prospects = availableTraversalProspects(
+      currentState.traversalProspects,
+      {
+        generation: currentState.sourceGeneration,
+        range: activeRange
+      }
+    );
+    const markers = prospects.map(prospect => {
+      const marker = document.createElement("span");
+      const boundary = prospect.kind === TRAVERSAL_PROSPECT_KIND.RIPPLE_START
+        ? "Start"
+        : "End";
+      marker.className = "traversal-prospect-marker";
+      marker.dataset.traversalProspect = prospect.id;
+      marker.dataset.kind = prospect.kind;
+      marker.dataset.address = String(prospect.address);
+      marker.setAttribute("role", "img");
+      marker.setAttribute(
+        "aria-label",
+        `Ripple ${boundary} Prospect at ${formatTime(prospect.address)}; future Address; Current did not move and remains ${formatTime(semanticCurrent)}`
+      );
+      setMarkerPosition(marker, prospect.address);
+      return marker;
+    });
+    elements["traversal-prospect-layer"].replaceChildren(...markers);
   }
 
   function setStyleProperty(element, name, value) {
@@ -1192,8 +1255,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         focus.type = "button";
         focus.className = "guide-action guide-action-focus";
         if (section.id === focusedId) {
-          focus.dataset.leaveSection = "true";
-          focus.textContent = "Leave";
+          focus.dataset.unfocus = "true";
+          focus.textContent = "Unfocus";
         } else {
           focus.dataset.focusSection = section.id;
           focus.textContent = "Focus";
@@ -1682,7 +1745,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         })
       : null;
     const livePlayback = Boolean(playbackProjection?.changed);
-    const projectedModel = livePlayback ? playbackProjection.model : model();
+    const projectedModel = livePlayback
+      ? playbackProjection.model
+      : presentationModel();
+    const projectedNeighborhood = canonicalNeighborhoodDirections(
+      projectedModel?.neighborhood
+    );
     elements["timeline-key-active-span"].dataset.active = String(
       Boolean(projectedModel?.activeSpan)
     );
@@ -1694,14 +1762,14 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     ]) {
       elements[id].dataset.live = String(livePlayback);
     }
-    if (state().videoLoaded && projectedModel?.neighborhood) {
+    if (state().videoLoaded && projectedNeighborhood) {
       setSegment(
         elements["neighborhood-fill"],
-        projectedModel.neighborhood.L,
-        projectedModel.neighborhood.R
+        projectedNeighborhood.backward,
+        projectedNeighborhood.forward
       );
-      setMarkerPosition(elements["neighborhood-backward-bound"], projectedModel.neighborhood.L);
-      setMarkerPosition(elements["neighborhood-forward-bound"], projectedModel.neighborhood.R);
+      setMarkerPosition(elements["neighborhood-backward-bound"], projectedNeighborhood.backward);
+      setMarkerPosition(elements["neighborhood-forward-bound"], projectedNeighborhood.forward);
       elements["active-span-fill"].hidden = !projectedModel.activeSpan;
       if (projectedModel.activeSpan) {
         elements["active-span-fill"].dataset.direction = projectedModel.activeSpan.direction;
@@ -1752,7 +1820,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       // YouTube's controls therefore remain pointer-accessible in every state.
       const surfaceOwnsPointer = currentState.videoLoaded && (!ordinaryPlayback || !centerRunning);
       surface.hidden = !surfaceOwnsPointer;
-      const activation = currentState.field?.activation || null;
+      const activation = currentState.panorama?.activation || null;
       const preparing = Boolean(activation && !activation.ready);
       surface.disabled = !currentState.videoLoaded || preparing;
       const label = contextObservation
@@ -1797,11 +1865,13 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const currentNeighborhood = resolution();
     const currentSpan = interval();
     const projection = timelineProjection();
-    const field = currentState.field;
-    const panoramaWindow = field?.span?.held && field.span.available
-      ? { start: field.span.start, end: field.span.end }
+    const panoramaState = currentState.panorama;
+    const panoramaWindow = panoramaState?.span?.frozen && panoramaState.span.available
+      ? { start: panoramaState.span.start, end: panoramaState.span.end }
       : null;
     const semanticCurrent = currentNeighborhood?.C ?? 0;
+    const acceptedCurrent = model().neighborhood?.C ?? 0;
+    const ghostCandidateActive = currentState.ghostGesture?.changed === true;
     const configuredReach = model().stepDistance;
     const effectiveReach = effectiveStepDistance(
       configuredReach,
@@ -1924,9 +1994,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["timeline-key-pins"].dataset.active = String(
       Boolean(orderedPins(guide()).length)
     );
-    const overallStretchFactor = formatStretchFactor(projection.timelineExtent, model().duration);
-    elements["duration-time"].textContent = overallStretchFactor
-      ? `${formatTime(model().duration)} · ${overallStretchFactor} spatial`
+    const overallTimelineAllocationFactor = formatTimelineAllocationFactor(
+      projection.timelineExtent,
+      model().duration
+    );
+    elements["duration-time"].textContent = overallTimelineAllocationFactor
+      ? `${formatTime(model().duration)} · ${overallTimelineAllocationFactor} Timeline allocation`
       : formatTime(model().duration);
     elements["range-label"].textContent = loaded ? formatRange(activeRange) : "—";
     const resolutionTimelineExtent = currentNeighborhood
@@ -1935,7 +2008,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const resolutionSourceDuration = currentNeighborhood
       ? currentNeighborhood.R - currentNeighborhood.L
       : null;
-    const neighborhoodStretchFactor = formatStretchFactor(
+    const neighborhoodTimelineAllocationFactor = formatTimelineAllocationFactor(
       resolutionTimelineExtent,
       resolutionSourceDuration
     );
@@ -1943,16 +2016,20 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? `${
           formatDuration(resolutionSourceDuration)
         }${
-          neighborhoodStretchFactor ? ` · ${neighborhoodStretchFactor} spatial` : ""
+          neighborhoodTimelineAllocationFactor
+            ? ` · ${neighborhoodTimelineAllocationFactor} Timeline allocation`
+            : ""
         } · ${
           currentState.session.model.neighborhoodBasis === NEIGHBORHOOD_BASIS.MOVEMENT
             ? "Movement scale"
             : "Range scale"
         }`
       : "—";
-    elements["pin-current-position"].textContent = currentNeighborhood ? `Current ${formatTime(semanticCurrent)}` : "Current —";
-    elements["context-setting-value"].textContent = currentState.contextSeconds > 0
-      ? `${currentState.contextSeconds} s centered on Current`
+    elements["pin-current-position"].textContent = currentNeighborhood
+      ? `${ghostCandidateActive ? "Ghost Candidate" : "Current"} ${formatTime(semanticCurrent)}`
+      : "Current —";
+    elements["context-setting-value"].textContent = currentState.contextDuration > 0
+      ? `${currentState.contextDuration} s centered on Current`
       : "Off";
 
     // One bounded cycling relation: 0 < inner < outer.
@@ -1969,8 +2046,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         `${panoramaCycle.inner}–${panoramaCycle.outer} s · ${pair}`;
     }
     // The stored quantum stays exact; only its presentation is rounded.
-    elements["nudge-seconds"].value = String(
-      Number((currentState.nudgeSeconds ?? 1 / 24).toFixed(3))
+    elements["nudge-distance"].value = String(
+      Number((currentState.nudgeDistance ?? 1 / 24).toFixed(3))
     );
     elements["step-distance"].value = String(configuredReach.forward);
     const adaptiveStep = configuredReach.mode === STEP_DISTANCE_MODE.ADAPTIVE;
@@ -2086,7 +2163,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         } ${formatRange(sectionExtent)}`
       : `No ${
           sectionKind === "panorama-span"
-            ? "Held Panorama span"
+            ? "Panorama Window"
             : sectionKind === "selected-pins"
               ? "two selected Pins"
               : "Active Span"
@@ -2102,12 +2179,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       elements["focused-section-range"].textContent = "—";
     }
 
-    const interactionLocked = !loaded;
+    const interactionLocked = !loaded || ghostCandidateActive;
     for (const id of [
       "go-range-start", "range-start-here", "range-midpoint",
       "go-range-end", "range-end-here", "full-video-range",
       "panorama-inner-offset", "panorama-outer-offset", "panorama-cycle-rate",
-      "nudge-seconds", "context-seconds", "playback-rate", "playback-dynamic",
+      "nudge-distance", "context-duration", "playback-rate", "playback-dynamic",
       "weight-relaxation-toggle",
       "section-source", "section-label", "pin-label",
       "chapter-source", "chapter-parse", "chapter-clear"
@@ -2136,7 +2213,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       || sectionKind !== "interval"
       || !currentSpan
       || workingAlreadyOwnsRange;
-    elements["leave-section"].disabled = interactionLocked || !focused;
+    elements["unfocus"].disabled = interactionLocked || !focused;
     elements["refine-backward"].disabled = interactionLocked || targets.backward === null;
     elements["refine-forward"].disabled = interactionLocked || targets.forward === null;
     elements.reopen.disabled = interactionLocked || !actionModel?.reopen;
@@ -2203,8 +2280,11 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? currentState.session.future.at(-1).label
       : "Nothing to redo";
     const destinationFrame = currentSpan?.departureNeighborhood;
-    const destinationScale = destinationFrame?.neighborhood
-      ? formatDuration(destinationFrame.neighborhood.R - destinationFrame.neighborhood.L)
+    const destinationNeighborhood = canonicalNeighborhoodDirections(
+      destinationFrame?.neighborhood
+    );
+    const destinationScale = destinationNeighborhood
+      ? formatDuration(destinationNeighborhood.forward - destinationNeighborhood.backward)
       : null;
     setActionMeta(
       "switch-end",
@@ -2241,13 +2321,15 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           : `${classifyRetainedRefineRelation(currentSpan, semanticCurrent, targets.forward) === "full" ? "full movement" : "retain anchor"} · to ${formatTime(targets.forward)}`
     );
     const rangeSourceSpan = activeRange.end - activeRange.start;
-    const rangeStretchFactor = formatStretchFactor(
+    const rangeTimelineAllocationFactor = formatTimelineAllocationFactor(
       projection.timelineDistance(activeRange.start, activeRange.end),
       rangeSourceSpan
     );
     elements["reopen-meta"].textContent = actionModel?.reopen
       ? `${formatDuration(rangeSourceSpan)} Range${
-          rangeStretchFactor ? ` · ${rangeStretchFactor} spatial` : ""
+          rangeTimelineAllocationFactor
+            ? ` · ${rangeTimelineAllocationFactor} Timeline allocation`
+            : ""
         }`
       : "Range-level resolution";
     // Step Distance is a distance on the map, and inside a weighted Section a
@@ -2305,6 +2387,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ]) elements[id].hidden = true;
       elements["active-span-fill"].hidden = true;
       elements["panorama-window-fill"].hidden = true;
+      elements["ripple-context-window-fill"].hidden = true;
+      elements["ripple-address-marker"].hidden = true;
+      elements["traversal-prospect-layer"].replaceChildren();
       elements["section-preview-fill"].hidden = true;
       elements["action-preview-fill"].hidden = true;
       elements["preview-current-marker"].hidden = true;
@@ -2331,6 +2416,10 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const currentDrag = state().currentDrag;
     const dragging = Boolean(currentDrag?.moved);
     const candidate = dragging ? currentDrag.candidate : semanticCurrent;
+    elements["current-marker"].dataset.acceptedAddress = String(acceptedCurrent);
+    elements["current-marker"].dataset.ghostCandidate = ghostCandidateActive
+      ? String(candidate)
+      : "";
     setMarkerPosition(elements["current-marker"], candidate);
     elements["current-marker"].classList.toggle("is-dragging", dragging);
     elements["current-marker"].classList.toggle(
@@ -2343,7 +2432,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     );
     elements["current-marker"].setAttribute(
       "aria-valuetext",
-      `${formatTime(candidate)}; Current${dragging ? " candidate" : ""}`
+      `${formatTime(candidate)}; ${
+        ghostCandidateActive ? "Ghost Candidate" : `Current${dragging ? " candidate" : ""}`
+      }`
     );
     // Current reads its own source Address on the map, where it is looked at.
     if (!currentMarkerTime.parentElement) {
@@ -2379,6 +2470,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
     elements["panorama-window-fill"].hidden = !panoramaWindow;
     if (panoramaWindow) setSegment(elements["panorama-window-fill"], panoramaWindow.start, panoramaWindow.end);
+    renderRippleProjection(activeRange, semanticCurrent);
     renderSectionPreview();
     renderActionPreview(previewResult, structuralPresentation, previewKind);
     renderTimelinePins();

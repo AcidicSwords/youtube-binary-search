@@ -85,15 +85,15 @@ assert.equal(lead.currentTime, 77.5);
 
 // Operator framing is the fallback for a disabled Context, not for a finished
 // one. Turning Context off reveals Refine's next weighted midpoints.
-byId.get("context-seconds").value = "0";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "0";
+byId.get("context-duration").dispatch("change");
 await flush();
 await poll();
 assert.equal(byId.get("panorama-transport-state").textContent, "Refine Frame");
 assert.equal(tail.currentTime, 37.5);
 assert.equal(lead.currentTime, 87.5);
-byId.get("context-seconds").value = "5";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "5";
+byId.get("context-duration").dispatch("change");
 await flush();
 await poll();
 assert.equal(byId.get("panorama-transport-state").textContent, "Context Frame");
@@ -186,16 +186,16 @@ assert.equal(currentText(), "Current 1:25");
 
 // Context accepts custom numeric durations; presets are suggestions rather than
 // the complete domain. Turning it off during observation restores Center once.
-byId.get("context-seconds").value = "0.5";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "0.5";
+byId.get("context-duration").dispatch("change");
 await flush();
 assert.equal(byId.get("context-setting-value").textContent, "0.5 s centered on Current");
 assert.equal(center.currentTime, 84.75, "Changing active Context must immediately retarget its centered window.");
 
 // Subsequent
 // traversal remains paused and does not issue an automatic play command.
-byId.get("context-seconds").value = "0";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "0";
+byId.get("context-duration").dispatch("change");
 await flush();
 assert.equal(center.currentTime, 85);
 assert.equal(center.state, 2);
@@ -223,8 +223,8 @@ assert.equal(center.currentTime, 85);
 // observation around Current, so it yields to playback rather than
 // reinterpreting the key as "commit the Address I was peeking at": Current is
 // unchanged, and playback departs from Current, not from the Cursor.
-byId.get("context-seconds").value = "5";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "5";
+byId.get("context-duration").dispatch("change");
 await flush();
 byId.get("timeline").dispatch("click", { target: byId.get("timeline"), clientX: 400 });
 await flush();

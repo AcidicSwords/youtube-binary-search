@@ -16,28 +16,28 @@ const unfolding = deriveObservedPanorama({
   centerAddress: 54,
   tailAddress: 52,
   leadAddress: 58,
-  tailHeld: false,
-  leadHeld: false
+  tailFrozen: false,
+  leadFrozen: false
 });
 assert.deepEqual(unfolding.span, {
   start: 52,
   end: 58,
   duration: 6,
   available: true,
-  held: false
+  frozen: false
 });
 
-const held = deriveObservedPanorama({
+const frozen = deriveObservedPanorama({
   targets: derivePanorama(60, { backward: 10, forward: 10, linked: true }, { start: 0, end: 100 }),
-  phase: PANORAMA_STATE.HELD,
+  phase: PANORAMA_STATE.FROZEN,
   centerAddress: 60,
   tailAddress: 50,
   leadAddress: 70,
-  tailHeld: true,
-  leadHeld: true
+  tailFrozen: true,
+  leadFrozen: true
 });
-assert.equal(held.span.held, true);
-assert.deepEqual({ start: held.span.start, end: held.span.end }, { start: 50, end: 70 });
+assert.equal(frozen.span.frozen, true);
+assert.deepEqual({ start: frozen.span.start, end: frozen.span.end }, { start: 50, end: 70 });
 
 assert.equal(chooseNearestRate([0.25, 0.5, 1, 1.5, 2], 0.6), 0.5);
 assert.equal(chooseNearestRate([0.25, 0.5, 1, 1.5, 2], 1.8), 2);
@@ -47,18 +47,18 @@ assert.equal(resolvePanoramaPhase({
   enabled: true,
   suspended: false,
   sides: [
-    { visible: true, available: true, held: true, offset: 0 },
-    { visible: true, available: true, held: true, offset: 0 }
+    { visible: true, available: true, frozen: true, offset: 0 },
+    { visible: true, available: true, frozen: true, offset: 0 }
   ]
-}), PANORAMA_STATE.COINCIDENT, "Held zero-offset sides remain physically coincident.");
+}), PANORAMA_STATE.COINCIDENT, "Frozen zero-offset sides remain physically coincident.");
 assert.equal(resolvePanoramaPhase({
   enabled: true,
   suspended: false,
   sides: [
-    { visible: true, available: true, held: true, offset: 10 },
-    { visible: true, available: true, held: true, offset: 10 }
+    { visible: true, available: true, frozen: true, offset: 10 },
+    { visible: true, available: true, frozen: true, offset: 10 }
   ]
-}), PANORAMA_STATE.HELD);
+}), PANORAMA_STATE.FROZEN);
 
 let session = createSession({ duration: 100, current: 50 });
 const retained = saveExtentAsSection(session, { start: 40, end: 60 }, "Panorama reading", "panorama-span");
@@ -108,10 +108,10 @@ assert.doesNotMatch(
 );
 assert.match(app, /saveExtentAsSection/);
 assert.doesNotMatch(app, /createSkimTransport|completeSkim|reachSkimDestination/);
-assert.match(panoramaSource, /FIELD_SIDE_MODE/);
+assert.match(panoramaSource, /PANORAMA_SIDE_MODE/);
 assert.match(
   panoramaSource,
-  /function stretch\(role = "both"\)[\s\S]*suspendedNow = suspensionRequired\(snapshot\)[\s\S]*resumeCycle\(runtime\.cycle[\s\S]*beginStretch\(sides\[name\], center, snapshot, \{ play: centerRunning && !suspendedNow \}\)/,
+  /function stretch\(role = "both"\)[\s\S]*suspendedNow = suspensionRequired\(snapshot\)[\s\S]*stretchCycle\(runtime\.cycle[\s\S]*beginStretch\(sides\[name\], center, snapshot, \{ play: centerRunning && !suspendedNow \}\)/,
   "Stretch must use live suspension state and resume the cycling cycle from its attained relation."
 );
 // A fresh leg is for discontinuities only: a scrub, a Range wrap, or Panorama
@@ -123,9 +123,9 @@ assert.match(panoramaSource, /function startCycleCycle\(center, snapshot[\s\S]*r
 assert.match(panoramaSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*(?:adapter\?\.place|adapter\?\.chapter)[\s\S]*side\.adapter\?\.play/,
   "Every running cycle must prime its side at 1× before directional-rate discovery.");
 assert.doesNotMatch(panoramaSource, /onHoldOffsets/,
-  "Hold and Stretch must never persist a measured runtime offset.");
+  "Freeze and Stretch must never persist a measured runtime offset.");
 assert.doesNotMatch(app, /onHoldOffsets:/,
-  "The application must not expose a Hold-to-configuration write path.");
+  "The application must not expose a Freeze-to-configuration write path.");
 assert.match(app, /function changePanoramaBoundary[\s\S]*state\.panoramaCycle = normalizePanoramaCycle/,
   "Only explicit Inner/Outer Offset input may update the configured Panorama relation.");
 assert.doesNotMatch(app, /state\.panoramaOffsets\s*=/,
@@ -137,9 +137,9 @@ assert.match(panoramaSource, /function drivePanorama\(center, centerDelta, snaps
 assert.match(panoramaSource, /function driveSide\(role, center, snapshot, centerRunning, cycleSide, participation\)[\s\S]*ensureSidePlaying\(side\);\s*requestSideRateStep\(side, cycleSide\.rate\)/,
   "Cycling rate must be requested only after a side is running and its capabilities are observable.");
 assert.match(css, /data-phase="unfolding"/);
-assert.match(css, /data-phase="held"/);
+assert.match(css, /data-phase="frozen"/);
 assert.match(css, /panorama-window-fill/);
 assert.match(packageJson.scripts.test, /panorama-layout-tests\.mjs/);
 assert.match(packageJson.scripts.check, /panorama-geometry\.js/);
 
-console.log("Panorama grammar tests passed: automatic Context, independent Hold/Stretch offsets, Range looping, side Step, and Guide retention.");
+console.log("Panorama grammar tests passed: automatic Context, independent Freeze/Stretch offsets, Range looping, side Step, and Guide retention.");

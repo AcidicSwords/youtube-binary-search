@@ -11,8 +11,8 @@ import {
   createPanoramaCycle,
   panoramaSideRate,
   advanceCycle,
-  holdCycle,
-  resumeCycle,
+  freezeCycle,
+  stretchCycle,
   rebasePanoramaCycle,
   restartPanoramaCycle
 } from "./panorama-geometry.js";
@@ -42,7 +42,7 @@ function run(runtime, steps, options = {}) {
   return { state, seen };
 }
 function begin(configured = cycle) {
-  const started = resumeCycle(createPanoramaCycle(configured, clock), configured);
+  const started = stretchCycle(createPanoramaCycle(configured, clock), configured);
   return { ...started, startedAt: clock, startingOffset: configured.inner, offset: configured.inner };
 }
 
@@ -90,7 +90,7 @@ function begin(configured = cycle) {
       `Both sides stay exactly one step from Center at ${centerRate}x.`
     );
   }
-  // Symmetry survives a Center rate too low to hold the step below it: Tail
+  // Symmetry survives a Center rate too low to freeze the step below it: Tail
   // floors at 0 rather than going backwards, which is the one asymmetry the
   // ladder can force and the reason such a Center has no Panorama triplet.
   const narrow = panoramaSideRates(0.75, 0.5);
@@ -138,7 +138,7 @@ function begin(configured = cycle) {
   assert.equal(panoramaSideRate({ role: "lead", phase: PANORAMA_DIRECTION.CONTRACTING, rate: 0.5 }), 0.5);
   assert.equal(panoramaSideRate({ role: "lead", phase: PANORAMA_DIRECTION.EXPANDING, rate: 0.5, waiting: true }), 1,
     "A side waiting at a cycling boundary runs at Center rate.");
-  assert.equal(panoramaSideRate({ role: "tail", phase: PANORAMA_DIRECTION.EXPANDING, rate: 0.5, held: true }), 1);
+  assert.equal(panoramaSideRate({ role: "tail", phase: PANORAMA_DIRECTION.EXPANDING, rate: 0.5, frozen: true }), 1);
 }
 
 // Expansion, barrier, contraction, and the full cycle
@@ -161,13 +161,13 @@ function begin(configured = cycle) {
   assert.equal(phases[0], PANORAMA_DIRECTION.CONTRACTING,
     "Reaching the outer boundary on every operational side begins contraction.");
   assert.equal(phases[1], PANORAMA_DIRECTION.EXPANDING, "The cycle repeats: x → expand → y → contract → x.");
-  assert.ok(phases.length >= 3, "Cycling continues until Hold is deliberately chosen.");
+  assert.ok(phases.length >= 3, "Cycling continues until Freeze is deliberately chosen.");
 }
 
 // A turn reports the direction it is heading in, not the one it arrived by
 {
   // Resuming a leg that already stands at the outer bound, with no time yet
-  // elapsed, is the exact case a Stretch after a fully attained Hold produces.
+  // elapsed, is the exact case a Stretch after a fully attained Freeze produces.
   // The Panorama is at its maximum, so the only thing it can do next is come back,
   // and that is what the side rates must be told. Reading it as still expanding
   // made the answer depend on whether the resume and the tick that followed it
@@ -232,7 +232,7 @@ function begin(configured = cycle) {
   // the pair turns around at the room the more constrained side actually has.
   // Letting the unclipped side run on to its own bound -- which is what a
   // per-side barrier did -- would leave Tail and Lead unequally displaced from
-  // Center, which is the one relation the Panorama exists to hold.
+  // Center, which is the one relation the Panorama exists to freeze.
   const asymmetric = {
     tail: { operational: true, available: 4 },
     lead: { operational: true, available: 1000 }
@@ -255,7 +255,7 @@ function begin(configured = cycle) {
     "Both sides remain equally displaced from Center throughout.");
 }
 
-// Sides that cannot hold the minimum offset are excluded from the barrier
+// Sides that cannot freeze the minimum offset are excluded from the barrier
 {
   const oneSided = {
     // Room for less than x: excluded by the law, not by visibility.
@@ -270,29 +270,29 @@ function begin(configured = cycle) {
     "A side without room for the configured inner offset must not stall the Panorama.");
 }
 
-// Hold preserves the attained relation and the resumption direction
+// Freeze preserves the attained relation and the resumption direction
 {
   let state = begin();
   state = run(state, 6).state;
   const attained = state.sides.lead.offset;
-  assert.ok(attained > cycle.inner && attained < cycle.outer, "Hold is taken mid-cycle.");
-  const held = holdCycle(state, cycle);
-  assert.equal(held.held, true);
+  assert.ok(attained > cycle.inner && attained < cycle.outer, "Freeze is taken mid-cycle.");
+  const frozen = freezeCycle(state, cycle);
+  assert.equal(frozen.frozen, true);
   clock += 5000;
-  const stillHeld = advanceCycle(held, { cycle, now: clock, sides: bothOperational });
-  assert.equal(stillHeld.sides.lead.offset, attained, "Hold preserves each attained offset.");
-  assert.equal(stillHeld.sides.tail.rate, 1, "Every held side runs at Center rate.");
-  assert.equal(stillHeld.phase, PANORAMA_DIRECTION.EXPANDING, "Hold preserves the cycling direction.");
+  const stillFrozen = advanceCycle(frozen, { cycle, now: clock, sides: bothOperational });
+  assert.equal(stillFrozen.sides.lead.offset, attained, "Freeze preserves each attained offset.");
+  assert.equal(stillFrozen.sides.tail.rate, 1, "Every frozen side runs at Center rate.");
+  assert.equal(stillFrozen.phase, PANORAMA_DIRECTION.EXPANDING, "Freeze preserves the cycling direction.");
 
-  // Resuming rebases the leg onto the relation actually on screen, so the held
+  // Resuming rebases the leg onto the relation actually on screen, so the frozen
   // seconds cost nothing: the cycle continues from where it stopped.
-  const restarted = rebasePanoramaCycle(resumeCycle(stillHeld, cycle), clock, attained);
+  const restarted = rebasePanoramaCycle(stretchCycle(stillFrozen, cycle), clock, attained);
   clock += 1000;
   const resumed = advanceCycle(restarted, { cycle, now: clock, sides: bothOperational });
   assert.ok(resumed.sides.lead.offset > attained, "Stretch resumes from the attained relation.");
 }
 
-// Contraction direction is preserved across a Hold as well
+// Contraction direction is preserved across a Freeze as well
 {
   let state = begin();
   while (state.phase === PANORAMA_DIRECTION.EXPANDING) {
@@ -301,9 +301,9 @@ function begin(configured = cycle) {
   }
   state = run(state, 2).state;
   assert.equal(state.phase, PANORAMA_DIRECTION.CONTRACTING);
-  const held = holdCycle(state, cycle);
+  const frozen = freezeCycle(state, cycle);
   const restarted = rebasePanoramaCycle(
-    resumeCycle(held, cycle), clock, state.sides.tail.offset
+    stretchCycle(frozen, cycle), clock, state.sides.tail.offset
   );
   clock += 1000;
   const resumed = advanceCycle(restarted, { cycle, now: clock, sides: bothOperational });
@@ -326,7 +326,7 @@ function begin(configured = cycle) {
       phase: state.phase,
       rate: cycle.rate,
       waiting: state.sides[role].waiting,
-      held: false
+      frozen: false
     });
     const outward = panoramaSideRate({
       role,
@@ -384,7 +384,7 @@ function begin(configured = cycle) {
 
 // Panorama returning after an extreme rate begins again at the inner offset
 {
-  // While Center plays alone the sides hold positions that stop describing
+  // While Center plays alone the sides freeze positions that stop describing
   // anything. Restoring that stale relation would put Tail and Lead somewhere
   // unrelated to Center; a fresh inner-offset leg keeps all three locally
   // related. This is the only resumption that discards phase.
@@ -409,4 +409,4 @@ function begin(configured = cycle) {
     "and takes the full outward duration from there, exactly as any other leg.");
 }
 
-console.log("Panorama Cycle tests passed: one-rung side steps that keep the cycle the same length at every Center rate, a wall-clock phase, turns that report the direction they are heading in, bounded expansion/contraction, Range clipping that lowers the shared bound rather than desynchronizing the pair, exclusion, deliberate Hold, phase-aware resumption, Weight-bucket crossings that keep both phase and deadline, and a fresh inner-offset leg when Panorama returns.");
+console.log("Panorama Cycle tests passed: one-rung side steps that keep the cycle the same length at every Center rate, a wall-clock phase, turns that report the direction they are heading in, bounded expansion/contraction, Range clipping that lowers the shared bound rather than desynchronizing the pair, exclusion, deliberate Freeze, phase-aware resumption, Weight-bucket crossings that keep both phase and deadline, and a fresh inner-offset leg when Panorama returns.");

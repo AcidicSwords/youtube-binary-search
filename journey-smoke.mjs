@@ -80,11 +80,11 @@ assert.equal(byId.get("center-transport-surface").disabled, true,
 await loadVideo("https://youtu.be/dQw4w9WgXcQ");
 assert.match(status(), /Loaded/);
 assert.equal(byId.get("duration-time").textContent, "1:40",
-  "An undeformed map reports its source length and no stretch factor.");
+  "An undeformed map reports its source length and no redundant Timeline Allocation Factor.");
 assert.equal(byId.get("chapter-parse").disabled, false,
   "Now chapters can be offered.");
-byId.get("context-seconds").value = "0";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "0";
+byId.get("context-duration").dispatch("change");
 await flush();
 
 // ==============================================================================
@@ -142,8 +142,8 @@ const weight = inSections("sectionWeighting")[0];
 assert.ok(weight, "A selected Section exposes its Weight.");
 weight.value = "4";
 await changeIn("sections-list", weight);
-assert.match(byId.get("duration-time").textContent, /spatial/,
-  "Weight is reported as a factor on the source, never as a second duration.");
+assert.match(byId.get("duration-time").textContent, /Timeline allocation/,
+  "Weight is reported through Timeline Allocation, never as a second duration.");
 assert.doesNotMatch(byId.get("duration-time").textContent, /^\d+:\d\d$/);
 
 // ==============================================================================
@@ -203,7 +203,7 @@ const focusedCurrent = currentText();
 await press("q");
 assert.notEqual(currentText(), focusedCurrent,
   "Operators keep working inside a Focus.");
-await clickIn("sections-list", inSections("leaveSection")[0]);
+await clickIn("sections-list", inSections("unfocus")[0]);
 assert.match(status(), /Restored Range/,
   "and leaving restores the containing Range exactly.");
 

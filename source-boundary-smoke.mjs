@@ -49,8 +49,8 @@ await poll();
 assert.equal(currentText(), "Current 0:22");
 assert.equal(center().videoId, "BBBBBBBBBBB");
 
-byId.get("context-seconds").value = "0";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "0";
+byId.get("context-duration").dispatch("change");
 await flush();
 
 // A pending Nudge is settled against B, then its timer is disarmed before C is
@@ -77,8 +77,8 @@ assert.equal(byId.get("return-action").disabled, true);
 
 // Automatic Context may be running when the source changes. Its delayed pause
 // and observation bounds cannot reach E.
-byId.get("context-seconds").value = "5";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "5";
+byId.get("context-duration").dispatch("change");
 byId.get("timeline").dispatch("click", {
   target: byId.get("timeline"),
   clientX: 600
@@ -101,8 +101,8 @@ assert.equal(byId.get("return-action").disabled, true);
 // Build and acquire a Section, bypass its topography, and start translating
 // its wire. Replacing the source cancels the drag to its origin, clears the
 // bypass and removes every old Guide identity.
-byId.get("context-seconds").value = "0";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "0";
+byId.get("context-duration").dispatch("change");
 for (const clientX of [200, 400]) {
   byId.get("timeline").dispatch("click", {
     target: byId.get("timeline"),
@@ -196,4 +196,22 @@ assert.equal(byId.get("return-action").disabled, true);
 assert.equal(tail().videoId, "JJJJJJJJJJJ");
 assert.equal(lead().videoId, "JJJJJJJJJJJ");
 
-console.log("Source boundary smoke passed: load generations reject stale identity, and Nudge, Step, Context, Playback, Section/Current/Pin/Range drags, Guide identity and weight relaxation cannot cross sources.");
+// Ripple identity and its uncompleted prospects are source-owned too. The
+// boundary cancels its shared Context before installing the next source.
+byId.get("context-duration").value = "5";
+byId.get("context-duration").dispatch("change");
+byId.get("timeline").dispatch("click", {
+  target: byId.get("timeline"),
+  clientX: 800,
+  shiftKey: true
+});
+await flush(3);
+assert.equal(byId.get("ripple-address-marker").hidden, false);
+assert.equal(descendants(byId.get("traversal-prospect-layer")).length, 2);
+await finishLoad("KKKKKKKKKKK", 45);
+assert.equal(currentText(), "Current 0:45");
+assert.equal(byId.get("ripple-address-marker").hidden, true);
+assert.equal(byId.get("ripple-context-window-fill").hidden, true);
+assert.equal(descendants(byId.get("traversal-prospect-layer")).length, 0);
+
+console.log("Source boundary smoke passed: load generations reject stale identity, and Nudge, Step, Context, Playback, Ripple/prospects, Section/Current/Pin/Range drags, Guide identity and weight relaxation cannot cross sources.");

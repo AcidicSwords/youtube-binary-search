@@ -14,6 +14,18 @@ import {
   sectionWeightIsUsed
 } from "./guide.js";
 
+/**
+ * Average Timeline-Space allocation across a positive Source-Time extent.
+ * This is derived from the effective projection; it is neither a stored
+ * Section Weighting nor the pointwise Effective Weight.
+ */
+export function timelineAllocationFactor(projectedExtent, sourceExtent) {
+  if (!Number.isFinite(projectedExtent) || !Number.isFinite(sourceExtent)) return null;
+  if (!(sourceExtent > EPSILON)) return null;
+  const factor = projectedExtent / sourceExtent;
+  return Number.isFinite(factor) && factor > 0 ? factor : null;
+}
+
 function activeWeight(section) {
   return normalizeSectionWeighting(section?.weighting, DEFAULT_SECTION_WEIGHTING);
 }

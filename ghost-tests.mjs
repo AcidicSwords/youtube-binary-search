@@ -11,7 +11,7 @@ import {
   step,
   refine,
   saveExtentAsSection,
-  setGuideSectionWeight,
+  setGuideSectionWeighting,
   ghostTraverse,
   settleGhostSequence,
   checkpoint,
@@ -46,7 +46,7 @@ function buildWorld() {
   const saved = saveExtentAsSection(session, { start: 40, end: 120 }, { label: "Middle" });
   session = saved.session;
   const sectionId = session.model.guide.sections.at(-1).id;
-  session = setGuideSectionWeight(session, sectionId, 2).session;
+  session = setGuideSectionWeighting(session, sectionId, 2).session;
   session = goTo(session, 200, { operator: "timeline" }).session;
   return { session, sectionId };
 }
@@ -268,7 +268,7 @@ function worldFingerprint(model) {
   }).traversalTrace;
 
   // The terrain moves underneath.
-  const reweighted = setGuideSectionWeight(refined.session, sectionId, 0.25).session;
+  const reweighted = setGuideSectionWeighting(refined.session, sectionId, 0.25).session;
   const wouldBeNow = refine(reweighted, "backward", {
     projection: projectionForModel(reweighted.model)
   });
