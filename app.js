@@ -230,6 +230,7 @@ function effectivePlaybackRate() {
 
 function savedPanoramaCycle(value) {
   if (value?.panoramaCycle) return value.panoramaCycle;
+  if (value?.fieldBreath) return value.fieldBreath; // lexicon-allow: v8 preference back-compat
   if (value?.panoramaOffsets || value?.panoramaResponse) return legacyPanoramaCycle(value);
   return DEFAULT_PANORAMA_CYCLE;
 }
@@ -250,7 +251,7 @@ function readPreferences() {
       nudgeSeconds: normalizeNudgeSeconds(value?.nudgeSeconds),
       playbackRate: normalizePlaybackRate(value?.playbackRate),
       texturedPlaybackEnabled: value?.texturedPlaybackEnabled === true || value?.dynamicPlaybackRate === true,
-      panoramaEnabled: value?.panoramaEnabled !== false,
+      panoramaEnabled: (value?.panoramaEnabled ?? value?.stepFieldEnabled) !== false, // lexicon-allow: v8 preference back-compat
       tailVisible: value?.tailVisible !== false,
       leadVisible: value?.leadVisible !== false
     };
