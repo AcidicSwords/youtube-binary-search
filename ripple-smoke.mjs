@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createSmokeEnvironment, descendants } from "./smoke-harness.mjs";
 
 const env = createSmokeEnvironment();
-const { byId, flush, poll, currentText } = env;
+const { byId, flush, poll, currentText, dispatchDocument } = env;
 
 await import("./app.js");
 window.onYouTubeIframeAPIReady();
@@ -123,4 +123,86 @@ assert.equal(center.state, 2);
 assert.match(byId.get("status").textContent, /positive Context Duration/,
   "Ripple owns Shift-click even when Context is Off, but refuses to manufacture a window.");
 
-console.log("Ripple smoke passed: bare Shift-click acquisition, distinct accessible observation/window/prospect projection, shared Context derivation and transport, independent Range clipping, Current/history/Active Span non-effects, live retargeting, Panorama Context Frame reuse, exact endpoint publication and persistence, Current-centred completion, and Context-Off refusal.");
+const beginGhostScan = async direction => {
+  dispatchDocument("keydown", { key: "g", code: "KeyG" });
+  dispatchDocument("wheel", {
+    target: byId.get("timeline"),
+    deltaX: 0,
+    deltaY: direction === "forward" ? -30 : 30
+  });
+  await flush(3);
+};
+const releaseGhostScan = async () => {
+  dispatchDocument("keyup", { key: "g", code: "KeyG" });
+  await flush(3);
+};
+
+// A forward Ghost scan acquires the newest valid future without mutating the
+// accepted Session, history, Trace, or prospect collection.
+const acceptedBeforeFuture = byId.get("current-marker").dataset.acceptedAddress;
+await beginGhostScan("forward");
+assert.equal(currentText(), "Ghost Candidate 1:17.5",
+  "Forward Ghost chooses the newest Ripple End Prospect first.");
+assert.equal(
+  byId.get("current-marker").dataset.acceptedAddress,
+  acceptedBeforeFuture,
+  "The prospect remains a Ghost Candidate until release."
+);
+assert.equal(byId.get("return-meta").textContent, historyBefore);
+assert.equal(byId.get("active-span-fill").dataset.medium, "direct",
+  "Prospect preview shows the ordinary Go Active Span, not historical recall.");
+assert.match(
+  byId.get("status").textContent,
+  /Ghost future.*Ripple End Prospect 1:17\.5.*Current remains 0:00/,
+  "Prospect scanning explicitly distinguishes the Candidate from Current."
+);
+assert.equal(descendants(byId.get("traversal-prospect-layer")).length, 2);
+
+dispatchDocument("keydown", { key: "Escape", code: "Escape" });
+dispatchDocument("keyup", { key: "g", code: "KeyG" });
+await flush(3);
+assert.equal(currentText(), acceptedCurrent,
+  "Escape cancels a prospective Ghost scan back to Current.");
+assert.equal(byId.get("return-meta").textContent, historyBefore);
+assert.equal(descendants(byId.get("traversal-prospect-layer")).length, 2,
+  "Cancellation consumes no prospect.");
+
+await beginGhostScan("forward");
+await releaseGhostScan();
+assert.equal(currentText(), "Current 1:17.5");
+assert.equal(byId.get("return-meta").textContent, "Go to Traversal Prospect",
+  "Release settles the prospect through one canonical Go history entry.");
+assert.match(byId.get("status").textContent, /Moved by Go to Ripple End Prospect 1:17\.5/);
+prospectMarkers = descendants(byId.get("traversal-prospect-layer"));
+assert.deepEqual(
+  prospectMarkers.map(marker => marker.dataset.kind),
+  ["ripple-start"],
+  "Successful Go consumes only its exact endpoint."
+);
+
+// The committed consequence is one ordinary Traversal Trace movement, not a
+// Ghost Return: reading backward from it reaches the Go departure.
+await beginGhostScan("backward");
+assert.equal(currentText(), "Ghost Candidate 0:00",
+  "Backward Ghost reads the ordinary movement from Current to the accepted prospect.");
+dispatchDocument("keydown", { key: "Escape", code: "Escape" });
+dispatchDocument("keyup", { key: "g", code: "KeyG" });
+await flush(3);
+assert.equal(currentText(), "Current 1:17.5");
+assert.equal(descendants(byId.get("traversal-prospect-layer")).length, 1);
+
+await beginGhostScan("forward");
+assert.equal(currentText(), "Ghost Candidate 1:12.5",
+  "The second forward gesture reads the remaining Start Prospect.");
+await releaseGhostScan();
+assert.equal(descendants(byId.get("traversal-prospect-layer")).length, 0,
+  "The second successful Go consumes the remaining exact endpoint.");
+
+dispatchDocument("keydown", { key: "z", code: "KeyZ" });
+await flush(3);
+assert.equal(currentText(), "Current 1:17.5",
+  "One Undo reverses only the second prospect Go.");
+assert.equal(descendants(byId.get("traversal-prospect-layer")).length, 0,
+  "Semantic Undo does not resurrect consumed transient prospects.");
+
+console.log("Ripple smoke passed: bare Shift-click acquisition, distinct accessible observation/window/prospect projection, shared Context derivation and transport, independent Range clipping, Current/history/Active Span non-effects, live retargeting, Panorama Context Frame reuse, exact endpoint publication and persistence, Current-centred completion, Context-Off refusal, newest-first frozen Ghost preview, exact cancellation, canonical Go settlement, ordinary Trace recording, endpoint-by-endpoint consumption, and Undo isolation.");

@@ -151,7 +151,7 @@ Every executable suite is listed here by the current behavior it protects.
 - `ghost-smoke.mjs` — Ghost in a real browser: the Guide on `I` while Tab stays the browser's, G arming without cost, a wheel notch recalling behind a fixed Anchor, one transaction on release, exact cancellation, wheel ownership between Ghost and Nudge, and Context playing through the recall as one retargeted window whose scan writes no observation.
 - `ghost-tests.mjs` — Ghost Traverse against a live Session: a preserved semantic world, Focus/Range bounds, one Undo per held gesture, the reversal envelope, recorded rather than recomputed Addresses, and a Section retained entirely in the past.
 - `traversal-trace-tests.mjs` — the append-only encounter ledger: records that keep reversals, direction in the Traversal Trace independent of source order, watched spans subdivided by the frozen Step law and clipped to the active Range, a frozen readable stream, and injection with provenance.
-- `traversal-prospects-tests.mjs` — transient future Addresses: Ripple batch order, newest-first availability, exact endpoint consumption, duplicate identity, generation invalidation, Focus filtering, removal, and clearing.
+- `traversal-prospects-tests.mjs` — transient future Addresses: Ripple batch order, newest-first frozen Ghost reading and reversal, stable acquisition, exact endpoint consumption, duplicate identity, generation invalidation, Focus filtering, removal, and clearing.
 - `section-topography-tests.mjs` — Section Weight, nested/overlapping Guide geometry, Pin movement, and spatial traversal consequences.
 - `operator-coherence-tests.mjs` — guarded Step, Refine roles, exact previews, weighted navigation, monotonic Playback residue, history, and lane packing.
 - `core-regression-tests.mjs` — kernel guarantees for scale, endpoint frames, Range, Focus, Guide, Playback, and Undo.
@@ -197,7 +197,7 @@ Every executable suite is listed here by the current behavior it protects.
 - `chapter-smoke.mjs` — offering and drawing Chapters is inert; navigation, composition, and Retain use canonical routes.
 - `section-weighting-smoke.mjs` — Guide-only Weight editing, effective geometry and atmosphere, scoped/whole-map bypass, weighted Step, and exact restoration.
 - `context-smoke.mjs` — post-traversal Context, Step deferral, replacement, Panorama suspension, reversal naming, Off, and Undo isolation.
-- `ripple-smoke.mjs` — bare Shift-click acquisition, shared clipped Context observation, live retargeting, semantic non-effects, distinct accessible projection, Panorama Frame reuse, endpoint publication, and Current-centred completion.
+- `ripple-smoke.mjs` — bare Shift-click acquisition, shared clipped Context observation, live retargeting, semantic non-effects, distinct accessible projection, Panorama Frame reuse, endpoint publication, Current-centred completion, newest-first Ghost preview/cancellation, canonical Go settlement, ordinary Trace recording, exact consumption, and Undo isolation.
 - `step-gesture-smoke.mjs` — captured/fallback release, keyboard hold, and rapid taps settle as one action.
 - `transport-coherence-smoke.mjs` — actual-rate observation, effective dynamic projection, settlement, proper-Range wrap, retry, Panorama rebasing, and history isolation.
 - `metadata-smoke.mjs` — delayed valid metadata is retried without creating a zero-duration Session.
@@ -214,7 +214,7 @@ Every executable suite is listed here by the current behavior it protects.
 - `lexicon-audit.mjs` — scans every product surface against `LEXICON.md` for retired vocabulary; report-only during the lexicon overhaul, `--strict` in the final gate. Run with `npm run audit:lexicon`.
 - `browser-smoke.mjs` — real Chromium geometry, equal square matrix cells, stable shifted labels, native-control hit access, exact Timeline pointer mapping, focus, responsive rails, dense structure, and compact reachability.
 - `timeline-render-smoke.mjs` — the Timeline's drawn layers in real Chromium: the track as an absolute positioning context and the Current Neighborhood, Active Span, and Weight Gradient each absolutely positioned, painted, non-collapsed, and inside the track — the fills a stylesheet edit can silently corrupt while every arithmetic suite stays green.
-- `ripple-render-smoke.mjs` — Ripple's Observation Address, Context Window, Start Prospect, and End Prospect as distinct, painted, non-collapsed, accessible channels that remain contained in the responsive Timeline and never displace Current.
+- `ripple-render-smoke.mjs` — Ripple's Observation Address, Context Window, Start Prospect, and End Prospect as distinct, painted, non-collapsed, accessible channels that remain contained in the responsive Timeline; real forward Ghost recognition keeps Current accepted until canonical Go release consumes one endpoint.
 - `panorama-render-smoke.mjs` — the Panorama's stable, partial, and stretching visual phases in real Chromium, including Freeze/Stretch cycling state and a positioned, painted Panorama Window.
 
 ## Change completion

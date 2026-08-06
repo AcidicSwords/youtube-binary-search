@@ -107,6 +107,8 @@ try {
     && drawn.prospects.every(marker => marker.insideTimeline),
   "Ripple channels remain inside the Timeline at the narrow responsive layout.");
 
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.waitForTimeout(180);
   await mediaClockTo(page, 78);
   await page.waitForTimeout(180);
   drawn = await report();
@@ -118,10 +120,55 @@ try {
     "Completed prospects stay painted for forward Ghost reading.");
   assert.equal(drawn.currentLeft, "0%");
 
+  await page.evaluate(() => {
+    const toggle = document.getElementById("guide-toggle");
+    if (toggle.getAttribute("aria-expanded") === "true") toggle.click();
+    document.activeElement?.blur();
+  });
+  const compactTimeline = await boxOf(page, "#timeline");
+  await page.mouse.move(
+    compactTimeline.x + compactTimeline.width / 2,
+    compactTimeline.y + compactTimeline.height / 2
+  );
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, -30);
+  await page.waitForTimeout(160);
+  const prospective = await page.evaluate(() => ({
+    accepted: document.getElementById("current-marker").dataset.acceptedAddress,
+    candidate: document.getElementById("current-marker").dataset.ghostCandidate,
+    status: document.getElementById("status").textContent,
+    history: document.getElementById("return-meta").textContent,
+    prospectCount: document.querySelectorAll("[data-traversal-prospect]").length,
+    playing: Object.values(window.__players)[0].state === 1
+  }));
+  assert.equal(prospective.accepted, "0");
+  assert.ok(
+    Number(prospective.candidate) > 77 && Number(prospective.candidate) < 78,
+    `Forward Ghost exposes the End Prospect as Candidate: ${JSON.stringify(prospective)}`
+  );
+  assert.match(prospective.status, /Ghost future.*Ripple End Prospect.*Current remains 0:00/);
+  assert.equal(prospective.history, "Nothing to undo");
+  assert.equal(prospective.prospectCount, 2);
+  assert.equal(prospective.playing, true,
+    "Prospect recognition reuses automatic Context while Current stays accepted.");
+
+  await page.keyboard.up("g");
+  await page.waitForTimeout(160);
+  const settled = await page.evaluate(() => ({
+    accepted: Number(document.getElementById("current-marker").dataset.acceptedAddress),
+    history: document.getElementById("return-meta").textContent,
+    prospectKinds: [...document.querySelectorAll("[data-traversal-prospect]")]
+      .map(element => element.dataset.kind)
+  }));
+  assert.ok(settled.accepted > 77 && settled.accepted < 78);
+  assert.equal(settled.history, "Go to Traversal Prospect");
+  assert.deepEqual(settled.prospectKinds, ["ripple-start"],
+    "Release consumes exactly the rendered End Prospect.");
+
   assert.deepEqual(failures, [],
     `Ripple rendered without console or page errors: ${failures.join(" | ")}`);
 
-  console.log("Ripple render smoke passed: Observation Address, Context Window, Start Prospect, and End Prospect are distinct, painted, non-collapsed, accessible, responsive, completion-correct, and separate from Current.");
+  console.log("Ripple render smoke passed: Observation Address, Context Window, Start Prospect, and End Prospect are distinct, painted, non-collapsed, accessible, responsive, completion-correct, and separate from Current; forward Ghost keeps the accepted marker fixed during Context recognition and release consumes only its canonical Go destination.");
 } finally {
   await close();
 }

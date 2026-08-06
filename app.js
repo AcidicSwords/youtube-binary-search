@@ -13,6 +13,7 @@ import {
   appendRippleProspects,
   beginTraversalProspectRead,
   clearTraversalProspects,
+  consumeTraversalProspect,
   createTraversalProspects,
   moveTraversalProspectRead,
   removeRippleProspects
@@ -5599,11 +5600,34 @@ function settleGhostGesture() {
   state.ghostWheel = null;
   if (!gesture?.changed) return false;
   if (gesture.readKind === "traversal-prospect") {
-    // Until the canonical settlement route is installed, a prospective scan
-    // remains exactly what it was during the hold: a cancellable preview.
-    locateAddress(gesture.anchor);
+    const prospect = gesture.selectedProspect;
+    const result = goTo(state.session, prospect?.address, {
+      operator: "go",
+      label: "Go to Traversal Prospect",
+      projection: gesture.projection
+    });
+    if (!result.changed) {
+      locateAddress(gesture.anchor);
+      view.render();
+      return false;
+    }
+    const boundary = prospect.kind === "ripple-start" ? "Start" : "End";
+    const accepted = accept(result, {
+      effect: false,
+      status: `Moved by Go to Ripple ${boundary} Prospect ${formatTime(prospect.address)}.`
+    });
+    if (!accepted) {
+      locateAddress(gesture.anchor);
+      view.render();
+      return false;
+    }
+    const consumed = consumeTraversalProspect(
+      state.traversalProspects,
+      prospect.id
+    );
+    if (consumed.changed) state.traversalProspects = consumed.state;
     view.render();
-    return false;
+    return true;
   }
   // This is the first semantic assignment in the gesture. Every wheel notch
   // before release lived only in the Ghost Candidate preview above.

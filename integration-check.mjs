@@ -618,6 +618,9 @@ has(scanGhost,
 has(topLevelFunction(appCode, "settleGhostGesture"),
   /state\.session = gesture\.previewSession[\s\S]*?checkpoint\(/,
   "Ghost settlement performs the first semantic assignment and one checkpoint.");
+has(topLevelFunction(appCode, "settleGhostGesture"),
+  /readKind === "traversal-prospect"[\s\S]*?goTo\(state\.session[\s\S]*?accept\(result[\s\S]*?consumeTraversalProspect\([\s\S]*?return true/,
+  "Prospect settlement commits canonical Go before consuming exactly its selected transient entry.");
 const nudgeWheel = topLevelFunction(appCode, "handleNudgeWheel");
 has(topLevelFunction(appCode, "wheelPixels"), /Math\.abs\(event\.deltaX\) > Math\.abs\(event\.deltaY\)/,
   "Nudge selects the dominant wheel axis.");
