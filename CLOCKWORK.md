@@ -75,7 +75,8 @@ relation. Detailed behavior remains in `SPEC.md` and `IMPLEMENTATION.md`.
 
 - **Owner** `app.js`; historical evidence in `traversal-trace.js`; future
   addresses in `traversal-prospects.js`
-- **Inputs** fixed Anchor, one frozen Trace or Prospect read, wheel direction
+- **Inputs** fixed Anchor, one frozen Trace stream with appended future entries,
+  wheel direction
 - **Relation** scan a provisional Ghost Candidate; commit only on settlement
 - **Outputs** preview Active Span/Neighborhood, then one settled movement
 - **Allowed mutations** preview state during scan; one canonical settlement
@@ -87,8 +88,8 @@ relation. Detailed behavior remains in `SPEC.md` and `IMPLEMENTATION.md`.
 
 - **Owner** `traversal-prospects.js`
 - **Inputs** Ripple identity, source generation, resolved Context boundaries
-- **Relation** append distinct Start then End occurrences; expose newest valid
-  occurrence first; consume by identity
+- **Relation** append distinct Start then End occurrences to Ghost's forward
+  side in acquisition order; consume by identity
 - **Outputs** Ripple Start Prospect and Ripple End Prospect
 - **Allowed mutations** transient source-scoped prospect collection
 - **Protected non-effects** no persistence, Guide, history, or Traversal Trace
@@ -103,8 +104,8 @@ relation. Detailed behavior remains in `SPEC.md` and `IMPLEMENTATION.md`.
   source generation
 - **Relation** invert through the effective Timeline Projection, derive the
   ordinary clipped Context Window, and observe without moving Current
-- **Outputs** Ripple Observation Address, Ripple Context Window, Cursor, two
-  Traversal Prospects after successful completion
+- **Outputs** status-only observation feedback and two transient future
+  Addresses after successful completion; no Timeline projection
 - **Allowed mutations** transient Ripple observation and prospect state
 - **Protected non-effects** Current, Neighborhood, Active Span, Focus, Guide,
   selections, Weightings, relaxation, history, Traversal Trace
@@ -120,8 +121,9 @@ relation. Detailed behavior remains in `SPEC.md` and `IMPLEMENTATION.md`.
   one ordinary Traversal Trace movement
 - **Allowed mutations** exactly the canonical Go transaction plus prospect
   consumption after success
-- **Protected non-effects** no Ghost Return, parallel movement operation,
-  Ripple-specific history, transport, projection, player, or Active Span
+- **Protected non-effects** no synthetic Ghost action, parallel movement
+  operation, Ripple-specific history, transport, projection, player, or Active
+  Span
 - **Tests** Ripple Ghost/semantic/browser proofs
 
 ## Source replacement

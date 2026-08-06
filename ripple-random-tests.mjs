@@ -5,16 +5,16 @@ import assert from "node:assert/strict";
 import {
   appendRippleProspects,
   availableTraversalProspects,
-  beginTraversalProspectRead,
   clearTraversalProspects,
   consumeTraversalProspect,
   createTraversalProspects,
-  moveTraversalProspectRead,
   removeRippleProspects
 } from "./traversal-prospects.js";
 import { createSession, goTo } from "./session.js";
 import {
   appendAtomicTraversal,
+  beginGhostRead,
+  moveGhostRead,
   createTraversalTrace
 } from "./traversal-trace.js";
 
@@ -72,11 +72,16 @@ for (let operation = 0; operation < 20_000; operation += 1) {
     const first = address();
     const second = address();
     const range = { start: Math.min(first, second), end: Math.max(first, second) };
-    const read = beginTraversalProspectRead(prospects, {
+    const frozenEntries = availableTraversalProspects(prospects, {
       generation,
       range
     });
-    const frozenIds = read.entries.map(entry => entry.id);
+    const frozenIds = frozenEntries.map(entry => entry.id);
+    let read = beginGhostRead(createTraversalTrace(0), {
+      current: 0,
+      range,
+      futureEntries: frozenEntries
+    });
     const appended = appendRippleProspects(prospects, {
       rippleId: `random-ripple-${generation}-${++rippleSequence}`,
       generation,
@@ -84,16 +89,20 @@ for (let operation = 0; operation < 20_000; operation += 1) {
       end: address()
     });
     prospects = appended.state;
-    let cursor = read;
+    const frozenReadableIds = read.positions
+      .filter(position => position.streamKind === "future")
+      .map(position => position.prospect.id);
     const walked = [];
     while (true) {
-      const moved = moveTraversalProspectRead(cursor, "forward");
+      const moved = moveGhostRead(createTraversalTrace(0), read, "forward");
       if (!moved.changed) break;
-      walked.push(moved.prospect.id);
-      cursor = moved.read;
+      walked.push(moved.cursor.prospect.id);
+      read = moved.read;
     }
-    assert.deepEqual(walked, frozenIds,
+    assert.deepEqual(walked, frozenReadableIds,
       "A frozen read is unaffected by a later randomized batch.");
+    assert.ok(frozenReadableIds.every(id => frozenIds.includes(id)),
+      "Adjacent duplicate Addresses collapse without changing the frozen source batch.");
     frozenReads += 1;
   } else {
     generation += 1;
@@ -110,7 +119,7 @@ for (let operation = 0; operation < 20_000; operation += 1) {
   const low = address();
   const high = address();
   const range = { start: Math.min(low, high), end: Math.max(low, high) };
-  const expected = [...prospects.entries].reverse().filter(entry =>
+  const expected = prospects.entries.filter(entry =>
     entry.generation === generation
     && entry.address >= range.start
     && entry.address <= range.end
@@ -118,7 +127,7 @@ for (let operation = 0; operation < 20_000; operation += 1) {
   assert.deepEqual(
     availableTraversalProspects(prospects, { generation, range }),
     expected,
-    "Availability is exactly newest-first generation and Range filtering."
+    "Availability is exactly append-order generation and Range filtering."
   );
 }
 
@@ -135,18 +144,21 @@ for (let trial = 0; trial < 2_000; trial += 1) {
     start: Math.max(0, destination - 0.5),
     end: destination
   });
-  const read = beginTraversalProspectRead(appended.state, {
-    generation: 1,
+  const trace = createTraversalTrace(current);
+  const read = beginGhostRead(trace, {
+    current,
     range: session.model.range,
-    excludeAddress: current,
-    excludeTolerance: 0.04
+    futureEntries: availableTraversalProspects(appended.state, {
+      generation: 1,
+      range: session.model.range
+    })
   });
-  const selected = moveTraversalProspectRead(read, "forward");
+  const selected = moveGhostRead(trace, read, "forward");
   assert.equal(selected.changed, true);
 
   const preview = goTo(session, selected.address, {
     operator: "go",
-    label: "Go to Traversal Prospect"
+    label: "Ghost Traverse"
   });
   assert.equal(preview.changed, true);
   assert.equal(session.model.neighborhood.C, current);
@@ -154,10 +166,10 @@ for (let trial = 0; trial < 2_000; trial += 1) {
 
   const committed = goTo(session, selected.address, {
     operator: "go",
-    label: "Go to Traversal Prospect"
+    label: "Ghost Traverse"
   });
   assert.equal(committed.session.history.length, 1);
-  assert.equal(committed.session.history[0].label, "Go to Traversal Prospect");
+  assert.equal(committed.session.history[0].label, "Ghost Traverse");
   assert.equal(committed.session.model.activeSpan.operator, "go");
   assert.equal(committed.session.model.activeSpan.medium, "direct");
 
@@ -170,11 +182,11 @@ for (let trial = 0; trial < 2_000; trial += 1) {
   assert.equal(traced.changed, true);
   assert.equal(traced.traversalTrace.records.length, 1);
 
-  const consumed = consumeTraversalProspect(appended.state, selected.prospect.id);
+  const consumed = consumeTraversalProspect(appended.state, selected.cursor.prospect.id);
   assert.equal(consumed.changed, true);
   assert.equal(consumed.state.entries.length, 1);
   assert.equal(
-    consumed.state.entries[0].id === selected.prospect.id,
+    consumed.state.entries[0].id === selected.cursor.prospect.id,
     false,
     "Only the exact accepted prospect is consumed."
   );

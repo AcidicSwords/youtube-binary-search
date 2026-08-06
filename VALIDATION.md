@@ -101,17 +101,14 @@ and `ghost-smoke.mjs` the gesture in a real browser.
   whole wheel quantum is earned. One turn of the wheel recalls exactly one
   moment whatever the device reports for a detent.
 - A gesture freezes the readable stream, Range, projection, and Step Distance at
-  its start, so it can never follow its own output and no mid-gesture change
+  its start, so later movement cannot mutate its candidates and no mid-gesture change
   moves a candidate already passed.
-- The scan is transient in both directions: a backward scan that crosses many
-  moments and a forward scan settled short of the live end each append exactly
-  one occurrence, the landing. Escape appends nothing and restores the origin,
-  history and future exactly.
-- Backward from a Ghost Return follows its live predecessor; forward may
-  resume the historical successors of the moment re-entered. The choice is made
-  once from the direction the gesture opens with. Any route the reader takes of
-  their own withdraws that offer, including one that leaves and returns to the
-  same Address.
+- The scan is transient in both directions. Historical settlement appends no
+  traversal record and preserves one cursor; Escape appends nothing and restores
+  the origin, history, and future exactly.
+- The same held gesture and repeated gestures can reverse backward and forward
+  across the history/future boundary without choosing a second reader or Ghost
+  presentation. Ordinary movement clears the continuation cursor.
 - A recalled Address the active Range excludes is unavailable rather than
   clamped; Ghost never leaves Focus, widens Range, or opens Full Video.
 - One Undo returns to the Anchor with all structure intact.
@@ -129,16 +126,15 @@ and `ghost-smoke.mjs` the gesture in a real browser.
 - acquisition, retarget, observation, completion, cancellation, and source
   replacement change no Current, Neighborhood, Active Span, semantic history,
   or Traversal Trace unless a prospect later settles through ordinary Go;
-- completed batches coexist newest first, End before Start; identity remains
+- completed batches coexist in append order, Start before End; identity remains
   exact under duplicate Addresses, Focus filtering, consumption, and generation
   invalidation;
-- forward Ghost freezes prospects before historical continuation; preview and
-  Escape commit nothing, successful Go writes one ordinary history/Trace
-  movement and consumes only its selected endpoint;
-- Chromium proves Current/Cursor/Ripple/Ghost channels, weighted inversion,
-  focused clipping, existing-layer non-collapse, responsive layout, reduced
-  motion, forced high contrast, accessible announcements, Escape, and source
-  replacement;
+- Ghost freezes one stream with future entries after history; preview and Escape
+  commit nothing, successful Go writes one ordinary history/Trace movement and
+  consumes only its selected endpoint;
+- Chromium proves Ripple leaves Timeline DOM and geometry untouched, future and
+  historical positions share one Ghost presentation, reversal is fluid, and
+  Freeze/Stretch cannot vertically move the Timeline;
 - 20,000 deterministic lifecycle operations and 2,000 Go settlements preserve
   all prospect, Session, history, and Trace invariants.
 

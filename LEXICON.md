@@ -513,14 +513,15 @@ Each canonical term carries:
 - **Class** operator · observation · **Owner** `app.js` · **Gesture**
   `Shift+click` on bare Timeline ground
 - **Definition** Observe a non-Current Timeline Address through the shared
-  Context transport and publish its resolved Context boundaries as future
-  Traversal Prospects.
+  Context transport and append its resolved Context boundaries to the forward
+  side of Ghost's one traversal stream.
 - **Code stem** `ripple` / `rippleObservation` · **UI label** Ripple
 - **Qualifiers** Ripple Observation Address, Ripple Context Window, Ripple Start
   Prospect, Ripple End Prospect.
 - **Non-effects** Ripple observation is not traversal. It changes neither
   Current, Current Neighborhood, Active Span, semantic history, nor Traversal
-  Trace. A later Go to one of its prospects is ordinary traversal.
+  Trace, and it draws nothing on the Timeline. A later Go to one of its future
+  entries is ordinary traversal.
 
 ### Ripple Observation Address
 - **Class** address · **Owner** `app.js`
@@ -645,7 +646,7 @@ Each canonical term carries:
 ### Traversal Trace
 - **Class** object · **Owner** `traversal-trace.js`
 - **Definition** Append-only record of the route actually taken through the
-  Source.
+  Source. Historical Ghost settlement moves a read cursor and does not append.
 - **Code stem** `traversalTrace` (`createTraversalTrace`) · **UI label**
   Traversal Trace
 - **Forbidden synonyms** User Time, Encounter Order, `userTime`, `user-time`.
@@ -656,21 +657,21 @@ Each canonical term carries:
 - **Class** transient object · **Owner** `traversal-prospects.js`
 - **Definition** Known Source Address available to Ghost's forward route that
   has not yet been committed as Current.
-- **Code stem** `traversalProspects` · **UI label** Traversal Prospect
+- **Code stem** `traversalProspects` · **UI label** —
 - **Non-effects** Not Traversal Trace, semantic history, Guide structure, or
-  persistent state.
+  persistent state. It has no distinct Timeline marker or Ghost presentation.
 
 ### Ripple Start Prospect
 - **Class** transient object · **Owner** `traversal-prospects.js`
 - **Definition** Traversal Prospect at the resolved start of a Ripple Context
   Window.
-- **Code stem** `kind: "ripple-start"` · **UI label** Ripple Start Prospect
+- **Code stem** `kind: "ripple-start"` · **UI label** —
 
 ### Ripple End Prospect
 - **Class** transient object · **Owner** `traversal-prospects.js`
 - **Definition** Traversal Prospect at the resolved end of a Ripple Context
   Window.
-- **Code stem** `kind: "ripple-end"` · **UI label** Ripple End Prospect
+- **Code stem** `kind: "ripple-end"` · **UI label** —
 
 ### Trace Entry
 - **Class** object · **Owner** `traversal-trace.js`
@@ -700,10 +701,9 @@ Each canonical term carries:
 ### Ghost
 - **Class** operator · **Owner** `app.js`, `session.js` · **Key** held `G` +
   wheel
-- **Definition** Operator that reads historical Traversal Trace backward and
-  reads available Traversal Prospects forward, falling back to a valid
-  historical continuation when no prospect is available, while preserving the
-  current semantic environment during its scan.
+- **Definition** Operator that moves backward and forward through one frozen
+  traversal stream while preserving the current semantic environment during its
+  scan. Available Ripple futures are appended after its historical positions.
 - **Code stem** `ghost` · **UI label** Ghost
 - **Non-effects** Restores no historical Range, Guide, Groups, Section
   Weightings, Focus, or semantic history.
@@ -725,22 +725,16 @@ Each canonical term carries:
 - **Class** position · **Owner** `app.js`
 - **Definition** Trace Address currently previewed during a Ghost Scan.
 - **Code stem** `ghostPosition` · **UI label** Ghost Position
-- **Forbidden synonyms** Ghost Current.
+- **Forbidden synonyms** Ghost Current, Ghost Return, Ghost Injection,
+  `GHOST_RETURN`, `appendGhostReturn`, `GHOST_INJECTION`,
+  `appendGhostInjection`.
 - **Non-effects** Becomes Current only after settlement.
 
 ### Ghost Scan
 - **Class** state · **Owner** `app.js`
-- **Definition** Transient movement through one frozen read source: Traversal
-  Trace or Traversal Prospects.
+- **Definition** Transient movement backward or forward through one frozen
+  stream containing historical positions and any appended Ripple futures.
 - **Code stem** `ghostScan` · **UI label** Ghost Scan
-
-### Ghost Return
-- **Class** object · **Owner** `traversal-trace.js`
-- **Definition** Settled movement from Ghost Anchor to Ghost Position, appended
-  as one Trace Entry.
-- **Code stem** `GHOST_RETURN` (`appendGhostReturn`) · **UI label** Ghost Return
-- **Forbidden synonyms** Ghost Injection, Ghost Landing, `GHOST_INJECTION`,
-  `appendGhostInjection`.
 
 ### Ghost Continuation
 - **Class** position · **Owner** `app.js`

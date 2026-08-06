@@ -3,11 +3,9 @@ import {
   TRAVERSAL_PROSPECT_KIND,
   appendRippleProspects,
   availableTraversalProspects,
-  beginTraversalProspectRead,
   clearTraversalProspects,
   consumeTraversalProspect,
   createTraversalProspects,
-  moveTraversalProspectRead,
   removeRippleProspects
 } from "./traversal-prospects.js";
 
@@ -50,8 +48,8 @@ assert.deepEqual(
     generation: 4,
     range: { start: 0, end: 100 }
   }).map(entry => entry.kind),
-  [TRAVERSAL_PROSPECT_KIND.RIPPLE_END, TRAVERSAL_PROSPECT_KIND.RIPPLE_START],
-  "Newest reads first, so one Ripple offers End before Start."
+  [TRAVERSAL_PROSPECT_KIND.RIPPLE_START, TRAVERSAL_PROSPECT_KIND.RIPPLE_END],
+  "Ripple endpoints remain in the order appended to the Trace's forward side."
 );
 
 const second = appendRippleProspects(state, {
@@ -67,73 +65,37 @@ assert.deepEqual(
     range: { start: 0, end: 100 }
   }).map(entry => `${entry.rippleId}:${entry.kind}`),
   [
-    "ripple-2:ripple-end",
-    "ripple-2:ripple-start",
+    "ripple-1:ripple-start",
     "ripple-1:ripple-end",
-    "ripple-1:ripple-start"
+    "ripple-2:ripple-start",
+    "ripple-2:ripple-end"
   ],
-  "Completed batches coexist in newest-first order."
+  "Completed batches coexist in append order."
 );
-
-let prospectRead = beginTraversalProspectRead(state, {
-  generation: 4,
-  range: { start: 0, end: 100 }
-});
-const firstForward = moveTraversalProspectRead(prospectRead, "forward");
-assert.equal(firstForward.changed, true);
-assert.equal(firstForward.prospect.rippleId, "ripple-2");
-assert.equal(firstForward.prospect.kind, TRAVERSAL_PROSPECT_KIND.RIPPLE_END,
-  "A forward read chooses the newest valid prospect first.");
-prospectRead = firstForward.read;
-const secondForward = moveTraversalProspectRead(prospectRead, "forward");
-assert.equal(secondForward.prospect.kind, TRAVERSAL_PROSPECT_KIND.RIPPLE_START,
-  "The other endpoint remains next in the frozen read.");
-const retraced = moveTraversalProspectRead(secondForward.read, "backward");
-assert.equal(retraced.prospect.id, firstForward.prospect.id,
-  "Reversing retraces the frozen prospect source instead of switching readers.");
-
-const frozenRead = beginTraversalProspectRead(state, {
-  generation: 4,
-  range: { start: 0, end: 100 }
-});
 const later = appendRippleProspects(state, {
   rippleId: "ripple-later",
   generation: 4,
   start: 70,
   end: 75
 });
-assert.equal(
-  moveTraversalProspectRead(frozenRead, "forward").prospect.rippleId,
-  "ripple-2",
-  "A batch arriving after gesture acquisition cannot enter its frozen source."
-);
 assert.equal(later.state.entries.length, state.entries.length + 2);
-assert.equal(
-  beginTraversalProspectRead(state, {
-    generation: 4,
-    range: { start: 0, end: 100 },
-    excludeAddress: 45
-  }).entries[0].kind,
-  TRAVERSAL_PROSPECT_KIND.RIPPLE_START,
-  "A prospect already at Current remains stored but cannot block the next movable prospect."
-);
 
-const newestEnd = availableTraversalProspects(state, {
+const firstStart = availableTraversalProspects(state, {
   generation: 4,
   range: { start: 0, end: 100 }
 })[0];
-const consumed = consumeTraversalProspect(state, newestEnd.id);
+const consumed = consumeTraversalProspect(state, firstStart.id);
 assert.equal(consumed.changed, true);
-assert.equal(consumed.prospect.id, newestEnd.id);
+assert.equal(consumed.prospect.id, firstStart.id);
 state = consumed.state;
 assert.deepEqual(
   state.entries
-    .filter(entry => entry.rippleId === "ripple-2")
+    .filter(entry => entry.rippleId === "ripple-1")
     .map(entry => entry.kind),
-  [TRAVERSAL_PROSPECT_KIND.RIPPLE_START],
+  [TRAVERSAL_PROSPECT_KIND.RIPPLE_END],
   "Consuming one endpoint leaves the other."
 );
-assert.equal(consumeTraversalProspect(state, newestEnd.id).changed, false,
+assert.equal(consumeTraversalProspect(state, firstStart.id).changed, false,
   "Consumption is exact and cannot select a coincident entry.");
 
 const duplicates = appendRippleProspects(state, {
@@ -153,7 +115,7 @@ assert.deepEqual(
     generation: 4,
     range: { start: 20, end: 30 }
   }).map(entry => entry.id),
-  [...duplicateEntries].reverse().map(entry => entry.id),
+  duplicateEntries.map(entry => entry.id),
   "Focus filters availability without deleting entries."
 );
 assert.equal(state.entries.filter(entry => entry.rippleId === "ripple-3").length, 2);
@@ -168,7 +130,7 @@ assert.equal(
 
 const removed = removeRippleProspects(state, "ripple-1");
 assert.equal(removed.changed, true);
-assert.equal(removed.prospects.length, 2);
+assert.equal(removed.prospects.length, 1);
 assert.equal(removed.state.entries.some(entry => entry.rippleId === "ripple-1"), false);
 assert.equal(removeRippleProspects(removed.state, "missing").changed, false);
 
@@ -190,4 +152,4 @@ assert.equal(
   "Invalid batches cannot manufacture partial prospects."
 );
 
-console.log("Traversal Prospect tests passed: Start-before-End append, newest-first frozen Ghost reading, reversal within one source, stable acquisition, Current exclusion without deletion, coexisting batches, exact consumption, duplicate occurrence identity, generation invalidation, Focus filtering without deletion, batch removal, and transient clearing.");
+console.log("Traversal Prospect tests passed: append-order future entries, coexisting batches, exact settlement consumption, duplicate occurrence identity, generation invalidation, Focus filtering without deletion, batch removal, and transient clearing.");

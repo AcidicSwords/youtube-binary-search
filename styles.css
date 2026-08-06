@@ -634,21 +634,6 @@ kbd {
     );
 }
 
-.ripple-context-window-fill {
-  position: absolute;
-  z-index: 5;
-  inset-block: 3px;
-  border: 1px dashed rgba(77, 220, 213, 0.88);
-  border-radius: 5px;
-  background:
-    repeating-linear-gradient(
-      135deg,
-      rgba(77, 220, 213, 0.14) 0 4px,
-      transparent 4px 8px
-    );
-  pointer-events: none;
-}
-
 .marker {
   position: absolute;
   top: calc(var(--track-top, 104px) - 9px);
@@ -801,57 +786,6 @@ kbd {
   height: 24px;
   pointer-events: none;
   background: rgba(202, 179, 255, 0.84);
-}
-
-.traversal-prospect-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 10;
-  pointer-events: none;
-}
-
-.traversal-prospect-marker {
-  position: absolute;
-  top: calc(var(--track-top, 104px) - 4px);
-  width: 3px;
-  height: 38px;
-  transform: translateX(-50%);
-  border-radius: 2px;
-  background: #efc96d;
-  box-shadow: 0 0 0 2px rgba(239, 201, 109, 0.14);
-}
-
-.traversal-prospect-marker::before {
-  position: absolute;
-  left: 50%;
-  width: 9px;
-  height: 9px;
-  transform: translateX(-50%) rotate(45deg);
-  border: 2px solid #efc96d;
-  background: var(--surface-3);
-  content: "";
-}
-
-.traversal-prospect-marker[data-kind="ripple-start"]::before {
-  bottom: -3px;
-}
-
-.traversal-prospect-marker[data-kind="ripple-end"]::before {
-  top: -3px;
-}
-
-.ripple-address-marker {
-  z-index: 11;
-  top: calc(var(--track-top, 104px) - 6px);
-  width: 13px;
-  height: 42px;
-  border: 2px solid #4ddcd5;
-  border-radius: 7px;
-  background: transparent;
-  box-shadow:
-    0 0 0 2px rgba(8, 11, 16, 0.78),
-    0 0 0 4px rgba(77, 220, 213, 0.17);
-  pointer-events: none;
 }
 
 
@@ -2856,23 +2790,4 @@ kbd {
 
 .current-departure-marker[data-owner="ghost"] {
   opacity: 1;
-}
-
-@media (forced-colors: active) {
-  .ripple-context-window-fill {
-    border-color: Highlight;
-    background: transparent;
-  }
-
-  .traversal-prospect-marker {
-    background: LinkText;
-    box-shadow: none;
-  }
-
-  .traversal-prospect-marker::before,
-  .ripple-address-marker {
-    border-color: Highlight;
-    background: Canvas;
-    box-shadow: none;
-  }
 }

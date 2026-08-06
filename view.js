@@ -51,10 +51,6 @@ import {
 } from "./session.js";
 import { YOUTUBE_STATE } from "./youtube.js";
 import { panoramaSideRates } from "./panorama-geometry.js";
-import {
-  availableTraversalProspects,
-  TRAVERSAL_PROSPECT_KIND
-} from "./traversal-prospects.js";
 
 const TIMELINE_SECTION_HIT_WIDTH = 28;
 const TIMELINE_SECTION_LANE_HEIGHT = 20;
@@ -339,58 +335,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const right = percent(end);
     element.style.left = `${left}%`;
     element.style.width = `${Math.max(0, right - left)}%`;
-  }
-
-  function renderRippleProjection(activeRange, semanticCurrent) {
-    const currentState = state();
-    const ripple = currentState.rippleObservation;
-    const activeRipple = ripple
-      && ripple.generation === currentState.sourceGeneration
-      ? ripple
-      : null;
-    const addressMarker = elements["ripple-address-marker"];
-    const contextFill = elements["ripple-context-window-fill"];
-
-    addressMarker.hidden = !activeRipple;
-    contextFill.hidden = !activeRipple;
-    if (activeRipple) {
-      setMarkerPosition(addressMarker, activeRipple.observationAddress);
-      setSegment(contextFill, activeRipple.contextStart, activeRipple.contextEnd);
-      addressMarker.setAttribute(
-        "aria-label",
-        `Ripple Observation Address ${formatTime(activeRipple.observationAddress)}; Current did not move and remains ${formatTime(semanticCurrent)}`
-      );
-      contextFill.dataset.rippleId = activeRipple.id;
-    } else {
-      addressMarker.removeAttribute("aria-label");
-      delete contextFill.dataset.rippleId;
-    }
-
-    const prospects = availableTraversalProspects(
-      currentState.traversalProspects,
-      {
-        generation: currentState.sourceGeneration,
-        range: activeRange
-      }
-    );
-    const markers = prospects.map(prospect => {
-      const marker = document.createElement("span");
-      const boundary = prospect.kind === TRAVERSAL_PROSPECT_KIND.RIPPLE_START
-        ? "Start"
-        : "End";
-      marker.className = "traversal-prospect-marker";
-      marker.dataset.traversalProspect = prospect.id;
-      marker.dataset.kind = prospect.kind;
-      marker.dataset.address = String(prospect.address);
-      marker.setAttribute("role", "img");
-      marker.setAttribute(
-        "aria-label",
-        `Ripple ${boundary} Prospect at ${formatTime(prospect.address)}; future Address; Current did not move and remains ${formatTime(semanticCurrent)}`
-      );
-      setMarkerPosition(marker, prospect.address);
-      return marker;
-    });
-    elements["traversal-prospect-layer"].replaceChildren(...markers);
   }
 
   function setStyleProperty(element, name, value) {
@@ -1722,6 +1666,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const physicallyDisplaced = state().videoLoaded
       && Number.isFinite(physical)
       && Math.abs(physical - semanticCurrent) > 0.05;
+    const rippleIsInvisible = Boolean(state().rippleObservation);
     const cursor = state().videoLoaded && (moving || physicallyDisplaced)
       ? clamp(physical, activeRange.start, activeRange.end)
       : semanticCurrent;
@@ -1729,7 +1674,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     // Cursor reports observation that has left Current. While it has not, this
     // readout would print a second copy of Current, so it reports nothing --
     // the same rule the Cursor marker follows on the map.
-    elements["cursor-time"].textContent = physicallyDisplaced || moving
+    elements["cursor-time"].textContent = !rippleIsInvisible && (physicallyDisplaced || moving)
       ? formatTime(cursor)
       : "—";
     const transport = state().transport;
@@ -1846,7 +1791,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       // it. Cursor reports observation that has left Current; during the drag
       // it has not, so there is nothing for it to report.
       const showCursor = (moving || physicallyDisplaced)
-        && !state().currentDrag?.moved;
+        && !state().currentDrag?.moved
+        && !rippleIsInvisible;
       elements["cursor-marker"].hidden = !showCursor;
       if (showCursor) setMarkerPosition(elements["cursor-marker"], cursor);
     } else {
@@ -2387,9 +2333,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ]) elements[id].hidden = true;
       elements["active-span-fill"].hidden = true;
       elements["panorama-window-fill"].hidden = true;
-      elements["ripple-context-window-fill"].hidden = true;
-      elements["ripple-address-marker"].hidden = true;
-      elements["traversal-prospect-layer"].replaceChildren();
       elements["section-preview-fill"].hidden = true;
       elements["action-preview-fill"].hidden = true;
       elements["preview-current-marker"].hidden = true;
@@ -2470,7 +2413,6 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
 
     elements["panorama-window-fill"].hidden = !panoramaWindow;
     if (panoramaWindow) setSegment(elements["panorama-window-fill"], panoramaWindow.start, panoramaWindow.end);
-    renderRippleProjection(activeRange, semanticCurrent);
     renderSectionPreview();
     renderActionPreview(previewResult, structuralPresentation, previewKind);
     renderTimelinePins();

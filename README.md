@@ -83,17 +83,18 @@ playback presentation and is unrelated to all three.
 
 `Shift+click` bare Timeline ground to **Ripple**-observe an Address without
 moving Current. Ripple uses the same weighted inverse map and automatic Context
-transport as the rest of the instrument. The Timeline distinguishes Current,
-moving Cursor, Ripple Observation Address, clipped Ripple Context Window, and
-its Start/End Traversal Prospects. Status and accessibility text explicitly say
-that Current did not move.
+transport as the rest of the instrument. Ripple draws nothing on the Timeline:
+Current and every existing layer stay exactly as they were. Status text reports
+the observation and explicitly says that Current did not move.
 
-When observation completes, hold `G` and wheel forward to inspect the newest
-prospect; wheel backward still reads where you have actually been. The moving
-mark is a Ghost Candidate until release. Releasing over a prospect performs
-ordinary Go, creates the ordinary Active Span/history/Traversal Trace movement,
-and consumes only that endpoint. Escape consumes nothing. Prospects are
-transient, filtered rather than deleted by Focus, and cleared with the source.
+When observation completes, its Start and End Addresses are appended to the
+forward side of the one stream Ghost already reads. Hold `G` and wheel in either
+direction to move fluidly backward and forward through that stream; both
+directions use the same Ghost Candidate presentation. Releasing over a future
+Address performs ordinary Go, which moves it onto the backward side, creates
+the ordinary Active Span/history/Traversal Trace movement, and consumes only
+that endpoint. Escape consumes nothing. Future entries are transient, filtered
+rather than deleted by Focus, and cleared with the source.
 
 Automatic Context recognizes a Current already reached. Ripple observation
 recognizes a non-Current Address. Neither is traversal and neither appends
@@ -160,7 +161,7 @@ Nudge is exact source-time adjustment. `Shift`+wheel uses the dominant wheel axi
 | `[` / `]` | Decrease / increase Step Distance preset |
 | `,` / `.` | Nudge backward / forward |
 | `I` / `O` | Open Guide / Operators and State & Settings |
-| Hold `G` + wheel | Ghost: backward through Trace; forward through prospects, then valid historical continuation |
+| Hold `G` + wheel | Ghost: move backward or forward through one Traversal Trace stream, including Ripple futures |
 | `Alt+Q/W/E/A/S/D` or `Alt` + an arrow Step | Carry the acquired retained object with Current |
 | `Esc` | Cancel the active manipulation or close the transient surface |
 | `?` | Shortcut help |

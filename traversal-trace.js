@@ -13,11 +13,11 @@
 // Pins, Sections, Weights and Focus established since then are exactly what
 // makes returning worth doing.
 //
-// The ledger is append-only. Recalling an earlier Address and committing it
-// writes a *new* occurrence at the live end, linked by provenance to the one it
-// was recalled from. Nothing is ever rewritten or dropped, because arriving
-// somewhere a second time — knowing what followed the first time — is not the
-// same event as arriving there without knowing.
+// The ledger is append-only for ordinary reader movement. Ghost merely changes
+// the cursor within one frozen view of that ledger; it does not manufacture a
+// second kind of occurrence. Ripple may append transient future Addresses to
+// that view, and settling one through canonical Go records the resulting
+// ordinary movement in the ledger.
 //
 // This module is a pure ledger. It reads no DOM, issues no media command, holds
 // no Session, knows nothing of Guide topology, and never persists itself.
@@ -26,8 +26,7 @@ import { EPSILON, clamp } from "./range-geometry.js";
 export const TRAVERSAL_KIND = Object.freeze({
   ATOMIC: "atomic",
   SEQUENCE: "sequence",
-  CONTINUOUS: "continuous",
-  GHOST_RETURN: "ghost-return"
+  CONTINUOUS: "continuous"
 });
 
 export const UNIT_KIND = Object.freeze({
@@ -141,8 +140,8 @@ export function appendObservedPassages(traversalTrace, { spans, cause, createdAt
 //
 // A Ghost gesture reads a stream that cannot change underneath it, so the whole
 // readable sequence is resolved once when the gesture begins. That single
-// decision settles three separate requirements at once: the gesture cannot
-// follow its own newly injected output, a Weight or Step change mid-gesture
+// decision settles three separate requirements at once: later movement cannot
+// mutate the gesture's candidates, a Weight or Step change mid-gesture
 // cannot move candidates the reader has already passed, and the Range that was
 // active at the start is the Range the whole gesture obeys.
 function passagePositions(unit, { range, projection, stepDistance }) {
@@ -199,21 +198,11 @@ function readablePositions(traversalTrace, { frozenStreamEnd, range, projection,
       address,
       recordId,
       unitIndex,
-      occurrenceKind: identity.occurrenceKind || "arrival",
-      recalledFrom: identity.recalledFrom || null
+      streamKind: "trace"
     }));
   };
   for (let index = 0; index < limit; index += 1) {
     const record = traversalTrace.records[index];
-    // A scan is not a journey, but a landing is.
-    //
-    // The wheel motion used to find a moment is search, and copying it into the
-    // stream made it a palindrome: scrolling backward walked forward through the
-    // original journey and turned around. Only the settled landing is recorded,
-    // and it is one jump from the live Anchor to the Address re-entered -- so
-    // this contributes exactly one new position, and re-entering a moment stays
-    // in the record where it belongs.
-    const injected = record.kind === TRAVERSAL_KIND.GHOST_RETURN;
     record.units.forEach((unit, unitIndex) => {
       if (unit.kind === UNIT_KIND.PASSAGE) {
         const inside = passagePositions(unit, { range: bounds, projection, stepDistance });
@@ -229,13 +218,7 @@ function readablePositions(traversalTrace, { frozenStreamEnd, range, projection,
           blocked = true;
           continue;
         }
-        const landing = injected && near(address, unit.to);
-        push(address, record.id, unitIndex, landing
-          ? {
-            occurrenceKind: "ghost-return",
-            recalledFrom: record.provenance?.recalledOccurrence || null
-          }
-          : {});
+        push(address, record.id, unitIndex);
       }
     });
   }
@@ -287,40 +270,72 @@ export function beginGhostRead(traversalTrace, {
   current,
   continuationPosition = null,
   frozenStreamEnd,
+  futureEntries = [],
   range,
   projection,
   stepDistance
 } = {}) {
-  const frozen = readablePositions(traversalTrace, {
+  const historical = readablePositions(traversalTrace, {
     frozenStreamEnd,
     range,
     projection,
     stepDistance
   });
+  const bounds = {
+    start: Number.isFinite(range?.start) ? range.start : Number.NEGATIVE_INFINITY,
+    end: Number.isFinite(range?.end) ? range.end : Number.POSITIVE_INFINITY
+  };
+  const positions = [...historical.positions];
+  if (!positions.length && Number.isFinite(Number(current))) {
+    positions.push(Object.freeze({
+      address: Number(current),
+      recordId: null,
+      unitIndex: null,
+      streamKind: "trace"
+    }));
+  }
+  for (const entry of Array.isArray(futureEntries) ? futureEntries : []) {
+    const address = Number(entry?.address);
+    if (
+      !Number.isFinite(address)
+      || address < bounds.start - EPSILON
+      || address > bounds.end + EPSILON
+    ) continue;
+    const previous = positions.at(-1);
+    if (previous && near(previous.address, address)) continue;
+    positions.push(Object.freeze({
+      address,
+      recordId: null,
+      unitIndex: null,
+      streamKind: "future",
+      prospect: Object.freeze({ ...entry })
+    }));
+  }
   let index = -1;
-  // The resume cursor is the historical occurrence a previous landing re-entered.
-  // Following it means "what originally came after this moment", which is only a
-  // question a forward gesture asks -- a backward gesture is asking what led to
-  // the present re-entry, and that is the live stream. The caller decides which,
-  // and having decided at activation it does not switch mid-gesture: reversing
-  // the wheel retraces the cursor already chosen.
+  // Ghost has one persistent position in one stream. A settled backward move
+  // leaves the positions ahead available, and a settled forward move makes that
+  // position part of the backward side. Direction never selects a second reader.
   if (continuationPosition && tracePositionIsValid(traversalTrace, continuationPosition, { range, current })) {
-    index = frozen.positions.findIndex(position =>
-      position.recordId === continuationPosition.recordId
+    index = positions.findIndex(position =>
+      position.streamKind === "trace"
+      && position.recordId === continuationPosition.recordId
       && position.unitIndex === continuationPosition.unitIndex
       && near(position.address, continuationPosition.address));
   }
   if (index < 0) {
-    for (let candidate = frozen.positions.length - 1; candidate >= 0; candidate -= 1) {
-      if (near(frozen.positions[candidate].address, current)) {
+    for (let candidate = positions.length - 1; candidate >= 0; candidate -= 1) {
+      if (
+        positions[candidate].streamKind === "trace"
+        && near(positions[candidate].address, current)
+      ) {
         index = candidate;
         break;
       }
     }
   }
   return Object.freeze({
-    positions: frozen.positions,
-    blocked: frozen.blocked,
+    positions: Object.freeze(positions),
+    blocked: historical.blocked,
     index,
     // Where the gesture began, which is the live occurrence Ghost anchors to.
     origin: Number.isFinite(current) ? current : 0
@@ -352,72 +367,12 @@ export function moveGhostRead(traversalTrace, ghostRead, direction) {
     changed: true,
     address: position.address,
     cursor: Object.freeze({
+      streamKind: position.streamKind,
       recordId: position.recordId,
       unitIndex: position.unitIndex,
-      address: position.address
+      address: position.address,
+      ...(position.prospect ? { prospect: position.prospect } : {})
     }),
     read: Object.freeze({ ...ghostRead, index: next })
-  };
-}
-
-// Releasing at a recalled Address injects that landing, and nothing else.
-//
-// The scan and the landing are different events. Scrolling while G is held
-// inspects prior the Traversal Trace; it may cross many occurrences and reverse direction,
-// and none of that is a journey the reader took -- it is the search they used to
-// find one moment. Writing it down made the stream a palindrome and spent later
-// wheel detents crossing the reader's own search motion.
-//
-// What is written is one jump: from the live Anchor to the Address re-entered.
-// It is linked in both directions -- to the Anchor it was recalled *from*, and
-// to the historical occurrence it re-enters -- because those are the two
-// questions worth asking at a re-entry. Backward asks what led here; forward
-// asks what originally followed the moment now standing in.
-//
-// A gesture that returns to its Anchor writes nothing, because its one unit
-// spans no distance and `appendTraceEntry` refuses those wherever they come from --
-// a zero-distance occurrence would sit in the stream indistinguishable from its
-// neighbour and cost a future detent to pass. The Session may still retain the
-// ground crossed; that is a different consequence of the same gesture.
-export function appendGhostReturn(traversalTrace, {
-  anchor,
-  anchorPosition,
-  landing,
-  recalledPosition,
-  scan,
-  createdAt
-} = {}) {
-  const from = Number(anchor);
-  const to = Number(landing);
-  if (!Number.isFinite(from) || !Number.isFinite(to)) {
-    return { traversalTrace, record: null, occurrence: null, continuationPosition: null, changed: false };
-  }
-  const appended = appendTraceEntry(traversalTrace, {
-    cause: "ghost",
-    kind: TRAVERSAL_KIND.GHOST_RETURN,
-    createdAt,
-    units: [{ kind: UNIT_KIND.JUMP, from, to }],
-    provenance: {
-      anchorOccurrence: anchorPosition ? Object.freeze({ ...anchorPosition }) : null,
-      recalledOccurrence: recalledPosition ? Object.freeze({ ...recalledPosition }) : null,
-      // The search itself is kept as evidence, never as traversal.
-      scan: Object.freeze({
-        candidateCount: Number(scan?.candidateCount) || 0,
-        visitedMinimum: Number(scan?.visitedMinimum),
-        visitedMaximum: Number(scan?.visitedMaximum),
-        directionChanges: Number(scan?.directionChanges) || 0
-      })
-    }
-  });
-  if (!appended.changed) {
-    return { traversalTrace, record: null, occurrence: null, continuationPosition: null, changed: false };
-  }
-  return {
-    ...appended,
-    occurrence: appended.traversalTrace.latestOccurrence,
-    // The historical occurrence that was re-entered, so an immediately forward
-    // gesture can resume its original successors rather than retracing the live
-    // stream it has just been added to.
-    continuationPosition: recalledPosition ? Object.freeze({ ...recalledPosition }) : null
   };
 }

@@ -580,7 +580,7 @@ has(topLevelFunction(appCode, "resetSourceScopedState"), /state\.shiftLayers = \
 has(topLevelFunction(appCode, "resetSourceScopedState"),
   /state\.traversalProspects = clearTraversalProspects\(\)[\s\S]*?state\.rippleObservation = null/,
   "Source reset clears Ripple identity and every Traversal Prospect.");
-// One wheel, two readers, one registration. Ghost takes precedence while G is
+// One wheel, one traversal stream, one registration. Ghost takes precedence while G is
 // held; otherwise the wheel is Nudge's exactly as before. A second listener
 // would let both act on one notch.
 check((appCode.match(/addEventListener\("wheel",\s*handleReaderWheel/g) || []).length === 1,
@@ -596,7 +596,6 @@ for (const field of [
   "candidate",
   "previewActiveSpan",
   "previewNeighborhood",
-  "readKind",
   "readId",
   "frozenTraceRead"
 ]) {
@@ -604,8 +603,10 @@ for (const field of [
     `Ghost provisional state owns ${field}.`);
 }
 has(beginGhost,
-  /initialDirection === "forward"[\s\S]*?beginTraversalProspectRead\([\s\S]*?readsProspects[\s\S]*?tracePositionIsValid/,
-  "Forward Ghost freezes Traversal Prospects first and falls back to valid historical continuation.");
+  /availableTraversalProspects\([\s\S]*?beginGhostRead\([\s\S]*?continuationPosition:[\s\S]*?futureEntries/,
+  "Ghost freezes historical positions and Ripple futures into one stream.");
+lacks(beginGhost, /initialDirection|beginTraversalProspectRead|readKind/,
+  "Gesture direction never selects a second Ghost reader.");
 const scanGhost = topLevelFunction(appCode, "handleGhostWheel");
 lacks(scanGhost, /state\.session\s*=/,
   "Ghost scanning never replaces the accepted Session.");
@@ -613,14 +614,24 @@ has(scanGhost,
   /gesture\.previewSession = result\.session[\s\S]*?gesture\.candidate = candidate\.address/,
   "Ghost scanning updates only its provisional Candidate and preview Session.");
 has(scanGhost,
-  /moveTraversalProspectRead\([\s\S]*?goTo\([\s\S]*?gesture\.selectedProspect = candidate\.prospect/,
-  "Prospect scanning uses a frozen reader and canonical Go only for provisional presentation.");
+  /moveGhostRead\([\s\S]*?ghostTraverse\([\s\S]*?sourcePosition: candidate\.cursor/,
+  "Every Ghost direction traverses the same frozen stream and presentation.");
+lacks(scanGhost, /moveTraversalProspectRead|readKind|selectedProspect/,
+  "Forward futures are not a separate Ghost type.");
 has(topLevelFunction(appCode, "settleGhostGesture"),
   /state\.session = gesture\.previewSession[\s\S]*?checkpoint\(/,
   "Ghost settlement performs the first semantic assignment and one checkpoint.");
 has(topLevelFunction(appCode, "settleGhostGesture"),
-  /readKind === "traversal-prospect"[\s\S]*?goTo\(state\.session[\s\S]*?accept\(result[\s\S]*?consumeTraversalProspect\([\s\S]*?return true/,
-  "Prospect settlement commits canonical Go before consuming exactly its selected transient entry.");
+  /sourcePosition\?\.prospect[\s\S]*?goTo\(state\.session[\s\S]*?accept\(result[\s\S]*?consumeTraversalProspect\([\s\S]*?return true/,
+  "Settling a future position commits canonical Go before consuming exactly that transient entry.");
+lacks(topLevelFunction(appCode, "settleGhostGesture"), /appendGhostR(?:eturn)|GHOST_R(?:ETURN)/,
+  "Historical Ghost settlement moves the one stream cursor without a synthetic action.");
+lacks(html, /ripple-address-marker|ripple-context-window-fill|traversal-prospect-layer/,
+  "Ripple owns no dedicated Timeline DOM.");
+lacks(styles, /\.ripple-address-marker|\.ripple-context-window-fill|\.traversal-prospect-marker/,
+  "Ripple owns no dedicated Timeline paint.");
+lacks(view, /renderRippleProjection|data-traversal-prospect/,
+  "The View does not project Ripple or its future entries onto the Timeline.");
 const cancelActive = topLevelFunction(appCode, "cancelActiveManipulation");
 has(cancelActive,
   /state\.currentDrag[\s\S]*?state\.guideDrag[\s\S]*?state\.dragHandle[\s\S]*?state\.ghostGesture[\s\S]*?state\.rippleObservation/,

@@ -13,7 +13,6 @@ import {
   appendObservedPassages,
   beginGhostRead,
   moveGhostRead,
-  appendGhostReturn,
   latestTracePositionAtAddress,
   tracePositionIsValid
 } from "./traversal-trace.js";
@@ -355,113 +354,42 @@ function walk(traversalTrace, ghostRead, direction, limit = 40) {
   const ghostRead = read(empty, 0);
   const moved = moveGhostRead(empty, ghostRead, "backward");
   assert.equal(moved.changed, false);
-  assert.equal(moved.reason, "no-traversal-trace");
-  assert.equal(appendGhostReturn(empty, { anchor: 0, landing: 0 }).changed, false,
-    "A gesture that landed nowhere writes nothing.");
+  assert.equal(moved.reason, "stream-end");
 }
 
-// A scan is not a journey, but a landing is
+// Ripple endpoints extend the forward side of the same stream
 {
-  // The reader walks A -> B -> C -> D, then recalls back to B and releases.
-  // What enters the stream is one occurrence of B, not the search that found it.
   const [A, B, C, D] = [10, 20, 30, 40];
   let traversalTrace = createTraversalTrace(A);
   for (const [from, to] of [[A, B], [B, C], [C, D]]) {
     traversalTrace = appendAtomicTraversal(traversalTrace, { from, to, cause: "go" }).traversalTrace;
   }
-  const beforeRecords = traversalTrace.records.length;
-
-  let ghostRead = read(traversalTrace, D, { frozenStreamEnd: traversalTrace.records.length });
-  const scanned = [];
-  for (let notch = 0; notch < 2; notch += 1) {
-    const moved = moveGhostRead(traversalTrace, ghostRead, "backward");
-    scanned.push({ address: moved.address, cursor: moved.cursor });
-    ghostRead = moved.read;
-  }
-  assert.deepEqual(scanned.map(entry => entry.address), [C, B],
-    "The scan crosses C on the way to B.");
-
-  const injected = appendGhostReturn(traversalTrace, {
-    anchor: D,
-    anchorPosition: { recordId: traversalTrace.records.at(-1).id, unitIndex: 0, address: D },
-    landing: B,
-    recalledPosition: scanned.at(-1).cursor,
-    scan: { candidateCount: scanned.length, visitedMinimum: B, visitedMaximum: D },
-    createdAt: 1
-  });
-  assert.equal(injected.changed, true);
-  assert.equal(injected.traversalTrace.records.length, beforeRecords + 1,
-    "One gesture writes one record,");
-  assert.equal(injected.record.units.length, 1,
-    "carrying one jump: the Anchor to what was re-entered.");
-  assert.deepEqual(injected.record.units[0], { kind: UNIT_KIND.JUMP, from: D, to: B });
-  assert.equal(injected.record.kind, TRAVERSAL_KIND.GHOST_RETURN);
-
-  // The search is kept as evidence and never as traversal.
-  assert.equal(injected.record.provenance.scan.candidateCount, 2);
-  assert.equal(injected.record.provenance.recalledOccurrence.address, B);
-  assert.equal(injected.record.provenance.anchorOccurrence.address, D);
-
-  // The landing is readable the Traversal Trace -- the reader really did re-enter B after
-  // reaching D, and that fact is worth as much as any other movement.
-  const stream = read(injected.traversalTrace, B);
-  assert.deepEqual(stream.positions.map(position => position.address), [A, B, C, D, B],
-    "The stream is the journey plus the landing: not the scan, and not nothing.");
-  assert.equal(stream.positions.at(-1).occurrenceKind, "ghost-return",
-    "and the landing knows it is a re-entry,");
-  assert.equal(stream.positions.at(-1).recalledFrom.address, B,
-    "linked to the occurrence it re-entered.");
-  assert.equal(injected.traversalTrace.latestOccurrence.address, B);
-
-  // Backward from the injected occurrence follows the live stream: what led to
-  // this re-entry. Forward may resume what originally followed the moment.
-  const backward = moveGhostRead(injected.traversalTrace, stream, "backward");
-  assert.equal(backward.address, D,
-    "Backward asks what led here, so the live predecessor comes first.");
-
-  const resumed = read(injected.traversalTrace, B, { continuationPosition: injected.continuationPosition });
-  const forward = walk(injected.traversalTrace, resumed, "forward");
-  assert.deepEqual(forward.addresses.slice(0, 2), [C, D],
-    "Forward asks what originally followed the moment re-entered.");
-  // Carrying on past them eventually arrives at the injection itself, which is
-  // simply where the reader is standing: the live stream has caught up with them.
-  assert.equal(forward.addresses.at(-1), B);
-
-  // Recalling twice does not accumulate mirrored copies of the search.
-  let twice = appendAtomicTraversal(injected.traversalTrace, {
-    from: B, to: 90, cause: "go"
-  }).traversalTrace;
-  const second = appendGhostReturn(twice, {
-    anchor: 90,
-    anchorPosition: null,
-    landing: B,
-    recalledPosition: scanned.at(-1).cursor,
-    scan: { candidateCount: 4 },
-    createdAt: 2
+  const futures = [
+    { id: "future-1", address: 70 },
+    { id: "future-2", address: 90 }
+  ];
+  let stream = read(traversalTrace, D, {
+    futureEntries: futures
   });
   assert.deepEqual(
-    read(second.traversalTrace, B).positions.map(position => position.address),
-    [A, B, C, D, B, 90, B],
-    "Two returns to B remain two occurrences, separated by what happened between."
+    stream.positions.map(position => position.address),
+    [A, B, C, D, 70, 90],
+    "Ripple endpoints are appended after the current Trace without becoming a second reader."
   );
-}
-
-// Returning to the Anchor writes nothing
-{
-  // The Session may still retain the ground crossed, but a zero-distance
-  // occurrence would sit in the stream indistinguishable from its neighbour and
-  // cost a future wheel detent to pass.
-  let traversalTrace = createTraversalTrace(0);
-  traversalTrace = appendAtomicTraversal(traversalTrace, { from: 0, to: 50, cause: "go" }).traversalTrace;
-  const unchanged = appendGhostReturn(traversalTrace, {
-    anchor: 50,
-    landing: 50,
-    recalledPosition: null,
-    scan: { candidateCount: 6, visitedMinimum: 10, visitedMaximum: 50 },
-    createdAt: 1
-  });
-  assert.equal(unchanged.changed, false, "A round trip appends no occurrence,");
-  assert.equal(unchanged.traversalTrace, traversalTrace, "and leaves the ledger exactly as it was.");
+  const forward = moveGhostRead(traversalTrace, stream, "forward");
+  assert.equal(forward.address, 70);
+  assert.equal(forward.cursor.streamKind, "future");
+  assert.equal(forward.cursor.prospect.id, "future-1");
+  const backToCurrent = moveGhostRead(traversalTrace, forward.read, "backward");
+  assert.equal(backToCurrent.address, D);
+  const intoUndo = moveGhostRead(traversalTrace, backToCurrent.read, "backward");
+  assert.equal(intoUndo.address, C);
+  const redoAgain = moveGhostRead(traversalTrace, intoUndo.read, "forward");
+  assert.equal(redoAgain.address, D,
+    "One held gesture can alternate backward and forward across the same pivot.");
+  const futureAgain = moveGhostRead(traversalTrace, redoAgain.read, "forward");
+  assert.equal(futureAgain.address, 70,
+    "and can cross from recorded traversal into Ripple future again without switching modes.");
 }
 
 // A resume cursor describes where the reader is standing
@@ -518,4 +446,4 @@ function walk(traversalTrace, ghostRead, direction, limit = 40) {
 }
 
 
-console.log("Traversal Trace tests passed: append-only records that keep reversals, direction in the Traversal Trace independent of source order, shared endpoints as one position, watched spans subdivided by the frozen Step law and clipped to the active Range, a frozen readable stream, every way a resume cursor can go stale refused for its own reason, and injection that records one landing rather than the search that found it, readable, linked to both the Anchor it came from and the moment it re-enters.");
+console.log("Traversal Trace tests passed: recorded movement keeps reversals, direction is independent of source order, shared endpoints are one position, watched spans follow the frozen Step law and active Range, and Ripple futures extend the same bidirectional frozen stream.");

@@ -82,7 +82,8 @@
      paints over the popover and swallows every click meant for its inputs. */
   z-index: 9;
   display: flex;
-  min-height: var(--control-height);
+  height: 54px;
+  min-height: 54px;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -161,7 +162,8 @@
   position: relative;
   z-index: 7;
   display: flex;
-  min-height: 36px;
+  height: 46px;
+  min-height: 46px;
   align-items: center;
   justify-content: center;
   padding: 5px;
@@ -186,12 +188,29 @@
   display: flex;
   width: min(100%, 210px);
   min-width: 0;
+  height: 34px;
   min-height: 34px;
   align-items: center;
   justify-content: center;
   gap: 6px;
   padding: 4px 8px;
   text-align: center;
+}
+
+.panorama-mode-toggle > span,
+.panorama-mode-toggle > small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panorama-mode-toggle > span {
+  flex: 1 1 0;
+}
+
+.panorama-mode-toggle > small {
+  flex: 1 1 0;
 }
 
 .panorama-mode-toggle {
@@ -359,7 +378,16 @@
   .pane-collapse,
   .panorama-visibility-toggle,
   .panorama-mode-toggle {
+    height: var(--touch);
     min-height: var(--touch);
+  }
+  .pane-panorama-controls {
+    height: calc(var(--touch) + 12px);
+    min-height: calc(var(--touch) + 12px);
+  }
+  .panorama-pane-bar {
+    height: calc(var(--touch) + 12px);
+    min-height: calc(var(--touch) + 12px);
   }
   .pane-collapse { width: var(--touch); }
 }

@@ -1,6 +1,6 @@
 {
   "name": "video-cartography",
-  "version": "9.1.0",
+  "version": "9.1.1",
   "description": "A spatial comprehension workspace for video.",
   "private": true,
   "type": "module",

@@ -1,6 +1,5 @@
-// Browser-only proof for Ripple's distinct visual channels. The DOM-free route
-// suite owns acquisition and semantics; this suite owns painted geometry,
-// responsive containment, and the rendered separation from Current.
+// Browser proof for Ripple's deliberately invisible Timeline behavior, the
+// single Ghost presentation, and stable Panorama/Timeline layout.
 import assert from "node:assert/strict";
 import {
   openApp,
@@ -10,80 +9,34 @@ import {
 } from "./browser-harness.mjs";
 
 const { page, close, failures } = await openApp();
+const settle = milliseconds => page.waitForTimeout(milliseconds);
 
-const report = () => page.evaluate(() => {
-  const timeline = document.getElementById("timeline").getBoundingClientRect();
-  const current = document.getElementById("current-marker");
-  const address = document.getElementById("ripple-address-marker");
-  const context = document.getElementById("ripple-context-window-fill");
-  const cursor = document.getElementById("cursor-marker");
-  const activeSpan = document.getElementById("active-span-fill");
-  const weightGradient = document.querySelector(".weight-gradient");
-  const prospects = [...document.querySelectorAll("[data-traversal-prospect]")];
-  const geometry = element => {
-    const rect = element.getBoundingClientRect();
-    const style = getComputedStyle(element);
-    return {
-      hidden: element.hidden,
-      left: element.style.left,
-      width: rect.width,
-      height: rect.height,
-      position: style.position,
-      painted: style.backgroundImage !== "none"
-        || style.backgroundColor !== "rgba(0, 0, 0, 0)"
-        || style.borderLeftWidth !== "0px",
-      insideTimeline: rect.left >= timeline.left - 2
-        && rect.right <= timeline.right + 2
-        && rect.top >= timeline.top - 1
-        && rect.bottom <= timeline.bottom + 1
-    };
-  };
+const timelineReport = () => page.evaluate(() => {
+  const timeline = document.getElementById("timeline");
+  const panel = document.getElementById("timeline-panel").getBoundingClientRect();
+  const controls = document.querySelector(".center-panorama-controls").getBoundingClientRect();
+  const button = document.getElementById("panorama-both-toggle").getBoundingClientRect();
   return {
-    currentLeft: current.style.left,
-    acceptedCurrent: current.dataset.acceptedAddress,
-    cursor: geometry(cursor),
-    activeSpan: geometry(activeSpan),
-    weightGradient: geometry(weightGradient),
-    address: {
-      ...geometry(address),
-      label: address.getAttribute("aria-label")
-    },
-    context: geometry(context),
-    prospects: prospects.map(element => ({
-      ...geometry(element),
-      kind: element.dataset.kind,
-      address: Number(element.dataset.address),
-      label: element.getAttribute("aria-label")
-    }))
+    panel: { top: panel.top, height: panel.height },
+    controls: { top: controls.top, height: controls.height },
+    button: { top: button.top, height: button.height },
+    childCount: timeline.children.length,
+    childIdentity: [...timeline.children].map(element =>
+      `${element.id || ""}:${element.className || ""}`
+    ),
+    forbiddenCount: document.querySelectorAll(
+      "#ripple-address-marker, #ripple-context-window-fill, "
+      + "#traversal-prospect-layer, [data-ripple-address], [data-traversal-prospect]"
+    ).length,
+    cursorHidden: document.getElementById("cursor-marker").hidden,
+    cursorText: document.getElementById("cursor-time").textContent,
+    currentText: document.getElementById("pin-current-position").textContent
   };
 });
 
 try {
   await loadVideo(page);
-  await page.keyboard.press("e");
-  await page.waitForTimeout(140);
-  await page.keyboard.press("Shift+t");
-  await page.waitForTimeout(180);
-  const weighting = page.locator("[data-section-weighting]").first();
-  await weighting.selectOption("2");
-  await page.waitForTimeout(180);
-
-  // A retained-object Shift-click belongs to that object, never bare Timeline
-  // Ripple acquisition.
-  const retainedPin = page.locator(".timeline-pin").first();
-  await page.keyboard.down("Shift");
-  await retainedPin.click();
-  await page.keyboard.up("Shift");
-  await page.waitForTimeout(120);
-  assert.equal(await page.$eval("#ripple-address-marker", element => element.hidden), true);
-  assert.equal(await page.locator("[data-traversal-prospect]").count(), 0);
-  await page.keyboard.press("f");
-  await page.waitForTimeout(160);
-  const focusedRangeEnd = Number(
-    await page.getAttribute("#range-end-handle", "aria-valuenow")
-  );
-  assert.ok(focusedRangeEnd < 100,
-    "The browser proof acquires Ripple inside a focused Range.");
+  await settle(180);
 
   await page.evaluate(() => {
     const field = document.getElementById("context-duration");
@@ -91,196 +44,107 @@ try {
     field.dispatchEvent(new Event("change", { bubbles: true }));
     document.activeElement?.blur();
   });
+  await settle(120);
 
-  const beforeRipple = await report();
-  assert.equal(beforeRipple.activeSpan.hidden, false,
-    "The retained weighted setup has an existing Active Span.");
-  assert.ok(beforeRipple.activeSpan.width > 0 && beforeRipple.activeSpan.painted);
-  assert.ok(beforeRipple.weightGradient.width > 0 && beforeRipple.weightGradient.painted);
-
-  const track = await boxOf(page, ".track");
-  const rippleFraction = 0.98;
+  const timeline = await boxOf(page, "#timeline");
+  const beforeRipple = await timelineReport();
   await page.keyboard.down("Shift");
   await page.mouse.click(
-    track.x + track.width * rippleFraction,
-    track.y + track.height / 2
+    timeline.x + timeline.width * 0.75,
+    timeline.y + timeline.height * 0.55
   );
   await page.keyboard.up("Shift");
-  await page.waitForTimeout(160);
+  await settle(180);
 
-  let drawn = await report();
-  assert.equal(drawn.currentLeft, beforeRipple.currentLeft,
-    "Ripple observation does not move the rendered Current.");
-  assert.equal(drawn.address.hidden, false);
-  assert.ok(Math.abs(Number.parseFloat(drawn.address.left) - rippleFraction * 100) < 0.2,
-    `The Observation Address is drawn under the Shift-click (${drawn.address.left}).`);
-  assert.equal(drawn.address.position, "absolute");
-  assert.ok(drawn.address.width > 0 && drawn.address.height > 0);
-  assert.ok(drawn.address.painted);
-  assert.ok(drawn.address.insideTimeline);
-  assert.match(drawn.address.label, /Current did not move and remains/);
+  const duringRipple = await timelineReport();
+  assert.equal(duringRipple.currentText, beforeRipple.currentText,
+    "Ripple observation leaves accepted Current unchanged.");
+  assert.equal(duringRipple.forbiddenCount, 0,
+    "Ripple has no dedicated Timeline layer, marker, or prospect nodes.");
+  assert.equal(duringRipple.childCount, beforeRipple.childCount,
+    "Ripple creates no Timeline children.");
+  assert.deepEqual(duringRipple.childIdentity, beforeRipple.childIdentity,
+    "Ripple leaves the Timeline's rendered layer set untouched.");
+  assert.equal(duringRipple.cursorHidden, true,
+    "Ripple does not borrow the generic Cursor marker.");
+  assert.match(duringRipple.cursorText.trim(), /—|â€”/,
+    "Ripple does not write an Address into the Timeline Cursor readout.");
+  assert.ok(Math.abs(duringRipple.panel.top - beforeRipple.panel.top) < 0.5,
+    "Starting Ripple does not move the Timeline.");
 
-  assert.equal(drawn.context.hidden, false);
-  assert.equal(drawn.context.position, "absolute");
-  assert.ok(drawn.context.width > 0 && drawn.context.height > 0);
-  assert.ok(drawn.context.painted);
-  assert.ok(drawn.context.insideTimeline);
-  assert.equal(drawn.cursor.hidden, false,
-    "Cursor shows the moving observation independently of Current.");
-  assert.ok(drawn.cursor.insideTimeline);
-  assert.deepEqual(
-    {
-      hidden: drawn.activeSpan.hidden,
-      left: drawn.activeSpan.left,
-      width: drawn.activeSpan.width,
-      painted: drawn.activeSpan.painted
-    },
-    {
-      hidden: beforeRipple.activeSpan.hidden,
-      left: beforeRipple.activeSpan.left,
-      width: beforeRipple.activeSpan.width,
-      painted: beforeRipple.activeSpan.painted
-    },
-    "Ripple visuals do not collapse or displace the existing Active Span."
+  // Complete the shared Context window so its Start and End Addresses become
+  // future entries in the same stream Ghost already reads.
+  await mediaClockTo(page, 81);
+  await settle(360);
+  assert.match(await page.textContent("#status"), /Ripple added futures/);
+
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.down("g");
+  await page.mouse.wheel(0, -120);
+  await settle(220);
+  const ghostFuture = await page.evaluate(() => ({
+    medium: document.getElementById("active-span-fill").dataset.medium,
+    current: document.getElementById("pin-current-position").textContent,
+    forbiddenCount: document.querySelectorAll(
+      "[data-traversal-prospect], #traversal-prospect-layer"
+    ).length,
+    childCount: document.getElementById("timeline").children.length
+  }));
+  assert.equal(ghostFuture.medium, "ghost",
+    "A future endpoint uses the same Ghost presentation as historical traversal.");
+  assert.match(ghostFuture.current, /Ghost Candidate/);
+  assert.equal(ghostFuture.forbiddenCount, 0,
+    "Ghost does not reveal a second forward/prospect presentation.");
+  assert.equal(ghostFuture.childCount, beforeRipple.childCount,
+    "Ghosting through a Ripple future adds no Timeline layer.");
+
+  await page.mouse.wheel(0, 120);
+  await settle(160);
+  await page.mouse.wheel(0, -120);
+  await settle(160);
+  assert.equal(
+    await page.$eval("#active-span-fill", element => element.dataset.medium),
+    "ghost",
+    "Reversing across the history/future boundary stays one Ghost action."
   );
-  assert.equal(drawn.weightGradient.width, beforeRipple.weightGradient.width);
-  assert.equal(drawn.weightGradient.painted, true,
-    "Ripple leaves the weighted Timeline atmosphere painted.");
+  await page.keyboard.up("g");
+  await settle(260);
 
-  assert.deepEqual(
-    drawn.prospects.map(marker => marker.kind),
-    ["ripple-end", "ripple-start"],
-    "End and Start prospects retain their distinct newest-first channels."
-  );
-  assert.ok(drawn.prospects.every(marker =>
-    marker.position === "absolute"
-    && marker.width > 0
-    && marker.height > 0
-    && marker.painted
-    && marker.insideTimeline
-    && /Current did not move/.test(marker.label)
-  ), `Every prospect is painted, non-collapsed, contained, and accessibly distinct from Current: ${JSON.stringify(drawn.prospects)}`);
-  const completedEndAddress = drawn.prospects
-    .find(marker => marker.kind === "ripple-end").address;
-  assert.ok(Math.abs(completedEndAddress - focusedRangeEnd) < 0.05,
-    "Ripple independently clips its Context End to the focused Range.");
-
-  await page.emulateMedia({ reducedMotion: "reduce", forcedColors: "active" });
-  await page.waitForTimeout(80);
-  const accessibleModes = await report();
-  assert.ok(
-    accessibleModes.address.painted
-    && accessibleModes.context.painted
-    && accessibleModes.prospects.every(marker => marker.painted),
-    "Ripple channels remain visible under reduced motion and forced high contrast."
-  );
-  await page.emulateMedia({ reducedMotion: "no-preference", forcedColors: "none" });
-
-  await page.setViewportSize({ width: 680, height: 900 });
-  await page.waitForTimeout(180);
-  drawn = await report();
-  assert.ok(drawn.address.insideTimeline
-    && drawn.context.insideTimeline
-    && drawn.prospects.every(marker => marker.insideTimeline),
-  "Ripple channels remain inside the Timeline at the narrow responsive layout.");
-
-  await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.waitForTimeout(180);
-  await mediaClockTo(page, completedEndAddress + 0.5);
-  await page.waitForTimeout(180);
-  drawn = await report();
-  assert.equal(drawn.address.hidden, true,
-    "The live Observation Address leaves presentation on completion.");
-  assert.equal(drawn.context.hidden, true,
-    "The live Context Window leaves presentation on completion.");
-  assert.equal(drawn.prospects.length, 2,
-    "Completed prospects stay painted for forward Ghost reading.");
-  assert.equal(drawn.currentLeft, beforeRipple.currentLeft);
-
+  // Freeze/Stretch changes wording and state, but its reserved control geometry
+  // must keep the Timeline vertically stationary.
   await page.evaluate(() => {
-    const toggle = document.getElementById("guide-toggle");
-    if (toggle.getAttribute("aria-expanded") === "true") toggle.click();
+    const field = document.getElementById("context-duration");
+    field.value = "0";
+    field.dispatchEvent(new Event("change", { bubbles: true }));
     document.activeElement?.blur();
   });
-  const compactTimeline = await boxOf(page, "#timeline");
-  await page.mouse.move(
-    compactTimeline.x + compactTimeline.width / 2,
-    compactTimeline.y + compactTimeline.height / 2
-  );
-  const historyBeforeProspect = await page.textContent("#return-meta");
-  await page.keyboard.down("g");
-  await page.mouse.wheel(0, -30);
-  await page.waitForTimeout(160);
-  const prospective = await page.evaluate(() => ({
-    accepted: document.getElementById("current-marker").dataset.acceptedAddress,
-    candidate: document.getElementById("current-marker").dataset.ghostCandidate,
-    status: document.getElementById("status").textContent,
-    history: document.getElementById("return-meta").textContent,
-    prospectCount: document.querySelectorAll("[data-traversal-prospect]").length,
-    playing: Object.values(window.__players)[0].state === 1
-  }));
-  assert.equal(prospective.accepted, beforeRipple.acceptedCurrent);
-  assert.ok(
-    Math.abs(Number(prospective.candidate) - completedEndAddress) < 0.05,
-    `Forward Ghost exposes the End Prospect as Candidate: ${JSON.stringify(prospective)}`
-  );
-  assert.match(prospective.status, /Ghost future.*Ripple End Prospect.*Current remains/);
-  assert.equal(prospective.history, historyBeforeProspect);
-  assert.equal(prospective.prospectCount, 2);
-  assert.equal(prospective.playing, true,
-    "Prospect recognition reuses automatic Context while Current stays accepted.");
-
-  await page.keyboard.up("g");
-  await page.waitForTimeout(160);
-  const settled = await page.evaluate(() => ({
-    accepted: Number(document.getElementById("current-marker").dataset.acceptedAddress),
-    history: document.getElementById("return-meta").textContent,
-    prospectKinds: [...document.querySelectorAll("[data-traversal-prospect]")]
-      .map(element => element.dataset.kind)
-  }));
-  assert.ok(Math.abs(settled.accepted - completedEndAddress) < 0.05);
-  assert.equal(settled.history, "Go to Traversal Prospect");
-  assert.deepEqual(settled.prospectKinds, ["ripple-start"],
-    "Release consumes exactly the rendered End Prospect.");
-
-  const acceptedAfterGo = settled.accepted;
-  const trackAfterSettlement = await boxOf(page, ".track");
-  await page.keyboard.down("Shift");
-  await page.mouse.click(
-    trackAfterSettlement.x + trackAfterSettlement.width * 0.35,
-    trackAfterSettlement.y + trackAfterSettlement.height / 2
-  );
-  await page.keyboard.up("Shift");
-  await page.waitForTimeout(120);
-  assert.equal(await page.$eval("#ripple-address-marker", element => element.hidden), false);
-  assert.equal(await page.locator("[data-traversal-prospect]").count(), 3);
   await page.keyboard.press("Escape");
-  await page.waitForTimeout(140);
-  assert.equal(
-    Number(await page.getAttribute("#current-marker", "data-accepted-address")),
-    acceptedAfterGo,
-    "Escape restores the accepted Current after a rendered Ripple."
-  );
-  assert.equal(await page.locator("[data-traversal-prospect]").count(), 1,
-    "Escape removes only the uncompleted batch.");
-
-  await page.keyboard.down("Shift");
-  await page.mouse.click(
-    trackAfterSettlement.x + trackAfterSettlement.width * 0.4,
-    trackAfterSettlement.y + trackAfterSettlement.height / 2
-  );
-  await page.keyboard.up("Shift");
-  await page.waitForTimeout(100);
-  await loadVideo(page, "https://youtu.be/AAAAAAAAAAA?t=10");
-  await page.waitForTimeout(120);
-  assert.equal(await page.locator("[data-traversal-prospect]").count(), 0,
-    "Source replacement clears completed and uncompleted prospects.");
-  assert.equal(await page.$eval("#ripple-address-marker", element => element.hidden), true);
+  await settle(180);
+  await page.click("#center-transport-surface");
+  await settle(180);
+  const layoutSamples = [];
+  const labels = new Set();
+  for (let index = 0; index < 10; index += 1) {
+    assert.equal(await page.isDisabled("#panorama-both-toggle"), false,
+      "The combined Panorama control is available for the layout stress test.");
+    await page.click("#panorama-both-toggle");
+    await settle(90);
+    labels.add((await page.textContent("#panorama-both-toggle-label")).trim());
+    layoutSamples.push(await timelineReport());
+  }
+  const spread = values => Math.max(...values) - Math.min(...values);
+  assert.ok(spread(layoutSamples.map(sample => sample.panel.top)) < 0.5,
+    "The Timeline does not jump vertically while Freeze and Stretch alternate.");
+  assert.ok(spread(layoutSamples.map(sample => sample.controls.height)) < 0.5,
+    "The Panorama control row reserves one stable height.");
+  assert.ok(spread(layoutSamples.map(sample => sample.button.height)) < 0.5,
+    "The changing Freeze/Stretch button label cannot resize its row.");
+  assert.deepEqual([...labels].sort(), ["Freeze Panorama", "Stretch Panorama"],
+    "The geometry proof exercised both button states.");
 
   assert.deepEqual(failures, [],
-    `Ripple rendered without console or page errors: ${failures.join(" | ")}`);
-
-  console.log("Ripple render smoke passed: bare and retained-object Shift ownership, weighted inversion, Cursor/Current separation, Observation Address, Context Window and endpoint projection, existing-layer non-collapse, responsive/reduced-motion/high-contrast accessibility, forward Ghost recognition and canonical settlement, Escape restoration, and source replacement.");
+    `Ripple and Panorama rendered without console or page errors: ${failures.join(" | ")}`);
+  console.log("Ripple render smoke passed: Ripple leaves the Timeline unpainted, future and historical positions share one Ghost presentation, reversal is fluid, and Freeze/Stretch cannot move the Timeline.");
 } finally {
   await close();
 }

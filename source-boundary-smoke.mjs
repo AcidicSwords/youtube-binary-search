@@ -196,22 +196,24 @@ assert.equal(byId.get("return-action").disabled, true);
 assert.equal(tail().videoId, "JJJJJJJJJJJ");
 assert.equal(lead().videoId, "JJJJJJJJJJJ");
 
-// Ripple identity and its uncompleted prospects are source-owned too. The
-// boundary cancels its shared Context before installing the next source.
+// Ripple identity and its uncompleted futures are source-owned too. They have
+// no Timeline surface; the boundary cancels shared Context and clears them.
 byId.get("context-duration").value = "5";
 byId.get("context-duration").dispatch("change");
+const timelineChildrenBeforeRipple = byId.get("timeline").children.length;
 byId.get("timeline").dispatch("click", {
   target: byId.get("timeline"),
   clientX: 800,
   shiftKey: true
 });
 await flush(3);
-assert.equal(byId.get("ripple-address-marker").hidden, false);
-assert.equal(descendants(byId.get("traversal-prospect-layer")).length, 2);
+assert.equal(byId.has("ripple-address-marker"), false);
+assert.equal(byId.has("ripple-context-window-fill"), false);
+assert.equal(byId.has("traversal-prospect-layer"), false);
+assert.equal(byId.get("timeline").children.length, timelineChildrenBeforeRipple);
+assert.equal(byId.get("cursor-marker").hidden, true);
 await finishLoad("KKKKKKKKKKK", 45);
 assert.equal(currentText(), "Current 0:45");
-assert.equal(byId.get("ripple-address-marker").hidden, true);
-assert.equal(byId.get("ripple-context-window-fill").hidden, true);
-assert.equal(descendants(byId.get("traversal-prospect-layer")).length, 0);
+assert.equal(byId.get("timeline").children.length, timelineChildrenBeforeRipple);
 
 console.log("Source boundary smoke passed: load generations reject stale identity, and Nudge, Step, Context, Playback, Ripple/prospects, Section/Current/Pin/Range drags, Guide identity and weight relaxation cannot cross sources.");

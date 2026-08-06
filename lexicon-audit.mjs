@@ -139,10 +139,14 @@ export const RETIRED_TERMS = [
   term("latestCursorAtAddress", "latestTracePositionAtAddress", { category: "trace" }),
   term("cursorIsValid", "tracePositionIsValid", { category: "trace" }),
   term("ghostResumeCursor", "ghostContinuation", { category: "trace" }),
-  term("GHOST_INJECTION", "GHOST_RETURN", { category: "trace" }),
-  term("ghost-injection", "ghost-return", { category: "trace" }),
-  term("appendGhostInjection", "appendGhostReturn", { category: "trace" }),
-  term("Ghost Injection", "Ghost Return", { caseInsensitive: true, category: "trace" }),
+  term("GHOST_INJECTION", "Ghost stream position", { category: "trace" }),
+  term("ghost-injection", "ghost stream position", { category: "trace" }),
+  term("appendGhostInjection", "Ghost cursor movement", { category: "trace" }),
+  term("Ghost Injection", "Ghost position", { caseInsensitive: true, category: "trace" }),
+  term("GHOST_RETURN", "Ghost stream position", { category: "trace" }),
+  term("ghost-return", "ghost stream position", { category: "trace" }),
+  term("appendGhostReturn", "Ghost cursor movement", { category: "trace" }),
+  term("Ghost Return", "Ghost position", { caseInsensitive: true, category: "trace" }),
   term("Ghost Current", "Ghost Position", { caseInsensitive: true, category: "trace" }),
 
   // Phase 7 — Chapters
@@ -225,34 +229,26 @@ for (const file of files) {
 }
 
 // Canonical Ripple language must bind to the same product objects everywhere:
-// one transient model, one presentation family, one accessible distinction
-// from Current, and no persistence schema of its own.
+// one transient future model feeding the one Ghost stream, no Timeline
+// projection, and no persistence schema of its own.
 const requiredRippleSurfaces = {
-  "index.html": [
-    /id="ripple-context-window-fill"/,
-    /id="ripple-address-marker"/,
-    /id="traversal-prospect-layer"[^>]*aria-label="Traversal Prospects"/
-  ],
-  "styles.css": [
-    /\.ripple-context-window-fill\b/,
-    /\.ripple-address-marker\b/,
-    /\.traversal-prospect-marker\b/,
-    /@media \(forced-colors: active\)[\s\S]*?\.ripple-context-window-fill/
-  ],
-  "view.js": [
-    /Ripple Observation Address[\s\S]*?Current did not move/,
-    /Ripple \$\{boundary\} Prospect[\s\S]*?future Address[\s\S]*?Current did not move/
-  ],
   "app.js": [
     /rippleObservation/,
     /traversalProspects/,
     /beginRippleObservation/,
-    /cancelActiveRippleObservation/
+    /cancelActiveRippleObservation/,
+    /availableTraversalProspects/,
+    /beginGhostRead\([\s\S]*?futureEntries/
   ],
   "traversal-prospects.js": [
     /TRAVERSAL_PROSPECT_KIND/,
-    /beginTraversalProspectRead/,
-    /moveTraversalProspectRead/
+    /availableTraversalProspects/,
+    /consumeTraversalProspect/
+  ],
+  "traversal-trace.js": [
+    /beginGhostRead/,
+    /futureEntries/,
+    /streamKind:\s*"future"/
   ]
 };
 for (const [name, patterns] of Object.entries(requiredRippleSurfaces)) {
@@ -267,6 +263,19 @@ for (const [name, patterns] of Object.entries(requiredRippleSurfaces)) {
     if (!pattern.test(source)) {
       consistencyFailures.push(`${name} lacks canonical Ripple seam ${pattern}`);
     }
+  }
+}
+
+const forbiddenRipplePresentation = {
+  "index.html": /ripple-context-window-fill|ripple-address-marker|traversal-prospect-layer/,
+  "styles.css": /\.ripple-context-window-fill\b|\.ripple-address-marker\b|\.traversal-prospect-marker\b/,
+  "view.js": /renderRippleProjection|data-traversal-prospect|from "\.\/traversal-prospects\.js"/,
+  "traversal-prospects.js": /beginTraversalProspectRead|moveTraversalProspectRead/
+};
+for (const [name, pattern] of Object.entries(forbiddenRipplePresentation)) {
+  const source = readFileSync(new URL(`./${name}`, import.meta.url), "utf8");
+  if (pattern.test(source)) {
+    consistencyFailures.push(`${name} retains forbidden separate Ripple/Ghost presentation ${pattern}`);
   }
 }
 

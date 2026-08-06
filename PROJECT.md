@@ -100,22 +100,28 @@ There are four temporal orders here, and only three of them are about the work. 
 It is an append-only, source-scoped ledger. A record holds directed units: a **jump** was a movement between two Addresses and only those two were occupied; a **span** was watched continuously and any Address inside it was genuinely seen. Every route that moves the reader writes one — Go, Step, Nudge, a Current drag, voluntary Playback, and an Undo or Redo that puts them somewhere else. Editing the world without moving writes nothing: a rename, a Weight, a new Pin, a Group toggled, an Undo of any of those. Automatic Context and Ripple observation recognize without traversing and write nothing. Programmatic placement never writes, because the player being told where to sit is a consequence of a movement rather than a movement of its own.
 
 **Ghost Traversal** — held `G` plus the wheel — reads while the semantic world
-stands still. Backward reads the Traversal Trace. Forward first reads available
-**Traversal Prospects**, newest first, then a valid historical continuation when
-no prospect is available. The Address the reader began at becomes a fixed
-Anchor. A historical landing produces an ordinary Active Span and one Ghost
-Return. A prospect landing settles through ordinary Go, writes ordinary history
-and Traversal Trace movement, and consumes only that prospect. It restores no
-historical Guide, Weight, Group, Focus, or Range.
+stands still. Backward and forward move through one frozen Traversal Trace
+stream. Ripple Start and End Addresses are appended to its forward side in
+acquisition order; direction never selects a second reader or presentation. The
+Address where the gesture begins becomes a fixed Anchor. Historical settlement
+moves the stream cursor without appending a synthetic traversal action. A
+future landing settles through ordinary Go, writes ordinary history and
+Traversal Trace movement, consumes only that future entry, and therefore becomes
+available on the backward side. Ghost restores no historical Guide, Weight,
+Group, Focus, or Range.
 
-Searching and arriving are different events. The scan is transient — it may cross many moments and reverse direction, and none of that is a path anybody walked. Releasing appends exactly one occurrence: a jump from the live Anchor to the moment re-entered, carrying provenance to both and to the scan as evidence. So repeated recall accumulates the moments returned to, never mirrored copies of the searching.
+Searching and arriving are different events. The scan is transient — it may
+cross many moments and reverse direction, and none of that is a path anybody
+walked. Releasing on history preserves the cursor in the same stream; releasing
+on a future commits only the resulting ordinary movement.
 
 **Ripple** is observation rather than traversal. `Shift+click` on bare Timeline
 ground resolves an observation Address through the same effective projection
 used by ordinary Go, derives one independently Range-clipped Context Window,
 and observes it through the shared Context transport while Current, Active Span,
-semantic history, and Traversal Trace remain unchanged. Successful completion
-leaves distinct Start and End Traversal Prospects. They are transient,
+semantic history, Traversal Trace, and every Timeline layer remain unchanged.
+Successful completion appends Start and End future entries to Ghost's forward
+side without drawing them. They are transient,
 source-scoped futures: Focus can make one unavailable without deleting it, and
 source replacement clears them all.
 

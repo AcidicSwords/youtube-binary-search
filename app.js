@@ -5,17 +5,14 @@ import {
   appendSequenceTraversal,
   appendObservedPassages,
   beginGhostRead,
-  moveGhostRead,
-  appendGhostReturn,
-  tracePositionIsValid
+  moveGhostRead
 } from "./traversal-trace.js";
 import {
   appendRippleProspects,
-  beginTraversalProspectRead,
+  availableTraversalProspects,
   clearTraversalProspects,
   consumeTraversalProspect,
   createTraversalProspects,
-  moveTraversalProspectRead,
   removeRippleProspects
 } from "./traversal-prospects.js";
 import {
@@ -5354,7 +5351,7 @@ elements["current-marker"].addEventListener("pointerdown", beginCurrentDrag);
 // cost nothing -- a reader who taps it, or holds it and changes their mind, has
 // not asked for anything and must not have their playback settled or their
 // history touched. Only a wheel quantum proves the intent.
-function beginGhostGesture({ initialDirection } = {}) {
+function beginGhostGesture() {
   if (!state.videoLoaded || !currentNeighborhood()) return false;
   // Anything still in flight becomes exact first, and is recorded, so the
   // gesture reads a stream that already contains the movement that led here.
@@ -5366,38 +5363,21 @@ function beginGhostGesture({ initialDirection } = {}) {
   const originModel = snapshotModel(model());
   const projection = timelineProjection();
   const stepDistance = effectiveStepDistance(model().stepDistance, activeRange(), projection);
-  // Which stream this gesture reads is decided once, by the direction it opens
-  // with. Forward first reads completed Ripple futures, newest first; without
-  // one it asks what historically followed a re-entered moment. Backward asks
-  // what led to the present re-entry. Reversing later retraces the frozen
-  // cursor already chosen rather than switching sources underneath the reader.
-  const prospectRead = initialDirection === "forward"
-    ? beginTraversalProspectRead(state.traversalProspects, {
-        generation: state.sourceGeneration,
-        range: activeRange(),
-        excludeAddress: anchor,
-        excludeTolerance: EPSILON
-      })
-    : null;
-  const readsProspects = Boolean(prospectRead?.entries.length);
-  const resumable = initialDirection === "forward"
-    && !readsProspects
-    && tracePositionIsValid(state.traversalTrace, state.ghostContinuation, {
-      current: anchor,
-      range: activeRange()
-    });
-  const read = readsProspects
-    ? null
-    : beginGhostRead(state.traversalTrace, {
-        current: anchor,
-        continuationPosition: resumable ? state.ghostContinuation : null,
-        // The boundary is where the stream stands now, so the gesture can never
-        // read the replay it is itself about to append.
-        frozenStreamEnd: state.traversalTrace.records.length,
-        range: activeRange(),
-        projection,
-        stepDistance
-      });
+  // Ghost always freezes one stream. Ripple endpoints are appended to its
+  // forward side; they never select a separate reader or a different gesture.
+  const futureEntries = availableTraversalProspects(state.traversalProspects, {
+    generation: state.sourceGeneration,
+    range: activeRange()
+  });
+  const read = beginGhostRead(state.traversalTrace, {
+    current: anchor,
+    continuationPosition: state.ghostContinuation,
+    frozenStreamEnd: state.traversalTrace.records.length,
+    futureEntries,
+    range: activeRange(),
+    projection,
+    stepDistance
+  });
   state.ghostGesture = {
     anchor,
     candidate: anchor,
@@ -5405,36 +5385,17 @@ function beginGhostGesture({ initialDirection } = {}) {
       ? copy(originModel.activeSpan)
       : null,
     previewNeighborhood: copy(originModel.neighborhood),
-    readKind: readsProspects
-      ? "traversal-prospect"
-      : resumable ? "historical-successor" : "live-occurrence",
-    readId: (
-      readsProspects
-        ? null
-        : resumable
-        ? state.ghostContinuation?.recordId
-        : read?.index >= 0
-          ? read.positions[read.index]?.recordId
-          : null
-    ),
+    readId: read?.index >= 0 ? read.positions[read.index]?.recordId : null,
     frozenTraceRead: read,
-    frozenProspectRead: prospectRead,
-    selectedProspect: null,
     originModel,
-    originHistory: state.session.history,
-    originFuture: state.session.future,
     previewSession: {
       model: snapshotModel(originModel),
       history: state.session.history,
       future: state.session.future
     },
-    anchorPosition: read?.index >= 0 ? read.positions[read.index] : null,
     projection,
     stepDistance,
-    initialDirection,
-    readOrigin: readsProspects
-      ? "traversal-prospect"
-      : resumable ? "historical-successor" : "live-occurrence",
+    readOrigin: "traversal-stream",
     visited: [],
     directionChanges: 0,
     visitedMinimum: anchor,
@@ -5457,9 +5418,8 @@ function handleGhostWheel(event) {
   // Playback, no frozen stream. Arming is free and staying armed is free; only a
   // whole quantum is a request.
   if (!earned) return true;
-  const openingDirection = earned > 0 ? "forward" : "backward";
   if (!state.ghostGesture
-    && !beginGhostGesture({ initialDirection: openingDirection })) return false;
+    && !beginGhostGesture()) return false;
   const gesture = state.ghostGesture;
   // One turn of the wheel is one occurrence, and the surplus is dropped.
   //
@@ -5478,37 +5438,24 @@ function handleGhostWheel(event) {
   let moved = false;
   let blocked = null;
   for (let index = 0; index < Math.abs(count); index += 1) {
-    const readsProspects = gesture.readKind === "traversal-prospect";
-    const candidate = readsProspects
-      ? moveTraversalProspectRead(gesture.frozenProspectRead, userDirection)
-      : moveGhostRead(
-          state.traversalTrace,
-          gesture.frozenTraceRead,
-          userDirection
-        );
+    const candidate = moveGhostRead(
+      state.traversalTrace,
+      gesture.frozenTraceRead,
+      userDirection
+    );
     if (!candidate.changed) {
       blocked = candidate.reason;
       break;
     }
     const previous = gesture.candidate;
-    const result = readsProspects
-      ? goTo({
-          model: snapshotModel(gesture.originModel),
-          history: gesture.originHistory,
-          future: gesture.originFuture
-        }, candidate.address, {
-          operator: "go",
-          label: "Go to Traversal Prospect",
-          projection: gesture.projection
-        })
-      : ghostTraverse(gesture.previewSession, candidate.address, {
-          anchor: gesture.anchor,
-          direction: userDirection,
-          originResolution: gesture.originModel.neighborhood,
-          originResolutionBasis: gesture.originModel.neighborhoodBasis,
-          projection: gesture.projection,
-          amend: true
-        });
+    const result = ghostTraverse(gesture.previewSession, candidate.address, {
+      anchor: gesture.anchor,
+      direction: userDirection,
+      originResolution: gesture.originModel.neighborhood,
+      originResolutionBasis: gesture.originModel.neighborhoodBasis,
+      projection: gesture.projection,
+      amend: true
+    });
     if (!result.changed) {
       blocked = result.reason;
       break;
@@ -5519,18 +5466,11 @@ function handleGhostWheel(event) {
       ? copy(result.session.model.activeSpan)
       : null;
     gesture.previewNeighborhood = copy(result.session.model.neighborhood);
-    if (readsProspects) {
-      gesture.frozenProspectRead = candidate.read;
-      gesture.selectedProspect = candidate.prospect;
-      gesture.readId = candidate.prospect.id;
-    } else {
-      gesture.frozenTraceRead = candidate.read;
-    }
+    gesture.frozenTraceRead = candidate.read;
+    gesture.readId = candidate.cursor.prospect?.id ?? candidate.cursor.recordId;
     gesture.visited.push({
       address: candidate.address,
-      sourcePosition: readsProspects
-        ? { prospectId: candidate.prospect.id, index: candidate.cursor }
-        : candidate.cursor,
+      sourcePosition: candidate.cursor,
       userDirection
     });
     gesture.visitedMinimum = Math.min(gesture.visitedMinimum, candidate.address);
@@ -5571,56 +5511,41 @@ function handleGhostWheel(event) {
     // have turned. Depth alone cannot say how much further there is to go, and
     // a reader who cannot see that has no way to tell a working recall from one
     // that has quietly run out -- which is most of what made this feel broken.
-    if (gesture.readKind === "traversal-prospect") {
-      const boundary = gesture.selectedProspect?.kind === "ripple-start"
-        ? "Start"
-        : "End";
-      const place = gesture.frozenProspectRead.index + 1;
-      const total = gesture.frozenProspectRead.entries.length;
-      setStatus(
-        `Ghost future · Ripple ${boundary} Prospect ${formatTime(gesture.candidate)
-        } · ${place} of ${total} · Current remains ${formatTime(gesture.anchor)}.`
-      );
-    } else {
-      const place = gesture.frozenTraceRead.index + 1;
-      const total = gesture.frozenTraceRead.positions.length;
-      setStatus(
-        `Ghost ${userDirection === "backward" ? "back" : "on"} · ${
-          formatTime(gesture.candidate)
-        } · ${place} of ${total} · anchored at ${formatTime(gesture.anchor)}.`
-      );
-    }
+    const place = gesture.frozenTraceRead.index + 1;
+    const total = gesture.frozenTraceRead.positions.length;
+    setStatus(
+      `Ghost ${userDirection === "backward" ? "back" : "forward"} · ${
+        formatTime(gesture.candidate)
+      } · ${place} of ${total} · anchored at ${formatTime(gesture.anchor)}.`
+    );
     view.render();
   } else if (blocked === "range-blocked") {
     setStatus("Ghost history continues outside the active Range. Unfocus or widen Range to continue.");
   } else if (blocked) {
     // Running out is the common case at the live end, and it is not a failure:
     // say which end was reached and how to leave it.
-    if (gesture.readKind === "traversal-prospect") {
-      setStatus(userDirection === "backward"
-        ? "Ghost is at the newest Traversal Prospect in this frozen scan."
-        : "Ghost reached the last Traversal Prospect in this frozen scan.");
-    } else {
-      setStatus(userDirection === "backward"
-        ? "Ghost is at the beginning of your path; there is nothing earlier to recall."
-        : "Ghost is at the most recent moment of your path; scroll the other way to look back.");
-    }
+    setStatus(userDirection === "backward"
+      ? "Ghost is at the beginning of the Traversal Trace."
+      : "Ghost is at the forward end of the Traversal Trace.");
   }
   return true;
 }
 
-// Releasing writes the recalled path into the live end of the Traversal Trace and commits
-// the whole gesture as one semantic transaction.
+// Release moves the one Traversal Trace position. Historical positions merely
+// move the cursor; a Ripple-contributed forward position settles through
+// canonical Go, enters the backward side as ordinary traversal, and is removed
+// from the pending forward entries.
 function settleGhostGesture() {
   const gesture = state.ghostGesture;
   state.ghostGesture = null;
   state.ghostWheel = null;
   if (!gesture?.changed) return false;
-  if (gesture.readKind === "traversal-prospect") {
-    const prospect = gesture.selectedProspect;
+  const finalVisit = gesture.visited.at(-1) || null;
+  const prospect = finalVisit?.sourcePosition?.prospect || null;
+  if (prospect) {
     const result = goTo(state.session, prospect?.address, {
       operator: "go",
-      label: "Go to Traversal Prospect",
+      label: "Ghost Traverse",
       projection: gesture.projection
     });
     if (!result.changed) {
@@ -5628,10 +5553,9 @@ function settleGhostGesture() {
       view.render();
       return false;
     }
-    const boundary = prospect.kind === "ripple-start" ? "Start" : "End";
     const accepted = accept(result, {
       effect: false,
-      status: `Moved by Go to Ripple ${boundary} Prospect ${formatTime(prospect.address)}.`
+      status: `Ghost moved Current to ${formatTime(prospect.address)}.`
     });
     if (!accepted) {
       locateAddress(gesture.anchor);
@@ -5643,6 +5567,9 @@ function settleGhostGesture() {
       prospect.id
     );
     if (consumed.changed) state.traversalProspects = consumed.state;
+    state.ghostContinuation = Object.freeze({
+      ...state.traversalTrace.latestOccurrence
+    });
     view.render();
     return true;
   }
@@ -5652,30 +5579,9 @@ function settleGhostGesture() {
   const settled = settleGhostSequence(state.session, gesture);
   if (settled.changed) state.session = settled.session;
   state.session = checkpoint(state.session, "Ghost Traverse", gesture.originModel).session;
-  // One landing, not the search that found it. The scan is kept as provenance
-  // so what the reader crossed is still on the record, but it is not a path
-  // anybody walked and must not be offered back as one.
-  const finalVisit = gesture.visited.at(-1) || null;
-  const ghostReturn = appendGhostReturn(state.traversalTrace, {
-    anchor: gesture.anchor,
-    anchorPosition: gesture.anchorPosition,
-    landing: gesture.candidate,
-    recalledPosition: finalVisit?.sourcePosition || null,
-    scan: {
-      candidateCount: gesture.visited.length,
-      visitedMinimum: gesture.visitedMinimum,
-      visitedMaximum: gesture.visitedMaximum,
-      directionChanges: gesture.directionChanges
-    },
-    createdAt: Date.now()
-  });
-  if (ghostReturn.changed) {
-    state.traversalTrace = ghostReturn.traversalTrace;
-    // The historical occurrence just re-entered, so an immediately forward
-    // gesture can resume its original successors. Release may sever the Working
-    // Interval afterwards without disturbing it.
-    state.ghostContinuation = ghostReturn.continuationPosition;
-  }
+  state.ghostContinuation = finalVisit?.sourcePosition
+    ? Object.freeze({ ...finalVisit.sourcePosition })
+    : null;
   syncIntervalPinSelection();
   view.renderGuide();
   view.render();
@@ -5701,7 +5607,7 @@ function cancelGhostGesture({ restore = true } = {}) {
   return true;
 }
 
-// One wheel, two readers. Ghost takes precedence whenever G is held; otherwise
+// One wheel, one Ghost stream. Ghost takes precedence whenever G is held; otherwise
 // the wheel belongs to Nudge exactly as before.
 function handleReaderWheel(event) {
   if (state.ghostKeyHeld && handleGhostWheel(event)) return;

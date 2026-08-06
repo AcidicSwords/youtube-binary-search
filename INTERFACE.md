@@ -130,9 +130,7 @@ The main layers remain distinct without relying on colour alone:
 - Active Span is the surviving directional relation;
 - Current is the semantic Address and carries its own label;
 - Cursor appears only when physical observation has left Current;
-- Ripple Observation Address is a teal outlined channel, never Current;
-- Ripple Context Window is a dashed observation fill;
-- Ripple Start and End Prospects are distinct future markers;
+- Ripple draws no Address, Context Window, or future marker on the Timeline;
 - Panorama Window is the frozen Panorama relation;
 - Pins and Section wires are retained topology;
 - operator and direct-manipulation previews are transient.
@@ -163,8 +161,8 @@ one another.
 - Escape resolves one tier per press: active direct drag, Ghost gesture, active
   Ripple, ordinary Context or Playback, then menu/dialog/panel.
 - Holding `G` and scrolling is Ghost Traversal. Backward reads the reader's
-  Traversal Trace; forward reads newest available Ripple prospects before a
-  valid historical continuation. Holding the key alone does nothing at all.
+  prior positions and forward reads later positions, including Ripple futures,
+  in one stream. Holding the key alone does nothing at all.
 
 ### Ghost Traversal
 
@@ -172,16 +170,18 @@ Ghost is drawn with what is already there. The Address the reader began at
 becomes the fixed Anchor and reuses the departure marker; the moving Address is
 explicitly a Ghost Candidate while accepted Current remains at the Anchor. Its
 preview relation is an Active Span. Historical recall marks that relation as
-recalled; prospect preview uses ordinary Go presentation.
+recalled, and future positions use that exact same Ghost presentation.
 
 The recalled path itself is never drawn. It exists operationally and becomes
 perceptible by scrolling through it. Drawing every occurrence would confuse
 source order with encounter order, and would turn an invisible recognition
 operator into a history editor.
 
-Scanning and landing are different events. Historical release records one Ghost
-Return. Prospect release uses ordinary Go and consumes that exact future only
-after success. Escape changes no semantic state and consumes nothing.
+Scanning and landing are different events. Historical release preserves the
+cursor in the same stream and appends no traversal action. Future release uses
+ordinary Go, consumes that exact future only after success, and makes the moved
+Current available on the backward side. Escape changes no semantic state and
+consumes nothing.
 
 With automatic Context on, the recall is heard as well as seen: each candidate
 plays, because a second of motion and sound is what actually places a moment

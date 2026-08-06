@@ -72,7 +72,7 @@ for (const retired of [
 ]) check(!existsSync(new URL(`./${retired}`, import.meta.url)), `Retired artifact remains: ${retired}.`);
 
 check(pkg.name === "video-cartography", "package.json retains the canonical package name.");
-check(pkg.version === "9.1.0", "Completion release is package version 9.1.0.");
+check(pkg.version === "9.1.1", "Ripple/Ghost coherence release is package version 9.1.1.");
 check(pkg.private === true && pkg.type === "module", "The static private ES-module package boundary is explicit.");
 check(pkg.scripts?.verify === "npm run check && npm run test:browser",
   "verify composes the DOM-free and Chromium gates.");
@@ -88,18 +88,22 @@ has(pkg.scripts?.test || "", /ripple-random-tests\.mjs/,
 has(pkg.scripts?.test || "", /traversal-prospects-tests\.mjs/,
   "The pure gate includes the Traversal Prospect owner proof.");
 has(pkg.scripts?.["test:browser"] || "", /ripple-render-smoke\.mjs/,
-  "The browser gate includes Ripple presentation and interaction proof.");
+  "The browser gate proves Ripple invisibility, shared Ghost presentation, and layout stability.");
 has(pkg.scripts?.check || "", /npm run audit/, "The validation gauges run in check.");
 
 // Ripple adds one transient future-state object, not a parallel application
 // architecture. The pure owner stays DOM- and persistence-free; app.js owns its
-// lifecycle and view.js owns its projection.
+// lifecycle, and no presentation layer draws it onto the Timeline.
 check(existsSync(new URL("./traversal-prospects.js", import.meta.url)),
   "The Traversal Prospect owner exists.");
 has(app, /from "\.\/traversal-prospects\.js"/,
   "The application lifecycle reaches the Traversal Prospect owner.");
-has(view, /from "\.\/traversal-prospects\.js"/,
-  "The presentation layer reaches Traversal Prospect read helpers.");
+lacks(view, /from "\.\/traversal-prospects\.js"|renderRippleProjection|data-traversal-prospect/,
+  "The presentation layer has no Ripple future reader or projection.");
+lacks(html, /ripple-address-marker|ripple-context-window-fill|traversal-prospect-layer/,
+  "Ripple has no dedicated Timeline DOM.");
+lacks(styles, /\.ripple-address-marker|\.ripple-context-window-fill|\.traversal-prospect-marker/,
+  "Ripple has no dedicated Timeline CSS.");
 lacks(prospects, /\b(?:document|window|localStorage|sessionStorage|history)\b|from "\.\/(?:app|view|session|guide|transport)\.js"/,
   "The Traversal Prospect owner has no DOM, persistence, or higher-layer dependency.");
 has(app, /traversalProspects:[\s\S]*?rippleObservation:\s*null/,

@@ -26,8 +26,7 @@ import {
   appendAtomicTraversal,
   appendObservedPassages,
   beginGhostRead,
-  moveGhostRead,
-  appendGhostReturn
+  moveGhostRead
 } from "./traversal-trace.js";
 
 const DURATION = 300;
@@ -291,7 +290,7 @@ function worldFingerprint(model) {
 }
 
 // ---------------------------------------------------------------------------
-// The whole shape: recall, inject, sever, replay, retain
+// The whole shape: recall, reverse, sever, replay, retain
 // ---------------------------------------------------------------------------
 {
   // The acceptance scenario in miniature. The reader traverses forward, recalls
@@ -336,35 +335,22 @@ function worldFingerprint(model) {
   assert.equal(gesturing.model.activeSpan.start, A);
   assert.equal(gesturing.model.activeSpan.end, D, "The Active Span reaches back to the Anchor.");
 
-  // Session settlement and the ledger are different consequences of one gesture.
-  // The Session retains the Anchor relation as a Active Span; the Traversal Trace
-  // records only where the reader landed.
-  const replay = appendGhostReturn(traversalTrace, {
-    anchor: D,
-    anchorPosition: { recordId: traversalTrace.records.at(-1).id, unitIndex: 0, address: D },
-    landing: A,
-    recalledPosition: visited.at(-1).sourcePosition,
-    scan: { candidateCount: visited.length, visitedMinimum: A, visitedMaximum: D },
-    createdAt: 1
-  });
-  traversalTrace = replay.traversalTrace;
-  assert.equal(replay.record.units.length, 1,
-    "The ledger keeps one landing, not the scan that found it,");
+  // Ghost moves the position in the existing stream. It does not append a
+  // special kind of traversal record.
   assert.equal(gesturing.model.activeSpan.start, A);
   assert.equal(gesturing.model.activeSpan.end, D,
     "while the Session keeps the whole Anchor relation.");
-  assert.equal(traversalTrace.records.length, streamBefore + 1);
-  assert.equal(traversalTrace.records.slice(0, streamBefore).length, streamBefore,
-    "Everything that already happened is still there.");
+  assert.equal(traversalTrace.records.length, streamBefore,
+    "Ghost navigation does not manufacture a second kind of Trace occurrence.");
 
-  // Sever the present. Current stays; the resume cursor is untouched by this.
+  // Sever the present. Current stays; the one Trace position is untouched.
   const severed = { ...gesturing, model: { ...gesturing.model, activeSpan: null } };
   assert.equal(severed.model.neighborhood.C, A);
 
-  // Replay A's successors, now knowing D.
+  // Move forward from the same A position, then back again.
   let resumed = beginGhostRead(traversalTrace, {
     current: A,
-    continuationPosition: replay.continuationPosition,
+    continuationPosition: visited.at(-1).sourcePosition,
     frozenStreamEnd: traversalTrace.records.length,
     range: RANGE,
     projection: projectionFor(session),
@@ -372,7 +358,10 @@ function worldFingerprint(model) {
   });
   const forward = moveGhostRead(traversalTrace, resumed, "forward");
   assert.equal(forward.address, B,
-    "Ghosting forward follows what originally came after A, not the replay just written.");
+    "Ghosting forward follows the same stream position.");
+  const back = moveGhostRead(traversalTrace, forward.read, "backward");
+  assert.equal(back.address, A,
+    "and reversing returns through that exact stream without switching Ghost modes.");
 
   const anchored = ghostTraverse(severed, forward.address, {
     anchor: A,

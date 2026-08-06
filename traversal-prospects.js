@@ -1,6 +1,5 @@
-// Transient future Addresses. Traversal Prospects are neither Session state nor
-// Traversal Trace evidence; they are source-scoped opportunities Ghost may read
-// forward and canonical Go may later consume.
+// Transient future Addresses appended to the forward side of Ghost's one
+// Traversal Trace stream. They are not a second Ghost reader or a visual layer.
 
 export const TRAVERSAL_PROSPECT_KIND = Object.freeze({
   RIPPLE_START: "ripple-start",
@@ -71,57 +70,11 @@ export function availableTraversalProspects(state, {
   const low = Number(range?.start);
   const high = Number(range?.end);
   if (!Number.isFinite(low) || !Number.isFinite(high) || high < low) return [];
-  return [...state.entries]
-    .reverse()
-    .filter(entry =>
+  return state.entries.filter(entry =>
       entry.generation === Number(generation)
       && entry.address >= low
       && entry.address <= high
     );
-}
-
-function createProspectRead(entries, index = -1) {
-  return Object.freeze({
-    entries: Object.freeze([...entries]),
-    index
-  });
-}
-
-// A Ghost gesture freezes one prospect stream when it opens. Later Ripple
-// batches, Focus changes, or consumption cannot rewrite what that held gesture
-// is already reading.
-export function beginTraversalProspectRead(state, options = {}) {
-  const excluded = Number(options.excludeAddress);
-  const exclusionTolerance = Math.max(0, Number(options.excludeTolerance) || 0);
-  const entries = availableTraversalProspects(state, options)
-    .filter(entry =>
-      !Number.isFinite(excluded)
-      || Math.abs(entry.address - excluded) > exclusionTolerance
-    );
-  return createProspectRead(entries);
-}
-
-export function moveTraversalProspectRead(read, direction) {
-  if (!read?.entries || !["forward", "backward"].includes(direction)) {
-    return { changed: false, reason: "invalid-read", read };
-  }
-  const nextIndex = read.index + (direction === "forward" ? 1 : -1);
-  if (nextIndex < 0 || nextIndex >= read.entries.length) {
-    return {
-      changed: false,
-      reason: direction === "forward" ? "prospect-end" : "prospect-start",
-      read
-    };
-  }
-  const nextRead = createProspectRead(read.entries, nextIndex);
-  const prospect = nextRead.entries[nextIndex];
-  return {
-    changed: true,
-    read: nextRead,
-    prospect,
-    address: prospect.address,
-    cursor: nextIndex
-  };
 }
 
 export function consumeTraversalProspect(state, id) {

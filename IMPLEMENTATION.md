@@ -1,6 +1,6 @@
 # Video Cartography — Canonical Implementation
 
-This document describes the release behavior implemented by version 9.1.0. It
+This document describes the release behavior implemented by version 9.1.1. It
 is a module and ownership map, not a history of earlier designs.
 
 ## Ownership
@@ -19,8 +19,8 @@ is a module and ownership map, not a history of earlier designs.
 | `panorama-geometry.js` | Pure Panorama offsets, cycling phases, bounds, and rate pairs |
 | `panorama.js` | Tail/Lead players, placement, Panorama transitions, Cycle runtime, Freeze/Stretch, and stale-event rejection |
 | `chapters.js` | Parsing offered chapter Addresses into transient candidate extents |
-| `traversal-trace.js` | The append-only encounter ledger: traversal records, the frozen readable stream, read cursors, and Ghost Return |
-| `traversal-prospects.js` | Immutable, transient Ripple endpoint identity, newest-first availability, frozen reads, exact consumption, batch removal, and clearing |
+| `traversal-trace.js` | The append-only encounter ledger and one frozen bidirectional stream with appended Ripple futures |
+| `traversal-prospects.js` | Immutable, transient Ripple endpoint identity, append-order availability, exact consumption, batch removal, and clearing |
 | `view.js` | DOM projection, timeline atmosphere and sourceGridLines, Guide rows, operator labels, and accessible state |
 | `app.js` | Composition, interaction acquisition, source generations, persistence, transient ownership, and adapter effects |
 
@@ -257,7 +257,7 @@ pointer restores the origin.
 one append-only ledger per source.
 
 ```js
-{ kind: "atomic" | "sequence" | "continuous" | "ghost-return",
+{ kind: "atomic" | "sequence" | "continuous",
   cause, createdAt,
   units: [{ kind: "jump" | "span", from, to }] }
 ```
@@ -272,22 +272,18 @@ of the stream without every caller having to test for it. Undo and Redo write
 when they move the reader and not otherwise: semantic history and the Traversal Trace are
 different orders, and traversing one is a route through the other.
 
-A gesture resolves one readable source once, at the moment it begins: backward
-uses the frozen Traversal Trace; forward uses a newest-first frozen Traversal
-Prospect read and falls back to valid historical continuation only when no
-prospect exists. It also freezes active Range, projection, and effective Step
-Distance. Reversing retraces that source rather than switching readers.
+A gesture resolves one readable stream once, at the moment it begins. Historical
+positions retain encounter order and available Ripple Start/End entries are
+appended to the forward side in acquisition order. The gesture also freezes
+active Range, projection, and effective Step Distance. Reversing moves through
+the same stream instead of switching readers or presentations.
 
 `session.js` supplies `ghostTraverse`, which amends one captured origin per
 notch, and `settleGhostSequence`, which commits the gesture as one transaction.
-Releasing a historical Candidate appends exactly one Ghost Return — Anchor to
-landing — with the scan kept as provenance rather than as traversal. A
-continuation lets an
-immediately-forward gesture replay the historical successors of the moment
-re-entered; it is refused once the reader is standing anywhere else, once its
-record or unit is gone, once its Address is not one the unit actually occupied,
-and once the active Range excludes it. Any route that moves the reader also
-withdraws it outright, so stepping away and back does not revive it.
+Releasing a historical Candidate preserves that position as the continuation
+cursor and appends no synthetic traversal record. The next gesture may move
+backward or forward from it in the same stream. Any ordinary route that moves
+the reader clears the cursor and establishes the newest real Trace position.
 
 Where automatic Context is enabled, each Ghost Candidate retargets one Context
 Window rather than opening a new one. Recognition is observation rather than
@@ -304,9 +300,10 @@ and phase. Repeated acquisition retargets one playing Context and removes only
 the superseded incomplete batch.
 
 `traversal-prospects.js` appends Start then End with unique IDs. Availability
-reverses insertion order and filters generation and active Range without
-deletion. A Ghost gesture freezes the returned entries. During scan, canonical
-`goTo()` runs against a copied origin only for Ghost Candidate presentation.
+preserves insertion order and filters generation and active Range without
+deletion. A Ghost gesture appends the returned entries to its one frozen stream.
+During scan, `ghostTraverse()` uses the same Ghost Candidate presentation for
+historical and future positions.
 On release, `goTo()` runs again against accepted Session; successful `accept()`
 creates one ordinary Go history/Active Span/Trace consequence, then
 `consumeTraversalProspect()` removes the exact selected ID. Cancellation or
@@ -314,8 +311,9 @@ refusal restores Current and consumes nothing.
 
 Ripple completion clears active identity but keeps prospects. Escape settles
 the shared Context, removes the incomplete batch, and restores Current-centred
-media/Panorama. Focus only filters availability. Source replacement cancels
-active Ripple and clears the complete source-scoped collection.
+media/Panorama. Ripple never adds Timeline DOM or paint. Focus only filters
+availability. Source replacement cancels active Ripple and clears the complete
+source-scoped collection.
 
 ## Playback and media authority
 

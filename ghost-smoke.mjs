@@ -396,15 +396,14 @@ try {
   const forwardStatus = await text("#status");
   await page.keyboard.up("g");
   await settle(300);
-  assert.match(forwardStatus, /most recent moment|Ghost on/,
+  assert.match(forwardStatus, /forward end of the Traversal Trace|Ghost on/,
     "At the live end, Ghosting forward reports the boundary instead of doing nothing.");
 
   // =========================================================================
-  // 9. A landing is recorded; the search that found it is not
+  // 9. A landing resumes the same stream; the search that found it is not
   // =========================================================================
-  // Walk deliberately, recall back two moments, release. The stream must gain
-  // the moment re-entered and nothing else -- then Ghosting backward from there
-  // follows what led to the re-entry, which is the Anchor, not the scan.
+  // Walk deliberately, recall back two moments, release. The stream remains the
+  // same path; a fresh gesture resumes at the landed occurrence.
   await page.evaluate(() => {
     const toggle = document.getElementById("guide-toggle");
     if (toggle.getAttribute("aria-expanded") === "true") toggle.click();
@@ -435,8 +434,8 @@ try {
     "Two detents back from the fourth stop lands on the second.");
   assert.equal(await currentAddress(), landedAt, "and releasing keeps it.");
 
-  // Backward from the injected landing follows the live stream: the Anchor is
-  // what led here, not the moment scanned through on the way.
+  // Backward from the landing continues to the prior occurrence in that same
+  // stream. There is no injected return action or second traversal type.
   await page.evaluate(() => document.activeElement?.blur());
   await page.keyboard.down("g");
   await page.mouse.wheel(0, 100);
@@ -444,10 +443,10 @@ try {
   const afterLanding = await currentAddress();
   await page.keyboard.up("g");
   await settle(320);
-  assert.equal(afterLanding, anchorAt,
-    "Backward from a re-entered moment asks what led to it, so the Anchor comes first.");
-  assert.notEqual(afterLanding, deliberate[2],
-    "and never the moment the scan merely passed through.");
+  assert.equal(afterLanding, deliberate[0],
+    "Backward from a re-entered moment continues through the same traversal stream.");
+  assert.notEqual(afterLanding, anchorAt,
+    "and does not manufacture a separate return edge to the live Anchor.");
 
   // =========================================================================
   // 10. Sub-threshold input costs nothing
@@ -575,8 +574,8 @@ try {
   await page.keyboard.press("Escape");
   await page.keyboard.up("g");
   await settle(340);
-  assert.equal(watchedTotal - heldTotal, 1,
-    "and automatic Context adds zero Trace units beyond the one Ghost Return.");
+  assert.equal(watchedTotal - heldTotal, 0,
+    "and neither the Ghost scan nor automatic Context writes onto the Traversal Trace.");
 
   // Back off, so nothing downstream inherits a playing window.
   await page.evaluate(() => {
@@ -654,12 +653,12 @@ try {
   await page.keyboard.press("Escape");
   await page.keyboard.up("g");
   await settle(340);
-  // Two gestures, two landings, two new moments: the backward scan's four
-  // candidates and the forward scan's two are search and cost nothing.
-  assert.equal(afterForward - beforeForward, 2,
-    "Two settled gestures add exactly two moments, whatever they scanned through.");
-  assert.equal(backFromLanding, walked[0],
-    "and backward from the landing follows what led there, which is the Anchor.");
+  // Both gestures only move the cursor within the one stream. Their scans and
+  // historical settlements add no new movement records.
+  assert.equal(afterForward - beforeForward, 0,
+    "Settled historical Ghost gestures do not manufacture traversal moments.");
+  assert.equal(backFromLanding, walked[1],
+    "and backward from the landing reaches the preceding position in that stream.");
 
   // =========================================================================
   // 13. An ordinary Step ends the historical pattern
@@ -719,7 +718,7 @@ try {
   // looks like from outside. A retained cursor would still be replaying the old
   // moment's successors, from a place the reader has since left and returned to
   // by a route of their own.
-  assert.match(afterStepForward, /most recent moment/,
+  assert.match(afterStepForward, /forward end of the Traversal Trace/,
     "so the historical successors it was offering are no longer on the table.");
   assert.ok(historicalNext && historicalNext !== reEntered,
     "The offer really existed before the Step: forward had somewhere to go.");
@@ -853,7 +852,7 @@ try {
   // 16. Nothing logged an error along the way
   // =========================================================================
   assert.deepEqual(failures, [], `Console/page errors: ${failures.join(" | ")}`);
-  console.log("Ghost smoke passed: the Guide is on I while Tab stays the browser's and G no longer touches either; holding G moves nothing, writes no history and draws no Anchor; a wheel notch recalls an earlier moment behind a fixed Anchor and an ordinary Active Span; releasing writes one transaction that one Undo reverses; Escape cancels exactly; Ghost owns the wheel only while G is held; one detent recalls exactly one moment; the recall says where in the path it is and what it is anchored to; Ghost interleaves with ordinary operators without ever landing where the reader has not been; releasing records the moment re-entered rather than the search that found it, so backward from it asks what led there; input below the threshold costs nothing at all; and with Context on the recall plays where it lands through one retargeted window while automatic recognition adds no Trace evidence; a forward scan settled short of the live end lands exactly once; stepping out and back onto a re-entered moment does not revive the offer the Step withdrew; dragging Current records one movement rather than the ground it crossed; and an Undo that moves the reader is itself a route they took, while one that moves nobody writes nothing.");
+  console.log("Ghost smoke passed: the Guide is on I while Tab stays the browser's and G no longer touches either; holding G moves nothing, writes no history and draws no Anchor; a wheel notch recalls an earlier moment behind a fixed Anchor and an ordinary Active Span; releasing writes one transaction that one Undo reverses; Escape cancels exactly; Ghost owns the wheel only while G is held; one detent recalls exactly one moment; the recall says where in the path it is and what it is anchored to; Ghost interleaves with ordinary operators without ever landing where the reader has not been; historical settlement preserves one stream cursor without adding a traversal action; input below the threshold costs nothing at all; and with Context on the recall plays where it lands through one retargeted window while automatic recognition adds no Trace evidence; a forward scan settled short of the live end stays in the same stream; stepping out and back onto a re-entered moment does not revive the offer the Step withdrew; dragging Current records one movement rather than the ground it crossed; and an Undo that moves the reader is itself a route they took, while one that moves nobody writes nothing.");
 } finally {
   await close();
 }
