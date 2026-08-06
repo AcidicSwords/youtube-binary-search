@@ -80,10 +80,10 @@ function buildGroups() {
 // presentation state.
 {
   const { guide, terrain } = buildGroups();
-  guide.visibleGroupId = null;
+  guide.shownGroupId = null;
   const removed = deleteGroup(guide, terrain.id);
   assert.equal(removed.allowed, true);
-  assert.equal(guide.visibleGroupId, null);
+  assert.equal(guide.shownGroupId, null);
 }
 
 // The last Group and identity-collapsing removals are refused by the same plan

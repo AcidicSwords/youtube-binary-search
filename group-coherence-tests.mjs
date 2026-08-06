@@ -16,10 +16,10 @@ import {
   setGroupState,
   deleteGroup,
   assignSectionGroup,
-  groupIsVisible,
-  visibleGroup,
+  groupIsShown,
+  shownGroup,
   sectionIsVisible,
-  sectionIsActive,
+  sectionWeightIsUsed,
   orderedPins,
   partitionGuidePins,
   sortedSections,
@@ -67,7 +67,7 @@ function build() {
 }
 
 const visibleIds = guide => guide.groups
-  .filter(group => groupIsVisible(guide, group))
+  .filter(group => groupIsShown(guide, group))
   .map(group => group.id);
 
 // --- 1. At most one visible Group ---------------------------------------------
@@ -82,21 +82,21 @@ const visibleIds = guide => guide.groups
 
   // The representation itself cannot say otherwise: there is one field, and it
   // holds one id.
-  assert.equal(typeof guide.visibleGroupId, "string");
+  assert.equal(typeof guide.shownGroupId, "string");
   assert.equal(
     guide.groups.some(group => "visible" in group),
     false,
     "No Group carries a visibility of its own to disagree with the Guide."
   );
-  assert.equal(visibleGroup(guide).id, guide.visibleGroupId);
+  assert.equal(shownGroup(guide).id, guide.shownGroupId);
 }
 
 // --- 2. Deterministic default visible Group -----------------------------------
 {
   const fresh = createGuide("fresh");
-  assert.equal(fresh.visibleGroupId, DEFAULT_GROUP_ID,
+  assert.equal(fresh.shownGroupId, DEFAULT_GROUP_ID,
     "A Guide with one Group draws it.");
-  assert.equal(visibleGroup(fresh).id, DEFAULT_GROUP_ID);
+  assert.equal(shownGroup(fresh).id, DEFAULT_GROUP_ID);
 
   // At most one, not exactly one. Hiding the only layer draws nothing, which is
   // how you look at the map undeformed and unmarked -- a state that was
@@ -105,8 +105,8 @@ const visibleIds = guide => guide.groups
   setGroupState(fresh, DEFAULT_GROUP_ID, { visible: false });
   assert.deepEqual(visibleIds(fresh), [],
     "The only Group can be hidden, and then nothing is drawn.");
-  assert.equal(fresh.visibleGroupId, null);
-  assert.equal(visibleGroup(fresh), null);
+  assert.equal(fresh.shownGroupId, null);
+  assert.equal(shownGroup(fresh), null);
 
   setGroupState(fresh, DEFAULT_GROUP_ID, { visible: true });
   assert.deepEqual(visibleIds(fresh), [DEFAULT_GROUP_ID],
@@ -150,7 +150,7 @@ const visibleIds = guide => guide.groups
     "Hiding a Group changes what is drawn, never what the projection computes.");
   assert.equal(sectionIsVisible(guide, guide.sections.find(s => s.groupId === terrain.id)), false,
     "The hidden layer supplies no Section bar,");
-  assert.equal(sectionIsActive(guide, guide.sections.find(s => s.groupId === terrain.id)), true,
+  assert.equal(sectionWeightIsUsed(guide, guide.sections.find(s => s.groupId === terrain.id)), true,
     "while remaining part of the density product. That is a baked layer.");
 
   setGroupState(guide, terrain.id, { active: false });
@@ -165,7 +165,7 @@ const visibleIds = guide => guide.groups
     "The Guide's order states the relation it renders.");
   setGroupState(guide, DEFAULT_GROUP_ID, { visible: true });
   assert.equal(guide.groups[0].id, DEFAULT_GROUP_ID);
-  assert.equal(guide.groups[0].id, guide.visibleGroupId,
+  assert.equal(guide.groups[0].id, guide.shownGroupId,
     "so order and identity can never disagree.");
 }
 
@@ -244,11 +244,11 @@ const visibleIds = guide => guide.groups
 // --- 10. Deleting the visible Group promotes a deterministic fallback ---------
 {
   const { guide, terrain, mapSection } = build();
-  assert.equal(guide.visibleGroupId, terrain.id);
+  assert.equal(guide.shownGroupId, terrain.id);
   const sectionsBefore = sortedSections(guide).length;
 
   assert.equal(deleteGroup(guide, terrain.id).allowed, true);
-  assert.equal(guide.visibleGroupId, DEFAULT_GROUP_ID,
+  assert.equal(guide.shownGroupId, DEFAULT_GROUP_ID,
     "Removing the drawn layer promotes Map rather than leaving none.");
   assert.deepEqual(visibleIds(guide), [DEFAULT_GROUP_ID]);
   assert.equal(guide.groups[0].id, DEFAULT_GROUP_ID);
@@ -267,9 +267,9 @@ const visibleIds = guide => guide.groups
   const { guide, terrain } = build();
   const spare = createGroup(guide, "Spare");
   setGroupState(guide, terrain.id, { visible: true });
-  assert.equal(guide.visibleGroupId, terrain.id);
+  assert.equal(guide.shownGroupId, terrain.id);
   assert.equal(deleteGroup(guide, spare.id).allowed, true);
-  assert.equal(guide.visibleGroupId, terrain.id,
+  assert.equal(guide.shownGroupId, terrain.id,
     "Removing an undrawn layer does not move the Timeline to another one.");
 }
 
@@ -282,7 +282,7 @@ const visibleIds = guide => guide.groups
   assignSectionGroup(guide, mapSection.id, terrain.id);
   assert.equal(sectionIsVisible(guide, mapSection), false,
     "A Section follows the layer it belongs to.");
-  assert.equal(guide.visibleGroupId, DEFAULT_GROUP_ID,
+  assert.equal(guide.shownGroupId, DEFAULT_GROUP_ID,
     "and moving it does not change which layer is drawn.");
 }
 
@@ -318,13 +318,13 @@ const visibleIds = guide => guide.groups
 
   const migrated = normalizeGuide(JSON.parse(JSON.stringify(legacy)), "legacy");
 
-  assert.equal(migrated.version, 9, "The schema is v9.");
-  assert.equal(migrated.visibleGroupId, "group-terrain",
+  assert.equal(migrated.version, 10, "The schema is v10.");
+  assert.equal(migrated.shownGroupId, "group-terrain",
     "The Group v8 marked visible is the Group v9 names.");
   assert.equal(migrated.groups[0].id, "group-terrain",
     "and it is rendered first.");
   assert.equal(
-    migrated.groups.filter(group => groupIsVisible(migrated, group)).length,
+    migrated.groups.filter(group => groupIsShown(migrated, group)).length,
     1
   );
 
@@ -366,7 +366,7 @@ const visibleIds = guide => guide.groups
 
   // Migration is idempotent: reading a v9 Guide again changes nothing.
   const again = normalizeGuide(JSON.parse(JSON.stringify(migrated)), "legacy");
-  assert.equal(again.visibleGroupId, migrated.visibleGroupId);
+  assert.equal(again.shownGroupId, migrated.shownGroupId);
   assert.deepEqual(
     again.groups.map(group => [group.id, group.active, group.label]),
     migrated.groups.map(group => [group.id, group.active, group.label])
@@ -375,6 +375,51 @@ const visibleIds = guide => guide.groups
     again.sections.map(entry => [entry.id, entry.groupId, entry.weight]),
     migrated.sections.map(entry => [entry.id, entry.groupId, entry.weight])
   );
+}
+
+// --- 12b. v9 to v10: the drawn Group is read from the old visibleGroupId key --
+// v9 named the drawn Group `visibleGroupId` on the Guide; v10 renames it
+// `shownGroupId`. A v9 save must still open on the Group it drew, and an
+// explicit "draw nothing" must still survive the round trip.
+{
+  const v9 = {
+    version: 9,
+    videoId: "v9",
+    updatedAt: 10,
+    visibleGroupId: "group-terrain",
+    groups: [
+      { id: DEFAULT_GROUP_ID, label: "Map", active: true, createdAt: 1, updatedAt: 1 },
+      { id: "group-terrain", label: "Terrain", active: false, createdAt: 2, updatedAt: 2 }
+    ],
+    pins: [
+      { id: "pin-a", t: 20, label: "A", kind: PIN_KIND.ENDPOINT, createdAt: 4, updatedAt: 4 },
+      { id: "pin-b", t: 60, label: "B", kind: PIN_KIND.ENDPOINT, createdAt: 5, updatedAt: 5 }
+    ],
+    sections: [
+      { id: "sec-1", startPinId: "pin-a", endPinId: "pin-b", label: "Argument", weight: 2, groupId: "group-terrain", createdAt: 7, updatedAt: 7 }
+    ]
+  };
+
+  const migrated = normalizeGuide(JSON.parse(JSON.stringify(v9)), "v9");
+  assert.equal(migrated.version, 10, "A v9 Guide upgrades to v10.");
+  assert.equal(migrated.shownGroupId, "group-terrain",
+    "The drawn Group is read from the v9 visibleGroupId key.");
+  assert.equal(migrated.groups[0].id, "group-terrain", "and rendered first.");
+  assert.deepEqual(
+    Object.fromEntries(migrated.groups.map(group => [group.id, group.active])),
+    { [DEFAULT_GROUP_ID]: true, "group-terrain": false },
+    "Activity crosses unchanged.");
+  assert.equal(migrated.sections.find(entry => entry.id === "sec-1").weight, 2,
+    "and Weight crosses unchanged.");
+
+  // "Draw nothing" is a choice, written as a null id; it survives under either
+  // key name.
+  const drawnNothing = normalizeGuide(
+    JSON.parse(JSON.stringify({ ...v9, visibleGroupId: null })),
+    "v9"
+  );
+  assert.equal(drawnNothing.shownGroupId, null,
+    "A v9 Guide that drew nothing still draws nothing after upgrade.");
 }
 
 // --- 13. Deformation is unchanged by where visibility is recorded -------------
@@ -512,7 +557,7 @@ const visibleIds = guide => guide.groups
   // Guide navigation to the hidden Section moves Current and does nothing else.
   const before = {
     drawnPins: timelinePins().length,
-    visibleGroup: inSections("groupToggle")
+    shownGroup: inSections("groupToggle")
       .filter(node => node.dataset.groupState === "visible")
       .map(node => `${node.dataset.groupToggle}:${node.checked}`)
       .join(","),
@@ -534,7 +579,7 @@ const visibleIds = guide => guide.groups
       .filter(node => node.dataset.groupState === "visible")
       .map(node => `${node.dataset.groupToggle}:${node.checked}`)
       .join(","),
-    before.visibleGroup,
+    before.shownGroup,
     "without switching the visible Group,"
   );
   assert.equal(
@@ -547,4 +592,4 @@ const visibleIds = guide => guide.groups
   assert.equal(byId.get("pins-list-count").textContent, before.pins);
 }
 
-console.log("Group coherence tests passed: one nullable visible-Group identity, deterministic default and fallback, independent layer activity, hidden-but-active deformation, standalone and shared Pin visibility, complete Guide partition, non-destructive Group removal, and exact v8-to-v9 identity migration.");
+console.log("Group coherence tests passed: one nullable visible-Group identity, deterministic default and fallback, independent layer activity, hidden-but-active deformation, standalone and shared Pin visibility, complete Guide partition, non-destructive Group removal, and v8 and v9 saves upgrading to v10 with the drawn Group and Weights intact.");

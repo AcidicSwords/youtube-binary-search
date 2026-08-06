@@ -507,7 +507,7 @@ has(appCode, /No saved Guide|no saved Guide|No Guide was saved|unreadable|damage
   }, "Group deletion exposes its exact shared plan and real heir.");
   setGroupState(guide, other.id, { visible: false, active: true });
   const hiddenActive = createTimelineProjection({ duration: 5, guide });
-  check(guide.visibleGroupId === null, "No Group drawn is a valid Guide state.");
+  check(guide.shownGroupId === null, "No Group drawn is a valid Guide state.");
   check(hiddenActive.weightAtSource(2) === 1,
     "A hidden active 1x Section remains an effective contributor without changing density.");
   setSectionWeight(guide, section.id, 2);

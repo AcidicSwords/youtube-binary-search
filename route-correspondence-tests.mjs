@@ -30,7 +30,7 @@ function readCanonical(env) {
   const key = [...env.localStorage.values.keys()].find(name => name.includes(":v9:"));
   const guide = key
     ? JSON.parse(env.localStorage.values.get(key))
-    : { pins: [], sections: [], groups: [], visibleGroupId: null };
+    : { pins: [], sections: [], groups: [], shownGroupId: null };
   const sectionsById = new Map(guide.sections.map(section => [section.id, section]));
   const pinsById = new Map(guide.pins.map(pin => [pin.id, pin]));
   return {
@@ -52,8 +52,8 @@ function readCanonical(env) {
       })
       .sort((a, b) => a[0] - b[0] || a[1] - b[1]),
     groups: [...guide.groups].map(group => [group.label, group.active]).sort(),
-    visibleGroupLabel:
-      guide.groups.find(group => group.id === guide.visibleGroupId)?.label ?? null,
+    shownGroupLabel:
+      guide.groups.find(group => group.id === guide.shownGroupId)?.label ?? null,
     current: byId.get("pin-current-position").textContent,
     range: byId.get("range-label").textContent,
     activeSpan: byId.get("section-window").textContent,
@@ -135,7 +135,7 @@ const STRUCTURE_KEYS = [
   "pins",
   "sections",
   "groups",
-  "visibleGroupLabel",
+  "shownGroupLabel",
   "duration",
   "sectionCount",
   "pinCount"

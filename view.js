@@ -22,8 +22,8 @@ import {
   getPin,
   orderedPins,
   partitionGuidePins,
-  groupIsVisible,
-  sectionIsActive,
+  groupIsShown,
+  sectionWeightIsUsed,
   sectionIsVisible,
   sectionsForPin,
   resolveSection,
@@ -887,7 +887,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       .map(section =>
         `${section.id}:${section.start}:${section.end}:${section.weight}:${section.label}`
         + `:${sectionIsVisible(guide(), section) ? "v" : "h"}`
-        + `:${sectionIsActive(guide(), section) ? "a" : "i"}`
+        + `:${sectionWeightIsUsed(guide(), section) ? "a" : "i"}`
       )
       .join(",");
     const selectedKey = [
@@ -1435,7 +1435,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       const block = document.createElement("section");
       block.className = "guide-group-block";
       block.dataset.groupId = group.id;
-      const visible = groupIsVisible(guide(), group);
+      const visible = groupIsShown(guide(), group);
       block.classList.toggle("is-hidden", !visible);
       block.classList.toggle("is-inactive", !group.active);
 

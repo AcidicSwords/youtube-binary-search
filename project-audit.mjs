@@ -271,7 +271,7 @@ for (const implementationLaw of [
   `IMPLEMENTATION describes ${implementationLaw}.`);
 has(docs["IMPLEMENTATION.md"], /projection\.weightedSections|effective contributors/i,
   "IMPLEMENTATION says atmosphere consumes effective projection contributors.");
-has(docs["IMPLEMENTATION.md"], /Guide persistence is source-keyed under version 9/i,
+has(docs["IMPLEMENTATION.md"], /Guide persistence is source-keyed under version 10/i,
   "IMPLEMENTATION names the exact current Guide persistence version.");
 has(docs["IMPLEMENTATION.md"], /rejects?[^\n]*outside[^\n]*Range/i,
   "IMPLEMENTATION says exact Address input rejects rather than clamps.");

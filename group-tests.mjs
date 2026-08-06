@@ -17,9 +17,9 @@ import {
   deleteGroup,
   resolveGroup,
   resolveSection,
-  sectionIsActive,
+  sectionWeightIsUsed,
   sectionIsVisible,
-  groupIsVisible,
+  groupIsShown,
   orderedPins,
   partitionGuidePins,
   normalizeGuide,
@@ -68,12 +68,12 @@ function build() {
 {
   const guide = createGuide("fresh");
   assert.deepEqual(guide.groups.map(group => group.id), [DEFAULT_GROUP_ID]);
-  assert.equal(guide.version, 9);
+  assert.equal(guide.version, 10);
   const group = createGroup(guide, "Terrain");
   assert.deepEqual(
     guide.groups.map(entry => ({
       id: entry.id,
-      visible: groupIsVisible(guide, entry),
+      visible: groupIsShown(guide, entry),
       active: entry.active
     })),
     [
@@ -187,7 +187,7 @@ function build() {
     "Changing the visible layer must not change the deformation stack.");
   assert.deepEqual(orderedPins(guide).map(pin => pin.t), [],
     "Hiding the drawn layer draws nothing rather than promoting another: which layer you want is a choice.");
-  assert.equal(guide.visibleGroupId, null);
+  assert.equal(guide.shownGroupId, null);
 
   setGroupState(guide, DEFAULT_GROUP_ID, { visible: true });
   assert.deepEqual(orderedPins(guide).map(pin => pin.t), [20, 60],
@@ -222,7 +222,7 @@ function build() {
   const detail = session.model.guide.groups[0];
   assert.equal(detail.label, "Detail");
   assert.equal(
-    session.model.guide.groups.filter(group => groupIsVisible(session.model.guide, group)).length,
+    session.model.guide.groups.filter(group => groupIsShown(session.model.guide, group)).length,
     1
   );
 
@@ -240,11 +240,11 @@ function build() {
   const sole = createSession({ duration: DURATION, guide: createGuide("sole") });
   const hidden = setGuideGroupState(sole, DEFAULT_GROUP_ID, { visible: false });
   assert.equal(hidden.changed, true);
-  assert.equal(hidden.session.model.guide.visibleGroupId, null,
+  assert.equal(hidden.session.model.guide.shownGroupId, null,
     "The sole Group can be hidden, and nothing is drawn.");
   assert.equal(orderedPins(hidden.session.model.guide).length, 0);
   const shownAgain = setGuideGroupState(hidden.session, DEFAULT_GROUP_ID, { visible: true });
-  assert.equal(shownAgain.session.model.guide.visibleGroupId, DEFAULT_GROUP_ID,
+  assert.equal(shownAgain.session.model.guide.shownGroupId, DEFAULT_GROUP_ID,
     "and showing it again names it back.");
 
   const restored = undo(session);
@@ -407,7 +407,7 @@ function build() {
   assert.ok(!visible.includes(10),
     "and leaves it when every referencing Section is hidden.");
   assert.equal(sectionIsVisible(guide, first), false);
-  assert.equal(sectionIsActive(guide, first), true);
+  assert.equal(sectionWeightIsUsed(guide, first), true);
 }
 
 // --- Deleting a Group returns its Sections rather than destroying them -----------
@@ -435,7 +435,7 @@ function build() {
     "and its Sections come home to that survivor.");
   assert.ok(guide.sections.every(section => section.groupId === terrain.id));
   assert.equal(guide.groups.length, 1);
-  assert.equal(guide.visibleGroupId, terrain.id,
+  assert.equal(guide.shownGroupId, terrain.id,
     "The drawn layer resolves to a Group that still exists.");
   assert.equal(deleteGroup(guide, terrain.id).allowed, false,
     "The last Group cannot be removed, because Sections would have nowhere to be.");
@@ -452,7 +452,7 @@ function build() {
     ],
     sections: [{ id: "sec-1", startPinId: "pin-a", endPinId: "pin-b", weight: 2, createdAt: 1 }]
   }, "legacy");
-  assert.equal(migrated.version, 9);
+  assert.equal(migrated.version, 10);
   assert.deepEqual(migrated.groups.map(group => group.id), [DEFAULT_GROUP_ID]);
   assert.ok(migrated.sections.every(section => section.groupId === DEFAULT_GROUP_ID));
   assert.equal(extentOf(migrated), DURATION + 30,
@@ -468,7 +468,7 @@ function build() {
   const restoredExtra = restored.groups.find(group => group.label === "Terrain");
   assert.ok(restoredExtra, "A named Group survives persistence.");
   assert.deepEqual(
-    { visible: groupIsVisible(restored, restoredExtra), active: restoredExtra.active },
+    { visible: groupIsShown(restored, restoredExtra), active: restoredExtra.active },
     { visible: false, active: false },
     "and so do both of its states."
   );
@@ -492,15 +492,15 @@ function build() {
     ]
   };
   const migrated = normalizeGuide(JSON.parse(JSON.stringify(legacyTwoVisible)), "repair");
-  assert.equal(migrated.version, 9);
+  assert.equal(migrated.version, 10);
   assert.equal(
-    migrated.groups.filter(group => groupIsVisible(migrated, group)).length,
+    migrated.groups.filter(group => groupIsShown(migrated, group)).length,
     1,
     "Two visible Groups in a v8 save resolve to exactly one."
   );
-  assert.equal(migrated.visibleGroupId, DEFAULT_GROUP_ID,
+  assert.equal(migrated.shownGroupId, DEFAULT_GROUP_ID,
     "and it is the first one the save marked visible.");
-  assert.equal(migrated.groups[0].id, migrated.visibleGroupId,
+  assert.equal(migrated.groups[0].id, migrated.shownGroupId,
     "which is rendered first.");
   assert.equal(
     migrated.groups.find(group => group.id === "group-second").active,
@@ -518,7 +518,7 @@ function build() {
   const legacyNoneVisible = JSON.parse(JSON.stringify(legacyTwoVisible));
   legacyNoneVisible.groups.forEach(group => { group.visible = false; });
   const repaired = normalizeGuide(legacyNoneVisible, "repair");
-  assert.equal(repaired.visibleGroupId, DEFAULT_GROUP_ID,
+  assert.equal(repaired.shownGroupId, DEFAULT_GROUP_ID,
     "A v8 save with no visible Group resolves to Map rather than to nothing.");
   assert.equal(validateGuide(repaired, DURATION), true);
 
@@ -526,10 +526,10 @@ function build() {
   const danglingSource = createGuide("dangling");
   createGroup(danglingSource, "Ghost");
   const dangling = JSON.parse(JSON.stringify(danglingSource));
-  dangling.visibleGroupId = "group-missing";
+  dangling.shownGroupId = "group-missing";
   const resolved = normalizeGuide(dangling, "dangling");
   assert.ok(
-    resolved.groups.some(group => group.id === resolved.visibleGroupId),
+    resolved.groups.some(group => group.id === resolved.shownGroupId),
     "A named visible Group always exists."
   );
   assert.equal(validateGuide(resolved, DURATION), true);
@@ -538,7 +538,7 @@ function build() {
   // first states one relation and renders another.
   const disordered = createGuide("disordered");
   createGroup(disordered, "Later");
-  disordered.visibleGroupId = DEFAULT_GROUP_ID;
+  disordered.shownGroupId = DEFAULT_GROUP_ID;
   assert.equal(validateGuide(disordered, DURATION), false,
     "A Guide that names one visible Group and renders another cannot pass.");
 }
@@ -549,7 +549,7 @@ function build() {
 {
   const { guide, terrain } = build();
   const drawnBars = () => sortedSections(guide).filter(section => sectionIsVisible(guide, section));
-  const gradientSources = () => sortedSections(guide).filter(section => sectionIsActive(guide, section));
+  const gradientSources = () => sortedSections(guide).filter(section => sectionWeightIsUsed(guide, section));
 
   setGroupState(guide, terrain.id, { visible: false, active: true });
   assert.equal(drawnBars().some(section => section.groupId === terrain.id), false,

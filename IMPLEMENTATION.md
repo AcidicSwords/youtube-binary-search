@@ -164,7 +164,7 @@ within 16 pixels is only a candidate until the pointer remains on it for 450 ms;
 release before arming performs movement only. Once armed, release calls the
 canonical Pin-link transaction. Undo restores the complete pre-drag state.
 
-Groups form a flat Section partition. `visibleGroupId` is nullable, so zero or
+Groups form a flat Section partition. `shownGroupId` is nullable, so zero or
 one Group may be drawn on Timeline; any number of Groups may independently be
 Active and contribute Weight. Hidden active structure still deforms the map.
 The default Group is ordinary. Only the last Group is protected from deletion.
@@ -181,7 +181,7 @@ Spatial dragging remains on Timeline.
 
 ## Persistence and recovery
 
-Guide persistence is source-keyed under version 9. Older version 1–8 records
+Guide persistence is source-keyed under version 10. Older version 1–8 records
 are migrated through the Guide kernel; valid current records round-trip without
 changing identity. User preferences have a separate versioned key and include
 Step Reach, Nudge, Context, Shift playback, Panorama settings, and pane

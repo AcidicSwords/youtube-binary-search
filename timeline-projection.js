@@ -11,7 +11,7 @@ import {
   normalizeSectionWeight,
   sortedSections,
   orderedPins,
-  sectionIsActive
+  sectionWeightIsUsed
 } from "./guide.js";
 
 function activeWeight(section) {
@@ -55,7 +55,7 @@ function buildSegments(duration, guide, weightRelaxation = null) {
       bypass?.kind === "section"
       && section.id === bypass.sectionId
     ))
-    .filter(section => sectionIsActive(source, section))
+    .filter(section => sectionWeightIsUsed(source, section))
     .filter(section => Math.abs(activeWeight(section) - 1) > EPSILON);
   const boundaries = [...new Set([
     0,

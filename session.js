@@ -30,10 +30,10 @@ import {
   normalizeSectionWeight,
   setSectionWeight,
   DEFAULT_GROUP_ID,
-  visibleGroup,
+  shownGroup,
   createGroup,
   setGroupState,
-  groupIsVisible,
+  groupIsShown,
   groupLabelTaken,
   nextGroupLabel,
   assignSectionGroup,
@@ -1290,7 +1290,7 @@ export function saveExtentAsSection(session, extent, label, provenance = "extent
   const selectedEndPin = getPin(session.model.guide, extent.endPinId);
   const startPin = selectedStartPin || findPinAt(session.model.guide, extent.start);
   const endPin = selectedEndPin || findPinAt(session.model.guide, extent.end);
-  const targetGroupId = visibleGroup(session.model.guide)?.id || DEFAULT_GROUP_ID;
+  const targetGroupId = shownGroup(session.model.guide)?.id || DEFAULT_GROUP_ID;
   const duplicate = startPin && endPin
     ? findDuplicateSection(
       session.model.guide,
@@ -1459,7 +1459,7 @@ export function setGuideGroupState(session, groupId, changes) {
   // Visibility is read from the Guide's nullable visible-Group identity rather than
   // from a field on this Group, so there is nothing here that can disagree with
   // the model about which layer the Timeline is drawing.
-  const wasVisible = groupIsVisible(session.model.guide, group);
+  const wasVisible = groupIsShown(session.model.guide, group);
   const next = {
     visible: typeof changes?.visible === "boolean" ? changes.visible : wasVisible,
     active: typeof changes?.active === "boolean" ? changes.active : group.active

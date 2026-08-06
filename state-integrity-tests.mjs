@@ -44,7 +44,7 @@ const clone = value => structuredClone(value);
     .map(group => ({ id: group.id, label: group.label, active: group.active }))
     .sort((first, second) => first.id.localeCompare(second.id));
   assert.deepEqual(shape(recovered.groups), shape(source.groups));
-  assert.equal(recovered.visibleGroupId, source.visibleGroupId,
+  assert.equal(recovered.shownGroupId, source.shownGroupId,
     "and an explicitly drawn-nothing Guide survives the round trip as such.");
   assert.equal(
     recovered.sections.find(item => item.id === section.id)?.groupId,

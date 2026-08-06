@@ -64,16 +64,16 @@ function now() {
 // Section belongs to exactly one Group, so a Section can never be half-hidden.
 export const DEFAULT_GROUP_ID = "group-default";
 
-function moveVisibleGroupFirst(guide, groupId) {
+function moveShownGroupFirst(guide, groupId) {
   const index = guide.groups.findIndex(group => group.id === groupId);
   if (index <= 0) return;
   const [group] = guide.groups.splice(index, 1);
   guide.groups.unshift(group);
 }
 
-function preferredVisibleGroup(guide, preferredId = null) {
+function preferredShownGroup(guide, preferredId = null) {
   return guide.groups.find(group => group.id === preferredId)
-    || guide.groups.find(group => group.id === guide.visibleGroupId)
+    || guide.groups.find(group => group.id === guide.shownGroupId)
     || guide.groups.find(group => group.id === DEFAULT_GROUP_ID)
     || guide.groups[0]
     || null;
@@ -106,28 +106,28 @@ export function nextGroupLabel(guide) {
   return `Group ${Date.now()}`;
 }
 
-export function groupIsVisible(guide, group) {
+export function groupIsShown(guide, group) {
   const id = typeof group === "string" ? group : group?.id;
   if (!id || !guide) return false;
-  return visibleGroup(guide)?.id === id;
+  return shownGroup(guide)?.id === id;
 }
 
-function enforceVisibleGroup(guide, preferredId = null) {
+function enforceShownGroup(guide, preferredId = null) {
   if (!guide || !Array.isArray(guide.groups) || !guide.groups.length) return null;
-  const visible = preferredVisibleGroup(guide, preferredId);
-  guide.visibleGroupId = visible.id;
-  moveVisibleGroupFirst(guide, visible.id);
+  const visible = preferredShownGroup(guide, preferredId);
+  guide.shownGroupId = visible.id;
+  moveShownGroupFirst(guide, visible.id);
   return visible;
 }
 
 // At most one Group is drawn, and none is a state the Guide can hold: hiding the
 // only Group is how you look at the map undeformed and unmarked. A null
-// visibleGroupId means exactly that, and is distinct from a stale id, which
+// shownGroupId means exactly that, and is distinct from a stale id, which
 // still resolves to a real Group so a damaged save never blanks the map.
-export function visibleGroup(guide) {
+export function shownGroup(guide) {
   if (!guide || !Array.isArray(guide.groups) || !guide.groups.length) return null;
-  if (guide.visibleGroupId === null) return null;
-  return guide.groups.find(group => group.id === guide.visibleGroupId)
+  if (guide.shownGroupId === null) return null;
+  return guide.groups.find(group => group.id === guide.shownGroupId)
     || guide.groups.find(group => group.id === DEFAULT_GROUP_ID)
     || guide.groups[0]
     || null;
@@ -150,7 +150,7 @@ export function createGroup(
   // A newly authored Group is the layer being worked on. Recovery paths may
   // create hidden Groups explicitly and choose the persisted visible Group once
   // the complete set has been read.
-  enforceVisibleGroup(guide, visible ? group.id : visibleGroup(guide)?.id);
+  enforceShownGroup(guide, visible ? group.id : shownGroup(guide)?.id);
   guide.updatedAt = changedAt;
   return group;
 }
@@ -166,12 +166,12 @@ function groupForSection(guide, section) {
   return resolveGroup(guide, section?.groupId);
 }
 
-export function sectionIsActive(guide, section) {
+export function sectionWeightIsUsed(guide, section) {
   return groupForSection(guide, section)?.active !== false;
 }
 
 export function sectionIsVisible(guide, section) {
-  return groupIsVisible(guide, groupForSection(guide, section));
+  return groupIsShown(guide, groupForSection(guide, section));
 }
 
 export function setGroupState(guide, groupId, changes = {}) {
@@ -182,16 +182,16 @@ export function setGroupState(guide, groupId, changes = {}) {
     active: entry.active,
     label: entry.label
   }));
-  const visibleBefore = visibleGroup(guide)?.id || null;
+  const visibleBefore = shownGroup(guide)?.id || null;
 
   if (typeof changes.visible === "boolean") {
     if (changes.visible) {
-      enforceVisibleGroup(guide, group.id);
-    } else if (groupIsVisible(guide, group)) {
+      enforceShownGroup(guide, group.id);
+    } else if (groupIsShown(guide, group)) {
       // Hiding the drawn layer draws nothing. It does not promote a different
       // Group: which layer you want is a choice, and guessing one on your behalf
       // is how "hide this" became unreachable when only one Group existed.
-      guide.visibleGroupId = null;
+      guide.shownGroupId = null;
     }
   }
   if (typeof changes.active === "boolean") group.active = changes.active;
@@ -209,7 +209,7 @@ export function setGroupState(guide, groupId, changes = {}) {
   }
   // Which Group is visible is one fact about the Guide, not a field of any
   // Group, so a change of layer is detected once rather than per Group.
-  if (visibleGroup(guide)?.id !== visibleBefore) {
+  if (shownGroup(guide)?.id !== visibleBefore) {
     group.updatedAt = changedAt;
     changed = true;
   }
@@ -306,7 +306,7 @@ export function deleteGroup(guide, groupId) {
   if (!plan.allowed) return plan;
 
   const index = guide.groups.findIndex(group => group.id === groupId);
-  const visibleBefore = guide.visibleGroupId;
+  const visibleBefore = guide.shownGroupId;
   const changedAt = now();
   guide.groups.splice(index, 1);
   for (const section of guide.sections) {
@@ -318,8 +318,8 @@ export function deleteGroup(guide, groupId) {
   // "No Group drawn" remains a deliberate state when an unrelated Group is
   // removed. If the drawn Group itself disappears, its real heir becomes the
   // next spatial owner.
-  if (visibleBefore === null) guide.visibleGroupId = null;
-  else enforceVisibleGroup(
+  if (visibleBefore === null) guide.shownGroupId = null;
+  else enforceShownGroup(
     guide,
     visibleBefore === groupId ? plan.heirGroupId : visibleBefore
   );
@@ -329,14 +329,14 @@ export function deleteGroup(guide, groupId) {
 
 export function createGuide(videoId = null) {
   const guide = {
-    version: 9,
+    version: 10,
     videoId,
     pins: [],
     sections: [],
     groups: [],
     // The optional Group the Timeline draws. One nullable identity makes both
     // zero and one explicit while making two drawn Groups unrepresentable.
-    visibleGroupId: DEFAULT_GROUP_ID,
+    shownGroupId: DEFAULT_GROUP_ID,
     updatedAt: now()
   };
   createGroup(guide, "Map", { id: DEFAULT_GROUP_ID });
@@ -644,7 +644,7 @@ function sectionGroupForCreation(guide, requestedGroupId) {
     const requested = guide.groups.find(group => group.id === requestedGroupId);
     if (requested) return requested;
   }
-  return visibleGroup(guide)
+  return shownGroup(guide)
     || guide.groups.find(group => group.id === DEFAULT_GROUP_ID)
     || guide.groups[0]
     || null;
@@ -1006,10 +1006,16 @@ export function normalizeGuide(parsed, videoId) {
   // every retained identity cross unchanged: only where visibility is written
   // down has changed.
   const sourceGroups = Array.isArray(parsed?.groups) ? parsed.groups : [];
+  // v10 names the drawn Group `shownGroupId`; v9 wrote `visibleGroupId`, and v8
+  // marked one Group `visible`. All three are read so no saved Guide loses which
+  // Group it drew.
+  const storedShownId = parsed?.shownGroupId !== undefined
+    ? parsed.shownGroupId
+    : parsed?.visibleGroupId;
   const persistedVisibleId = (
-    typeof parsed?.visibleGroupId === "string"
-      && sourceGroups.some(source => source?.id === parsed.visibleGroupId)
-      ? parsed.visibleGroupId
+    typeof storedShownId === "string"
+      && sourceGroups.some(source => source?.id === storedShownId)
+      ? storedShownId
       : sourceGroups.find(source => source?.visible === true)?.id
   );
   const defaultSource = sourceGroups.find(source => source?.id === DEFAULT_GROUP_ID);
@@ -1042,8 +1048,8 @@ export function normalizeGuide(parsed, videoId) {
   // An explicit null is a choice ("draw nothing"), so it survives the round
   // trip. Anything else that fails to resolve is damage, and damage falls back
   // to a real Group rather than blanking the map.
-  if (parsed?.visibleGroupId === null) guide.visibleGroupId = null;
-  else enforceVisibleGroup(guide, persistedVisibleId || DEFAULT_GROUP_ID);
+  if (storedShownId === null) guide.shownGroupId = null;
+  else enforceShownGroup(guide, persistedVisibleId || DEFAULT_GROUP_ID);
 
   const idMap = new Map();
   for (const source of sourcePins) {
@@ -1129,7 +1135,7 @@ export function migrateSavedRegions(parsed, videoId) {
 export function validateGuide(guide, duration) {
   if (
     !guide
-    || Number(guide.version) !== 9
+    || Number(guide.version) !== 10
     || !Array.isArray(guide.groups)
     || !Array.isArray(guide.pins)
     || !Array.isArray(guide.sections)
@@ -1139,7 +1145,7 @@ export function validateGuide(guide, duration) {
   const ids = new Set();
   const groupIds = new Set();
   let defaultGroups = 0;
-  let visibleGroups = 0;
+  let shownGroups = 0;
 
   for (const group of guide.groups) {
     if (
@@ -1151,18 +1157,18 @@ export function validateGuide(guide, duration) {
       || !Number.isFinite(group.updatedAt)
     ) return false;
     if (group.id === DEFAULT_GROUP_ID) defaultGroups += 1;
-    if (group.id === guide.visibleGroupId) visibleGroups += 1;
+    if (group.id === guide.shownGroupId) shownGroups += 1;
     ids.add(group.id);
     groupIds.add(group.id);
   }
   // Exactly one Map, and at most one named drawn Group -- null is the ordinary
   // way to say "draw nothing". When a Group is named it is drawn first, so the
   // Guide's order states the relation it renders.
-  const drawsNothing = guide.visibleGroupId === null;
+  const drawsNothing = guide.shownGroupId === null;
   if (
     defaultGroups !== 1
-    || (drawsNothing ? visibleGroups !== 0 : visibleGroups !== 1)
-    || (!drawsNothing && guide.groups[0]?.id !== guide.visibleGroupId)
+    || (drawsNothing ? shownGroups !== 0 : shownGroups !== 1)
+    || (!drawsNothing && guide.groups[0]?.id !== guide.shownGroupId)
   ) return false;
   // Names are identities here, so they must be distinguishable.
   const labels = guide.groups.map(group => String(group.label || "").trim().toLowerCase());
@@ -1242,10 +1248,14 @@ export function sanitizeGuide(input, videoId, duration) {
   };
 
   const sourceGroups = Array.isArray(source.groups) ? source.groups : [];
+  // Same v10 / v9 / v8 back-compat as normalizeGuide (see there).
+  const storedShownId = source.shownGroupId !== undefined
+    ? source.shownGroupId
+    : source.visibleGroupId;
   const persistedVisibleId = (
-    typeof source.visibleGroupId === "string"
-      && sourceGroups.some(group => group?.id === source.visibleGroupId)
-      ? source.visibleGroupId
+    typeof storedShownId === "string"
+      && sourceGroups.some(group => group?.id === storedShownId)
+      ? storedShownId
       : sourceGroups.find(group => group?.visible === true)?.id
   );
   recoverGroup(
@@ -1259,8 +1269,8 @@ export function sanitizeGuide(input, videoId, duration) {
   // An explicit null is a choice ("draw nothing"), so it survives the round
   // trip. Anything else that fails to resolve is damage, and damage falls back
   // to a real Group rather than blanking the map.
-  if (source.visibleGroupId === null) guide.visibleGroupId = null;
-  else enforceVisibleGroup(guide, persistedVisibleId || DEFAULT_GROUP_ID);
+  if (storedShownId === null) guide.shownGroupId = null;
+  else enforceShownGroup(guide, persistedVisibleId || DEFAULT_GROUP_ID);
 
   for (const sourcePin of sortPins(source.pins || [])) {
     const address = Number(sourcePin?.t);

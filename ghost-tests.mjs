@@ -60,7 +60,7 @@ function worldFingerprint(model) {
     groups: model.guide.groups.map(group => [
       group.id, group.label || null, group.active
     ]).sort(),
-    visibleGroupId: model.guide.visibleGroupId,
+    shownGroupId: model.guide.shownGroupId,
     range: [model.range.start, model.range.end],
     focus: model.focus ? [model.focus.kind, model.focus.sectionId || null] : null,
     stepReach: model.stepReach,
