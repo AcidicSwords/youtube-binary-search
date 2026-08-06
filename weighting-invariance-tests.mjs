@@ -12,7 +12,7 @@ import {
   refine,
   setStepDistance,
   effectiveStepDistance,
-  setGuideSectionWeight,
+  setGuideSectionWeighting,
   saveExtentAsSection,
   STEP_DISTANCE_MODE
 } from "./session.js";
@@ -33,7 +33,7 @@ function sessionAtWeight(weight) {
   session = saved.session;
   const sectionId = session.model.guide.sections.at(-1).id;
   if (weight !== 1) {
-    session = setGuideSectionWeight(session, sectionId, weight).session;
+    session = setGuideSectionWeighting(session, sectionId, weight).session;
   }
   session = goTo(session, 50, { operator: "timeline" }).session;
   return { session, sectionId };
@@ -89,7 +89,7 @@ function addresses(model) {
     ...addresses(neutral.session.model),
     neighborhood: [neutral.session.model.neighborhood.L, neutral.session.model.neighborhood.R]
   };
-  const edited = setGuideSectionWeight(neutral.session, neutral.sectionId, 0.25);
+  const edited = setGuideSectionWeighting(neutral.session, neutral.sectionId, 0.25);
   assert.equal(edited.changed, true);
   assert.deepEqual(
     {
@@ -212,11 +212,11 @@ function addresses(model) {
   const nestedAt = (outer, inner) => {
     let session = createSession({ duration: DURATION });
     session = saveExtentAsSection(session, { start: 20, end: 60 }, { label: "outer" }).session;
-    session = setGuideSectionWeight(
+    session = setGuideSectionWeighting(
       session, session.model.guide.sections.at(-1).id, outer
     ).session;
     session = saveExtentAsSection(session, { start: 40, end: 56 }, { label: "inner" }).session;
-    session = setGuideSectionWeight(
+    session = setGuideSectionWeighting(
       session, session.model.guide.sections.at(-1).id, inner
     ).session;
     return goTo(session, 48, { operator: "timeline" }).session;

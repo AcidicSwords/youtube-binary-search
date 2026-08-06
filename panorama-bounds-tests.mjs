@@ -231,7 +231,7 @@ function makeControllerHarness() {
   const panoramaSource = readFileSync("panorama.js", "utf8");
   assert.match(app, /function setRange\([\s\S]*?settleBeforeAction\(\);[\s\S]*?setSessionRange/);
   assert.match(app, /function focusSection\([\s\S]*?settleBeforeAction\(\);[\s\S]*?focusSessionSection/);
-  assert.match(app, /function leaveSection\([\s\S]*?settleBeforeAction\(\);[\s\S]*?leaveSessionSection/);
+  assert.match(app, /function unfocus\([\s\S]*?settleBeforeAction\(\);[\s\S]*?unfocusSession/);
   assert.match(panoramaSource, /export function panoramaShouldSuspend\(snapshot\)/);
   assert.match(panoramaSource, /transportKind === "context"/);
   assert.doesNotMatch(panoramaSource, /transportKind === "loop"/);

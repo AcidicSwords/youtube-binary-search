@@ -9,9 +9,9 @@ import {
   goTo,
   step,
   saveExtentAsSection,
-  setGuideSectionWeight,
+  setGuideSectionWeighting,
   focusSection,
-  leaveSection
+  unfocus
 } from "./session.js";
 import { resolveSection } from "./guide.js";
 import { createTimelineProjection, projectionForModel } from "./timeline-projection.js";
@@ -29,7 +29,7 @@ function buildSession() {
     session = goTo(session, end, { operator: "timeline" }).session;
     session = saveExtentAsSection(session, { start, end }, { label: `S${start}` }).session;
     const id = session.model.guide.sections.at(-1).id;
-    session = setGuideSectionWeight(session, id, weight).session;
+    session = setGuideSectionWeighting(session, id, weight).session;
     sectionIds.push(id);
   }
   return { session, sectionIds };
@@ -148,7 +148,7 @@ for (const [label, sectionId, weight] of [
 // --- Unfocus restores the whole map ------------------------------------------
 {
   const focused = focusSection(session, expandedId).session;
-  const restored = leaveSection(focused).session;
+  const restored = unfocus(focused).session;
   const projection = projectionForModel(restored.model);
   assert.deepEqual(
     { start: projection.viewExtent.start, end: projection.viewExtent.end },

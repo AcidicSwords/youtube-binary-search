@@ -19,8 +19,8 @@ import {
   effectiveStepDistance,
   goTo,
   goToGuidePin,
-  retainSpanAsSection,
-  setGuideSectionWeight,
+  retainActiveSpanAsSection,
+  setGuideSectionWeighting,
   step,
   stepToPin,
   switchActiveEnd
@@ -168,13 +168,13 @@ function weightedGuide(...definitions) {
   let session = createSession({ duration: 100, current: 20 });
   session = goTo(session, 40, { label: "Test Go" }).session;
   const before = { ...session.model.activeSpan };
-  const tagged = retainSpanAsSection(session, "");
+  const tagged = retainActiveSpanAsSection(session, "");
   assert.equal(tagged.changed, true);
   assert.equal(tagged.value.created, true);
   assert.equal(tagged.value.section.label, "");
   assert.equal(tagged.value.section.weighting, 1,
     "Tag retains topology without bundling a Weight mutation.");
-  const weighted = setGuideSectionWeight(
+  const weighted = setGuideSectionWeighting(
     tagged.session,
     tagged.value.section.id,
     0.75
@@ -201,7 +201,7 @@ function weightedGuide(...definitions) {
     label: "Second"
   }).section;
   const session = createSession({ duration: 100, current: 20, guide });
-  const selected = setGuideSectionWeight(session, second.id, 2);
+  const selected = setGuideSectionWeighting(session, second.id, 2);
   assert.equal(selected.changed, true);
   assert.equal(selected.value.id, second.id);
   assert.equal(selected.value.weighting, 2);

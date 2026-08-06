@@ -6,13 +6,13 @@ import {
 import {
   createSession,
   focusSection,
-  focusWorkingSection,
+  focusActiveSpan,
   goTo,
-  leaveSection,
+  unfocus,
   retainCurrentAsPin,
   localRefine,
   reopen,
-  retainSpanAsSection,
+  retainActiveSpanAsSection,
   setRange,
   setStepDistance,
   step,
@@ -144,14 +144,14 @@ for (let run = 0; run < RUNS; run += 1) {
     } else if (operation === 10) {
       result = retainCurrentAsPin(session, random() < 0.4 ? `Pin ${Math.floor(random() * 20)}` : "");
     } else if (operation === 11) {
-      result = retainSpanAsSection(session, `Section ${Math.floor(random() * 30)}`);
+      result = retainActiveSpanAsSection(session, `Section ${Math.floor(random() * 30)}`);
     } else if (operation === 12) {
       const sections = session.model.guide.sections;
       result = sections.length
         ? focusSection(session, sections[Math.floor(random() * sections.length)].id)
         : { session, changed: false };
-    } else if (operation === 13) result = leaveSection(session);
-    else if (operation === 14) result = focusWorkingSection(session);
+    } else if (operation === 13) result = unfocus(session);
+    else if (operation === 14) result = focusActiveSpan(session);
     else {
       // Metamorphic check: Endpoint Transposition must remain an involution for
       // every randomly reached valid Interval, not only hand-authored examples.

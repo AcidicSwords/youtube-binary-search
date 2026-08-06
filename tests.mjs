@@ -62,11 +62,11 @@ import {
   previewRange,
   checkpoint,
   focusSection,
-  focusWorkingSection,
-  leaveSection,
+  focusActiveSpan,
+  unfocus,
   completePlayback,
   retainCurrentAsPin,
-  retainSpanAsSection,
+  retainActiveSpanAsSection,
   renameGuidePin,
   deleteGuidePin,
   renameGuideSection,
@@ -783,7 +783,7 @@ let focusedAgain = createSession({ duration: 100, current: 20, guide: focusGuide
 focusedAgain = goTo(focusedAgain, 25, { operator: "timeline", label: "Timeline Click" }).session;
 focusedAgain = focusSection(focusedAgain, focusSectionRecord.id).session;
 const beforeUnfocusLoop = copy(focusedAgain.model.activeSpan);
-focusedAgain = leaveSection(focusedAgain).session;
+focusedAgain = unfocus(focusedAgain).session;
 assert.deepEqual(focusedAgain.model.range, { start: 0, end: 100 });
 assert.deepEqual(
   {
@@ -807,7 +807,7 @@ assert.deepEqual(focusedAgain.model.activeSpan.arrivalNeighborhood.neighborhood,
 let working = createSession({ duration: 100, current: 50, guide: createGuide("video") });
 working = goTo(working, 70, { operator: "timeline" }).session;
 const workingBeforeFocus = copy(working.model.activeSpan);
-working = focusWorkingSection(working).session;
+working = focusActiveSpan(working).session;
 assert.equal(working.model.focus.kind, FOCUS_KIND.ACTIVE_SPAN);
 assert.deepEqual(working.model.focus.extent, { start: 50, end: 70 });
 assert.deepEqual(working.model.range, { start: 50, end: 70 });
@@ -832,11 +832,11 @@ assert.deepEqual(
   { start: working.model.activeSpan.start, end: working.model.activeSpan.end },
   { start: 50, end: 60 }
 );
-working = focusWorkingSection(working).session;
+working = focusActiveSpan(working).session;
 assert.deepEqual(working.model.range, { start: 50, end: 60 });
 assert.deepEqual(working.model.focus.extent, { start: 50, end: 60 });
 assert.deepEqual(working.model.focus.returnRange, { start: 0, end: 100 });
-working = leaveSection(working).session;
+working = unfocus(working).session;
 assert.equal(working.model.focus, null);
 assert.deepEqual(working.model.range, { start: 0, end: 100 });
 assert.deepEqual(
@@ -846,7 +846,7 @@ assert.deepEqual(
 );
 assert.equal(working.model.guide.sections.length, 0);
 
-working = retainSpanAsSection(working, "Working").session;
+working = retainActiveSpanAsSection(working, "Working").session;
 const retainedWorkingId = working.model.guide.sections[0].id;
 assert.equal(resolveSection(working.model.guide, retainedWorkingId).label, "Working");
 assert.deepEqual(
@@ -865,7 +865,7 @@ assert.notEqual(edited.model.guide, guideBeforeEdit, "Guide edits must replace t
 assert.equal(guideBeforeEdit.pins.length, 0);
 assert.equal(edited.model.guide.pins.length, 1);
 edited = goTo(edited, 60, { operator: "timeline", label: "Timeline Click" }).session;
-edited = retainSpanAsSection(edited, "Forty to sixty").session;
+edited = retainActiveSpanAsSection(edited, "Forty to sixty").session;
 assert.equal(edited.model.guide.sections.length, 1);
 edited = undo(edited).session;
 assert.equal(edited.model.guide.sections.length, 0);
@@ -888,10 +888,10 @@ assert.equal(noOpResult.changed, false);
 noOpResult = deleteGuidePin(noops, "missing-pin");
 assert.equal(noOpResult.changed, false);
 noops = goTo(noops, 60, { operator: "timeline", label: "Timeline Click" }).session;
-noops = retainSpanAsSection(noops, "Forty to sixty").session;
+noops = retainActiveSpanAsSection(noops, "Forty to sixty").session;
 const noOpSection = noops.model.guide.sections[0];
 const sectionHistoryLength = noops.history.length;
-noOpResult = retainSpanAsSection(noops, "Forty to sixty");
+noOpResult = retainActiveSpanAsSection(noops, "Forty to sixty");
 assert.equal(noOpResult.changed, false);
 assert.equal(noOpResult.session.history.length, sectionHistoryLength);
 noOpResult = renameGuideSection(noops, noOpSection.id, "Forty to sixty");

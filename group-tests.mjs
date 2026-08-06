@@ -37,7 +37,7 @@ import {
   goToGuidePin,
   workFromExtent,
   saveExtentAsSection,
-  setGuideSectionWeight,
+  setGuideSectionWeighting,
   undo
 } from "./session.js";
 
@@ -269,7 +269,7 @@ function build() {
   assert.equal(tagged.changed, true);
   assert.equal(tagged.value.section.groupId, detail.id,
     "Tag authors in the visible layer without conflating an identical hidden layer.");
-  const weighted = setGuideSectionWeight(
+  const weighted = setGuideSectionWeighting(
     tagged.session,
     tagged.value.section.id,
     2

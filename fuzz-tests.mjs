@@ -9,10 +9,10 @@ import {
   setRange,
   undo,
   retainCurrentAsPin,
-  retainSpanAsSection,
+  retainActiveSpanAsSection,
   focusSection,
-  focusWorkingSection,
-  leaveSection
+  focusActiveSpan,
+  unfocus
 } from "./session.js";
 import { validateGuide, resolveSection } from "./guide.js";
 import { EPSILON } from "./range-geometry.js";
@@ -105,15 +105,15 @@ for (let run = 0; run < RUNS; run += 1) {
       result = setRange(session, start, end, session.model.neighborhood.C);
     } else if (operation === 7) result = undo(session);
     else if (operation === 8) result = retainCurrentAsPin(session, random() < 0.2 ? "Pinned" : "");
-    else if (operation === 9) result = retainSpanAsSection(session, `Section ${Math.floor(random() * 20)}`);
+    else if (operation === 9) result = retainActiveSpanAsSection(session, `Section ${Math.floor(random() * 20)}`);
     else if (operation === 10) {
       const sections = session.model.guide.sections;
       result = sections.length
         ? focusSection(session, sections[Math.floor(random() * sections.length)].id)
         : { session, changed: false };
-    } else if (operation === 11) result = leaveSection(session);
+    } else if (operation === 11) result = unfocus(session);
     else if (operation === 12) result = switchActiveEnd(session);
-    else result = focusWorkingSection(session);
+    else result = focusActiveSpan(session);
 
     if (result?.session) session = result.session;
     assertSessionInvariant(session);

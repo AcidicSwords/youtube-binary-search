@@ -25,7 +25,7 @@ import {
   focusSection,
   goToGuidePin,
   saveExtentAsSection,
-  setGuideSectionWeight,
+  setGuideSectionWeighting,
   step
 } from "./session.js";
 
@@ -235,7 +235,7 @@ assert.equal(setSectionWeighting(guide, compressed.id, 3).changed, false);
 
 let session = createSession({ duration: 100, current: 29 });
 let saved = saveExtentAsSection(session, { start: 30, end: 50 }, "Weighted");
-session = setGuideSectionWeight(
+session = setGuideSectionWeighting(
   saved.session,
   saved.value.section.id,
   0.5

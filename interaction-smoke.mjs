@@ -315,7 +315,7 @@ byId.get("full-video-range").click();
 await flush();
 assert.equal(byId.get("range-label").textContent, "0:25–0:50");
 assert.equal(byId.get("focused-section-title").textContent, "Active Span");
-byId.get("leave-section").click();
+byId.get("unfocus").click();
 await flush();
 assert.equal(byId.get("range-label").textContent, "0:00–1:40");
 assert.equal(byId.get("range-start-handle").hidden, false);

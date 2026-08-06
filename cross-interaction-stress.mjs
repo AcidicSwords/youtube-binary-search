@@ -219,7 +219,7 @@ assert.equal(drawnBars(), focusedBars,
   "and restoring visibility restores exactly what Focus was drawing.");
 assert.equal(drawnPins(), focusedPins);
 
-await clickIn("sections-list", inSections("leaveSection")[0]);
+await clickIn("sections-list", inSections("unfocus")[0]);
 assert.match(status(), /Restored Range/);
 
 // ==============================================================================
@@ -262,7 +262,7 @@ for (const mark of chapterMarks()) {
   assert.ok(fraction >= 0 && fraction <= 100,
     "and every drawn mark lands inside the drawn map.");
 }
-await clickIn("sections-list", inSections("leaveSection")[0]);
+await clickIn("sections-list", inSections("unfocus")[0]);
 assert.equal(chapterMarks().length, 4, "Unfocus restores the whole set.");
 
 // Through all of that, no Chapter became an operand.

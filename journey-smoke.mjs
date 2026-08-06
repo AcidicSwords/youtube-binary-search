@@ -203,7 +203,7 @@ const focusedCurrent = currentText();
 await press("q");
 assert.notEqual(currentText(), focusedCurrent,
   "Operators keep working inside a Focus.");
-await clickIn("sections-list", inSections("leaveSection")[0]);
+await clickIn("sections-list", inSections("unfocus")[0]);
 assert.match(status(), /Restored Range/,
   "and leaving restores the containing Range exactly.");
 

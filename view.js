@@ -1192,8 +1192,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         focus.type = "button";
         focus.className = "guide-action guide-action-focus";
         if (section.id === focusedId) {
-          focus.dataset.leaveSection = "true";
-          focus.textContent = "Leave";
+          focus.dataset.unfocus = "true";
+          focus.textContent = "Unfocus";
         } else {
           focus.dataset.focusSection = section.id;
           focus.textContent = "Focus";
@@ -2136,7 +2136,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       || sectionKind !== "interval"
       || !currentSpan
       || workingAlreadyOwnsRange;
-    elements["leave-section"].disabled = interactionLocked || !focused;
+    elements["unfocus"].disabled = interactionLocked || !focused;
     elements["refine-backward"].disabled = interactionLocked || targets.backward === null;
     elements["refine-forward"].disabled = interactionLocked || targets.forward === null;
     elements.reopen.disabled = interactionLocked || !actionModel?.reopen;

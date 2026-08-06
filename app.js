@@ -59,7 +59,7 @@ import {
   effectiveStepDistance,
   reopen as reopenSession,
   switchActiveEnd as switchSessionEndpoint,
-  releaseInterval as releaseSessionInterval,
+  releaseActiveSpan as releaseSessionActiveSpan,
   setRange as setSessionRange,
   previewRange,
   checkpoint,
@@ -67,17 +67,17 @@ import {
   settleGhostSequence,
   settleStepSequence,
   focusSection as focusSessionSection,
-  focusWorkingSection as focusSessionWorkingSection,
-  leaveSection as leaveSessionSection,
+  focusActiveSpan as focusSessionActiveSpan,
+  unfocus as unfocusSession,
   completePlayback,
   retainCurrentAsPin as pinSessionCurrent,
-  retainSpanAsSection,
+  retainActiveSpanAsSection as retainSessionActiveSpanAsSection,
   saveExtentAsSection,
   renameGuidePin,
   deleteGuidePin,
   renameGuideSection,
   deleteGuideSection,
-  setGuideSectionWeight,
+  setGuideSectionWeighting,
   moveGuidePin,
   moveGuideSection,
   unlinkGuideSectionEndpoint,
@@ -1703,7 +1703,7 @@ function releaseActiveSpan() {
   if (!state.videoLoaded) return false;
   settleBeforeAction();
   const hadTimelineOperand = Boolean(state.timelineSelection);
-  const result = releaseSessionInterval(state.session);
+  const result = releaseSessionActiveSpan(state.session);
   if (!result.changed) {
     if (hadTimelineOperand) {
       state.timelineSelection = null;
@@ -1790,7 +1790,7 @@ function toggleWeightRelaxation() {
 
 function focusOrUnfocus() {
   if (!state.videoLoaded) return false;
-  if (model().focus) return leaveSection();
+  if (model().focus) return unfocus();
   const working = currentSpan();
   const selected = state.timelineSelection?.kind === "section"
     ? resolveSection(guide(), state.timelineSelection.id)
@@ -1809,7 +1809,7 @@ function focusOrUnfocus() {
       return focusSection(selected.id);
     }
   }
-  if (working) return focusWorkingSection();
+  if (working) return focusActiveSpan();
   setStatus("Establish a Active Span or select a Section before Focus.");
   return false;
 }
@@ -2200,14 +2200,14 @@ function focusSection(sectionId) {
   });
 }
 
-function focusWorkingSection() {
+function focusActiveSpan() {
   settleBeforeAction();
   const interval = currentSpan();
   if (!interval) {
     setStatus("Establish a Active Span before focusing it.", true);
     return;
   }
-  const result = focusSessionWorkingSection(state.session);
+  const result = focusSessionActiveSpan(state.session);
   if (!result.changed) {
     setStatus("The Active Span already owns the active Range.");
     return;
@@ -2217,9 +2217,9 @@ function focusWorkingSection() {
   });
 }
 
-function leaveSection() {
+function unfocus() {
   settleBeforeAction();
-  const result = leaveSessionSection(state.session);
+  const result = unfocusSession(state.session);
   if (!result.changed) return;
   acceptRangeTransition(result, {
     status: `Restored Range ${formatRange(result.session.model.range)}.`
@@ -2230,7 +2230,7 @@ function changeSectionWeighting(sectionId, weight) {
   const section = resolveSection(guide(), sectionId);
   if (!section) return false;
   const name = sectionName(section);
-  const result = setGuideSectionWeight(
+  const result = setGuideSectionWeighting(
     state.session,
     sectionId,
     Number(weight)
@@ -2327,7 +2327,7 @@ function selectedSectionExtent(source = null) {
   };
 }
 
-function retainActiveSpanAsSection(event = null, options = {}) {
+function retainSectionFromSource(event = null, options = {}) {
   event?.preventDefault?.();
   const label = options.useFormLabel === false
     ? ""
@@ -2336,7 +2336,7 @@ function retainActiveSpanAsSection(event = null, options = {}) {
   if (!extent) return setStatus("Establish the selected Extent before saving a Section.", true);
   settleBeforeAction();
   const result = kind === "interval"
-    ? retainSpanAsSection(state.session, label)
+    ? retainSessionActiveSpanAsSection(state.session, label)
     : saveExtentAsSection(
       state.session,
       extent,
@@ -5666,7 +5666,7 @@ elements.release.addEventListener("click", releaseActiveSpan);
 elements.retain.addEventListener("click", event => {
   const latchedMatrix = event.shiftKey !== true && state.shiftLayers.matrix;
   if (event.shiftKey || latchedMatrix) {
-    retainActiveSpanAsSection(event, { source: "interval", useFormLabel: false });
+    retainSectionFromSource(event, { source: "interval", useFormLabel: false });
     if (latchedMatrix) consumeShiftLayer("matrix");
     return;
   }
@@ -5885,17 +5885,17 @@ for (const control of document.querySelectorAll("[data-step-fraction]")) {
 }
 
 // Guide creation and Range affordances
-elements["section-retain-form"].addEventListener("submit", retainActiveSpanAsSection);
+elements["section-retain-form"].addEventListener("submit", retainSectionFromSource);
 elements["section-label"].addEventListener("input", view.render);
 elements["section-source"].addEventListener("change", view.render);
-elements["focus-active-span"].addEventListener("click", focusWorkingSection);
+elements["focus-active-span"].addEventListener("click", focusActiveSpan);
 elements["pin-retain-form"].addEventListener("submit", retainCurrentAsPin);
 elements["pin-label"].addEventListener("input", view.render);
 elements["range-state"].addEventListener("click", toggleRangeTools);
 elements["range-tools"].addEventListener("toggle", () => {
   elements["range-state"].setAttribute("aria-expanded", String(elements["range-tools"].open));
 });
-elements["leave-section"].addEventListener("click", leaveSection);
+elements["unfocus"].addEventListener("click", unfocus);
 
 // Guide
 elements["guide-toggle"].addEventListener("click", () => toggleGuide());
@@ -6301,8 +6301,8 @@ function handleGuideClick(event) {
   if (reveal) return revealPin(reveal.dataset.revealPin);
   const focus = event.target.closest("[data-focus-section]");
   if (focus) return focusSection(focus.dataset.focusSection);
-  const leave = event.target.closest("[data-leave-section]");
-  if (leave) return leaveSection();
+  const leave = event.target.closest("[data-unfocus]");
+  if (leave) return unfocus();
   const renamePinButton = event.target.closest("[data-rename-pin]");
   if (renamePinButton) return renamePinById(renamePinButton.dataset.renamePin);
   const deletePinButton = event.target.closest("[data-delete-pin]");
@@ -6575,7 +6575,7 @@ document.addEventListener("keydown", event => {
   // transactions used by their pointer controls.
   else if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && key === "t") {
     event.preventDefault();
-    retainActiveSpanAsSection(event, {
+    retainSectionFromSource(event, {
       source: "interval",
       useFormLabel: false
     });

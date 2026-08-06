@@ -157,7 +157,7 @@ target is stored.
 
 Weight changes are single Guide selector transactions. Weight has no matrix
 route and no press-and-hold gesture; every edit calls the one Session
-`setGuideSectionWeight()` transaction.
+`setGuideSectionWeighting()` transaction.
 
 The spatial Link gesture uses the same Pin drag as ordinary movement. A target
 within 16 pixels is only a candidate until the pointer remains on it for 450 ms;

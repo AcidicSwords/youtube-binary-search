@@ -997,7 +997,7 @@ export function switchActiveEnd(session, options = {}) {
   }, options);
 }
 
-export function releaseInterval(session) {
+export function releaseActiveSpan(session) {
   if (!session.model.activeSpan) return unchanged(session, "no-active-span");
   return commit(session, "Release Active Span", draft => {
     draft.activeSpan = null;
@@ -1066,7 +1066,7 @@ export function focusSection(session, sectionId, options = {}) {
   }, options);
 }
 
-export function focusWorkingSection(session) {
+export function focusActiveSpan(session) {
   const interval = session.model.activeSpan;
   if (!interval) return unchanged(session, "no-active-span");
   if (
@@ -1099,7 +1099,7 @@ export function focusWorkingSection(session) {
   });
 }
 
-export function leaveSection(session) {
+export function unfocus(session) {
   if (!session.model.focus) return unchanged(session, "not-focused");
   return commit(session, "Leave Section", draft => {
     const returnRange = clone(draft.focus.returnRange) || { start: 0, end: draft.duration };
@@ -1328,7 +1328,7 @@ export function saveExtentAsSection(session, extent, label, provenance = "extent
   }, { guideEdit: true });
 }
 
-export function retainSpanAsSection(session, label) {
+export function retainActiveSpanAsSection(session, label) {
   if (!session.model.activeSpan) return unchanged(session, "no-active-span");
   return saveExtentAsSection(
     session,
@@ -1562,7 +1562,7 @@ export function deleteGuideGroup(session, groupId) {
   }, { guideEdit: true });
 }
 
-export function setGuideSectionWeight(session, sectionId, weight) {
+export function setGuideSectionWeighting(session, sectionId, weight) {
   const section = resolveSection(session.model.guide, sectionId);
   if (!section) return unchanged(session, "missing-section");
   if (!isSectionWeighting(weight)) {
@@ -1810,7 +1810,7 @@ export function previewTransition(session, action, options = {}) {
     case "reopen":
       return reopen(session);
     case "release":
-      return releaseInterval(session);
+      return releaseActiveSpan(session);
     default:
       return unchanged(session, "unsupported-preview");
   }

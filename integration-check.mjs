@@ -207,9 +207,9 @@ has(appCode, /plain && key === "f"[\s\S]{0,100}?focusOrUnfocus\(\)/,
   "F reaches Focus / Unfocus.");
 
 // Tag has one grammar on pointer, keyboard, preview, and Guide surfaces.
-has(appCode, /elements\.retain\.addEventListener\("click"[\s\S]*?retainActiveSpanAsSection\([\s\S]*?source:\s*"interval"[\s\S]*?retainCurrentAsPin\(/,
+has(appCode, /elements\.retain\.addEventListener\("click"[\s\S]*?retainSectionFromSource\([\s\S]*?source:\s*"interval"[\s\S]*?retainCurrentAsPin\(/,
   "The Tag button routes Shift to Section and plain input to Current Pin.");
-has(appCode, /event\.shiftKey[\s\S]{0,180}?key === "t"[\s\S]{0,220}?retainActiveSpanAsSection\(/,
+has(appCode, /event\.shiftKey[\s\S]{0,180}?key === "t"[\s\S]{0,220}?retainSectionFromSource\(/,
   "Shift+T tags the Active Span as a Section.");
 has(appCode, /plain && key === "t"[\s\S]{0,120}?retainCurrentAsPin\(/,
   "Plain T tags Current as a Pin.");
@@ -223,7 +223,7 @@ has(view, /retain:\s*shiftLayer\s*\?\s*positiveActiveSpan\s*:\s*\{ start: semant
   "Tag preview follows the same Pin/Section operand law.");
 has(topLevelFunction(appCode, "retainCurrentAsPin"), /!result\.changed[\s\S]*?result\.value\?\.pin[\s\S]*?selectTimelineRetained\(\{ kind: "pin"/,
   "Duplicate Retain Pin acquires the existing exact Pin.");
-has(topLevelFunction(appCode, "retainActiveSpanAsSection"), /reason === "duplicate-section"[\s\S]*?selectTimelineRetained\(\{ kind: "section"/,
+has(topLevelFunction(appCode, "retainSectionFromSource"), /reason === "duplicate-section"[\s\S]*?selectTimelineRetained\(\{ kind: "section"/,
   "Duplicate Retain Section acquires the existing exact Section.");
 lacks(html, /<kbd>\s*P\s*<\/kbd>|Shift\s*\+\s*P|aria-keyshortcuts="[^"]*(?:^|\s)(?:Shift\+)?P(?:\s|$)/i,
   "No visible or accessible P binding remains.");
@@ -334,7 +334,7 @@ has(appCode, /texturedRatePolicy|RATE_POLICY_KIND\.DYNAMIC[\s\S]*?timelineProjec
 has(topLevelFunction(appCode, "handleTimelineClick"), /state\.timelineSelection = null[\s\S]*?moveToAddress\(/,
   "Bare Timeline Go clears the acquired operand before moving.");
 const release = topLevelFunction(appCode, "releaseActiveSpan");
-has(release, /releaseSessionInterval\(state\.session\)/, "Release delegates semantic residue to Session.");
+has(release, /releaseSessionActiveSpan\(state\.session\)/, "Release delegates semantic residue to Session.");
 has(release, /state\.timelineSelection = null/, "Release also clears the Timeline operand.");
 lacks(release, /guideSelection\s*=\s*null|weightRelaxation\s*=|focus\s*=|setRange/,
   "Release does not mutate Guide Selection, bypass, Focus, or Range.");

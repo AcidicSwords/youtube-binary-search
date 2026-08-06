@@ -66,7 +66,7 @@ assert.match(app, /key === "t"[\s\S]*retainCurrentAsPin\(/);
 assert.match(app, /key === "f"[\s\S]*focusOrUnfocus\(\)/);
 assert.match(app, /shiftedSpatialKey\("a"\)[\s\S]*traverseToAdjacentPin\("backward"/);
 assert.match(app, /shiftedSpatialKey\("d"\)[\s\S]*traverseToAdjacentPin\("forward"/);
-assert.match(app, /event\.shiftKey[\s\S]*key === "t"[\s\S]*retainActiveSpanAsSection\(/);
+assert.match(app, /event\.shiftKey[\s\S]*key === "t"[\s\S]*retainSectionFromSource\(/);
 
 const canonicalDocs = [
   source("./README.md"),
