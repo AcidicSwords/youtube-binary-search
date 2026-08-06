@@ -1,20 +1,20 @@
 import assert from "node:assert/strict";
 import {
-  BREATH_PHASE,
-  BREATH_RATE_STEPS,
-  DEFAULT_FIELD_BREATH,
+  PANORAMA_DIRECTION,
+  PANORAMA_SIDE_RATE_STEPS,
+  DEFAULT_PANORAMA_CYCLE,
   normalizeFieldBreath,
-  breathRatePair,
-  breathTargetOffset,
+  panoramaSideRates,
+  panoramaTargetOffset,
   breathRateFromResponse,
   effectiveBreathBounds,
-  createBreathRuntime,
-  breathSideRate,
+  createPanoramaCycle,
+  panoramaSideRate,
   advanceBreath,
   holdBreath,
   resumeBreath,
-  rebaseBreath,
-  restartBreath
+  rebasePanoramaCycle,
+  restartPanoramaCycle
 } from "./step-field-geometry.js";
 
 const breath = { inner: 2, outer: 10, rate: 0.5 };
@@ -42,48 +42,48 @@ function run(runtime, steps, options = {}) {
   return { state, seen };
 }
 function begin(configured = breath) {
-  const started = resumeBreath(createBreathRuntime(configured, clock), configured);
+  const started = resumeBreath(createPanoramaCycle(configured, clock), configured);
   return { ...started, startedAt: clock, startingOffset: configured.inner, offset: configured.inner };
 }
 
 // Configuration
 {
   assert.deepEqual(
-    DEFAULT_FIELD_BREATH,
+    DEFAULT_PANORAMA_CYCLE,
     { inner: 0.25, outer: 2.5, rate: 0.25 },
     "The shipped Field is a conservative local horizon."
   );
   assert.deepEqual(
-    breathRatePair(DEFAULT_FIELD_BREATH.rate),
+    panoramaSideRates(DEFAULT_PANORAMA_CYCLE.rate),
     { center: 1, tailRate: 0.75, leadRate: 1.25 }
   );
   assert.deepEqual(normalizeFieldBreath({ inner: 3, outer: 12, rate: 0.25 }),
     { inner: 3, outer: 12, rate: 0.25 });
   assert.ok(normalizeFieldBreath({ inner: 30, outer: 12 }).inner < 12,
     "The inner offset can never reach or exceed the outer offset.");
-  assert.deepEqual(normalizeFieldBreath(null), DEFAULT_FIELD_BREATH);
-  assert.equal(normalizeFieldBreath({ rate: 4 }).rate, DEFAULT_FIELD_BREATH.rate);
+  assert.deepEqual(normalizeFieldBreath(null), DEFAULT_PANORAMA_CYCLE);
+  assert.equal(normalizeFieldBreath({ rate: 4 }).rate, DEFAULT_PANORAMA_CYCLE.rate);
 
   // z < c < w with c − z = w − c
-  for (const rate of BREATH_RATE_STEPS) {
-    const pair = breathRatePair(rate);
+  for (const rate of PANORAMA_SIDE_RATE_STEPS) {
+    const pair = panoramaSideRates(rate);
     assert.ok(pair.tailRate < pair.center && pair.center < pair.leadRate);
     assert.ok(
       Math.abs((pair.center - pair.tailRate) - (pair.leadRate - pair.center)) < 1e-9,
       "The breathing rate pair must be symmetric about Center rate."
     );
   }
-  assert.deepEqual(breathRatePair(0.25), { center: 1, tailRate: 0.75, leadRate: 1.25 });
+  assert.deepEqual(panoramaSideRates(0.25), { center: 1, tailRate: 0.75, leadRate: 1.25 });
 
   // The step either side of Center is an interval on the rate ladder, not a
   // fraction of Center. Scaling it -- tail = C(1-z), lead = C(1+z) -- is
   // identical at 1x and wrong everywhere else: the gap between Center and a side
   // would grow with Center, so the Field would open faster the faster you played
   // and a breath would last a different number of seconds at every rate.
-  assert.deepEqual(breathRatePair(0.5, 2), { center: 2, tailRate: 1.5, leadRate: 2.5 },
+  assert.deepEqual(panoramaSideRates(0.5, 2), { center: 2, tailRate: 1.5, leadRate: 2.5 },
     "Changing Center rate moves the whole relation without changing its size.");
   for (const centerRate of [0.5, 0.75, 1, 1.25, 1.5, 1.75]) {
-    const pair = breathRatePair(0.25, centerRate);
+    const pair = panoramaSideRates(0.25, centerRate);
     assert.ok(
       Math.abs((pair.center - pair.tailRate) - 0.25) < 1e-9
       && Math.abs((pair.leadRate - pair.center) - 0.25) < 1e-9,
@@ -93,10 +93,10 @@ function begin(configured = breath) {
   // Symmetry survives a Center rate too low to hold the step below it: Tail
   // floors at 0 rather than going backwards, which is the one asymmetry the
   // ladder can force and the reason such a Center has no Panorama triplet.
-  const narrow = breathRatePair(0.75, 0.5);
+  const narrow = panoramaSideRates(0.75, 0.5);
   assert.equal(narrow.tailRate, 0, "A step wider than Center cannot reverse Tail.");
   assert.equal(narrow.leadRate, 1.25);
-  const wide = breathRatePair(0.75, 2);
+  const wide = panoramaSideRates(0.75, 2);
   assert.ok(Math.abs((wide.center - wide.tailRate) - (wide.leadRate - wide.center)) < 1e-9,
     "Wherever both sides fit, the relation stays symmetric about Center.");
   assert.equal(breathRateFromResponse({ tailRate: 0.5, leadRate: 2 }), 0.75);
@@ -131,14 +131,14 @@ function begin(configured = breath) {
 
 // Rate assignment per phase
 {
-  assert.equal(breathSideRate({ role: "tail", phase: BREATH_PHASE.EXPANDING, rate: 0.5 }), 0.5);
-  assert.equal(breathSideRate({ role: "lead", phase: BREATH_PHASE.EXPANDING, rate: 0.5 }), 1.5);
-  assert.equal(breathSideRate({ role: "tail", phase: BREATH_PHASE.CONTRACTING, rate: 0.5 }), 1.5,
+  assert.equal(panoramaSideRate({ role: "tail", phase: PANORAMA_DIRECTION.EXPANDING, rate: 0.5 }), 0.5);
+  assert.equal(panoramaSideRate({ role: "lead", phase: PANORAMA_DIRECTION.EXPANDING, rate: 0.5 }), 1.5);
+  assert.equal(panoramaSideRate({ role: "tail", phase: PANORAMA_DIRECTION.CONTRACTING, rate: 0.5 }), 1.5,
     "Contraction exchanges the side rates so Tail catches Center.");
-  assert.equal(breathSideRate({ role: "lead", phase: BREATH_PHASE.CONTRACTING, rate: 0.5 }), 0.5);
-  assert.equal(breathSideRate({ role: "lead", phase: BREATH_PHASE.EXPANDING, rate: 0.5, waiting: true }), 1,
+  assert.equal(panoramaSideRate({ role: "lead", phase: PANORAMA_DIRECTION.CONTRACTING, rate: 0.5 }), 0.5);
+  assert.equal(panoramaSideRate({ role: "lead", phase: PANORAMA_DIRECTION.EXPANDING, rate: 0.5, waiting: true }), 1,
     "A side waiting at a breathing boundary runs at Center rate.");
-  assert.equal(breathSideRate({ role: "tail", phase: BREATH_PHASE.EXPANDING, rate: 0.5, held: true }), 1);
+  assert.equal(panoramaSideRate({ role: "tail", phase: PANORAMA_DIRECTION.EXPANDING, rate: 0.5, held: true }), 1);
 }
 
 // Expansion, barrier, contraction, and the full cycle
@@ -149,7 +149,7 @@ function begin(configured = breath) {
   const expanded = run(state, 4);
   state = expanded.state;
   assert.equal(state.sides.tail.offset, 4, "Offset grows by the configured fractional spread.");
-  assert.equal(state.phase, BREATH_PHASE.EXPANDING);
+  assert.equal(state.phase, PANORAMA_DIRECTION.EXPANDING);
 
   const phases = [];
   for (let index = 0; index < 80; index += 1) {
@@ -158,9 +158,9 @@ function begin(configured = breath) {
     state = advanceBreath(state, { breath, now: clock, sides: bothOperational });
     if (state.phase !== previous) phases.push(state.phase);
   }
-  assert.equal(phases[0], BREATH_PHASE.CONTRACTING,
+  assert.equal(phases[0], PANORAMA_DIRECTION.CONTRACTING,
     "Reaching the outer boundary on every operational side begins contraction.");
-  assert.equal(phases[1], BREATH_PHASE.EXPANDING, "The cycle repeats: x → expand → y → contract → x.");
+  assert.equal(phases[1], PANORAMA_DIRECTION.EXPANDING, "The cycle repeats: x → expand → y → contract → x.");
   assert.ok(phases.length >= 3, "Breathing continues until Hold is deliberately chosen.");
 }
 
@@ -173,8 +173,8 @@ function begin(configured = breath) {
   // made the answer depend on whether the resume and the tick that followed it
   // landed in the same millisecond -- which is not a question the geometry is
   // allowed to have an opinion about.
-  const atOuter = breathTargetOffset({
-    direction: BREATH_PHASE.EXPANDING,
+  const atOuter = panoramaTargetOffset({
+    direction: PANORAMA_DIRECTION.EXPANDING,
     startedAt: 5000,
     startingOffset: breath.outer,
     inner: breath.inner,
@@ -182,12 +182,12 @@ function begin(configured = breath) {
     now: 5000,
     driftRate: breath.rate
   });
-  assert.deepEqual(atOuter, { offset: breath.outer, direction: BREATH_PHASE.CONTRACTING });
+  assert.deepEqual(atOuter, { offset: breath.outer, direction: PANORAMA_DIRECTION.CONTRACTING });
 
   // The inner turn is the mirror of it, and already reads this way: a
   // contraction that has arrived turns outward.
-  const atInner = breathTargetOffset({
-    direction: BREATH_PHASE.CONTRACTING,
+  const atInner = panoramaTargetOffset({
+    direction: PANORAMA_DIRECTION.CONTRACTING,
     startedAt: 5000,
     startingOffset: breath.inner,
     inner: breath.inner,
@@ -195,12 +195,12 @@ function begin(configured = breath) {
     now: 5000,
     driftRate: breath.rate
   });
-  assert.deepEqual(atInner, { offset: breath.inner, direction: BREATH_PHASE.EXPANDING });
+  assert.deepEqual(atInner, { offset: breath.inner, direction: PANORAMA_DIRECTION.EXPANDING });
 
   // Nothing between the turns changes: an ordinary outward leg is still outward
   // right up to the bound.
-  const midway = breathTargetOffset({
-    direction: BREATH_PHASE.EXPANDING,
+  const midway = panoramaTargetOffset({
+    direction: PANORAMA_DIRECTION.EXPANDING,
     startedAt: 0,
     startingOffset: breath.inner,
     inner: breath.inner,
@@ -208,7 +208,7 @@ function begin(configured = breath) {
     now: 15000,
     driftRate: breath.rate
   });
-  assert.deepEqual(midway, { offset: 9.5, direction: BREATH_PHASE.EXPANDING });
+  assert.deepEqual(midway, { offset: 9.5, direction: PANORAMA_DIRECTION.EXPANDING });
 }
 
 // Offsets always remain inside the effective bounds and never cross Center
@@ -243,7 +243,7 @@ function begin(configured = breath) {
   assert.equal(state.sides.lead.offset, 4,
     "and the unclipped side turns with it, so the two stay symmetric.");
   state = run(state, 1, { sides: asymmetric }).state;
-  assert.equal(state.phase, BREATH_PHASE.CONTRACTING,
+  assert.equal(state.phase, PANORAMA_DIRECTION.CONTRACTING,
     "The shared bound is the clipped one, so contraction begins there.");
 
   let contracted = state;
@@ -264,7 +264,7 @@ function begin(configured = breath) {
   };
   let state = begin();
   state = run(state, 30, { sides: oneSided }).state;
-  assert.equal(state.phase, BREATH_PHASE.CONTRACTING,
+  assert.equal(state.phase, PANORAMA_DIRECTION.CONTRACTING,
     "A dormant side must not stall the Field at its outer boundary.");
   assert.equal(state.sides.tail.excluded, true,
     "A side without room for the configured inner offset must not stall the Field.");
@@ -282,11 +282,11 @@ function begin(configured = breath) {
   const stillHeld = advanceBreath(held, { breath, now: clock, sides: bothOperational });
   assert.equal(stillHeld.sides.lead.offset, attained, "Hold preserves each attained offset.");
   assert.equal(stillHeld.sides.tail.rate, 1, "Every held side runs at Center rate.");
-  assert.equal(stillHeld.phase, BREATH_PHASE.EXPANDING, "Hold preserves the breathing direction.");
+  assert.equal(stillHeld.phase, PANORAMA_DIRECTION.EXPANDING, "Hold preserves the breathing direction.");
 
   // Resuming rebases the leg onto the relation actually on screen, so the held
   // seconds cost nothing: the breath continues from where it stopped.
-  const restarted = rebaseBreath(resumeBreath(stillHeld, breath), clock, attained);
+  const restarted = rebasePanoramaCycle(resumeBreath(stillHeld, breath), clock, attained);
   clock += 1000;
   const resumed = advanceBreath(restarted, { breath, now: clock, sides: bothOperational });
   assert.ok(resumed.sides.lead.offset > attained, "Stretch resumes from the attained relation.");
@@ -295,19 +295,19 @@ function begin(configured = breath) {
 // Contraction direction is preserved across a Hold as well
 {
   let state = begin();
-  while (state.phase === BREATH_PHASE.EXPANDING) {
+  while (state.phase === PANORAMA_DIRECTION.EXPANDING) {
     clock += 1000;
     state = advanceBreath(state, { breath, now: clock, sides: bothOperational });
   }
   state = run(state, 2).state;
-  assert.equal(state.phase, BREATH_PHASE.CONTRACTING);
+  assert.equal(state.phase, PANORAMA_DIRECTION.CONTRACTING);
   const held = holdBreath(state, breath);
-  const restarted = rebaseBreath(
+  const restarted = rebasePanoramaCycle(
     resumeBreath(held, breath), clock, state.sides.tail.offset
   );
   clock += 1000;
   const resumed = advanceBreath(restarted, { breath, now: clock, sides: bothOperational });
-  assert.equal(resumed.phase, BREATH_PHASE.CONTRACTING);
+  assert.equal(resumed.phase, PANORAMA_DIRECTION.CONTRACTING);
   assert.ok(resumed.sides.tail.offset < state.sides.tail.offset);
 }
 
@@ -315,29 +315,29 @@ function begin(configured = breath) {
 // outward pair unconditionally contradicts a preserved contracting phase.
 {
   let state = begin();
-  while (state.phase === BREATH_PHASE.EXPANDING) {
+  while (state.phase === PANORAMA_DIRECTION.EXPANDING) {
     clock += 1000;
     state = advanceBreath(state, { breath, now: clock, sides: bothOperational });
   }
-  assert.equal(state.phase, BREATH_PHASE.CONTRACTING);
+  assert.equal(state.phase, PANORAMA_DIRECTION.CONTRACTING);
   for (const role of ["tail", "lead"]) {
-    const resumed = breathSideRate({
+    const resumed = panoramaSideRate({
       role,
       phase: state.phase,
       rate: breath.rate,
       waiting: state.sides[role].waiting,
       held: false
     });
-    const outward = breathSideRate({
+    const outward = panoramaSideRate({
       role,
-      phase: BREATH_PHASE.EXPANDING,
+      phase: PANORAMA_DIRECTION.EXPANDING,
       rate: breath.rate
     });
     assert.notEqual(resumed, outward,
       `Resuming a contracting ${role} must not command the outward rate.`);
   }
   assert.equal(
-    breathSideRate({ role: "tail", phase: state.phase, rate: breath.rate }),
+    panoramaSideRate({ role: "tail", phase: state.phase, rate: breath.rate }),
     1.5,
     "A contracting Tail catches Center."
   );
@@ -365,7 +365,7 @@ function begin(configured = breath) {
     state = advanceBreath(state, { breath, now: clock, centerRate, sides: bothOperational });
     assert.equal(state.startedAt, before.startedAt, "The leg is not restarted.");
     assert.equal(state.startingOffset, before.startingOffset, "nor rebased.");
-    assert.equal(state.phase, BREATH_PHASE.EXPANDING, "and it keeps its direction.");
+    assert.equal(state.phase, PANORAMA_DIRECTION.EXPANDING, "and it keeps its direction.");
     assert.ok(state.sides.tail.offset > before.sides.tail.offset,
       "The offset continues from where it was.");
     assert.equal(state.sides.tail.offset, state.sides.lead.offset,
@@ -394,14 +394,14 @@ function begin(configured = breath) {
   assert.ok(state.sides.tail.offset > breath.inner, "The Field was open when Panorama was lost.");
   // The leg it was on genuinely started somewhere other than the inner offset,
   // so a restart is something that can be observed rather than assumed.
-  state = rebaseBreath(state, clock, state.sides.tail.offset);
+  state = rebasePanoramaCycle(state, clock, state.sides.tail.offset);
   assert.ok(state.startingOffset > breath.inner);
 
   clock += 30000;
-  const resumed = restartBreath(state, breath, clock);
+  const resumed = restartPanoramaCycle(state, breath, clock);
   assert.equal(resumed.startingOffset, breath.inner, "It resumes at the inner offset,");
   assert.equal(resumed.startedAt, clock, "on a fresh leg,");
-  assert.equal(resumed.phase, BREATH_PHASE.EXPANDING, "expanding outward.");
+  assert.equal(resumed.phase, PANORAMA_DIRECTION.EXPANDING, "expanding outward.");
 
   clock += ((breath.outer - breath.inner) / breath.rate) * 1000;
   const reopened = advanceBreath(resumed, { breath, now: clock, sides: bothOperational });

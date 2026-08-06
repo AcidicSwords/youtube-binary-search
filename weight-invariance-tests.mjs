@@ -18,7 +18,7 @@ import {
 } from "./session.js";
 import { projectionForModel } from "./timeline-projection.js";
 import { deriveContextWindow, createContextTransport } from "./transport.js";
-import { effectiveBreathBounds, deriveStepField } from "./step-field-geometry.js";
+import { effectiveBreathBounds, derivePanorama } from "./step-field-geometry.js";
 
 const DURATION = 100;
 const RANGE = { start: 0, end: DURATION };
@@ -262,7 +262,7 @@ function addresses(model) {
 
   // Field geometry is physical: offsets and breathing bounds are source seconds.
   assert.deepEqual(
-    deriveStepField(50, { backward: 10, forward: 10, linked: true }, RANGE).envelope,
+    derivePanorama(50, { backward: 10, forward: 10, linked: true }, RANGE).envelope,
     { start: 40, end: 60 },
     "Field offsets are source-time displacements from Center."
   );

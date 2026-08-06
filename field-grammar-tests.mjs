@@ -1,18 +1,18 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  STEP_FIELD_PHASE,
+  PANORAMA_STATE,
   chooseNearestRate,
-  deriveStepField,
+  derivePanorama,
   resolveFieldPhase,
   deriveObservedField
 } from "./step-field-geometry.js";
 import { createSession, saveExtentAsSection } from "./session.js";
 
-const targets = deriveStepField(50, { backward: 10, forward: 10, linked: true }, { start: 0, end: 100 });
+const targets = derivePanorama(50, { backward: 10, forward: 10, linked: true }, { start: 0, end: 100 });
 const unfolding = deriveObservedField({
   targets,
-  phase: STEP_FIELD_PHASE.UNFOLDING,
+  phase: PANORAMA_STATE.UNFOLDING,
   centerAddress: 54,
   tailAddress: 52,
   leadAddress: 58,
@@ -28,8 +28,8 @@ assert.deepEqual(unfolding.span, {
 });
 
 const held = deriveObservedField({
-  targets: deriveStepField(60, { backward: 10, forward: 10, linked: true }, { start: 0, end: 100 }),
-  phase: STEP_FIELD_PHASE.HELD,
+  targets: derivePanorama(60, { backward: 10, forward: 10, linked: true }, { start: 0, end: 100 }),
+  phase: PANORAMA_STATE.HELD,
   centerAddress: 60,
   tailAddress: 50,
   leadAddress: 70,
@@ -50,7 +50,7 @@ assert.equal(resolveFieldPhase({
     { visible: true, available: true, held: true, offset: 0 },
     { visible: true, available: true, held: true, offset: 0 }
   ]
-}), STEP_FIELD_PHASE.COINCIDENT, "Held zero-offset sides remain physically coincident.");
+}), PANORAMA_STATE.COINCIDENT, "Held zero-offset sides remain physically coincident.");
 assert.equal(resolveFieldPhase({
   enabled: true,
   suspended: false,
@@ -58,7 +58,7 @@ assert.equal(resolveFieldPhase({
     { visible: true, available: true, held: true, offset: 10 },
     { visible: true, available: true, held: true, offset: 10 }
   ]
-}), STEP_FIELD_PHASE.HELD);
+}), PANORAMA_STATE.HELD);
 
 let session = createSession({ duration: 100, current: 50 });
 const retained = saveExtentAsSection(session, { start: 40, end: 60 }, "Field reading", "field-span");
@@ -79,7 +79,7 @@ for (const retired of ["continue", "context-action", "skim", "speed-select", "fi
   assert.doesNotMatch(html, new RegExp(`id=["']${retired}["']`), `Retired playback control remains: ${retired}`);
 }
 for (const id of [
-  "field-transport-state", "field-both-toggle", "field-span-fill",
+  "field-transport-state", "field-both-toggle", "panorama-window-fill",
   "field-inner-offset", "field-outer-offset", "field-breath-rate",
   "section-retain-form", "section-source", "pin-retain-form", "pin-current",
   "release", "retain", "focus-toggle", "shift-layer-toggle",
@@ -90,7 +90,7 @@ assert.match(app, /function applyPlayerEffect\(result[\s\S]*result\?\.activeSpan
   "Committed traversal must invoke automatic Context when enabled.");
 assert.match(
   app,
-  /const sideStep = role => event => \{[\s\S]*stepField\?\.getStepSelection[\s\S]*carryRetained: event\?\.altKey === true \|\| state\.carryModifier/
+  /const sideStep = role => event => \{[\s\S]*panorama\?\.getStepSelection[\s\S]*carryRetained: event\?\.altKey === true \|\| state\.carryModifier/
 );
 assert.match(app, /bindStepPress\(control[\s\S]*tap:\s*tapStep/);
 assert.match(
@@ -118,7 +118,7 @@ assert.match(
 // returning after Center played alone. It restarts the phase, which is what
 // makes an ordinary Weight-bucket change -- which never arrives here -- keep its
 // direction, its offset and its deadline.
-assert.match(fieldSource, /function startBreathCycle\(center, snapshot[\s\S]*restartBreath\(runtime\.breath, configured, now\(\)\)[\s\S]*Math\.min\(bounds\.inner, bounds\.outer\)/,
+assert.match(fieldSource, /function startBreathCycle\(center, snapshot[\s\S]*restartPanoramaCycle\(runtime\.breath, configured, now\(\)\)[\s\S]*Math\.min\(bounds\.inner, bounds\.outer\)/,
   "A discontinuity must begin a fresh breath leg at the inner boundary and expand outward.");
 assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*(?:adapter\?\.place|adapter\?\.cue)[\s\S]*side\.adapter\?\.play/,
   "Every running breath must prime its side at 1× before directional-rate discovery.");
@@ -126,7 +126,7 @@ assert.doesNotMatch(fieldSource, /onHoldOffsets/,
   "Hold and Stretch must never persist a measured runtime offset.");
 assert.doesNotMatch(app, /onHoldOffsets:/,
   "The application must not expose a Hold-to-configuration write path.");
-assert.match(app, /function changeFieldBoundary[\s\S]*state\.fieldBreath = normalizeFieldBreath/,
+assert.match(app, /function changeFieldBoundary[\s\S]*state\.panoramaCycle = normalizeFieldBreath/,
   "Only explicit Inner/Outer Offset input may update the configured Field relation.");
 assert.doesNotMatch(app, /state\.fieldOffsets\s*=/,
   "Two independent side Offsets are replaced by one bounded breathing relation.");
@@ -138,7 +138,7 @@ assert.match(fieldSource, /function driveSide\(role, center, snapshot, centerRun
   "Breathing rate must be requested only after a side is running and its capabilities are observable.");
 assert.match(css, /data-phase="unfolding"/);
 assert.match(css, /data-phase="held"/);
-assert.match(css, /field-span-fill/);
+assert.match(css, /panorama-window-fill/);
 assert.match(packageJson.scripts.test, /field-grammar-tests\.mjs/);
 assert.match(packageJson.scripts.check, /step-field-geometry\.js/);
 

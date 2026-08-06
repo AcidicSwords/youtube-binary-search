@@ -26,8 +26,8 @@ import {
   withPlaybackActualRate
 } from "./transport.js";
 import {
-  DEFAULT_FIELD_BREATH,
-  breathRatePair
+  DEFAULT_PANORAMA_CYCLE,
+  panoramaSideRates
 } from "./step-field-geometry.js";
 
 const read = path => readFileSync(new URL(`./${path}`, import.meta.url), "utf8")
@@ -559,9 +559,9 @@ has(session, /export function settleStepSequence[\s\S]*?Step Reversal[\s\S]*?vis
   "Step settlement retains a sparse transient reversal envelope.");
 has(sources["guide-session-completion-tests.mjs"], /visitedMinimum[\s\S]*?visitedMaximum[\s\S]*?Step Reversal[\s\S]*?history\.length, 1/,
   "Step Reversal has focused one-transaction coverage.");
-same(DEFAULT_FIELD_BREATH, { inner: 0.25, outer: 2.5, rate: 0.25 },
+same(DEFAULT_PANORAMA_CYCLE, { inner: 0.25, outer: 2.5, rate: 0.25 },
   "Field ships with conservative 0.25-2.5 second defaults.");
-same(breathRatePair(DEFAULT_FIELD_BREATH.rate), {
+same(panoramaSideRates(DEFAULT_PANORAMA_CYCLE.rate), {
   center: 1,
   tailRate: 0.75,
   leadRate: 1.25
@@ -574,7 +574,7 @@ has(interactionSmoke, /savedFieldBreath = \{ inner: 3, outer: 12, rate: 0\.4 \}/
   "Saved Field coverage uses values wider than the shipped defaults.");
 has(interactionSmoke, /3–12 s · 0\.6× \/ 1\.4×/,
   "Saved non-preset Field rates have truthful presentation coverage.");
-has(interactionSmoke, /fieldBreath,[\s\S]*savedFieldBreath/,
+has(interactionSmoke, /panoramaCycle,[\s\S]*savedFieldBreath/,
   "Saved Field coverage proves the valid persisted preference remains unchanged.");
 
 // Required completion suites must exist and be executed by a package script.

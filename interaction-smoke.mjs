@@ -6,7 +6,7 @@ const { byId, players, flush, poll, dispatchDocument, currentText } = env;
 const savedFieldBreath = { inner: 3, outer: 12, rate: 0.4 };
 env.localStorage.values.set(
   "binary-youtube-reader:preferences:v1",
-  JSON.stringify({ fieldBreath: savedFieldBreath })
+  JSON.stringify({ panoramaCycle: savedFieldBreath })
 );
 
 await import("./app.js");
@@ -27,7 +27,7 @@ assert.equal(byId.get("field-outer-offset").value, "12");
 assert.equal(byId.get("field-breath-rate").value, "0.4");
 assert.equal(byId.get("panorama-setting-value").textContent, "3–12 s · 0.6× / 1.4×");
 assert.deepEqual(
-  JSON.parse(env.localStorage.values.get("binary-youtube-reader:preferences:v1")).fieldBreath,
+  JSON.parse(env.localStorage.values.get("binary-youtube-reader:preferences:v1")).panoramaCycle,
   savedFieldBreath,
   "Booting with new defaults must not rewrite a valid saved Field relation."
 );

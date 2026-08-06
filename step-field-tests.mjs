@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  STEP_FIELD_PHASE,
+  PANORAMA_STATE,
   deriveFieldBounds,
-  deriveStepField,
+  derivePanorama,
   chooseNearestRate,
   resolveFieldPhase
 } from "./step-field-geometry.js";
@@ -33,7 +33,7 @@ import {
     constraint: "none"
   });
 
-  const field = deriveStepField(50, { backward: 10, forward: 10, linked: true }, { start: 0, end: 100 });
+  const field = derivePanorama(50, { backward: 10, forward: 10, linked: true }, { start: 0, end: 100 });
   assert.equal(field.center, 50);
   assert.equal(field.tail.target, 40);
   assert.equal(field.tail.distance, 10);
@@ -45,7 +45,7 @@ import {
 }
 
 {
-  const field = deriveStepField(4, { backward: 10, forward: 10, linked: true }, { start: 0, end: 12 });
+  const field = derivePanorama(4, { backward: 10, forward: 10, linked: true }, { start: 0, end: 12 });
   assert.equal(field.tail.target, 0);
   assert.equal(field.tail.distance, 4);
   assert.equal(field.tail.constrained, true);
@@ -85,8 +85,8 @@ assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: false }), false);
 assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: true }), true);
 assert.equal(fieldPreferenceRequiresEstablish({ tailRate: 0.75 }), false);
 
-assert.equal(resolveFieldPhase({ enabled: false, suspended: false, sides: [] }), STEP_FIELD_PHASE.OFF);
-assert.equal(resolveFieldPhase({ enabled: true, suspended: true, sides: [] }), STEP_FIELD_PHASE.SUSPENDED);
+assert.equal(resolveFieldPhase({ enabled: false, suspended: false, sides: [] }), PANORAMA_STATE.OFF);
+assert.equal(resolveFieldPhase({ enabled: true, suspended: true, sides: [] }), PANORAMA_STATE.SUSPENDED);
 assert.equal(resolveFieldPhase({
   enabled: true,
   suspended: false,
@@ -94,7 +94,7 @@ assert.equal(resolveFieldPhase({
     { visible: true, available: true, held: false, offset: 2 },
     { visible: true, available: true, held: false, offset: 3 }
   ]
-}), STEP_FIELD_PHASE.UNFOLDING);
+}), PANORAMA_STATE.UNFOLDING);
 assert.equal(resolveFieldPhase({
   enabled: true,
   suspended: false,
@@ -102,7 +102,7 @@ assert.equal(resolveFieldPhase({
     { visible: true, available: true, held: true, offset: 10 },
     { visible: true, available: true, held: false, offset: 6 }
   ]
-}), STEP_FIELD_PHASE.PARTIAL);
+}), PANORAMA_STATE.PARTIAL);
 assert.equal(resolveFieldPhase({
   enabled: true,
   suspended: false,
@@ -110,7 +110,7 @@ assert.equal(resolveFieldPhase({
     { visible: true, available: true, held: true, offset: 10 },
     { visible: true, available: true, held: true, offset: 10 }
   ]
-}), STEP_FIELD_PHASE.HELD);
+}), PANORAMA_STATE.HELD);
 
 {
   const html = readFileSync("index.html", "utf8");
@@ -132,17 +132,17 @@ assert.equal(resolveFieldPhase({
     assert.match(html, new RegExp(`id=["']${id}["']`), `Missing Step Field DOM id: ${id}`);
   }
 
-  assert.match(app, /createStepFieldController/);
+  assert.match(app, /createPanoramaController/);
   assert.match(app, /createStepGestureController/);
   assert.match(
     app,
-    /const sideStep = role => event => \{[\s\S]*stepField\?\.getStepSelection[\s\S]*carryRetained: event\?\.altKey === true \|\| state\.carryModifier/,
+    /const sideStep = role => event => \{[\s\S]*panorama\?\.getStepSelection[\s\S]*carryRetained: event\?\.altKey === true \|\| state\.carryModifier/,
     "Every side Step source must preserve the originating event's carry modifier in the shared transaction."
   );
   assert.match(app, /bindStepPress\(control/);
   assert.match(app, /performStep\(selection\.direction, selection\.distance/);
   assert.match(app, /function startFieldPlaybackFromGesture\(options = \{\}\)/);
-  assert.match(app, /stepField\?\.playFromGesture\?\.\(\{ center: destination, reason: "playback" \}\);[\s\S]*player\.play\(\);/,
+  assert.match(app, /panorama\?\.playFromGesture\?\.\(\{ center: destination, reason: "playback" \}\);[\s\S]*player\.play\(\);/,
     "Parent-owned playback must refold/start both side players and Center in one synchronous gesture stack.");
   // Observation ownership, not an inferred rate or modifier, decides whether
   // the Panorama participates. The confirmed actual rate is then the authority
@@ -247,7 +247,7 @@ assert.equal(resolveFieldPhase({
     "Restoring one collapsed projection must not force a sibling re-establishment.");
   assert.match(fieldSource, /side\.ready = Boolean\(side\.adapter\)/);
   assert.match(fieldSource, /resetSources/);
-  assert.match(app, /stepField\?\.resetSources\?\.\(\)/,
+  assert.match(app, /panorama\?\.resetSources\?\.\(\)/,
     "Reloading a video must release stale side-source errors, including same-video reloads.");
   assert.match(css, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);
   assert.match(css, /@container \(max-width: 680px\)/);

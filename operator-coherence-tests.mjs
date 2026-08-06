@@ -33,7 +33,7 @@ import {
   createTimelineProjection,
   projectionForModel
 } from "./timeline-projection.js";
-import { deriveStepField } from "./step-field-geometry.js";
+import { derivePanorama } from "./step-field-geometry.js";
 import {
   createPlaybackTransport,
   rebasePlaybackTransport
@@ -306,7 +306,7 @@ const weightedSession = createSession({
   guide: weightedGuide
 });
 const weightedProjection = projectionForModel(weightedSession.model);
-const field = deriveStepField(
+const field = derivePanorama(
   35,
   { backward: 10, forward: 10, linked: true },
   { start: 0, end: 100 },

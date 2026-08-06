@@ -2,7 +2,7 @@
 // These tests drive the real controller with a deterministic iframe stub so the
 // transition lifecycle, coalescing, and stale-event rejection are observable.
 import assert from "node:assert/strict";
-import { createStepFieldController } from "./step-field.js";
+import { createPanoramaController } from "./step-field.js";
 import { YOUTUBE_STATE } from "./youtube.js";
 
 function element() {
@@ -48,11 +48,11 @@ function makeHarness({ deferredCue = false, reducedMotion = false } = {}) {
     current: 50,
     range: { start: 0, end: 200 },
     stepReach: { backward: 10, forward: 10, linked: true },
-    fieldBreath: { inner: 2, outer: 10, rate: 0.5 },
+    panoramaCycle: { inner: 2, outer: 10, rate: 0.5 },
     transportKind: "idle",
     pendingStep: false,
     dragging: false,
-    fieldFrame: null,
+    panoramaFrame: null,
     center: {
       time: 50,
       rate: 1,
@@ -91,11 +91,11 @@ function makeHarness({ deferredCue = false, reducedMotion = false } = {}) {
 
   const previousYT = globalThis.YT;
   globalThis.YT = { Player: function Player() {} };
-  const controller = createStepFieldController({
+  const controller = createPanoramaController({
     document,
     getSnapshot: () => snapshot,
     getPreferences: () => ({
-      stepFieldEnabled: true,
+      panoramaEnabled: true,
       tailVisible: true,
       leadVisible: true,
       breathRate: 0.5,
@@ -109,11 +109,11 @@ function makeHarness({ deferredCue = false, reducedMotion = false } = {}) {
 
   // One committed movement: Session has already changed when the Frame arrives.
   function commit({ center, tail, lead, owner = "operator", kind = "step", outgoing = null }) {
-    const previous = snapshot.fieldFrame;
+    const previous = snapshot.panoramaFrame;
     snapshot = {
       ...snapshot,
       current: center,
-      fieldFrame: {
+      panoramaFrame: {
         owner,
         kind,
         tail,

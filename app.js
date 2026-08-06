@@ -115,9 +115,9 @@ import {
   isYouTubeApiReady,
   parseYouTubeUrl
 } from "./youtube.js";
-import { createStepFieldController } from "./step-field.js";
+import { createPanoramaController } from "./step-field.js";
 import {
-  DEFAULT_FIELD_BREATH,
+  DEFAULT_PANORAMA_CYCLE,
   normalizeFieldBreath,
   breathRateFromResponse
 } from "./step-field-geometry.js";
@@ -192,13 +192,13 @@ function legacyFieldBreath(value) {
   const outer = Math.max(
     Number(legacy?.backward) || 0,
     Number(legacy?.forward) || 0
-  ) || DEFAULT_FIELD_BREATH.outer;
+  ) || DEFAULT_PANORAMA_CYCLE.outer;
   return {
     inner: Math.max(MIN_NUDGE_SECONDS, outer / 4),
     outer,
     rate: value?.fieldResponse
       ? breathRateFromResponse(value.fieldResponse)
-      : DEFAULT_FIELD_BREATH.rate
+      : DEFAULT_PANORAMA_CYCLE.rate
   };
 }
 
@@ -229,9 +229,9 @@ function effectivePlaybackRate() {
 }
 
 function savedFieldBreath(value) {
-  if (value?.fieldBreath) return value.fieldBreath;
+  if (value?.panoramaCycle) return value.panoramaCycle;
   if (value?.fieldOffsets || value?.fieldResponse) return legacyFieldBreath(value);
-  return DEFAULT_FIELD_BREATH;
+  return DEFAULT_PANORAMA_CYCLE;
 }
 
 function readPreferences() {
@@ -246,11 +246,11 @@ function readPreferences() {
       // One bounded breathing relation replaces the two independent side
       // Offsets. A legacy pair migrates once: its widest side becomes the outer
       // offset and its saved rates become the nearest symmetric breathing pair.
-      fieldBreath: normalizeFieldBreath(savedFieldBreath(value)),
+      panoramaCycle: normalizeFieldBreath(savedFieldBreath(value)),
       nudgeSeconds: normalizeNudgeSeconds(value?.nudgeSeconds),
       playbackRate: normalizePlaybackRate(value?.playbackRate),
       dynamicPlaybackRate: value?.dynamicPlaybackRate === true,
-      stepFieldEnabled: value?.stepFieldEnabled !== false,
+      panoramaEnabled: value?.panoramaEnabled !== false,
       tailVisible: value?.tailVisible !== false,
       leadVisible: value?.leadVisible !== false
     };
@@ -258,11 +258,11 @@ function readPreferences() {
     return {
       contextSeconds: 5,
       stepReach: normalizeStepReach(10),
-      fieldBreath: { ...DEFAULT_FIELD_BREATH },
+      panoramaCycle: { ...DEFAULT_PANORAMA_CYCLE },
       nudgeSeconds: DEFAULT_NUDGE_SECONDS,
       playbackRate: DEFAULT_PLAYBACK_RATE,
       dynamicPlaybackRate: false,
-      stepFieldEnabled: true,
+      panoramaEnabled: true,
       tailVisible: true,
       leadVisible: true
     };
@@ -281,12 +281,12 @@ const state = {
   availableRates: [1],
   transport: idleTransport(),
   pendingStep: null,
-  fieldBreath: normalizeFieldBreath(preferences.fieldBreath),
+  panoramaCycle: normalizeFieldBreath(preferences.panoramaCycle),
   nudgeSeconds: normalizeNudgeSeconds(preferences.nudgeSeconds),
   contextSeconds: preferences.contextSeconds,
   playbackRate: preferences.playbackRate,
   dynamicPlaybackRate: preferences.dynamicPlaybackRate,
-  stepFieldEnabled: preferences.stepFieldEnabled,
+  panoramaEnabled: preferences.panoramaEnabled,
   tailVisible: preferences.tailVisible,
   leadVisible: preferences.leadVisible,
   dragHandle: null,
@@ -356,7 +356,7 @@ const state = {
 };
 
 let player = null;
-let stepField = null;
+let panorama = null;
 let pendingLoad = null;
 let loadGeneration = 0;
 let cuedGeneration = 0;
@@ -404,7 +404,7 @@ function configuredStepReach() {
 }
 
 function currentFieldBreath() {
-  return normalizeFieldBreath(state.fieldBreath ?? preferences.fieldBreath);
+  return normalizeFieldBreath(state.panoramaCycle ?? preferences.panoramaCycle);
 }
 
 // Field Offsets remain physical observation settings that are independent from
@@ -741,23 +741,23 @@ function persistPreferences() {
       model()?.stepReach ?? preferences.stepReach,
       preferences.stepReach
     );
-    preferences.fieldBreath = normalizeFieldBreath(state.fieldBreath);
+    preferences.panoramaCycle = normalizeFieldBreath(state.panoramaCycle);
     preferences.nudgeSeconds = normalizeNudgeSeconds(state.nudgeSeconds);
     preferences.contextSeconds = state.contextSeconds;
     preferences.playbackRate = normalizePlaybackRate(state.playbackRate);
     preferences.dynamicPlaybackRate = state.dynamicPlaybackRate === true;
-    preferences.stepFieldEnabled = state.stepFieldEnabled;
+    preferences.panoramaEnabled = state.panoramaEnabled;
     preferences.tailVisible = state.tailVisible;
     preferences.leadVisible = state.leadVisible;
 
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify({
       contextSeconds: preferences.contextSeconds,
       stepReach: preferences.stepReach,
-      fieldBreath: preferences.fieldBreath,
+      panoramaCycle: preferences.panoramaCycle,
       nudgeSeconds: preferences.nudgeSeconds,
       playbackRate: preferences.playbackRate,
       dynamicPlaybackRate: preferences.dynamicPlaybackRate,
-      stepFieldEnabled: preferences.stepFieldEnabled,
+      panoramaEnabled: preferences.panoramaEnabled,
       tailVisible: preferences.tailVisible,
       leadVisible: preferences.leadVisible
     }));
@@ -1026,9 +1026,9 @@ function locateAddress(address, {
   player.setRate(1);
   if (!centerAligned) placePlayer(address);
   if (resetField) {
-    stepField?.resetAtCurrent?.();
+    panorama?.resetAtCurrent?.();
   } else if (!fieldAligned) {
-    stepField?.translateToCurrent(address, { preserve: preserveField });
+    panorama?.translateToCurrent(address, { preserve: preserveField });
   }
 }
 
@@ -1054,7 +1054,7 @@ function startContext(anchor, options = {}) {
   // Context playback belongs only to Center. Tail and Lead pause their stored
   // playback relation and temporarily preview the exact Context bounds.
   // Retargeting an active Context reuses that already-suspended Field.
-  if (!options.retarget) stepField?.pause({ center: anchor, freeze: false });
+  if (!options.retarget) panorama?.pause({ center: anchor, freeze: false });
   player.setRate(1);
   placePlayer(transport.start);
   if (Math.abs(safeCurrentTime() - transport.start) <= 0.25) {
@@ -1073,7 +1073,7 @@ function applyPlayerEffect(result, options = {}) {
 
   if (observe && state.contextSeconds > 0 && result?.activeSpan) {
     if (!options.fieldAligned) {
-      stepField?.translateToCurrent(destination, { preserve: true });
+      panorama?.translateToCurrent(destination, { preserve: true });
     }
     startContext(destination);
     return;
@@ -1161,7 +1161,7 @@ function accept(result, options = {}) {
   const rangeAligned = result.rangeChanged === true
     && options.effect !== false;
   if (rangeAligned) {
-    stepField?.resetAtCurrent?.();
+    panorama?.resetAtCurrent?.();
   }
   if (options.effect !== false) {
     applyPlayerEffect(result, {
@@ -1353,7 +1353,7 @@ function settleTransport(options = {}) {
   if (active.kind === TRANSPORT_KIND.CONTEXT) {
     if (restoreObservation && !handoffField && currentNeighborhood()) {
       placePlayer(currentNeighborhood().C);
-      stepField?.translateToCurrent(currentNeighborhood().C, { preserve: true });
+      panorama?.translateToCurrent(currentNeighborhood().C, { preserve: true });
     }
     if (shouldRender) view.render();
     return true;
@@ -1363,7 +1363,7 @@ function settleTransport(options = {}) {
     // Ordinary pause freezes the visible Field once. A direct handoff skips
     // that intermediate formation because the next transport will establish
     // its own Field around the newly settled Current in the same action.
-    if (!handoffField) stepField?.pause({ center: current, freeze: true });
+    if (!handoffField) panorama?.pause({ center: current, freeze: true });
     const result = completePlayback(state.session, {
       current,
       departure: active.departure,
@@ -1377,7 +1377,7 @@ function settleTransport(options = {}) {
     if (result.changed) {
       state.session = result.session;
       syncIntervalPinSelection();
-      if (!handoffField) stepField?.translateToCurrent(current, { preserve: true });
+      if (!handoffField) panorama?.translateToCurrent(current, { preserve: true });
       persistPreferences();
       view.renderGuide();
     }
@@ -1832,8 +1832,8 @@ function traverseHistory(transform, emptyMessage, completedVerb, cause) {
   const rangeChanged = Math.abs(previousModel.range.start - activeRange().start) > EPSILON
     || Math.abs(previousModel.range.end - activeRange().end) > EPSILON;
   if (currentMoved && state.contextSeconds > 0) {
-    if (rangeChanged) stepField?.resetAtCurrent?.();
-    else stepField?.translateToCurrent(destination, { preserve: true });
+    if (rangeChanged) panorama?.resetAtCurrent?.();
+    else panorama?.translateToCurrent(destination, { preserve: true });
     startContext(destination);
   } else if (currentMoved || rangeChanged) {
     locateAddress(destination, {
@@ -1947,8 +1947,8 @@ function performStep(direction, distance = reachFor(direction), options = {}) {
   ) {
     view.renderGuide();
   }
-  if (carried.rangeChanged) stepField?.resetAtCurrent?.();
-  else stepField?.translateToCurrent(currentNeighborhood().C, { preserve: true });
+  if (carried.rangeChanged) panorama?.resetAtCurrent?.();
+  else panorama?.translateToCurrent(currentNeighborhood().C, { preserve: true });
   // A pending Step delays only automatic Context and history settlement. Its
   // semantic Current and all three physical panes move immediately, so a held
   // or rapidly tapped sequence remains a visible traversal rather than a marker
@@ -2000,9 +2000,9 @@ function startNativePlaybackSession() {
   state.transport.enteredPath = true;
   state.transport = withTransportPhase(state.transport, "playing");
   if (playbackAllowsPanorama(state.transport, { offeredRates: offeredRates() })) {
-    stepField?.resumeAt?.({ center: current, reason: "native-playback" });
+    panorama?.resumeAt?.({ center: current, reason: "native-playback" });
   } else {
-    stepField?.pause({ center: current, freeze: false });
+    panorama?.pause({ center: current, freeze: false });
   }
   setStatus(`Playing through Range ${formatRange(activeRange())}.`);
   view.render();
@@ -2063,9 +2063,9 @@ function startFieldPlaybackFromGesture(options = {}) {
     // key event. Ask every muted side and Center to play in the same synchronous
     // activation stack; delayed Center state events are too late to transfer that
     // activation to sibling YouTube iframes reliably.
-    stepField?.playFromGesture?.({ center: destination, reason: "playback" });
+    panorama?.playFromGesture?.({ center: destination, reason: "playback" });
   } else {
-    stepField?.pause({ center: destination, freeze: false });
+    panorama?.pause({ center: destination, freeze: false });
   }
   player.setRate(state.transport.requestedRate);
   player.play();
@@ -2135,9 +2135,9 @@ function wrapPlaybackRange() {
   placePlayer(range.start);
   player.setRate(state.transport.requestedRate);
   if (playbackAllowsPanorama(state.transport, { offeredRates: offeredRates() })) {
-    stepField?.resumeAt?.({ center: range.start, reason: "range-wrap" });
+    panorama?.resumeAt?.({ center: range.start, reason: "range-wrap" });
   }
-  else stepField?.pause({ center: range.start, freeze: false });
+  else panorama?.pause({ center: range.start, freeze: false });
   player.play();
   view.renderTransport();
   return true;
@@ -2988,7 +2988,7 @@ function transitionSourceBoundary() {
   state.availableRates = [1];
   state.videoLoaded = false;
   state.videoId = null;
-  stepField?.resetSources?.();
+  panorama?.resetSources?.();
   state.session = createSession({ stepReach: preferences.stepReach });
   view.invalidateTimelinePins();
   view.renderGuide();
@@ -3057,7 +3057,7 @@ function initializeVideo(request = pendingLoad) {
   // Build and cue Tail/Lead before the Center transport surface becomes active.
   // This keeps the first parent-owned playback gesture synchronous across all
   // ready players instead of racing the polling interval.
-  stepField?.tick();
+  panorama?.tick();
   const shouldRewrite = Boolean(recovery.sourcePrefix)
     && (!recovery.exact || recovery.sanitized);
   const guidePersisted = !shouldRewrite || persistGuide();
@@ -3193,9 +3193,9 @@ function handlePlaybackRateChange(rate) {
   // Actual-rate events own the compatibility transition, but repeated
   // confirmations of the same compatibility state own no second Field command.
   if (panoramaIsAvailable && !panoramaWasAvailable) {
-    stepField?.resumeAt?.({ center, reason: "confirmed-playback-rate" });
+    panorama?.resumeAt?.({ center, reason: "confirmed-playback-rate" });
   } else if (!panoramaIsAvailable && panoramaWasAvailable) {
-    stepField?.pause({ center, freeze: false });
+    panorama?.pause({ center, freeze: false });
   }
   view.render();
 }
@@ -3229,7 +3229,7 @@ function handlePlayerError(code) {
 
 function pollPlayer() {
   if (!state.videoLoaded || !player || !state.playerReady) {
-    stepField?.tick();
+    panorama?.tick();
     return;
   }
   // YouTube commonly reports only 1x until the iframe has actually entered
@@ -3322,7 +3322,7 @@ function pollPlayer() {
         player.setRate(transport.requestedRate);
         player.play();
       }
-      stepField?.tick();
+      panorama?.tick();
       view.renderTransport();
       return;
     }
@@ -3349,7 +3349,7 @@ function pollPlayer() {
   // Transport owns discontinuities such as Range wrap. Resolve those first so
   // the Field observes the rebased Center once instead of reacting to the
   // out-of-window frame and then being placed again by the wrap.
-  stepField?.tick();
+  panorama?.tick();
   view.renderTransport();
 }
 
@@ -3568,16 +3568,16 @@ function previewGuideDrag(drag) {
       return { kind: "pin", start: step.start, center, end: step.end };
     })();
   state.directFrame = frame;
-  stepField?.previewExtent?.(frame);
+  panorama?.previewExtent?.(frame);
 }
 
 function clearGuideDragPreview({ restore = true } = {}) {
   state.directFrame = null;
-  stepField?.clearPreview?.({ restore: false });
+  panorama?.clearPreview?.({ restore: false });
   if (!restore || !state.videoLoaded || !currentNeighborhood()) return;
   const current = currentNeighborhood().C;
   placePlayer(current);
-  stepField?.translateToCurrent?.(current, { preserve: true });
+  panorama?.translateToCurrent?.(current, { preserve: true });
 }
 
 function updateGuideDrag(event) {
@@ -3900,7 +3900,7 @@ function showCurrentDragFrame(candidate) {
         return { kind: "current", start: step.start, center: candidate, end: step.end };
       })();
   state.directFrame = frame;
-  stepField?.previewExtent?.(frame);
+  panorama?.previewExtent?.(frame);
 }
 
 function finishCurrentDrag(event, options = {}) {
@@ -3929,13 +3929,13 @@ function finishCurrentDrag(event, options = {}) {
   if (options.cancel === true) {
     // Cancellation restores the original Current presentation and creates no
     // semantic change and no history.
-    stepField?.clearPreview?.({ restore: false });
+    panorama?.clearPreview?.({ restore: false });
     locateAddress(currentNeighborhood().C);
-    stepField?.translateToCurrent?.(currentNeighborhood().C, { preserve: true });
+    panorama?.translateToCurrent?.(currentNeighborhood().C, { preserve: true });
     view.render();
     return false;
   }
-  stepField?.clearPreview?.({ restore: false });
+  panorama?.clearPreview?.({ restore: false });
   // Releasing commits one Step, not one Go: dragging Current extends or shortens
   // the retained traversal exactly as a Step of that distance would.
   const projection = drag.projection;
@@ -3952,7 +3952,7 @@ function finishCurrentDrag(event, options = {}) {
   if (committed) completePendingStep();
   else {
     locateAddress(currentNeighborhood().C);
-    stepField?.translateToCurrent?.(currentNeighborhood().C, { preserve: true });
+    panorama?.translateToCurrent?.(currentNeighborhood().C, { preserve: true });
     view.render();
   }
   return Boolean(committed);
@@ -4227,12 +4227,12 @@ function changeFieldBoundary(boundary, value) {
   const next = boundary === "inner"
     ? { ...breath, inner: Math.min(amount, breath.outer) }
     : { ...breath, outer: Math.max(amount, breath.inner) };
-  state.fieldBreath = normalizeFieldBreath(next);
+  state.panoramaCycle = normalizeFieldBreath(next);
   persistPreferences();
-  stepField?.reconfigureOffset?.();
+  panorama?.reconfigureOffset?.();
   setStatus(
     `${boundary === "inner" ? "Inner" : "Outer"} Panorama offset set to ${
-      boundary === "inner" ? state.fieldBreath.inner : state.fieldBreath.outer
+      boundary === "inner" ? state.panoramaCycle.inner : state.panoramaCycle.outer
     }s.`
   );
   view.render();
@@ -5030,7 +5030,7 @@ function initializePlayerApi() {
       onError: handlePlayerError
     }
   });
-  stepField = createStepFieldController({
+  panorama = createPanoramaController({
     document,
     getSnapshot: () => ({
       videoLoaded: state.videoLoaded,
@@ -5040,11 +5040,11 @@ function initializePlayerApi() {
       // Step Field offsets are physical observation settings. They are
       // intentionally independent from the semantic Step Reach.
       stepReach: currentFieldOffsets(),
-      fieldBreath: currentFieldBreath(),
+      panoramaCycle: currentFieldBreath(),
       // The application resolves the ambient Frame owner and supplies exact
       // source Addresses. The Field controller never imports timeline
       // projection, operator arithmetic, or Context math.
-      fieldFrame: fieldOperatorPreview(),
+      panoramaFrame: fieldOperatorPreview(),
       transport: state.transport,
       // The Field decides whether a complete Panorama triplet exists, so it
       // needs the ladder the adapter actually offers. Without it every Center
@@ -5059,18 +5059,18 @@ function initializePlayerApi() {
       playerState: state.playerState
     }),
     getPreferences: () => ({
-      stepFieldEnabled: state.stepFieldEnabled,
+      panoramaEnabled: state.panoramaEnabled,
       tailVisible: state.tailVisible,
       leadVisible: state.leadVisible,
       breathRate: currentFieldBreath().rate,
       reducedMotion: prefersReducedMotion()
     }),
     setPreferences: patch => {
-      if (Object.hasOwn(patch, "stepFieldEnabled")) state.stepFieldEnabled = Boolean(patch.stepFieldEnabled);
+      if (Object.hasOwn(patch, "panoramaEnabled")) state.panoramaEnabled = Boolean(patch.panoramaEnabled);
       if (Object.hasOwn(patch, "tailVisible")) state.tailVisible = Boolean(patch.tailVisible);
       if (Object.hasOwn(patch, "leadVisible")) state.leadVisible = Boolean(patch.leadVisible);
       if (Object.hasOwn(patch, "breathRate")) {
-        state.fieldBreath = normalizeFieldBreath({
+        state.panoramaCycle = normalizeFieldBreath({
           ...currentFieldBreath(),
           rate: patch.breathRate
         });
@@ -5704,7 +5704,7 @@ const directionalStep = direction => event => {
   };
 };
 const sideStep = role => event => {
-  const selection = stepField?.getStepSelection?.(role) || null;
+  const selection = panorama?.getStepSelection?.(role) || null;
   if (!selection || !Number.isFinite(selection.address) || !currentNeighborhood()) {
     return null;
   }
@@ -6182,17 +6182,17 @@ function previewGuideAddressInput(input) {
   // effective midpoint or the Pin's own Address. Tail and Lead carry the edges.
   state.directFrame = frame;
   placePlayer(frame.center);
-  stepField?.previewExtent?.(frame);
+  panorama?.previewExtent?.(frame);
   return true;
 }
 
 function clearGuideAddressPreview() {
   if (!state.directFrame) return false;
   state.directFrame = null;
-  stepField?.clearPreview?.({ restore: false });
+  panorama?.clearPreview?.({ restore: false });
   if (state.videoLoaded && currentNeighborhood()) {
     locateAddress(currentNeighborhood().C);
-    stepField?.translateToCurrent?.(currentNeighborhood().C, { preserve: true });
+    panorama?.translateToCurrent?.(currentNeighborhood().C, { preserve: true });
   }
   view.render();
   return true;

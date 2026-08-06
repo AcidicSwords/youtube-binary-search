@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createStepFieldController, FIELD_SIDE_MODE } from "./step-field.js";
+import { createPanoramaController, FIELD_SIDE_MODE } from "./step-field.js";
 import { YOUTUBE_STATE } from "./youtube.js";
 import { FIELD_FRAME_ACTIVATION } from "./field-frame.js";
 
@@ -40,7 +40,7 @@ function makeHarness({
     createElement(tag) { return element(tag.toUpperCase()); }
   };
   let preferences = {
-    stepFieldEnabled: true,
+    panoramaEnabled: true,
     tailVisible: true,
     leadVisible: true,
     tailRate: 0.5,
@@ -52,7 +52,7 @@ function makeHarness({
     current: 50,
     range: { start: 0, end: 100 },
     stepReach: { backward: 10, forward: 10, linked: true },
-    fieldBreath: { inner: 2, outer: 10, rate: 0.5 },
+    panoramaCycle: { inner: 2, outer: 10, rate: 0.5 },
     pendingStep: false,
     dragging: false,
     rangeDragging: false,
@@ -122,7 +122,7 @@ function makeHarness({
   // The breath runs on the wall clock, so the suite supplies its own and moves
   // it deliberately. Nothing here depends on how long the test took to run.
   let clock = 0;
-  const controller = createStepFieldController({
+  const controller = createPanoramaController({
     now: () => clock,
     document,
     getSnapshot: () => snapshot,
@@ -292,7 +292,7 @@ function makeHarness({
     h.controller.tick();
     h.snapshot = {
       ...h.snapshot,
-      fieldBreath: { inner: 2, outer: 20, rate: 0.5 }
+      panoramaCycle: { inner: 2, outer: 20, rate: 0.5 }
     };
     assert.equal(h.controller.reconfigureOffset(), true);
     assert.equal(
@@ -320,7 +320,7 @@ function makeHarness({
     assert.ok(partial > 2 && partial < 20, "The Field was Held part-way through its breath.");
     h.snapshot = {
       ...h.snapshot,
-      fieldBreath: { inner: 2, outer: 30, rate: 0.5 }
+      panoramaCycle: { inner: 2, outer: 30, rate: 0.5 }
     };
     h.controller.reconfigureOffset();
     assert.equal(
@@ -400,8 +400,8 @@ function makeHarness({
   try {
     h.snapshot = {
       ...h.snapshot,
-      fieldBreath: { inner: 1, outer: 2.5, rate: 0.5 },
-      fieldFrame: {
+      panoramaCycle: { inner: 1, outer: 2.5, rate: 0.5 },
+      panoramaFrame: {
         kind: "step",
         activation: { kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS },
         start: 35,
@@ -427,7 +427,7 @@ function makeHarness({
 
     h.snapshot = {
       ...h.snapshot,
-      fieldFrame: {
+      panoramaFrame: {
         kind: "step",
         start: 35,
         center: 50,
@@ -443,7 +443,7 @@ function makeHarness({
 
     h.snapshot = {
       ...h.snapshot,
-      fieldFrame: {
+      panoramaFrame: {
         kind: "refine",
         start: 42,
         center: 50,
@@ -459,7 +459,7 @@ function makeHarness({
 
     h.snapshot = {
       ...h.snapshot,
-      fieldFrame: {
+      panoramaFrame: {
         kind: "reopen",
         start: 25,
         center: 50,
@@ -481,7 +481,7 @@ function makeHarness({
         time: 48.25,
         state: YOUTUBE_STATE.PLAYING
       },
-      fieldFrame: {
+      panoramaFrame: {
         kind: "context",
         start: 47.5,
         center: 50,
@@ -519,7 +519,7 @@ function makeHarness({
   try {
     h.snapshot = {
       ...h.snapshot,
-      fieldFrame: {
+      panoramaFrame: {
         kind: "step",
         activation: { kind: FIELD_FRAME_ACTIVATION.STEP_TO_ADDRESS },
         start: 40,
@@ -540,7 +540,7 @@ function makeHarness({
     );
     h.snapshot = {
       ...h.snapshot,
-      fieldFrame: null,
+      panoramaFrame: null,
       transportKind: "playback",
       center: {
         ...h.snapshot.center,
@@ -619,7 +619,7 @@ function makeHarness({
   try {
     h.snapshot = {
       ...h.snapshot,
-      fieldBreath: { inner: 1, outer: 2.5, rate: 0.5 }
+      panoramaCycle: { inner: 1, outer: 2.5, rate: 0.5 }
     };
     h.controller.tick();
     assert.equal(h.tail().time, 47.5);

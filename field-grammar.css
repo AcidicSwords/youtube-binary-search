@@ -48,7 +48,7 @@
   transform: translateX(0) scale(1);
 }
 
-.field-span-fill {
+.panorama-window-fill {
   position: absolute;
   z-index: 4;
   top: 3px;

@@ -18,7 +18,7 @@ import { getActionRanges, normalizeDirectionalReach } from "./range-geometry.js"
 import {
   deriveFieldBounds,
   fieldPreferenceRequiresEstablish,
-  createStepFieldController
+  createPanoramaController
 } from "./step-field.js";
 import { chooseNearestRate, breathRateFromResponse } from "./step-field-geometry.js";
 
@@ -46,8 +46,8 @@ assert.equal(fieldPreferenceRequiresEstablish({ tailRate: 0.75 }), false);
 assert.equal(fieldPreferenceRequiresEstablish({ leadRate: 1.5 }), false);
 assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: false }), false);
 assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: true }), true);
-assert.equal(fieldPreferenceRequiresEstablish({ stepFieldEnabled: false }), false);
-assert.equal(fieldPreferenceRequiresEstablish({ stepFieldEnabled: true }), true);
+assert.equal(fieldPreferenceRequiresEstablish({ panoramaEnabled: false }), false);
+assert.equal(fieldPreferenceRequiresEstablish({ panoramaEnabled: true }), true);
 // A legacy saved side-rate pair migrates once into the nearest symmetric
 // breathing rate; the two sides are never configured independently again.
 assert.equal(breathRateFromResponse({ tailRate: 0.75, leadRate: 1.25 }), 0.25);
@@ -154,7 +154,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
       return elements.get(id);
     }
   };
-  const controller = createStepFieldController({
+  const controller = createPanoramaController({
     document,
     getSnapshot: () => ({
       videoLoaded: true,
@@ -166,7 +166,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
       center: { time: 50, rate: 1, state: 1, availableRates: [0.5, 1, 2] }
     }),
     getPreferences: () => ({
-      stepFieldEnabled: false,
+      panoramaEnabled: false,
       tailVisible: true,
       leadVisible: true,
       tailRate: 0.5,
@@ -239,7 +239,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   );
   assert.match(app, /setStepReach as setSessionStepReach/);
   assert.match(app, /stepReach: currentFieldOffsets\(\)/);
-  assert.match(app, /fieldFrame:\s*fieldOperatorPreview\(\)/);
+  assert.match(app, /panoramaFrame:\s*fieldOperatorPreview\(\)/);
   assert.match(
     app,
     /function fieldFrameRequest[\s\S]*FIELD_FRAME_OWNER\.CONTEXT[\s\S]*transport\.start[\s\S]*transport\.end/,
@@ -259,16 +259,16 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   );
   assert.doesNotMatch(app, /onHoldOffsets:/);
   assert.doesNotMatch(field, /onHoldOffsets/);
-  assert.match(app, /function changeFieldBoundary[\s\S]*state\.fieldBreath = normalizeFieldBreath/);
+  assert.match(app, /function changeFieldBoundary[\s\S]*state\.panoramaCycle = normalizeFieldBreath/);
   assert.match(app, /seconds:\s*state\.contextSeconds/);
   assert.doesNotMatch(
     app,
-    /fieldBreath\s*=\s*[^;\n]*contextSeconds|contextSeconds\s*=\s*[^;\n]*fieldBreath/,
+    /panoramaCycle\s*=\s*[^;\n]*contextSeconds|contextSeconds\s*=\s*[^;\n]*panoramaCycle/,
     "Context duration and the physical Field relation must remain independently owned."
   );
   assert.match(
     app,
-    /function changeFieldBoundary[\s\S]*boundary === "inner"[\s\S]*Math\.min\(amount, breath\.outer\)[\s\S]*Math\.max\(amount, breath\.inner\)[\s\S]*stepField\?\.reconfigureOffset\?\.\(\)/,
+    /function changeFieldBoundary[\s\S]*boundary === "inner"[\s\S]*Math\.min\(amount, breath\.outer\)[\s\S]*Math\.max\(amount, breath\.inner\)[\s\S]*panorama\?\.reconfigureOffset\?\.\(\)/,
     "0 < inner < outer is enforced against the sibling bound and reconciled once."
   );
   assert.doesNotMatch(
@@ -281,8 +281,8 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
     /performStep\(selection\.direction, selection\.distance,\s*\{[\s\S]*carryRetained: selection\.carryRetained === true/,
     "All Step surfaces must preserve the shared semantic transaction while optionally carrying a retained Pin or Section."
   );
-  assert.match(app, /stepField\?\.translateToCurrent/);
-  assert.match(field, /BREATH_PHASE/);
+  assert.match(app, /panorama\?\.translateToCurrent/);
+  assert.match(field, /PANORAMA_DIRECTION/);
   assert.doesNotMatch(field, /chooseDirectionalRate|requestStretchRate/,
     "The breathing runtime resolves rates from its phase, not from a side policy.");
   assert.match(field, /onAutoplayBlocked:[\s\S]*playback = "blocked"/);

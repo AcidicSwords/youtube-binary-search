@@ -14,23 +14,23 @@ import {
   directFrame
 } from "./field-frame.js";
 import {
-  STEP_FIELD_PHASE,
+  PANORAMA_STATE,
   FIELD_REACH_TOLERANCE,
-  BREATH_PHASE,
-  BREATH_RATE_STEPS,
-  DEFAULT_FIELD_BREATH,
+  PANORAMA_DIRECTION,
+  PANORAMA_SIDE_RATE_STEPS,
+  DEFAULT_PANORAMA_CYCLE,
   normalizeFieldBreath,
-  breathRatePair,
-  breathSideRate,
+  panoramaSideRates,
+  panoramaSideRate,
   effectiveBreathBounds,
-  createBreathRuntime,
+  createPanoramaCycle,
   advanceBreath,
   holdBreath,
   resumeBreath,
-  rebaseBreath,
-  restartBreath,
+  rebasePanoramaCycle,
+  restartPanoramaCycle,
   deriveFieldBounds,
-  deriveStepField,
+  derivePanorama,
   normalizeFieldReach,
   chooseNearestRate,
   hasCenterDiscontinuity,
@@ -39,14 +39,14 @@ import {
 } from "./step-field-geometry.js";
 
 export {
-  STEP_FIELD_PHASE,
-  DEFAULT_FIELD_BREATH,
-  BREATH_PHASE,
-  BREATH_RATE_STEPS,
+  PANORAMA_STATE,
+  DEFAULT_PANORAMA_CYCLE,
+  PANORAMA_DIRECTION,
+  PANORAMA_SIDE_RATE_STEPS,
   normalizeFieldBreath,
-  breathRatePair,
+  panoramaSideRates,
   deriveFieldBounds,
-  deriveStepField,
+  derivePanorama,
   normalizeFieldReach,
   chooseNearestRate,
   resolveFieldPhase,
@@ -70,11 +70,11 @@ export const FIELD_TRANSITION_MS = 260;
 
 function defaultPreferences() {
   return {
-    stepFieldEnabled: true,
+    panoramaEnabled: true,
     tailVisible: true,
     leadVisible: true,
     reducedMotion: false,
-    breathRate: DEFAULT_FIELD_BREATH.rate
+    breathRate: DEFAULT_PANORAMA_CYCLE.rate
   };
 }
 
@@ -86,13 +86,13 @@ function snapshotReach(snapshot) {
 // Breath still describes one: its outer offset is the legacy configured Offset
 // and its inner offset is a proportional fraction of it.
 function snapshotBreath(snapshot) {
-  if (snapshot?.fieldBreath) return normalizeFieldBreath(snapshot.fieldBreath);
+  if (snapshot?.panoramaCycle) return normalizeFieldBreath(snapshot.panoramaCycle);
   const reach = snapshotReach(snapshot);
   const outer = Math.max(reach.backward, reach.forward);
   return normalizeFieldBreath({
     inner: Math.max(EPSILON, outer / 4),
     outer,
-    rate: DEFAULT_FIELD_BREATH.rate
+    rate: DEFAULT_PANORAMA_CYCLE.rate
   });
 }
 
@@ -134,12 +134,12 @@ export function fieldShouldSuspend(snapshot) {
 }
 
 export function fieldPreferenceRequiresEstablish(patch) {
-  return patch?.stepFieldEnabled === true
+  return patch?.panoramaEnabled === true
     || patch?.tailVisible === true
     || patch?.leadVisible === true;
 }
 
-export function createStepFieldController({
+export function createPanoramaController({
   document,
   getSnapshot,
   getPreferences = defaultPreferences,
@@ -167,7 +167,7 @@ export function createStepFieldController({
   };
 
   const runtime = {
-    phase: STEP_FIELD_PHASE.OFF,
+    phase: PANORAMA_STATE.OFF,
     structuralKey: null,
     semanticCurrent: null,
     lastCenterTime: null,
@@ -179,7 +179,7 @@ export function createStepFieldController({
     field: null,
     fieldKey: "",
     // Breathing runtime. Held until a genuine Center playback gesture begins.
-    breath: createBreathRuntime(DEFAULT_FIELD_BREATH),
+    breath: createPanoramaCycle(DEFAULT_PANORAMA_CYCLE),
     // Field Frame placement and its one directional transition. The generation
     // token discards player callbacks belonging to a superseded Frame.
     frame: null,
@@ -238,11 +238,11 @@ export function createStepFieldController({
         if (sides[role].error) sides[role].retrySource = true;
       }
     }
-    if (before.stepFieldEnabled && !after.stepFieldEnabled) {
+    if (before.panoramaEnabled && !after.panoramaEnabled) {
       pauseSides({ freeze: false });
-      runtime.phase = STEP_FIELD_PHASE.OFF;
+      runtime.phase = PANORAMA_STATE.OFF;
       runtime.centerWasRunning = false;
-    } else if (!before.stepFieldEnabled && after.stepFieldEnabled) {
+    } else if (!before.panoramaEnabled && after.panoramaEnabled) {
       for (const role of ["tail", "lead"]) {
         if (after[`${role}Visible`]) {
           runtime.restoreRoles.add(role);
@@ -250,7 +250,7 @@ export function createStepFieldController({
         }
       }
     }
-    if (fieldPreferenceRequiresEstablish(patch) && patch?.stepFieldEnabled === true) {
+    if (fieldPreferenceRequiresEstablish(patch) && patch?.panoramaEnabled === true) {
       runtime.forceEstablish = true;
     }
     publish(getSnapshot?.());
@@ -302,7 +302,7 @@ export function createStepFieldController({
   // The application resolves the ambient Frame owner and hands this controller
   // finished source Addresses. Nothing here recomputes an operator target.
   function snapshotFrame(snapshot = getSnapshot?.()) {
-    const value = snapshot?.fieldFrame ?? snapshot?.fieldPreview;
+    const value = snapshot?.panoramaFrame ?? snapshot?.fieldPreview;
     if (!value || !snapshot?.range) return null;
     const center = clamp(
       Number(value.center),
@@ -369,7 +369,7 @@ export function createStepFieldController({
   }
 
   function fieldIsEnabled(prefs = preferences()) {
-    return Boolean(prefs.stepFieldEnabled);
+    return Boolean(prefs.panoramaEnabled);
   }
 
   function sideIsVisible(role, prefs = preferences()) {
@@ -427,7 +427,7 @@ export function createStepFieldController({
   function bind() {
     elements["step-field-toggle"]?.addEventListener?.("click", () => {
       const prefs = preferences();
-      changePreferences({ stepFieldEnabled: !prefs.stepFieldEnabled });
+      changePreferences({ panoramaEnabled: !prefs.panoramaEnabled });
     });
     elements["tail-collapse"]?.addEventListener?.("click", event => {
       event.stopPropagation?.();
@@ -438,10 +438,10 @@ export function createStepFieldController({
       changePreferences({ leadVisible: false });
     });
     elements["tail-restore"]?.addEventListener?.("click", () => {
-      changePreferences({ tailVisible: true, stepFieldEnabled: true });
+      changePreferences({ tailVisible: true, panoramaEnabled: true });
     });
     elements["lead-restore"]?.addEventListener?.("click", () => {
-      changePreferences({ leadVisible: true, stepFieldEnabled: true });
+      changePreferences({ leadVisible: true, panoramaEnabled: true });
     });
     // One breathing-rate pair, not two conceptually independent side rates.
     elements["field-breath-rate"]?.addEventListener?.("change", event => {
@@ -525,7 +525,7 @@ export function createStepFieldController({
   }
 
   function ensurePlayers(prefs) {
-    if (!prefs.stepFieldEnabled) return;
+    if (!prefs.panoramaEnabled) return;
     if (prefs.tailVisible) createSide("tail");
     if (prefs.leadVisible) createSide("lead");
   }
@@ -691,14 +691,14 @@ export function createStepFieldController({
     // falls between the provided presets. Otherwise assigning `select.value`
     // would leave a real HTML select with no selected option while the Field
     // continued to use the preserved value.
-    const steps = BREATH_RATE_STEPS.some(rate => Math.abs(rate - current) <= EPSILON)
-      ? [...BREATH_RATE_STEPS]
-      : [...BREATH_RATE_STEPS, current].sort((first, second) => first - second);
+    const steps = PANORAMA_SIDE_RATE_STEPS.some(rate => Math.abs(rate - current) <= EPSILON)
+      ? [...PANORAMA_SIDE_RATE_STEPS]
+      : [...PANORAMA_SIDE_RATE_STEPS, current].sort((first, second) => first - second);
     const key = steps.join("|");
     if (select.dataset.rates !== key) {
       select.replaceChildren();
       for (const step of steps) {
-        const pair = breathRatePair(step);
+        const pair = panoramaSideRates(step);
         const option = document.createElement("option");
         option.value = String(step);
         option.textContent = `${pair.tailRate}\u00d7 / ${pair.leadRate}\u00d7`;
@@ -732,7 +732,7 @@ export function createStepFieldController({
 
   function establish(snapshot, address = snapshot.current) {
     const center = clamp(address, snapshot.range.start, snapshot.range.end);
-    runtime.breath = rebaseBreath(
+    runtime.breath = rebasePanoramaCycle(
       holdBreath(runtime.breath, snapshotBreath(snapshot)),
       now(),
       attainedBreathOffset()
@@ -744,7 +744,7 @@ export function createStepFieldController({
     runtime.centerWasRunning = false;
     runtime.forceEstablish = false;
     runtime.restoreRoles.clear();
-    runtime.phase = STEP_FIELD_PHASE.HELD;
+    runtime.phase = PANORAMA_STATE.HELD;
   }
 
   function translateToCurrent(current, { preserve = true } = {}) {
@@ -785,10 +785,10 @@ export function createStepFieldController({
       && (prefs.tailVisible || prefs.leadVisible);
     runtime.suspended = fieldActive && suspensionRequired(snapshot);
     runtime.phase = !fieldActive
-      ? STEP_FIELD_PHASE.OFF
+      ? PANORAMA_STATE.OFF
       : runtime.suspended
-        ? STEP_FIELD_PHASE.SUSPENDED
-        : STEP_FIELD_PHASE.HELD;
+        ? PANORAMA_STATE.SUSPENDED
+        : PANORAMA_STATE.HELD;
     if (preview) renderPreview(snapshot, preview);
     else publish(snapshot);
   }
@@ -939,8 +939,8 @@ export function createStepFieldController({
     );
     runtime.suspended = hasVisibleField;
     runtime.phase = hasVisibleField
-      ? STEP_FIELD_PHASE.SUSPENDED
-      : STEP_FIELD_PHASE.OFF;
+      ? PANORAMA_STATE.SUSPENDED
+      : PANORAMA_STATE.OFF;
     runtime.centerWasRunning = false;
     const reach = {
       backward: Math.max(0, preview.center - preview.start),
@@ -950,7 +950,7 @@ export function createStepFieldController({
     // A direct-manipulation preview may momentarily collapse onto either
     // endpoint. Step Reach is strictly positive, so keep its geometry contract
     // intact while sideStates below preserve the collapsed side truthfully.
-    const targets = deriveStepField(
+    const targets = derivePanorama(
       preview.center,
       {
         backward: Math.max(reach.backward, EPSILON),
@@ -1018,7 +1018,7 @@ export function createStepFieldController({
 
   function startBreathCycle(center, snapshot = getSnapshot?.()) {
     const configured = snapshotBreath(snapshot);
-    const fresh = restartBreath(runtime.breath, configured, now());
+    const fresh = restartPanoramaCycle(runtime.breath, configured, now());
     runtime.breath = {
       ...fresh,
       held: false,
@@ -1084,7 +1084,7 @@ export function createStepFieldController({
     const snapshot = getSnapshot?.();
     const prefs = preferences();
     const suspendedNow = suspensionRequired(snapshot);
-    if (!snapshot?.videoLoaded || !prefs.stepFieldEnabled || suspendedNow) {
+    if (!snapshot?.videoLoaded || !prefs.panoramaEnabled || suspendedNow) {
       return { tail: false, lead: false };
     }
     // Context may have just been settled in the same click/Space stack. Do not
@@ -1125,7 +1125,7 @@ export function createStepFieldController({
     const snapshot = getSnapshot?.();
     const prefs = preferences();
     const suspendedNow = suspensionRequired(snapshot);
-    if (!snapshot?.videoLoaded || !prefs.stepFieldEnabled || suspendedNow) {
+    if (!snapshot?.videoLoaded || !prefs.panoramaEnabled || suspendedNow) {
       return { tail: false, lead: false };
     }
 
@@ -1172,7 +1172,7 @@ export function createStepFieldController({
       // outward pair is only correct while expanding; a contracting Field needs
       // the exchanged rates immediately, not one controller tick later.
       if (side.mode === FIELD_SIDE_MODE.STRETCHING) {
-        requestBreathRate(side, breathSideRate({
+        requestBreathRate(side, panoramaSideRate({
           role,
           phase: runtime.breath.phase,
           rate: snapshotBreath(snapshot).rate,
@@ -1198,7 +1198,7 @@ export function createStepFieldController({
 
   function activationState() {
     const prefs = preferences();
-    if (!prefs.stepFieldEnabled) return { ready: true, pending: [], available: {} };
+    if (!prefs.panoramaEnabled) return { ready: true, pending: [], available: {} };
     const snapshot = getSnapshot?.();
     const center = Number(snapshot?.current);
     const visible = ["tail", "lead"].filter(role =>
@@ -1237,7 +1237,7 @@ export function createStepFieldController({
     // Stretch resumes from the attained relation and the preserved direction, so
     // the leg is rebased onto the offset actually on screen rather than onto
     // where an unheld breath would have arrived while it was held.
-    runtime.breath = rebaseBreath(
+    runtime.breath = rebasePanoramaCycle(
       resumeBreath(runtime.breath, snapshotBreath(snapshot)),
       now(),
       attainedBreathOffset()
@@ -1313,7 +1313,7 @@ export function createStepFieldController({
       }
       attained = attained === null ? offset : attained;
     }
-    runtime.breath = rebaseBreath(
+    runtime.breath = rebasePanoramaCycle(
       holdBreath(runtime.breath, snapshotBreath(snapshot)),
       now(),
       attainedBreathOffset()
@@ -1602,7 +1602,7 @@ export function createStepFieldController({
       snapshot.range.start,
       snapshot.range.end
     );
-    const targets = live || deriveStepField(
+    const targets = live || derivePanorama(
       center,
       snapshotReach(snapshot),
       snapshot.range
@@ -1665,7 +1665,7 @@ export function createStepFieldController({
       ready: [observed.tail.ready, observed.lead.ready],
       activated: [observed.tail.activated, observed.lead.activated],
       errors: [observed.tail.error, observed.lead.error],
-      enabled: prefs.stepFieldEnabled,
+      enabled: prefs.panoramaEnabled,
       visible: [observed.tail.visible, observed.lead.visible],
       available: [observed.tail.available, observed.lead.available],
       targets: [
@@ -1697,7 +1697,7 @@ export function createStepFieldController({
     const preview = activePreview(snapshot);
     const loaded = Boolean(snapshot.videoLoaded);
     const root = elements["step-field"];
-    const shown = loaded && prefs.stepFieldEnabled;
+    const shown = loaded && prefs.panoramaEnabled;
     root.classList.toggle("field-off", !shown);
     root.classList.toggle("tail-collapsed", !prefs.tailVisible);
     root.classList.toggle("lead-collapsed", !prefs.leadVisible);
@@ -1804,7 +1804,7 @@ export function createStepFieldController({
       ? "Panorama suspended"
       : runtime.breath.held
         ? "Held"
-        : runtime.breath.phase === BREATH_PHASE.CONTRACTING
+        : runtime.breath.phase === PANORAMA_DIRECTION.CONTRACTING
           ? "Breathing in"
           : "Breathing out");
     setText(
@@ -1831,8 +1831,8 @@ export function createStepFieldController({
     if (!snapshot.videoLoaded || !snapshot.videoId) {
       const idlePhase = fieldIsEnabled(prefs)
         && (prefs.tailVisible || prefs.leadVisible)
-        ? STEP_FIELD_PHASE.COINCIDENT
-        : STEP_FIELD_PHASE.OFF;
+        ? PANORAMA_STATE.COINCIDENT
+        : PANORAMA_STATE.OFF;
       if (runtime.phase !== idlePhase || runtime.centerWasRunning) {
         pauseSides({ freeze: false });
       }
@@ -1844,10 +1844,10 @@ export function createStepFieldController({
     }
 
     if (!fieldIsEnabled(prefs) || (!prefs.tailVisible && !prefs.leadVisible)) {
-      if (runtime.phase !== STEP_FIELD_PHASE.OFF || runtime.centerWasRunning) {
+      if (runtime.phase !== PANORAMA_STATE.OFF || runtime.centerWasRunning) {
         pauseSides({ freeze: false });
       }
-      runtime.phase = STEP_FIELD_PHASE.OFF;
+      runtime.phase = PANORAMA_STATE.OFF;
       runtime.structuralKey = structuralKey(snapshot);
       runtime.semanticCurrent = snapshot.current;
       runtime.lastCenterTime = snapshot.current;
@@ -1911,7 +1911,7 @@ export function createStepFieldController({
     runtime.centerWasRunning = centerRunning && !runtime.suspended;
 
     const relationalCenter = runtime.suspended ? snapshot.current : center;
-    const live = deriveStepField(
+    const live = derivePanorama(
       relationalCenter,
       snapshotReach(snapshot),
       snapshot.range
@@ -1923,9 +1923,9 @@ export function createStepFieldController({
       centerRunning && !runtime.suspended
     );
     runtime.phase = runtime.suspended
-      ? STEP_FIELD_PHASE.SUSPENDED
+      ? PANORAMA_STATE.SUSPENDED
       : resolveFieldPhase({
-        enabled: prefs.stepFieldEnabled,
+        enabled: prefs.panoramaEnabled,
         suspended: false,
         sides: [
           { ...sideStates.tail, visible: sideIsVisible("tail", prefs) },
@@ -2020,11 +2020,11 @@ export function createStepFieldController({
     populateBreathRateControl(prefs);
     establish(snapshot, snapshot.current);
     runtime.suspended = suspensionRequired(snapshot);
-    runtime.phase = !prefs.stepFieldEnabled || (!prefs.tailVisible && !prefs.leadVisible)
-      ? STEP_FIELD_PHASE.OFF
+    runtime.phase = !prefs.panoramaEnabled || (!prefs.tailVisible && !prefs.leadVisible)
+      ? PANORAMA_STATE.OFF
       : runtime.suspended
-        ? STEP_FIELD_PHASE.SUSPENDED
-        : STEP_FIELD_PHASE.HELD;
+        ? PANORAMA_STATE.SUSPENDED
+        : PANORAMA_STATE.HELD;
     const preview = activePreview(snapshot);
     if (preview) renderPreview(snapshot, preview);
     else publish(snapshot);
@@ -2040,7 +2040,7 @@ export function createStepFieldController({
       pauseSides({ center: options.center, freeze: options.freeze !== false });
       const snapshot = getSnapshot?.();
       runtime.suspended = suspensionRequired(snapshot);
-      if (runtime.suspended) runtime.phase = STEP_FIELD_PHASE.SUSPENDED;
+      if (runtime.suspended) runtime.phase = PANORAMA_STATE.SUSPENDED;
       runtime.centerWasRunning = false;
       const preview = activePreview(snapshot);
       if (preview) renderPreview(snapshot, preview);

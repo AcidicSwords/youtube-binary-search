@@ -2,7 +2,7 @@
 import { EPSILON, clamp } from "./range-geometry.js";
 import { PANORAMA_SIDE_STEP } from "./transport.js";
 
-export const STEP_FIELD_PHASE = Object.freeze({
+export const PANORAMA_STATE = Object.freeze({
   OFF: "off",
   COINCIDENT: "coincident",
   UNFOLDING: "unfolding",
@@ -19,13 +19,13 @@ export const DEFAULT_FIELD_RESPONSE = Object.freeze({ tailRate: 0.5, leadRate: 2
 // Field Breath: bounded expansion and contraction during ordinary Center
 // playback. The relation is symmetric, so one breathing-rate pair is configured
 // rather than two conceptually independent side rates.
-export const BREATH_PHASE = Object.freeze({
+export const PANORAMA_DIRECTION = Object.freeze({
   EXPANDING: "expanding",
   CONTRACTING: "contracting"
 });
 
-export const BREATH_RATE_STEPS = Object.freeze([0.25, 0.5, 0.75]);
-export const DEFAULT_FIELD_BREATH = Object.freeze({
+export const PANORAMA_SIDE_RATE_STEPS = Object.freeze([0.25, 0.5, 0.75]);
+export const DEFAULT_PANORAMA_CYCLE = Object.freeze({
   inner: 0.25,
   outer: 2.5,
   rate: 0.25
@@ -35,20 +35,20 @@ const BREATH_BOUND_TOLERANCE = 0.02;
 // The configured relation is 0 < x < y. A pair that collapses has no breath to
 // describe, so the inner offset is pushed strictly inside the outer one rather
 // than being accepted as equal.
-export function normalizeFieldBreath(value = DEFAULT_FIELD_BREATH) {
+export function normalizeFieldBreath(value = DEFAULT_PANORAMA_CYCLE) {
   const rawOuter = Number(value?.outer);
   const outer = Number.isFinite(rawOuter) && rawOuter > 0
     ? rawOuter
-    : DEFAULT_FIELD_BREATH.outer;
+    : DEFAULT_PANORAMA_CYCLE.outer;
   const rawInner = Number(value?.inner);
   const requestedInner = Number.isFinite(rawInner) && rawInner > 0
     ? rawInner
-    : DEFAULT_FIELD_BREATH.inner;
+    : DEFAULT_PANORAMA_CYCLE.inner;
   const inner = requestedInner < outer ? requestedInner : outer / 2;
   const rawRate = Number(value?.rate);
   const rate = Number.isFinite(rawRate) && rawRate > 0 && rawRate < 1
     ? rawRate
-    : DEFAULT_FIELD_BREATH.rate;
+    : DEFAULT_PANORAMA_CYCLE.rate;
   return { inner, outer, rate };
 }
 
@@ -62,7 +62,7 @@ export function normalizeFieldBreath(value = DEFAULT_FIELD_BREATH) {
 // Because the ladder is evenly spaced, an additive step keeps the difference
 // fixed at exactly one rung, which is what makes the breath take the same nine
 // seconds at every Center rate the Panorama can hold.
-export function breathRatePair(rate, centerRate = 1) {
+export function panoramaSideRates(rate, centerRate = 1) {
   const step = normalizeFieldBreath({ rate }).rate;
   const center = Number.isFinite(centerRate) && centerRate > 0 ? centerRate : 1;
   return {
@@ -92,12 +92,12 @@ export const BREATH_DRIFT_RATE = PANORAMA_SIDE_STEP;
 // touches nothing here, so the breath keeps its phase and still reaches maximum
 // at the moment it was always going to. Only a genuine discontinuity — Panorama
 // returning after an extreme rate, or a Range wrap — restarts the leg.
-export function breathTargetOffset({
-  direction = BREATH_PHASE.EXPANDING,
+export function panoramaTargetOffset({
+  direction = PANORAMA_DIRECTION.EXPANDING,
   startedAt = 0,
   startingOffset = 0,
-  inner = DEFAULT_FIELD_BREATH.inner,
-  outer = DEFAULT_FIELD_BREATH.outer,
+  inner = DEFAULT_PANORAMA_CYCLE.inner,
+  outer = DEFAULT_PANORAMA_CYCLE.outer,
   now = startedAt,
   driftRate = BREATH_DRIFT_RATE
 } = {}) {
@@ -109,7 +109,7 @@ export function breathTargetOffset({
   const travelled = Math.max(0, Number(driftRate) || 0) * elapsed;
   const from = clamp(startingOffset, inner, outer) - inner;
   // Distance along one full out-and-back lap, measured from the inner turn.
-  const entered = direction === BREATH_PHASE.CONTRACTING ? (2 * span) - from : from;
+  const entered = direction === PANORAMA_DIRECTION.CONTRACTING ? (2 * span) - from : from;
   const lap = 2 * span;
   const position = ((entered + travelled) % lap + lap) % lap;
   // A turn reports the direction it is heading in, not the one it arrived by.
@@ -119,18 +119,18 @@ export function breathTargetOffset({
   // still expanding made a leg resumed from a fully attained Hold depend on
   // whether the resume and the next tick landed in the same millisecond.
   return position < span
-    ? { offset: inner + position, direction: BREATH_PHASE.EXPANDING }
-    : { offset: inner + (lap - position), direction: BREATH_PHASE.CONTRACTING };
+    ? { offset: inner + position, direction: PANORAMA_DIRECTION.EXPANDING }
+    : { offset: inner + (lap - position), direction: PANORAMA_DIRECTION.CONTRACTING };
 }
 
 export function breathRateFromResponse(response = DEFAULT_FIELD_RESPONSE) {
   const { tailRate, leadRate } = normalizeFieldResponse(response);
   const symmetric = ((1 - tailRate) + (leadRate - 1)) / 2;
-  return BREATH_RATE_STEPS.reduce(
+  return PANORAMA_SIDE_RATE_STEPS.reduce(
     (best, step) => (
       Math.abs(step - symmetric) < Math.abs(best - symmetric) ? step : best
     ),
-    BREATH_RATE_STEPS[0]
+    PANORAMA_SIDE_RATE_STEPS[0]
   );
 }
 
@@ -154,10 +154,10 @@ export function effectiveBreathBounds(breath, available) {
   };
 }
 
-export function createBreathRuntime(breath = DEFAULT_FIELD_BREATH, startedAt = 0) {
+export function createPanoramaCycle(breath = DEFAULT_PANORAMA_CYCLE, startedAt = 0) {
   const { inner } = normalizeFieldBreath(breath);
   return {
-    phase: BREATH_PHASE.EXPANDING,
+    phase: PANORAMA_DIRECTION.EXPANDING,
     held: true,
     startedAt,
     startingOffset: inner,
@@ -173,15 +173,15 @@ export function createBreathRuntime(breath = DEFAULT_FIELD_BREATH, startedAt = 0
 // after Center played alone at an extreme rate and the sides hold positions that
 // no longer relate to anything. Begin a fresh leg at the inner offset rather
 // than restoring a stale relation.
-export function restartBreath(runtime, breath = DEFAULT_FIELD_BREATH, startedAt = 0) {
-  const fresh = createBreathRuntime(breath, startedAt);
+export function restartPanoramaCycle(runtime, breath = DEFAULT_PANORAMA_CYCLE, startedAt = 0) {
+  const fresh = createPanoramaCycle(breath, startedAt);
   return { ...fresh, held: Boolean(runtime?.held) };
 }
 
 // Holding rebases the leg onto the offset actually attained, so resuming
 // continues from the relation on screen rather than from where an unheld breath
 // would have arrived.
-export function rebaseBreath(runtime, startedAt = 0, startingOffset = null) {
+export function rebasePanoramaCycle(runtime, startedAt = 0, startingOffset = null) {
   if (!runtime) return runtime;
   // The relation on screen is the one to continue from. A caller that knows
   // what the sides actually attained -- Hold and Stretch both do -- says so;
@@ -196,7 +196,7 @@ export function rebaseBreath(runtime, startedAt = 0, startingOffset = null) {
 
 // A held or boundary-waiting side runs at Center rate so it follows Center
 // while preserving its attained offset.
-export function breathSideRate({
+export function panoramaSideRate({
   role,
   phase,
   rate,
@@ -204,9 +204,9 @@ export function breathSideRate({
   held = false,
   centerRate = 1
 }) {
-  const pair = breathRatePair(rate, centerRate);
+  const pair = panoramaSideRates(rate, centerRate);
   if (held || waiting) return pair.center;
-  const outward = phase !== BREATH_PHASE.CONTRACTING;
+  const outward = phase !== PANORAMA_DIRECTION.CONTRACTING;
   if (role === "tail") return outward ? pair.tailRate : pair.leadRate;
   return outward ? pair.leadRate : pair.tailRate;
 }
@@ -249,7 +249,7 @@ export function advanceBreath(runtime, {
   sides = {}
 } = {}) {
   const configured = normalizeFieldBreath(breath);
-  const state = runtime || createBreathRuntime(configured, now);
+  const state = runtime || createPanoramaCycle(configured, now);
   const bounds = {
     tail: effectiveBreathBounds(configured, sides.tail?.available),
     lead: effectiveBreathBounds(configured, sides.lead?.available)
@@ -276,7 +276,7 @@ export function advanceBreath(runtime, {
       ),
       direction: state.phase
     }
-    : breathTargetOffset({
+    : panoramaTargetOffset({
       direction: state.phase,
       startedAt: state.startedAt,
       startingOffset: state.startingOffset,
@@ -319,7 +319,7 @@ export function advanceBreath(runtime, {
       excluded: placed.excluded,
       bounds: bounds[role]
     };
-    next.sides[role].rate = breathSideRate({
+    next.sides[role].rate = panoramaSideRate({
       role,
       phase: next.phase,
       rate: configured.rate,
@@ -337,8 +337,8 @@ export function advanceBreath(runtime, {
 // Hold alone stops the cycle. It preserves each attained offset, sets every
 // held side to Center rate, and preserves the breathing direction so Stretch
 // resumes from the attained relation.
-export function holdBreath(runtime, breath = DEFAULT_FIELD_BREATH) {
-  const state = runtime || createBreathRuntime(breath);
+export function holdBreath(runtime, breath = DEFAULT_PANORAMA_CYCLE) {
+  const state = runtime || createPanoramaCycle(breath);
   return {
     ...state,
     held: true,
@@ -349,8 +349,8 @@ export function holdBreath(runtime, breath = DEFAULT_FIELD_BREATH) {
   };
 }
 
-export function resumeBreath(runtime, breath = DEFAULT_FIELD_BREATH) {
-  const state = runtime || createBreathRuntime(breath);
+export function resumeBreath(runtime, breath = DEFAULT_PANORAMA_CYCLE) {
+  const state = runtime || createPanoramaCycle(breath);
   return { ...state, held: false };
 }
 
@@ -439,7 +439,7 @@ export function deriveFieldBounds({ current, stepReach, range }) {
   };
 }
 
-export function deriveStepField(current, stepReach, range) {
+export function derivePanorama(current, stepReach, range) {
   const bounds = deriveFieldBounds({ current, stepReach, range });
   return {
     center: bounds.current,
@@ -481,15 +481,15 @@ export function hasCenterDiscontinuity(previous, current, tolerance = 2.5) {
 }
 
 export function resolveFieldPhase({ enabled, suspended, sides }) {
-  if (!enabled) return STEP_FIELD_PHASE.OFF;
-  if (suspended) return STEP_FIELD_PHASE.SUSPENDED;
+  if (!enabled) return PANORAMA_STATE.OFF;
+  if (suspended) return PANORAMA_STATE.SUSPENDED;
   const active = (sides || []).filter(side => side.visible && side.available);
-  if (!active.length) return STEP_FIELD_PHASE.COINCIDENT;
-  if (active.every(side => !(side.offset > FIELD_REACH_TOLERANCE))) return STEP_FIELD_PHASE.COINCIDENT;
+  if (!active.length) return PANORAMA_STATE.COINCIDENT;
+  if (active.every(side => !(side.offset > FIELD_REACH_TOLERANCE))) return PANORAMA_STATE.COINCIDENT;
   const held = active.filter(side => side.held).length;
-  if (held === active.length) return STEP_FIELD_PHASE.HELD;
-  if (held > 0) return STEP_FIELD_PHASE.PARTIAL;
-  return STEP_FIELD_PHASE.UNFOLDING;
+  if (held === active.length) return PANORAMA_STATE.HELD;
+  if (held > 0) return PANORAMA_STATE.PARTIAL;
+  return PANORAMA_STATE.UNFOLDING;
 }
 
 export function deriveObservedField({
@@ -549,7 +549,7 @@ export function deriveObservedField({
       end: lead,
       duration: Math.max(0, lead - tail),
       available: spanAvailable,
-      held: spanAvailable && phase === STEP_FIELD_PHASE.HELD
+      held: spanAvailable && phase === PANORAMA_STATE.HELD
     }
   };
 }

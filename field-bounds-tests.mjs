@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  STEP_FIELD_PHASE,
+  PANORAMA_STATE,
   FIELD_SIDE_MODE,
-  createStepFieldController,
+  createPanoramaController,
   deriveFieldBounds,
   fieldShouldSuspend
 } from "./step-field.js";
@@ -91,7 +91,7 @@ function makeControllerHarness() {
     current: 50,
     range: { start: 0, end: 100 },
     stepReach: { backward: 10, forward: 10, linked: true },
-    fieldBreath: { inner: 2, outer: 10, rate: 0.5 },
+    panoramaCycle: { inner: 2, outer: 10, rate: 0.5 },
     transportKind: "idle",
     pendingStep: false,
     dragging: false,
@@ -126,7 +126,7 @@ function makeControllerHarness() {
 
   const previousYT = globalThis.YT;
   globalThis.YT = { Player: function Player() {} };
-  const controller = createStepFieldController({
+  const controller = createPanoramaController({
     document,
     getSnapshot: () => snapshot,
     onChange: field => changes.push(field),
@@ -148,7 +148,7 @@ function makeControllerHarness() {
     harness.controller.tick();
     assert.equal(harness.adapters.get("player-tail").read().time, 40, "Paused Tail must display its represented backward Step frame.");
     assert.equal(harness.adapters.get("player-lead").read().time, 60, "Paused Lead must display its represented forward Step frame.");
-    assert.equal(harness.controller.snapshot().phase, STEP_FIELD_PHASE.HELD);
+    assert.equal(harness.controller.snapshot().phase, PANORAMA_STATE.HELD);
 
     harness.controller.stretch("both");
     assert.equal(harness.controller.snapshot().tailMode, FIELD_SIDE_MODE.STRETCHING);
@@ -185,7 +185,7 @@ function makeControllerHarness() {
 
     harness.snapshot = { ...harness.snapshot, transportKind: "context" };
     harness.controller.tick();
-    assert.equal(harness.controller.snapshot().phase, STEP_FIELD_PHASE.SUSPENDED);
+    assert.equal(harness.controller.snapshot().phase, PANORAMA_STATE.SUSPENDED);
     assert.equal(harness.adapters.get("player-tail").read().state, YOUTUBE_STATE.PAUSED);
     assert.equal(harness.adapters.get("player-lead").read().state, YOUTUBE_STATE.PAUSED);
     const suspendedModes = {
@@ -236,7 +236,7 @@ function makeControllerHarness() {
   assert.match(fieldSource, /transportKind === "context"/);
   assert.doesNotMatch(fieldSource, /transportKind === "loop"/);
   assert.match(fieldSource, /function resetAtCurrent\(\)[\s\S]*invalidate\(\{ pause: false \}\)/);
-  assert.match(app, /resetField[\s\S]*stepField\?\.resetAtCurrent/);
+  assert.match(app, /resetField[\s\S]*panorama\?\.resetAtCurrent/);
   assert.doesNotMatch(fieldSource, /snapshot\.neighborhood/, "Field bounds must not depend on Resolution.");
 }
 

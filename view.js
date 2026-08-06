@@ -46,7 +46,7 @@ import {
   previewTransition
 } from "./session.js";
 import { YOUTUBE_STATE } from "./youtube.js";
-import { breathRatePair } from "./step-field-geometry.js";
+import { panoramaSideRates } from "./step-field-geometry.js";
 
 const TIMELINE_SECTION_HIT_WIDTH = 28;
 const TIMELINE_SECTION_LANE_HEIGHT = 20;
@@ -1798,7 +1798,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const currentSpan = interval();
     const projection = timelineProjection();
     const field = currentState.field;
-    const fieldSpan = field?.span?.held && field.span.available
+    const panoramaWindow = field?.span?.held && field.span.available
       ? { start: field.span.start, end: field.span.end }
       : null;
     const semanticCurrent = currentNeighborhood?.C ?? 0;
@@ -1920,7 +1920,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["timeline-key-range"].dataset.active = String(loaded);
     elements["timeline-key-resolution"].dataset.active = String(Boolean(currentNeighborhood));
     elements["timeline-key-active-span"].dataset.active = String(Boolean(currentSpan));
-    elements["timeline-key-field"].dataset.active = String(Boolean(fieldSpan));
+    elements["timeline-key-field"].dataset.active = String(Boolean(panoramaWindow));
     elements["timeline-key-pins"].dataset.active = String(
       Boolean(orderedPins(guide()).length)
     );
@@ -1956,17 +1956,17 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : "Off";
 
     // One bounded breathing relation: 0 < inner < outer.
-    const fieldBreath = currentState.fieldBreath || { inner: 0.25, outer: 2.5, rate: 0.25 };
-    elements["field-inner-offset"].value = String(fieldBreath.inner);
-    elements["field-outer-offset"].value = String(fieldBreath.outer);
-    elements["field-inner-offset"].max = String(fieldBreath.outer);
-    elements["field-outer-offset"].min = String(fieldBreath.inner);
+    const panoramaCycle = currentState.panoramaCycle || { inner: 0.25, outer: 2.5, rate: 0.25 };
+    elements["field-inner-offset"].value = String(panoramaCycle.inner);
+    elements["field-outer-offset"].value = String(panoramaCycle.outer);
+    elements["field-inner-offset"].max = String(panoramaCycle.outer);
+    elements["field-outer-offset"].min = String(panoramaCycle.inner);
     if (elements["panorama-setting-value"]) {
-      const configuredPair = breathRatePair(fieldBreath.rate);
+      const configuredPair = panoramaSideRates(panoramaCycle.rate);
       const pair = elements["field-breath-rate"]?.selectedOptions?.[0]?.textContent
         || `${configuredPair.tailRate}× / ${configuredPair.leadRate}×`;
       elements["panorama-setting-value"].textContent =
-        `${fieldBreath.inner}–${fieldBreath.outer} s · ${pair}`;
+        `${panoramaCycle.inner}–${panoramaCycle.outer} s · ${pair}`;
     }
     // The stored quantum stays exact; only its presentation is rounded.
     elements["nudge-seconds"].value = String(
@@ -2057,16 +2057,16 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? { start: selectedPins[0].t, end: selectedPins[1].t }
       : null;
     let sectionExtent = sectionKind === "field-span"
-      ? fieldSpan
+      ? panoramaWindow
       : sectionKind === "selected-pins"
         ? selectedPinExtent
         : currentSpan;
     const sourceOptions = [...elements["section-source"].options];
     const fieldOption = sourceOptions.find(option => option.value === "field-span");
-    if (fieldOption) fieldOption.disabled = !fieldSpan;
+    if (fieldOption) fieldOption.disabled = !panoramaWindow;
     const selectedPinsOption = sourceOptions.find(option => option.value === "selected-pins");
     if (selectedPinsOption) selectedPinsOption.disabled = !selectedPinExtent;
-    if (sectionKind === "field-span" && !fieldSpan && currentSpan) {
+    if (sectionKind === "field-span" && !panoramaWindow && currentSpan) {
       elements["section-source"].value = "interval";
       sectionKind = "interval";
       sectionExtent = currentSpan;
@@ -2304,7 +2304,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         "current-departure-marker"
       ]) elements[id].hidden = true;
       elements["active-span-fill"].hidden = true;
-      elements["field-span-fill"].hidden = true;
+      elements["panorama-window-fill"].hidden = true;
       elements["section-preview-fill"].hidden = true;
       elements["action-preview-fill"].hidden = true;
       elements["preview-current-marker"].hidden = true;
@@ -2377,8 +2377,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["range-end-handle"].setAttribute("aria-valuenow", String(activeRange.end));
     elements["range-end-handle"].setAttribute("aria-valuetext", `${formatTime(activeRange.end)}; Range ends`);
 
-    elements["field-span-fill"].hidden = !fieldSpan;
-    if (fieldSpan) setSegment(elements["field-span-fill"], fieldSpan.start, fieldSpan.end);
+    elements["panorama-window-fill"].hidden = !panoramaWindow;
+    if (panoramaWindow) setSegment(elements["panorama-window-fill"], panoramaWindow.start, panoramaWindow.end);
     renderSectionPreview();
     renderActionPreview(previewResult, structuralPresentation, previewKind);
     renderTimelinePins();
