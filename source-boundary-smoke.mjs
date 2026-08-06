@@ -196,4 +196,22 @@ assert.equal(byId.get("return-action").disabled, true);
 assert.equal(tail().videoId, "JJJJJJJJJJJ");
 assert.equal(lead().videoId, "JJJJJJJJJJJ");
 
-console.log("Source boundary smoke passed: load generations reject stale identity, and Nudge, Step, Context, Playback, Section/Current/Pin/Range drags, Guide identity and weight relaxation cannot cross sources.");
+// Ripple identity and its uncompleted prospects are source-owned too. The
+// boundary cancels its shared Context before installing the next source.
+byId.get("context-duration").value = "5";
+byId.get("context-duration").dispatch("change");
+byId.get("timeline").dispatch("click", {
+  target: byId.get("timeline"),
+  clientX: 800,
+  shiftKey: true
+});
+await flush(3);
+assert.equal(byId.get("ripple-address-marker").hidden, false);
+assert.equal(descendants(byId.get("traversal-prospect-layer")).length, 2);
+await finishLoad("KKKKKKKKKKK", 45);
+assert.equal(currentText(), "Current 0:45");
+assert.equal(byId.get("ripple-address-marker").hidden, true);
+assert.equal(byId.get("ripple-context-window-fill").hidden, true);
+assert.equal(descendants(byId.get("traversal-prospect-layer")).length, 0);
+
+console.log("Source boundary smoke passed: load generations reject stale identity, and Nudge, Step, Context, Playback, Ripple/prospects, Section/Current/Pin/Range drags, Guide identity and weight relaxation cannot cross sources.");

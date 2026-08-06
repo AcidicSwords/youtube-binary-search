@@ -205,4 +205,32 @@ assert.equal(currentText(), "Current 1:17.5",
 assert.equal(descendants(byId.get("traversal-prospect-layer")).length, 0,
   "Semantic Undo does not resurrect consumed transient prospects.");
 
-console.log("Ripple smoke passed: bare Shift-click acquisition, distinct accessible observation/window/prospect projection, shared Context derivation and transport, independent Range clipping, Current/history/Active Span non-effects, live retargeting, Panorama Context Frame reuse, exact endpoint publication and persistence, Current-centred completion, Context-Off refusal, newest-first frozen Ghost preview, exact cancellation, canonical Go settlement, ordinary Trace recording, endpoint-by-endpoint consumption, and Undo isolation.");
+// Escape owns an active Ripple before the ordinary transport tier. Cancellation
+// removes only the uncompleted batch and restores Current-centred presentation.
+byId.get("context-duration").value = "5";
+byId.get("context-duration").dispatch("change");
+await flush(2);
+const currentBeforeRippleCancel = currentText();
+const historyBeforeRippleCancel = byId.get("return-meta").textContent;
+byId.get("timeline").dispatch("click", {
+  target: byId.get("timeline"),
+  clientX: 400,
+  shiftKey: true
+});
+await flush(3);
+assert.equal(descendants(byId.get("traversal-prospect-layer")).length, 2);
+assert.equal(byId.get("ripple-address-marker").hidden, false);
+dispatchDocument("keydown", { key: "Escape", code: "Escape" });
+await flush(3);
+assert.equal(currentText(), currentBeforeRippleCancel);
+assert.equal(byId.get("return-meta").textContent, historyBeforeRippleCancel);
+assert.equal(center.state, 2);
+assert.equal(center.currentTime, 77.5,
+  "Ripple cancellation restores media to accepted Current.");
+assert.equal(descendants(byId.get("traversal-prospect-layer")).length, 0,
+  "Escape removes the uncompleted Ripple batch.");
+assert.equal(byId.get("ripple-address-marker").hidden, true);
+assert.equal(byId.get("ripple-context-window-fill").hidden, true);
+assert.match(byId.get("status").textContent, /Ripple cancelled.*Current remains 1:17\.5/);
+
+console.log("Ripple smoke passed: bare Shift-click acquisition, distinct accessible observation/window/prospect projection, shared Context derivation and transport, independent Range clipping, Current/history/Active Span non-effects, live retargeting, Panorama Context Frame reuse, exact endpoint publication and persistence, Current-centred completion, Context-Off refusal, newest-first frozen Ghost preview, exact cancellation, canonical Go settlement, ordinary Trace recording, endpoint-by-endpoint consumption, Undo isolation, and Escape lifecycle restoration.");

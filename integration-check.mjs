@@ -621,6 +621,17 @@ has(topLevelFunction(appCode, "settleGhostGesture"),
 has(topLevelFunction(appCode, "settleGhostGesture"),
   /readKind === "traversal-prospect"[\s\S]*?goTo\(state\.session[\s\S]*?accept\(result[\s\S]*?consumeTraversalProspect\([\s\S]*?return true/,
   "Prospect settlement commits canonical Go before consuming exactly its selected transient entry.");
+const cancelActive = topLevelFunction(appCode, "cancelActiveManipulation");
+has(cancelActive,
+  /state\.currentDrag[\s\S]*?state\.guideDrag[\s\S]*?state\.dragHandle[\s\S]*?state\.ghostGesture[\s\S]*?state\.rippleObservation/,
+  "Escape priority is direct drag, Ghost Candidate, then active Ripple.");
+const stopOrClose = topLevelFunction(appCode, "stopOrClose");
+has(stopOrClose,
+  /isTransportActive\(state\.transport\)[\s\S]*?guideDialogOpen\(\)[\s\S]*?pin-cluster-menu[\s\S]*?state\.guideOpen/,
+  "Ordinary Context or Playback settles before menus, dialogs, and panels.");
+has(topLevelFunction(appCode, "cancelActiveRippleObservation"),
+  /settleTransport\(\)[\s\S]*?Ripple cancelled[\s\S]*?Current remains/,
+  "Ripple Escape uses transport settlement and explicitly restores Current.");
 const nudgeWheel = topLevelFunction(appCode, "handleNudgeWheel");
 has(topLevelFunction(appCode, "wheelPixels"), /Math\.abs\(event\.deltaX\) > Math\.abs\(event\.deltaY\)/,
   "Nudge selects the dominant wheel axis.");

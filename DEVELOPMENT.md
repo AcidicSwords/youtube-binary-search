@@ -197,11 +197,11 @@ Every executable suite is listed here by the current behavior it protects.
 - `chapter-smoke.mjs` — offering and drawing Chapters is inert; navigation, composition, and Retain use canonical routes.
 - `section-weighting-smoke.mjs` — Guide-only Weight editing, effective geometry and atmosphere, scoped/whole-map bypass, weighted Step, and exact restoration.
 - `context-smoke.mjs` — post-traversal Context, Step deferral, replacement, Panorama suspension, reversal naming, Off, and Undo isolation.
-- `ripple-smoke.mjs` — bare Shift-click acquisition, shared clipped Context observation, live retargeting, semantic non-effects, distinct accessible projection, Panorama Frame reuse, endpoint publication, Current-centred completion, newest-first Ghost preview/cancellation, canonical Go settlement, ordinary Trace recording, exact consumption, and Undo isolation.
+- `ripple-smoke.mjs` — bare Shift-click acquisition, shared clipped Context observation, live retargeting, semantic non-effects, distinct accessible projection, Panorama Frame reuse, endpoint publication, Current-centred completion, newest-first Ghost preview/cancellation, canonical Go settlement, ordinary Trace recording, exact consumption, Undo isolation, and Escape restoration.
 - `step-gesture-smoke.mjs` — captured/fallback release, keyboard hold, and rapid taps settle as one action.
 - `transport-coherence-smoke.mjs` — actual-rate observation, effective dynamic projection, settlement, proper-Range wrap, retry, Panorama rebasing, and history isolation.
 - `metadata-smoke.mjs` — delayed valid metadata is retried without creating a zero-duration Session.
-- `source-boundary-smoke.mjs` — stale load generations plus Nudge, Step, Context, Playback, every drag owner, Guide identity, and bypass cleanup at source replacement.
+- `source-boundary-smoke.mjs` — stale load generations plus Nudge, Step, Context, Playback, Ripple/prospects, every drag owner, Guide identity, and bypass cleanup at source replacement.
 - `guide-recovery-smoke.mjs` — older fallback preservation, read/quarantine failures, truthful status, and unsafe current records remaining read-only.
 - `transaction-integrity-smoke.mjs` — one checkpoint per gesture, persistence honesty, source recovery evidence, Group identity, dense lanes, and coincident Pin identity.
 - `cross-interaction-stress.mjs` — Groups, Chapters, Focus, Weight, traversal, Shift layers, Pin topology, and one history stack do not leak meanings into one another.

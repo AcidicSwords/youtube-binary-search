@@ -5102,15 +5102,27 @@ function toggleRangeTools() {
   elements["range-state"].setAttribute("aria-expanded", String(elements["range-tools"].open));
 }
 
+function cancelActiveRippleObservation() {
+  const ripple = state.rippleObservation;
+  if (!ripple) return false;
+  if (rippleOwnsContext()) {
+    settleTransport();
+  } else {
+    removeActiveRippleProspects();
+    state.rippleObservation = null;
+    locateAddress(currentNeighborhood().C, { preservePanorama: true });
+    view.render();
+  }
+  setStatus(
+    `Ripple cancelled. Current remains ${formatTime(currentNeighborhood().C)}.`
+  );
+  return true;
+}
+
 // Escape is the universal cancel. A live direct manipulation owns it first, so
 // the same key that abandons a drag never also closes the surface behind it.
 function cancelActiveManipulation() {
-  // Ghost first: it is the only manipulation that can be in flight while no
-  // pointer is down, so nothing else would recognise it as cancellable.
-  if (state.ghostGesture) {
-    cancelGhostGesture({ restore: true });
-    return true;
-  }
+  // Pointer-owned direct manipulation is physically topmost while held.
   if (state.currentDrag) {
     finishCurrentDrag({ pointerId: state.currentDrag.pointerId }, { cancel: true });
     return true;
@@ -5123,14 +5135,24 @@ function cancelActiveManipulation() {
     cancelRangeDrag();
     return true;
   }
+  // Ghost is next because its Candidate is still provisional. An active Ripple
+  // follows it; ordinary observation belongs to the transport tier below.
+  if (state.ghostGesture) {
+    cancelGhostGesture({ restore: true });
+    return true;
+  }
+  if (state.rippleObservation) return cancelActiveRippleObservation();
   return false;
 }
 
 function stopOrClose() {
   // Escape resolves only the topmost active layer. Repeated presses move outward
   // predictably instead of collapsing unrelated state in one action.
-  if (state.dragHandle) return cancelRangeDrag();
-  if (state.guideDrag) return finishGuideDrag(null, { cancel: true });
+  if (isTransportActive(state.transport)) {
+    settleTransport();
+    setStatus("Observation stopped.");
+    return true;
+  }
   if (guideDialogOpen()) return closeGuideDialog();
   if (!elements["pin-cluster-menu"].hidden) {
     view.closePinClusterMenu({ restoreFocus: true });
@@ -5139,11 +5161,6 @@ function stopOrClose() {
   }
   if (compactGuideLayout() && state.guideOpen) {
     closeGuide();
-    return true;
-  }
-  if (isTransportActive(state.transport)) {
-    settleTransport();
-    setStatus("Observation stopped.");
     return true;
   }
   view.setPreviewAction(null);
