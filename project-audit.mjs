@@ -79,6 +79,8 @@ check(pkg.scripts?.audit === "node integration-check.mjs && node project-audit.m
 check(pkg.scripts?.["test:browser"] === "node browser-smoke.mjs && node ghost-smoke.mjs && node timeline-render-smoke.mjs && node ripple-render-smoke.mjs && node panorama-render-smoke.mjs",
   "The browser proof has one package route covering every browser-backed suite.");
 has(pkg.scripts?.check || "", /npm run test:semantic/, "The extended semantic state-space proof runs in check.");
+has(pkg.scripts?.test || "", /ripple-random-tests\.mjs/,
+  "The pure gate includes randomized Ripple prospect and settlement stress.");
 has(pkg.scripts?.check || "", /npm run audit/, "The validation gauges run in check.");
 
 // Reproducibility is a release law. Dependency selection happens once in the
