@@ -13,8 +13,8 @@ byId.get("load-video").click();
 await flush(5);
 await poll();
 
-byId.get("context-seconds").value = "0";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "0";
+byId.get("context-duration").dispatch("change");
 byId.get("timeline").dispatch("click", {
   target: byId.get("timeline"),
   clientX: 500

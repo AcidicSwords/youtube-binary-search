@@ -31,8 +31,8 @@ byId.get("load-video").click();
 await flush(5);
 await poll();
 await flush(3);
-byId.get("context-seconds").value = "0";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "0";
+byId.get("context-duration").dispatch("change");
 
 // Establish and retain 30–50 as an ordinary Section.
 for (const clientX of [300, 500]) {
@@ -445,8 +445,8 @@ assert.deepEqual(
 // readout that announces a movement must state the source time it will actually
 // cross, or the interface reads "10s · to 0:43" beside a Current of 0:38.
 {
-  byId.get("context-seconds").value = "0";
-  byId.get("context-seconds").dispatch("change");
+  byId.get("context-duration").value = "0";
+  byId.get("context-duration").dispatch("change");
   byId.get("step-mode-fixed").dispatch("click", { detail: 1 });
   byId.get("step-distance").value = "10";
   byId.get("step-distance").dispatch("change");

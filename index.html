@@ -205,10 +205,10 @@
                   <button id="step-fraction-8" type="button" data-step-fraction="0.125" aria-pressed="false">1/8</button>
                 </div>
                 <p class="setting-note">Step distance is measured across the Timeline: one unit equals one source second at <span class="unit-mark">1×</span> Weight and covers proportionally less inside an expanded Section. Range-relative size follows the active Range’s weighted Timeline width. Every Step readout states the source time the movement will actually cross.</p>
-                <label class="compact-setting" for="nudge-seconds">
+                <label class="compact-setting" for="nudge-distance">
                   <span>Fine Nudge distance</span>
                   <span class="number-with-unit">
-                    <input id="nudge-seconds" type="number" min="0.042" max="10" step="0.001"
+                    <input id="nudge-distance" type="number" min="0.042" max="10" step="0.001"
                       value="0.042" inputmode="decimal" disabled>
                     <span>s</span>
                   </span>
@@ -232,9 +232,9 @@
             <details id="observation-settings" class="tool-disclosure observation-settings">
               <summary><span>Automatic Context</span><span id="context-setting-value">5 s centered on Current</span></summary>
               <div class="compact-settings">
-                <label class="compact-setting" for="context-seconds">
+                <label class="compact-setting" for="context-duration">
                   <span>Center-only duration</span>
-                  <input id="context-seconds" type="number" min="0" max="300" step="0.25"
+                  <input id="context-duration" type="number" min="0" max="300" step="0.25"
                     value="5" list="context-presets" inputmode="decimal" disabled>
                   <datalist id="context-presets">
                     <option value="0" label="Off"></option>

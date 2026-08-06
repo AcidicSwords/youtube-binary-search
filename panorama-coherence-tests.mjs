@@ -192,7 +192,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   for (const id of [
     "panorama-inner-offset", "panorama-outer-offset", "panorama-cycle-rate",
     "tail-player-surface", "lead-player-surface",
-    "panorama-both-toggle", "nudge-seconds",
+    "panorama-both-toggle", "nudge-distance",
     "panorama-transport-state", "panorama-rate-state"
   ]) assert.match(html, new RegExp(`id=["']${id}["']`));
 
@@ -216,7 +216,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   // setting?" depended on which setting.
   assert.match(
     html,
-    /id="parameter-panel"[\s\S]*id="nudge-seconds"[\s\S]*id="panorama-inner-offset"[\s\S]*id="panorama-outer-offset"[\s\S]*id="panorama-cycle-rate"/,
+    /id="parameter-panel"[\s\S]*id="nudge-distance"[\s\S]*id="panorama-inner-offset"[\s\S]*id="panorama-outer-offset"[\s\S]*id="panorama-cycle-rate"/,
     "Every remembered setting lives in State & Settings."
   );
   assert.doesNotMatch(html, /center-panorama-settings/,
@@ -260,10 +260,10 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   assert.doesNotMatch(app, /onHoldOffsets:/);
   assert.doesNotMatch(field, /onHoldOffsets/);
   assert.match(app, /function changePanoramaBoundary[\s\S]*state\.panoramaCycle = normalizePanoramaCycle/);
-  assert.match(app, /seconds:\s*state\.contextSeconds/);
+  assert.match(app, /seconds:\s*state\.contextDuration/);
   assert.doesNotMatch(
     app,
-    /panoramaCycle\s*=\s*[^;\n]*contextSeconds|contextSeconds\s*=\s*[^;\n]*panoramaCycle/,
+    /panoramaCycle\s*=\s*[^;\n]*contextDuration|contextDuration\s*=\s*[^;\n]*panoramaCycle/,
     "Context duration and the physical Panorama relation must remain independently owned."
   );
   assert.match(

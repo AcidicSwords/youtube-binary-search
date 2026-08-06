@@ -6,7 +6,11 @@ const { byId, players, flush, poll, dispatchDocument, currentText } = env;
 const savedPanoramaCycle = { inner: 3, outer: 12, rate: 0.4 };
 env.localStorage.values.set(
   "binary-youtube-reader:preferences:v1",
-  JSON.stringify({ panoramaCycle: savedPanoramaCycle })
+  JSON.stringify({
+    panoramaCycle: savedPanoramaCycle,
+    contextSeconds: 7.25,
+    nudgeSeconds: 0.125
+  })
 );
 
 await import("./app.js");
@@ -25,6 +29,10 @@ assert.equal(byId.get("duration-time").textContent, "1:40");
 assert.equal(byId.get("panorama-inner-offset").value, "3");
 assert.equal(byId.get("panorama-outer-offset").value, "12");
 assert.equal(byId.get("panorama-cycle-rate").value, "0.4");
+assert.equal(byId.get("context-duration").value, "7.25",
+  "The legacy Context seconds key migrates without resetting its value.");
+assert.equal(byId.get("nudge-distance").value, "0.125",
+  "The legacy Nudge seconds key migrates without resetting its value.");
 assert.equal(byId.get("panorama-setting-value").textContent, "3–12 s · 0.6× / 1.4×");
 assert.deepEqual(
   JSON.parse(env.localStorage.values.get("binary-youtube-reader:preferences:v1")).panoramaCycle,
@@ -46,6 +54,15 @@ byId.get("panorama-inner-offset").dispatch("change");
 byId.get("panorama-outer-offset").value = "2.5";
 byId.get("panorama-outer-offset").dispatch("change");
 await flush();
+const migratedPreferences = JSON.parse(
+  env.localStorage.values.get("binary-youtube-reader:preferences:v1")
+);
+assert.equal(migratedPreferences.contextDuration, 7.25);
+assert.equal(migratedPreferences.nudgeDistance, 0.125);
+assert.equal("contextSeconds" in migratedPreferences, false,
+  "Preference writes contain only the canonical Context Duration key.");
+assert.equal("nudgeSeconds" in migratedPreferences, false,
+  "Preference writes contain only the canonical Nudge Distance key.");
 
 // Tune rejects an empty/invalid Offset without silently converting it to the
 // minimum or leaving the field showing a value the model did not accept.
@@ -86,8 +103,8 @@ await flush();
 
 // Keep this smoke focused on direct interaction; automatic Context has its own
 // dedicated smoke test.
-byId.get("context-seconds").value = "0";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "0";
+byId.get("context-duration").dispatch("change");
 
 // Step size is a first-class semantic setting. Adaptive presets are immediate,
 // Range-relative, and reversible back to the independent manual value.

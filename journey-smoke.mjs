@@ -83,8 +83,8 @@ assert.equal(byId.get("duration-time").textContent, "1:40",
   "An undeformed map reports its source length and no stretch factor.");
 assert.equal(byId.get("chapter-parse").disabled, false,
   "Now chapters can be offered.");
-byId.get("context-seconds").value = "0";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "0";
+byId.get("context-duration").dispatch("change");
 await flush();
 
 // ==============================================================================

@@ -14,8 +14,8 @@ await flush(5);
 await poll();
 await flush(3);
 
-byId.get("context-seconds").value = "0";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "0";
+byId.get("context-duration").dispatch("change");
 for (const clientX of [250, 500]) {
   byId.get("timeline").dispatch("click", {
     target: byId.get("timeline"),

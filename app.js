@@ -158,7 +158,7 @@ const METADATA_GRACE_MS = 4000;
 const METADATA_RETRY_MS = 150;
 const PROGRAMMATIC_PLACEMENT_GRACE_MS = 2000;
 const NATIVE_POSITION_TOLERANCE_SECONDS = 0.25;
-const MAX_CONTEXT_SECONDS = 300;
+const MAX_CONTEXT_DURATION = 300;
 // Bounds for the stored Shift rate. They bound the wish, not the offer: what is
 // actually played is always a rate the player reported.
 const MIN_PLAYBACK_RATE = 0.25;
@@ -173,18 +173,18 @@ const PIN_SNAP_ARM_MS = 450;
 // the Session kernel uses, or a single Nudge would resolve to the Address it
 // started from and move nothing. 1/24 s is the smallest frame-like increment
 // that clears EPSILON.
-const DEFAULT_NUDGE_SECONDS = 1 / 24;
-const MIN_NUDGE_SECONDS = EPSILON * 1.02;
-const MAX_NUDGE_SECONDS = 10;
+const DEFAULT_NUDGE_DISTANCE = 1 / 24;
+const MIN_NUDGE_DISTANCE = EPSILON * 1.02;
+const MAX_NUDGE_DISTANCE = 10;
 const NUDGE_WHEEL_THRESHOLD = 24;
 const NUDGE_GESTURE_SETTLE_MS = 420;
 const PRECISION_DRAG_GAIN = 0.2;
 
-function normalizeNudgeSeconds(value, fallback = DEFAULT_NUDGE_SECONDS) {
+function normalizeNudgeDistance(value, fallback = DEFAULT_NUDGE_DISTANCE) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric <= 0) return fallback;
   // A configured quantum at or below EPSILON would silently disable Nudge.
-  return clamp(numeric, MIN_NUDGE_SECONDS, MAX_NUDGE_SECONDS);
+  return clamp(numeric, MIN_NUDGE_DISTANCE, MAX_NUDGE_DISTANCE);
 }
 
 function legacyPanoramaCycle(value) {
@@ -194,7 +194,7 @@ function legacyPanoramaCycle(value) {
     Number(legacy?.forward) || 0
   ) || DEFAULT_PANORAMA_CYCLE.outer;
   return {
-    inner: Math.max(MIN_NUDGE_SECONDS, outer / 4),
+    inner: Math.max(MIN_NUDGE_DISTANCE, outer / 4),
     outer,
     rate: value?.panoramaResponse
       ? sideRateStepFromResponse(value.panoramaResponse)
@@ -202,11 +202,11 @@ function legacyPanoramaCycle(value) {
   };
 }
 
-function normalizeContextSeconds(value, fallback = 5) {
+function normalizeContextDuration(value, fallback = 5) {
   if (value === null || value === undefined || String(value).trim() === "") return fallback;
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
-  return clamp(numeric, 0, MAX_CONTEXT_SECONDS);
+  return clamp(numeric, 0, MAX_CONTEXT_DURATION);
 }
 
 // The rate Shift+Space plays Center at. Stored as a wish, not as a command: the
@@ -242,13 +242,21 @@ function readPreferences() {
       ? Number(value.stepSeconds)
       : 10;
     return {
-      contextSeconds: normalizeContextSeconds(value?.contextSeconds),
+      // Canonical key first; the legacy seconds-named key remains read-only.
+      contextDuration: normalizeContextDuration(
+        value?.contextDuration
+        ?? value?.contextSeconds // lexicon-allow: legacy preference back-compat
+      ),
       stepDistance: normalizeStepDistance(value?.stepDistance ?? legacyStep),
       // One bounded cycling relation replaces the two independent side
       // Offsets. A legacy pair migrates once: its widest side becomes the outer
       // offset and its saved rates become the nearest symmetric cycling pair.
       panoramaCycle: normalizePanoramaCycle(savedPanoramaCycle(value)),
-      nudgeSeconds: normalizeNudgeSeconds(value?.nudgeSeconds),
+      // Canonical key first; the legacy seconds-named key remains read-only.
+      nudgeDistance: normalizeNudgeDistance(
+        value?.nudgeDistance
+        ?? value?.nudgeSeconds // lexicon-allow: legacy preference back-compat
+      ),
       playbackRate: normalizePlaybackRate(value?.playbackRate),
       texturedPlaybackEnabled: value?.texturedPlaybackEnabled === true || value?.dynamicPlaybackRate === true,
       panoramaEnabled: (value?.panoramaEnabled ?? value?.stepFieldEnabled) !== false, // lexicon-allow: v8 preference back-compat
@@ -257,10 +265,10 @@ function readPreferences() {
     };
   } catch {
     return {
-      contextSeconds: 5,
+      contextDuration: 5,
       stepDistance: normalizeStepDistance(10),
       panoramaCycle: { ...DEFAULT_PANORAMA_CYCLE },
-      nudgeSeconds: DEFAULT_NUDGE_SECONDS,
+      nudgeDistance: DEFAULT_NUDGE_DISTANCE,
       playbackRate: DEFAULT_PLAYBACK_RATE,
       texturedPlaybackEnabled: false,
       panoramaEnabled: true,
@@ -283,8 +291,8 @@ const state = {
   transport: idleTransport(),
   pendingStep: null,
   panoramaCycle: normalizePanoramaCycle(preferences.panoramaCycle),
-  nudgeSeconds: normalizeNudgeSeconds(preferences.nudgeSeconds),
-  contextSeconds: preferences.contextSeconds,
+  nudgeDistance: normalizeNudgeDistance(preferences.nudgeDistance),
+  contextDuration: preferences.contextDuration,
   playbackRate: preferences.playbackRate,
   texturedPlaybackEnabled: preferences.texturedPlaybackEnabled,
   panoramaEnabled: preferences.panoramaEnabled,
@@ -541,13 +549,13 @@ function panoramaFrameRequest() {
   // not merely while its transport is running. The edges are the bounded
   // observation window before, during, and after transport, so beginning,
   // pausing, stopping, or settling Context reassigns neither side.
-  if (state.contextSeconds > EPSILON) {
+  if (state.contextDuration > EPSILON) {
     const window = contextRunning
       ? { start: transport.start, end: transport.end }
       : deriveContextWindow(
         currentNeighborhood().C,
         activeRange(),
-        state.contextSeconds
+        state.contextDuration
       );
     if (window) {
       return {
@@ -743,8 +751,8 @@ function persistPreferences() {
       preferences.stepDistance
     );
     preferences.panoramaCycle = normalizePanoramaCycle(state.panoramaCycle);
-    preferences.nudgeSeconds = normalizeNudgeSeconds(state.nudgeSeconds);
-    preferences.contextSeconds = state.contextSeconds;
+    preferences.nudgeDistance = normalizeNudgeDistance(state.nudgeDistance);
+    preferences.contextDuration = state.contextDuration;
     preferences.playbackRate = normalizePlaybackRate(state.playbackRate);
     preferences.texturedPlaybackEnabled = state.texturedPlaybackEnabled === true;
     preferences.panoramaEnabled = state.panoramaEnabled;
@@ -752,10 +760,10 @@ function persistPreferences() {
     preferences.leadVisible = state.leadVisible;
 
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify({
-      contextSeconds: preferences.contextSeconds,
+      contextDuration: preferences.contextDuration,
       stepDistance: preferences.stepDistance,
       panoramaCycle: preferences.panoramaCycle,
-      nudgeSeconds: preferences.nudgeSeconds,
+      nudgeDistance: preferences.nudgeDistance,
       playbackRate: preferences.playbackRate,
       texturedPlaybackEnabled: preferences.texturedPlaybackEnabled,
       panoramaEnabled: preferences.panoramaEnabled,
@@ -1037,7 +1045,7 @@ function startContext(anchor, options = {}) {
   const transport = createContextTransport({
     anchor,
     range: activeRange(),
-    seconds: state.contextSeconds
+    seconds: state.contextDuration
   });
 
   if (transport.kind === TRANSPORT_KIND.IDLE) {
@@ -1072,7 +1080,7 @@ function applyPlayerEffect(result, options = {}) {
     : result?.activeSpan?.arrival;
   if (!Number.isFinite(destination)) return;
 
-  if (observe && state.contextSeconds > 0 && result?.activeSpan) {
+  if (observe && state.contextDuration > 0 && result?.activeSpan) {
     if (!options.panoramaAligned) {
       panorama?.translateToCurrent(destination, { preserve: true });
     }
@@ -1832,7 +1840,7 @@ function traverseHistory(transform, emptyMessage, completedVerb, cause) {
   const currentMoved = Math.abs(destination - departure) > EPSILON;
   const rangeChanged = Math.abs(previousModel.range.start - activeRange().start) > EPSILON
     || Math.abs(previousModel.range.end - activeRange().end) > EPSILON;
-  if (currentMoved && state.contextSeconds > 0) {
+  if (currentMoved && state.contextDuration > 0) {
     if (rangeChanged) panorama?.resetAtCurrent?.();
     else panorama?.translateToCurrent(destination, { preserve: true });
     startContext(destination);
@@ -3887,9 +3895,9 @@ function updateCurrentDrag(event) {
 // Context is enabled, otherwise the exact Go/operator Frame around the
 // candidate Address.
 function showCurrentDragFrame(candidate) {
-  const contextHalf = state.contextSeconds / 2;
+  const contextHalf = state.contextDuration / 2;
   const range = activeRange();
-  const frame = state.contextSeconds > 0
+  const frame = state.contextDuration > 0
     ? {
         kind: "current",
         start: Math.max(range.start, candidate - contextHalf),
@@ -4248,7 +4256,7 @@ function frameDuration() {
 }
 
 function nudgeQuantum() {
-  return frameDuration() ?? normalizeNudgeSeconds(state.nudgeSeconds);
+  return frameDuration() ?? normalizeNudgeDistance(state.nudgeDistance);
 }
 
 function formatQuantum(value) {
@@ -4631,7 +4639,7 @@ function handleNudgeWheel(event) {
 }
 
 function syncContextControl() {
-  elements["context-seconds"].value = String(state.contextSeconds);
+  elements["context-duration"].value = String(state.contextDuration);
   renderPlaybackRateChoices();
 }
 
@@ -5279,7 +5287,7 @@ function handleGhostWheel(event) {
     //
     // With Context off, the recall stays a silent frame-by-frame scan.
     const landing = currentNeighborhood().C;
-    if (state.contextSeconds > 0) {
+    if (state.contextDuration > 0) {
       startContext(landing, { retarget: transportIs(TRANSPORT_KIND.CONTEXT) });
     } else {
       locateAddress(landing, { preservePanorama: true });
@@ -5744,18 +5752,18 @@ for (const binding of [
 // the ensuing click. Keyboard focus remains intact for Tab and Enter.
 document.addEventListener("pointerup", releasePointerControlFocus);
 
-elements["context-seconds"].addEventListener("change", event => {
-  const previous = state.contextSeconds;
-  state.contextSeconds = normalizeContextSeconds(event.target.value, previous);
-  event.target.value = String(state.contextSeconds);
+elements["context-duration"].addEventListener("change", event => {
+  const previous = state.contextDuration;
+  state.contextDuration = normalizeContextDuration(event.target.value, previous);
+  event.target.value = String(state.contextDuration);
   persistPreferences();
   if (transportIs(TRANSPORT_KIND.CONTEXT)) {
-    if (state.contextSeconds === 0) {
+    if (state.contextDuration === 0) {
       settleTransport();
       setStatus("Automatic Context turned off.");
     } else {
       startContext(currentNeighborhood().C, { retarget: true });
-      setStatus(`Automatic Context updated to ${state.contextSeconds}s.`);
+      setStatus(`Automatic Context updated to ${state.contextDuration}s.`);
     }
   }
   view.render();
@@ -5849,16 +5857,16 @@ elements["panorama-inner-offset"].addEventListener("change", event => {
 elements["panorama-outer-offset"].addEventListener("change", event => {
   changePanoramaBoundary("outer", event.target.value);
 });
-elements["nudge-seconds"].addEventListener("change", event => {
+elements["nudge-distance"].addEventListener("change", event => {
   const parsed = Number(event.target.value);
   if (!String(event.target.value).trim() || !Number.isFinite(parsed) || parsed <= 0) {
     setStatus("Nudge must be a positive number of seconds.", true);
     view.render();
     return;
   }
-  state.nudgeSeconds = normalizeNudgeSeconds(parsed);
+  state.nudgeDistance = normalizeNudgeDistance(parsed);
   persistPreferences();
-  setStatus(`Nudge set to ${formatQuantum(state.nudgeSeconds)}.`);
+  setStatus(`Nudge set to ${formatQuantum(state.nudgeDistance)}.`);
   view.render();
 });
 elements["step-distance"].addEventListener("change", event => {

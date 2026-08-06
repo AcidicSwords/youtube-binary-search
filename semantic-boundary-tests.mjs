@@ -166,8 +166,8 @@ finding(
 );
 
 // Establish and activate the configured Panorama at Current 50.
-environment.byId.get("context-seconds").value = "0";
-environment.byId.get("context-seconds").dispatch("change");
+environment.byId.get("context-duration").value = "0";
+environment.byId.get("context-duration").dispatch("change");
 environment.byId.get("timeline").dispatch("click", { clientX: 500 });
 await environment.flush(5);
 await environment.poll();
@@ -188,8 +188,8 @@ const configuredOuterOffset = environment.byId.get("panorama-outer-offset").valu
 // geometry must remain the exact 2.5-second Context preview while its source
 // window is active, without rewriting the independently configured live Panorama
 // offsets underneath it.
-environment.byId.get("context-seconds").value = "5";
-environment.byId.get("context-seconds").dispatch("change");
+environment.byId.get("context-duration").value = "5";
+environment.byId.get("context-duration").dispatch("change");
 environment.byId.get("timeline").dispatch("click", { clientX: 600 });
 await environment.flush(8);
 environment.center().currentTime = 59;

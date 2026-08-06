@@ -18,8 +18,8 @@ byId.get("youtube-url").value = "https://youtu.be/dQw4w9WgXcQ";
 byId.get("load-video").click();
 await flush(5);
 await poll();
-byId.get("context-seconds").value = "0";
-byId.get("context-seconds").dispatch("change");
+byId.get("context-duration").value = "0";
+byId.get("context-duration").dispatch("change");
 await flush();
 
 const chapterRows = () => descendants(byId.get("chapters-list"))

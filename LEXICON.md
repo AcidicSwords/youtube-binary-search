@@ -213,7 +213,8 @@ Each canonical term carries:
 - **Definition** Move a precise distance in Source Time.
 - **Code stem** `nudge` · **UI label** Nudge
 - **Qualifiers** Nudge Distance, Nudge Backward/Forward.
-- **Forbidden synonyms** nudgeSeconds (persisted key retired to `nudgeDistance`).
+- **Forbidden synonyms** nudgeSeconds (legacy persisted key; read-only
+  compatibility).
 
 ---
 
@@ -503,7 +504,8 @@ Each canonical term carries:
 - **Class** attribute · **Owner** `app.js`
 - **Definition** Configured total Source-Time span of the Context Window.
 - **Code stem** `contextDuration` · **UI label** Context Duration
-- **Forbidden synonyms** Center-only duration, `contextSeconds` (persisted key).
+- **Forbidden synonyms** Center-only duration, `contextSeconds` (legacy
+  persisted key; read-only compatibility).
 
 ### Ripple Observation Address
 - **Class** address · **Owner** `app.js`

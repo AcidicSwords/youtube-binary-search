@@ -125,7 +125,7 @@ assert.equal(resolvePanoramaPhase({
     "panorama", "player-tail", "player", "player-lead", "center-transport-surface",
     "tail-player-surface", "lead-player-surface",
     "panorama-both-toggle", "panorama-cycle-rate",
-    "panorama-inner-offset", "panorama-outer-offset", "nudge-seconds",
+    "panorama-inner-offset", "panorama-outer-offset", "nudge-distance",
     "current-marker", "current-departure-marker",
     "tail-collapse", "lead-collapse", "tail-restore", "lead-restore", "panorama-toggle"
   ]) {

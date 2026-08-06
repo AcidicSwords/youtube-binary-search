@@ -1951,8 +1951,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         }`
       : "—";
     elements["pin-current-position"].textContent = currentNeighborhood ? `Current ${formatTime(semanticCurrent)}` : "Current —";
-    elements["context-setting-value"].textContent = currentState.contextSeconds > 0
-      ? `${currentState.contextSeconds} s centered on Current`
+    elements["context-setting-value"].textContent = currentState.contextDuration > 0
+      ? `${currentState.contextDuration} s centered on Current`
       : "Off";
 
     // One bounded cycling relation: 0 < inner < outer.
@@ -1969,8 +1969,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         `${panoramaCycle.inner}–${panoramaCycle.outer} s · ${pair}`;
     }
     // The stored quantum stays exact; only its presentation is rounded.
-    elements["nudge-seconds"].value = String(
-      Number((currentState.nudgeSeconds ?? 1 / 24).toFixed(3))
+    elements["nudge-distance"].value = String(
+      Number((currentState.nudgeDistance ?? 1 / 24).toFixed(3))
     );
     elements["step-distance"].value = String(configuredReach.forward);
     const adaptiveStep = configuredReach.mode === STEP_DISTANCE_MODE.ADAPTIVE;
@@ -2107,7 +2107,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "go-range-start", "range-start-here", "range-midpoint",
       "go-range-end", "range-end-here", "full-video-range",
       "panorama-inner-offset", "panorama-outer-offset", "panorama-cycle-rate",
-      "nudge-seconds", "context-seconds", "playback-rate", "playback-dynamic",
+      "nudge-distance", "context-duration", "playback-rate", "playback-dynamic",
       "weight-relaxation-toggle",
       "section-source", "section-label", "pin-label",
       "chapter-source", "chapter-parse", "chapter-clear"

@@ -461,8 +461,8 @@ try {
   // and it is the same window following the wheel, not a new observation torn
   // down and rebuilt at every notch.
   await page.evaluate(() => {
-    document.getElementById("context-seconds").value = "4";
-    document.getElementById("context-seconds").dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("context-duration").value = "4";
+    document.getElementById("context-duration").dispatchEvent(new Event("change", { bubbles: true }));
     document.activeElement?.blur();
   });
   await settle(260);
@@ -559,8 +559,8 @@ try {
 
   // Back off, so nothing downstream inherits a playing window.
   await page.evaluate(() => {
-    document.getElementById("context-seconds").value = "0";
-    document.getElementById("context-seconds").dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("context-duration").value = "0";
+    document.getElementById("context-duration").dispatchEvent(new Event("change", { bubbles: true }));
     document.activeElement?.blur();
   });
   await settle(300);
