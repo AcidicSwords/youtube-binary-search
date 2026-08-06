@@ -26,7 +26,7 @@ function element(tagName = "DIV") {
 
 function makeHarness({
   rates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
-  deferredCue = false,
+  deferredChapter = false,
   delayedPlay = false,
   ratesAfterPlay = null
 } = {}) {
@@ -70,10 +70,10 @@ function makeHarness({
     const adapter = {
       commands,
       mute() { commands.push(["mute"]); },
-      cue(_videoId, address) {
-        commands.push(["cue", address]);
+      chapter(_videoId, address) {
+        commands.push(["chapter", address]);
         time = address;
-        if (!deferredCue) {
+        if (!deferredChapter) {
           state = YOUTUBE_STATE.CUED;
           config.events.onStateChange?.(state);
         }
@@ -100,7 +100,7 @@ function makeHarness({
       setTime(value) { time = value; },
       setState(value) { state = value; config.events.onStateChange?.(value); },
       setRates(value) { availableRates = [...value]; },
-      finishCue() { state = YOUTUBE_STATE.CUED; config.events.onStateChange?.(state); },
+      finishChapter() { state = YOUTUBE_STATE.CUED; config.events.onStateChange?.(state); },
       finishPlay() {
         if (Array.isArray(ratesAfterPlay)) availableRates = [...ratesAfterPlay];
         state = YOUTUBE_STATE.PLAYING;
@@ -155,10 +155,10 @@ function makeHarness({
     h.controller.tick();
     assert.equal(h.tail().time, 40, "Initial Tail must show the frame represented by backward Step.");
     assert.equal(h.lead().time, 60, "Initial Lead must show the frame represented by forward Step.");
-    assert.ok(h.tail().commands.some(command => command[0] === "cue"));
-    assert.ok(h.tail().commands.some(command => command[0] === "place"), "Pre-activation parking must decode the represented frame after cueing.");
+    assert.ok(h.tail().commands.some(command => command[0] === "chapter"));
+    assert.ok(h.tail().commands.some(command => command[0] === "place"), "Pre-activation parking must decode the represented frame after chaptering.");
 
-    const leadCuesBeforeRecovery = h.lead().commands.filter(command => command[0] === "cue").length;
+    const leadChaptersBeforeRecovery = h.lead().commands.filter(command => command[0] === "chapter").length;
     h.lead().fail();
     assert.equal(h.controller.snapshot().leadRuntime.error, true);
     assert.equal(h.controller.snapshot().leadRuntime.ready, true, "A media error must not discard the reusable IFrame adapter.");
@@ -167,8 +167,8 @@ function makeHarness({
     h.controller.tick();
     assert.equal(h.controller.snapshot().leadRuntime.error, false, "Restoring a failed pane must retry its source.");
     assert.ok(
-      h.lead().commands.filter(command => command[0] === "cue").length > leadCuesBeforeRecovery,
-      "Lead recovery must re-cue the current video instead of remaining permanently unavailable."
+      h.lead().commands.filter(command => command[0] === "chapter").length > leadChaptersBeforeRecovery,
+      "Lead recovery must re-chapter the current video instead of remaining permanently unavailable."
     );
 
     const semanticInterval = Object.freeze({ departure: 30, arrival: 50 });
@@ -179,10 +179,10 @@ function makeHarness({
     const started = h.controller.playFromGesture({ center: 50 });
     assert.deepEqual(started, { tail: true, lead: true }, "A Context settled in the same gesture stack must not leave stale suspension behind.");
     assert.deepEqual(h.snapshot.activeSpan, semanticInterval, "Physical Panorama activation must not mutate semantic Interval.");
-    assert.ok(["cue", "place"].includes(h.tail().commands.at(-2)?.[0]));
+    assert.ok(["chapter", "place"].includes(h.tail().commands.at(-2)?.[0]));
     assert.equal(h.tail().commands.at(-2)?.[1], 48, "A fresh cycle begins at the inner offset behind Center.");
     assert.deepEqual(h.tail().commands.at(-1), ["play"]);
-    assert.ok(["cue", "place"].includes(h.lead().commands.at(-2)?.[0]));
+    assert.ok(["chapter", "place"].includes(h.lead().commands.at(-2)?.[0]));
     assert.equal(h.lead().commands.at(-2)?.[1], 52, "A fresh cycle begins at the inner offset ahead of Center.");
     assert.deepEqual(h.lead().commands.at(-1), ["play"]);
     assert.equal(h.controller.cycle().phase, "expanding");
@@ -336,7 +336,7 @@ function makeHarness({
 
 {
   const h = makeHarness({
-    deferredCue: true,
+    deferredChapter: true,
     delayedPlay: true
   });
   try {
@@ -365,7 +365,7 @@ function makeHarness({
       tailCommands,
       "A hidden pane must remain dormant across polling ticks."
     );
-    h.tail().finishCue();
+    h.tail().finishChapter();
     assert.equal(
       h.tail().commands.filter(command => command[0] === "play").length,
       tailPlays,
@@ -384,7 +384,7 @@ function makeHarness({
       leadCommands,
       "Panorama Off must not keep issuing hidden player commands."
     );
-    h.lead().finishCue();
+    h.lead().finishChapter();
     assert.equal(
       h.lead().commands.filter(command => command[0] === "play").length,
       0,
@@ -722,23 +722,23 @@ function makeHarness({
 {
   const h = makeHarness({
     rates: [1],
-    deferredCue: true,
+    deferredChapter: true,
     delayedPlay: true,
     ratesAfterPlay: [0.5, 1, 1.5, 2]
   });
   try {
     h.controller.tick();
     assert.equal(h.controller.activationState().ready, false, "Center Play must wait until visible side sources are cued.");
-    const tailCueCount = h.tail().commands.filter(command => command[0] === "cue").length;
-    const leadCueCount = h.lead().commands.filter(command => command[0] === "cue").length;
-    h.tail().finishCue();
-    h.lead().finishCue();
+    const tailChapterCount = h.tail().commands.filter(command => command[0] === "chapter").length;
+    const leadChapterCount = h.lead().commands.filter(command => command[0] === "chapter").length;
+    h.tail().finishChapter();
+    h.lead().finishChapter();
     assert.equal(h.controller.activationState().ready, true);
 
     const started = h.controller.playFromGesture({ center: 50 });
     assert.deepEqual(started, { tail: true, lead: true });
-    assert.equal(h.tail().commands.filter(command => command[0] === "cue").length, tailCueCount, "Trusted Play must not re-cue Tail.");
-    assert.equal(h.lead().commands.filter(command => command[0] === "cue").length, leadCueCount, "Trusted Play must not re-cue Lead.");
+    assert.equal(h.tail().commands.filter(command => command[0] === "chapter").length, tailChapterCount, "Trusted Play must not re-chapter Tail.");
+    assert.equal(h.lead().commands.filter(command => command[0] === "chapter").length, leadChapterCount, "Trusted Play must not re-chapter Lead.");
     assert.deepEqual(h.tail().commands.slice(-2), [["place", 48], ["play"]]);
     assert.deepEqual(h.lead().commands.slice(-2), [["place", 52], ["play"]]);
 

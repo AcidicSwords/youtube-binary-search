@@ -52,25 +52,25 @@ byId.get("context-seconds").dispatch("change");
 await flush();
 
 // ==============================================================================
-// 1. A retained Cue is saved, not merely reported
+// 1. A retained Chapter is saved, not merely reported
 // ==============================================================================
 // Retention assigned the Session directly and rendered the result. The Guide
 // showed the Section, the status said it was retained, and storage never heard
 // about it -- so it was gone on the next load. Nothing in the interface
 // distinguished that from a real save.
-byId.get("cue-source").value = "0:00 Opening\n0:30 Middle\n1:10 End";
-byId.get("cue-capture").dispatch("submit");
+byId.get("chapter-source").value = "0:00 Opening\n0:30 Middle\n1:10 End";
+byId.get("chapter-capture").dispatch("submit");
 await flush();
 
-const retainButtons = descendants(byId.get("cues-list"))
-  .filter(node => node.dataset.cueRetain);
+const retainButtons = descendants(byId.get("chapters-list"))
+  .filter(node => node.dataset.chapterRetain);
 assert.equal(retainButtons.length, 3);
-byId.get("cues-list").dispatch("click", { target: retainButtons[1] });
+byId.get("chapters-list").dispatch("click", { target: retainButtons[1] });
 await flush();
 
 assert.match(byId.get("status").textContent, /Retained/);
 assert.equal(byId.get("sections-list-count").textContent, "1",
-  "Retaining a spanning Cue saves one Section.");
+  "Retaining a spanning Chapter saves one Section.");
 assert.equal(storedGuide()?.sections.length, 1,
   "and the save reaches storage in the same transaction that reported it.");
 assert.equal(storedGuide()?.pins.length, 2,
@@ -79,21 +79,21 @@ assert.equal(storedGuide()?.pins.length, 2,
 // The real test of a save is the reload.
 await loadVideo("https://youtu.be/dQw4w9WgXcQ");
 assert.equal(byId.get("sections-list-count").textContent, "1",
-  "A retained Cue survives reopening the video.");
+  "A retained Chapter survives reopening the video.");
 assert.equal(byId.get("pins-list-count").textContent, "2");
 
-// A point Cue retains a Pin by the same path.
-byId.get("cue-source").value = "0:45 A point";
-byId.get("cue-capture").dispatch("submit");
+// A point Chapter retains a Pin by the same path.
+byId.get("chapter-source").value = "0:45 A point";
+byId.get("chapter-capture").dispatch("submit");
 await flush();
-const pointRetain = descendants(byId.get("cues-list"))
-  .find(node => node.dataset.cueRetain);
-byId.get("cues-list").dispatch("click", { target: pointRetain });
+const pointRetain = descendants(byId.get("chapters-list"))
+  .find(node => node.dataset.chapterRetain);
+byId.get("chapters-list").dispatch("click", { target: pointRetain });
 await flush();
 const pinsAfterPoint = byId.get("pins-list-count").textContent;
 await loadVideo("https://youtu.be/dQw4w9WgXcQ");
 assert.equal(byId.get("pins-list-count").textContent, pinsAfterPoint,
-  "A Cue retained as a Pin survives reopening too.");
+  "A Chapter retained as a Pin survives reopening too.");
 
 // ==============================================================================
 // 2. A pending Nudge settles before the next transaction commits
@@ -288,4 +288,4 @@ assert.match(byId.get("status").textContent, /already called/,
     "Loading alone does not manufacture an empty save over the damaged record.");
 }
 
-console.log("Transaction integrity smoke passed: a retained Cue is written to storage in the transaction that reports it and survives reopening; a pending Nudge settles before the next operator commits, so Undo unwinds in the order actions happened; Weight is assigned in one place and one selection is one decision; the relationship band stays bounded under heavy overlap while every Section keeps its control; Group names cannot collide; and Address equality never silently chooses among coincident Pin identities; and an unreadable saved map is reported and set aside rather than overwritten.");
+console.log("Transaction integrity smoke passed: a retained Chapter is written to storage in the transaction that reports it and survives reopening; a pending Nudge settles before the next operator commits, so Undo unwinds in the order actions happened; Weight is assigned in one place and one selection is one decision; the relationship band stays bounded under heavy overlap while every Section keeps its control; Group names cannot collide; and Address equality never silently chooses among coincident Pin identities; and an unreadable saved map is reported and set aside rather than overwritten.");

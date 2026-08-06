@@ -246,7 +246,7 @@ semantic state, and a gesture produces at most one history entry.
    still tags Current as a Pin.
 3. Press `Shift+T`; confirm the Active Span becomes a Section and duplicate
    Tag selects rather than duplicates it.
-4. Plain-click and Shift/Extend-click Pins, Sections, and a Cue. Confirm plain
+4. Plain-click and Shift/Extend-click Pins, Sections, and a Chapter. Confirm plain
    selection replaces and shifted selection expands one contiguous extent.
 5. Focus that extent, change a retained Section's Weight in Guide, then Unfocus.
 6. Create another Group. Toggle On Timeline and Active independently, including

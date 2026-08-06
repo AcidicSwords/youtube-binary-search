@@ -25,7 +25,7 @@
 - **Section** — a retained positive edge between two Pin identities, with an optional title, one Group, and one Weight.
 - **Tag** — the matrix retention operator. `T` is Retain Pin from Current; `Shift+T` is Retain Section from a positive Active Span.
 - **Guide** — the persistent source-scoped graph of Groups, Pins, and Sections, including objects not currently drawn on the Timeline.
-- **Cue** — a transient Address or extent offered from chapter-like text. It is not persisted, weighted, or traversable as a Pin until explicitly retained. When optionally drawn on the Timeline, its inert presentation is positioned through the effective projection without entering the Guide or traversal.
+- **Chapter** — a transient Address or extent offered from chapter-like text. It is not persisted, weighted, or traversable as a Pin until explicitly retained. When optionally drawn on the Timeline, its inert presentation is positioned through the effective projection without entering the Guide or traversal.
 - **Group** — one ordinary partition of Sections. Every Section belongs to one Group; the last Group cannot be removed.
 - **Drawn Group** — the optional Group whose Sections and endpoint Pins appear on the Timeline. At most one Group is drawn, and drawing no Group is valid.
 - **Active Group** — a Group whose Section weights contribute to the effective projection. Activity is independent of whether the Group is drawn.
@@ -65,6 +65,6 @@
 - **Ghost injection** — the one occurrence appended on release: a jump from the live Anchor to the Address re-entered, linked to both. Backward from an injected occurrence follows its live predecessor; forward may resume the historical successors of the occurrence it re-entered.
 - **Dynamic Playback** — the optional Shift playback policy that reads cumulative active Section Weight as a playback texture: each doubling or halving of Weight shifts Center by one playback-rate step, so compressed ground plays faster and expanded ground plays slower. It is a log-compressed reading of the map, not a correction of it, and it retunes as Current or deformation bypass changes.
 - **Load Generation** — the monotonically increasing identity on an immutable source request, used with the adapter’s loaded video identity to reject stale metadata and state events.
-- **Source-transition boundary** — the single operation that settles or cancels all old-source transient owners, persists safe Guide changes, clears source-scoped presentation, and only then cues the new source.
+- **Source-transition boundary** — the single operation that settles or cancels all old-source transient owners, persists safe Guide changes, clears source-scoped presentation, and only then chapters the new source.
 - **Guide Recovery** — versioned loading that distinguishes an absent Guide from unreadable data, quarantines damaged higher-priority evidence before fallback, and refuses destructive rewrite when preservation fails.
-- **Undo / Redo** — traversal of semantic Session transactions. Transient presentation such as deformation bypass, open panels, Cues, and Panorama animation phase is outside this history.
+- **Undo / Redo** — traversal of semantic Session transactions. Transient presentation such as deformation bypass, open panels, Chapters, and Panorama animation phase is outside this history.

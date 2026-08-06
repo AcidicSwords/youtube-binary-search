@@ -515,7 +515,7 @@ export function createPanoramaController({
           side.ratesKnown = false;
           side.error = true;
           // The IFrame adapter remains usable after a media error. Keeping the
-          // player ready allows an explicit pane restore or video reload to cue
+          // player ready allows an explicit pane restore or video reload to chapter
           // the source again instead of leaving this projection permanently dead.
           side.ready = Boolean(side.adapter);
           side.playback = "error";
@@ -601,14 +601,14 @@ export function createPanoramaController({
       return false;
     }
 
-    // Source loading and playback are separate phases. Never issue a fresh cue in
-    // the same stack as playVideo(): YouTube may process that cue after play and
-    // leave the iframe paused. Parking records the target while the one preload cue
+    // Source loading and playback are separate phases. Never issue a fresh chapter in
+    // the same stack as playVideo(): YouTube may process that chapter after play and
+    // leave the iframe paused. Parking records the target while the one preload chapter
     // settles, then CUED places the decoded frame.
     if (!side.sourceReady) {
       if (side.playback !== "loading") {
         side.playback = "loading";
-        side.adapter?.cue?.(side.videoId, target);
+        side.adapter?.chapter?.(side.videoId, target);
       }
       side.lastPlacedAddress = target;
       side.lastPlaceAt = now;
@@ -1056,7 +1056,7 @@ export function createPanoramaController({
     // Center exactly so acquiring the Panorama cannot alter the attained offset.
     requestSideRateStep(side, snapshotCenterRate(snapshot), true);
 
-    // The source must already be cued before the trusted play gesture; a cue and
+    // The source must already be cued before the trusted play gesture; a chapter and
     // play issued together race in the YouTube iframe.
     const address = exactAddress(side.role, center, offset, snapshot.range);
     side.desiredAddress = address;
@@ -1067,7 +1067,7 @@ export function createPanoramaController({
       side.adapter?.place?.(address);
     } else if (side.playback !== "loading") {
       side.playback = "loading";
-      side.adapter?.cue?.(side.videoId, address);
+      side.adapter?.chapter?.(side.videoId, address);
     }
     if (play && side.sourceReady) {
       side.adapter?.play?.();
@@ -1367,7 +1367,7 @@ export function createPanoramaController({
       side.pendingPlay = true;
       if (side.playback !== "loading" && side.videoId) {
         side.playback = "loading";
-        side.adapter?.cue?.(side.videoId, side.desiredAddress ?? runtime.semanticCurrent ?? 0);
+        side.adapter?.chapter?.(side.videoId, side.desiredAddress ?? runtime.semanticCurrent ?? 0);
       }
       return false;
     }
@@ -1961,7 +1961,7 @@ export function createPanoramaController({
       side.desiredAddress = snapshot.current;
       side.lastPlacedAddress = null;
       side.adapter.mute?.();
-      side.adapter.cue?.(snapshot.videoId, snapshot.current);
+      side.adapter.chapter?.(snapshot.videoId, snapshot.current);
       runtime.forceEstablish = true;
     }
   }

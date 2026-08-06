@@ -1,7 +1,7 @@
 // Interference between the object families.
 //
 // Every suite beside this one proves one family in isolation. This one crosses
-// them: Groups against Focus, Weight, traversal and the Guide; Cues against
+// them: Groups against Focus, Weight, traversal and the Guide; Chapters against
 // deformation, Focus and history; the Pin routes against composition and the
 // Shift layer; and Undo across all of it. The question each block asks is not
 // "does this work" but "does doing this change what that means".
@@ -32,16 +32,16 @@ const sectionRows = () => descendants(byId.get("sections-list"))
   .filter(node => node.dataset.sectionGo);
 const pinRows = () => descendants(byId.get("pins-list"))
   .filter(node => node.dataset.pinGo);
-const cueRows = () => descendants(byId.get("cues-list"))
-  .filter(node => node.dataset.cueGo);
+const chapterRows = () => descendants(byId.get("chapters-list"))
+  .filter(node => node.dataset.chapterGo);
 const inSections = key => descendants(byId.get("sections-list"))
   .filter(node => node.dataset[key] !== undefined);
 const drawnBars = () => descendants(byId.get("section-lane"))
   .filter(node => node.dataset.sectionGo).length;
 const drawnPins = () => descendants(byId.get("pin-lane"))
   .filter(node => node.dataset.pinGo || node.dataset.clusterIndex).length;
-const cueMarks = () => descendants(byId.get("cue-lane"))
-  .filter(node => node.className === "timeline-cue");
+const chapterMarks = () => descendants(byId.get("chapter-lane"))
+  .filter(node => node.className === "timeline-chapter");
 const deformed = () => descendants(byId.get("topography-layer"))
   .some(node => String(node.className).includes("has-"));
 const workingWindow = () => byId.get("section-window").textContent;
@@ -223,22 +223,22 @@ await clickIn("sections-list", inSections("leaveSection")[0]);
 assert.match(status(), /Restored Range/);
 
 // ==============================================================================
-// 4. Cues are drawn through the same projection, and stay inert in all of it.
+// 4. Chapters are drawn through the same projection, and stay inert in all of it.
 // ==============================================================================
-byId.get("cue-source").value = "0:00 A\n0:20 B\n0:50 C\n1:20 D";
-byId.get("cue-capture").dispatch("submit");
+byId.get("chapter-source").value = "0:00 A\n0:20 B\n0:50 C\n1:20 D";
+byId.get("chapter-capture").dispatch("submit");
 await flush();
-assert.equal(cueRows().length, 4);
-byId.get("cue-lane-toggle").click();
+assert.equal(chapterRows().length, 4);
+byId.get("chapter-lane-toggle").click();
 await flush();
 
-const positions = () => cueMarks().map(mark => mark.style.left);
+const positions = () => chapterMarks().map(mark => mark.style.left);
 const deformedPositions = positions();
 assert.equal(deformedPositions.length, 4);
 assert.notDeepEqual(
   deformedPositions,
   ["0%", "20%", "50%", "80%"],
-  "A drawn Cue is projected, so a Weight moves it exactly as it moves a Pin."
+  "A drawn Chapter is projected, so a Weight moves it exactly as it moves a Pin."
 );
 
 // Flatten the map and the marks return to their source fractions.
@@ -246,39 +246,39 @@ await setGroupState("group-default", "weightsEnabled", false);
 assert.deepEqual(
   positions(),
   ["0%", "20%", "50%", "80%"],
-  "Deactivating the Group flattens Cue marks with everything else."
+  "Deactivating the Group flattens Chapter marks with everything else."
 );
 await setGroupState("group-default", "weightsEnabled", true);
 assert.deepEqual(positions(), deformedPositions,
-  "and reactivating restores them, because nothing about a Cue was stored.");
+  "and reactivating restores them, because nothing about a Chapter was stored.");
 
 // Focus clips them to the viewport rather than piling them against an edge.
 await selectSection(0);
 await clickIn("sections-list", inSections("focusSection")[0]);
-assert.ok(cueMarks().length < 4,
-  "Focus draws only the Cues inside the viewport.");
-for (const mark of cueMarks()) {
+assert.ok(chapterMarks().length < 4,
+  "Focus draws only the Chapters inside the viewport.");
+for (const mark of chapterMarks()) {
   const fraction = Number.parseFloat(mark.style.left);
   assert.ok(fraction >= 0 && fraction <= 100,
     "and every drawn mark lands inside the drawn map.");
 }
 await clickIn("sections-list", inSections("leaveSection")[0]);
-assert.equal(cueMarks().length, 4, "Unfocus restores the whole set.");
+assert.equal(chapterMarks().length, 4, "Unfocus restores the whole set.");
 
-// Through all of that, no Cue became an operand.
+// Through all of that, no Chapter became an operand.
 assert.equal(byId.get("sections-list-count").textContent, "2");
 assert.equal(byId.get("pins-list-count").textContent, "4");
-for (const mark of descendants(byId.get("cue-lane"))) {
+for (const mark of descendants(byId.get("chapter-lane"))) {
   assert.deepEqual(Object.keys(mark.dataset || {}), [],
-    "A drawn Cue carries nothing a pointer handler dispatches on.");
+    "A drawn Chapter carries nothing a pointer handler dispatches on.");
 }
 
 // ==============================================================================
-// 5. Composition crosses the families: Cue with Section, Section with Pin.
+// 5. Composition crosses the families: Chapter with Section, Section with Pin.
 // ==============================================================================
-await clickIn("cues-list", cueRows()[0]);
+await clickIn("chapters-list", chapterRows()[0]);
 assert.match(workingWindow(), /0:00–0:20/,
-  "A Cue takes its extent as the Active Span.");
+  "A Chapter takes its extent as the Active Span.");
 await clickIn("sections-list", sectionRows()[1], { shiftKey: true });
 assert.match(workingWindow(), /0:00–1:20/,
   "and a retained Section extends it by the same law.");
@@ -291,7 +291,7 @@ const beforeCompose = sectionRows().length;
 byId.get("retain").dispatch("click", { detail: 1, shiftKey: true });
 await flush();
 assert.equal(sectionRows().length, beforeCompose + 1,
-  "A span composed from a Cue and a Section retains like any other.");
+  "A span composed from a Chapter and a Section retains like any other.");
 byId.get("return-action").click();
 await flush();
 assert.equal(sectionRows().length, beforeCompose,
@@ -482,9 +482,9 @@ assert.equal(groupIds().length, 1,
   "The empty default Group remains reachable after every Section is undone.");
 assert.equal(byId.get("duration-time").textContent, "1:40",
   "and the map returns to the undeformed source.");
-assert.equal(byId.get("cues-list-count").textContent, "4",
-  "Cues survive: they are an offer, not history.");
-assert.equal(cueMarks().length, 4,
+assert.equal(byId.get("chapters-list-count").textContent, "4",
+  "Chapters survive: they are an offer, not history.");
+assert.equal(chapterMarks().length, 4,
   "and so does the drawing of them, which no transaction ever owned.");
 
 // Redo returns the whole construction, Groups and all.
@@ -524,4 +524,4 @@ assert.deepEqual(
     "and leaving it clears the mark, having moved nothing.");
 }
 
-console.log("Cross-interaction stress passed: Group visibility and activity govern drawing and deformation independently and are observed by traversal but never by the projection; Cues project through deformation and Focus while staying inert; composition crosses Cues, Sections and Pins by one law; reveal moves nothing and preserves an armed Shift layer; Unlink works from the Pin under a hidden Group; a Group renames and removes non-destructively; one history stack Undoes and Redoes the whole construction; every Group offers rename and remove with only the last refused; and hovering a Pin row marks its Address on the map.");
+console.log("Cross-interaction stress passed: Group visibility and activity govern drawing and deformation independently and are observed by traversal but never by the projection; Chapters project through deformation and Focus while staying inert; composition crosses Chapters, Sections and Pins by one law; reveal moves nothing and preserves an armed Shift layer; Unlink works from the Pin under a hidden Group; a Group renames and removes non-destructively; one history stack Undoes and Redoes the whole construction; every Group offers rename and remove with only the last refused; and hovering a Pin row marks its Address on the map.");

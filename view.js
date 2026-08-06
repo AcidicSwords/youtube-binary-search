@@ -1,5 +1,5 @@
 // DOM projection layer. It derives presentation from state and does not own semantic transactions.
-import { cueName } from "./cues.js";
+import { chapterTitle } from "./chapters.js";
 import { formatTime, formatRange, sectionDisplayName } from "./format.js";
 // Re-exported so the presentation layer stays the single import site for text
 // formatting, while the kernel takes them from the shared module directly.
@@ -159,10 +159,10 @@ export function projectedSectionMidpointFraction(section, projection) {
   return clamp((midpoint - start) / width, 0, 1);
 }
 
-export function projectCueExtent(cue, projection) {
-  if (!cue || !projection?.sourceToTimeline || !(projection.viewSpan > 0)) return null;
-  const sourceStart = Number.isFinite(cue.start) ? cue.start : cue.time;
-  const sourceEnd = Number.isFinite(cue.end) ? cue.end : sourceStart;
+export function projectChapterExtent(chapter, projection) {
+  if (!chapter || !projection?.sourceToTimeline || !(projection.viewSpan > 0)) return null;
+  const sourceStart = Number.isFinite(chapter.start) ? chapter.start : chapter.time;
+  const sourceEnd = Number.isFinite(chapter.end) ? chapter.end : sourceStart;
   if (!Number.isFinite(sourceStart) || !Number.isFinite(sourceEnd)) return null;
   const projectedStart = projection.sourceToTimeline(Math.min(sourceStart, sourceEnd));
   const projectedEnd = projection.sourceToTimeline(Math.max(sourceStart, sourceEnd));
@@ -690,40 +690,40 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     field.append(atmosphere, sourceGridLines);
   }
 
-  // Cues drawn on the map, and nothing more than drawn. A Cue is a candidate
+  // Chapters drawn on the map, and nothing more than drawn. A Chapter is a candidate
   // Address the creator wrote down; it is not in the Guide, not in the
   // projection's segments, and not traversable until it is retained. So this
   // lane holds spans, never buttons, and carries no data attribute any
   // pointer handler reads: hit-testing, drag acquisition and Pin clustering
-  // all work from those, and inheriting one of them would make a Cue
+  // all work from those, and inheriting one of them would make a Chapter
   // traversable by a rendering decision rather than by the user retaining it.
   // Returns whether anything was drawn, so the lanes below can make room.
-  function renderTimelineCues(projection) {
-    const lane = elements["cue-lane"];
+  function renderTimelineChapters(projection) {
+    const lane = elements["chapter-lane"];
     if (!lane) return false;
     lane.replaceChildren();
-    const cues = state().cuesOnTimeline ? state().cues || [] : [];
-    if (!cues.length) return false;
+    const chapters = state().chaptersShownOnTimeline ? state().chapters || [] : [];
+    if (!chapters.length) return false;
     // A chapter title may only occupy the map up to where the next one begins.
     // Capping each at a fixed width let neighbours closer than that cap overlap
     // into one unreadable run of words, which is worse than showing fewer names.
     // The name is a child of the lane rather than of its own mark so that a
     // percentage width measures the timeline, which is what the room is in.
-    const placed = cues
-      .map(cue => ({ cue, projected: projectCueExtent(cue, projection) }))
+    const placed = chapters
+      .map(chapter => ({ chapter, projected: projectChapterExtent(chapter, projection) }))
       .filter(entry => entry.projected)
       .sort((first, second) => first.projected.left - second.projected.left);
-    for (const [index, { cue, projected }] of placed.entries()) {
+    for (const [index, { chapter, projected }] of placed.entries()) {
       const mark = document.createElement("span");
-      mark.className = "timeline-cue";
+      mark.className = "timeline-chapter";
       mark.style.left = `${projected.left * 100}%`;
       mark.style.width = `${projected.width * 100}%`;
       lane.appendChild(mark);
 
       const room = (placed[index + 1]?.projected.left ?? 1) - projected.left;
       const name = document.createElement("span");
-      name.className = "timeline-cue-name";
-      name.textContent = cueName(cue) || formatTime(cue.time);
+      name.className = "timeline-chapter-name";
+      name.textContent = chapterTitle(chapter) || formatTime(chapter.time);
       name.style.left = `${projected.left * 100}%`;
       name.style.maxWidth = `${Math.max(0, room * 100)}%`;
       lane.appendChild(name);
@@ -788,13 +788,13 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const pinTop = 17;
     const trackTop = 44;
     const rulerTop = trackTop + 58;
-    const cueBand = renderTimelineCues(projection) ? 15 : 0;
-    const sectionTop = rulerTop + 38 + cueBand;
+    const chapterBand = renderTimelineChapters(projection) ? 15 : 0;
+    const sectionTop = rulerTop + 38 + chapterBand;
     const timelineHeight = sectionTop + sectionBandHeight + 4;
     setStyleProperty(elements.timeline, "--track-top", `${trackTop}px`);
     setStyleProperty(elements.timeline, "--ruler-top", `${rulerTop}px`);
     setStyleProperty(elements.timeline, "--pin-top", `${pinTop}px`);
-    setStyleProperty(elements.timeline, "--cue-top", `${rulerTop + 34}px`);
+    setStyleProperty(elements.timeline, "--chapter-top", `${rulerTop + 34}px`);
     setStyleProperty(elements.timeline, "--section-top", `${sectionTop}px`);
     setStyleProperty(elements.timeline, "--timeline-height", `${timelineHeight}px`);
 
@@ -906,12 +906,12 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const snapKey = `${state().guideDrag?.snapTargetPinId || "none"}:${
       state().guideDrag?.snapArmed === true ? "armed" : "candidate"
     }`;
-    const cueKey = state().cuesOnTimeline
-      ? (state().cues || []).map(cue =>
-          `${cue.time}:${cue.end}:${cue.label || ""}`
+    const chapterKey = state().chaptersShownOnTimeline
+      ? (state().chapters || []).map(chapter =>
+          `${chapter.time}:${chapter.end}:${chapter.label || ""}`
         ).join(",")
       : "off";
-    const key = `${activeRange.start}|${activeRange.end}|${width}|${sectionLaneHeight}|${pinClusterGap}|${projection.viewStart}:${projection.viewEnd}|${sectionKey}|${selectedKey}|${intervalKey}|${snapKey}|${pinKey}|${cueKey}`;
+    const key = `${activeRange.start}|${activeRange.end}|${width}|${sectionLaneHeight}|${pinClusterGap}|${projection.viewStart}:${projection.viewEnd}|${sectionKey}|${selectedKey}|${intervalKey}|${snapKey}|${pinKey}|${chapterKey}`;
     if (key === renderedPinKey) return;
     renderedPinKey = key;
     const clusterDrag = state().guideDrag?.origin === "cluster-menu";
@@ -1027,7 +1027,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "sectionGroup",
       "sectionGo",
       "pinGo",
-      "cueGo",
+      "chapterGo",
       "groupToggle",
       "renameGroup",
       "deleteGroup"
@@ -1397,7 +1397,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const composing = state().shiftLayers?.guide === true;
     elements["guide-compose-toggle"].setAttribute("aria-pressed", String(composing));
     elements["guide-compose-toggle"].classList.toggle("active", composing);
-    renderCues();
+    renderChapters();
     invalidateTimelinePins();
     renderTimelinePins();
   }
@@ -1529,66 +1529,66 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     return containers;
   }
 
-  // Cues are offered, never placed. They render as candidates: the creator's
+  // Chapters are offered, never placed. They render as candidates: the creator's
   // own title and extent, one action that turns a candidate into structure, and
   // nothing that edits anything — because there is nothing yet to edit.
-  function renderCues() {
-    const cues = state().cues || [];
-    elements["cues-list-count"].textContent = String(cues.length);
-    const laneToggle = elements["cue-lane-toggle"];
-    const showing = Boolean(state().cuesOnTimeline);
-    laneToggle.disabled = !cues.length;
+  function renderChapters() {
+    const chapters = state().chapters || [];
+    elements["chapters-list-count"].textContent = String(chapters.length);
+    const laneToggle = elements["chapter-lane-toggle"];
+    const showing = Boolean(state().chaptersShownOnTimeline);
+    laneToggle.disabled = !chapters.length;
     laneToggle.setAttribute("aria-pressed", showing ? "true" : "false");
     laneToggle.textContent = showing ? "Hide on timeline" : "Show on timeline";
     laneToggle.title = showing
-      ? "Stop drawing the offered Cues on the map"
-      : "Draw every offered Cue on the map as a mark you can read but not act on";
-    elements["cues-list"].replaceChildren();
-    if (!cues.length) {
+      ? "Stop drawing the offered Chapters on the map"
+      : "Draw every offered Chapter on the map as a mark you can read but not act on";
+    elements["chapters-list"].replaceChildren();
+    if (!chapters.length) {
       const empty = document.createElement("p");
       empty.className = "empty-state";
       empty.textContent = state().videoLoaded
-        ? "No Cues offered. Paste a description to navigate its chapters."
+        ? "No Chapters offered. Paste a description to navigate its chapters."
         : "Load a video, then paste its description.";
-      elements["cues-list"].appendChild(empty);
+      elements["chapters-list"].appendChild(empty);
       return;
     }
-    for (const cue of cues) {
+    for (const chapter of chapters) {
       const item = document.createElement("article");
-      item.className = "guide-item cue-item";
+      item.className = "guide-item chapter-item";
       const main = document.createElement("button");
       main.type = "button";
       main.className = "guide-item-main";
-      main.dataset.cueGo = String(cue.index);
+      main.dataset.chapterGo = String(chapter.index);
       const title = document.createElement("span");
       title.className = "guide-item-title";
-      title.textContent = cueName(cue) || "Cue";
+      title.textContent = chapterTitle(chapter) || "Chapter";
       const meta = document.createElement("span");
       meta.className = "guide-item-time";
-      const spans = cue.end > cue.start + EPSILON;
+      const spans = chapter.end > chapter.start + EPSILON;
       meta.textContent = spans
-        ? `${formatRange(cue)} · ${formatDuration(cue.end - cue.start)}`
-        : formatTime(cue.time);
+        ? `${formatRange(chapter)} · ${formatDuration(chapter.end - chapter.start)}`
+        : formatTime(chapter.time);
       main.title = spans
-        ? `${cueName(cue) || "Cue"} at ${formatTime(cue.time)}; click to go and take its extent, Shift+click to extend the Active Span`
-        : `${cueName(cue) || "Cue"} at ${formatTime(cue.time)}; click to go`;
+        ? `${chapterTitle(chapter) || "Chapter"} at ${formatTime(chapter.time)}; click to go and take its extent, Shift+click to extend the Active Span`
+        : `${chapterTitle(chapter) || "Chapter"} at ${formatTime(chapter.time)}; click to go`;
       main.append(title, meta);
       const actions = document.createElement("div");
-      actions.className = "guide-item-actions cue-item-actions";
+      actions.className = "guide-item-actions chapter-item-actions";
       const retain = document.createElement("button");
       retain.type = "button";
       retain.className = "guide-action";
-      retain.dataset.cueRetain = String(cue.index);
+      retain.dataset.chapterRetain = String(chapter.index);
       retain.textContent = spans ? "Retain Section" : "Retain Pin";
       retain.title = spans
-        ? "Save this Cue's extent as a Section, keeping the creator's title"
-        : "Save this Cue's Address as a Pin, keeping the creator's title";
+        ? "Save this Chapter's extent as a Section, keeping the creator's title"
+        : "Save this Chapter's Address as a Pin, keeping the creator's title";
       actions.append(retain);
       const header = document.createElement("div");
       header.className = "guide-item-header";
       header.append(main, actions);
       item.append(header);
-      elements["cues-list"].appendChild(item);
+      elements["chapters-list"].appendChild(item);
     }
   }
 
@@ -2110,7 +2110,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "nudge-seconds", "context-seconds", "playback-rate", "playback-dynamic",
       "weight-relaxation-toggle",
       "section-source", "section-label", "pin-label",
-      "cue-source", "cue-parse", "cue-clear"
+      "chapter-source", "chapter-parse", "chapter-clear"
     ]) {
       if (elements[id]) elements[id].disabled = interactionLocked;
     }

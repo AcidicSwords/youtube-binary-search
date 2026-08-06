@@ -261,7 +261,7 @@ acquires the Timeline object. Clicking bare Timeline ground clears that
 acquisition without closing the Guide row.
 
 A plain Guide click replaces the Active Span with the clicked Pin, Section,
-or Cue extent. Physical Shift or Guide's one-shot `Extend` latch grows the
+or Chapter extent. Physical Shift or Guide's one-shot `Extend` latch grows the
 existing interval to include it. The Guide and matrix latches are independent;
 using one cannot consume the other.
 
@@ -294,10 +294,10 @@ that independent endpoint near a valid Pin. Amber is a candidate; remaining on
 the same target arms a green relation; only release after arming merges identity.
 Passing through or releasing early performs ordinary movement.
 
-### Cues
+### Chapters
 
-Cues are chapter Addresses offered from pasted text, not retained structure.
-They have no persistence, Weight, topology, or traversal identity. A Cue click
+Chapters are chapter Addresses offered from pasted text, not retained structure.
+They have no persistence, Weight, topology, or traversal identity. A Chapter click
 navigates or establishes its derived extent; Shift/Extend composes it like any
 other extent. `Retain` creates an ordinary Pin or Section carrying the offered
 title. `Show on timeline` adds inert marks only: they cannot be clicked, dragged,

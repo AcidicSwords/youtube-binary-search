@@ -106,8 +106,8 @@ function makeControllerHarness() {
     const adapter = {
       commands,
       mute() { commands.push(["mute"]); },
-      cue(_videoId, address) {
-        commands.push(["cue", address]);
+      chapter(_videoId, address) {
+        commands.push(["chapter", address]);
         time = address;
         state = YOUTUBE_STATE.CUED;
         config.events.onStateChange?.(state);

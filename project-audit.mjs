@@ -235,8 +235,8 @@ lacks(canonicalText, /\binverse of (?:the )?(?:effective |cumulative )?Weight\b|
   "No canonical document describes dynamic playback as inverting the map.");
 lacks(html, /rate the inverse of the map|inverse of (?:the )?weight/i,
   "and no visible control does either.");
-lacks(docs["GLOSSARY.md"], /^\s*- \*\*Cue\*\*[^\n]*not[^\n]*projected/im,
-  "Glossary does not contradict the projection used to draw optional Cues.");
+lacks(docs["GLOSSARY.md"], /^\s*- \*\*Chapter\*\*[^\n]*not[^\n]*projected/im,
+  "Glossary does not contradict the projection used to draw optional Chapters.");
 
 for (const law of [
   /### 3\.3 Subtractive Active Span/,
@@ -287,7 +287,7 @@ for (const interfaceLaw of [
   /## Guide/,
   /### Sections/,
   /### Pins/,
-  /### Cues/,
+  /### Chapters/,
   /## Parameters/,
   /## Keyboard and modifier reference/
 ]) has(docs["INTERFACE.md"], interfaceLaw, `INTERFACE describes ${interfaceLaw}.`);

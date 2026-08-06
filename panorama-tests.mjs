@@ -181,7 +181,7 @@ assert.equal(resolvePanoramaPhase({
   assert.doesNotMatch(panoramaSource, /\.raw\?\.\(|\.raw\(\)/,
     "Panorama code must request an inaccessible side player without reaching through its adapter.");
   assert.match(panoramaSource, /function parkSide\(side, address, \{ force = false \} = \{\}\)/);
-  assert.match(panoramaSource, /if \(!side\.sourceReady\)[\s\S]*side\.adapter\?\.cue\?\.\(side\.videoId, target\)[\s\S]*return true;[\s\S]*side\.adapter\?\.place\?\.\(target\)[\s\S]*side\.adapter\?\.pause\?\.\(\)/,
+  assert.match(panoramaSource, /if \(!side\.sourceReady\)[\s\S]*side\.adapter\?\.chapter\?\.\(side\.videoId, target\)[\s\S]*return true;[\s\S]*side\.adapter\?\.place\?\.\(target\)[\s\S]*side\.adapter\?\.pause\?\.\(\)/,
     "A source may be cued only while preparing; source-ready paused sides must seek and pause on their represented frame.");
   assert.match(panoramaSource, /function beginStretch\(side, center, snapshot,[\s\S]*if \(play && side\.sourceReady\)[\s\S]*side\.adapter\?\.play\?\.\(\)/,
     "Trusted side playback must start only after that side source has reached CUED readiness.");
@@ -257,4 +257,4 @@ assert.equal(resolvePanoramaPhase({
   assert.match(packageJson.scripts.test, /panorama-tests\.mjs/);
 }
 
-console.log("All Step Panorama tests passed: geometry, suspension, Hold/Stretch, side Step, visible bootstrap, shared user activation, autoplay delegation, cue-based parking, rate priming, and panoramic layout.");
+console.log("All Step Panorama tests passed: geometry, suspension, Hold/Stretch, side Step, visible bootstrap, shared user activation, autoplay delegation, chapter-based parking, rate priming, and panoramic layout.");

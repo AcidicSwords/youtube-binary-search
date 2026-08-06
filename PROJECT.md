@@ -113,7 +113,7 @@ Every Section belongs to exactly one ordinary Group. At most one Group is drawn 
 
 Guide focus is inspection. An acquired Timeline operand is spatial selection. The distinction matters: focusing a hidden Guide row does not silently scope `X`; acquiring a visible Timeline Section does.
 
-Cues are offered source Addresses or extents, such as parsed creator chapters. They remain transient candidates until the reader explicitly navigates, composes, or Tags them into ordinary retained structure.
+Chapters are offered source Addresses or extents, such as parsed creator chapters. They remain transient candidates until the reader explicitly navigates, composes, or Tags them into ordinary retained structure.
 
 ## Operator Matrix
 

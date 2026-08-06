@@ -18,7 +18,7 @@ is a module and ownership map, not a history of earlier designs.
 | `panorama-frame.js` | Pure Panorama Frame ownership, identity, direction, and transition descriptions |
 | `panorama-geometry.js` | Pure Panorama offsets, cycling phases, bounds, and rate pairs |
 | `panorama.js` | Tail/Lead players, placement, Panorama transitions, Cycle runtime, Hold, and stale-event rejection |
-| `cues.js` | Parsing offered chapter Addresses into transient candidate extents |
+| `chapters.js` | Parsing offered chapter Addresses into transient candidate extents |
 | `traversal-trace.js` | The append-only encounter ledger: traversal records, the frozen readable stream, read cursors, and Ghost injection |
 | `view.js` | DOM projection, timeline atmosphere and sourceGridLines, Guide rows, operator labels, and accessible state |
 | `app.js` | Composition, interaction acquisition, source generations, persistence, transient ownership, and adapter effects |
@@ -185,7 +185,7 @@ Guide persistence is source-keyed under version 10. Older version 1–8 records
 are migrated through the Guide kernel; valid current records round-trip without
 changing identity. User preferences have a separate versioned key and include
 Step Reach, Nudge, Context, Shift playback, Panorama settings, and pane
-visibility. Deformation bypass, open surfaces, selections, Cues, and Panorama
+visibility. Deformation bypass, open surfaces, selections, Chapters, and Panorama
 runtime are transient.
 
 Guide loading returns an explicit recovery result:
@@ -220,13 +220,13 @@ snapshot whose actual loaded `videoId` matches it; duration must also be valid.
 Thus an untagged stale CUED or metadata event from source A cannot initialize
 source B.
 
-Before cueing a new identity, `transitionSourceBoundary()` resolves all owners
+Before chaptering a new identity, `transitionSourceBoundary()` resolves all owners
 of the old source in one place. It cancels Current, Pin, Section, and Range
 drags to their origins; settles Nudge and pending Step; safely settles active
 Context or Playback; persists settled Guide changes; clears native Go and
-programmatic placement; closes transient dialogs and Pin clusters; clears Cues,
+programmatic placement; closes transient dialogs and Pin clusters; clears Chapters,
 selection, Guide focus, Shift latches, Panorama runtime, and deformation bypass;
-then creates a fresh Session and cues the new source. Player errors use the same
+then creates a fresh Session and chapters the new source. Player errors use the same
 boundary. No source Address, identity, timer, or history checkpoint may cross it.
 
 ## Nudge and direct manipulation

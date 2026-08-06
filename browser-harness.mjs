@@ -93,7 +93,7 @@ function installFakeMediaApi(duration) {
     emitRate(rate) { queueMicrotask(() => this.events.onPlaybackRateChange?.({ data: rate })); }
     cueVideoById({ videoId = null, startSeconds = 0 } = {}) {
       this.videoId = videoId;
-      this.commands.push(["cue", startSeconds]);
+      this.commands.push(["chapter", startSeconds]);
       this.currentTime = startSeconds;
       this.state = 5;
       this.emitState(5);

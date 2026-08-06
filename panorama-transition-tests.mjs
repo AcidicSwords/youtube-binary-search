@@ -32,7 +32,7 @@ function element() {
   };
 }
 
-function makeHarness({ deferredCue = false, reducedMotion = false } = {}) {
+function makeHarness({ deferredChapter = false, reducedMotion = false } = {}) {
   const elements = new Map();
   const document = {
     hidden: false,
@@ -68,10 +68,10 @@ function makeHarness({ deferredCue = false, reducedMotion = false } = {}) {
     const adapter = {
       commands,
       mute() {},
-      cue(_videoId, address) {
-        commands.push(["cue", address]);
+      chapter(_videoId, address) {
+        commands.push(["chapter", address]);
         time = address;
-        if (!deferredCue) {
+        if (!deferredChapter) {
           state = YOUTUBE_STATE.CUED;
           config.events.onStateChange?.(state);
         }
@@ -81,7 +81,7 @@ function makeHarness({ deferredCue = false, reducedMotion = false } = {}) {
       pause() { state = YOUTUBE_STATE.PAUSED; },
       setRate() {},
       read() { return { time, rate: 1, state, availableRates: [0.5, 1, 1.5, 2] }; },
-      finishCue() { state = YOUTUBE_STATE.CUED; config.events.onStateChange?.(state); },
+      finishChapter() { state = YOUTUBE_STATE.CUED; config.events.onStateChange?.(state); },
       get time() { return time; }
     };
     adapters.set(id, adapter);
@@ -208,7 +208,7 @@ function makeHarness({ deferredCue = false, reducedMotion = false } = {}) {
 // Rapid operations coalesce: obsolete intermediate placements are discarded and
 // the Panorama settles on the latest committed state.
 {
-  const h = makeHarness({ deferredCue: true });
+  const h = makeHarness({ deferredChapter: true });
   try {
     h.controller.tick();
     for (const center of [60, 70, 80]) {
@@ -216,7 +216,7 @@ function makeHarness({ deferredCue = false, reducedMotion = false } = {}) {
     }
     const placementsBefore = h.tail().commands.filter(command => command[0] === "place").length;
     // A callback belonging to a superseded Frame arrives late.
-    h.tail().finishCue();
+    h.tail().finishChapter();
     assert.equal(
       h.tail().commands.filter(command => command[0] === "place").length,
       placementsBefore + 1,

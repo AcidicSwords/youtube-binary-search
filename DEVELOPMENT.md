@@ -131,7 +131,7 @@ owner. Do not reach through the media adapter from application or Panorama code.
 
 - A load request is immutable and generation-owned.
 - Initialization requires the current generation and matching adapter `videoId`.
-- Every source replacement runs the one transition boundary before cueing.
+- Every source replacement runs the one transition boundary before chaptering.
 - No old-source drag, timer, selection, Panorama owner, transport, or checkpoint may
   reach the fresh Session.
 - Version-9 Guide evidence is inspected before older fallbacks.
@@ -177,13 +177,13 @@ Every executable suite is listed here by the current behavior it protects.
 - `panorama-runtime-tests.mjs` — real controller placement, proportional cycling, dormant panes, stale events, rate fallback, direct previews, and boundary recovery.
 - `panorama-transition-tests.mjs` — directional opacity transitions, rapid coalescing, reversal, stale callback rejection, and reduced motion.
 
-### Guide, Groups, Cues, modifiers, and routes
+### Guide, Groups, Chapters, modifiers, and routes
 
 - `group-tests.mjs` — zero-or-one visible Group, independent Active stack, hidden Guide navigation, Pin visibility, multiplicative layering, and planned deletion.
-- `system-coherence-tests.mjs` — Section reachability, projected midpoints, Cue extents, flat Group blocks, Focus ownership, and explicit Panorama activation.
+- `system-coherence-tests.mjs` — Section reachability, projected midpoints, Chapter extents, flat Group blocks, Focus ownership, and explicit Panorama activation.
 - `group-coherence-tests.mjs` — nullable visible-Group identity, independent activity, hidden-but-active deformation, Group removal, and version-9 migration.
 - `state-integrity-tests.mjs` — Guide validation, repair, round-trip completeness, membership recovery, and impossible source extents.
-- `cue-tests.mjs` — timestamp parsing and contiguous transient candidate extents without retained side effects.
+- `chapter-tests.mjs` — timestamp parsing and contiguous transient candidate extents without retained side effects.
 - `nudge-tests.mjs` — one wheel route, dominant axis, accumulation, target acquisition, keyboard and Guide convergence, one Undo, and preview parity.
 - `operator-grammar-tests.mjs` — the pure `QWE / ASD / RTF` fixture matches DOM order, keys, runtime branches, CSS areas, shifted meanings, and canonical docs.
 - `route-correspondence-tests.mjs` — distinct interaction routes claiming one operation reach the same canonical consequence.
@@ -193,7 +193,7 @@ Every executable suite is listed here by the current behavior it protects.
 - `startup-smoke.mjs` — the module graph loads and binds against the minimal document contract.
 - `interaction-smoke.mjs` — matrix Tag routes, retained editing, unlink/link, Timeline manipulation, clusters, Shift traversal, Frame previews, Undo/Redo, and playback focus.
 - `guide-composition-smoke.mjs` — plain Guide selection replaces, Shift/Extend composes monotonically, and the result can be tagged as one parent Section.
-- `cue-smoke.mjs` — offering and drawing Cues is inert; navigation, composition, and Retain use canonical routes.
+- `chapter-smoke.mjs` — offering and drawing Chapters is inert; navigation, composition, and Retain use canonical routes.
 - `section-weight-smoke.mjs` — Guide-only Weight editing, effective geometry and atmosphere, scoped/whole-map bypass, weighted Step, and exact restoration.
 - `context-smoke.mjs` — post-traversal Context, Step deferral, replacement, Panorama suspension, reversal naming, Off, and Undo isolation.
 - `step-gesture-smoke.mjs` — captured/fallback release, keyboard hold, and rapid taps settle as one action.
@@ -202,8 +202,8 @@ Every executable suite is listed here by the current behavior it protects.
 - `source-boundary-smoke.mjs` — stale load generations plus Nudge, Step, Context, Playback, every drag owner, Guide identity, and bypass cleanup at source replacement.
 - `guide-recovery-smoke.mjs` — older fallback preservation, read/quarantine failures, truthful status, and unsafe current records remaining read-only.
 - `transaction-integrity-smoke.mjs` — one checkpoint per gesture, persistence honesty, source recovery evidence, Group identity, dense lanes, and coincident Pin identity.
-- `cross-interaction-stress.mjs` — Groups, Cues, Focus, Weight, traversal, Shift layers, Pin topology, and one history stack do not leak meanings into one another.
-- `journey-smoke.mjs` — the complete use order from load through traversal, Tag, Guide, Weight, Cues, composition, Focus, persistence, and source replacement.
+- `cross-interaction-stress.mjs` — Groups, Chapters, Focus, Weight, traversal, Shift layers, Pin topology, and one history stack do not leak meanings into one another.
+- `journey-smoke.mjs` — the complete use order from load through traversal, Tag, Guide, Weight, Chapters, composition, Focus, persistence, and source replacement.
 
 ### Composition, source audits, and browser proof
 

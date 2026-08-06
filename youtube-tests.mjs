@@ -76,7 +76,7 @@ try {
     availableRates: [0.5, 1, 1.5, 2]
   });
 
-  player.cue("dQw4w9WgXcQ", 12);
+  player.chapter("dQw4w9WgXcQ", 12);
   assert.equal(player.read().videoId, "dQw4w9WgXcQ",
     "The adapter snapshot exposes the source identity actually loaded by YouTube.");
   assert.equal(player.read().time, 12);

@@ -131,7 +131,7 @@ import {
   bindStepPress,
   createStepGestureController
 } from "./step-gesture.js";
-import { parseCueList, cueName } from "./cues.js";
+import { parseChapters, chapterTitle } from "./chapters.js";
 import { sectionDisplayName, formatRate } from "./format.js";
 import { createView } from "./view.js";
 
@@ -294,11 +294,11 @@ const state = {
   rangeDragProjection: null,
   guideTab: "sections",
   // Offered candidates. Never persisted, never projected, never traversed --
-  // a Cue is structure only once the reader retains it.
-  cues: [],
-  // Whether the offered Cues are drawn on the map. A drawing only: it changes
+  // a Chapter is structure only once the reader retains it.
+  chapters: [],
+  // Whether the offered Chapters are drawn on the map. A drawing only: it changes
   // what is visible and nothing about what any operator can reach.
-  cuesOnTimeline: false,
+  chaptersShownOnTimeline: false,
   guideOpen: false,
   railMode: "guide",
   compactGuide: null,
@@ -359,7 +359,7 @@ let player = null;
 let panorama = null;
 let pendingLoad = null;
 let loadGeneration = 0;
-let cuedGeneration = 0;
+let chapterdGeneration = 0;
 let pollTimer = null;
 let metadataTimer = null;
 let stepGesture = null;
@@ -2823,7 +2823,7 @@ function extendIntervalToRetained(kind, id, name, options = {}) {
   );
 }
 
-// The same extension law, expressed over a bare extent so that a Cue -- which
+// The same extension law, expressed over a bare extent so that a Chapter -- which
 // is not in the Guide and owns no identity -- composes exactly as a Section
 // does. Composition is a fact about extents, not about retained objects.
 function extendIntervalToExtent(extent, name, selection = null, options = {}) {
@@ -2895,14 +2895,14 @@ function clearMetadataRetry() {
   metadataTimer = null;
 }
 
-// Cues, selections, previews, and gesture accumulators have meaning only inside
+// Chapters, selections, previews, and gesture accumulators have meaning only inside
 // the source that produced them. Reset them as one boundary operation before a
 // different video is cued so no route can carry an Address or retained identity
 // across source identity.
 function resetSourceScopedState() {
-  state.cues = [];
-  state.cuesOnTimeline = false;
-  if (elements["cue-source"]) elements["cue-source"].value = "";
+  state.chapters = [];
+  state.chaptersShownOnTimeline = false;
+  if (elements["chapter-source"]) elements["chapter-source"].value = "";
   state.timelineSelection = null;
   state.guideSelection = null;
   state.selectedPinIds = [];
@@ -3054,7 +3054,7 @@ function initializeVideo(request = pendingLoad) {
   if (currentLoadRequest(request)) pendingLoad = null;
 
   locateAddress(requestedStart);
-  // Build and cue Tail/Lead before the Center transport surface becomes active.
+  // Build and chapter Tail/Lead before the Center transport surface becomes active.
   // This keeps the first parent-owned playback gesture synchronous across all
   // ready players instead of racing the polling interval.
   panorama?.tick();
@@ -3091,17 +3091,17 @@ function initializeVideo(request = pendingLoad) {
   view.render();
 }
 
-function cuePendingVideo() {
+function chapterPendingVideo() {
   if (!state.playerReady || !pendingLoad) return;
-  if (pendingLoad.generation === cuedGeneration) return;
+  if (pendingLoad.generation === chapterdGeneration) return;
   const request = Object.freeze({
     ...pendingLoad,
     metadataStartedAt: Date.now()
   });
   pendingLoad = request;
-  cuedGeneration = request.generation;
+  chapterdGeneration = request.generation;
   transitionSourceBoundary();
-  player.cue(request.videoId, request.startSeconds || 0);
+  player.chapter(request.videoId, request.startSeconds || 0);
   setStatus("Loading YouTube video metadata…");
 }
 
@@ -4634,111 +4634,111 @@ function syncContextControl() {
   renderPlaybackRateChoices();
 }
 
-// Cues: a creator's chapters offered as candidates.
+// Chapters: a creator's chapters offered as candidates.
 //
 // They are parsed from a pasted description, held only in interface state, and
 // never enter the Guide, the projection, or traversal. Navigating one is an
 // ordinary Go; composing two is the ordinary extension law; and retaining one
 // is the ordinary save, carrying the creator's own title across.
-function cueAt(index) {
-  return state.cues[Number(index)] || null;
+function chapterAt(index) {
+  return state.chapters[Number(index)] || null;
 }
 
-function cueLabelFor(cue) {
-  return cueName(cue) || `Cue at ${formatTime(cue.time)}`;
+function chapterLabelFor(chapter) {
+  return chapterTitle(chapter) || `Chapter at ${formatTime(chapter.time)}`;
 }
 
-function cueSpans(cue) {
-  return cue.end - cue.start > EPSILON;
+function chapterSpans(chapter) {
+  return chapter.end - chapter.start > EPSILON;
 }
 
-function offerCues(event = null) {
+function offerChapters(event = null) {
   event?.preventDefault?.();
   if (!state.videoLoaded) return;
-  const cues = parseCueList(elements["cue-source"].value, {
+  const chapters = parseChapters(elements["chapter-source"].value, {
     duration: model().duration
   });
-  state.cues = cues;
+  state.chapters = chapters;
   view.renderGuide();
   view.render();
-  setStatus(cues.length
-    ? `Offered ${cues.length} Cue${cues.length === 1 ? "" : "s"}. Nothing is retained until you say so.`
-    : "No Addresses found in that text.", !cues.length);
+  setStatus(chapters.length
+    ? `Offered ${chapters.length} Chapter${chapters.length === 1 ? "" : "s"}. Nothing is retained until you say so.`
+    : "No Addresses found in that text.", !chapters.length);
 }
 
-function clearCues() {
-  state.cues = [];
-  state.cuesOnTimeline = false;
-  elements["cue-source"].value = "";
+function clearChapters() {
+  state.chapters = [];
+  state.chaptersShownOnTimeline = false;
+  elements["chapter-source"].value = "";
   view.renderGuide();
   view.render();
-  setStatus("Cleared the offered Cues.");
+  setStatus("Cleared the offered Chapters.");
 }
 
-// Drawing every Cue at once answers the question the list cannot: where the
+// Drawing every Chapter at once answers the question the list cannot: where the
 // creator's divisions fall relative to the structure already built. It is a
-// drawing and stays one -- the marks are inert, so the only way a Cue becomes
+// drawing and stays one -- the marks are inert, so the only way a Chapter becomes
 // something to act on is still to retain it.
-function toggleCueLane() {
-  if (!(state.cues || []).length) return;
-  state.cuesOnTimeline = !state.cuesOnTimeline;
+function toggleChapterLane() {
+  if (!(state.chapters || []).length) return;
+  state.chaptersShownOnTimeline = !state.chaptersShownOnTimeline;
   view.renderGuide();
   view.render();
-  setStatus(state.cuesOnTimeline
-    ? `Drawing ${state.cues.length} Cue${state.cues.length === 1 ? "" : "s"} on the map. They mark, they do not act.`
-    : "Cues are no longer drawn on the map.");
+  setStatus(state.chaptersShownOnTimeline
+    ? `Drawing ${state.chapters.length} Chapter${state.chapters.length === 1 ? "" : "s"} on the map. They mark, they do not act.`
+    : "Chapters are no longer drawn on the map.");
 }
 
-function goToCue(index, { composing = false, consumeShiftOwner = null } = {}) {
-  const cue = cueAt(index);
-  if (!cue) return;
+function goToChapter(index, { composing = false, consumeShiftOwner = null } = {}) {
+  const chapter = chapterAt(index);
+  if (!chapter) return;
   if (composing && extendIntervalToExtent(
-    cue,
-    cueLabelFor(cue),
+    chapter,
+    chapterLabelFor(chapter),
     null,
     { consumeShiftOwner }
   )) return;
   settleBeforeAction();
-  if (!cueSpans(cue)) {
-    return moveToAddress(cue.time, {
-      operator: "cue",
-      label: `Go to ${cueLabelFor(cue)}`,
-      status: destination => `Current is at ${cueLabelFor(cue)}, ${formatTime(destination)}.`
+  if (!chapterSpans(chapter)) {
+    return moveToAddress(chapter.time, {
+      operator: "chapter",
+      label: `Go to ${chapterLabelFor(chapter)}`,
+      status: destination => `Current is at ${chapterLabelFor(chapter)}, ${formatTime(destination)}.`
     });
   }
-  moveToAddress((cue.start + cue.end) / 2, {
+  moveToAddress((chapter.start + chapter.end) / 2, {
     operator: "section",
-    label: `Go to ${cueLabelFor(cue)}`,
-    transaction: (sourceSession, _destination, projection) => workFromExtent(sourceSession, cue, {
+    label: `Go to ${chapterLabelFor(chapter)}`,
+    transaction: (sourceSession, _destination, projection) => workFromExtent(sourceSession, chapter, {
       operator: "section",
-      label: `Go to ${cueLabelFor(cue)}`,
+      label: `Go to ${chapterLabelFor(chapter)}`,
       projection
     }),
     status: destination =>
-      `${cueLabelFor(cue)} is the Active Span; Current is centered at ${formatTime(destination)}.`
+      `${chapterLabelFor(chapter)} is the Active Span; Current is centered at ${formatTime(destination)}.`
   });
 }
 
 // Retention is the moment a candidate becomes structure, and it is the ordinary
-// save -- so a retained Cue is indistinguishable afterwards from one the reader
+// save -- so a retained Chapter is indistinguishable afterwards from one the reader
 // drew. The creator's title comes across because it is the thing worth keeping.
-function retainCue(index) {
-  const cue = cueAt(index);
-  if (!cue) return;
+function retainChapter(index) {
+  const chapter = chapterAt(index);
+  if (!chapter) return;
   settleBeforeAction();
-  const label = cueName(cue) || "";
-  if (!cueSpans(cue)) {
-    goToCue(index);
+  const label = chapterTitle(chapter) || "";
+  if (!chapterSpans(chapter)) {
+    goToChapter(index);
     const pinned = pinSessionCurrent(state.session, label);
     if (!pinned.changed) return setStatus("That Address already holds a Pin.");
     // Retention is an ordinary Guide transaction, so it goes through the one
-    // path that saves. Assigning the Session directly reported a retained Cue
+    // path that saves. Assigning the Session directly reported a retained Chapter
     // that no reload could find.
     const pinId = pinned.value.pin.id;
     if (!accept(pinned, {
       effect: false,
       renderGuide: true,
-      status: `Retained ${cueLabelFor(cue)} as a Pin.`
+      status: `Retained ${chapterLabelFor(chapter)} as a Pin.`
     })) return;
     selectTimelineRetained({ kind: "pin", id: pinId });
     selectGuideTab("pins");
@@ -4746,7 +4746,7 @@ function retainCue(index) {
     view.render();
     return;
   }
-  const saved = saveExtentAsSection(state.session, cue, label, "cue");
+  const saved = saveExtentAsSection(state.session, chapter, label, "chapter");
   if (!saved.changed) {
     const existing = saved.value?.section;
     if (existing) {
@@ -4761,7 +4761,7 @@ function retainCue(index) {
   if (!accept(saved, {
     effect: false,
     renderGuide: true,
-    status: `Retained ${cueLabelFor(cue)} as a Section.`
+    status: `Retained ${chapterLabelFor(chapter)} as a Section.`
   })) return;
   selectTimelineRetained({ kind: "section", id: sectionId });
   selectGuideTab("sections");
@@ -4769,7 +4769,7 @@ function retainCue(index) {
   view.render();
 }
 
-const GUIDE_TABS = ["sections", "pins", "cues"];
+const GUIDE_TABS = ["sections", "pins", "chapters"];
 
 function selectGuideTab(tab, { focus = false } = {}) {
   const names = GUIDE_TABS;
@@ -5022,7 +5022,7 @@ function initializePlayerApi() {
       onReady: () => {
         state.playerReady = true;
         setStatus("YouTube ready. Paste a link.");
-        cuePendingVideo();
+        chapterPendingVideo();
       },
       onStateChange: handlePlayerStateChange,
       onPlaybackRateChange: handlePlaybackRateChange,
@@ -5111,7 +5111,7 @@ elements["load-video"].addEventListener("click", () => {
     setStatus("Waiting for the YouTube API…");
     return;
   }
-  cuePendingVideo();
+  chapterPendingVideo();
 });
 elements["youtube-url"].addEventListener("keydown", event => {
   if (event.key === "Enter") elements["load-video"].click();
@@ -5895,7 +5895,7 @@ elements["guide-close"].addEventListener("click", closeGuide);
 elements["guide-scrim"].addEventListener("click", closeGuide);
 elements["guide-tab-sections"].addEventListener("click", () => selectGuideTab("sections"));
 elements["guide-tab-pins"].addEventListener("click", () => selectGuideTab("pins"));
-elements["guide-tab-cues"].addEventListener("click", () => selectGuideTab("cues"));
+elements["guide-tab-chapters"].addEventListener("click", () => selectGuideTab("chapters"));
 elements["sections-list"].addEventListener("change", event => {
   const move = event.target.closest?.("[data-section-group]");
   if (move) {
@@ -5973,19 +5973,19 @@ elements["guide-compose-toggle"].addEventListener("click", () => {
   view.render();
 });
 
-elements["cue-capture"].addEventListener("submit", offerCues);
-elements["cue-clear"].addEventListener("click", clearCues);
-elements["cue-lane-toggle"].addEventListener("click", toggleCueLane);
-elements["cues-list"].addEventListener("click", event => {
-  const retain = event.target.closest("[data-cue-retain]");
-  if (retain) return retainCue(retain.dataset.cueRetain);
-  const go = event.target.closest("[data-cue-go]");
-  if (go) return goToCue(go.dataset.cueGo, {
+elements["chapter-capture"].addEventListener("submit", offerChapters);
+elements["chapter-clear"].addEventListener("click", clearChapters);
+elements["chapter-lane-toggle"].addEventListener("click", toggleChapterLane);
+elements["chapters-list"].addEventListener("click", event => {
+  const retain = event.target.closest("[data-chapter-retain]");
+  if (retain) return retainChapter(retain.dataset.chapterRetain);
+  const go = event.target.closest("[data-chapter-go]");
+  if (go) return goToChapter(go.dataset.chapterGo, {
     composing: composingGuideClick(event),
     consumeShiftOwner: guideShiftLayerSupplied(event) ? "guide" : null
   });
 });
-for (const id of ["guide-tab-sections", "guide-tab-pins", "guide-tab-cues"]) {
+for (const id of ["guide-tab-sections", "guide-tab-pins", "guide-tab-chapters"]) {
   elements[id].addEventListener("keydown", handleGuideTabKeydown);
 }
 elements["guide-dialog-form"].addEventListener("submit", submitGuideDialog);

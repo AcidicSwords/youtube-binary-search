@@ -10,7 +10,7 @@ import { createTimelineProjection } from "./timeline-projection.js";
 import {
   packTimelineSectionLanes,
   projectedSectionMidpointFraction,
-  projectCueExtent,
+  projectChapterExtent,
   partitionGuideSections
 } from "./view.js";
 import {
@@ -67,20 +67,20 @@ const close = (actual, expected, tolerance = 1e-9) => {
   assert.notEqual(projectedSectionMidpointFraction(resolved, projection), 0.5);
 }
 
-// A Cue is offered as its complete extent and clips to Focus without becoming
+// A Chapter is offered as its complete extent and clips to Focus without becoming
 // a control. Intersecting offers remain visible even when their start lies
 // before the drawn window.
 {
   const projection = createTimelineProjection({
     duration: 20,
-    guide: createGuide("cue-video"),
+    guide: createGuide("chapter-video"),
     view: { start: 5, end: 15 }
   });
-  const clipped = projectCueExtent({ time: 0, start: 0, end: 10 }, projection);
+  const clipped = projectChapterExtent({ time: 0, start: 0, end: 10 }, projection);
   assert.ok(clipped);
   close(clipped.left, 0);
   close(clipped.width, 0.5);
-  assert.equal(projectCueExtent({ time: 16, start: 16, end: 20 }, projection), null);
+  assert.equal(projectChapterExtent({ time: 16, start: 16, end: 20 }, projection), null);
 }
 
 // Groups are a complete flat partition. Empty Groups remain represented, and
@@ -180,4 +180,4 @@ const close = (actual, expected, tolerance = 1e-9) => {
   assert.match(styles, /\.guide-group-block/);
 }
 
-console.log("System coherence tests passed: unlimited Section reachability, projected source midpoints, Cue extents, flat Group blocks, Focus boundary ownership, explicit Panorama activation, and restrained user-facing names.");
+console.log("System coherence tests passed: unlimited Section reachability, projected source midpoints, Chapter extents, flat Group blocks, Focus boundary ownership, explicit Panorama activation, and restrained user-facing names.");

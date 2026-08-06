@@ -24,8 +24,8 @@ const sectionRows = () => descendants(byId.get("sections-list"))
   .filter(node => node.dataset.sectionGo);
 const pinRows = () => descendants(byId.get("pins-list"))
   .filter(node => node.dataset.pinGo);
-const cueRows = () => descendants(byId.get("cues-list"))
-  .filter(node => node.dataset.cueGo);
+const chapterRows = () => descendants(byId.get("chapters-list"))
+  .filter(node => node.dataset.chapterGo);
 const inSections = key => descendants(byId.get("sections-list"))
   .filter(node => node.dataset[key] !== undefined);
 const groupNames = () => descendants(byId.get("sections-list"))
@@ -33,8 +33,8 @@ const groupNames = () => descendants(byId.get("sections-list"))
   .map(node => node.textContent);
 const drawnBars = () => descendants(byId.get("section-lane"))
   .filter(node => node.dataset.sectionGo).length;
-const cueMarks = () => descendants(byId.get("cue-lane"))
-  .filter(node => node.className === "timeline-cue");
+const chapterMarks = () => descendants(byId.get("chapter-lane"))
+  .filter(node => node.className === "timeline-chapter");
 const status = () => byId.get("status").textContent;
 const press = async (key, options = {}) => {
   dispatchDocument("keydown", {
@@ -67,9 +67,9 @@ const loadVideo = async url => {
 assert.match(status(), /Paste a link/,
   "The first instruction is the first thing to do.");
 assert.equal(byId.get("sections-list-count").textContent, "0");
-assert.equal(byId.get("cue-parse").disabled, true,
+assert.equal(byId.get("chapter-parse").disabled, true,
   "Chapters cannot be offered against a source that is not loaded.");
-assert.equal(byId.get("cue-lane-toggle").disabled, true,
+assert.equal(byId.get("chapter-lane-toggle").disabled, true,
   "and there is nothing to draw.");
 assert.equal(byId.get("center-transport-surface").disabled, true,
   "Playback has nothing to play.");
@@ -81,7 +81,7 @@ await loadVideo("https://youtu.be/dQw4w9WgXcQ");
 assert.match(status(), /Loaded/);
 assert.equal(byId.get("duration-time").textContent, "1:40",
   "An undeformed map reports its source length and no stretch factor.");
-assert.equal(byId.get("cue-parse").disabled, false,
+assert.equal(byId.get("chapter-parse").disabled, false,
   "Now chapters can be offered.");
 byId.get("context-seconds").value = "0";
 byId.get("context-seconds").dispatch("change");
@@ -149,36 +149,36 @@ assert.doesNotMatch(byId.get("duration-time").textContent, /^\d+:\d\d$/);
 // ==============================================================================
 // 7. Take the creator's own divisions. Offered, never placed.
 // ==============================================================================
-const sectionsBeforeCues = sectionRows().length;
-const pinsBeforeCues = pinRows().length;
-byId.get("cue-source").value = [
+const sectionsBeforeChapters = sectionRows().length;
+const pinsBeforeChapters = pinRows().length;
+byId.get("chapter-source").value = [
   "Chapters",
   "0:00 Cold open",
   "0:35 The claim",
   "1:15 What it costs"
 ].join("\n");
-byId.get("cue-capture").dispatch("submit");
+byId.get("chapter-capture").dispatch("submit");
 await flush();
-assert.equal(cueRows().length, 3);
-assert.equal(sectionRows().length, sectionsBeforeCues,
+assert.equal(chapterRows().length, 3);
+assert.equal(sectionRows().length, sectionsBeforeChapters,
   "Offering chapters retains nothing.");
-assert.equal(pinRows().length, pinsBeforeCues);
+assert.equal(pinRows().length, pinsBeforeChapters);
 
 // Put them on the map to see where they fall against what is already built.
-byId.get("cue-lane-toggle").click();
+byId.get("chapter-lane-toggle").click();
 await flush();
-assert.equal(cueMarks().length, 3);
-assert.equal(sectionRows().length, sectionsBeforeCues,
+assert.equal(chapterMarks().length, 3);
+assert.equal(sectionRows().length, sectionsBeforeChapters,
   "and drawing them still retains nothing.");
 
 // One of them is worth keeping.
-await clickIn("cues-list", descendants(byId.get("cues-list"))
-  .find(node => node.dataset.cueRetain === "1"));
-assert.equal(sectionRows().length, sectionsBeforeCues + 1,
+await clickIn("chapters-list", descendants(byId.get("chapters-list"))
+  .find(node => node.dataset.chapterRetain === "1"));
+assert.equal(sectionRows().length, sectionsBeforeChapters + 1,
   "Retaining a chapter saves one ordinary Section.");
 assert.ok(sectionRows().some(row => rowText(row).includes("The claim")),
   "carrying the creator's own title.");
-assert.equal(cueRows().length, 3, "and leaves the rest on offer.");
+assert.equal(chapterRows().length, 3, "and leaves the rest on offer.");
 
 // ==============================================================================
 // 8. Compose the two into one span, and keep that too.
@@ -328,10 +328,10 @@ await loadVideo("https://youtu.be/AAAAAAAAAAA");
 assert.equal(byId.get("sections-list-count").textContent, "0",
   "A different source starts with its own empty Guide.");
 assert.equal(byId.get("pins-list-count").textContent, "0");
-assert.equal(byId.get("cues-list-count").textContent, "0",
+assert.equal(byId.get("chapters-list-count").textContent, "0",
   "and the previous creator's chapters do not follow: their Addresses mean nothing here.");
-assert.equal(cueMarks().length, 0, "so nothing of theirs is drawn.");
-assert.equal(byId.get("cue-source").value, "",
+assert.equal(chapterMarks().length, 0, "so nothing of theirs is drawn.");
+assert.equal(byId.get("chapter-source").value, "",
   "and the box they were pasted into is empty.");
 assert.equal(byId.get("duration-time").textContent, "1:40",
   "The new map is undeformed.");

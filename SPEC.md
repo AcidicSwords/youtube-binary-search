@@ -62,7 +62,7 @@ The following are intentionally absent from Session history and Guide persistenc
 - selected/aligned Pin indicators;
 - Matrix Shift latch, Guide Extend latch, and physical modifier state;
 - deformation bypass;
-- offered Cues and Cue-lane visibility;
+- offered Chapters and Chapter-lane visibility;
 - open panels, dialogs, cluster menus, hover, focus, and preview state;
 - Panorama Frame transition revision, Panorama Cycle phase, and side-player synchronization.
 
@@ -297,7 +297,7 @@ Three inputs may supply Shift semantics:
 
 - physical Shift is global for the current action and consumes no latch;
 - the Matrix Shift latch belongs only to Matrix Refine, Step, and Tag;
-- Guide Extend belongs only to Guide/Cue composition.
+- Guide Extend belongs only to Guide/Chapter composition.
 
 Only the matching latched owner may be consumed, and only when that latch actually supplied a modified action:
 
@@ -385,7 +385,7 @@ A Guide destination outside a focused Range may leave Focus or open Full Video a
 
 Every semantic operator commits the smallest complete transaction. Undo restores the checkpoint immediately before it; Redo restores the displaced state. A new semantic transaction clears the Redo future.
 
-Metadata-only presentation, deformation bypass, panel state, previews, Cues, transport ticks, rate events, Panorama Cycle, and playback wraps do not enter Session history. A changed Guide transaction is persisted after acceptance when recovery permits safe writing.
+Metadata-only presentation, deformation bypass, panel state, previews, Chapters, transport ticks, rate events, Panorama Cycle, and playback wraps do not enter Session history. A changed Guide transaction is persisted after acceptance when recovery permits safe writing.
 
 ## 6. Selection and direct manipulation
 
@@ -453,7 +453,7 @@ Typing a valid candidate may preview it through the same Panorama Frame as a dra
 
 ### 6.3 Guide composition and Carry
 
-A plain Guide click replaces the working relation with the clicked Pin or Section. Physical Shift or Guide Extend grows the current Active Span to the minimum contiguous extent containing the selected Cue, Pin, or Section. Composition stores the resulting extent, not an object set.
+A plain Guide click replaces the working relation with the clicked Pin or Section. Physical Shift or Guide Extend grows the current Active Span to the minimum contiguous extent containing the selected Chapter, Pin, or Section. Composition stores the resulting extent, not an object set.
 
 Alt with a spatial navigation operator may Carry the acquired Timeline Pin or Section by the same effective Timeline-space displacement as Current. Structural and source bounds clip or refuse the retained-object movement without changing the underlying navigation law. Carry is optional and creates no second operator family.
 
@@ -491,7 +491,7 @@ Direct Pin editing uses the Step neighborhood around its candidate Address. Dire
 
 #### Slideshow transitions
 
-One sequencer owns settled Frame identity and revision. A new semantic movement may produce one directional transition: forward movement reads toward Lead; backward movement reads toward Tail. Semantic state commits before this presentation cue.
+One sequencer owns settled Frame identity and revision. A new semantic movement may produce one directional transition: forward movement reads toward Lead; backward movement reads toward Tail. Semantic state commits before this presentation chapter.
 
 Republishing the same Frame does not create another transition. A moving Context Cursor does not change the identity of its fixed-edge Frame. Reduced-motion preference may remove the visual transition without changing any Frame Address.
 
@@ -650,9 +650,9 @@ Retain Pin retains Current as an explicit Pin. Retain Section retains a positive
 
 Guide renames, Weight changes, Group changes, Pin moves, Section moves, unlink/link, and deletion are ordinary Session transactions and use the same operations from every surface. Deleting the Section targeted by deformation bypass clears that bypass presentation. Deleting a focused Section leaves Focus through the same containing-Range law as other exits.
 
-### 9.2 Cues
+### 9.2 Chapters
 
-Cues are transient candidates parsed from offered text. They may be previewed, navigated with Go, composed into a Active Span, or explicitly retained with their title. They never enter Guide persistence, Section Weight, effective projection, or Pin traversal before retention.
+Chapters are transient candidates parsed from offered text. They may be previewed, navigated with Go, composed into a Active Span, or explicitly retained with their title. They never enter Guide persistence, Section Weight, effective projection, or Pin traversal before retention.
 
 ### 9.3 Recovery result
 
@@ -713,7 +713,7 @@ A stale state, duration, or CUED event from source A cannot initialize source B.
 
 ### 10.2 One source-transition boundary
 
-Before cueing a new identity, one boundary resolves every old-source owner:
+Before chaptering a new identity, one boundary resolves every old-source owner:
 
 - settle or cancel the active Step sequence according to its existing law;
 - settle Nudge before its timer can checkpoint;
@@ -722,9 +722,9 @@ Before cueing a new identity, one boundary resolves every old-source owner:
 - clear native Go, programmatic placement, player-pause claims, and metadata retry;
 - close dialogs and Pin-cluster menus;
 - persist safe settled Guide changes;
-- clear Cues, Timeline selection, Guide focus, aligned Pins, Shift layers, direct preview, Panorama runtime, and deformation bypass;
+- clear Chapters, Timeline selection, Guide focus, aligned Pins, Shift layers, direct preview, Panorama runtime, and deformation bypass;
 - reset source identity, Session, transport, offers, and physical side sources;
-- only then cue the new source.
+- only then chapter the new source.
 
 Player error and ordinary source replacement use the same boundary. No old Address, retained ID, timer, transport, preview, or history entry may reach the new Session.
 

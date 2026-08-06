@@ -827,19 +827,19 @@ kbd {
   height: var(--section-content-height, 0);
 }
 
-/* Cues are drawn, never operated. Their full offered extents are visible, but
+/* Chapters are drawn, never operated. Their full offered extents are visible, but
    nothing in this lane takes a pointer, so an offer cannot become an operand
    until the user retains it. */
-.cue-lane {
+.chapter-lane {
   position: absolute;
-  inset: var(--cue-top, 138px) 0 auto;
+  inset: var(--chapter-top, 138px) 0 auto;
   height: 14px;
   color: var(--faint);
   font: 600 0.56rem system-ui, sans-serif;
   pointer-events: none;
 }
 
-.timeline-cue {
+.timeline-chapter {
   position: absolute;
   top: 0;
   min-width: 1px;
@@ -850,7 +850,7 @@ kbd {
   pointer-events: none;
 }
 
-.timeline-cue-name {
+.timeline-chapter-name {
   position: absolute;
   top: 7px;
   padding-right: 6px;
@@ -2653,23 +2653,23 @@ kbd {
   .guide-address-input { width: calc(10ch + 14px); }
 }
 
-/* Cues are candidates, not structure. They read quieter than a retained entry
+/* Chapters are candidates, not structure. They read quieter than a retained entry
    so the Guide never looks fuller than the map actually is, and they carry one
    action -- the one that makes them real. */
-.cue-item {
+.chapter-item {
   border-style: dashed;
   opacity: 0.88;
 }
 
-.cue-item .guide-item-title { color: var(--muted); }
+.chapter-item .guide-item-title { color: var(--muted); }
 
-.cue-item:hover,
-.cue-item:focus-within {
+.chapter-item:hover,
+.chapter-item:focus-within {
   border-style: solid;
   opacity: 1;
 }
 
-.cue-create-form textarea {
+.chapter-create-form textarea {
   width: 100%;
   min-height: 84px;
   padding: 8px 10px;
@@ -2683,7 +2683,7 @@ kbd {
   resize: vertical;
 }
 
-.cue-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.chapter-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 /* A Group is a flat block containing its Section rows. Hidden and inactive
    alter the block chrome without removing the controls that restore either

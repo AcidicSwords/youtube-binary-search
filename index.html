@@ -148,7 +148,7 @@
               <div id="action-preview-fill" class="action-preview-fill" hidden></div>
               <div id="panorama-window-fill" class="panorama-window-fill" hidden></div>
             </div>
-            <div id="cue-lane" class="cue-lane" aria-hidden="true"></div>
+            <div id="chapter-lane" class="chapter-lane" aria-hidden="true"></div>
             <div id="section-lane" class="section-lane" aria-label="Sections"></div>
             <div id="pin-lane" class="pin-lane" aria-label="Pins"></div>
             <div id="pin-cluster-menu" class="pin-cluster-menu" role="menu" aria-label="Nearby Pins" hidden></div>
@@ -409,7 +409,7 @@
             <div class="guide-tabs" role="tablist" aria-label="Guide views">
               <button id="guide-tab-sections" class="guide-tab active" type="button" role="tab" aria-selected="true" aria-controls="guide-sections-panel" tabindex="0">Sections <span id="sections-list-count">0</span></button>
               <button id="guide-tab-pins" class="guide-tab" type="button" role="tab" aria-selected="false" aria-controls="guide-pins-panel" tabindex="-1">Pins <span id="pins-list-count">0</span></button>
-              <button id="guide-tab-cues" class="guide-tab" type="button" role="tab" aria-selected="false" aria-controls="guide-cues-panel" tabindex="-1">Cues <span id="cues-list-count">0</span></button>
+              <button id="guide-tab-chapters" class="guide-tab" type="button" role="tab" aria-selected="false" aria-controls="guide-chapters-panel" tabindex="-1">Chapters <span id="chapters-list-count">0</span></button>
             </div>
 
             <section id="focused-section" class="focused-section" hidden>
@@ -465,24 +465,24 @@
               <div id="pins-list" class="guide-list"><p class="empty-state">No Pins for this video.</p></div>
             </section>
 
-            <section id="guide-cues-panel" class="guide-tab-panel" role="tabpanel" aria-labelledby="guide-tab-cues" hidden>
+            <section id="guide-chapters-panel" class="guide-tab-panel" role="tabpanel" aria-labelledby="guide-tab-chapters" hidden>
               <details class="guide-create-disclosure">
                 <summary><span>Offer chapters</span></summary>
-                <form id="cue-capture" class="guide-create-form cue-create-form">
-                  <label for="cue-source">Paste a video description
-                    <textarea id="cue-source" rows="4" placeholder="0:00 Intro&#10;1:23 The setup&#10;…" disabled></textarea>
+                <form id="chapter-capture" class="guide-create-form chapter-create-form">
+                  <label for="chapter-source">Paste a video description
+                    <textarea id="chapter-source" rows="4" placeholder="0:00 Intro&#10;1:23 The setup&#10;…" disabled></textarea>
                   </label>
                   <p class="setting-note">Chapters a creator wrote are a partition someone who understood the video already drew. They are offered here, never placed: nothing enters the Guide, the map, or traversal until you retain it.</p>
-                  <div class="compact-actions cue-actions">
-                    <button id="cue-parse" class="primary" type="submit" disabled>Offer</button>
-                    <button id="cue-clear" type="button" disabled>Clear</button>
+                  <div class="compact-actions chapter-actions">
+                    <button id="chapter-parse" class="primary" type="submit" disabled>Offer</button>
+                    <button id="chapter-clear" type="button" disabled>Clear</button>
                   </div>
                 </form>
               </details>
-              <div class="compact-actions cue-lane-actions">
-                <button id="cue-lane-toggle" type="button" class="guide-action" aria-pressed="false" disabled>Show on timeline</button>
+              <div class="compact-actions chapter-lane-actions">
+                <button id="chapter-lane-toggle" type="button" class="guide-action" aria-pressed="false" disabled>Show on timeline</button>
               </div>
-              <div id="cues-list" class="guide-list"><p class="empty-state">No Cues offered. Paste a description to navigate its chapters.</p></div>
+              <div id="chapters-list" class="guide-list"><p class="empty-state">No Chapters offered. Paste a description to navigate its chapters.</p></div>
             </section>
 
           </aside>

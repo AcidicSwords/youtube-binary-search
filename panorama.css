@@ -371,7 +371,7 @@
    Frame to the next, and the semantic commit never waits for it: Session has
    already changed when these classes appear.
 
-   The cue is opacity only. Translating the panes read as a shake rather than as
+   The chapter is opacity only. Translating the panes read as a shake rather than as
    travel — three iframes cannot be reparented, so nothing can actually slide
    between roles, and the movement bought nothing for the jitter it cost. What
    remains is the one thing the roles genuinely differ in: on forward traversal

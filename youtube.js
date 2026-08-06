@@ -139,7 +139,7 @@ export function createYouTubePlayer(elementId, options = {}) {
   }
 
   const adapter = {
-    cue(videoId, startSeconds = 0) {
+    chapter(videoId, startSeconds = 0) {
       rawPlayer?.cueVideoById({ videoId, startSeconds });
     },
     play() {

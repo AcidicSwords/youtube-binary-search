@@ -101,14 +101,14 @@ The Matrix Shift button is a one-shot layer owned only by Matrix actions. Guide 
 
 A Pin owns one source Address. A Section is an edge between two Pin identities and owns one Weight. Shared endpoint identity makes connected Sections move together; coincident but distinct Pins remain independent.
 
-The Guide has Sections, Pins, and transient Cues:
+The Guide has Sections, Pins, and transient Chapters:
 
 - click a Timeline Pin to acquire it and move Current there;
 - click a Timeline Section to make its extent the Active Span and center Current spatially within it;
 - use exact Address fields, Nudge controls, Weight, Group, rename, delete, Focus, and unlink controls in the Guide;
 - drag Pins, Section end regions, or Section middles on the Timeline or from their Guide rows; both routes invoke the same operations and preview through the Panorama;
 - unlink a shared endpoint to create an independent Pin at the same Address; drag it near another Pin and hold for the visible snap to arm before release to link;
-- offer chapter text as Cues, then navigate, compose, or retain it explicitly. Cues do not enter the map or Guide on their own.
+- offer chapter text as Chapters, then navigate, compose, or retain it explicitly. Chapters do not enter the map or Guide on their own.
 
 Every Section belongs to one ordinary Group. At most one Group is drawn on the Timeline, and drawing none is valid. Any number of Groups may be Active and contribute Weight even while hidden. Deleting a Group moves its Sections to the reported surviving Group; the last Group and a move that would create a duplicate Section are refused.
 

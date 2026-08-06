@@ -129,7 +129,7 @@ const PAIRS = [];
 //   "structure"  — the retained graph only. Routes that build the same object
 //                  by different means may legitimately leave Current elsewhere;
 //                  a manual capture has to move Current to place the extent,
-//                  while retaining an offered Cue does not. What must match is
+//                  while retaining an offered Chapter does not. What must match is
 //                  the object and its future capabilities, not the path.
 const STRUCTURE_KEYS = [
   "pins",
@@ -206,18 +206,18 @@ converge(
   }
 );
 
-// --- Retention: a retained Cue is an ordinary Section -------------------------
+// --- Retention: a retained Chapter is an ordinary Section -------------------------
 // Provenance must not create a class of object. A Section retained from a
 // creator's chapter and one drawn over the same extent are the same mechanism.
 converge(
-  "Cue retention and ordinary Section creation",
+  "Chapter retention and ordinary Section creation",
   async ({ byId, flush }) => {
-    byId.get("cue-source").value = "0:20 Chapter\n1:00 Next";
-    byId.get("cue-capture").dispatch("submit");
+    byId.get("chapter-source").value = "0:20 Chapter\n1:00 Next";
+    byId.get("chapter-capture").dispatch("submit");
     await flush();
-    const retain = descendants(byId.get("cues-list"))
-      .find(node => node.dataset.cueRetain === "0");
-    byId.get("cues-list").dispatch("click", { target: retain });
+    const retain = descendants(byId.get("chapters-list"))
+      .find(node => node.dataset.chapterRetain === "0");
+    byId.get("chapters-list").dispatch("click", { target: retain });
     await flush();
     byId.get("release").click();
     await flush();
@@ -234,7 +234,7 @@ converge(
     await flush();
   },
   // A manual capture must move Current to place the extent; retaining an
-  // offered Cue need not. The Section they produce is the same mechanism.
+  // offered Chapter need not. The Section they produce is the same mechanism.
   "structure"
 );
 
@@ -322,5 +322,5 @@ if (indexArg !== undefined) {
       `${pair.name}: two routes to one operation must agree on ${pair.form}.`
     );
   }
-  console.log("Route correspondence tests passed: an exact Address edit and twelve Nudges reach one Address; Timeline and Guide Section selection reach one Active Span; a retained Cue is an ordinary Section; Focus from the operator and from a Guide row install one scope; and Group membership is the same partition however it is reached.");
+  console.log("Route correspondence tests passed: an exact Address edit and twelve Nudges reach one Address; Timeline and Guide Section selection reach one Active Span; a retained Chapter is an ordinary Section; Focus from the operator and from a Guide row install one scope; and Group membership is the same partition however it is reached.");
 }

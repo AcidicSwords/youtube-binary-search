@@ -120,7 +120,7 @@ assert.match(
 // direction, its offset and its deadline.
 assert.match(panoramaSource, /function startCycleCycle\(center, snapshot[\s\S]*restartPanoramaCycle\(runtime\.cycle, configured, now\(\)\)[\s\S]*Math\.min\(bounds\.inner, bounds\.outer\)/,
   "A discontinuity must begin a fresh cycle leg at the inner boundary and expand outward.");
-assert.match(panoramaSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*(?:adapter\?\.place|adapter\?\.cue)[\s\S]*side\.adapter\?\.play/,
+assert.match(panoramaSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*(?:adapter\?\.place|adapter\?\.chapter)[\s\S]*side\.adapter\?\.play/,
   "Every running cycle must prime its side at 1× before directional-rate discovery.");
 assert.doesNotMatch(panoramaSource, /onHoldOffsets/,
   "Hold and Stretch must never persist a measured runtime offset.");

@@ -298,7 +298,7 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
     emitState(data) { queueMicrotask(() => this.events.onStateChange?.({ data })); }
     emitRate(rate) { queueMicrotask(() => this.events.onPlaybackRateChange?.({ data: rate })); }
     cueVideoById({ videoId = null, startSeconds = 0 }) {
-      this.commands.push(["cue", startSeconds]);
+      this.commands.push(["chapter", startSeconds]);
       this.videoId = videoId;
       this.currentTime = startSeconds;
       this.state = 5;

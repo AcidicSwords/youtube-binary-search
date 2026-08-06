@@ -216,7 +216,7 @@ const clone = value => structuredClone(value);
     app.indexOf("[STORAGE_V8_PREFIX") < app.indexOf("[STORAGE_V7_PREFIX")
   );
   assert.ok(app.includes("resetSourceScopedState();"));
-  assert.ok(app.includes("state.cues = [];"));
+  assert.ok(app.includes("state.chapters = [];"));
   assert.ok(app.includes("return orderedPins(sourceGuide)"));
   assert.ok(app.includes("timelineProjection().timelineDistance("));
   assert.ok(app.includes("selection.address"));

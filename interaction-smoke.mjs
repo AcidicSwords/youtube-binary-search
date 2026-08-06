@@ -547,8 +547,8 @@ assert.equal(tail.createdWhilePanoramaOff, false, "Tail must be created only aft
 assert.equal(lead.createdWhilePanoramaOff, false, "Lead must be created only after its pane is measurable.");
 assert.match(String(tail.iframe.allow || ""), /autoplay/, "Tail iframe must explicitly receive autoplay permission.");
 assert.match(String(lead.iframe.allow || ""), /autoplay/, "Lead iframe must explicitly receive autoplay permission.");
-assert.ok(tail.commands.some(command => command[0] === "cue"), "Tail must use cue only for pre-activation placement.");
-assert.ok(lead.commands.some(command => command[0] === "cue"), "Lead must use cue only for pre-activation placement.");
+assert.ok(tail.commands.some(command => command[0] === "chapter"), "Tail must use chapter only for pre-activation placement.");
+assert.ok(lead.commands.some(command => command[0] === "chapter"), "Lead must use chapter only for pre-activation placement.");
 
 // A retained Section is one object in Guide, Timeline, and Panorama. Selecting its
 // Guide row establishes its exact Extent and returns Current to the midpoint.
