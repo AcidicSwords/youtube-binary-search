@@ -212,6 +212,7 @@ Every executable suite is listed here by the current behavior it protects.
 - `lexicon-audit.mjs` — scans every product surface against `LEXICON.md` for retired vocabulary; report-only during the lexicon overhaul, `--strict` in the final gate. Run with `npm run audit:lexicon`.
 - `browser-smoke.mjs` — real Chromium geometry, equal square matrix cells, stable shifted labels, native-control hit access, exact Timeline pointer mapping, focus, responsive rails, dense structure, and compact reachability.
 - `timeline-render-smoke.mjs` — the Timeline's drawn layers in real Chromium: the track as an absolute positioning context and the Current Neighborhood, Active Span, and Weight Gradient each absolutely positioned, painted, non-collapsed, and inside the track — the fills a stylesheet edit can silently corrupt while every arithmetic suite stays green.
+- `panorama-render-smoke.mjs` — the Panorama's stable, partial, and stretching visual phases in real Chromium, including Freeze/Stretch cycling state and a positioned, painted Panorama Window.
 
 ## Change completion
 

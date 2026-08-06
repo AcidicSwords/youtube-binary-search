@@ -10,7 +10,7 @@
     "check": "node --check app.js && node --check panorama-frame.js && node --check step-gesture.js && node --check panorama.js && node --check panorama-geometry.js && node --check session.js && node --check guide.js && node --check group-coherence-tests.mjs && node --check timeline-projection.js && node --check range-geometry.js && node --check transport.js && node --check youtube.js && node --check chapters.js && node --check format.js && node --check view.js && node --check operator-grammar.js && npm test && npm run test:semantic && npm run audit && node startup-smoke.mjs && node interaction-smoke.mjs && node context-smoke.mjs && node step-gesture-smoke.mjs && node transport-coherence-smoke.mjs && node section-weighting-smoke.mjs && node guide-composition-smoke.mjs && node chapter-smoke.mjs && node route-correspondence-tests.mjs && node transaction-integrity-smoke.mjs && node guide-recovery-smoke.mjs && node source-boundary-smoke.mjs && node group-coherence-tests.mjs && node cross-interaction-stress.mjs && node journey-smoke.mjs && node metadata-smoke.mjs",
     "audit": "node integration-check.mjs && node project-audit.mjs && node lexicon-audit.mjs --strict",
     "audit:lexicon": "node lexicon-audit.mjs",
-    "test:browser": "node browser-smoke.mjs && node ghost-smoke.mjs && node timeline-render-smoke.mjs",
+    "test:browser": "node browser-smoke.mjs && node ghost-smoke.mjs && node timeline-render-smoke.mjs && node panorama-render-smoke.mjs",
     "verify": "npm run check && npm run test:browser"
   },
   "engines": {

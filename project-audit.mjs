@@ -75,7 +75,7 @@ check(pkg.scripts?.audit === "node integration-check.mjs && node project-audit.m
   "The integration, project, and strict lexicon gauges are all part of check.");
 // Everything that needs a real browser runs from one route, so there is no way
 // to satisfy the release gate while skipping a suite that needs Chromium.
-check(pkg.scripts?.["test:browser"] === "node browser-smoke.mjs && node ghost-smoke.mjs && node timeline-render-smoke.mjs",
+check(pkg.scripts?.["test:browser"] === "node browser-smoke.mjs && node ghost-smoke.mjs && node timeline-render-smoke.mjs && node panorama-render-smoke.mjs",
   "The browser proof has one package route covering every browser-backed suite.");
 has(pkg.scripts?.check || "", /npm run test:semantic/, "The extended semantic state-space proof runs in check.");
 has(pkg.scripts?.check || "", /npm run audit/, "The validation gauges run in check.");
