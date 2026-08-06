@@ -14,7 +14,7 @@
 - **Density** — the product of effective covering Section weights at a source segment; integrating it produces Timeline Space.
 - **Effective Projection** — the single immutable source↔Timeline mapping for one render or operation after Group activity, Weight, and the current weight relaxation have been resolved.
 - **Spatial midpoint** — the source Address halfway between two endpoints in Timeline Space. It need not equal their arithmetic source-time midpoint.
-- **Stretch factor** — a Timeline extent reported relative to the source span it allocates. At `1×`, Timeline and source extent correspond.
+- **Timeline Allocation Factor** — a Timeline extent reported relative to the Source-Time span it allocates. At `1×`, Timeline and Source-Time extent correspond.
 - **Viewport** — the source extent drawn across the Timeline. Focus changes the viewport; operators still consume the same effective projection.
 - **Weight** — one Section’s positive map-scale factor. It changes Timeline density, not source duration. Fixed playback ignores it; optional Textured Playback explicitly reads its effective composite.
 - **Weight Gradient** — the perceptual violet/teal field derived from effective contributors. It communicates compression or expansion while sourceGridLines communicate exact metric density.

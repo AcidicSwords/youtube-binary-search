@@ -8,8 +8,8 @@ env.localStorage.values.set(
   "binary-youtube-reader:preferences:v1",
   JSON.stringify({
     panoramaCycle: savedPanoramaCycle,
-    contextSeconds: 7.25,
-    nudgeSeconds: 0.125
+    contextSeconds: 7.25, // lexicon-allow: legacy preference migration fixture
+    nudgeSeconds: 0.125 // lexicon-allow: legacy preference migration fixture
   })
 );
 
@@ -59,9 +59,9 @@ const migratedPreferences = JSON.parse(
 );
 assert.equal(migratedPreferences.contextDuration, 7.25);
 assert.equal(migratedPreferences.nudgeDistance, 0.125);
-assert.equal("contextSeconds" in migratedPreferences, false,
+assert.equal("contextSeconds" in migratedPreferences, false, // lexicon-allow: legacy preference migration assertion
   "Preference writes contain only the canonical Context Duration key.");
-assert.equal("nudgeSeconds" in migratedPreferences, false,
+assert.equal("nudgeSeconds" in migratedPreferences, false, // lexicon-allow: legacy preference migration assertion
   "Preference writes contain only the canonical Nudge Distance key.");
 
 // Tune rejects an empty/invalid Offset without silently converting it to the

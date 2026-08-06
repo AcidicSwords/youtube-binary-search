@@ -151,7 +151,27 @@ export const RETIRED_TERMS = [
   term("Dynamic Playback", "Textured Playback", { caseInsensitive: true, category: "playback" }),
   term("dynamicRatePolicy", "texturedRatePolicy", { category: "playback" }),
   term("desiredCenterRate", "texturedRateForWeight", { category: "playback" }),
-  term("dynamic-weight-texture", "textured", { category: "playback" })
+  term("dynamic-weight-texture", "textured", { category: "playback" }),
+
+  // Clockwork completion — internal correspondence and persisted settings.
+  // The only permitted appearances of old preference keys are individual
+  // `lexicon-allow` lines that prove read-only migration.
+  term("contextSeconds", "contextDuration", { category: "settings" }),
+  term("nudgeSeconds", "nudgeDistance", { category: "settings" }),
+  term("FIELD_SIDE_MODE", "PANORAMA_SIDE_MODE", { category: "panorama" }),
+  term("runtime\\.cycle\\.held", "runtime.cycle.frozen", { category: "panorama" }),
+  term("side\\.held", "side.frozen", { category: "panorama" }),
+  term("resumePanorama", "stretchPanorama", { category: "panorama" }),
+  term("resumeCycle", "stretchCycle", { category: "panorama" }),
+  term("step-pane", "panorama-pane", { category: "panorama" }),
+  term("Section Stretch Factor", "Section Weighting / Timeline Allocation Factor", {
+    caseInsensitive: true,
+    category: "topography"
+  }),
+  term("Stretch Factor", "Timeline Allocation Factor", {
+    caseInsensitive: true,
+    category: "topography"
+  })
 ];
 
 function walk(dir, out = []) {
