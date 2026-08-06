@@ -30,6 +30,12 @@ const SCANNED_EXTENSIONS = new Set([".js", ".mjs", ".css", ".html", ".md"]);
 // job: the authority that lists them as forbidden, and this audit that hunts
 // for them.
 const EXEMPT_FILES = new Set(["LEXICON.md", "lexicon-audit.mjs"]);
+if (EXEMPT_FILES.has("HANDOFF.md")) {
+  throw new Error("HANDOFF.md is retired and cannot be exempted from the lexicon audit.");
+}
+if (existsSync(new URL("./HANDOFF.md", import.meta.url))) {
+  throw new Error("HANDOFF.md is a retired delivery artifact and must not ship.");
+}
 
 const SKIP_DIRS = new Set(["node_modules", ".git"]);
 

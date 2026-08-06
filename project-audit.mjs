@@ -55,6 +55,7 @@ for (const retired of [
   ".v5.2-patch-backup",
   "BRANCH_INSTALL.md",
   "DELETE_FILES.txt",
+  "HANDOFF.md",
   "MANUAL_SMOKE.md",
   "PATCHSET.md",
   "SHA256SUMS",
