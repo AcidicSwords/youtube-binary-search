@@ -197,6 +197,7 @@ Every executable suite is listed here by the current behavior it protects.
 - `chapter-smoke.mjs` — offering and drawing Chapters is inert; navigation, composition, and Retain use canonical routes.
 - `section-weighting-smoke.mjs` — Guide-only Weight editing, effective geometry and atmosphere, scoped/whole-map bypass, weighted Step, and exact restoration.
 - `context-smoke.mjs` — post-traversal Context, Step deferral, replacement, Panorama suspension, reversal naming, Off, and Undo isolation.
+- `ripple-smoke.mjs` — bare Shift-click acquisition, shared clipped Context observation, live retargeting, semantic non-effects, Panorama Frame reuse, endpoint publication, and Current-centred completion.
 - `step-gesture-smoke.mjs` — captured/fallback release, keyboard hold, and rapid taps settle as one action.
 - `transport-coherence-smoke.mjs` — actual-rate observation, effective dynamic projection, settlement, proper-Range wrap, retry, Panorama rebasing, and history isolation.
 - `metadata-smoke.mjs` — delayed valid metadata is retried without creating a zero-duration Session.

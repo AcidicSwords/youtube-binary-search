@@ -10,8 +10,10 @@ import {
   tracePositionIsValid
 } from "./traversal-trace.js";
 import {
+  appendRippleProspects,
   clearTraversalProspects,
-  createTraversalProspects
+  createTraversalProspects,
+  removeRippleProspects
 } from "./traversal-prospects.js";
 import {
   EPSILON,
@@ -380,6 +382,7 @@ let panorama = null;
 let pendingLoad = null;
 let loadGeneration = 0;
 let chapterdGeneration = 0;
+let rippleSequence = 0;
 let pollTimer = null;
 let metadataTimer = null;
 let stepGesture = null;
@@ -1089,6 +1092,81 @@ function startContext(anchor, options = {}) {
   if (!options.retarget || state.playerState !== YOUTUBE_STATE.PLAYING) player.play();
 }
 
+function removeActiveRippleProspects() {
+  const ripple = state.rippleObservation;
+  if (!ripple) return false;
+  const removed = removeRippleProspects(state.traversalProspects, ripple.id);
+  if (removed.changed) state.traversalProspects = removed.state;
+  return removed.changed;
+}
+
+function rippleOwnsContext(transport = state.transport) {
+  const ripple = state.rippleObservation;
+  return Boolean(
+    ripple
+    && ripple.generation === loadGeneration
+    && transport?.kind === TRANSPORT_KIND.CONTEXT
+    && Math.abs(transport.anchor - ripple.observationAddress) <= EPSILON
+  );
+}
+
+function beginRippleObservation(observationAddress) {
+  if (
+    !state.videoLoaded
+    || !Number.isFinite(observationAddress)
+    || !contains(activeRange(), observationAddress)
+  ) return false;
+
+  const window = deriveContextWindow(
+    observationAddress,
+    activeRange(),
+    state.contextDuration
+  );
+  if (!window) {
+    setStatus("Ripple needs a positive Context Duration.", true);
+    view.render();
+    return false;
+  }
+
+  const retarget = rippleOwnsContext()
+    && state.playerState === YOUTUBE_STATE.PLAYING;
+  if (retarget) {
+    // Settle every non-transport owner, but preserve the one running Context so
+    // the next Ripple can retarget it without a stop/start seam.
+    settleBeforeAction({ transport: false });
+    removeActiveRippleProspects();
+    state.rippleObservation = null;
+  } else {
+    settleBeforeAction({ replacingContext: true });
+  }
+
+  const id = `ripple-${loadGeneration}-${++rippleSequence}`;
+  const appended = appendRippleProspects(state.traversalProspects, {
+    rippleId: id,
+    generation: loadGeneration,
+    start: window.start,
+    end: window.end
+  });
+  if (!appended.changed) return false;
+  state.traversalProspects = appended.state;
+  state.rippleObservation = {
+    id,
+    generation: loadGeneration,
+    observationAddress,
+    contextStart: window.start,
+    contextEnd: window.end,
+    phase: "observing"
+  };
+  startContext(observationAddress, { retarget });
+  setStatus(
+    `Ripple observing ${formatTime(observationAddress)}. Current remains ${
+      formatTime(currentNeighborhood().C)
+    }.`
+  );
+  view.render();
+  return true;
+}
+
 function applyPlayerEffect(result, options = {}) {
   if (!state.videoLoaded || !player) return;
   const observe = options.observe !== false;
@@ -1365,7 +1443,21 @@ function settleTransport(options = {}) {
   if (issuePause) player.pause();
 
   if (active.kind === TRANSPORT_KIND.CONTEXT) {
-    const observationCenter = Number.isFinite(active.anchor)
+    const ripple = rippleOwnsContext(active)
+      ? state.rippleObservation
+      : null;
+    if (ripple) {
+      if (options.completeRipple === true && ripple.generation === loadGeneration) {
+        ripple.phase = "completed";
+        state.rippleObservation = null;
+      } else {
+        removeActiveRippleProspects();
+        state.rippleObservation = null;
+      }
+    }
+    const observationCenter = ripple
+      ? currentNeighborhood()?.C
+      : Number.isFinite(active.anchor)
       ? active.anchor
       : currentNeighborhood()?.C;
     if (restoreObservation && !handoffPanorama && Number.isFinite(observationCenter)) {
@@ -1373,6 +1465,13 @@ function settleTransport(options = {}) {
       panorama?.translateToCurrent(observationCenter, { preserve: true });
     }
     if (shouldRender) view.render();
+    if (ripple && options.completeRipple === true) {
+      setStatus(
+        `Ripple added futures at ${formatTime(ripple.contextStart)} and ${
+          formatTime(ripple.contextEnd)
+        }.`
+      );
+    }
     return true;
   }
 
@@ -3372,7 +3471,7 @@ function pollPlayer() {
         player.play();
       }
     } else if (!inside) {
-      settleTransport();
+      settleTransport({ completeRipple: rippleOwnsContext(transport) });
       return;
     }
   } else if (transport.kind === TRANSPORT_KIND.PLAYBACK && state.playerState === YOUTUBE_STATE.PLAYING) {
@@ -4034,17 +4133,30 @@ function finishCurrentDrag(event, options = {}) {
 }
 
 function handleTimelineClick(event) {
-  if (!state.videoLoaded || state.dragHandle) return;
+  if (
+    !state.videoLoaded
+    || state.dragHandle
+    || state.guideDrag
+    || state.currentDrag
+    || state.ghostGesture
+  ) return;
   if (
     event.target.closest(".range-handle")
     || event.target.closest(".timeline-pin")
     || event.target.closest(".pin-cluster-menu")
     || event.target.closest("[data-section-go]")
+    || event.target.closest("#current-marker")
+    || event.target.closest("[data-ripple-address]")
+    || event.target.closest("[data-traversal-prospect]")
   ) return;
   view.closePinClusterMenu();
   const time = timeFromPointer(event, timelineProjection(), true);
   if (!contains(activeRange(), time)) {
     setStatus("That Address is outside Range.", true);
+    return;
+  }
+  if (event.shiftKey === true) {
+    beginRippleObservation(time);
     return;
   }
   // Bare map ground acquires no retained object. Clear the spatial operand

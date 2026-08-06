@@ -466,6 +466,25 @@ has(topLevelFunction(appCode, "applyActiveShiftPlaybackPolicy"),
 has(topLevelFunction(appCode, "pollPlayer"),
   /availableRates[\s\S]*?applyActiveShiftPlaybackPolicy\(\{[\s\S]*?playback-rate-offer/,
   "Expanded rate offers rederive active Shift playback policy.");
+const timelineClick = topLevelFunction(appCode, "handleTimelineClick");
+has(timelineClick,
+  /timeFromPointer\(event, timelineProjection\(\), true\)[\s\S]*?event\.shiftKey === true[\s\S]*?beginRippleObservation\(time\)/,
+  "Bare Shift-click Ripple reuses canonical Timeline inversion.");
+has(timelineClick,
+  /if \(event\.shiftKey === true\) \{\s*beginRippleObservation\(time\);\s*return;\s*\}/,
+  "Ripple acquisition returns before ordinary Go.");
+const beginRipple = topLevelFunction(appCode, "beginRippleObservation");
+has(beginRipple,
+  /deriveContextWindow\([\s\S]*?observationAddress[\s\S]*?activeRange\(\)[\s\S]*?state\.contextDuration/,
+  "Ripple derives the shared independently clipped Context Window.");
+has(beginRipple,
+  /appendRippleProspects\(state\.traversalProspects[\s\S]*?start: window\.start[\s\S]*?end: window\.end/,
+  "Ripple publishes the actual clipped Context boundaries.");
+has(beginRipple, /startContext\(observationAddress, \{ retarget \}\)/,
+  "Ripple observation uses the one Context transport route.");
+has(topLevelFunction(appCode, "settleTransport"),
+  /options\.completeRipple === true[\s\S]*?state\.rippleObservation = null/,
+  "Successful Context completion clears active Ripple identity while preserving its batch.");
 has(styles, /\.center-transport-overlay\s*\{[^}]*pointer-events:\s*none/,
   "The full iframe overlay is non-blocking.");
 has(styles, /\.center-transport-surface\s*\{[^}]*pointer-events:\s*auto/,
