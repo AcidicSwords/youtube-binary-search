@@ -10,6 +10,10 @@ import {
   tracePositionIsValid
 } from "./traversal-trace.js";
 import {
+  clearTraversalProspects,
+  createTraversalProspects
+} from "./traversal-prospects.js";
+import {
   EPSILON,
   clamp,
   contains,
@@ -354,6 +358,12 @@ const state = {
   // not history: history records what the world was, this records where the
   // reader was. Source-scoped and session-local.
   traversalTrace: createTraversalTrace(0),
+  // Known future Addresses contributed by completed Ripple observations.
+  // Transient, source-scoped, and deliberately outside Session/history/Trace.
+  traversalProspects: createTraversalProspects(),
+  // Identity and presentation for the one Ripple currently being observed.
+  // Context remains the transport owner; this state never replaces it.
+  rippleObservation: null,
   // Where the last Ghost gesture left the historical read cursor, so the next
   // one can continue through the original pattern rather than restarting from
   // the occurrence that gesture itself appended.
@@ -2936,6 +2946,8 @@ function resetSourceScopedState() {
   // discarded, and the ledger starts empty.
   cancelGhostGesture({ restore: false });
   state.traversalTrace = createTraversalTrace(0);
+  state.traversalProspects = clearTraversalProspects();
+  state.rippleObservation = null;
   state.ghostKeyHeld = false;
   state.ghostGesture = null;
   state.ghostContinuation = null;

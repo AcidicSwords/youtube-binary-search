@@ -550,10 +550,17 @@ has(appCode, /function consumeShiftLayer\(owner\)[\s\S]*?state\.shiftLayers\?\.\
   "Latched Shift is consumed by named owner.");
 has(appCode, /shiftLayers:\s*\{ matrix: false, guide: false \}/,
   "Matrix and Guide own separate Shift latches.");
+has(appCode, /traversalProspects:\s*createTraversalProspects\(\)/,
+  "Application state owns one transient Traversal Prospect collection.");
+has(appCode, /rippleObservation:\s*null/,
+  "Application state owns one nullable active Ripple observation.");
 lacks(appCode, /consumeShiftLayer\(\s*\)/,
   "No ownerless Shift-layer consumption remains.");
 has(topLevelFunction(appCode, "resetSourceScopedState"), /state\.shiftLayers = \{ matrix: false, guide: false \}/,
   "Source reset clears both surface latches.");
+has(topLevelFunction(appCode, "resetSourceScopedState"),
+  /state\.traversalProspects = clearTraversalProspects\(\)[\s\S]*?state\.rippleObservation = null/,
+  "Source reset clears Ripple identity and every Traversal Prospect.");
 // One wheel, two readers, one registration. Ghost takes precedence while G is
 // held; otherwise the wheel is Nudge's exactly as before. A second listener
 // would let both act on one notch.
