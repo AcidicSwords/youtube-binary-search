@@ -260,11 +260,11 @@ function addresses(model) {
     "Context transport carries those same source edges."
   );
 
-  // Field geometry is physical: offsets and cycling bounds are source seconds.
+  // Panorama geometry is physical: offsets and cycling bounds are source seconds.
   assert.deepEqual(
     derivePanorama(50, { backward: 10, forward: 10, linked: true }, RANGE).envelope,
     { start: 40, end: 60 },
-    "Field offsets are source-time displacements from Center."
+    "Panorama offsets are source-time displacements from Center."
   );
   assert.deepEqual(
     effectiveCycleBounds({ inner: 2.5, outer: 10, rate: 0.5 }, 50),
@@ -290,4 +290,4 @@ function addresses(model) {
   }
 }
 
-console.log("Weight invariance tests passed: retained Addresses, duration, Nudge displacement, Context and Field geometry are Weight-blind; Step, Refine, seeded Resolution and adaptive Reach follow the metric; and editing Weight moves nothing at all.");
+console.log("Weight invariance tests passed: retained Addresses, duration, Nudge displacement, Context and Panorama geometry are Weight-blind; Step, Refine, seeded Resolution and adaptive Reach follow the metric; and editing Weight moves nothing at all.");

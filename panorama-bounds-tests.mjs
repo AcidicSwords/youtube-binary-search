@@ -4,8 +4,8 @@ import {
   PANORAMA_STATE,
   FIELD_SIDE_MODE,
   createPanoramaController,
-  deriveFieldBounds,
-  fieldShouldSuspend
+  derivePanoramaBounds,
+  panoramaShouldSuspend
 } from "./panorama.js";
 import { YOUTUBE_STATE } from "./youtube.js";
 
@@ -19,38 +19,38 @@ function assertContained(bounds, range) {
 {
   const range = { start: 0, end: 100 };
   const resolution = { L: 48, C: 50, R: 52 };
-  const bounds = deriveFieldBounds({ current: 50, stepReach: { backward: 10, forward: 10, linked: true }, range });
+  const bounds = derivePanoramaBounds({ current: 50, stepReach: { backward: 10, forward: 10, linked: true }, range });
   assert.deepEqual(bounds.envelope, { start: 40, end: 60 });
-  assert.ok(bounds.envelope.start < resolution.L, "Field may extend behind Resolution.");
-  assert.ok(bounds.envelope.end > resolution.R, "Field may extend ahead of Resolution.");
+  assert.ok(bounds.envelope.start < resolution.L, "Panorama may extend behind Resolution.");
+  assert.ok(bounds.envelope.end > resolution.R, "Panorama may extend ahead of Resolution.");
   assertContained(bounds, range);
 }
 
 for (const current of [0, 1, 4, 25, 50, 96, 99, 100]) {
   const range = { start: 0, end: 100 };
-  assertContained(deriveFieldBounds({ current, stepReach: { backward: 10, forward: 10, linked: true }, range }), range);
+  assertContained(derivePanoramaBounds({ current, stepReach: { backward: 10, forward: 10, linked: true }, range }), range);
 }
 
 {
-  const bounds = deriveFieldBounds({ current: 4, stepReach: { backward: 10, forward: 10, linked: true }, range: { start: 0, end: 100 } });
+  const bounds = derivePanoramaBounds({ current: 4, stepReach: { backward: 10, forward: 10, linked: true }, range: { start: 0, end: 100 } });
   assert.deepEqual(bounds.tail, { target: 0, reach: 4, constrained: true });
   assert.equal(bounds.constraint, "start");
 }
 {
-  const bounds = deriveFieldBounds({ current: 96, stepReach: { backward: 10, forward: 10, linked: true }, range: { start: 0, end: 100 } });
+  const bounds = derivePanoramaBounds({ current: 96, stepReach: { backward: 10, forward: 10, linked: true }, range: { start: 0, end: 100 } });
   assert.deepEqual(bounds.lead, { target: 100, reach: 4, constrained: true });
   assert.equal(bounds.constraint, "end");
 }
 {
-  const bounds = deriveFieldBounds({ current: 4, stepReach: { backward: 10, forward: 10, linked: true }, range: { start: 0, end: 12 } });
+  const bounds = derivePanoramaBounds({ current: 4, stepReach: { backward: 10, forward: 10, linked: true }, range: { start: 0, end: 12 } });
   assert.deepEqual(bounds.envelope, { start: 0, end: 12 });
   assert.equal(bounds.constraint, "both");
 }
 
-assert.equal(fieldShouldSuspend({ transportKind: "playback" }), false);
-assert.equal(fieldShouldSuspend({ transport: { kind: "context" } }), true, "Context is Center-only.");
-assert.equal(fieldShouldSuspend({ pendingStep: true }), true);
-assert.equal(fieldShouldSuspend({ rangeDragging: true }), true);
+assert.equal(panoramaShouldSuspend({ transportKind: "playback" }), false);
+assert.equal(panoramaShouldSuspend({ transport: { kind: "context" } }), true, "Context is Center-only.");
+assert.equal(panoramaShouldSuspend({ pendingStep: true }), true);
+assert.equal(panoramaShouldSuspend({ rangeDragging: true }), true);
 
 function fakeElement() {
   const listeners = new Map();
@@ -164,7 +164,7 @@ function makeControllerHarness() {
     const tailCommands = harness.adapters.get("player-tail").commands;
     assert.ok(tailCommands.some(command => command[0] === "play"), "Native Center playback starts the muted Tail.");
     // Stretch resumed at the attained outer bound, so both sides arrive at the
-    // outer synchronization barrier at once and the Field contracts.
+    // outer synchronization barrier at once and the Panorama contracts.
     assert.equal(harness.controller.cycle().phase, "contracting");
     assert.ok(
       tailCommands.some(command => command[0] === "rate" && command[1] > 1),
@@ -214,7 +214,7 @@ function makeControllerHarness() {
     harness.controller.resetAtCurrent();
     assert.ok(
       harness.changes.slice(changesBeforeReset).includes(null),
-      "A structural reset must invalidate the prior projected Field before re-establishing it."
+      "A structural reset must invalidate the prior projected Panorama before re-establishing it."
     );
     const field = harness.controller.snapshot();
     assert.equal(field.constraint, "both");
@@ -228,16 +228,16 @@ function makeControllerHarness() {
 
 {
   const app = readFileSync("app.js", "utf8");
-  const fieldSource = readFileSync("panorama.js", "utf8");
+  const panoramaSource = readFileSync("panorama.js", "utf8");
   assert.match(app, /function setRange\([\s\S]*?settleBeforeAction\(\);[\s\S]*?setSessionRange/);
   assert.match(app, /function focusSection\([\s\S]*?settleBeforeAction\(\);[\s\S]*?focusSessionSection/);
   assert.match(app, /function leaveSection\([\s\S]*?settleBeforeAction\(\);[\s\S]*?leaveSessionSection/);
-  assert.match(fieldSource, /export function fieldShouldSuspend\(snapshot\)/);
-  assert.match(fieldSource, /transportKind === "context"/);
-  assert.doesNotMatch(fieldSource, /transportKind === "loop"/);
-  assert.match(fieldSource, /function resetAtCurrent\(\)[\s\S]*invalidate\(\{ pause: false \}\)/);
-  assert.match(app, /resetField[\s\S]*panorama\?\.resetAtCurrent/);
-  assert.doesNotMatch(fieldSource, /snapshot\.neighborhood/, "Field bounds must not depend on Resolution.");
+  assert.match(panoramaSource, /export function panoramaShouldSuspend\(snapshot\)/);
+  assert.match(panoramaSource, /transportKind === "context"/);
+  assert.doesNotMatch(panoramaSource, /transportKind === "loop"/);
+  assert.match(panoramaSource, /function resetAtCurrent\(\)[\s\S]*invalidate\(\{ pause: false \}\)/);
+  assert.match(app, /resetPanorama[\s\S]*panorama\?\.resetAtCurrent/);
+  assert.doesNotMatch(panoramaSource, /snapshot\.neighborhood/, "Panorama bounds must not depend on Resolution.");
 }
 
-console.log("Field bounds tests passed: Range containment, Context suspension, native playback, Hold, and side Step.");
+console.log("Panorama bounds tests passed: Range containment, Context suspension, native playback, Hold, and side Step.");

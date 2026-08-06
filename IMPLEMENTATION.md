@@ -15,16 +15,16 @@ is a module and ownership map, not a history of earlier designs.
 | `transport.js` | Transient Context and Playback state, observation policy, requested-rate policy, and retry/wrap rebasing |
 | `youtube.js` | YouTube player construction, actual media snapshots, actual-rate events, and adapter commands |
 | `step-gesture.js` | Step press, repeat, release, and one-transaction gesture timing |
-| `panorama-frame.js` | Pure Field Frame ownership, identity, direction, and transition descriptions |
-| `panorama-geometry.js` | Pure Field offsets, cycling phases, bounds, and rate pairs |
-| `panorama.js` | Tail/Lead players, placement, Field transitions, Cycle runtime, Hold, and stale-event rejection |
+| `panorama-frame.js` | Pure Panorama Frame ownership, identity, direction, and transition descriptions |
+| `panorama-geometry.js` | Pure Panorama offsets, cycling phases, bounds, and rate pairs |
+| `panorama.js` | Tail/Lead players, placement, Panorama transitions, Cycle runtime, Hold, and stale-event rejection |
 | `cues.js` | Parsing offered chapter Addresses into transient candidate extents |
 | `user-time.js` | The append-only encounter ledger: traversal records, the frozen readable stream, read cursors, and Ghost injection |
 | `view.js` | DOM projection, timeline atmosphere and sourceGridLines, Guide rows, operator labels, and accessible state |
 | `app.js` | Composition, interaction acquisition, source generations, persistence, transient ownership, and adapter effects |
 
 The pure semantic modules do not read the DOM or issue media commands. The
-Field controller receives resolved source Addresses; it does not import Guide
+Panorama controller receives resolved source Addresses; it does not import Guide
 topology or operator arithmetic. The YouTube adapter is the only module that
 constructs `YT.Player`.
 
@@ -185,7 +185,7 @@ Guide persistence is source-keyed under version 10. Older version 1–8 records
 are migrated through the Guide kernel; valid current records round-trip without
 changing identity. User preferences have a separate versioned key and include
 Step Reach, Nudge, Context, Shift playback, Panorama settings, and pane
-visibility. Deformation bypass, open surfaces, selections, Cues, and Field
+visibility. Deformation bypass, open surfaces, selections, Cues, and Panorama
 runtime are transient.
 
 Guide loading returns an explicit recovery result:
@@ -225,7 +225,7 @@ of the old source in one place. It cancels Current, Pin, Section, and Range
 drags to their origins; settles Nudge and pending Step; safely settles active
 Context or Playback; persists settled Guide changes; clears native Go and
 programmatic placement; closes transient dialogs and Pin clusters; clears Cues,
-selection, Guide focus, Shift latches, Field runtime, and deformation bypass;
+selection, Guide focus, Shift latches, Panorama runtime, and deformation bypass;
 then creates a fresh Session and cues the new source. Player errors use the same
 boundary. No source Address, identity, timer, or history checkpoint may cross it.
 
@@ -326,15 +326,15 @@ The centered parent overlay is non-blocking. Only its compact Play/Panorama
 button receives pointer events, leaving native YouTube seek, captions, settings,
 volume, and fullscreen controls reachable while paused or idle.
 
-## Field Frame and Field Cycle
+## Panorama Frame and Panorama Cycle
 
-Outside ordinary playback, the application resolves one Field Frame per
+Outside ordinary playback, the application resolves one Panorama Frame per
 semantic movement. Ownership priority is direct manipulation, then enabled
 Context framing, then the last applicable operator. Step is the default;
 Refine and Reopen show their next weighted midpoints; a selected Section shows
 Start/midpoint/End while Current owns that midpoint. Pin manipulation centers
 the Pin between weighted Step destinations, and Section manipulation supplies
-its exact three-point extent. The Field controller receives only those source
+its exact three-point extent. The Panorama controller receives only those source
 Addresses.
 
 `panorama-frame.js` gives each Frame a stable identity and direction. The runtime
@@ -342,7 +342,7 @@ uses opacity-only transitions and coalesces rapid movement; semantic commits do
 not wait for animation. Superseded media callbacks are rejected by current
 placement ownership.
 
-During ordinary Panorama playback, Frame ownership yields to Field Cycle. The
+During ordinary Panorama playback, Frame ownership yields to Panorama Cycle. The
 conservative default is:
 
 ```js
@@ -357,6 +357,6 @@ synchronization barrier, reverses only after every operational side arrives,
 and preserves phase through deliberate Hold/Stretch. Hold changes no semantic
 state or preference.
 
-Context, Step Reach, Field offsets, and Weight have separate owners. Context and
-live Field displacement remain source-time geometry. Weight affects only
+Context, Step Reach, Panorama offsets, and Weight have separate owners. Context and
+live Panorama displacement remain source-time geometry. Weight affects only
 Timeline-derived addresses and explicitly dynamic Playback.

@@ -4,13 +4,13 @@ import {
   PANORAMA_STATE,
   chooseNearestRate,
   derivePanorama,
-  resolveFieldPhase,
-  deriveObservedField
+  resolvePanoramaPhase,
+  deriveObservedPanorama
 } from "./panorama-geometry.js";
 import { createSession, saveExtentAsSection } from "./session.js";
 
 const targets = derivePanorama(50, { backward: 10, forward: 10, linked: true }, { start: 0, end: 100 });
-const unfolding = deriveObservedField({
+const unfolding = deriveObservedPanorama({
   targets,
   phase: PANORAMA_STATE.UNFOLDING,
   centerAddress: 54,
@@ -27,7 +27,7 @@ assert.deepEqual(unfolding.span, {
   held: false
 });
 
-const held = deriveObservedField({
+const held = deriveObservedPanorama({
   targets: derivePanorama(60, { backward: 10, forward: 10, linked: true }, { start: 0, end: 100 }),
   phase: PANORAMA_STATE.HELD,
   centerAddress: 60,
@@ -43,7 +43,7 @@ assert.equal(chooseNearestRate([0.25, 0.5, 1, 1.5, 2], 0.6), 0.5);
 assert.equal(chooseNearestRate([0.25, 0.5, 1, 1.5, 2], 1.8), 2);
 assert.equal(chooseNearestRate([1], 0.5), 1);
 
-assert.equal(resolveFieldPhase({
+assert.equal(resolvePanoramaPhase({
   enabled: true,
   suspended: false,
   sides: [
@@ -51,7 +51,7 @@ assert.equal(resolveFieldPhase({
     { visible: true, available: true, held: true, offset: 0 }
   ]
 }), PANORAMA_STATE.COINCIDENT, "Held zero-offset sides remain physically coincident.");
-assert.equal(resolveFieldPhase({
+assert.equal(resolvePanoramaPhase({
   enabled: true,
   suspended: false,
   sides: [
@@ -61,17 +61,17 @@ assert.equal(resolveFieldPhase({
 }), PANORAMA_STATE.HELD);
 
 let session = createSession({ duration: 100, current: 50 });
-const retained = saveExtentAsSection(session, { start: 40, end: 60 }, "Field reading", "field-span");
+const retained = saveExtentAsSection(session, { start: 40, end: 60 }, "Panorama reading", "field-span");
 assert.equal(retained.changed, true);
 session = retained.session;
-assert.equal(session.model.activeSpan, null, "Retaining a Field span must not manufacture a movement Interval.");
+assert.equal(session.model.activeSpan, null, "Retaining a Panorama span must not manufacture a movement Interval.");
 assert.equal(session.model.guide.sections.length, 1);
 assert.equal(session.model.guide.pins.length, 2);
 assert.equal(session.model.guide.sections[0].provenance, "field-span");
 
 const html = readFileSync("index.html", "utf8");
 const app = readFileSync("app.js", "utf8");
-const fieldSource = readFileSync("panorama.js", "utf8");
+const panoramaSource = readFileSync("panorama.js", "utf8");
 const css = readFileSync("panorama-layout.css", "utf8");
 const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 
@@ -84,7 +84,7 @@ for (const id of [
   "section-retain-form", "section-source", "pin-retain-form", "pin-current",
   "release", "retain", "focus-toggle", "shift-layer-toggle",
   "step-size-seconds", "step-mode-fixed", "step-mode-adaptive"
-]) assert.match(html, new RegExp(`id=["']${id}["']`), `Missing Field/Guide control: ${id}`);
+]) assert.match(html, new RegExp(`id=["']${id}["']`), `Missing Panorama/Guide control: ${id}`);
 
 assert.match(app, /function applyPlayerEffect\(result[\s\S]*result\?\.activeSpan[\s\S]*startContext\(destination\)/,
   "Committed traversal must invoke automatic Context when enabled.");
@@ -99,7 +99,7 @@ assert.match(
   "Every proper Range must be the stable playback loop operand."
 );
 assert.match(app, /function wrapPlaybackRange\([\s\S]*rebasePlaybackTransport\(transport,\s*range\.start\)[\s\S]*placePlayer\(range\.start\)[\s\S]*resumeAt[\s\S]*player\.play\(\)/,
-  "Range wrap must rebase the Field without a Session transaction.");
+  "Range wrap must rebase the Panorama without a Session transaction.");
 assert.doesNotMatch(app, /createLoopTransport|TRANSPORT_KIND\.LOOP|data-loop-section/);
 assert.doesNotMatch(
   app,
@@ -108,9 +108,9 @@ assert.doesNotMatch(
 );
 assert.match(app, /saveExtentAsSection/);
 assert.doesNotMatch(app, /createSkimTransport|completeSkim|reachSkimDestination/);
-assert.match(fieldSource, /FIELD_SIDE_MODE/);
+assert.match(panoramaSource, /FIELD_SIDE_MODE/);
 assert.match(
-  fieldSource,
+  panoramaSource,
   /function stretch\(role = "both"\)[\s\S]*suspendedNow = suspensionRequired\(snapshot\)[\s\S]*resumeCycle\(runtime\.cycle[\s\S]*beginStretch\(sides\[name\], center, snapshot, \{ play: centerRunning && !suspendedNow \}\)/,
   "Stretch must use live suspension state and resume the cycling cycle from its attained relation."
 );
@@ -118,23 +118,23 @@ assert.match(
 // returning after Center played alone. It restarts the phase, which is what
 // makes an ordinary Weight-bucket change -- which never arrives here -- keep its
 // direction, its offset and its deadline.
-assert.match(fieldSource, /function startCycleCycle\(center, snapshot[\s\S]*restartPanoramaCycle\(runtime\.cycle, configured, now\(\)\)[\s\S]*Math\.min\(bounds\.inner, bounds\.outer\)/,
+assert.match(panoramaSource, /function startCycleCycle\(center, snapshot[\s\S]*restartPanoramaCycle\(runtime\.cycle, configured, now\(\)\)[\s\S]*Math\.min\(bounds\.inner, bounds\.outer\)/,
   "A discontinuity must begin a fresh cycle leg at the inner boundary and expand outward.");
-assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*(?:adapter\?\.place|adapter\?\.cue)[\s\S]*side\.adapter\?\.play/,
+assert.match(panoramaSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*(?:adapter\?\.place|adapter\?\.cue)[\s\S]*side\.adapter\?\.play/,
   "Every running cycle must prime its side at 1× before directional-rate discovery.");
-assert.doesNotMatch(fieldSource, /onHoldOffsets/,
+assert.doesNotMatch(panoramaSource, /onHoldOffsets/,
   "Hold and Stretch must never persist a measured runtime offset.");
 assert.doesNotMatch(app, /onHoldOffsets:/,
   "The application must not expose a Hold-to-configuration write path.");
-assert.match(app, /function changeFieldBoundary[\s\S]*state\.panoramaCycle = normalizePanoramaCycle/,
-  "Only explicit Inner/Outer Offset input may update the configured Field relation.");
-assert.doesNotMatch(app, /state\.fieldOffsets\s*=/,
+assert.match(app, /function changePanoramaBoundary[\s\S]*state\.panoramaCycle = normalizePanoramaCycle/,
+  "Only explicit Inner/Outer Offset input may update the configured Panorama relation.");
+assert.doesNotMatch(app, /state\.panoramaOffsets\s*=/,
   "Two independent side Offsets are replaced by one bounded cycling relation.");
-assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*side\.adapter\?\.play/,
+assert.match(panoramaSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*side\.adapter\?\.play/,
   "Side playback must prime at 1× inside the same Stretch transition.");
-assert.match(fieldSource, /function driveField\(center, centerDelta, snapshot, centerRunning\)[\s\S]*advanceCycle\(runtime\.cycle/,
-  "The whole Field cycles as one relation, so the state machine advances once per tick.");
-assert.match(fieldSource, /function driveSide\(role, center, snapshot, centerRunning, cycleSide, participation\)[\s\S]*ensureSidePlaying\(side\);\s*requestSideRateStep\(side, cycleSide\.rate\)/,
+assert.match(panoramaSource, /function drivePanorama\(center, centerDelta, snapshot, centerRunning\)[\s\S]*advanceCycle\(runtime\.cycle/,
+  "The whole Panorama cycles as one relation, so the state machine advances once per tick.");
+assert.match(panoramaSource, /function driveSide\(role, center, snapshot, centerRunning, cycleSide, participation\)[\s\S]*ensureSidePlaying\(side\);\s*requestSideRateStep\(side, cycleSide\.rate\)/,
   "Cycling rate must be requested only after a side is running and its capabilities are observable.");
 assert.match(css, /data-phase="unfolding"/);
 assert.match(css, /data-phase="held"/);
@@ -142,4 +142,4 @@ assert.match(css, /panorama-window-fill/);
 assert.match(packageJson.scripts.test, /panorama-layout-tests\.mjs/);
 assert.match(packageJson.scripts.check, /panorama-geometry\.js/);
 
-console.log("Field grammar tests passed: automatic Context, independent Hold/Stretch offsets, Range looping, side Step, and Guide retention.");
+console.log("Panorama grammar tests passed: automatic Context, independent Hold/Stretch offsets, Range looping, side Step, and Guide retention.");

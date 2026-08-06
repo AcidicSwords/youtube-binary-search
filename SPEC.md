@@ -42,7 +42,7 @@ Preferences may persist independently from a source:
 
 - Context duration;
 - Step Reach mode and values;
-- Field Inner Offset, Outer Offset, and cycling-rate spread;
+- Panorama Inner Offset, Outer Offset, and cycling-rate spread;
 - Nudge quantum when no exact media frame is available;
 - Shift playback fixed wish and dynamic-policy choice;
 - Panorama enabled state and side visibility.
@@ -64,7 +64,7 @@ The following are intentionally absent from Session history and Guide persistenc
 - deformation bypass;
 - offered Cues and Cue-lane visibility;
 - open panels, dialogs, cluster menus, hover, focus, and preview state;
-- Field Frame transition revision, Field Cycle phase, and side-player synchronization.
+- Panorama Frame transition revision, Panorama Cycle phase, and side-player synchronization.
 
 Each transient has one owner and one settlement or cancellation boundary. A timer cannot checkpoint state after its source or gesture owner has changed.
 
@@ -345,7 +345,7 @@ Release clears:
 - the Active Span, if present;
 - the acquired Timeline operand.
 
-It preserves Current, Resolution, Range and Focus, Guide focus, Pins, Sections, Groups, Weight, deformation bypass, Field preferences, and playback preferences.
+It preserves Current, Resolution, Range and Focus, Guide focus, Pins, Sections, Groups, Weight, deformation bypass, Panorama preferences, and playback preferences.
 
 Clearing a semantic Active Span creates one Undoable Session transaction. Clearing only presentation selection succeeds without history.
 
@@ -385,7 +385,7 @@ A Guide destination outside a focused Range may leave Focus or open Full Video a
 
 Every semantic operator commits the smallest complete transaction. Undo restores the checkpoint immediately before it; Redo restores the displaced state. A new semantic transaction clears the Redo future.
 
-Metadata-only presentation, deformation bypass, panel state, previews, Cues, transport ticks, rate events, Field Cycle, and playback wraps do not enter Session history. A changed Guide transaction is persisted after acceptance when recovery permits safe writing.
+Metadata-only presentation, deformation bypass, panel state, previews, Cues, transport ticks, rate events, Panorama Cycle, and playback wraps do not enter Session history. A changed Guide transaction is persisted after acceptance when recovery permits safe writing.
 
 ## 6. Selection and direct manipulation
 
@@ -421,11 +421,11 @@ Section wire roles come from its end regions and middle. The Timeline does not d
 
 A click that does not cross the drag threshold remains a click. Drag settlement suppresses the synthetic trailing click. Each gesture captures its origin model, history, future, and effective projection; cancellation restores that origin exactly.
 
-Pin and Section manipulation previews through the Field. A Pin uses its Step neighborhood; a Section uses its Start, midpoint, and End. Active Span bounds that coincide with a moved Pin follow the same canonical Pin transaction.
+Pin and Section manipulation previews through the Panorama. A Pin uses its Step neighborhood; a Section uses its Start, midpoint, and End. Active Span bounds that coincide with a moved Pin follow the same canonical Pin transaction.
 
 ### Current drag and Nudge as Step
 
-Dragging Current is Step, not Go. Pointer movement changes only a candidate and Field preview; Session Current remains at departure until commit. Release converts the source candidate into an equivalent effective Timeline distance and commits one Step gesture. A stationary press is a no-op. Cancellation restores the origin.
+Dragging Current is Step, not Go. Pointer movement changes only a candidate and Panorama preview; Session Current remains at departure until commit. Release converts the source candidate into an equivalent effective Timeline distance and commits one Step gesture. A stationary press is a no-op. Cancellation restores the origin.
 
 This law preserves the established residue: moving Current extends or shortens the same traversal instead of inventing a fresh neighborhood around the landing point. Bare Timeline Go is the distinct route for that goal.
 
@@ -449,7 +449,7 @@ When the adapter proves an exact frame duration, that duration is the quantum an
 Guide Address fields accept finite seconds or valid `MM:SS` / `HH:MM:SS` timecode. Non-leading timecode fields must be below 60. Exact Address fields reject anything outside
 Range, any collapsed/reversed Section geometry, and any invalid structural relation. They never silently substitute a boundary value for the typed value.
 
-Typing a valid candidate may preview it through the same Field Frame as a drag. Commit routes through `moveGuidePin` or `moveGuideSection` and one checkpoint. Guide decrement/increment controls route through Nudge and repeat while held.
+Typing a valid candidate may preview it through the same Panorama Frame as a drag. Commit routes through `moveGuidePin` or `moveGuideSection` and one checkpoint. Guide decrement/increment controls route through Nudge and repeat while held.
 
 ### 6.3 Guide composition and Carry
 
@@ -457,11 +457,11 @@ A plain Guide click replaces the working relation with the clicked Pin or Sectio
 
 Alt with a spatial navigation operator may Carry the acquired Timeline Pin or Section by the same effective Timeline-space displacement as Current. Structural and source bounds clip or refuse the retained-object movement without changing the underlying navigation law. Carry is optional and creates no second operator family.
 
-## 7. Panoramic Phase Field
+## 7. Panoramic Phase Panorama
 
-### Field Frame
+### Panorama Frame
 
-The Field Frame is the stable Tail–Center–Lead presentation outside ordinary Panorama playback. It is a projection of canonical or direct-manipulation state, never a second semantic model.
+The Panorama Frame is the stable Tail–Center–Lead presentation outside ordinary Panorama playback. It is a projection of canonical or direct-manipulation state, never a second semantic model.
 
 Every valid Frame satisfies:
 
@@ -478,7 +478,7 @@ Frame ownership has one priority order:
 1. active direct manipulation supplies its exact candidate Frame;
 2. otherwise enabled Context supplies its bounded Context Frame;
 3. otherwise the last applicable operator supplies its Frame;
-4. ordinary playback hands presentation to Field Cycle rather than Field Frame.
+4. ordinary playback hands presentation to Panorama Cycle rather than Panorama Frame.
 
 Operator Frames use the effective projection:
 
@@ -501,9 +501,9 @@ When Context duration is positive, Context owns Tail and Lead before, during, an
 
 Tail is the first Context Address, Lead is the last, and Center is Current while idle or Cursor while running. Starting, pausing, stopping, or settling Context does not reassign the edges. Setting Context duration to zero returns ownership to operator framing.
 
-### Field Cycle
+### Panorama Cycle
 
-Field Cycle is the live Tail/Lead relation during ordinary Panorama playback. Its configured relation is:
+Panorama Cycle is the live Tail/Lead relation during ordinary Panorama playback. Its configured relation is:
 
 ```text
 0 < Inner Offset x < Outer Offset y
@@ -532,17 +532,17 @@ outward Lead = Center × (1 + rate)
 
 During contraction the side roles exchange. A side reaching a boundary first follows Center at Center rate while preserving the attained offset. When every operational side reaches the same boundary, the phase reverses. A collapsed, hidden, unavailable, or Range-clipped side is excluded from this synchronization barrier. If a side has less room than Inner Offset, the minimum is not reduced; the side is parked within available room and does not cycle.
 
-Hold freezes attained offsets, clears waiting state, and places held sides at Center rate without rewriting the configured bounds or phase direction. Stretch resumes from that exact relation. Field Hold and Cycle phase create no Session checkpoint.
+Hold freezes attained offsets, clears waiting state, and places held sides at Center rate without rewriting the configured bounds or phase direction. Stretch resumes from that exact relation. Panorama Hold and Cycle phase create no Session checkpoint.
 
-Field runtime suspends while Context, pending Step, direct manipulation, or an incompatible Playback policy/actual rate owns observation. Stale side-player events cannot revive a hidden, collapsed, unavailable, or superseded side.
+Panorama runtime suspends while Context, pending Step, direct manipulation, or an incompatible Playback policy/actual rate owns observation. Stale side-player events cannot revive a hidden, collapsed, unavailable, or superseded side.
 
 ## 8. Context and Playback
 
 ### 8.1 Context transport
 
-Context is transient source-contiguous Center observation around a semantic anchor. It plays at `1×` from its clipped start toward its clipped end, leaves Current unchanged, and keeps the Context Field Frame stable. A following semantic command may replace it without creating an intermediate history entry.
+Context is transient source-contiguous Center observation around a semantic anchor. It plays at `1×` from its clipped start toward its clipped end, leaves Current unchanged, and keeps the Context Panorama Frame stable. A following semantic command may replace it without creating an intermediate history entry.
 
-Context duration and Field offsets are independent. Similar numeric displacement does not create shared state ownership.
+Context duration and Panorama offsets are independent. Similar numeric displacement does not create shared state ownership.
 
 ### 8.2 Explicit Playback ownership
 
@@ -575,7 +575,7 @@ ratePolicy = configured fixed wish or dynamic
 
 Observation policy does not derive from numeric rate. A fixed Shift wish that resolves to `1×` remains Center only.
 
-A native Center Play event may create an ordinary Panorama Playback session at the adapter’s actual native rate. If that actual rate is incompatible with the fixed side relation, the Field suspends; ordinary Center playback continues.
+A native Center Play event may create an ordinary Panorama Playback session at the adapter’s actual native rate. If that actual rate is incompatible with the fixed side relation, the Panorama suspends; ordinary Center playback continues.
 
 ### 8.3 Rate authority
 
@@ -585,7 +585,7 @@ Three rate facts remain distinct:
 - **requested** — the nearest currently offered rate sent to the adapter;
 - **actual** — the rate confirmed by the adapter’s playback-rate event.
 
-The actual-rate event updates only transport runtime and Field availability. It creates no new semantic Playback transaction.
+The actual-rate event updates only transport runtime and Panorama availability. It creates no new semantic Playback transaction.
 
 Fixed wishes resolve against positive offered rates in logarithmic distance, because rate distance is multiplicative. An exact tie prefers the offer nearer `1×`, then a deterministic numeric tie. If available rates expand, the fixed wish is retained and an active fixed Shift playback retunes when a closer offer appears.
 
@@ -722,7 +722,7 @@ Before cueing a new identity, one boundary resolves every old-source owner:
 - clear native Go, programmatic placement, player-pause claims, and metadata retry;
 - close dialogs and Pin-cluster menus;
 - persist safe settled Guide changes;
-- clear Cues, Timeline selection, Guide focus, aligned Pins, Shift layers, direct preview, Field runtime, and deformation bypass;
+- clear Cues, Timeline selection, Guide focus, aligned Pins, Shift layers, direct preview, Panorama runtime, and deformation bypass;
 - reset source identity, Session, transport, offers, and physical side sources;
 - only then cue the new source.
 
@@ -749,7 +749,7 @@ Previews are dry runs or pure projections. They cannot maintain parallel target 
 The following are release invariants:
 
 - source time is the only stored temporal coordinate;
-- Range, Resolution, Active Span, Pins, Sections, Context, and Field Frames remain source-contiguous;
+- Range, Resolution, Active Span, Pins, Sections, Context, and Panorama Frames remain source-contiguous;
 - effective Timeline density is always positive;
 - source↔Timeline mapping is continuous and invertible;
 - at most one Group is drawn, while any number may be active;
@@ -764,7 +764,7 @@ The following are release invariants:
 - each gesture owner creates at most one Undo checkpoint;
 - source generations and transition boundary prevent cross-source state;
 - damaged Guide evidence is never overwritten without successful preservation;
-- new Field defaults do not overwrite valid saved settings or restrict available settings;
+- new Panorama defaults do not overwrite valid saved settings or restrict available settings;
 - advanced layers can be ignored without making the ordinary player incomplete.
 
 The complete release proof is a clean locked install followed by:

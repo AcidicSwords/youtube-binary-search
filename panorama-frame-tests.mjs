@@ -6,11 +6,11 @@ import {
   contextFrame,
   operatorFrame,
   directFrame,
-  resolveFieldFrame,
+  resolvePanoramaFrame,
   framesEqual,
   frameIdentity,
   frameTransition,
-  createFieldFrameSequencer
+  createPanoramaFrameSequencer
 } from "./panorama-frame.js";
 
 const range = { start: 0, end: 100 };
@@ -70,7 +70,7 @@ const range = { start: 0, end: 100 };
   assert.equal(directFrame({ kind: "made-up", start: 1, center: 2, end: 3, range }), null);
   assert.equal(directFrame({ kind: "pin", center: 2, end: 3, range }), null,
     "An incomplete direct request cannot acquire Frame ownership.");
-  assert.equal(resolveFieldFrame(null), null);
+  assert.equal(resolvePanoramaFrame(null), null);
 }
 
 // Transitions
@@ -89,7 +89,7 @@ const range = { start: 0, end: 100 };
 
 // Sequencer: one revision per semantic movement
 {
-  const sequencer = createFieldFrameSequencer();
+  const sequencer = createPanoramaFrameSequencer();
   const a = sequencer.resolve({ kind: "step", center: 20, backward: 10, forward: 30, range });
   assert.equal(a.revision, 1);
   assert.equal(a.direction, FIELD_FRAME_DIRECTION.NONE, "The first Frame has no prior position.");
@@ -110,7 +110,7 @@ const range = { start: 0, end: 100 };
 
 // Rapid same-direction traversal reads as one continuing slideshow
 {
-  const sequencer = createFieldFrameSequencer();
+  const sequencer = createPanoramaFrameSequencer();
   const centers = [10, 20, 30, 40, 50];
   const seen = centers.map(center =>
     sequencer.resolve({ kind: "step", center, backward: center - 10, forward: center + 10, range })
@@ -123,13 +123,13 @@ const range = { start: 0, end: 100 };
   assert.deepEqual(
     [seen.at(-1).tail, seen.at(-1).center, seen.at(-1).lead],
     [40, 50, 60],
-    "The Field settles on the latest resulting Frame."
+    "The Panorama settles on the latest resulting Frame."
   );
 }
 
 // Context beginning, moving and ending performs no side-frame reassignment
 {
-  const sequencer = createFieldFrameSequencer();
+  const sequencer = createPanoramaFrameSequencer();
   const before = sequencer.resolve({
     owner: FIELD_FRAME_OWNER.CONTEXT,
     start: 45,
@@ -162,7 +162,7 @@ const range = { start: 0, end: 100 };
 
 // Direct manipulation overrides, then one transition restores the ambient Frame
 {
-  const sequencer = createFieldFrameSequencer();
+  const sequencer = createPanoramaFrameSequencer();
   sequencer.resolve({ kind: "step", center: 50, backward: 40, forward: 60, range });
   const dragging = sequencer.resolve({
     owner: FIELD_FRAME_OWNER.DIRECT,
@@ -182,4 +182,4 @@ const range = { start: 0, end: 100 };
   assert.equal(sequencer.current(), null);
 }
 
-console.log("Field Frame tests passed: ownership priority, stable identity, directional transitions, Context edge persistence, and direct-manipulation validation.");
+console.log("Panorama Frame tests passed: ownership priority, stable identity, directional transitions, Context edge persistence, and direct-manipulation validation.");

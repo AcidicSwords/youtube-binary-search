@@ -19,7 +19,7 @@ await flush(5);
 assert.equal(currentText(), "Current 0:00");
 assert.equal(byId.get("duration-time").textContent, "1:40");
 
-// New shipped defaults never replace an existing valid Field preference. A
+// New shipped defaults never replace an existing valid Panorama preference. A
 // non-preset spread remains a real selectable option and the summary derives
 // the same symmetric rate pair the runtime actually uses.
 assert.equal(byId.get("field-inner-offset").value, "3");
@@ -29,7 +29,7 @@ assert.equal(byId.get("panorama-setting-value").textContent, "3–12 s · 0.6× 
 assert.deepEqual(
   JSON.parse(env.localStorage.values.get("binary-youtube-reader:preferences:v1")).panoramaCycle,
   savedPanoramaCycle,
-  "Booting with new defaults must not rewrite a valid saved Field relation."
+  "Booting with new defaults must not rewrite a valid saved Panorama relation."
 );
 await poll();
 await flush();
@@ -61,7 +61,7 @@ await flush();
 const cycleOptions = descendants(byId.get("field-cycle-rate"))
   .map(option => option.textContent);
 assert.deepEqual(cycleOptions, ["0.75× / 1.25×", "0.6× / 1.4×", "0.5× / 1.5×", "0.25× / 1.75×"],
-  "The Field exposes one symmetric cycling-rate pair per step.");
+  "The Panorama exposes one symmetric cycling-rate pair per step.");
 assert.equal(byId.get("field-cycle-rate").value, "0.4");
 byId.get("field-cycle-rate").value = "0.5";
 byId.get("field-cycle-rate").dispatch("change");
@@ -70,7 +70,7 @@ await poll();
 assert.equal(byId.get("field-cycle-rate").value, "0.5");
 
 // 0 < inner < outer holds strictly. An inner offset that reaches the outer one
-// describes a Field with no cycle, so it is repaired to the midpoint rather
+// describes a Panorama with no cycle, so it is repaired to the midpoint rather
 // than accepted as equal.
 byId.get("field-inner-offset").value = "40";
 byId.get("field-inner-offset").dispatch("change");
@@ -543,14 +543,14 @@ assert.equal(lead.currentTime, 50, "Lead must preview the selected Section end."
 assert.equal(byId.get("center-transport-surface").disabled, false);
 assert.equal(tail.playerVars.controls, 0);
 assert.equal(lead.playerVars.controls, 0);
-assert.equal(tail.createdWhileFieldOff, false, "Tail must be created only after its pane is measurable.");
-assert.equal(lead.createdWhileFieldOff, false, "Lead must be created only after its pane is measurable.");
+assert.equal(tail.createdWhilePanoramaOff, false, "Tail must be created only after its pane is measurable.");
+assert.equal(lead.createdWhilePanoramaOff, false, "Lead must be created only after its pane is measurable.");
 assert.match(String(tail.iframe.allow || ""), /autoplay/, "Tail iframe must explicitly receive autoplay permission.");
 assert.match(String(lead.iframe.allow || ""), /autoplay/, "Lead iframe must explicitly receive autoplay permission.");
 assert.ok(tail.commands.some(command => command[0] === "cue"), "Tail must use cue only for pre-activation placement.");
 assert.ok(lead.commands.some(command => command[0] === "cue"), "Lead must use cue only for pre-activation placement.");
 
-// A retained Section is one object in Guide, Timeline, and Field. Selecting its
+// A retained Section is one object in Guide, Timeline, and Panorama. Selecting its
 // Guide row establishes its exact Extent and returns Current to the midpoint.
 // Dragging either endpoint in Guide moves by relative Timeline distance and
 // previews the Section as Tail=start, Center=midpoint, Lead=end.
@@ -686,7 +686,7 @@ assert.equal(
 );
 
 // The profile is the whole-Section handle. Its preview translates all three
-// viewer addresses together; cancelling restores both the Guide and Field.
+// viewer addresses together; cancelling restores both the Guide and Panorama.
 selectedSectionMain = descendants(byId.get("sections-list"))
   .find(node => node.dataset.sectionGo);
 byId.get("sections-list").dispatch("click", { target: selectedSectionMain });
@@ -753,7 +753,7 @@ assert.equal(byId.get("tail-restore").hidden, true);
 
 // One parent-page click refolds both sides to Center and requests Tail, Center,
 // and Lead synchronously. It is a fresh Stretch regardless of the prior held
-// geometry; the semantic Interval remains untouched while the Field forms.
+// geometry; the semantic Interval remains untouched while the Panorama forms.
 center.currentTime = 50;
 const intervalBeforeStretch = byId.get("section-window").textContent;
 const playCounts = {
@@ -770,7 +770,7 @@ assert.deepEqual(lead.commands.slice(-2).map(command => command[0]), ["place", "
 await flush();
 assert.equal(byId.get("center-transport-surface").hidden, true, "Native Center controls must be exposed while ordinary playback is running.");
 
-// The Field forms from authoritative Center progression. Tail and Lead use
+// The Panorama forms from authoritative Center progression. Tail and Lead use
 // confirmed directional rates, while Hold freezes the measured visible frame.
 for (let elapsed = 1; elapsed <= 8; elapsed += 1) {
   center.currentTime = 50 + elapsed;
@@ -778,7 +778,7 @@ for (let elapsed = 1; elapsed <= 8; elapsed += 1) {
   lead.currentTime = 50 + elapsed * 2;
   await poll();
 }
-// The Field cycles outward from its inner offset: Tail falls behind Center at
+// The Panorama cycles outward from its inner offset: Tail falls behind Center at
 // z < c while Lead advances at w > c, and both stay inside [x, y].
 //
 // The offset opens against the wall clock rather than against elapsed Center
@@ -794,7 +794,7 @@ await poll();
 await flush();
 const tailOffsetText = byId.get("tail-offset-state").textContent;
 assert.notEqual(tailOffsetText, offsetBeforeCycleing,
-  "A second of real time opens the Field.");
+  "A second of real time opens the Panorama.");
 assert.equal(tailOffsetText, byId.get("lead-offset-state").textContent,
   "and both sides stay equally displaced from Center.");
 assert.match(tailOffsetText, /in 2\.5s–10s$/, "inside the configured bounds.");
@@ -806,7 +806,7 @@ assert.equal(byId.get("section-window").textContent, intervalBeforeStretch,
 // held side to Center rate, and writes no configuration and no Session state.
 byId.get("field-both-toggle").click();
 await flush();
-assert.equal(center.state, 1, "Holding the Field must not interrupt Center playback.");
+assert.equal(center.state, 1, "Holding the Panorama must not interrupt Center playback.");
 assert.equal(tail.rate, 1, "Every held side matches Center at 1x.");
 assert.equal(lead.rate, 1);
 assert.equal(byId.get("field-both-toggle-label").textContent, "Stretch both");
@@ -1225,4 +1225,4 @@ assert.equal(env.document.activeElement, null, "Pointer activation must not leav
   );
 }
 
-console.log("Interaction smoke passed: direct T/Shift+T tagging, retained Section editing, spatial Pin unlink/link, Timeline Section node dragging, Guide exact Address editing, operational clustered Pins, Shift Pin traversal, local Refine preview, unsaved Working Focus, Switch involution, Undo/Redo ownership, composable Step intervals, shared activation, bounded Field cycling, immutable configured offsets, whole-Field side Step, universal Space playback, and coherent focus release.");
+console.log("Interaction smoke passed: direct T/Shift+T tagging, retained Section editing, spatial Pin unlink/link, Timeline Section node dragging, Guide exact Address editing, operational clustered Pins, Shift Pin traversal, local Refine preview, unsaved Working Focus, Switch involution, Undo/Redo ownership, composable Step intervals, shared activation, bounded Panorama cycling, immutable configured offsets, whole-Panorama side Step, universal Space playback, and coherent focus release.");

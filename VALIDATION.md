@@ -57,7 +57,7 @@ The complete gate must prove all of the following.
   scope transfers the one active bypass.
 - Deleting the target or replacing the source clears bypass. An active drag
   safely refuses `X`; pending Step/Nudge settles first.
-- `X` issues no direct player command. Fixed Playback and Field configuration
+- `X` issues no direct player command. Fixed Playback and Panorama configuration
   remain unchanged; only explicitly dynamic Playback may retune from the new
   effective map.
 
@@ -129,7 +129,7 @@ rewrite-refusal coverage.
   identity and current generation must both match.
 - Replacing a source during Nudge, Step, Current/Pin/Section/Range drag,
   Playback, Context, or deformation bypass leaves no old-source Address,
-  identity, timer, Field owner, or history checkpoint in the fresh Session.
+  identity, timer, Panorama owner, or history checkpoint in the fresh Session.
 - The old semantic Guide is persisted only after pending ownership is resolved.
 - An unreadable current Guide plus valid older fallback preserves the unreadable
   evidence before migration can rewrite the current key.
@@ -138,7 +138,7 @@ rewrite-refusal coverage.
   recovery and never claims evidence was preserved when it was not.
 - A present empty-string current record is unreadable evidence, not absence; it
   is quarantined exactly before an older valid record may be promoted.
-- Valid saved preferences survive unchanged; a legacy Field preference migrates
+- Valid saved preferences survive unchanged; a legacy Panorama preference migrates
   deterministically.
 
 ### Groups, modifiers, Nudge, and Step reversal
@@ -162,7 +162,7 @@ rewrite-refusal coverage.
   creates one `Step Reversal` history entry and retains the visited contiguous
   envelope; no persistent Path remains.
 
-### Field
+### Panorama
 
 - With no saved preference, defaults are exactly `0.25–2.5 s` and
   Tail/Center/Lead `0.75× / 1× / 1.25×`.
@@ -179,7 +179,7 @@ rewrite-refusal coverage.
 - A turn reports the direction it is heading in, not the one it arrived by, so
   a leg resumed at a fully attained bound contracts immediately rather than
   depending on how much wall clock has passed since the resume.
-- Field Off, collapsed panes, Center-only Playback, Context, and incompatible
+- Panorama Off, collapsed panes, Center-only Playback, Context, and incompatible
   actual rate keep side players dormant. Hold/Stretch changes no preference,
   Guide, Step Reach, Weight, or history.
 
@@ -199,7 +199,7 @@ rewrite-refusal coverage.
 Use a current Chromium build, an embeddable YouTube video with ordinary controls,
 and a desktop viewport near 1440p. Also inspect a compact viewport, a coarse
 pointer if available, reduced motion, a proper sub-Range, dense overlapping
-Sections, and a Pin cluster. Begin with the conservative Field defaults unless a
+Sections, and a Pin cluster. Begin with the conservative Panorama defaults unless a
 journey says otherwise.
 
 ### Journey A — ordinary player
@@ -210,7 +210,7 @@ journey says otherwise.
 4. With focus on reader background, play and pause with Space.
 5. Focus an application button and press Space; the focused control must keep
    its native activation instead of starting playback behind it.
-6. Confirm no Guide, operator, Field side, Weight, or Focus setup is required to
+6. Confirm no Guide, operator, Panorama side, Weight, or Focus setup is required to
    use the application as an ordinary player.
 7. Set a Section's Weight from the Guide, tick a Group's visibility box, then
    press an operator hotkey without clicking anything else; it must act on the
@@ -272,7 +272,7 @@ activity.
 Accept when the contextual control and `X` agree, the action lives inside
 Operators outside the matrix, and no Timeline-header control duplicates it.
 
-### Journey E — Field
+### Journey E — Panorama
 
 1. Confirm the initial Parameters read `0.25–2.5 s` and
    `0.75× / 1× / 1.25×`.
@@ -284,11 +284,11 @@ Operators outside the matrix, and no Timeline-header control duplicates it.
 5. Start Shift playback at fixed `1×` and at another offered rate. Both are
    Center-only; ordinary plain playback restores Panorama policy.
 6. Refine, Reopen, Step, drag a Pin, and drag a Section while paused. Confirm
-   Tail/Center/Lead show the corresponding exact Field Frames. A gesture restores
+   Tail/Center/Lead show the corresponding exact Panorama Frames. A gesture restores
    the configured ambient owner: Context edges while Context is enabled, and the
    last applicable operator frame after Context is turned off.
 
-Accept when Context duration, Step Reach, Field offsets, Weight, and playback
+Accept when Context duration, Step Reach, Panorama offsets, Weight, and playback
 rate policy remain independent and no preview breaks live Cycle behavior.
 
 ### Journey F — source and recovery integrity
@@ -296,7 +296,7 @@ rate policy remain independent and no preview breaks live Cycle behavior.
 1. Begin an unsaved Nudge or Step sequence, then load another source. Repeat
    during a Section drag, Playback, Context, and active deformation bypass.
 2. Confirm the fresh source has no old Active Span, Guide identity,
-   selection, timer, transport, Field preview, Shift latch, or bypass.
+   selection, timer, transport, Panorama preview, Shift latch, or bypass.
 3. Rapidly request source A then source B. Allow late A events to arrive. Only B
    may initialize.
 4. Reopen the original source and confirm its settled Guide persisted.
@@ -355,7 +355,7 @@ zero or one Group is On Timeline; any number may be Active
 effective density is positive
 source-to-Timeline mapping is continuous, strictly increasing, and invertible
 Tail is behind Center and Lead is ahead whenever each side is operational
-Field offsets remain inside their effective Inner/Outer bounds
+Panorama offsets remain inside their effective Inner/Outer bounds
 source playback remains contiguous
 transport-only retry and wrap add no history
 one interaction gesture creates at most one checkpoint

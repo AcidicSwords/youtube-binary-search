@@ -118,7 +118,7 @@ assert.equal(byId.get("current-departure-marker").hidden, false,
 assert.equal(byId.get("current-marker").style.left, "65%",
   "The Current marker follows the candidate Timeline position.");
 assert.equal(byId.get("field-transport-state").textContent, "Current Frame",
-  "Direct manipulation temporarily supplies an exact Field Frame.");
+  "Direct manipulation temporarily supplies an exact Panorama Frame.");
 assert.equal(env.center().currentTime, 65, "Center displays the candidate frame.");
 // The drag commits a Step, so it must show the Step it will commit. Without a
 // live preview the Active Span and neighbourhood stand still under a
@@ -399,7 +399,7 @@ dispatchDocument("keydown", { key: "z", code: "KeyZ" });
 await flush();
 assert.equal(pinAddress(), "1:07", "One Guide nudge gesture is one Undo checkpoint.");
 
-// An Address input previews the candidate Field Frame before commit, and
+// An Address input previews the candidate Panorama Frame before commit, and
 // Escape cancels without writing Session state.
 const committedPinAddress = () => descendants(byId.get("pin-lane"))
   .find(node => node.dataset.pinGo)?.["aria-label"];
@@ -410,7 +410,7 @@ previewInput.value = "0:20";
 byId.get("pins-list").dispatch("input", { target: previewInput });
 await flush();
 assert.equal(byId.get("field-transport-state").textContent, "Pin Frame",
-  "Typing an Address previews the candidate Field Frame.");
+  "Typing an Address previews the candidate Panorama Frame.");
 assert.equal(env.center().currentTime, 20);
 assert.equal(committedPinAddress(), addressBeforePreview,
   "Previewing an Address writes no Session state.");
@@ -501,11 +501,11 @@ assert.equal(offMap.defaultPrevented, true,
 
 // A form control the pointer is over keeps its own wheel, and a plain wheel is
 // never claimed anywhere.
-const overField = dispatchDocument("wheel", {
+const overPanorama = dispatchDocument("wheel", {
   target: byId.get("context-seconds"), deltaY: -120, deltaX: 0, shiftKey: true
 });
 await flush(2);
-assert.ok(!overField.defaultPrevented,
+assert.ok(!overPanorama.defaultPrevented,
   "and a form control under the pointer keeps its own wheel.");
 const plainOffMap = dispatchDocument("wheel", {
   target: byId.get("status"), deltaY: -120, deltaX: 0

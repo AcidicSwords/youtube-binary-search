@@ -365,7 +365,7 @@
 }
 
 
-/* Directional Field transitions.
+/* Directional Panorama transitions.
 
    Every committed movement produces one transition from the currently displayed
    Frame to the next, and the semantic commit never waits for it: Session has
@@ -416,7 +416,7 @@
   to { opacity: 1; }
 }
 
-/* The Field cycles between its inner and outer offsets during ordinary
+/* The Panorama cycles between its inner and outer offsets during ordinary
    playback. The marker is informational; the relation itself is physical. */
 .panorama.is-cycling .center-field-summary strong {
   color: var(--accent, #79a8ff);

@@ -20,7 +20,7 @@ import {
   resolveOfferedRate,
   resolvePlaybackRate,
   retryPlaybackTransport,
-  transportFieldRange,
+  transportPanoramaRange,
   withPlaybackActualRate,
   withPlaybackRatePolicy,
   withPlaybackRequestedRate,
@@ -85,7 +85,7 @@ assert.equal(wrapped.startedAt, 1234);
 assert.equal(playback.cycles, 0, "Range wrap metadata is immutable and Session-independent");
 
 assert.deepEqual(
-  transportFieldRange(playback, { start: 40, end: 80 }),
+  transportPanoramaRange(playback, { start: 40, end: 80 }),
   { start: 40, end: 80 }
 );
 
@@ -174,7 +174,7 @@ const LADDER = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
     "and at the top there is no Lead.");
 
   // A missing neighbour suspends Panorama rather than substituting an
-  // asymmetric triplet, which would break the one relation the Field rests on.
+  // asymmetric triplet, which would break the one relation the Panorama rests on.
   assert.equal(panoramaTriplet(1, [0.5, 1, 1.25, 1.5]), null,
     "A ladder without 0.75x cannot hold a triplet at 1x.");
   assert.equal(panoramaTriplet(1, [0.5, 0.75, 1, 1.5]), null,

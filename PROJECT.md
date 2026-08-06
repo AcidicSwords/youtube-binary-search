@@ -3,14 +3,14 @@
 ## Canonical Project Establishment
 
 - **Category:** spatial comprehension workspace for video
-- **Primary surfaces:** Panoramic Phase Field · Temporal Topography · Guide · Operator Matrix
+- **Primary surfaces:** Panoramic Phase Panorama · Temporal Topography · Guide · Operator Matrix
 - **Tagline:** See the phases. Map the whole.
 
 Video Cartography turns a linear audiovisual source into a perceptually panoramic and spatially navigable environment without changing the source itself.
 
 Ordinary video is globally present but locally actualized: the complete sequence exists, while one source phase ordinarily occupies the audiovisual present. The project creates three complementary forms of availability:
 
-- the **Panoramic Phase Field** makes a bounded neighborhood of source phases perceptually co-present;
+- the **Panoramic Phase Panorama** makes a bounded neighborhood of source phases perceptually co-present;
 - the **Temporal Topography** makes the complete ordered source available as a navigable, positively deformable map;
 - the **Guide** makes discovered locations and relations persist as Pins and Sections.
 
@@ -40,15 +40,15 @@ The source is never edited. The application changes the environment through whic
 
 ## Source, Range, and the Active Span
 
-Every meaningful temporal value is a source Address. Duration, Range, Current, Cursor, Resolution, Active Span bounds, Pins, Sections, Context, and Field positions all remain in source time.
+Every meaningful temporal value is a source Address. Duration, Range, Current, Cursor, Resolution, Active Span bounds, Pins, Sections, Context, and Panorama positions all remain in source time.
 
 **Range** is the admissible source universe. A chain of navigation or search operations excludes alternatives from the current admissible relation. The **Active Span** is the positive, contiguous residue that survives those exclusions. It carries two source bounds, orientation, and endpoint viewpoints; it is not a persistent record of the traversed path.
 
 **Reopen** restores Range-level discrimination without discarding the residue. **Undo** restores prior semantic state. **Release** clears the active residue and the acquired Timeline operand while preserving Current, retained topology, Guide focus, Focus, Weight, and the current deformation-bypass comparison.
 
-## Panoramic Phase Field
+## Panoramic Phase Panorama
 
-The Panoramic Phase Field is the local perceptual surface formed by:
+The Panoramic Phase Panorama is the local perceptual surface formed by:
 
 ```text
 Tail | Center | Lead
@@ -56,15 +56,15 @@ Tail | Center | Lead
 
 Center is the audible, actualized phase. Tail remains at or behind Center; Lead remains at or ahead. Their co-presence is a representation of temporal relation, not a claim that the source events are simultaneous.
 
-### Field Frame
+### Panorama Frame
 
-Outside ordinary playback, the Field presents one stable interpretation of the active state. Step exposes its next backward and forward destinations. Refine and Reopen expose directional midpoint candidates. A Section exposes Start, its spatial midpoint, and End. Pin and ordinary Go use the Step neighborhood. Direct manipulation temporarily supplies its exact candidate extent.
+Outside ordinary playback, the Panorama presents one stable interpretation of the active state. Step exposes its next backward and forward destinations. Refine and Reopen expose directional midpoint candidates. A Section exposes Start, its spatial midpoint, and End. Pin and ordinary Go use the Step neighborhood. Direct manipulation temporarily supplies its exact candidate extent.
 
-When Context is enabled, its bounded source window owns the Field Frame. Tail and Lead remain at the Context edges while Center is Current at rest and Cursor during Context transport. Beginning, pausing, or settling Context does not reassign those edges.
+When Context is enabled, its bounded source window owns the Panorama Frame. Tail and Lead remain at the Context edges while Center is Current at rest and Cursor during Context transport. Beginning, pausing, or settling Context does not reassign those edges.
 
 Each committed movement produces at most one directional presentation transition. The semantic operation commits first; the transition merely makes its direction legible.
 
-### Field Cycle
+### Panorama Cycle
 
 During ordinary Panorama playback, Tail and Lead travel between an Inner Offset `x` and Outer Offset `y`, where `0 < x < y`. Their outward rates are symmetric around Center’s rate. At a boundary, a side follows Center while preserving its attained offset until every operational side arrives; the cycle then reverses.
 
@@ -154,16 +154,16 @@ Playback extends watched Active Span coverage without shortening prior coverage.
 
 Observation and rate are separate dimensions. Plain `Space` requests a `1×` Panorama. `Shift+Space` requests playback at a configured fixed wish, or at the optional dynamic Weight texture: `c*(W) = 1 − 0.25·log₂W`, one playback-rate step per octave of cumulative active Weight. Panorama accompanies any Center rate with a complete adjacent triplet on the adapter's ladder and stands aside at the ends of it, without ending the Playback transaction. The media adapter’s offered and confirmed actual rates remain authoritative. A Center-only request stays Center only even when its actual rate is `1×`.
 
-The Field never confiscates ordinary player controls. If the confirmed actual Center rate cannot preserve Panorama, the side views suspend rather than drift.
+The Panorama never confiscates ordinary player controls. If the confirmed actual Center rate cannot preserve Panorama, the side views suspend rather than drift.
 
 ## Operational cycle
 
 ```text
 load a source and use ordinary playback
-→ perceive the local Field
+→ perceive the local Panorama
 → Refine, Step, or Go
 → leave a contiguous Active Span
-→ verify through Context and the Field Frame
+→ verify through Context and the Panorama Frame
 → Tag Current as a Pin or the Interval as a Section
 → assign Section Weight in Guide
 → optionally compare with Toggle Deformation
@@ -175,6 +175,6 @@ The instrument becomes more useful through use while the source remains unchange
 
 ## Optionality and non-goals
 
-The same application must remain complete as an ordinary YouTube player, a keyboard-driven Center player, a player plus Operator Matrix, a player plus Guide, or the full Field/Topography/Guide instrument.
+The same application must remain complete as an ordinary YouTube player, a keyboard-driven Center player, a player plus Operator Matrix, a player plus Guide, or the full Panorama/Topography/Guide instrument.
 
 Video Cartography is not a non-linear editor, an automatic summary, a transcript reader with a player attached, or a claim that the reader’s retained map is objectively inherent in the source. It is an instrument for constructing and navigating a defensible representation while preserving the source as authority.

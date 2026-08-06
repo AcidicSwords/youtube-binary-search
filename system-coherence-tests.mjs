@@ -18,7 +18,7 @@ import {
   operatorFrame,
   framesEqual,
   frameIdentity,
-  createFieldFrameSequencer
+  createPanoramaFrameSequencer
 } from "./panorama-frame.js";
 import {
   createSession,
@@ -142,7 +142,7 @@ const close = (actual, expected, tolerance = 1e-9) => {
   assert.equal(framesEqual(observed, actionable), false);
   assert.notEqual(frameIdentity(observed), frameIdentity(actionable));
 
-  const sequencer = createFieldFrameSequencer();
+  const sequencer = createPanoramaFrameSequencer();
   const first = sequencer.resolve({
     kind: "step", center: 50, backward: 40, forward: 60, range
   });
@@ -170,7 +170,7 @@ const close = (actual, expected, tolerance = 1e-9) => {
   assert.match(index, /aria-label="Panorama"/);
   assert.match(index, /<h2>Timeline<\/h2>/);
   assert.match(index, /Go to Timeline Midpoint/);
-  assert.doesNotMatch(index, /Step Field|Temporal map/);
+  assert.doesNotMatch(index, /Step Panorama|Temporal map/);
   assert.match(styles, /left: var\(--section-midpoint, 50%\)/);
   // The bounded, scrollable lane band must never reuse a lane by modulo; every
   // Section keeps its own reachable control even under dense overlap.

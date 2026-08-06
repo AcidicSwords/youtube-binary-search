@@ -490,7 +490,7 @@ has(topLevelFunction(appCode, "persistGuide"), /safeToRewriteCurrent === false[\
 has(appCode, /No saved Guide|no saved Guide|No Guide was saved|unreadable|damaged saved record/i,
   "Recovery status distinguishes absence from damaged evidence.");
 
-// Group lifecycle, modifier ownership, Nudge, Step Reversal, and Field defaults
+// Group lifecycle, modifier ownership, Nudge, Step Reversal, and Panorama defaults
 // retain one implementation per consequence.
 {
   const guide = createGuide("groups");
@@ -560,22 +560,22 @@ has(session, /export function settleStepSequence[\s\S]*?Step Reversal[\s\S]*?vis
 has(sources["guide-session-completion-tests.mjs"], /visitedMinimum[\s\S]*?visitedMaximum[\s\S]*?Step Reversal[\s\S]*?history\.length, 1/,
   "Step Reversal has focused one-transaction coverage.");
 same(DEFAULT_PANORAMA_CYCLE, { inner: 0.25, outer: 2.5, rate: 0.25 },
-  "Field ships with conservative 0.25-2.5 second defaults.");
+  "Panorama ships with conservative 0.25-2.5 second defaults.");
 same(panoramaSideRates(DEFAULT_PANORAMA_CYCLE.rate), {
   center: 1,
   tailRate: 0.75,
   leadRate: 1.25
-}, "Default Field rates are 0.75x / 1x / 1.25x.");
+}, "Default Panorama rates are 0.75x / 1x / 1.25x.");
 has(html, /id="field-inner-offset"[^>]*max="300"[^>]*value="0\.25"/,
-  "Field defaults do not restrict the selectable inner-offset range.");
+  "Panorama defaults do not restrict the selectable inner-offset range.");
 has(html, /id="field-outer-offset"[^>]*max="300"[^>]*value="2\.5"/,
-  "Field defaults do not restrict the selectable outer-offset range.");
+  "Panorama defaults do not restrict the selectable outer-offset range.");
 has(interactionSmoke, /savedPanoramaCycle = \{ inner: 3, outer: 12, rate: 0\.4 \}/,
-  "Saved Field coverage uses values wider than the shipped defaults.");
+  "Saved Panorama coverage uses values wider than the shipped defaults.");
 has(interactionSmoke, /3–12 s · 0\.6× \/ 1\.4×/,
-  "Saved non-preset Field rates have truthful presentation coverage.");
+  "Saved non-preset Panorama rates have truthful presentation coverage.");
 has(interactionSmoke, /panoramaCycle,[\s\S]*savedPanoramaCycle/,
-  "Saved Field coverage proves the valid persisted preference remains unchanged.");
+  "Saved Panorama coverage proves the valid persisted preference remains unchanged.");
 
 // Required completion suites must exist and be executed by a package script.
 const scriptCorpus = Object.values(pkg.scripts || {}).join(" && ");
@@ -619,6 +619,6 @@ if (failures.length) {
   process.exitCode = 1;
 } else {
   console.log(
-    "Integration check passed: QWE / ASD / RTF and Tag, transient X bypass, one effective projection, playback/source ownership, Guide recovery, modifiers/Nudge, Step Reversal, native controls, and conservative Field defaults agree."
+    "Integration check passed: QWE / ASD / RTF and Tag, transient X bypass, one effective projection, playback/source ownership, Guide recovery, modifiers/Nudge, Step Reversal, native controls, and conservative Panorama defaults agree."
   );
 }

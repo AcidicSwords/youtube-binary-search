@@ -176,7 +176,7 @@ const clone = value => structuredClone(value);
   assert.equal(visibleIds.includes(standalone.id), true);
 }
 
-// The Field-to-Step bridge is exact across deformed and overlapping terrain:
+// The Panorama-to-Step bridge is exact across deformed and overlapping terrain:
 // map distance to the displayed source Address lands on that Address.
 {
   const guide = createGuide("video-f");

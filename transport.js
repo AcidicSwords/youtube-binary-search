@@ -36,7 +36,7 @@ export function isTransportActive(transport) {
   return Boolean(transport && transport.kind !== TRANSPORT_KIND.IDLE);
 }
 
-export function transportFieldRange(transport, range) {
+export function transportPanoramaRange(transport, range) {
   if (
     !range
     || !Number.isFinite(range.start)
@@ -197,7 +197,7 @@ export function resolveCenterRate(weight, rates) {
 // Panorama needs a complete symmetric triplet: one rate step below Center for
 // Tail and one above for Lead. Both must actually be offered. A missing
 // neighbour yields no triplet rather than an asymmetric substitute, because
-// unequal side steps would break the one relation the Field rests on — Tail and
+// unequal side steps would break the one relation the Panorama rests on — Tail and
 // Lead equally displaced from Center, cycling at one shared speed.
 export function panoramaTriplet(centerRate, rates) {
   const center = positiveRate(centerRate);
@@ -213,7 +213,7 @@ export function panoramaTriplet(centerRate, rates) {
 // An adapter that has not yet reported its ladder has not reported a *missing*
 // ladder. YouTube commonly answers 1x until playback has actually begun, so an
 // unknown offer is treated as capable and re-evaluated when the real list
-// arrives — the rule the Field already follows everywhere else.
+// arrives — the rule the Panorama already follows everywhere else.
 export function offerIsKnown(rates) {
   return Array.isArray(rates)
     && rates.filter(rate => Number.isFinite(Number(rate)) && Number(rate) > 0).length > 1;

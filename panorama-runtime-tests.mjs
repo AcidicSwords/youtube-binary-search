@@ -178,7 +178,7 @@ function makeHarness({
     h.snapshot = { ...h.snapshot, transportKind: "idle" };
     const started = h.controller.playFromGesture({ center: 50 });
     assert.deepEqual(started, { tail: true, lead: true }, "A Context settled in the same gesture stack must not leave stale suspension behind.");
-    assert.deepEqual(h.snapshot.activeSpan, semanticInterval, "Physical Field activation must not mutate semantic Interval.");
+    assert.deepEqual(h.snapshot.activeSpan, semanticInterval, "Physical Panorama activation must not mutate semantic Interval.");
     assert.ok(["cue", "place"].includes(h.tail().commands.at(-2)?.[0]));
     assert.equal(h.tail().commands.at(-2)?.[1], 48, "A fresh cycle begins at the inner offset behind Center.");
     assert.deepEqual(h.tail().commands.at(-1), ["play"]);
@@ -211,7 +211,7 @@ function makeHarness({
     assert.equal(h.controller.snapshot().leadMode, FIELD_SIDE_MODE.HELD);
     assert.equal(h.controller.cycle().held, true, "Hold alone changes Stretching into Held.");
     assert.equal(h.controller.cycle().phase, "expanding", "Hold preserves the cycling direction.");
-    assert.deepEqual(h.snapshot.activeSpan, semanticInterval, "Hold changes runtime Field state only; it must not redefine Interval.");
+    assert.deepEqual(h.snapshot.activeSpan, semanticInterval, "Hold changes runtime Panorama state only; it must not redefine Interval.");
     const heldTail = h.controller.cycle().sides.tail.offset;
     const heldLead = h.controller.cycle().sides.lead.offset;
     assert.ok(heldTail >= 2 && heldTail <= 10, "A held offset stays inside the configured [x, y] bounds.");
@@ -228,8 +228,8 @@ function makeHarness({
     assert.equal(h.lead().time, 52 + heldLead);
 
     h.controller.translateToCurrent(60, { preserve: true });
-    assert.equal(h.tail().time, 60 - heldTail, "Whole-Field translation must preserve Tail's attained offset.");
-    assert.equal(h.lead().time, 60 + heldLead, "Whole-Field translation must preserve Lead's attained offset.");
+    assert.equal(h.tail().time, 60 - heldTail, "Whole-Panorama translation must preserve Tail's attained offset.");
+    assert.equal(h.lead().time, 60 + heldLead, "Whole-Panorama translation must preserve Lead's attained offset.");
     assert.equal(h.controller.getStepSelection("tail").distance, heldTail);
   } finally {
     h.restore();
@@ -284,7 +284,7 @@ function makeHarness({
   }
 }
 
-// The Outer Offset is one Field-level configuration. Editing it reconciles the
+// The Outer Offset is one Panorama-level configuration. Editing it reconciles the
 // live relation without becoming a Hold and without writing Session state.
 {
   const h = makeHarness();
@@ -303,7 +303,7 @@ function makeHarness({
     assert.equal(
       h.lead().time,
       70,
-      "Both sides reconcile against the one configured Field relation."
+      "Both sides reconcile against the one configured Panorama relation."
     );
 
     h.controller.playFromGesture({ center: 50 });
@@ -317,7 +317,7 @@ function makeHarness({
     h.controller.tick();
     h.controller.hold("both");
     const partial = h.controller.cycle().sides.tail.offset;
-    assert.ok(partial > 2 && partial < 20, "The Field was Held part-way through its cycle.");
+    assert.ok(partial > 2 && partial < 20, "The Panorama was Held part-way through its cycle.");
     h.snapshot = {
       ...h.snapshot,
       panoramaCycle: { inner: 2, outer: 30, rate: 0.5 }
@@ -355,7 +355,7 @@ function makeHarness({
     assert.equal(
       h.controller.snapshot().span.available,
       false,
-      "Removing either side must invalidate the published two-sided Field span."
+      "Removing either side must invalidate the published two-sided Panorama span."
     );
     const tailCommands = h.tail().commands.length;
     h.controller.tick();
@@ -382,13 +382,13 @@ function makeHarness({
     assert.equal(
       h.lead().commands.length,
       leadCommands,
-      "Field Off must not keep issuing hidden player commands."
+      "Panorama Off must not keep issuing hidden player commands."
     );
     h.lead().finishCue();
     assert.equal(
       h.lead().commands.filter(command => command[0] === "play").length,
       0,
-      "A delayed side callback must respect a later Field Off transition."
+      "A delayed side callback must respect a later Panorama Off transition."
     );
   } finally {
     h.restore();
@@ -412,10 +412,10 @@ function makeHarness({
       }
     };
     h.controller.tick();
-    assert.equal(h.tail().time, 35, "Step preview must use the semantic Backward destination, not Field Offset.");
-    assert.equal(h.lead().time, 72, "Step preview must use the semantic Forward destination, not Field Offset.");
+    assert.equal(h.tail().time, 35, "Step preview must use the semantic Backward destination, not Panorama Offset.");
+    assert.equal(h.lead().time, 72, "Step preview must use the semantic Forward destination, not Panorama Offset.");
     assert.equal(h.elements.get("field-transport-state").textContent, "Step Frame");
-    assert.equal(h.controller.snapshot().span.held, false, "A temporary preview must not become a Held Field span.");
+    assert.equal(h.controller.snapshot().span.held, false, "A temporary preview must not become a Held Panorama span.");
     assert.equal(h.controller.getStepSelection("tail").distance, 15);
     assert.equal(h.controller.getStepSelection("tail").address, 35);
     assert.equal(h.controller.getStepSelection("lead").distance, 22);
@@ -423,7 +423,7 @@ function makeHarness({
     assert.equal(h.elements.get("tail-player-surface").getAttribute("aria-disabled"), "false");
     assert.equal(h.elements.get("lead-player-surface").getAttribute("aria-disabled"), "false");
     assert.equal(h.elements.get("field-both-toggle").disabled, true,
-      "A Field Frame makes the combined Stretch/Hold control non-actionable.");
+      "A Panorama Frame makes the combined Stretch/Hold control non-actionable.");
 
     h.snapshot = {
       ...h.snapshot,
@@ -536,7 +536,7 @@ function makeHarness({
     assert.deepEqual(
       started,
       { tail: true, lead: true },
-      "Playback activation must replace an idle operator preview with a fresh live Field."
+      "Playback activation must replace an idle operator preview with a fresh live Panorama."
     );
     h.snapshot = {
       ...h.snapshot,
@@ -627,7 +627,7 @@ function makeHarness({
     assert.equal(
       h.controller.previewExtent({ kind: "unknown", center: 50 }),
       false,
-      "Unknown preview kinds must not acquire the Field."
+      "Unknown preview kinds must not acquire the Panorama."
     );
     assert.equal(
       h.controller.previewExtent({ kind: "section", center: 50 }),
@@ -686,8 +686,8 @@ function makeHarness({
       center: 1,
       end: 3.5
     });
-    assert.equal(h.tail().time, 0, "Pin preview Field must clamp Tail at Range Start.");
-    assert.equal(h.lead().time, 3.5, "Pin preview Field must use its supplied spatial Step target.");
+    assert.equal(h.tail().time, 0, "Pin preview Panorama must clamp Tail at Range Start.");
+    assert.equal(h.lead().time, 3.5, "Pin preview Panorama must use its supplied spatial Step target.");
     assert.equal(h.elements.get("field-transport-state").textContent, "Pin Frame");
   } finally {
     h.restore();
@@ -765,4 +765,4 @@ function makeHarness({
   }
 }
 
-console.log("Field runtime tests passed: decoded paused frames, Field Frame placement, one-rung side steps that keep the cycle the same length at every Center rate, Hold isolation, Field-level Offset reconciliation, dormant hidden/off panes, stale-event rejection, exact pause, whole-Field Step geometry, direct-manipulation Frames, unsupported-rate fallback, and boundary recovery.");
+console.log("Panorama runtime tests passed: decoded paused frames, Panorama Frame placement, one-rung side steps that keep the cycle the same length at every Center rate, Hold isolation, Panorama-level Offset reconciliation, dormant hidden/off panes, stale-event rejection, exact pause, whole-Panorama Step geometry, direct-manipulation Frames, unsupported-rate fallback, and boundary recovery.");

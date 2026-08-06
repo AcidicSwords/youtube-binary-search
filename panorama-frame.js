@@ -1,6 +1,6 @@
-// Pure Field Frame resolution.
+// Pure Panorama Frame resolution.
 //
-// A Field Frame is the stable Tail–Center–Lead presentation used outside
+// A Panorama Frame is the stable Tail–Center–Lead presentation used outside
 // ordinary Center playback. It is not a semantic operator: it is a perceptual
 // projection of the state produced by an operator, by Context, or by a direct
 // manipulation.
@@ -163,7 +163,7 @@ export function directFrame({ kind, start, center, end, range }) {
   });
 }
 
-export function resolveFieldFrame(request) {
+export function resolvePanoramaFrame(request) {
   if (!request || typeof request !== "object") return null;
   if (request.owner === FIELD_FRAME_OWNER.CONTEXT) return contextFrame(request);
   if (request.owner === FIELD_FRAME_OWNER.DIRECT) return directFrame(request);
@@ -215,10 +215,10 @@ export function frameTransition(previous, next, options = {}) {
   };
 }
 
-// One sequencer owns stable Frame identity for a Field. `revision` advances only
+// One sequencer owns stable Frame identity for a Panorama. `revision` advances only
 // when the settled Frame changes, so Context transport, cycling, and repeated
 // republishing of the same state never look like new movements.
-export function createFieldFrameSequencer(options = {}) {
+export function createPanoramaFrameSequencer(options = {}) {
   const tolerance = Number.isFinite(options.tolerance)
     ? options.tolerance
     : FRAME_TOLERANCE;
@@ -227,7 +227,7 @@ export function createFieldFrameSequencer(options = {}) {
   let transition = null;
 
   function resolve(request) {
-    const next = resolveFieldFrame(request);
+    const next = resolvePanoramaFrame(request);
     if (!next) return null;
     const previous = settled;
     const reframed = !framesEqual(previous, next, tolerance);

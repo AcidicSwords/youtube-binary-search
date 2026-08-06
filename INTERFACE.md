@@ -41,7 +41,7 @@ button; the overlay itself does not receive pointer events. Native seek,
 captions, settings, volume, and fullscreen controls remain pointer-accessible
 while paused, idle, or playing.
 
-### Field Frame
+### Panorama Frame
 
 When ordinary playback is not running, the panes form a stable directional
 slideshow around Current:
@@ -68,7 +68,7 @@ offers a Step-to-Address activation or a live playback relation. Context,
 Refine, Reopen, and direct-edit Frames remain informative; their side images do
 not disguise another operator.
 
-### Field Cycle
+### Panorama Cycle
 
 During ordinary Panorama playback, Tail and Lead cycle between one Inner and
 one Outer source-time offset around Center. The conservative shipped setting is:
@@ -130,7 +130,7 @@ The main layers remain distinct without relying on colour alone:
 - Active Span is the surviving directional relation;
 - Current is the semantic Address and carries its own label;
 - Cursor appears only when physical observation has left Current;
-- Field span is the held Panorama relation;
+- Panorama span is the held Panorama relation;
 - Pins and Section wires are retained topology;
 - operator and direct-manipulation previews are transient.
 
@@ -364,7 +364,7 @@ reader hotkeys work without another Timeline click.
 Every form control has an accessible name and every button declares its type.
 Operator keys are visible and exposed through `aria-keyshortcuts`. Contextual
 disabled states state the missing operand. `aria-pressed` communicates Shift,
-Field, Group, and deformation-bypass state.
+Panorama, Group, and deformation-bypass state.
 
 Fine and coarse pointers share visual marks but use different hit geometry.
 Coarse Pin and Section targets are at least 48 pixels. The visible Pin or Section

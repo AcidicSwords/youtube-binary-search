@@ -90,7 +90,7 @@ await flush();
 assert.deepEqual(
   playerCommandCounts(),
   commandsBeforeWeight,
-  "Timeline compression must issue no player or Field command."
+  "Timeline compression must issue no player or Panorama command."
 );
 commandsBeforeWeight = playerCommandCounts();
 dispatchDocument("keydown", { key: "z", code: "KeyZ" });
@@ -280,7 +280,7 @@ await flush();
 assert.deepEqual(
   playerCommandCounts(),
   commandsBeforeWeight,
-  "Timeline expansion must issue no player or Field command."
+  "Timeline expansion must issue no player or Panorama command."
 );
 assert.equal(
   byId.get("duration-time").textContent,
@@ -337,7 +337,7 @@ await setSectionWeighting("1");
 await flush();
 
 // Tag creates a Section; its Weight is then assigned in Guide without handing
-// anything to the media or Field layers.
+// anything to the media or Panorama layers.
 byId.get("release").click();
 for (const clientX of [600, 700]) {
   byId.get("timeline").dispatch("click", {
@@ -361,7 +361,7 @@ await flush(3);
 assert.deepEqual(
   playerCommandCounts(),
   commandsBeforeWeight,
-  "Assigning a Weight must not issue a player or Field command."
+  "Assigning a Weight must not issue a player or Panorama command."
 );
 assert.equal(byId.get("sections-list-count").textContent, "2");
 assert.equal(
@@ -400,11 +400,11 @@ assert.equal(
 assert.deepEqual(
   playerCommandCounts(),
   commandsBeforeWeight,
-  "Bypassing and restoring deformation issue no player or Field command."
+  "Bypassing and restoring deformation issue no player or Panorama command."
 );
 
 // Existing Section weights remain editable during source playback without
-// pausing, seeking, changing rate, or realigning either Field side.
+// pausing, seeking, changing rate, or realigning either Panorama side.
 sectionNodes = descendants(byId.get("sections-list"));
 byId.get("sections-list").dispatch("click", {
   target: sectionNodes.find(node => node.dataset.sectionGo === sectionId)
@@ -496,7 +496,7 @@ assert.deepEqual(
   assert.equal(readout("step-size-summary"), "10 units · manual");
 }
 
-// Selecting a Section and the Field Frame it publishes use the same effective
+// Selecting a Section and the Panorama Frame it publishes use the same effective
 // midpoint. An asymmetric overlapping Weight makes this observably different
 // from the arithmetic source midpoint.
 {
@@ -546,7 +546,7 @@ assert.deepEqual(
     `Section navigation centers Current in effective Timeline Space; got ${center().currentTime}, expected ${expectedCenter}.`);
   assert.ok(Math.abs(tail().currentTime - outerSection.start) < 1e-6);
   assert.ok(Math.abs(lead().currentTime - outerSection.end) < 1e-6,
-    "The Field uses Start / effective midpoint / End for that same Section.");
+    "The Panorama uses Start / effective midpoint / End for that same Section.");
 }
 
 // Scope follows what is acquired, and bare Timeline selection makes the

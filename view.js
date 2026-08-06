@@ -2062,8 +2062,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         ? selectedPinExtent
         : currentSpan;
     const sourceOptions = [...elements["section-source"].options];
-    const fieldOption = sourceOptions.find(option => option.value === "field-span");
-    if (fieldOption) fieldOption.disabled = !panoramaWindow;
+    const panoramaOption = sourceOptions.find(option => option.value === "field-span");
+    if (panoramaOption) panoramaOption.disabled = !panoramaWindow;
     const selectedPinsOption = sourceOptions.find(option => option.value === "selected-pins");
     if (selectedPinsOption) selectedPinsOption.disabled = !selectedPinExtent;
     if (sectionKind === "field-span" && !panoramaWindow && currentSpan) {

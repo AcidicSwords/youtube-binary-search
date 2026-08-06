@@ -51,7 +51,7 @@ function begin(configured = cycle) {
   assert.deepEqual(
     DEFAULT_PANORAMA_CYCLE,
     { inner: 0.25, outer: 2.5, rate: 0.25 },
-    "The shipped Field is a conservative local horizon."
+    "The shipped Panorama is a conservative local horizon."
   );
   assert.deepEqual(
     panoramaSideRates(DEFAULT_PANORAMA_CYCLE.rate),
@@ -78,7 +78,7 @@ function begin(configured = cycle) {
   // The step either side of Center is an interval on the rate ladder, not a
   // fraction of Center. Scaling it -- tail = C(1-z), lead = C(1+z) -- is
   // identical at 1x and wrong everywhere else: the gap between Center and a side
-  // would grow with Center, so the Field would open faster the faster you played
+  // would grow with Center, so the Panorama would open faster the faster you played
   // and a cycle would last a different number of seconds at every rate.
   assert.deepEqual(panoramaSideRates(0.5, 2), { center: 2, tailRate: 1.5, leadRate: 2.5 },
     "Changing Center rate moves the whole relation without changing its size.");
@@ -168,7 +168,7 @@ function begin(configured = cycle) {
 {
   // Resuming a leg that already stands at the outer bound, with no time yet
   // elapsed, is the exact case a Stretch after a fully attained Hold produces.
-  // The Field is at its maximum, so the only thing it can do next is come back,
+  // The Panorama is at its maximum, so the only thing it can do next is come back,
   // and that is what the side rates must be told. Reading it as still expanding
   // made the answer depend on whether the resume and the tick that followed it
   // landed in the same millisecond -- which is not a question the geometry is
@@ -228,7 +228,7 @@ function begin(configured = cycle) {
 
 // A clipped side lowers the shared bound; it does not desynchronize the pair
 {
-  // Tail has room for x but not for y. The Field cycles as one relation, so
+  // Tail has room for x but not for y. The Panorama cycles as one relation, so
   // the pair turns around at the room the more constrained side actually has.
   // Letting the unclipped side run on to its own bound -- which is what a
   // per-side barrier did -- would leave Tail and Lead unequally displaced from
@@ -265,9 +265,9 @@ function begin(configured = cycle) {
   let state = begin();
   state = run(state, 30, { sides: oneSided }).state;
   assert.equal(state.phase, PANORAMA_DIRECTION.CONTRACTING,
-    "A dormant side must not stall the Field at its outer boundary.");
+    "A dormant side must not stall the Panorama at its outer boundary.");
   assert.equal(state.sides.tail.excluded, true,
-    "A side without room for the configured inner offset must not stall the Field.");
+    "A side without room for the configured inner offset must not stall the Panorama.");
 }
 
 // Hold preserves the attained relation and the resumption direction
@@ -349,7 +349,7 @@ function begin(configured = cycle) {
   // else. The sides still differ from Center by one rung, so the offset still
   // opens at the same speed and still reaches maximum at the moment it was
   // always going to. Restarting here -- which a per-rate cycle would have to do
-  // -- would make the Field twitch at every Section boundary.
+  // -- would make the Panorama twitch at every Section boundary.
   clock = 0;
   let state = begin();
   state = run(state, 4).state;                       // four real seconds in
@@ -391,7 +391,7 @@ function begin(configured = cycle) {
   clock = 0;
   let state = begin();
   state = run(state, 6).state;
-  assert.ok(state.sides.tail.offset > cycle.inner, "The Field was open when Panorama was lost.");
+  assert.ok(state.sides.tail.offset > cycle.inner, "The Panorama was open when Panorama was lost.");
   // The leg it was on genuinely started somewhere other than the inner offset,
   // so a restart is something that can be observed rather than assumed.
   state = rebasePanoramaCycle(state, clock, state.sides.tail.offset);
@@ -409,4 +409,4 @@ function begin(configured = cycle) {
     "and takes the full outward duration from there, exactly as any other leg.");
 }
 
-console.log("Field Cycle tests passed: one-rung side steps that keep the cycle the same length at every Center rate, a wall-clock phase, turns that report the direction they are heading in, bounded expansion/contraction, Range clipping that lowers the shared bound rather than desynchronizing the pair, exclusion, deliberate Hold, phase-aware resumption, Weight-bucket crossings that keep both phase and deadline, and a fresh inner-offset leg when Panorama returns.");
+console.log("Panorama Cycle tests passed: one-rung side steps that keep the cycle the same length at every Center rate, a wall-clock phase, turns that report the direction they are heading in, bounded expansion/contraction, Range clipping that lowers the shared bound rather than desynchronizing the pair, exclusion, deliberate Hold, phase-aware resumption, Weight-bucket crossings that keep both phase and deadline, and a fresh inner-offset leg when Panorama returns.");

@@ -16,8 +16,8 @@ import {
 } from "./session.js";
 import { getActionRanges, normalizeDirectionalReach } from "./range-geometry.js";
 import {
-  deriveFieldBounds,
-  fieldPreferenceRequiresEstablish,
+  derivePanoramaBounds,
+  panoramaPreferenceRequiresEstablish,
   createPanoramaController
 } from "./panorama.js";
 import { chooseNearestRate, sideRateStepFromResponse } from "./panorama-geometry.js";
@@ -42,12 +42,12 @@ assert.deepEqual(normalizeStepReach({ backward: 0.01, forward: 900, linked: fals
   mode: "fixed",
   fraction: 1 / 16
 });
-assert.equal(fieldPreferenceRequiresEstablish({ tailRate: 0.75 }), false);
-assert.equal(fieldPreferenceRequiresEstablish({ leadRate: 1.5 }), false);
-assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: false }), false);
-assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: true }), true);
-assert.equal(fieldPreferenceRequiresEstablish({ panoramaEnabled: false }), false);
-assert.equal(fieldPreferenceRequiresEstablish({ panoramaEnabled: true }), true);
+assert.equal(panoramaPreferenceRequiresEstablish({ tailRate: 0.75 }), false);
+assert.equal(panoramaPreferenceRequiresEstablish({ leadRate: 1.5 }), false);
+assert.equal(panoramaPreferenceRequiresEstablish({ tailVisible: false }), false);
+assert.equal(panoramaPreferenceRequiresEstablish({ tailVisible: true }), true);
+assert.equal(panoramaPreferenceRequiresEstablish({ panoramaEnabled: false }), false);
+assert.equal(panoramaPreferenceRequiresEstablish({ panoramaEnabled: true }), true);
 // A legacy saved side-rate pair migrates once into the nearest symmetric
 // cycling rate; the two sides are never configured independently again.
 assert.equal(sideRateStepFromResponse({ tailRate: 0.75, leadRate: 1.25 }), 0.25);
@@ -107,7 +107,7 @@ assert.equal(sideRateStepFromResponse({ tailRate: 0.5, leadRate: 2 }), 0.75);
 }
 
 {
-  const bounds = deriveFieldBounds({
+  const bounds = derivePanoramaBounds({
     current: 50,
     stepReach: { backward: 5, forward: 15, linked: false },
     range: { start: 0, end: 100 }
@@ -175,7 +175,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
     createPlayer: () => { created += 1; return null; }
   });
   controller.tick();
-  assert.equal(created, 0, "Disabling Step Field preserves the single-player reader boundary.");
+  assert.equal(created, 0, "Disabling Step Panorama preserves the single-player reader boundary.");
   globalThis.YT = originalYT;
 }
 
@@ -183,7 +183,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   const html = readFileSync("index.html", "utf8");
   const app = readFileSync("app.js", "utf8");
   const field = readFileSync("panorama.js", "utf8");
-  const fieldCss = readFileSync("panorama.css", "utf8");
+  const panoramaCss = readFileSync("panorama.css", "utf8");
   const styles = readFileSync("styles.css", "utf8");
   const view = readFileSync("view.js", "utf8");
   const implementation = readFileSync("IMPLEMENTATION.md", "utf8");
@@ -204,10 +204,10 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   assert.equal((html.match(/id=["']field-both-toggle["']/g) || []).length, 1);
   assert.match(html, /id=["']tail-pane["'][\s\S]*id=["']player-tail["']/);
   assert.match(html, /id=["']lead-pane["'][\s\S]*id=["']player-lead["']/);
-  assert.doesNotMatch(fieldCss, /\.step-pane-action/, "Side players must not use a transparent overlay element.");
-  assert.match(fieldCss, /\.side-player-surface iframe[\s\S]*pointer-events:\s*none/);
+  assert.doesNotMatch(panoramaCss, /\.step-pane-action/, "Side players must not use a transparent overlay element.");
+  assert.match(panoramaCss, /\.side-player-surface iframe[\s\S]*pointer-events:\s*none/);
   assert.match(
-    fieldCss,
+    panoramaCss,
     /\.pane-field-controls\s*\{[\s\S]*display:\s*flex[\s\S]*justify-content:\s*center/
   );
   // The Nudge quantum and the Panorama's offsets are both remembered settings,
@@ -222,59 +222,59 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   assert.doesNotMatch(html, /center-field-settings/,
     "The Panorama keeps no settings popover of its own.");
   assert.doesNotMatch(field, /bindSideStepSurface/,
-    "Step Field must expose geometry while the application owns the shared Step gesture.");
+    "Step Panorama must expose geometry while the application owns the shared Step gesture.");
   assert.match(app, /tail-player-surface[\s\S]*bindStepPress\(control/);
   assert.match(app, /lead-player-surface[\s\S]*bindStepPress\(control/);
-  assert.match(fieldCss, /\.pane-field-controls\s*\{[\s\S]*z-index:\s*7/);
+  assert.match(panoramaCss, /\.pane-field-controls\s*\{[\s\S]*z-index:\s*7/);
   assert.match(
-    fieldCss,
+    panoramaCss,
     /@container \(max-width: 680px\)[\s\S]*grid-template-areas:\s*"center"\s*"tail"\s*"lead"/,
     "Phone layout must explicitly stack Center, Tail, Lead without relying on auto-placement."
   );
-  assert.match(fieldCss, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);
+  assert.match(panoramaCss, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);
   assert.match(
     styles,
     /\.center-transport-surface:hover:not\(:disabled\),[\s\S]*background:\s*transparent[\s\S]*transform:\s*none/,
     "Center hover may emphasize its transport icon but must not dim or shift the primary frame."
   );
   assert.match(app, /setStepReach as setSessionStepReach/);
-  assert.match(app, /stepReach: currentFieldOffsets\(\)/);
-  assert.match(app, /panoramaFrame:\s*fieldOperatorPreview\(\)/);
+  assert.match(app, /stepReach: currentPanoramaOffsets\(\)/);
+  assert.match(app, /panoramaFrame:\s*panoramaOperatorPreview\(\)/);
   assert.match(
     app,
-    /function fieldFrameRequest[\s\S]*FIELD_FRAME_OWNER\.CONTEXT[\s\S]*transport\.start[\s\S]*transport\.end/,
+    /function panoramaFrameRequest[\s\S]*FIELD_FRAME_OWNER\.CONTEXT[\s\S]*transport\.start[\s\S]*transport\.end/,
     "Context supplies the frozen observation window as the Frame's fixed edges."
   );
-  assert.match(app, /const fieldFrames = createFieldFrameSequencer\(\)/,
-    "One sequencer owns stable Field Frame identity and its revision.");
+  assert.match(app, /const panoramaFrames = createPanoramaFrameSequencer\(\)/,
+    "One sequencer owns stable Panorama Frame identity and its revision.");
   assert.match(
     app,
-    /function fieldStepPreview[\s\S]*kind,[\s\S]*projection\.stepTarget\([\s\S]*"backward"[\s\S]*projection\.stepTarget\([\s\S]*"forward"/,
-    "Paused Field preview must consume the exact weighted Step destinations from the semantic owner."
+    /function panoramaStepPreview[\s\S]*kind,[\s\S]*projection\.stepTarget\([\s\S]*"backward"[\s\S]*projection\.stepTarget\([\s\S]*"forward"/,
+    "Paused Panorama preview must consume the exact weighted Step destinations from the semantic owner."
   );
   assert.match(
     app,
-    /fieldStepPreview\(center,\s*"pin"\)/,
-    "Pin dragging must supply spatial Step targets rather than physical Field offsets."
+    /panoramaStepPreview\(center,\s*"pin"\)/,
+    "Pin dragging must supply spatial Step targets rather than physical Panorama offsets."
   );
   assert.doesNotMatch(app, /onHoldOffsets:/);
   assert.doesNotMatch(field, /onHoldOffsets/);
-  assert.match(app, /function changeFieldBoundary[\s\S]*state\.panoramaCycle = normalizePanoramaCycle/);
+  assert.match(app, /function changePanoramaBoundary[\s\S]*state\.panoramaCycle = normalizePanoramaCycle/);
   assert.match(app, /seconds:\s*state\.contextSeconds/);
   assert.doesNotMatch(
     app,
     /panoramaCycle\s*=\s*[^;\n]*contextSeconds|contextSeconds\s*=\s*[^;\n]*panoramaCycle/,
-    "Context duration and the physical Field relation must remain independently owned."
+    "Context duration and the physical Panorama relation must remain independently owned."
   );
   assert.match(
     app,
-    /function changeFieldBoundary[\s\S]*boundary === "inner"[\s\S]*Math\.min\(amount, cycle\.outer\)[\s\S]*Math\.max\(amount, cycle\.inner\)[\s\S]*panorama\?\.reconfigureOffset\?\.\(\)/,
+    /function changePanoramaBoundary[\s\S]*boundary === "inner"[\s\S]*Math\.min\(amount, cycle\.outer\)[\s\S]*Math\.max\(amount, cycle\.inner\)[\s\S]*panorama\?\.reconfigureOffset\?\.\(\)/,
     "0 < inner < outer is enforced against the sibling bound and reconciled once."
   );
   assert.doesNotMatch(
     app,
     /lastStepReachEdited|stepReachLastEdited/,
-    "Field tuning must not write a dead or cross-owned Step direction preference."
+    "Panorama tuning must not write a dead or cross-owned Step direction preference."
   );
   assert.match(
     app,
@@ -297,4 +297,4 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   assert.match(readme, /Step Reach/);
 }
 
-console.log("Field coherence tests passed: semantic Step Reach and physical Field offsets remain independent.");
+console.log("Panorama coherence tests passed: semantic Step Reach and physical Panorama offsets remain independent.");

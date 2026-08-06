@@ -20,8 +20,8 @@ const lead = env.lead();
 assert.ok(center && tail && lead, "Center and side players must exist for Context preview coverage.");
 assert.equal(byId.get("context-setting-value").textContent, "5 s centered on Current");
 
-// Arm the Field while Center is paused. A traversal must run Context only in
-// Center; the sides remain suspended even though the Field is armed to cycle.
+// Arm the Panorama while Center is paused. A traversal must run Context only in
+// Center; the sides remain suspended even though the Panorama is armed to cycle.
 byId.get("field-both-toggle").click();
 const tailPlaysBeforeContext = tail.commands.filter(command => command[0] === "play").length;
 center.deferNextPlacement = true;
@@ -44,7 +44,7 @@ assert.equal(byId.get("lead-player-surface")["aria-disabled"], "true");
 assert.equal(
   tail.commands.filter(command => command[0] === "play").length,
   tailPlaysBeforeContext,
-  "Context must not activate an armed Field cycle."
+  "Context must not activate an armed Panorama cycle."
 );
 
 // A stale pre-placement Cursor cannot terminate Context. Once the player enters
@@ -304,4 +304,4 @@ await flush(4);
 assert.equal(currentText(), originAfterClick,
   "Undo returns to the state the whole sequence departed from.");
 
-console.log("Context smoke passed: automatic post-traversal observation, held-key Step deferral, delayed placement, Field suspension, replacement traversal, Step during Context, reversed-sequence observation and naming, Off, and Undo isolation.");
+console.log("Context smoke passed: automatic post-traversal observation, held-key Step deferral, delayed placement, Panorama suspension, replacement traversal, Step during Context, reversed-sequence observation and naming, Off, and Undo isolation.");

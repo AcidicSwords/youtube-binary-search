@@ -4,11 +4,11 @@
 
 Video Cartography keeps YouTube source time exact while making a video available in three complementary ways:
 
-- the **Panoramic Phase Field** places nearby Tail, Center, and Lead phases side by side;
+- the **Panoramic Phase Panorama** places nearby Tail, Center, and Lead phases side by side;
 - the **Temporal Topography** projects the ordered source into a positively deformable Timeline;
 - the **Guide** retains discovered Addresses as Pins and relations as Sections.
 
-The application remains useful at every depth. You can use only the ordinary Center player, add keyboard navigation, open the Guide, or use the complete Field and weighted map. None of the advanced layers is required by another.
+The application remains useful at every depth. You can use only the ordinary Center player, add keyboard navigation, open the Guide, or use the complete Panorama and weighted map. None of the advanced layers is required by another.
 
 ## Load and play
 
@@ -23,13 +23,13 @@ Playback owns two independent facts:
 
 The YouTube adapter remains authoritative about the actual rate. A fixed Shift wish of `1×` is still Center only. If native controls move a Panorama playback away from `1×`, Tail and Lead suspend until the actual rate is compatible again. A focused proper Range wraps; the full-video Range stops at source end.
 
-## Panoramic Phase Field
+## Panoramic Phase Panorama
 
 ```text
 Tail | Center | Lead
 ```
 
-Center is audible. Tail and Lead are optional muted observations. Outside playback, the Field is a stable directional slideshow
+Center is audible. Tail and Lead are optional muted observations. Outside playback, the Panorama is a stable directional slideshow
 around Current:
 
 - Step shows the next backward and forward Step destinations;
@@ -38,9 +38,9 @@ around Current:
 - a Pin or ordinary Go uses the Step neighborhood;
 - direct manipulation temporarily previews the exact candidate relation.
 
-When Context is enabled, its bounded source window owns the Frame: Tail and Lead remain at the window edges while Center observes within it. Context duration and Field offsets are independent settings.
+When Context is enabled, its bounded source window owns the Frame: Tail and Lead remain at the window edges while Center observes within it. Context duration and Panorama offsets are independent settings.
 
-During ordinary Panorama playback, the Field cycles continuously between inner
+During ordinary Panorama playback, the Panorama cycles continuously between inner
 and outer offsets until Hold preserves the attained relation. The conservative shipped defaults are:
 
 ```text
@@ -106,7 +106,7 @@ The Guide has Sections, Pins, and transient Cues:
 - click a Timeline Pin to acquire it and move Current there;
 - click a Timeline Section to make its extent the Active Span and center Current spatially within it;
 - use exact Address fields, Nudge controls, Weight, Group, rename, delete, Focus, and unlink controls in the Guide;
-- drag Pins, Section end regions, or Section middles on the Timeline or from their Guide rows; both routes invoke the same operations and preview through the Field;
+- drag Pins, Section end regions, or Section middles on the Timeline or from their Guide rows; both routes invoke the same operations and preview through the Panorama;
 - unlink a shared endpoint to create an independent Pin at the same Address; drag it near another Pin and hold for the visible snap to arm before release to link;
 - offer chapter text as Cues, then navigate, compose, or retain it explicitly. Cues do not enter the map or Guide on their own.
 

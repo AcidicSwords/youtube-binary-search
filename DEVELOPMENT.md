@@ -52,10 +52,10 @@ runs the same complete `npm run verify` gate before publishing.
 8. Current, Cursor, and media position are different authorities.
 9. Pin identity is graph identity. Coincident Address does not imply identity.
 10. Guide owns exact structure editing; Timeline owns spatial manipulation.
-11. Step Reach, Nudge, Context, Field offsets, Section Weight, Playback policy,
+11. Step Reach, Nudge, Context, Panorama offsets, Section Weight, Playback policy,
     and deformation bypass have separate owners.
 12. Ordinary player controls and simple Center-only use must remain complete
-    when Guide, Field, Weight, or Focus is ignored.
+    when Guide, Panorama, Weight, or Focus is ignored.
 13. Presentation may preview or reshape the map; it may not invent semantic state.
 14. Repair a false test or document when a law changes; do not preserve an
     obsolete generation merely to keep a gauge green.
@@ -71,8 +71,8 @@ runs the same complete `npm run verify` gate before publishing.
 | Effective density, inverse map, spatial midpoint | `timeline-projection.js` | every spatial consumer and atmosphere |
 | Context/Playback policy, offer resolution, wrap | `transport.js` | adapter actual-rate and application playback tests |
 | YouTube source identity or actual media state | `youtube.js` | source-generation and stale-event tests |
-| Field Frame identity or transition | `panorama-frame.js` | application owner selection and Field runtime |
-| Field bounds or cycling policy | `panorama-geometry.js` | controller lifecycle and browser presentation |
+| Panorama Frame identity or transition | `panorama-frame.js` | application owner selection and Panorama runtime |
+| Panorama bounds or cycling policy | `panorama-geometry.js` | controller lifecycle and browser presentation |
 | Tail/Lead player behavior | `panorama.js` | stale events, dormant panes, user activation, native-player isolation |
 | DOM projection and visual state | `view.js` | source audit plus Chromium proof |
 | Interaction acquisition, persistence, source boundary | `app.js` | route convergence and whole-system journeys |
@@ -80,7 +80,7 @@ runs the same complete `npm run verify` gate before publishing.
 
 Do not branch inside an operator on Section coverage. Extend or consume the
 shared projection. Do not make a view-only fix by adding another semantic state
-owner. Do not reach through the media adapter from application or Field code.
+owner. Do not reach through the media adapter from application or Panorama code.
 
 ## Boundary requirements
 
@@ -112,7 +112,7 @@ owner. Do not reach through the media adapter from application or Field code.
 - Release, bare Timeline Go, Guide focus, and Timeline acquisition must preserve
   their distinct selection consequences.
 
-### Playback and Field
+### Playback and Panorama
 
 - Observation policy and rate policy are explicit and independent.
 - Stored wish, offered resolution, requested command, and confirmed actual rate
@@ -121,9 +121,9 @@ owner. Do not reach through the media adapter from application or Field code.
 - Retry and proper-Range wrap preserve the transport and reapply its policy.
 - A fixed Shift wish of `1×` remains Center-only.
 - The parent Play control may not cover native YouTube controls.
-- Field suspension derives from observation policy and confirmed compatibility,
+- Panorama suspension derives from observation policy and confirmed compatibility,
   not a numeric shortcut.
-- Field Cycle defaults to `0.25–2.5 s` and `0.75× / 1× / 1.25×`, while saved
+- Panorama Cycle defaults to `0.25–2.5 s` and `0.75× / 1× / 1.25×`, while saved
   valid preferences and wider available settings remain valid.
 - Hold/Stretch changes neither preferences, Guide, Step Reach, nor history.
 
@@ -132,7 +132,7 @@ owner. Do not reach through the media adapter from application or Field code.
 - A load request is immutable and generation-owned.
 - Initialization requires the current generation and matching adapter `videoId`.
 - Every source replacement runs the one transition boundary before cueing.
-- No old-source drag, timer, selection, Field owner, transport, or checkpoint may
+- No old-source drag, timer, selection, Panorama owner, transport, or checkpoint may
   reach the fresh Session.
 - Version-9 Guide evidence is inspected before older fallbacks.
 - An unreadable higher-priority record must be quarantined before a fallback may
@@ -163,17 +163,17 @@ Every executable suite is listed here by the current behavior it protects.
 - `focus-viewport-tests.mjs` — focused drawing fills the map while operator geometry remains independent of viewport.
 - `guide-session-completion-tests.mjs` — shared Group-deletion plan and sparse Step Reversal settlement.
 
-### Transport, media, and Field
+### Transport, media, and Panorama
 
 - `transport-tests.mjs` — explicit observation/rate policies, actual-rate authority, policy-preserving retry/rebase, log-space offers, and unbounded inverse Weight.
 - `youtube-tests.mjs` — URL/time parsing, loaded-source identity in snapshots, and actual playback-rate event delivery.
 - `step-gesture-tests.mjs` — repeat cadence, release batching, boundary stop, cancellation, and takeover.
-- `panorama-tests.mjs` — Field geometry, suspension, Hold/Stretch, side activation, user activation, and panoramic layout contracts.
+- `panorama-tests.mjs` — Panorama geometry, suspension, Hold/Stretch, side activation, user activation, and panoramic layout contracts.
 - `panorama-bounds-tests.mjs` — Range-contained side geometry, unavailable sides, Context suspension, and side Step.
 - `panorama-cycle-tests.mjs` — conservative defaults, symmetric rates, expansion/contraction, Range clipping, synchronization, Hold, and resume.
-- `panorama-coherence-tests.mjs` — semantic Step Reach and physical Field offsets remain independent.
+- `panorama-coherence-tests.mjs` — semantic Step Reach and physical Panorama offsets remain independent.
 - `panorama-frame-tests.mjs` — Frame ownership priority, stable identity, direction, Context edges, and direct-frame validation.
-- `panorama-layout-tests.mjs` — Field UI ownership and the separation of Context, Hold/Stretch, Range loop, side Step, and Guide retention.
+- `panorama-layout-tests.mjs` — Panorama UI ownership and the separation of Context, Hold/Stretch, Range loop, side Step, and Guide retention.
 - `panorama-runtime-tests.mjs` — real controller placement, proportional cycling, dormant panes, stale events, rate fallback, direct previews, and boundary recovery.
 - `panorama-transition-tests.mjs` — directional opacity transitions, rapid coalescing, reversal, stale callback rejection, and reduced motion.
 
@@ -195,9 +195,9 @@ Every executable suite is listed here by the current behavior it protects.
 - `guide-composition-smoke.mjs` — plain Guide selection replaces, Shift/Extend composes monotonically, and the result can be tagged as one parent Section.
 - `cue-smoke.mjs` — offering and drawing Cues is inert; navigation, composition, and Retain use canonical routes.
 - `section-weight-smoke.mjs` — Guide-only Weight editing, effective geometry and atmosphere, scoped/whole-map bypass, weighted Step, and exact restoration.
-- `context-smoke.mjs` — post-traversal Context, Step deferral, replacement, Field suspension, reversal naming, Off, and Undo isolation.
+- `context-smoke.mjs` — post-traversal Context, Step deferral, replacement, Panorama suspension, reversal naming, Off, and Undo isolation.
 - `step-gesture-smoke.mjs` — captured/fallback release, keyboard hold, and rapid taps settle as one action.
-- `transport-coherence-smoke.mjs` — actual-rate observation, effective dynamic projection, settlement, proper-Range wrap, retry, Field rebasing, and history isolation.
+- `transport-coherence-smoke.mjs` — actual-rate observation, effective dynamic projection, settlement, proper-Range wrap, retry, Panorama rebasing, and history isolation.
 - `metadata-smoke.mjs` — delayed valid metadata is retried without creating a zero-duration Session.
 - `source-boundary-smoke.mjs` — stale load generations plus Nudge, Step, Context, Playback, every drag owner, Guide identity, and bypass cleanup at source replacement.
 - `guide-recovery-smoke.mjs` — older fallback preservation, read/quarantine failures, truthful status, and unsafe current records remaining read-only.

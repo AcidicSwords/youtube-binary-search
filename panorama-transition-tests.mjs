@@ -1,4 +1,4 @@
-// The Field Frame behaves as a stable directional slideshow around Current.
+// The Panorama Frame behaves as a stable directional slideshow around Current.
 // These tests drive the real controller with a deterministic iframe stub so the
 // transition lifecycle, coalescing, and stale-event rejection are observable.
 import assert from "node:assert/strict";
@@ -206,7 +206,7 @@ function makeHarness({ deferredCue = false, reducedMotion = false } = {}) {
 }
 
 // Rapid operations coalesce: obsolete intermediate placements are discarded and
-// the Field settles on the latest committed state.
+// the Panorama settles on the latest committed state.
 {
   const h = makeHarness({ deferredCue: true });
   try {
@@ -297,7 +297,7 @@ function makeHarness({ deferredCue = false, reducedMotion = false } = {}) {
     assert.equal(h.tail().time, 65);
     assert.equal(h.lead().time, 75);
     assert.deepEqual(h.controller.cycle().configured, configured,
-      "A direct Frame must not rewrite the configured Field relation.");
+      "A direct Frame must not rewrite the configured Panorama relation.");
     h.controller.clearPreview();
     assert.equal(h.tail().time, 40, "Ending the gesture restores the ambient Frame.");
     assert.equal(h.lead().time, 60);
@@ -322,4 +322,4 @@ function makeHarness({ deferredCue = false, reducedMotion = false } = {}) {
   }
 }
 
-console.log("Field slideshow tests passed: repeated forward and backward transitions, immediate reversal, rapid coalescing with stale-callback rejection, persistent Context framing, direct-manipulation priority, and reduced motion.");
+console.log("Panorama slideshow tests passed: repeated forward and backward transitions, immediate reversal, rapid coalescing with stale-callback rejection, persistent Context framing, direct-manipulation priority, and reduced motion.");

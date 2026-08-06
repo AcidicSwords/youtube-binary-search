@@ -1,4 +1,4 @@
-// Pure Step Field geometry, phase, and response-policy helpers.
+// Pure Step Panorama geometry, phase, and response-policy helpers.
 import { EPSILON, clamp } from "./range-geometry.js";
 import { PANORAMA_SIDE_STEP } from "./transport.js";
 
@@ -16,7 +16,7 @@ export const FIELD_REACH_TOLERANCE = 0.16;
 // cycling rate. Nothing at runtime configures the two sides independently.
 export const DEFAULT_FIELD_RESPONSE = Object.freeze({ tailRate: 0.5, leadRate: 2 });
 
-// Field Cycle: bounded expansion and contraction during ordinary Center
+// Panorama Cycle: bounded expansion and contraction during ordinary Center
 // playback. The relation is symmetric, so one cycling-rate pair is configured
 // rather than two conceptually independent side rates.
 export const PANORAMA_DIRECTION = Object.freeze({
@@ -114,7 +114,7 @@ export function panoramaTargetOffset({
   const position = ((entered + travelled) % lap + lap) % lap;
   // A turn reports the direction it is heading in, not the one it arrived by.
   // Both bounds give the same offset either way, so only the direction is at
-  // stake -- and a Field sitting exactly at its outer bound is about to come
+  // stake -- and a Panorama sitting exactly at its outer bound is about to come
   // back, which is what the side rates must be told. Reading the outer turn as
   // still expanding made a leg resumed from a fully attained Hold depend on
   // whether the resume and the next tick landed in the same millisecond.
@@ -124,7 +124,7 @@ export function panoramaTargetOffset({
 }
 
 export function sideRateStepFromResponse(response = DEFAULT_FIELD_RESPONSE) {
-  const { tailRate, leadRate } = normalizeFieldResponse(response);
+  const { tailRate, leadRate } = normalizePanoramaResponse(response);
   const symmetric = ((1 - tailRate) + (leadRate - 1)) / 2;
   return PANORAMA_SIDE_RATE_STEPS.reduce(
     (best, step) => (
@@ -236,7 +236,7 @@ function sideAtOffset(offset, bounds, operational) {
 //
 // It used to be accumulated: each tick added `centerDelta × rate`, where
 // centerDelta is elapsed *Center source* time. That made the cycle speed
-// proportional to the Center rate, so playing at 1.5x opened the Field half
+// proportional to the Center rate, so playing at 1.5x opened the Panorama half
 // again as fast and a cycle lasted a different number of seconds at every rate.
 // It also meant a tick that never ran — a background tab, a slow frame — was
 // simply lost. Deriving from the phase fixes both: the drift is per real
@@ -354,7 +354,7 @@ export function resumeCycle(runtime, cycle = DEFAULT_PANORAMA_CYCLE) {
   return { ...state, held: false };
 }
 
-function normalizeFieldResponse(value = DEFAULT_FIELD_RESPONSE) {
+function normalizePanoramaResponse(value = DEFAULT_FIELD_RESPONSE) {
   const tailRate = Number(value?.tailRate);
   const leadRate = Number(value?.leadRate);
   return {
@@ -367,43 +367,43 @@ function normalizeFieldResponse(value = DEFAULT_FIELD_RESPONSE) {
   };
 }
 
-export function normalizeFieldReach(value) {
+export function normalizePanoramaReach(value) {
   if (!value || typeof value !== "object") {
-    throw new TypeError("Step Field requires directional Reach.");
+    throw new TypeError("Step Panorama requires directional Reach.");
   }
   const backward = Number(value.backward);
   const forward = Number(value.forward);
   const linked = value.linked !== false;
   if (!(Number.isFinite(backward) && backward > 0 && Number.isFinite(forward) && forward > 0)) {
-    throw new TypeError("Step Field requires positive backward and forward Reach.");
+    throw new TypeError("Step Panorama requires positive backward and forward Reach.");
   }
   if (linked && Math.abs(backward - forward) > EPSILON) {
-    throw new TypeError("Linked Step Field Reach must be equal in both directions.");
+    throw new TypeError("Linked Step Panorama Reach must be equal in both directions.");
   }
   return { backward, forward, linked };
 }
 
-function validateFieldInputs(current, stepReach, range) {
+function validatePanoramaInputs(current, stepReach, range) {
   if (!Number.isFinite(current)) {
-    throw new TypeError("Step Field requires a finite Current.");
+    throw new TypeError("Step Panorama requires a finite Current.");
   }
-  normalizeFieldReach(stepReach);
+  normalizePanoramaReach(stepReach);
   if (
     !range
     || !Number.isFinite(range.start)
     || !Number.isFinite(range.end)
     || range.end < range.start
   ) {
-    throw new TypeError("Step Field requires a valid Range.");
+    throw new TypeError("Step Panorama requires a valid Range.");
   }
 }
 
-export function deriveFieldBounds({ current, stepReach, range }) {
-  const requested = normalizeFieldReach(stepReach);
-  validateFieldInputs(current, requested, range);
+export function derivePanoramaBounds({ current, stepReach, range }) {
+  const requested = normalizePanoramaReach(stepReach);
+  validatePanoramaInputs(current, requested, range);
 
   const center = clamp(current, range.start, range.end);
-  // Field offsets are physical source-time relations. Timeline weighting does
+  // Panorama offsets are physical source-time relations. Timeline weighting does
   // not alter Tail/Lead placement or Hold/Stretch measurement.
   const backwardTarget = Math.max(range.start, center - requested.backward);
   const forwardTarget = Math.min(range.end, center + requested.forward);
@@ -440,7 +440,7 @@ export function deriveFieldBounds({ current, stepReach, range }) {
 }
 
 export function derivePanorama(current, stepReach, range) {
-  const bounds = deriveFieldBounds({ current, stepReach, range });
+  const bounds = derivePanoramaBounds({ current, stepReach, range });
   return {
     center: bounds.current,
     requestedReach: bounds.requestedReach,
@@ -480,7 +480,7 @@ export function hasCenterDiscontinuity(previous, current, tolerance = 2.5) {
   return current < previous - 0.75 || Math.abs(current - previous) > tolerance;
 }
 
-export function resolveFieldPhase({ enabled, suspended, sides }) {
+export function resolvePanoramaPhase({ enabled, suspended, sides }) {
   if (!enabled) return PANORAMA_STATE.OFF;
   if (suspended) return PANORAMA_STATE.SUSPENDED;
   const active = (sides || []).filter(side => side.visible && side.available);
@@ -492,7 +492,7 @@ export function resolveFieldPhase({ enabled, suspended, sides }) {
   return PANORAMA_STATE.UNFOLDING;
 }
 
-export function deriveObservedField({
+export function deriveObservedPanorama({
   targets,
   phase,
   centerAddress,

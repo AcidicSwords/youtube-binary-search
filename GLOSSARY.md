@@ -43,17 +43,17 @@
 - **Go** — move to an exact known Address, seed a movement-scale Resolution, and establish the corresponding contiguous residue.
 - **Nudge** — precise source-time movement of Current or retained topology through one shared operation. It is called a frame only when the media adapter proves an exact frame duration.
 - **Carry** — translate the acquired Timeline Pin or Section through the same Timeline-space displacement as a navigation action, within its structural boundary.
-- **Panoramic Phase Field / Field** — Tail, Center, and Lead presented as one local perceptual surface.
-- **Field Frame** — the stable Context, operator, or direct-manipulation Tail–Center–Lead presentation used outside ordinary Panorama playback.
-- **Field Cycle** — bounded expansion and contraction of operational Tail and Lead offsets during Panorama playback.
+- **Panoramic Phase Panorama / Panorama** — Tail, Center, and Lead presented as one local perceptual surface.
+- **Panorama Frame** — the stable Context, operator, or direct-manipulation Tail–Center–Lead presentation used outside ordinary Panorama playback.
+- **Panorama Cycle** — bounded expansion and contraction of operational Tail and Lead offsets during Panorama playback.
 - **Tail** — the optional muted source phase at or behind Center.
 - **Center** — the audible primary player; Current while settled and Cursor during active observation.
 - **Lead** — the optional muted source phase at or ahead of Center.
-- **Inner Offset** — the minimum Tail/Lead separation from Center during Field Cycle.
-- **Outer Offset** — the maximum Tail/Lead separation from Center during Field Cycle.
-- **Stretch** — begin or resume Field Cycle from its current relation.
-- **Hold** — preserve the attained Field offsets and direction while every held side follows Center at Center rate.
-- **Context** — bounded source-contiguous Center observation around Current. While enabled, its stable edges own the Field Frame.
+- **Inner Offset** — the minimum Tail/Lead separation from Center during Panorama Cycle.
+- **Outer Offset** — the maximum Tail/Lead separation from Center during Panorama Cycle.
+- **Stretch** — begin or resume Panorama Cycle from its current relation.
+- **Hold** — preserve the attained Panorama offsets and direction while every held side follows Center at Center rate.
+- **Context** — bounded source-contiguous Center observation around Current. While enabled, its stable edges own the Panorama Frame.
 - **Playback** — source-contiguous observation that settles watched coverage into the Active Span without shortening existing coverage.
 - **Observation Policy** — explicit playback ownership of either `panorama` or `center-only`, independent from rate.
 - **Rate Policy** — either a fixed stored wish or a dynamic request. It is resolved against the media adapter’s offered rates.
@@ -67,4 +67,4 @@
 - **Load Generation** — the monotonically increasing identity on an immutable source request, used with the adapter’s loaded video identity to reject stale metadata and state events.
 - **Source-transition boundary** — the single operation that settles or cancels all old-source transient owners, persists safe Guide changes, clears source-scoped presentation, and only then cues the new source.
 - **Guide Recovery** — versioned loading that distinguishes an absent Guide from unreadable data, quarantines damaged higher-priority evidence before fallback, and refuses destructive rewrite when preservation fails.
-- **Undo / Redo** — traversal of semantic Session transactions. Transient presentation such as deformation bypass, open panels, Cues, and Field animation phase is outside this history.
+- **Undo / Redo** — traversal of semantic Session transactions. Transient presentation such as deformation bypass, open panels, Cues, and Panorama animation phase is outside this history.

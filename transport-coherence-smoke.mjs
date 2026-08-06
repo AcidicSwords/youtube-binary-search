@@ -296,7 +296,7 @@ assert.equal(rateSelect.value, "2",
   // relation at any Center the ladder can surround -- which is the whole reason
   // the texture is one step per octave rather than an inverse. This used to
   // declare Center-only, so choosing to follow Weight meant choosing to lose the
-  // Field, and the two could never be used together.
+  // Panorama, and the two could never be used together.
   await flush(2);
   assert.notEqual(byId.get("field-transport-state").textContent, "Panorama suspended",
     "A weighted playback keeps its Panorama.");
@@ -324,7 +324,7 @@ assert.equal(rateSelect.value, "2",
   // relation at any Center the ladder can surround -- which is the whole reason
   // the texture is one step per octave rather than an inverse. This used to
   // declare Center-only, so choosing to follow Weight meant choosing to lose the
-  // Field, and the two features could never be used together.
+  // Panorama, and the two features could never be used together.
   const sidePlaysAtNeutral = sidePlays();
   center.currentTime = 25;
   await poll(); await flush(2);
@@ -339,4 +339,4 @@ assert.equal(rateSelect.value, "2",
   assert.equal(center.state, 2, "Ending dynamic playback still pauses Center exactly.");
 }
 
-console.log("Transport coherence smoke passed: live projection, exact settlement, Focus-owned proper-Range looping, one-pass Field rebasing, wrap history isolation, Unfocus restoration, full-video completion, a fixed Shift rate that stays Center-only, and a rate that follows Section weight across the map while the Panorama cycles one rung either side of it.");
+console.log("Transport coherence smoke passed: live projection, exact settlement, Focus-owned proper-Range looping, one-pass Panorama rebasing, wrap history isolation, Unfocus restoration, full-video completion, a fixed Shift rate that stays Center-only, and a rate that follows Section weight across the map while the Panorama cycles one rung either side of it.");

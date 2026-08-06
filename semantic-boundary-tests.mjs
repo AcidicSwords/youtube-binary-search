@@ -158,14 +158,14 @@ finding(
     ),
   {
     matrixStepBackwardDisabled: environment.byId.get("step-backward").disabled,
-    combinedFieldToggleDisabled: environment.byId.get("field-both-toggle").disabled,
+    combinedPanoramaToggleDisabled: environment.byId.get("field-both-toggle").disabled,
     tailSurfaceDisabled: environment.byId.get("tail-player-surface")["aria-disabled"],
     tailSurfaceTabIndex: environment.byId.get("tail-player-surface").tabIndex,
     tailMeta: environment.byId.get("tail-meta").textContent
   }
 );
 
-// Establish and activate the configured Field at Current 50.
+// Establish and activate the configured Panorama at Current 50.
 environment.byId.get("context-seconds").value = "0";
 environment.byId.get("context-seconds").dispatch("change");
 environment.byId.get("timeline").dispatch("click", { clientX: 500 });
@@ -186,7 +186,7 @@ const configuredOuterOffset = environment.byId.get("field-outer-offset").value;
 
 // Start Context at 60 and advance only the Center Cursor. The visible side
 // geometry must remain the exact 2.5-second Context preview while its source
-// window is active, without rewriting the independently configured live Field
+// window is active, without rewriting the independently configured live Panorama
 // offsets underneath it.
 environment.byId.get("context-seconds").value = "5";
 environment.byId.get("context-seconds").dispatch("change");

@@ -2,15 +2,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   PANORAMA_STATE,
-  deriveFieldBounds,
+  derivePanoramaBounds,
   derivePanorama,
   chooseNearestRate,
-  resolveFieldPhase
+  resolvePanoramaPhase
 } from "./panorama-geometry.js";
 import {
   FIELD_SIDE_MODE,
-  fieldShouldSuspend,
-  fieldPreferenceRequiresEstablish
+  panoramaShouldSuspend,
+  panoramaPreferenceRequiresEstablish
 } from "./panorama.js";
 import {
   OBSERVATION_POLICY,
@@ -19,7 +19,7 @@ import {
 } from "./transport.js";
 
 {
-  const bounds = deriveFieldBounds({
+  const bounds = derivePanoramaBounds({
     current: 50,
     stepReach: { backward: 10, forward: 10, linked: true },
     range: { start: 0, end: 100 }
@@ -61,8 +61,8 @@ assert.equal(chooseNearestRate([], 2), 1);
 
 assert.equal(FIELD_SIDE_MODE.HELD, "held");
 assert.equal(FIELD_SIDE_MODE.STRETCHING, "stretching");
-assert.equal(fieldShouldSuspend({ transportKind: "context" }), true);
-assert.equal(fieldShouldSuspend({ transportKind: "playback" }), false);
+assert.equal(panoramaShouldSuspend({ transportKind: "context" }), true);
+assert.equal(panoramaShouldSuspend({ transportKind: "playback" }), false);
 const panoramaPlayback = createPlaybackTransport({
   departure: 10,
   observationPolicy: OBSERVATION_POLICY.PANORAMA,
@@ -77,17 +77,17 @@ const centerOnlyPlayback = createPlaybackTransport({
   offeredRates: [0.75, 1, 1.25],
   actualRate: 1
 });
-assert.equal(fieldShouldSuspend({ transport: panoramaPlayback }), false);
-assert.equal(fieldShouldSuspend({ transport: centerOnlyPlayback }), true);
-assert.equal(fieldShouldSuspend({ pendingStep: true, transportKind: "idle" }), true);
-assert.equal(fieldShouldSuspend({ dragging: true, transportKind: "idle" }), true);
-assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: false }), false);
-assert.equal(fieldPreferenceRequiresEstablish({ tailVisible: true }), true);
-assert.equal(fieldPreferenceRequiresEstablish({ tailRate: 0.75 }), false);
+assert.equal(panoramaShouldSuspend({ transport: panoramaPlayback }), false);
+assert.equal(panoramaShouldSuspend({ transport: centerOnlyPlayback }), true);
+assert.equal(panoramaShouldSuspend({ pendingStep: true, transportKind: "idle" }), true);
+assert.equal(panoramaShouldSuspend({ dragging: true, transportKind: "idle" }), true);
+assert.equal(panoramaPreferenceRequiresEstablish({ tailVisible: false }), false);
+assert.equal(panoramaPreferenceRequiresEstablish({ tailVisible: true }), true);
+assert.equal(panoramaPreferenceRequiresEstablish({ tailRate: 0.75 }), false);
 
-assert.equal(resolveFieldPhase({ enabled: false, suspended: false, sides: [] }), PANORAMA_STATE.OFF);
-assert.equal(resolveFieldPhase({ enabled: true, suspended: true, sides: [] }), PANORAMA_STATE.SUSPENDED);
-assert.equal(resolveFieldPhase({
+assert.equal(resolvePanoramaPhase({ enabled: false, suspended: false, sides: [] }), PANORAMA_STATE.OFF);
+assert.equal(resolvePanoramaPhase({ enabled: true, suspended: true, sides: [] }), PANORAMA_STATE.SUSPENDED);
+assert.equal(resolvePanoramaPhase({
   enabled: true,
   suspended: false,
   sides: [
@@ -95,7 +95,7 @@ assert.equal(resolveFieldPhase({
     { visible: true, available: true, held: false, offset: 3 }
   ]
 }), PANORAMA_STATE.UNFOLDING);
-assert.equal(resolveFieldPhase({
+assert.equal(resolvePanoramaPhase({
   enabled: true,
   suspended: false,
   sides: [
@@ -103,7 +103,7 @@ assert.equal(resolveFieldPhase({
     { visible: true, available: true, held: false, offset: 6 }
   ]
 }), PANORAMA_STATE.PARTIAL);
-assert.equal(resolveFieldPhase({
+assert.equal(resolvePanoramaPhase({
   enabled: true,
   suspended: false,
   sides: [
@@ -117,7 +117,7 @@ assert.equal(resolveFieldPhase({
   const css = readFileSync("panorama.css", "utf8");
   const layoutCss = readFileSync("styles.css", "utf8");
   const app = readFileSync("app.js", "utf8");
-  const fieldSource = readFileSync("panorama.js", "utf8");
+  const panoramaSource = readFileSync("panorama.js", "utf8");
   const youtubeSource = readFileSync("youtube.js", "utf8");
   const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 
@@ -129,7 +129,7 @@ assert.equal(resolveFieldPhase({
     "current-marker", "current-departure-marker",
     "tail-collapse", "lead-collapse", "tail-restore", "lead-restore", "panorama-toggle"
   ]) {
-    assert.match(html, new RegExp(`id=["']${id}["']`), `Missing Step Field DOM id: ${id}`);
+    assert.match(html, new RegExp(`id=["']${id}["']`), `Missing Step Panorama DOM id: ${id}`);
   }
 
   assert.match(app, /createPanoramaController/);
@@ -141,7 +141,7 @@ assert.equal(resolveFieldPhase({
   );
   assert.match(app, /bindStepPress\(control/);
   assert.match(app, /performStep\(selection\.direction, selection\.distance/);
-  assert.match(app, /function startFieldPlaybackFromGesture\(options = \{\}\)/);
+  assert.match(app, /function startPanoramaPlaybackFromGesture\(options = \{\}\)/);
   assert.match(app, /panorama\?\.playFromGesture\?\.\(\{ center: destination, reason: "playback" \}\);[\s\S]*player\.play\(\);/,
     "Parent-owned playback must refold/start both side players and Center in one synchronous gesture stack.");
   // Observation ownership, not an inferred rate or modifier, decides whether
@@ -155,37 +155,37 @@ assert.equal(resolveFieldPhase({
   assert.match(app, /player\.setRate\(state\.transport\.requestedRate\);\s*player\.play\(\);/,
     "and the rate is established before the play command that uses it.");
   assert.match(app, /center-transport-surface/);
-  assert.match(fieldSource, /function playFromGesture\(options = \{\}\)/);
+  assert.match(panoramaSource, /function playFromGesture\(options = \{\}\)/);
   assert.doesNotMatch(app, /onHoldOffsets:/);
-  assert.doesNotMatch(fieldSource, /onHoldOffsets/);
-  assert.match(fieldSource, /const FIELD_SIDE_MODE/);
-  assert.match(fieldSource, /function stretch\(role = "both"\)/);
-  assert.match(fieldSource, /function hold\(role = "both"\)/);
-  assert.match(fieldSource, /function toggleBoth\(\)/);
-  assert.doesNotMatch(fieldSource, /function toggleSide\(/,
+  assert.doesNotMatch(panoramaSource, /onHoldOffsets/);
+  assert.match(panoramaSource, /const FIELD_SIDE_MODE/);
+  assert.match(panoramaSource, /function stretch\(role = "both"\)/);
+  assert.match(panoramaSource, /function hold\(role = "both"\)/);
+  assert.match(panoramaSource, /function toggleBoth\(\)/);
+  assert.doesNotMatch(panoramaSource, /function toggleSide\(/,
     "Cycling is one coordinated relation; independent side Stretch/Hold controls are removed.");
   assert.doesNotMatch(html, /id="(?:tail|lead)-field-toggle"/,
     "There is one combined Stretch/Hold control.");
   assert.doesNotMatch(html, /id="(?:tail|lead)-rate-select"/,
     "The interface exposes one cycling-rate pair, not two independent side rates.");
-  assert.match(fieldSource, /function freezeSideForPause\(side, center, snapshot\)/);
-  assert.match(fieldSource, /function translateToCurrent\(current, \{ preserve = true \} = \{\}\)/);
-  assert.match(fieldSource, /const retained = side\.offset > REACH_TOLERANCE[\s\S]*side\.offset[\s\S]*side\.configuredOffset/,
+  assert.match(panoramaSource, /function freezeSideForPause\(side, center, snapshot\)/);
+  assert.match(panoramaSource, /function translateToCurrent\(current, \{ preserve = true \} = \{\}\)/);
+  assert.match(panoramaSource, /const retained = side\.offset > REACH_TOLERANCE[\s\S]*side\.offset[\s\S]*side\.configuredOffset/,
     "Semantic traversal must translate a live held relation, falling back only to its distinct configured Offset.");
-  assert.match(fieldSource, /Context and semantic gestures are Center-only/);
-  assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*side\.adapter\?\.play\?\.\(\)/,
+  assert.match(panoramaSource, /Context and semantic gestures are Center-only/);
+  assert.match(panoramaSource, /function beginStretch\(side, center, snapshot,[\s\S]*requestRate\(side, 1, true\)[\s\S]*side\.adapter\?\.play\?\.\(\)/,
     "Every play must refold and prime a side at 1× before directional-rate discovery.");
-  assert.match(fieldSource, /mode:\s*"step"/);
-  assert.doesNotMatch(fieldSource, /mode:\s*"go"/);
-  assert.match(fieldSource, /accessible:\s*false/);
-  assert.doesNotMatch(fieldSource, /\.raw\?\.\(|\.raw\(\)/,
-    "Field code must request an inaccessible side player without reaching through its adapter.");
-  assert.match(fieldSource, /function parkSide\(side, address, \{ force = false \} = \{\}\)/);
-  assert.match(fieldSource, /if \(!side\.sourceReady\)[\s\S]*side\.adapter\?\.cue\?\.\(side\.videoId, target\)[\s\S]*return true;[\s\S]*side\.adapter\?\.place\?\.\(target\)[\s\S]*side\.adapter\?\.pause\?\.\(\)/,
+  assert.match(panoramaSource, /mode:\s*"step"/);
+  assert.doesNotMatch(panoramaSource, /mode:\s*"go"/);
+  assert.match(panoramaSource, /accessible:\s*false/);
+  assert.doesNotMatch(panoramaSource, /\.raw\?\.\(|\.raw\(\)/,
+    "Panorama code must request an inaccessible side player without reaching through its adapter.");
+  assert.match(panoramaSource, /function parkSide\(side, address, \{ force = false \} = \{\}\)/);
+  assert.match(panoramaSource, /if \(!side\.sourceReady\)[\s\S]*side\.adapter\?\.cue\?\.\(side\.videoId, target\)[\s\S]*return true;[\s\S]*side\.adapter\?\.place\?\.\(target\)[\s\S]*side\.adapter\?\.pause\?\.\(\)/,
     "A source may be cued only while preparing; source-ready paused sides must seek and pause on their represented frame.");
-  assert.match(fieldSource, /function beginStretch\(side, center, snapshot,[\s\S]*if \(play && side\.sourceReady\)[\s\S]*side\.adapter\?\.play\?\.\(\)/,
+  assert.match(panoramaSource, /function beginStretch\(side, center, snapshot,[\s\S]*if \(play && side\.sourceReady\)[\s\S]*side\.adapter\?\.play\?\.\(\)/,
     "Trusted side playback must start only after that side source has reached CUED readiness.");
-  assert.match(fieldSource, /render\(snapshot\);[\s\S]*ensurePlayers\(prefs\);/,
+  assert.match(panoramaSource, /render\(snapshot\);[\s\S]*ensurePlayers\(prefs\);/,
     "Side panes must be rendered and measurable before player creation.");
   assert.match(youtubeSource, /DEFAULT_IFRAME_ALLOW[\s\S]*"autoplay"/);
   assert.match(youtubeSource, /setAttribute\?\.\("allow", options\.iframeAllow \|\| DEFAULT_IFRAME_ALLOW\)/);
@@ -223,9 +223,9 @@ assert.equal(resolveFieldPhase({
   assert.match(css, /\.step-pane\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/,
     "Every pane must force its implicit content track to shrink instead of clipping the Lead controls.");
   assert.match(layoutCss, /\.player-panel\s*\{[\s\S]*container-type:\s*inline-size/,
-    "Step Field responsive geometry must measure its containing panel.");
+    "Step Panorama responsive geometry must measure its containing panel.");
   assert.match(css, /\.panorama\.field-off[\s\S]*grid-template-areas:\s*"center"[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/,
-    "Field-off projection must remain Center-only even when collapsed preferences persist.");
+    "Panorama-off projection must remain Center-only even when collapsed preferences persist.");
   assert.match(css, /\.panorama\.tail-collapsed:not\(\.lead-collapsed\):not\(\.field-off\)[\s\S]*grid-template-columns:\s*48px minmax\(0, 1fr\)/,
     "A collapsed Tail must release medium-layout width to Lead.");
   assert.match(css, /\.panorama\.lead-collapsed:not\(\.tail-collapsed\):not\(\.field-off\)[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 48px/,
@@ -237,16 +237,16 @@ assert.equal(resolveFieldPhase({
     /@container \(max-width: 680px\)[\s\S]*\.panorama\.tail-collapsed\.lead-collapsed:not\(\.field-off\)[\s\S]*grid-template-areas:\s*"center"\s*"tail"\s*"lead"/,
     "Phone stacking must override the more-specific collapsed medium layout."
   );
-  assert.match(fieldSource, /const availableRoles = controllableRoles\(snapshot, prefs\)[\s\S]*const held = runtime\.cycle\.held/,
-    "Combined Field state must derive from one cycling relation over currently operational projections.");
-  assert.match(fieldSource, /function sideIsOperational\([\s\S]*sideIsVisible[\s\S]*side\.sourceReady[\s\S]*effectiveOffset/,
-    "One operational predicate must govern side controls, side Step, and combined Field actions.");
-  assert.match(fieldSource, /function sidePlaybackAllowed\([\s\S]*runtime\.centerWasRunning[\s\S]*!runtime\.suspended/,
-    "Delayed side-player events must re-check current Field ownership before playing.");
-  assert.match(fieldSource, /runtime\.restoreRoles/,
+  assert.match(panoramaSource, /const availableRoles = controllableRoles\(snapshot, prefs\)[\s\S]*const held = runtime\.cycle\.held/,
+    "Combined Panorama state must derive from one cycling relation over currently operational projections.");
+  assert.match(panoramaSource, /function sideIsOperational\([\s\S]*sideIsVisible[\s\S]*side\.sourceReady[\s\S]*effectiveOffset/,
+    "One operational predicate must govern side controls, side Step, and combined Panorama actions.");
+  assert.match(panoramaSource, /function sidePlaybackAllowed\([\s\S]*runtime\.centerWasRunning[\s\S]*!runtime\.suspended/,
+    "Delayed side-player events must re-check current Panorama ownership before playing.");
+  assert.match(panoramaSource, /runtime\.restoreRoles/,
     "Restoring one collapsed projection must not force a sibling re-establishment.");
-  assert.match(fieldSource, /side\.ready = Boolean\(side\.adapter\)/);
-  assert.match(fieldSource, /resetSources/);
+  assert.match(panoramaSource, /side\.ready = Boolean\(side\.adapter\)/);
+  assert.match(panoramaSource, /resetSources/);
   assert.match(app, /panorama\?\.resetSources\?\.\(\)/,
     "Reloading a video must release stale side-source errors, including same-video reloads.");
   assert.match(css, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);
@@ -257,4 +257,4 @@ assert.equal(resolveFieldPhase({
   assert.match(packageJson.scripts.test, /panorama-tests\.mjs/);
 }
 
-console.log("All Step Field tests passed: geometry, suspension, Hold/Stretch, side Step, visible bootstrap, shared user activation, autoplay delegation, cue-based parking, rate priming, and panoramic layout.");
+console.log("All Step Panorama tests passed: geometry, suspension, Hold/Stretch, side Step, visible bootstrap, shared user activation, autoplay delegation, cue-based parking, rate priming, and panoramic layout.");

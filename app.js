@@ -92,7 +92,7 @@ import {
   RATE_POLICY_KIND,
   idleTransport,
   isTransportActive,
-  transportFieldRange,
+  transportPanoramaRange,
   deriveContextWindow,
   isProperRange,
   createContextTransport,
@@ -124,7 +124,7 @@ import {
 import {
   FIELD_FRAME_OWNER,
   FIELD_FRAME_ACTIVATION,
-  createFieldFrameSequencer
+  createPanoramaFrameSequencer
 } from "./panorama-frame.js";
 import {
   DEFAULT_STEP_GESTURE_TIMING,
@@ -187,8 +187,8 @@ function normalizeNudgeSeconds(value, fallback = DEFAULT_NUDGE_SECONDS) {
   return clamp(numeric, MIN_NUDGE_SECONDS, MAX_NUDGE_SECONDS);
 }
 
-function legacyFieldCycle(value) {
-  const legacy = value?.fieldOffsets;
+function legacyPanoramaCycle(value) {
+  const legacy = value?.panoramaOffsets;
   const outer = Math.max(
     Number(legacy?.backward) || 0,
     Number(legacy?.forward) || 0
@@ -196,8 +196,8 @@ function legacyFieldCycle(value) {
   return {
     inner: Math.max(MIN_NUDGE_SECONDS, outer / 4),
     outer,
-    rate: value?.fieldResponse
-      ? sideRateStepFromResponse(value.fieldResponse)
+    rate: value?.panoramaResponse
+      ? sideRateStepFromResponse(value.panoramaResponse)
       : DEFAULT_PANORAMA_CYCLE.rate
   };
 }
@@ -230,7 +230,7 @@ function effectivePlaybackRate() {
 
 function savedPanoramaCycle(value) {
   if (value?.panoramaCycle) return value.panoramaCycle;
-  if (value?.fieldOffsets || value?.fieldResponse) return legacyFieldCycle(value);
+  if (value?.panoramaOffsets || value?.panoramaResponse) return legacyPanoramaCycle(value);
   return DEFAULT_PANORAMA_CYCLE;
 }
 
@@ -325,7 +325,7 @@ const state = {
   shiftKeyHeld: false,
   field: null,
   // Direct manipulation of Current on the Temporal Topography. It commits a
-  // Step, not a Go and not a Pin move, and it owns the Field Frame while it runs.
+  // Step, not a Go and not a Pin move, and it owns the Panorama Frame while it runs.
   currentDrag: null,
   // True while a Step gesture is being held. Predictive chrome stands down for
   // the duration: a destination marker is an answer to "where would this go",
@@ -387,8 +387,8 @@ function activeRange() {
   return model().range;
 }
 
-function activeFieldRange() {
-  return transportFieldRange(state.transport, activeRange()) || activeRange();
+function activePanoramaRange() {
+  return transportPanoramaRange(state.transport, activeRange()) || activeRange();
 }
 
 function currentStepReach() {
@@ -407,9 +407,9 @@ function currentPanoramaCycle() {
   return normalizePanoramaCycle(state.panoramaCycle ?? preferences.panoramaCycle);
 }
 
-// Field Offsets remain physical observation settings that are independent from
-// the semantic Step Reach. The outer offset is the Field's cycling bound.
-function currentFieldOffsets() {
+// Panorama Offsets remain physical observation settings that are independent from
+// the semantic Step Reach. The outer offset is the Panorama's cycling bound.
+function currentPanoramaOffsets() {
   const cycle = currentPanoramaCycle();
   return normalizeStepReach({
     backward: cycle.outer,
@@ -419,7 +419,7 @@ function currentFieldOffsets() {
   });
 }
 
-function fieldStepPreview(center, kind = "step") {
+function panoramaStepPreview(center, kind = "step") {
   const reach = currentStepReach();
   const projection = timelineProjection();
   return {
@@ -442,7 +442,7 @@ function fieldStepPreview(center, kind = "step") {
   };
 }
 
-// The next settled Field Frame is resolved once per semantic movement. Context
+// The next settled Panorama Frame is resolved once per semantic movement. Context
 // has priority over operator framing, but only while Context is enabled.
 function sectionFrame(start, end, projection = timelineProjection()) {
   return {
@@ -500,7 +500,7 @@ function operatorFrameRequest() {
       };
     }
   }
-  const step = fieldStepPreview(center);
+  const step = panoramaStepPreview(center);
   return {
     kind: "step",
     center,
@@ -513,7 +513,7 @@ function operatorFrameRequest() {
   };
 }
 
-function fieldFrameRequest() {
+function panoramaFrameRequest() {
   if (!state.videoLoaded || !currentNeighborhood() || !activeRange()) return null;
   // Direct manipulation temporarily supplies an exact Frame and has priority
   // over both Context and operator framing for the gesture's lifetime.
@@ -533,7 +533,7 @@ function fieldFrameRequest() {
       )
     )
   ) {
-    // Ordinary Center playback hands presentation to the Field Cycle.
+    // Ordinary Center playback hands presentation to the Panorama Cycle.
     return null;
   }
   // Context has priority over operator framing whenever Context is *enabled* —
@@ -564,15 +564,15 @@ function fieldFrameRequest() {
 
 // One sequencer owns stable Frame identity, so republishing the same state and
 // Context transport inside a settled window create no new transition.
-const fieldFrames = createFieldFrameSequencer();
+const panoramaFrames = createPanoramaFrameSequencer();
 
-function fieldOperatorPreview() {
-  const request = fieldFrameRequest();
+function panoramaOperatorPreview() {
+  const request = panoramaFrameRequest();
   if (!request) {
-    fieldFrames.reset();
+    panoramaFrames.reset();
     return null;
   }
-  const frame = fieldFrames.resolve(request);
+  const frame = panoramaFrames.resolve(request);
   if (!frame) return null;
   // Side Step distance is semantic Reach, not the clipped Frame geometry, so it
   // travels with the Frame rather than being re-derived from its addresses.
@@ -1013,9 +1013,9 @@ function scheduleNativeGo(address) {
 }
 
 function locateAddress(address, {
-  preserveField = false,
-  resetField = false,
-  fieldAligned = false,
+  preservePanorama = false,
+  resetPanorama = false,
+  panoramaAligned = false,
   centerAligned = false
 } = {}) {
   if (!player || !Number.isFinite(address)) return;
@@ -1025,10 +1025,10 @@ function locateAddress(address, {
   player.pause();
   player.setRate(1);
   if (!centerAligned) placePlayer(address);
-  if (resetField) {
+  if (resetPanorama) {
     panorama?.resetAtCurrent?.();
-  } else if (!fieldAligned) {
-    panorama?.translateToCurrent(address, { preserve: preserveField });
+  } else if (!panoramaAligned) {
+    panorama?.translateToCurrent(address, { preserve: preservePanorama });
   }
 }
 
@@ -1040,7 +1040,7 @@ function startContext(anchor, options = {}) {
   });
 
   if (transport.kind === TRANSPORT_KIND.IDLE) {
-    locateAddress(anchor, { preserveField: true });
+    locateAddress(anchor, { preservePanorama: true });
     return;
   }
 
@@ -1053,7 +1053,7 @@ function startContext(anchor, options = {}) {
     : transport;
   // Context playback belongs only to Center. Tail and Lead pause their stored
   // playback relation and temporarily preview the exact Context bounds.
-  // Retargeting an active Context reuses that already-suspended Field.
+  // Retargeting an active Context reuses that already-suspended Panorama.
   if (!options.retarget) panorama?.pause({ center: anchor, freeze: false });
   player.setRate(1);
   placePlayer(transport.start);
@@ -1072,15 +1072,15 @@ function applyPlayerEffect(result, options = {}) {
   if (!Number.isFinite(destination)) return;
 
   if (observe && state.contextSeconds > 0 && result?.activeSpan) {
-    if (!options.fieldAligned) {
+    if (!options.panoramaAligned) {
       panorama?.translateToCurrent(destination, { preserve: true });
     }
     startContext(destination);
     return;
   }
   locateAddress(destination, {
-    preserveField: true,
-    fieldAligned: options.fieldAligned === true,
+    preservePanorama: true,
+    panoramaAligned: options.panoramaAligned === true,
     centerAligned: options.centerAligned === true
   });
 }
@@ -1166,7 +1166,7 @@ function accept(result, options = {}) {
   if (options.effect !== false) {
     applyPlayerEffect(result, {
       observe: options.observe,
-      fieldAligned: rangeAligned
+      panoramaAligned: rangeAligned
     });
   }
   if (
@@ -1328,7 +1328,7 @@ function settleTransport(options = {}) {
 
   const restoreObservation = options.restoreObservation !== false;
   const issuePause = options.issuePause !== false;
-  const handoffField = options.handoffField === true;
+  const handoffPanorama = options.handoffPanorama === true;
   const shouldRender = options.render !== false;
   const current = clamp(safeCurrentTime(), activeRange().start, activeRange().end);
   // Watched source time, recorded as what was actually observed rather than as
@@ -1351,7 +1351,7 @@ function settleTransport(options = {}) {
   if (issuePause) player.pause();
 
   if (active.kind === TRANSPORT_KIND.CONTEXT) {
-    if (restoreObservation && !handoffField && currentNeighborhood()) {
+    if (restoreObservation && !handoffPanorama && currentNeighborhood()) {
       placePlayer(currentNeighborhood().C);
       panorama?.translateToCurrent(currentNeighborhood().C, { preserve: true });
     }
@@ -1360,10 +1360,10 @@ function settleTransport(options = {}) {
   }
 
   if (active.kind === TRANSPORT_KIND.PLAYBACK) {
-    // Ordinary pause freezes the visible Field once. A direct handoff skips
+    // Ordinary pause freezes the visible Panorama once. A direct handoff skips
     // that intermediate formation because the next transport will establish
-    // its own Field around the newly settled Current in the same action.
-    if (!handoffField) panorama?.pause({ center: current, freeze: true });
+    // its own Panorama around the newly settled Current in the same action.
+    if (!handoffPanorama) panorama?.pause({ center: current, freeze: true });
     const result = completePlayback(state.session, {
       current,
       departure: active.departure,
@@ -1377,7 +1377,7 @@ function settleTransport(options = {}) {
     if (result.changed) {
       state.session = result.session;
       syncIntervalPinSelection();
-      if (!handoffField) panorama?.translateToCurrent(current, { preserve: true });
+      if (!handoffPanorama) panorama?.translateToCurrent(current, { preserve: true });
       persistPreferences();
       view.renderGuide();
     }
@@ -1429,7 +1429,7 @@ function flushPendingStep(options = {}) {
       activeSpan: currentSpan()
     }, {
       observe: options.observe,
-      fieldAligned: true,
+      panoramaAligned: true,
       centerAligned: true
     });
   }
@@ -1561,12 +1561,12 @@ function settleBeforeAction(options = {}) {
     settleTransport({
       restoreObservation: false,
       issuePause: !handoffTransport,
-      handoffField: handoffTransport
+      handoffPanorama: handoffTransport
     });
   } else if (options.transport !== false) {
     settleTransport({
       issuePause: !handoffTransport,
-      handoffField: handoffTransport
+      handoffPanorama: handoffTransport
     });
   }
 }
@@ -1837,8 +1837,8 @@ function traverseHistory(transform, emptyMessage, completedVerb, cause) {
     startContext(destination);
   } else if (currentMoved || rangeChanged) {
     locateAddress(destination, {
-      preserveField: !rangeChanged,
-      resetField: rangeChanged
+      preservePanorama: !rangeChanged,
+      resetPanorama: rangeChanged
     });
   }
   view.renderGuide();
@@ -2008,7 +2008,7 @@ function startNativePlaybackSession() {
   view.render();
 }
 
-function startFieldPlaybackFromGesture(options = {}) {
+function startPanoramaPlaybackFromGesture(options = {}) {
   if (!state.videoLoaded) return false;
   settleBeforeAction({ handoffTransport: true });
   clearNativeGo();
@@ -2039,7 +2039,7 @@ function startFieldPlaybackFromGesture(options = {}) {
     // either side of Center, so they hold their relation at any Center the
     // ladder can surround -- which is the whole point of reading Weight as one
     // step per octave rather than as an inverse. Declaring Center-only here
-    // suspended the Field before the triplet was ever consulted, so choosing to
+    // suspended the Panorama before the triplet was ever consulted, so choosing to
     // follow Weight still meant choosing to lose the Panorama.
     //
     // A fixed Shift rate stays Center-only: it is a deliberate request for one
@@ -2057,7 +2057,7 @@ function startFieldPlaybackFromGesture(options = {}) {
   // side of it, so the Panorama accompanies any Center rate the adapter can
   // surround. Where it cannot -- the ends of the ladder, or a ladder missing a
   // neighbour -- Center plays alone rather than drifting: ordinary playback is a
-  // capability this system keeps, not one the Field is allowed to cost it.
+  // capability this system keeps, not one the Panorama is allowed to cost it.
   if (playbackAllowsPanorama(state.transport, { offeredRates: offeredRates() })) {
     // This function is called directly from a trusted parent-page click or Space
     // key event. Ask every muted side and Center to play in the same synchronous
@@ -2094,7 +2094,7 @@ function toggleNativePlayback(options = {}) {
     // ordinary playback wherever it is issued, so Context yields to it rather
     // than reinterpreting the key as "commit what I was peeking at". Current is
     // placed exactly by dragging it, nudging it, or editing its Address.
-    startFieldPlaybackFromGesture({ shifted: options.fast === true });
+    startPanoramaPlaybackFromGesture({ shifted: options.fast === true });
     return;
   }
   if (transportIs(TRANSPORT_KIND.PLAYBACK)) {
@@ -2109,7 +2109,7 @@ function toggleNativePlayback(options = {}) {
     startNativePlaybackSession();
     requestCenterPause();
   } else {
-    startFieldPlaybackFromGesture({ shifted: options.fast === true });
+    startPanoramaPlaybackFromGesture({ shifted: options.fast === true });
   }
 }
 
@@ -2143,7 +2143,7 @@ function wrapPlaybackRange() {
   return true;
 }
 
-function heldFieldSpan() {
+function heldPanoramaWindow() {
   const span = state.field?.span;
   return span?.held && span.available ? { start: span.start, end: span.end } : null;
 }
@@ -2155,7 +2155,7 @@ function acceptRangeTransition(result, { status, closeGuide = false } = {}) {
     status
   });
   if (!accepted) return false;
-  locateAddress(currentNeighborhood().C, { resetField: true });
+  locateAddress(currentNeighborhood().C, { resetPanorama: true });
   if (closeGuide) closeCompactGuideAfterSelection();
   return true;
 }
@@ -2311,7 +2311,7 @@ function selectedSectionExtent(source = null) {
   return {
     kind,
     extent: kind === "field-span"
-      ? heldFieldSpan()
+      ? heldPanoramaWindow()
       : kind === "selected-pins"
         ? selectedPinExtent()
         : currentSpan()
@@ -3191,7 +3191,7 @@ function handlePlaybackRateChange(rate) {
   const panoramaIsAvailable = playbackAllowsPanorama(state.transport, { offeredRates: offeredRates() });
   const center = clamp(safeCurrentTime(), activeRange().start, activeRange().end);
   // Actual-rate events own the compatibility transition, but repeated
-  // confirmations of the same compatibility state own no second Field command.
+  // confirmations of the same compatibility state own no second Panorama command.
   if (panoramaIsAvailable && !panoramaWasAvailable) {
     panorama?.resumeAt?.({ center, reason: "confirmed-playback-rate" });
   } else if (!panoramaIsAvailable && panoramaWasAvailable) {
@@ -3234,7 +3234,7 @@ function pollPlayer() {
   }
   // YouTube commonly reports only 1x until the iframe has actually entered
   // playback, so the offer is re-read rather than trusted once at load. Unknown
-  // is not the same as unsupported -- the same rule the Field already follows.
+  // is not the same as unsupported -- the same rule the Panorama already follows.
   const offered = playerSnapshot().availableRates;
   if (offered.join(",") !== (state.availableRates || []).join(",")) {
     state.availableRates = offered;
@@ -3347,7 +3347,7 @@ function pollPlayer() {
   }
 
   // Transport owns discontinuities such as Range wrap. Resolve those first so
-  // the Field observes the rebased Center once instead of reacting to the
+  // the Panorama observes the rebased Center once instead of reacting to the
   // out-of-window frame and then being placed again by the wrap.
   panorama?.tick();
   view.renderTransport();
@@ -3564,7 +3564,7 @@ function previewGuideDrag(drag) {
   const frame = section
     ? sectionPreview
     : (() => {
-      const step = fieldStepPreview(center, "pin");
+      const step = panoramaStepPreview(center, "pin");
       return { kind: "pin", start: step.start, center, end: step.end };
     })();
   state.directFrame = frame;
@@ -3786,7 +3786,7 @@ function finishGuideDrag(event, options = {}) {
   const guidePersisted = persistGuide();
   if (drag.rangeChanged) {
     clearGuideDragPreview({ restore: false });
-    locateAddress(currentNeighborhood().C, { resetField: true });
+    locateAddress(currentNeighborhood().C, { resetPanorama: true });
   } else {
     clearGuideDragPreview();
   }
@@ -3882,7 +3882,7 @@ function updateCurrentDrag(event) {
   view.render();
 }
 
-// The candidate Field Frame during a Current drag: the Context Frame when
+// The candidate Panorama Frame during a Current drag: the Context Frame when
 // Context is enabled, otherwise the exact Go/operator Frame around the
 // candidate Address.
 function showCurrentDragFrame(candidate) {
@@ -3896,7 +3896,7 @@ function showCurrentDragFrame(candidate) {
         end: Math.min(range.end, candidate + contextHalf)
       }
     : (() => {
-        const step = fieldStepPreview(candidate, "current");
+        const step = panoramaStepPreview(candidate, "current");
         return { kind: "current", start: step.start, center: candidate, end: step.end };
       })();
   state.directFrame = frame;
@@ -4047,7 +4047,7 @@ function finishRangeDrag() {
   state.rangeDragProjection = null;
   if (changed) {
     state.session = checkpoint(state.session, "Adjust Range", origin).session;
-    locateAddress(currentNeighborhood().C, { resetField: true });
+    locateAddress(currentNeighborhood().C, { resetPanorama: true });
     view.renderGuide();
     setStatus(`Range set to ${formatRange(activeRange())}.`);
   } else if (origin) {
@@ -4213,9 +4213,9 @@ function prefersReducedMotion() {
   );
 }
 
-// Inner and Outer Offset are the bounds of one Field relation, not two
+// Inner and Outer Offset are the bounds of one Panorama relation, not two
 // independent side settings. 0 < x < y is enforced against the sibling bound.
-function changeFieldBoundary(boundary, value) {
+function changePanoramaBoundary(boundary, value) {
   const parsed = Number(value);
   if (!String(value).trim() || !Number.isFinite(parsed) || parsed <= 0) {
     setStatus("Panorama offset must be a positive number.", true);
@@ -5036,17 +5036,17 @@ function initializePlayerApi() {
       videoLoaded: state.videoLoaded,
       videoId: state.videoId,
       current: currentNeighborhood()?.C || 0,
-      range: activeFieldRange(),
-      // Step Field offsets are physical observation settings. They are
+      range: activePanoramaRange(),
+      // Step Panorama offsets are physical observation settings. They are
       // intentionally independent from the semantic Step Reach.
-      stepReach: currentFieldOffsets(),
+      stepReach: currentPanoramaOffsets(),
       panoramaCycle: currentPanoramaCycle(),
       // The application resolves the ambient Frame owner and supplies exact
-      // source Addresses. The Field controller never imports timeline
+      // source Addresses. The Panorama controller never imports timeline
       // projection, operator arithmetic, or Context math.
-      panoramaFrame: fieldOperatorPreview(),
+      panoramaFrame: panoramaOperatorPreview(),
       transport: state.transport,
-      // The Field decides whether a complete Panorama triplet exists, so it
+      // The Panorama decides whether a complete Panorama triplet exists, so it
       // needs the ladder the adapter actually offers. Without it every Center
       // rate but 1x reads as uncertain and the Panorama suspends -- which is
       // exactly what following Weight was supposed to stop doing.
@@ -5077,8 +5077,8 @@ function initializePlayerApi() {
       }
       persistPreferences();
     },
-    onChange: fieldState => {
-      state.field = fieldState;
+    onChange: panoramaState => {
+      state.field = panoramaState;
       view.render();
     },
     formatTime
@@ -5281,7 +5281,7 @@ function handleGhostWheel(event) {
     if (state.contextSeconds > 0) {
       startContext(landing, { retarget: transportIs(TRANSPORT_KIND.CONTEXT) });
     } else {
-      locateAddress(landing, { preserveField: true });
+      locateAddress(landing, { preservePanorama: true });
     }
     syncIntervalPinSelection();
     // A recall is otherwise almost silent -- Current moves and an Interval
@@ -5708,7 +5708,7 @@ const sideStep = role => event => {
   if (!selection || !Number.isFinite(selection.address) || !currentNeighborhood()) {
     return null;
   }
-  // The Field presents an exact source Address; Step consumes Timeline Space.
+  // The Panorama presents an exact source Address; Step consumes Timeline Space.
   // Convert at the application boundary so activating a visible phase lands on
   // that phase under neutral, compressed, expanded, and overlapping terrain.
   const distance = timelineProjection().timelineDistance(
@@ -5841,12 +5841,12 @@ for (const control of document.querySelectorAll("[data-preview-action]")) {
   control.addEventListener("blur", () => { view.setPreviewAction(null); view.render(); });
 }
 
-// Step Field geometry
+// Step Panorama geometry
 elements["field-inner-offset"].addEventListener("change", event => {
-  changeFieldBoundary("inner", event.target.value);
+  changePanoramaBoundary("inner", event.target.value);
 });
 elements["field-outer-offset"].addEventListener("change", event => {
-  changeFieldBoundary("outer", event.target.value);
+  changePanoramaBoundary("outer", event.target.value);
 });
 elements["nudge-seconds"].addEventListener("change", event => {
   const parsed = Number(event.target.value);
@@ -6127,7 +6127,7 @@ function applyGuideAddressInput(input) {
   return true;
 }
 
-// An Address input previews the candidate Field Frame before commit. Typing is
+// An Address input previews the candidate Panorama Frame before commit. Typing is
 // presentation only: it seeks the players but writes no Session state.
 function previewGuideAddressInput(input) {
   const target = guideAddressTarget(input);
@@ -6175,7 +6175,7 @@ function previewGuideAddressInput(input) {
       effectiveProjectionForModel(candidate.session.model)
     );
   } else {
-    const step = fieldStepPreview(address, "pin");
+    const step = panoramaStepPreview(address, "pin");
     frame = { kind: "pin", start: step.start, center: address, end: step.end };
   }
   // Center shows what the drag path shows for the same edit: the Section's

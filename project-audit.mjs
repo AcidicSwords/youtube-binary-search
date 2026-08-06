@@ -181,7 +181,7 @@ lacks(docs["SPEC.md"], /normative for v(?!8\.0\.0\b)\d/i,
 // that altitude. These checks bind to law-bearing terms, not patch history.
 for (const section of [
   /## Load and play/,
-  /## Panoramic Phase Field/,
+  /## Panoramic Phase Panorama/,
   /## Temporal Topography/,
   /## Active Span and operators/,
   /## Guide and direct manipulation/,
@@ -266,7 +266,7 @@ for (const implementationLaw of [
   /## Source-generation boundary/,
   /## Nudge and direct manipulation/,
   /## Playback and media authority/,
-  /## Field Frame and Field Cycle/
+  /## Panorama Frame and Panorama Cycle/
 ]) has(docs["IMPLEMENTATION.md"], implementationLaw,
   `IMPLEMENTATION describes ${implementationLaw}.`);
 has(docs["IMPLEMENTATION.md"], /projection\.weightContributors|effective contributors/i,
@@ -310,12 +310,12 @@ for (const heading of [
   /### Playback and ordinary-player integrity/,
   /### Source and Guide integrity/,
   /### Groups, modifiers, Nudge, and Step reversal/,
-  /### Field/,
+  /### Panorama/,
   /### Documentation and gauges/
 ]) has(docs["VALIDATION.md"], heading, `VALIDATION includes ${heading}.`);
 has(docs["VALIDATION.md"], /npm ci[\s\S]*?npm run verify/,
   "VALIDATION starts from the reproducible complete release gate.");
-for (const journey of ["ordinary player", "operator comprehension", "retain and compose", "deformation comparison", "Field", "source and recovery integrity"]) {
+for (const journey of ["ordinary player", "operator comprehension", "retain and compose", "deformation comparison", "Panorama", "source and recovery integrity"]) {
   has(docs["VALIDATION.md"], new RegExp(`### Journey [A-F] — ${escapeRegExp(journey)}`, "i"),
     `VALIDATION retains manual journey ${journey}.`);
 }
@@ -420,6 +420,6 @@ if (failures.length) {
   process.exitCode = 1;
 } else {
   console.log(
-    "Project audit passed: lockfile and npm-ci CI, package/spec authority, exact suite map, final operator and projection language, playback/source/Guide laws, Field defaults, and canonical documents form one release contract."
+    "Project audit passed: lockfile and npm-ci CI, package/spec authority, exact suite map, final operator and projection language, playback/source/Guide laws, Panorama defaults, and canonical documents form one release contract."
   );
 }
