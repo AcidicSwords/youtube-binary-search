@@ -742,7 +742,7 @@ await flush();
 await poll();
 assert.equal(byId.get("tail-pane").classList.contains("is-collapsed"), true);
 assert.equal(byId.get("tail-restore").hidden, false);
-assert.equal(byId.get("panorama-both-toggle-label").textContent, "Resume Panorama");
+assert.equal(byId.get("panorama-both-toggle-label").textContent, "Stretch Panorama");
 assert.equal(lead.currentTime, leadBeforeCollapse);
 assert.equal(lead.commands.filter(command => command[0] === "place").length, leadPlacesBeforeCollapse);
 byId.get("tail-restore").click();
@@ -771,7 +771,7 @@ await flush();
 assert.equal(byId.get("center-transport-surface").hidden, true, "Native Center controls must be exposed while ordinary playback is running.");
 
 // The Panorama forms from authoritative Center progression. Tail and Lead use
-// confirmed directional rates, while Hold freezes the measured visible frame.
+// confirmed directional rates, while Freeze preserves the measured visible frame.
 for (let elapsed = 1; elapsed <= 8; elapsed += 1) {
   center.currentTime = 50 + elapsed;
   tail.currentTime = 50 + elapsed * 0.5;
@@ -802,20 +802,20 @@ assert.equal(byId.get("panorama-transport-state").textContent, "Cycling out");
 assert.equal(byId.get("section-window").textContent, intervalBeforeStretch,
   "Cycling must never rewrite the semantic Interval.");
 
-// Hold alone stops the cycle. It preserves the attained relation, sets every
-// held side to Center rate, and writes no configuration and no Session state.
+// Freeze alone stops the cycle. It preserves the attained relation, sets every
+// frozen side to Center rate, and writes no configuration and no Session state.
 byId.get("panorama-both-toggle").click();
 await flush();
 assert.equal(center.state, 1, "Holding the Panorama must not interrupt Center playback.");
-assert.equal(tail.rate, 1, "Every held side matches Center at 1x.");
+assert.equal(tail.rate, 1, "Every frozen side matches Center at 1x.");
 assert.equal(lead.rate, 1);
-assert.equal(byId.get("panorama-both-toggle-label").textContent, "Resume Panorama");
-assert.equal(byId.get("panorama-transport-state").textContent, "Held");
-assert.equal(byId.get("panorama-outer-offset").value, "10", "Hold must not overwrite the configured Outer Offset.");
-assert.equal(byId.get("panorama-inner-offset").value, "2.5", "Hold must not overwrite the configured Inner Offset.");
-assert.equal(byId.get("step-distance").value, "10", "Hold must not overwrite semantic Step size.");
+assert.equal(byId.get("panorama-both-toggle-label").textContent, "Stretch Panorama");
+assert.equal(byId.get("panorama-transport-state").textContent, "Frozen");
+assert.equal(byId.get("panorama-outer-offset").value, "10", "Freeze must not overwrite the configured Outer Offset.");
+assert.equal(byId.get("panorama-inner-offset").value, "2.5", "Freeze must not overwrite the configured Inner Offset.");
+assert.equal(byId.get("step-distance").value, "10", "Freeze must not overwrite semantic Step size.");
 assert.equal(byId.get("section-window").textContent, intervalBeforeStretch,
-  "Hold must update neither semantic Step Distance nor Interval.");
+  "Freeze must update neither semantic Step Distance nor Interval.");
 
 // Native pause settles playback, preserves its attained relation internally,
 // then returns the panes to the exact semantic Step preview.
@@ -846,7 +846,7 @@ assert.equal(currentText(), "Current 0:58");
 assert.match(byId.get("section-window").textContent, /0:25–0:58/);
 
 // Side panes display and invoke the same semantic Step destinations. The stored
-// playback Hold relation remains separate and returns only when playback starts.
+// playback Freeze relation remains separate and returns only when playback starts.
 byId.get("tail-player-surface").click();
 await env.delay(150);
 await flush();

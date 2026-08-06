@@ -70,7 +70,7 @@ During ordinary Panorama playback, Tail and Lead travel between an Inner Offset 
 
 The minimum offset is a law rather than a preference. A side without enough Range room to preserve `x` is excluded from the cycling barrier instead of silently weakening the relation. Hidden, collapsed, unavailable, and Range-clipped sides are likewise excluded.
 
-Hold preserves the attained relation at Center rate and keeps the cycle direction for later resumption. Reaching the outer boundary starts contraction; it does not choose Hold.
+Freeze Panorama preserves the attained relation at Center rate and keeps the cycle direction for later Stretch. Reaching the outer boundary starts contraction; it does not choose Freeze.
 
 The conservative shipped relation is `0.25–2.5 s` with `Tail 0.75× | Center 1× | Lead 1.25×`. It favors local coherence without limiting the settings a reader may choose or replacing previously saved preferences.
 

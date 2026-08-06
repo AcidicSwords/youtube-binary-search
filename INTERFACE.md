@@ -32,7 +32,7 @@ unrelated players.
 
 Each pane's top bar contains only identity, Address, and a local visibility
 action. Center's bar also reports Panorama state. The sole bottom action is the
-centered `Resume Panorama` / `Freeze Panorama` control. Remembered tuning lives in
+centered `Stretch Panorama` / `Freeze Panorama` control. Remembered tuning lives in
 State & Settings, not around the video.
 
 Center is the audible ordinary YouTube player. Tail and Lead are muted
@@ -83,7 +83,7 @@ stronger provided rate pairs remain selectable, and existing saved values remain
 unchanged.
 
 `Freeze Panorama` preserves the attained relation and phase while Center continues.
-`Resume Panorama` resumes from it. A side without enough Range room for the Inner
+`Stretch Panorama` continues from it. A side without enough Range room for the Inner
 Offset becomes non-operational rather than crossing Center or silently shrinking
 the configured minimum. Collapsed, hidden, or unavailable panes do not stall the
 other side.
@@ -130,7 +130,7 @@ The main layers remain distinct without relying on colour alone:
 - Active Span is the surviving directional relation;
 - Current is the semantic Address and carries its own label;
 - Cursor appears only when physical observation has left Current;
-- Panorama span is the held Panorama relation;
+- Panorama Window is the frozen Panorama relation;
 - Pins and Section wires are retained topology;
 - operator and direct-manipulation previews are transient.
 

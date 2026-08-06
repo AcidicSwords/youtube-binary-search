@@ -2144,9 +2144,9 @@ function wrapPlaybackRange() {
   return true;
 }
 
-function heldPanoramaWindow() {
+function frozenPanoramaWindow() {
   const span = state.field?.span;
-  return span?.held && span.available ? { start: span.start, end: span.end } : null;
+  return span?.frozen && span.available ? { start: span.start, end: span.end } : null;
 }
 
 function acceptRangeTransition(result, { status, closeGuide = false } = {}) {
@@ -2312,7 +2312,7 @@ function selectedSectionExtent(source = null) {
   return {
     kind,
     extent: kind === "panorama-span"
-      ? heldPanoramaWindow()
+      ? frozenPanoramaWindow()
       : kind === "selected-pins"
         ? selectedPinExtent()
         : currentSpan()

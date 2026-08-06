@@ -125,7 +125,7 @@ owner. Do not reach through the media adapter from application or Panorama code.
   not a numeric shortcut.
 - Panorama Cycle defaults to `0.25–2.5 s` and `0.75× / 1× / 1.25×`, while saved
   valid preferences and wider available settings remain valid.
-- Hold/Stretch changes neither preferences, Guide, Step Distance, nor history.
+- Freeze/Stretch changes neither preferences, Guide, Step Distance, nor history.
 
 ### Source and persistence
 
@@ -168,12 +168,12 @@ Every executable suite is listed here by the current behavior it protects.
 - `transport-tests.mjs` — explicit observation/rate policies, actual-rate authority, policy-preserving retry/rebase, log-space offers, and unbounded inverse Weight.
 - `youtube-tests.mjs` — URL/time parsing, loaded-source identity in snapshots, and actual playback-rate event delivery.
 - `step-gesture-tests.mjs` — repeat cadence, release batching, boundary stop, cancellation, and takeover.
-- `panorama-tests.mjs` — Panorama geometry, suspension, Hold/Stretch, side activation, user activation, and panoramic layout contracts.
+- `panorama-tests.mjs` — Panorama geometry, suspension, Freeze/Stretch, side activation, user activation, and panoramic layout contracts.
 - `panorama-bounds-tests.mjs` — Range-contained side geometry, unavailable sides, Context suspension, and side Step.
-- `panorama-cycle-tests.mjs` — conservative defaults, symmetric rates, expansion/contraction, Range clipping, synchronization, Hold, and resume.
+- `panorama-cycle-tests.mjs` — conservative defaults, symmetric rates, expansion/contraction, Range clipping, synchronization, Freeze, and Stretch.
 - `panorama-coherence-tests.mjs` — semantic Step Distance and physical Panorama offsets remain independent.
 - `panorama-frame-tests.mjs` — Frame ownership priority, stable identity, direction, Context edges, and direct-frame validation.
-- `panorama-layout-tests.mjs` — Panorama UI ownership and the separation of Context, Hold/Stretch, Range loop, side Step, and Guide retention.
+- `panorama-layout-tests.mjs` — Panorama UI ownership and the separation of Context, Freeze/Stretch, Range loop, side Step, and Guide retention.
 - `panorama-runtime-tests.mjs` — real controller placement, proportional cycling, dormant panes, stale events, rate fallback, direct previews, and boundary recovery.
 - `panorama-transition-tests.mjs` — directional opacity transitions, rapid coalescing, reversal, stale callback rejection, and reduced motion.
 

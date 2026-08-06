@@ -1,7 +1,7 @@
 // Step Panorama execution controller. Tail and Lead are muted physical projections of Session state.
 // Session owns semantic Current/Interval. This controller owns only physical Tail/Lead players,
 // Panorama Frame placement, the slideshow transition lifecycle, the cycling runtime, boundary
-// synchronization, Hold, and stale-event rejection. It imports neither operator arithmetic nor
+// synchronization, Freeze, and stale-event rejection. It imports neither operator arithmetic nor
 // Guide topology.
 import { EPSILON, clamp } from "./range-geometry.js";
 import { playbackAllowsPanorama } from "./transport.js";
@@ -25,8 +25,8 @@ import {
   effectiveCycleBounds,
   createPanoramaCycle,
   advanceCycle,
-  holdCycle,
-  resumeCycle,
+  freezeCycle,
+  stretchCycle,
   rebasePanoramaCycle,
   restartPanoramaCycle,
   derivePanoramaBounds,
@@ -53,8 +53,8 @@ export {
   deriveObservedPanorama
 } from "./panorama-geometry.js";
 
-export const FIELD_SIDE_MODE = Object.freeze({
-  HELD: "held",
+export const PANORAMA_SIDE_MODE = Object.freeze({
+  FROZEN: "frozen",
   STRETCHING: "stretching"
 });
 
@@ -117,7 +117,7 @@ export function panoramaShouldSuspend(snapshot) {
     || snapshot?.dragging
     || snapshot?.pendingStep
     || transportKind === "context"
-    // Tail and Lead hold their relation to Center by sitting one playback-rate
+    // Tail and Lead freeze their relation to Center by sitting one playback-rate
     // rung either side of it, so the Panorama runs at any Center rate that has
     // both neighbours on the adapter's ladder -- not only at 1x. Where a
     // neighbour is missing, or Center is at an end of the ladder, there is no
@@ -178,7 +178,7 @@ export function createPanoramaController({
     preview: null,
     field: null,
     panoramaKey: "",
-    // Cycling runtime. Held until a genuine Center playback gesture begins.
+    // Cycling runtime. Frozen until a genuine Center playback gesture begins.
     cycle: createPanoramaCycle(DEFAULT_PANORAMA_CYCLE),
     // Panorama Frame placement and its one directional transition. The generation
     // token discards player callbacks belonging to a superseded Frame.
@@ -206,7 +206,7 @@ export function createPanoramaController({
       ratesKnown: false,
       pendingPlay: false,
       videoId: null,
-      mode: FIELD_SIDE_MODE.HELD,
+      mode: PANORAMA_SIDE_MODE.FROZEN,
       offset: 0,
       progressOffset: 0,
       configuredOffset: 0,
@@ -710,11 +710,11 @@ export function createPanoramaController({
   }
 
   function establishSide(side, center, snapshot) {
-    // A fresh Panorama is Held at its configured outer offset. Cycling begins at
+    // A fresh Panorama is Frozen at its configured outer offset. Cycling begins at
     // the inner boundary only when Center playback resumes the cycle.
     const bounds = sideCycleBounds(side.role, center, snapshot);
     const offset = bounds.outer;
-    side.mode = FIELD_SIDE_MODE.HELD;
+    side.mode = PANORAMA_SIDE_MODE.FROZEN;
     side.offset = offset;
     side.progressOffset = offset;
     side.waiting = false;
@@ -733,7 +733,7 @@ export function createPanoramaController({
   function establish(snapshot, address = snapshot.current) {
     const center = clamp(address, snapshot.range.start, snapshot.range.end);
     runtime.cycle = rebasePanoramaCycle(
-      holdCycle(runtime.cycle, snapshotCycle(snapshot)),
+      freezeCycle(runtime.cycle, snapshotCycle(snapshot)),
       now(),
       attainedCycleOffset()
     );
@@ -744,7 +744,7 @@ export function createPanoramaController({
     runtime.centerWasRunning = false;
     runtime.forceEstablish = false;
     runtime.restoreRoles.clear();
-    runtime.phase = PANORAMA_STATE.HELD;
+    runtime.phase = PANORAMA_STATE.FROZEN;
   }
 
   function translateToCurrent(current, { preserve = true } = {}) {
@@ -766,7 +766,7 @@ export function createPanoramaController({
         ? side.offset
         : side.configuredOffset;
       const offset = preserve ? clamp(retained, 0, bounds.outer) : bounds.outer;
-      side.mode = FIELD_SIDE_MODE.HELD;
+      side.mode = PANORAMA_SIDE_MODE.FROZEN;
       side.offset = offset;
       side.progressOffset = offset;
       side.waiting = false;
@@ -788,7 +788,7 @@ export function createPanoramaController({
       ? PANORAMA_STATE.OFF
       : runtime.suspended
         ? PANORAMA_STATE.SUSPENDED
-        : PANORAMA_STATE.HELD;
+        : PANORAMA_STATE.FROZEN;
     if (preview) renderPreview(snapshot, preview);
     else publish(snapshot);
   }
@@ -796,7 +796,7 @@ export function createPanoramaController({
   // Reconcile the live relation with a newly configured Inner/Outer Offset. A
   // side already following its configured bound follows the new one; a partial
   // relation is preserved and only clamped into the new [x, y] when necessary.
-  // Editing configuration never becomes a Hold and never rewrites Session state.
+  // Editing configuration never becomes a Freeze and never rewrites Session state.
   function reconfigureOffset(role = "both") {
     const snapshot = getSnapshot?.();
     if (!snapshot?.videoLoaded || !snapshot.range) return false;
@@ -830,7 +830,7 @@ export function createPanoramaController({
       side.progressOffset = attained;
       side.beforeStretchOffset = clamp(side.beforeStretchOffset, 0, bounds.outer);
       runtime.cycle.sides[name].offset = attained;
-      if (side.mode === FIELD_SIDE_MODE.HELD && sideIsVisible(name, prefs) && !preview) {
+      if (side.mode === PANORAMA_SIDE_MODE.FROZEN && sideIsVisible(name, prefs) && !preview) {
         pauseSide(side);
         parkAtRelation(side, center, snapshot, { force: true });
       }
@@ -962,12 +962,12 @@ export function createPanoramaController({
     const sideStates = {
       tail: {
         available: reach.backward > EPSILON,
-        held: false,
+        frozen: false,
         offset: reach.backward
       },
       lead: {
         available: reach.forward > EPSILON,
-        held: false,
+        frozen: false,
         offset: reach.forward
       }
     };
@@ -999,10 +999,10 @@ export function createPanoramaController({
   // attained relation and its preserved direction.
   // A fresh leg from the inner offset. This is for genuine discontinuities only
   // -- a native scrub, a Range wrap, or Panorama returning after Center played
-  // alone at an extreme rate -- where the sides hold positions that no longer
+  // alone at an extreme rate -- where the sides freeze positions that no longer
   // relate to anything on screen. An ordinary Weight bucket change is not one of
   // these and must never arrive here: it keeps its phase and its deadline.
-  // What the sides are actually showing, which is what a Hold or a Stretch must
+  // What the sides are actually showing, which is what a Freeze or a Stretch must
   // continue from. The two are symmetric, so either answers for the pair.
   function attainedCycleOffset() {
     // The side's own offset, not the cycle's mirror of it. Establishing a Panorama
@@ -1021,7 +1021,7 @@ export function createPanoramaController({
     const fresh = restartPanoramaCycle(runtime.cycle, configured, now());
     runtime.cycle = {
       ...fresh,
-      held: false,
+      frozen: false,
       sides: Object.fromEntries(["tail", "lead"].map(role => {
         const bounds = sideCycleBounds(role, center, snapshot);
         return [role, { offset: Math.min(bounds.inner, bounds.outer), waiting: false }];
@@ -1035,7 +1035,7 @@ export function createPanoramaController({
   function beginStretch(side, center, snapshot, { play = false } = {}) {
     if (!sideCanRun(side)) return false;
     side.beforeStretchOffset = side.offset;
-    side.mode = FIELD_SIDE_MODE.STRETCHING;
+    side.mode = PANORAMA_SIDE_MODE.STRETCHING;
     const bounds = sideCycleBounds(side.role, center, snapshot);
     const offset = clamp(
       runtime.cycle.sides[side.role].offset > EPSILON
@@ -1142,7 +1142,7 @@ export function createPanoramaController({
     runtime.centerWasRunning = true;
     // Panorama is returning after being unavailable -- Center played alone at an
     // extreme rate, or the adapter only just confirmed a rate the sides can sit
-    // either side of. The sides hold offsets from before or during that stretch
+    // either side of. The sides freeze offsets from before or during that stretch
     // which no longer describe anything, so the leg restarts at the inner offset
     // rather than restoring a stale relation. This is the one resumption that
     // discards phase; an ordinary Weight-bucket change never reaches here.
@@ -1171,13 +1171,13 @@ export function createPanoramaController({
       // Resuming after a wrap continues the preserved cycling phase. The
       // outward pair is only correct while expanding; a contracting Panorama needs
       // the exchanged rates immediately, not one controller tick later.
-      if (side.mode === FIELD_SIDE_MODE.STRETCHING) {
+      if (side.mode === PANORAMA_SIDE_MODE.STRETCHING) {
         requestSideRateStep(side, panoramaSideRate({
           role,
           phase: runtime.cycle.phase,
           rate: snapshotCycle(snapshot).rate,
           waiting: runtime.cycle.sides[role].waiting,
-          held: runtime.cycle.held,
+          frozen: runtime.cycle.frozen,
           centerRate
         }), true);
       } else {
@@ -1236,9 +1236,9 @@ export function createPanoramaController({
     if (centerRunning) runtime.centerWasRunning = true;
     // Stretch resumes from the attained relation and the preserved direction, so
     // the leg is rebased onto the offset actually on screen rather than onto
-    // where an unheld cycle would have arrived while it was held.
+    // where an unheld cycle would have arrived while it was frozen.
     runtime.cycle = rebasePanoramaCycle(
-      resumeCycle(runtime.cycle, snapshotCycle(snapshot)),
+      stretchCycle(runtime.cycle, snapshotCycle(snapshot)),
       now(),
       attainedCycleOffset()
     );
@@ -1263,10 +1263,10 @@ export function createPanoramaController({
     return plausible ? measured : clamp(side.progressOffset, 0, maximum);
   }
 
-  // Hold alone stops the cycling cycle. It preserves each attained offset
-  // within [x, y], sets every held side to Center rate, and preserves the
+  // Freeze alone stops the cycling cycle. It preserves each attained offset
+  // within [x, y], sets every frozen side to Center rate, and preserves the
   // cycling direction for later resumption. It writes no Session state.
-  function hold(role = "both") {
+  function freeze(role = "both") {
     const snapshot = getSnapshot?.();
     if (suspensionRequired(snapshot) || !snapshot?.range) return null;
     const roles = role === "both"
@@ -1279,7 +1279,7 @@ export function createPanoramaController({
     for (const name of roles) {
       const side = sides[name];
       const bounds = sideCycleBounds(name, center, snapshot);
-      let offset = side.mode === FIELD_SIDE_MODE.STRETCHING
+      let offset = side.mode === PANORAMA_SIDE_MODE.STRETCHING
         ? measuredOffset(side, center, snapshot)
         : clamp(side.offset, 0, bounds.outer);
       // Holding an armed-but-not-yet-playing Panorama keeps its visible relation
@@ -1314,11 +1314,11 @@ export function createPanoramaController({
       attained = attained === null ? offset : attained;
     }
     runtime.cycle = rebasePanoramaCycle(
-      holdCycle(runtime.cycle, snapshotCycle(snapshot)),
+      freezeCycle(runtime.cycle, snapshotCycle(snapshot)),
       now(),
       attainedCycleOffset()
     );
-    for (const name of roles) sides[name].mode = FIELD_SIDE_MODE.HELD;
+    for (const name of roles) sides[name].mode = PANORAMA_SIDE_MODE.FROZEN;
     publish(snapshot);
     return attained;
   }
@@ -1338,7 +1338,7 @@ export function createPanoramaController({
       if (measured > REACH_TOLERANCE || side.offset <= REACH_TOLERANCE) offset = measured;
     }
     offset = clamp(offset, 0, maximum);
-    side.mode = FIELD_SIDE_MODE.HELD;
+    side.mode = PANORAMA_SIDE_MODE.FROZEN;
     side.offset = offset;
     side.progressOffset = offset;
     side.waiting = false;
@@ -1350,14 +1350,14 @@ export function createPanoramaController({
     parkAtRelation(side, center, snapshot, { force: true });
   }
 
-  // One combined Stretch/Hold control. Cycling is a coordinated Panorama
-  // relation, so there is no independent per-side Stretch/Hold gesture.
+  // One combined Stretch/Freeze control. Cycling is a coordinated Panorama
+  // relation, so there is no independent per-side Stretch/Freeze gesture.
   function toggleBoth() {
     if (suspensionRequired()) return;
     const roles = controllableRoles(getSnapshot?.(), preferences());
     if (!roles.length) return;
-    if (runtime.cycle.held) stretch("both");
-    else hold("both");
+    if (runtime.cycle.frozen) stretch("both");
+    else freeze("both");
   }
 
   function ensureSidePlaying(side) {
@@ -1437,7 +1437,7 @@ export function createPanoramaController({
     });
     runtime.cycle = {
       phase: advanced.phase,
-      held: advanced.held,
+      frozen: advanced.frozen,
       startedAt: advanced.startedAt,
       startingOffset: advanced.startingOffset,
       offset: advanced.offset,
@@ -1463,14 +1463,14 @@ export function createPanoramaController({
     const prefs = preferences();
     if (!prefs[`${role}Visible`] || !sideCanRun(side)) {
       pauseSide(side);
-      return { available: false, held: false, offset: 0 };
+      return { available: false, frozen: false, offset: 0 };
     }
     if (!participation.operational) {
       // The side cannot preserve the configured inner offset, so it does not
       // cycle and takes no part in the barrier. It still shows the frame the
       // remaining room allows rather than collapsing onto Center.
       const parked = Math.max(0, cycleSide.bounds.parked ?? 0);
-      side.mode = FIELD_SIDE_MODE.HELD;
+      side.mode = PANORAMA_SIDE_MODE.FROZEN;
       side.offset = parked;
       side.progressOffset = parked;
       side.waiting = false;
@@ -1478,20 +1478,20 @@ export function createPanoramaController({
       runtime.cycle.sides[role].offset = parked;
       pauseSide(side);
       parkSide(side, exactAddress(role, center, parked, snapshot.range));
-      return { available: false, held: true, offset: parked };
+      return { available: false, frozen: true, offset: parked };
     }
 
     side.configuredOffset = configuredOffset(role, snapshot);
     side.waiting = Boolean(cycleSide.waiting);
-    side.mode = runtime.cycle.held
-      ? FIELD_SIDE_MODE.HELD
-      : FIELD_SIDE_MODE.STRETCHING;
+    side.mode = runtime.cycle.frozen
+      ? PANORAMA_SIDE_MODE.FROZEN
+      : PANORAMA_SIDE_MODE.STRETCHING;
 
     if (!centerRunning) {
       stabilizeParkedSide(side, center, snapshot);
       return {
         available: true,
-        held: side.mode === FIELD_SIDE_MODE.HELD,
+        frozen: side.mode === PANORAMA_SIDE_MODE.FROZEN,
         offset: side.offset
       };
     }
@@ -1509,7 +1509,7 @@ export function createPanoramaController({
     correctRunningSide(side, desired);
     return {
       available: true,
-      held: runtime.cycle.held || Boolean(cycleSide.waiting),
+      frozen: runtime.cycle.frozen || Boolean(cycleSide.waiting),
       offset
     };
   }
@@ -1584,7 +1584,7 @@ export function createPanoramaController({
     if (!side.sourceReady && !side.error) return "Preparing video";
     if (side.blocked) return "Playback blocked — retry Play";
     if (side.error) return "Player unavailable";
-    if (!side.rateAvailable && side.mode === FIELD_SIDE_MODE.STRETCHING) return "Rate unavailable — held at target";
+    if (!side.rateAvailable && side.mode === PANORAMA_SIDE_MODE.STRETCHING) return "Rate unavailable — frozen at target";
     return Number.isFinite(side.desiredAddress)
       ? formatTime(side.desiredAddress)
       : "Preparing frame";
@@ -1608,8 +1608,8 @@ export function createPanoramaController({
       snapshot.range
     );
     const states = sideStates || {
-      tail: { available: targets.tail.available, held: sides.tail.mode === FIELD_SIDE_MODE.HELD, offset: sides.tail.offset },
-      lead: { available: targets.lead.available, held: sides.lead.mode === FIELD_SIDE_MODE.HELD, offset: sides.lead.offset }
+      tail: { available: targets.tail.available, frozen: sides.tail.mode === PANORAMA_SIDE_MODE.FROZEN, offset: sides.tail.offset },
+      lead: { available: targets.lead.available, frozen: sides.lead.mode === PANORAMA_SIDE_MODE.FROZEN, offset: sides.lead.offset }
     };
     const observed = deriveObservedPanorama({
       targets,
@@ -1629,8 +1629,8 @@ export function createPanoramaController({
       ),
       tailVisible: sideIsVisible("tail", prefs),
       leadVisible: sideIsVisible("lead", prefs),
-      tailHeld: states.tail.held,
-      leadHeld: states.lead.held
+      tailFrozen: states.tail.frozen,
+      leadFrozen: states.lead.frozen
     });
     for (const role of ["tail", "lead"]) {
       const side = sides[role];
@@ -1652,7 +1652,7 @@ export function createPanoramaController({
       end: observed.lead.address,
       duration: Math.max(0, observed.lead.address - observed.tail.address),
       available: observed.tail.visible && observed.lead.visible && observed.lead.address - observed.tail.address > EPSILON,
-      held: observed.tail.held && observed.lead.held
+      frozen: observed.tail.frozen && observed.lead.frozen
     };
     const key = JSON.stringify({
       phase: observed.phase,
@@ -1673,7 +1673,7 @@ export function createPanoramaController({
         Number(observed.lead.targetDistance.toFixed(2))
       ],
       constraint: observed.constraint,
-      span: [observed.span.available, observed.span.held],
+      span: [observed.span.available, observed.span.frozen],
       activation: observed.activation,
       suspended: runtime.suspended,
       preview: preview?.kind || null
@@ -1720,7 +1720,7 @@ export function createPanoramaController({
       "is-traversing-backward",
       transitionDirection === FIELD_FRAME_DIRECTION.BACKWARD
     );
-    root.classList.toggle("is-cycling", !runtime.cycle.held && !preview);
+    root.classList.toggle("is-cycling", !runtime.cycle.frozen && !preview);
 
     elements["tail-pane"]?.classList?.toggle("is-collapsed", !prefs.tailVisible);
     elements["lead-pane"]?.classList?.toggle("is-collapsed", !prefs.leadVisible);
@@ -1772,19 +1772,19 @@ export function createPanoramaController({
     );
     const availableRoles = controllableRoles(snapshot, prefs);
     // Cycling is one Panorama relation, so the combined control reports one state.
-    const held = runtime.cycle.held;
+    const frozen = runtime.cycle.frozen;
     const bothLabel = availableRoles.length === 1
       ? visibleRoles.length === 1 ? "visible side" : "available side"
       : "both";
-    setText(elements["panorama-both-toggle-label"], held ? "Resume Panorama" : "Freeze Panorama");
-    elements["panorama-both-toggle"]?.setAttribute?.("aria-pressed", String(held));
+    setText(elements["panorama-both-toggle-label"], frozen ? "Stretch Panorama" : "Freeze Panorama");
+    elements["panorama-both-toggle"]?.setAttribute?.("aria-pressed", String(frozen));
     if (elements["panorama-both-toggle"]) {
       elements["panorama-both-toggle"].disabled = runtime.suspended
         || !shown
         || !availableRoles.length;
       elements["panorama-both-toggle"].setAttribute(
         "aria-label",
-        `${held ? "Panorama is frozen; resume" : "Panorama is cycling; freeze"} ${bothLabel}`
+        `${frozen ? "Panorama is frozen; resume" : "Panorama is cycling; freeze"} ${bothLabel}`
       );
     }
     const frameLabel = {
@@ -1802,8 +1802,8 @@ export function createPanoramaController({
       ? `${frameLabel} Frame`
       : runtime.suspended
       ? "Panorama suspended"
-      : runtime.cycle.held
-        ? "Held"
+      : runtime.cycle.frozen
+        ? "Frozen"
         : runtime.cycle.phase === PANORAMA_DIRECTION.CONTRACTING
           ? "Cycling in"
           : "Cycling out");
@@ -1813,7 +1813,7 @@ export function createPanoramaController({
     );
     setText(elements["panorama-span-label"], preview
       ? `${formatTime(preview.start)}–${formatTime(preview.end)}`
-      : field?.span?.held && field.span.available
+      : field?.span?.frozen && field.span.available
       ? `${formatTime(field.span.start)}–${formatTime(field.span.end)}`
       : `Current ${loaded ? formatTime(snapshot.current) : "—"}`);
   }
@@ -1954,7 +1954,7 @@ export function createPanoramaController({
       side.actualRate = 1;
       side.desiredRate = 1;
       side.availableRates = [1];
-      side.mode = FIELD_SIDE_MODE.HELD;
+      side.mode = PANORAMA_SIDE_MODE.FROZEN;
       side.offset = 0;
       side.progressOffset = 0;
       side.configuredOffset = configuredOffset(side.role, snapshot);
@@ -2024,7 +2024,7 @@ export function createPanoramaController({
       ? PANORAMA_STATE.OFF
       : runtime.suspended
         ? PANORAMA_STATE.SUSPENDED
-        : PANORAMA_STATE.HELD;
+        : PANORAMA_STATE.FROZEN;
     const preview = activePreview(snapshot);
     if (preview) renderPreview(snapshot, preview);
     else publish(snapshot);
@@ -2056,13 +2056,13 @@ export function createPanoramaController({
     previewExtent,
     clearPreview,
     getStepSelection: stepSelection,
-    hold,
+    freeze,
     stretch,
     togglePanorama: toggleBoth,
     cycle() {
       return {
         phase: runtime.cycle.phase,
-        held: runtime.cycle.held,
+        frozen: runtime.cycle.frozen,
         configured: snapshotCycle(getSnapshot?.()),
         sides: {
           tail: { ...runtime.cycle.sides.tail },

@@ -175,12 +175,12 @@ rewrite-refusal coverage.
   frame, and reduced motion preserves the result.
 - Cycle remains within effective Inner/Outer bounds, excludes unavailable
   sides from the barrier, reverses only when every operational side arrives,
-  and resumes the preserved phase after Hold.
+  and continues the preserved phase after Freeze.
 - A turn reports the direction it is heading in, not the one it arrived by, so
   a leg resumed at a fully attained bound contracts immediately rather than
   depending on how much wall clock has passed since the resume.
 - Panorama Off, collapsed panes, Center-only Playback, Context, and incompatible
-  actual rate keep side players dormant. Hold/Stretch changes no preference,
+  actual rate keep side players dormant. Freeze/Stretch changes no preference,
   Guide, Step Distance, Weight, or history.
 
 ### Documentation and gauges
@@ -278,7 +278,7 @@ Operators outside the matrix, and no Timeline-header control duplicates it.
    `0.75× / 1× / 1.25×`.
 2. Start plain playback. Tail must remain behind, Lead ahead, and both must
    cycle through a complete expansion/contraction cycle.
-3. Hold partway through expansion, resume, then repeat during contraction.
+3. Freeze partway through expansion, Stretch, then repeat during contraction.
    Direction and attained relation must survive.
 4. Collapse each side in turn and restore it. The other side must not stall.
 5. Start Shift playback at fixed `1×` and at another offered rate. Both are

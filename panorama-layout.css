@@ -24,12 +24,12 @@
 }
 
 .panorama[data-phase="unfolding"]::before,
-.panorama[data-phase="partially-held"]::before {
+.panorama[data-phase="partially-frozen"]::before {
   opacity: 0.34;
   transform: scaleX(0.88);
 }
 
-.panorama[data-phase="held"]::before {
+.panorama[data-phase="frozen"]::before {
   opacity: 0.13;
   transform: scaleX(1);
 }
@@ -43,7 +43,7 @@
 .panorama[data-phase="coincident"] .step-pane-side { opacity: 0.82; }
 .panorama[data-phase="unfolding"] .tail-pane { transform: translateX(-3px) scale(.994); }
 .panorama[data-phase="unfolding"] .lead-pane { transform: translateX(3px) scale(.994); }
-.panorama[data-phase="held"] .step-pane-side {
+.panorama[data-phase="frozen"] .step-pane-side {
   opacity: 0.98;
   transform: translateX(0) scale(1);
 }

@@ -17,7 +17,7 @@ is a module and ownership map, not a history of earlier designs.
 | `step-gesture.js` | Step press, repeat, release, and one-transaction gesture timing |
 | `panorama-frame.js` | Pure Panorama Frame ownership, identity, direction, and transition descriptions |
 | `panorama-geometry.js` | Pure Panorama offsets, cycling phases, bounds, and rate pairs |
-| `panorama.js` | Tail/Lead players, placement, Panorama transitions, Cycle runtime, Hold, and stale-event rejection |
+| `panorama.js` | Tail/Lead players, placement, Panorama transitions, Cycle runtime, Freeze/Stretch, and stale-event rejection |
 | `chapters.js` | Parsing offered chapter Addresses into transient candidate extents |
 | `traversal-trace.js` | The append-only encounter ledger: traversal records, the frozen readable stream, read cursors, and Ghost injection |
 | `view.js` | DOM projection, timeline atmosphere and sourceGridLines, Guide rows, operator labels, and accessible state |
@@ -354,7 +354,7 @@ cycling between 0.25 and 2.5 source seconds. The available settings remain
 wider; saved valid preferences are not replaced. The pure cycling state
 machine clamps against Range, excludes a side without the minimum room from its
 synchronization barrier, reverses only after every operational side arrives,
-and preserves phase through deliberate Hold/Stretch. Hold changes no semantic
+and preserves phase through deliberate Freeze/Stretch. Freeze changes no semantic
 state or preference.
 
 Context, Step Distance, Panorama offsets, and Weight have separate owners. Context and

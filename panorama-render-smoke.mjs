@@ -65,13 +65,13 @@ try {
   assert.equal(initial.windowPainted, true,
     "The Panorama Window has a visible paint channel.");
   const unfolding = await phaseReport("unfolding");
-  const partial = await phaseReport("partially-held");
-  const held = await phaseReport("held");
-  assert.ok(unfolding.auraOpacity > held.auraOpacity,
+  const partial = await phaseReport("partially-frozen");
+  const frozen = await phaseReport("frozen");
+  assert.ok(unfolding.auraOpacity > frozen.auraOpacity,
     "Stretching has a stronger visual aura than the stable Panorama.");
-  assert.ok(partial.auraOpacity > held.auraOpacity,
-    "A partially held Panorama remains visibly in transition.");
-  assert.ok(held.sides.every(side => side.visible && side.opacity > 0),
+  assert.ok(partial.auraOpacity > frozen.auraOpacity,
+    "A partially frozen Panorama remains visibly in transition.");
+  assert.ok(frozen.sides.every(side => side.visible && side.opacity > 0),
     "Both stable side panes remain visible.");
 
   await page.click("#center-transport-surface");

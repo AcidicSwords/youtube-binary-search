@@ -52,7 +52,8 @@
 - **Inner Offset** — the minimum Tail/Lead separation from Center during Panorama Cycle.
 - **Outer Offset** — the maximum Tail/Lead separation from Center during Panorama Cycle.
 - **Stretch** — begin or resume Panorama Cycle from its current relation.
-- **Hold** — preserve the attained Panorama offsets and direction while every held side follows Center at Center rate.
+- **Freeze Panorama** — stop the Panorama Cycle while preserving attained offsets and direction at Center rate.
+- **Stretch Panorama** — continue the Panorama Cycle from its frozen relation.
 - **Context** — bounded source-contiguous Center observation around Current. While enabled, its stable edges own the Panorama Frame.
 - **Playback** — source-contiguous observation that settles watched coverage into the Active Span without shortening existing coverage.
 - **Observation Policy** — explicit playback ownership of either `panorama` or `center-only`, independent from rate.

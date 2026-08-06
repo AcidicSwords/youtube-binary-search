@@ -1798,7 +1798,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const currentSpan = interval();
     const projection = timelineProjection();
     const field = currentState.field;
-    const panoramaWindow = field?.span?.held && field.span.available
+    const panoramaWindow = field?.span?.frozen && field.span.available
       ? { start: field.span.start, end: field.span.end }
       : null;
     const semanticCurrent = currentNeighborhood?.C ?? 0;
@@ -2086,7 +2086,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
         } ${formatRange(sectionExtent)}`
       : `No ${
           sectionKind === "panorama-span"
-            ? "Held Panorama span"
+            ? "Panorama Window"
             : sectionKind === "selected-pins"
               ? "two selected Pins"
               : "Active Span"

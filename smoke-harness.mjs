@@ -214,7 +214,7 @@ export function createSmokeEnvironment({ duration = 100, compact = false, deferr
   byId.get("context-seconds").value = "5";
   byId.get("section-source").value = "interval";
   addOption(byId.get("section-source"), "interval", "Active Span");
-  addOption(byId.get("section-source"), "panorama-span", "Held Panorama span");
+  addOption(byId.get("section-source"), "panorama-span", "Panorama Window");
   addOption(byId.get("panorama-cycle-rate"), "0.25", "0.75\u00d7 / 1.25\u00d7");
 
   const documentListeners = new Map();

@@ -532,7 +532,7 @@ outward Lead = Center × (1 + rate)
 
 During contraction the side roles exchange. A side reaching a boundary first follows Center at Center rate while preserving the attained offset. When every operational side reaches the same boundary, the phase reverses. A collapsed, hidden, unavailable, or Range-clipped side is excluded from this synchronization barrier. If a side has less room than Inner Offset, the minimum is not reduced; the side is parked within available room and does not cycle.
 
-Hold freezes attained offsets, clears waiting state, and places held sides at Center rate without rewriting the configured bounds or phase direction. Stretch resumes from that exact relation. Panorama Hold and Cycle phase create no Session checkpoint.
+Freeze Panorama preserves attained offsets, clears waiting state, and places frozen sides at Center rate without rewriting the configured bounds or phase direction. Stretch Panorama continues from that exact relation. Freeze and Cycle phase create no Session checkpoint.
 
 Panorama runtime suspends while Context, pending Step, direct manipulation, or an incompatible Playback policy/actual rate owns observation. Stale side-player events cannot revive a hidden, collapsed, unavailable, or superseded side.
 
