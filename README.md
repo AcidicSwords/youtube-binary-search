@@ -160,6 +160,7 @@ npm run verify
 
 ## Canonical documents
 
+- `CLOCKWORK.md` — compact owner/relation/non-effect index
 - `PROJECT.md` — stable conceptual model
 - `GLOSSARY.md` — normative vocabulary
 - `SPEC.md` — normative state and behavior laws

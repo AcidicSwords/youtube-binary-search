@@ -116,7 +116,6 @@ export const RETIRED_TERMS = [
   term("Field Breath", "Panorama Cycle", { caseInsensitive: true, category: "panorama" }),
   term("Breath Rate", "Side Rate Step", { caseInsensitive: true, category: "panorama" }),
   term("Hold both", "Freeze Panorama", { category: "panorama" }),
-  term("Stretch both", "Resume Panorama", { caseInsensitive: true, category: "panorama" }),
   term("stepField", "panorama", { category: "panorama" }),
   term("STEP_FIELD_PHASE", "PANORAMA_STATE", { category: "panorama" }),
   term("BREATH_PHASE", "PANORAMA_DIRECTION", { category: "panorama" }),
@@ -124,7 +123,6 @@ export const RETIRED_TERMS = [
   term("DEFAULT_FIELD_BREATH", "DEFAULT_PANORAMA_CYCLE", { category: "panorama" }),
   term("breathRatePair", "panoramaSideRates", { category: "panorama" }),
   term("holdPanorama", "freezePanorama", { category: "panorama" }),
-  term("stretchPanorama", "resumePanorama", { category: "panorama" }),
 
   // Phase 6 — Traversal Trace / Ghost
   term("User Time", "Traversal Trace", { caseInsensitive: true, category: "trace" }),

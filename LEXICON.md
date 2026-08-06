@@ -278,7 +278,7 @@ Each canonical term carries:
   and one Section Weighting.
 - **Code stem** `section` · **UI label** Section
 - **Qualifiers** Section Start Pin, Section End Pin, Section Weighting, Section
-  Timeline Midpoint, Section Stretch Factor.
+  Timeline Midpoint, Section Timeline Allocation Factor.
 - **Non-effects** Not an Active Span.
 
 ### Section Start Pin
@@ -367,7 +367,7 @@ Each canonical term carries:
 - **Qualifiers** `SECTION_WEIGHTING_VALUES`, `DEFAULT_SECTION_WEIGHTING`.
 - **Forbidden synonyms** Section Weight, `section.weight`,
   `SECTION_WEIGHT_VALUES`, `DEFAULT_SECTION_WEIGHT`.
-- **Non-effects** Not the operative Weight; not the Stretch Factor.
+- **Non-effects** Not the operative Weight; not the Timeline Allocation Factor.
 
 ### Weight
 - **Class** attribute · **Owner** `timeline-projection.js`
@@ -399,14 +399,20 @@ Each canonical term carries:
 - **Code stem** `projection` · **UI label** —
 - **Qualifiers** `sourceToTimeline`, `timelineToSource`, `stepTarget`.
 
-### Stretch Factor
+### Timeline Allocation Factor
 - **Class** attribute · **Owner** `timeline-projection.js`
-- **Definition** Timeline-Space extent divided by Source-Time duration.
-- **Code stem** `stretchFactor` (`formatStretchFactor`, `rangeStretchFactor`) ·
-  **UI label** Stretch Factor
-- **Forbidden synonyms** `formatStretch`, `rangeStretch`. `Stretch` must never
-  name a Panorama control or motion.
-- **Non-effects** May differ from a Section's Weighting under overlap.
+- **Definition** Effective projected Timeline-Space extent divided by
+  Source-Time extent for one qualified interval.
+- **Code stem** `timelineAllocationFactor`
+  (`formatTimelineAllocationFactor`, `rangeTimelineAllocationFactor`) ·
+  **UI label** Timeline Allocation
+- **Qualifiers** Section Timeline Allocation Factor, Range Timeline Allocation
+  Factor, Neighborhood Timeline Allocation Factor, Overall Timeline Allocation
+  Factor.
+- **Forbidden synonyms** Stretch Factor, Section Stretch Factor,
+  `formatStretchFactor`, `rangeStretchFactor`.
+- **Non-effects** Derived rather than stored; may differ from a Section
+  Weighting under overlap; does not change Timeline Projection.
 
 ### Temporal Topography
 - **Class** presentation · **Owner** `view.js`
@@ -499,6 +505,24 @@ Each canonical term carries:
 - **Code stem** `contextDuration` · **UI label** Context Duration
 - **Forbidden synonyms** Center-only duration, `contextSeconds` (persisted key).
 
+### Ripple Observation Address
+- **Class** address · **Owner** `app.js`
+- **Definition** Non-Current Address acquired from bare Timeline ground for
+  observation through the shared Context relation.
+- **Code stem** `rippleObservation.observationAddress` · **UI label** Ripple
+  Observation Address
+- **Non-effects** Does not change Current, semantic history, Traversal Trace,
+  Guide structure, Focus, Range, or Section Weightings.
+
+### Ripple Context Window
+- **Class** interval · **Owner** `transport.js`
+- **Definition** Independently Range-clipped Context Window derived for a Ripple
+  Observation Address.
+- **Code stem** `rippleObservation.contextStart` /
+  `rippleObservation.contextEnd` · **UI label** Ripple Context Window
+- **Non-effects** Not a second transport or Context Duration; uses the ordinary
+  Context owner and clipping relation.
+
 ### Panorama
 - **Class** object · **Owner** `panorama.js`
 - **Definition** The Tail–Center–Lead observation system.
@@ -517,11 +541,19 @@ Each canonical term carries:
 - **Code stem** `panoramaWindow` · **UI label** Panorama Window
 - **Forbidden synonyms** Field span, Panorama span, Panorama Extent,
   `fieldSpan`.
+- **Non-effects** A frozen positive Window may be retained as an ordinary
+  Section; that Section carries no Panorama identity.
 
 ### Panorama Width
 - **Class** attribute · **Owner** `panorama.js`
 - **Definition** Source-Time duration of the Panorama Window.
 - **Code stem** `panoramaWidth` · **UI label** Panorama Width
+
+### Panorama Pane
+- **Class** presentation · **Owner** `panorama.js`
+- **Definition** One Tail, Center, or Lead viewing pane in the Panorama.
+- **Code stem** `panorama-pane` · **UI label** Tail · Center · Lead
+- **Forbidden synonyms** `step-pane`.
 
 ### Panorama Cycle
 - **Class** state · **Owner** `panorama-geometry.js`
@@ -561,17 +593,29 @@ Each canonical term carries:
 
 ### Freeze Panorama
 - **Class** operator · **Owner** `panorama.js`
-- **Definition** Stop the Panorama Cycle at its attained offsets while Center
-  continues.
+- **Definition** Stop the Panorama Cycle at its attained Tail and Lead offsets.
 - **Code stem** `freezePanorama` (runtime state `frozen`) · **UI label** Freeze
   Panorama
 - **Forbidden synonyms** Hold Panorama, Hold both, `holdPanorama`, `held`.
+- **Non-effects** Does not change Panorama preferences, Current, Timeline
+  Projection, Section Weighting, semantic history, or Traversal Trace.
 
-### Resume Panorama
+### Frozen Panorama
+- **Class** state · **Owner** `panorama.js`
+- **Definition** Panorama state in which the Cycle is stopped and attained Tail
+  and Lead offsets remain stable.
+- **Code stem** `PANORAMA_STATE.FROZEN` / `cycle.frozen` · **UI label** Frozen
+  Panorama
+
+### Stretch Panorama
 - **Class** operator · **Owner** `panorama.js`
-- **Definition** Continue the Panorama Cycle from its frozen state.
-- **Code stem** `resumePanorama` · **UI label** Resume Panorama
-- **Forbidden synonyms** Stretch both, Stretch Panorama, `stretchPanorama`.
+- **Definition** Continue the Panorama Cycle from the frozen relation.
+- **Code stem** `stretchPanorama` / `stretchCycle` · **UI label** Stretch
+  Panorama
+- **Forbidden synonyms** Resume Panorama, `resumePanorama`, `resumeCycle`.
+- **Non-effects** Does not change Section Weighting, Timeline Projection, Step
+  Distance, Current, semantic history, or Traversal Trace. While stretching,
+  the Panorama Window is not eligible as a stable Section source.
 
 > `Suspended` remains a legal **internal** system condition (Center-only
 > Shift+Space, unavailable side players, synchronization transitions, source
@@ -588,6 +632,28 @@ Each canonical term carries:
 - **Code stem** `traversalTrace` (`createTraversalTrace`) · **UI label**
   Traversal Trace
 - **Forbidden synonyms** User Time, Encounter Order, `userTime`, `user-time`.
+- **Non-effects** Automatic Context and Ripple observation do not append Trace
+  evidence. Movement to a Ripple prospect is ordinary traversal and does.
+
+### Traversal Prospect
+- **Class** transient object · **Owner** `traversal-prospects.js`
+- **Definition** Known Source Address available to Ghost's forward route that
+  has not yet been committed as Current.
+- **Code stem** `traversalProspects` · **UI label** Traversal Prospect
+- **Non-effects** Not Traversal Trace, semantic history, Guide structure, or
+  persistent state.
+
+### Ripple Start Prospect
+- **Class** transient object · **Owner** `traversal-prospects.js`
+- **Definition** Traversal Prospect at the resolved start of a Ripple Context
+  Window.
+- **Code stem** `kind: "ripple-start"` · **UI label** Ripple Start Prospect
+
+### Ripple End Prospect
+- **Class** transient object · **Owner** `traversal-prospects.js`
+- **Definition** Traversal Prospect at the resolved end of a Ripple Context
+  Window.
+- **Code stem** `kind: "ripple-end"` · **UI label** Ripple End Prospect
 
 ### Trace Entry
 - **Class** object · **Owner** `traversal-trace.js`
@@ -622,6 +688,14 @@ Each canonical term carries:
 - **Code stem** `ghost` · **UI label** Ghost
 - **Non-effects** Restores no historical Range, Guide, Groups, Section
   Weightings, Focus, or semantic history.
+
+### Ghost Candidate
+- **Class** provisional address · **Owner** `app.js`
+- **Definition** Address currently previewed by a Ghost gesture while accepted
+  Session Current remains unchanged.
+- **Code stem** `ghostGesture.candidate` · **UI label** Ghost Candidate
+- **Non-effects** Scanning changes neither semantic history nor Traversal Trace;
+  cancellation discards the Candidate.
 
 ### Ghost Anchor
 - **Class** position · **Owner** `app.js`

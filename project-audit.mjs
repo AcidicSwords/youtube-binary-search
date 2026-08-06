@@ -22,6 +22,7 @@ const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const canonicalNames = [
   "README.md",
+  "CLOCKWORK.md",
   "PROJECT.md",
   "GLOSSARY.md",
   "SPEC.md",
