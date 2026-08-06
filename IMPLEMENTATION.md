@@ -1,6 +1,6 @@
 # Video Cartography — Canonical Implementation
 
-This document describes the release behavior implemented by version 9.0.0. It
+This document describes the release behavior implemented by version 9.1.0. It
 is a module and ownership map, not a history of earlier designs.
 
 ## Ownership
