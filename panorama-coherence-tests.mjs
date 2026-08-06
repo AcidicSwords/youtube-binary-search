@@ -204,7 +204,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   assert.equal((html.match(/id=["']panorama-both-toggle["']/g) || []).length, 1);
   assert.match(html, /id=["']tail-pane["'][\s\S]*id=["']player-tail["']/);
   assert.match(html, /id=["']lead-pane["'][\s\S]*id=["']player-lead["']/);
-  assert.doesNotMatch(panoramaCss, /\.step-pane-action/, "Side players must not use a transparent overlay element.");
+  assert.doesNotMatch(panoramaCss, /\.panorama-pane-action/, "Side players must not use a transparent overlay element.");
   assert.match(panoramaCss, /\.side-player-surface iframe[\s\S]*pointer-events:\s*none/);
   assert.match(
     panoramaCss,
@@ -231,7 +231,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
     /@container \(max-width: 680px\)[\s\S]*grid-template-areas:\s*"center"\s*"tail"\s*"lead"/,
     "Phone layout must explicitly stack Center, Tail, Lead without relying on auto-placement."
   );
-  assert.match(panoramaCss, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);
+  assert.match(panoramaCss, /\.panorama-pane \.player-wrap[\s\S]*min-height:\s*200px/);
   assert.match(
     styles,
     /\.center-transport-surface:hover:not\(:disabled\),[\s\S]*background:\s*transparent[\s\S]*transform:\s*none/,

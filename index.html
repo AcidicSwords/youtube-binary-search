@@ -42,11 +42,11 @@
       <section id="reader-column" class="reader-column" aria-label="Video reader">
         <section id="player-panel" class="player-panel" aria-label="Panorama">
           <div id="panorama" class="panorama panorama-off" data-phase="off" aria-label="Panorama">
-            <section id="tail-pane" class="step-pane step-pane-side tail-pane" aria-label="Tail panorama view">
-              <div class="step-pane-bar">
+            <section id="tail-pane" class="panorama-pane panorama-pane-side tail-pane" aria-label="Tail panorama view">
+              <div class="panorama-pane-bar">
                 <div class="pane-identity">
-                  <span class="step-pane-role">Tail</span>
-                  <span id="tail-meta" class="step-pane-meta">—</span>
+                  <span class="panorama-pane-role">Tail</span>
+                  <span id="tail-meta" class="panorama-pane-meta">—</span>
                 </div>
                 <div class="pane-bar-actions">
                   <button id="tail-collapse" class="pane-collapse" type="button" aria-label="Collapse Tail" title="Collapse Tail"><span aria-hidden="true">‹</span></button>
@@ -56,16 +56,16 @@
               <div class="pane-panorama-controls tail-panorama-controls" aria-label="Tail panorama state">
                 <p class="panorama-side-state"><span>Tail</span><small id="tail-offset-state">0 s in 0.25–2.5 s</small></p>
               </div>
-              <button id="tail-restore" class="step-pane-restore" type="button" aria-label="Show Tail" hidden>
+              <button id="tail-restore" class="panorama-pane-restore" type="button" aria-label="Show Tail" hidden>
                 <span aria-hidden="true">←</span><span>Tail</span>
               </button>
             </section>
 
-            <section class="step-pane step-pane-center" aria-label="Center video">
-              <div class="step-pane-bar center-bar">
+            <section class="panorama-pane panorama-pane-center" aria-label="Center video">
+              <div class="panorama-pane-bar center-bar">
                 <div class="pane-identity">
-                  <span class="step-pane-role">Center</span>
-                  <span id="center-meta" class="step-pane-meta">—</span>
+                  <span class="panorama-pane-role">Center</span>
+                  <span id="center-meta" class="panorama-pane-meta">—</span>
                 </div>
                 <div class="pane-bar-actions center-bar-actions">
                   <div class="panorama-state-readout center-panorama-summary">
@@ -93,11 +93,11 @@
               </div>
             </section>
 
-            <section id="lead-pane" class="step-pane step-pane-side lead-pane" aria-label="Lead panorama view">
-              <div class="step-pane-bar">
+            <section id="lead-pane" class="panorama-pane panorama-pane-side lead-pane" aria-label="Lead panorama view">
+              <div class="panorama-pane-bar">
                 <div class="pane-identity">
-                  <span class="step-pane-role">Lead</span>
-                  <span id="lead-meta" class="step-pane-meta">—</span>
+                  <span class="panorama-pane-role">Lead</span>
+                  <span id="lead-meta" class="panorama-pane-meta">—</span>
                 </div>
                 <div class="pane-bar-actions">
                   <button id="lead-collapse" class="pane-collapse" type="button" aria-label="Collapse Lead" title="Collapse Lead"><span aria-hidden="true">›</span></button>
@@ -107,7 +107,7 @@
               <div class="pane-panorama-controls" aria-label="Lead panorama state">
                 <p class="panorama-side-state"><span>Lead</span><small id="lead-offset-state">0 s in 0.25–2.5 s</small></p>
               </div>
-              <button id="lead-restore" class="step-pane-restore" type="button" aria-label="Show Lead" hidden>
+              <button id="lead-restore" class="panorama-pane-restore" type="button" aria-label="Show Lead" hidden>
                 <span>Lead</span><span aria-hidden="true">→</span>
               </button>
             </section>

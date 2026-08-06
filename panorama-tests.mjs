@@ -191,7 +191,7 @@ assert.equal(resolvePanoramaPhase({
   assert.match(youtubeSource, /setAttribute\?\.\("allow", options\.iframeAllow \|\| DEFAULT_IFRAME_ALLOW\)/);
   assert.match(youtubeSource, /setAttribute\?\.\("tabindex", "-1"\)/);
   assert.match(youtubeSource, /options\.accessible === false[\s\S]*setAttribute\?\.\("aria-hidden", "true"\)/);
-  assert.doesNotMatch(html, /class="step-pane-action"/,
+  assert.doesNotMatch(html, /class="panorama-pane-action"/,
     "YouTube side iframes must not be covered by a transparent action element.");
   assert.match(html, /id="tail-player-surface"[\s\S]*role="button"[\s\S]*id="player-tail"/);
   assert.match(html, /id="lead-player-surface"[\s\S]*role="button"[\s\S]*id="player-lead"/);
@@ -220,7 +220,7 @@ assert.equal(resolvePanoramaPhase({
   assert.match(layoutCss, /\.center-transport-surface[\s\S]*position:\s*absolute/);
   assert.match(css, /grid-template-areas:\s*"tail center lead"[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1\.1fr\) minmax\(0, 1fr\)/,
     "Wide panes must occupy explicit Tail | Center | Lead areas without fixed minima that clip the containing panel.");
-  assert.match(css, /\.step-pane\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/,
+  assert.match(css, /\.panorama-pane\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/,
     "Every pane must force its implicit content track to shrink instead of clipping the Lead controls.");
   assert.match(layoutCss, /\.player-panel\s*\{[\s\S]*container-type:\s*inline-size/,
     "Step Panorama responsive geometry must measure its containing panel.");
@@ -249,7 +249,7 @@ assert.equal(resolvePanoramaPhase({
   assert.match(panoramaSource, /resetSources/);
   assert.match(app, /panorama\?\.resetSources\?\.\(\)/,
     "Reloading a video must release stale side-source errors, including same-video reloads.");
-  assert.match(css, /\.step-pane \.player-wrap[\s\S]*min-height:\s*200px/);
+  assert.match(css, /\.panorama-pane \.player-wrap[\s\S]*min-height:\s*200px/);
   assert.match(css, /@container \(max-width: 680px\)/);
   assert.match(css, /@media \(min-width: 1240px\)/);
   assert.match(layoutCss, /@media \(min-width: 1240px\)/);

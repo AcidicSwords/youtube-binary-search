@@ -24,7 +24,7 @@ const phaseReport = async phase => {
   return page.evaluate(() => {
   const root = window.__panoramaPhaseProbe;
   const aura = getComputedStyle(root, "::before");
-  const sides = [...root.querySelectorAll(".step-pane-side")].map(element => {
+  const sides = [...root.querySelectorAll(".panorama-pane-side")].map(element => {
     const style = getComputedStyle(element);
     return {
       opacity: Number(style.opacity),
