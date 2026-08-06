@@ -72,7 +72,7 @@ for (const retired of [
 ]) check(!existsSync(new URL(`./${retired}`, import.meta.url)), `Retired artifact remains: ${retired}.`);
 
 check(pkg.name === "video-cartography", "package.json retains the canonical package name.");
-check(pkg.version === "9.1.1", "Ripple/Ghost coherence release is package version 9.1.1.");
+check(pkg.version === "9.1.2", "Ripple/Ghost stack-order release is package version 9.1.2.");
 check(pkg.private === true && pkg.type === "module", "The static private ES-module package boundary is explicit.");
 check(pkg.scripts?.verify === "npm run check && npm run test:browser",
   "verify composes the DOM-free and Chromium gates.");

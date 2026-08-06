@@ -70,11 +70,13 @@ export function availableTraversalProspects(state, {
   const low = Number(range?.start);
   const high = Number(range?.end);
   if (!Number.isFinite(low) || !Number.isFinite(high) || high < low) return [];
-  return state.entries.filter(entry =>
+  return state.entries
+    .filter(entry =>
       entry.generation === Number(generation)
       && entry.address >= low
       && entry.address <= high
-    );
+    )
+    .reverse();
 }
 
 export function consumeTraversalProspect(state, id) {

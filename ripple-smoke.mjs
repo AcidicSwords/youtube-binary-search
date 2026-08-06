@@ -109,6 +109,16 @@ assert.equal(byId.get("return-meta").textContent, historyBefore);
 assert.match(byId.get("status").textContent, /Ripple added futures at 1:12\.5 and 1:17\.5/);
 assert.equal(byId.get("timeline").children.length, timelineChildren);
 
+// Complete a later Ripple. Its newest endpoint must sit in front of the whole
+// earlier batch: forward Ghost is a stack, not a queue.
+await shiftClickTimeline(500);
+assert.equal(center.currentTime, 47.5);
+center.currentTime = 53;
+await poll();
+await flush(3);
+assert.match(byId.get("status").textContent, /Ripple added futures at 0:47\.5 and 0:52\.5/);
+assert.equal(currentText(), acceptedCurrent);
+
 byId.get("context-duration").value = "0";
 byId.get("context-duration").dispatch("change");
 await flush(2);
@@ -117,18 +127,19 @@ assert.equal(currentText(), acceptedCurrent);
 assert.match(byId.get("status").textContent, /positive Context Duration/);
 
 // Forward and backward are two directions in one Ghost stream. The first
-// forward position is Ripple Start because endpoints retain append order.
+// forward position is the later Ripple's End because the newest endpoint and
+// the last completed Ripple are at the front.
 await beginGhost("forward");
-assert.equal(currentText(), "Ghost Candidate 1:12.5");
+assert.equal(currentText(), "Ghost Candidate 0:52.5");
 assert.equal(byId.get("active-span-fill").dataset.medium, "ghost",
   "Future and historical positions share one Ghost presentation.");
-assert.match(byId.get("status").textContent, /Ghost forward.*1:12\.5/);
+assert.match(byId.get("status").textContent, /Ghost forward.*0:52\.5/);
 
 await moveGhost("backward");
 assert.equal(currentText(), "Ghost Candidate 0:00",
   "The same held gesture reverses from Ripple future to its Trace pivot.");
 await moveGhost("forward");
-assert.equal(currentText(), "Ghost Candidate 1:12.5",
+assert.equal(currentText(), "Ghost Candidate 0:52.5",
   "and moves forward into that same future again without switching readers.");
 
 dispatchDocument("keydown", { key: "Escape", code: "Escape" });
@@ -139,10 +150,10 @@ assert.equal(byId.get("return-meta").textContent, historyBefore);
 
 await beginGhost("forward");
 await releaseGhost();
-assert.equal(currentText(), "Current 1:12.5");
+assert.equal(currentText(), "Current 0:52.5");
 assert.equal(byId.get("return-meta").textContent, "Ghost Traverse",
   "Settling a Ripple future uses canonical Go under the one Ghost history label.");
-assert.match(byId.get("status").textContent, /Ghost moved Current to 1:12\.5/);
+assert.match(byId.get("status").textContent, /Ghost moved Current to 0:52\.5/);
 
 // The settled future is now on the backward side. From there one held gesture
 // can walk back, forward over it, onward into the remaining future, then reverse
@@ -150,15 +161,25 @@ assert.match(byId.get("status").textContent, /Ghost moved Current to 1:12\.5/);
 await beginGhost("backward");
 assert.equal(currentText(), "Ghost Candidate 0:00");
 await moveGhost("forward");
-assert.equal(currentText(), "Ghost Candidate 1:12.5");
+assert.equal(currentText(), "Ghost Candidate 0:52.5");
+await moveGhost("forward");
+assert.equal(currentText(), "Ghost Candidate 0:47.5");
 await moveGhost("forward");
 assert.equal(currentText(), "Ghost Candidate 1:17.5");
-await moveGhost("backward");
+await moveGhost("forward");
 assert.equal(currentText(), "Ghost Candidate 1:12.5");
+await moveGhost("backward");
+assert.equal(currentText(), "Ghost Candidate 1:17.5");
+await moveGhost("backward");
+assert.equal(currentText(), "Ghost Candidate 0:47.5");
+await moveGhost("backward");
+assert.equal(currentText(), "Ghost Candidate 0:52.5");
 await moveGhost("backward");
 assert.equal(currentText(), "Ghost Candidate 0:00");
 await moveGhost("forward");
-assert.equal(currentText(), "Ghost Candidate 1:12.5");
+assert.equal(currentText(), "Ghost Candidate 0:52.5");
+await moveGhost("forward");
+assert.equal(currentText(), "Ghost Candidate 0:47.5");
 await moveGhost("forward");
 assert.equal(currentText(), "Ghost Candidate 1:17.5");
 await releaseGhost();
@@ -179,4 +200,4 @@ assert.equal(center.state, 2);
 assert.match(byId.get("status").textContent, /Ripple cancelled/);
 assert.equal(byId.get("timeline").children.length, timelineChildren);
 
-console.log("Ripple smoke passed: invisible Timeline behavior, shared Context, append-order future endpoints, one bidirectional Ghost stream and presentation, canonical future settlement, repeated reversal, cancellation, and Current/history non-effects.");
+console.log("Ripple smoke passed: invisible Timeline behavior, shared Context, newest-first future endpoints, last-Ripple-first ordering, one bidirectional Ghost stream and presentation, canonical future settlement, repeated reversal, cancellation, and Current/history non-effects.");

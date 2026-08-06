@@ -101,8 +101,9 @@ It is an append-only, source-scoped ledger. A record holds directed units: a **j
 
 **Ghost Traversal** — held `G` plus the wheel — reads while the semantic world
 stands still. Backward and forward move through one frozen Traversal Trace
-stream. Ripple Start and End Addresses are appended to its forward side in
-acquisition order; direction never selects a second reader or presentation. The
+stream. Ripple Start and End Addresses are pushed onto its forward side newest
+first, so the last completed Ripple is traversed before older Ripples; direction
+never selects a second reader or presentation. The
 Address where the gesture begins becomes a fixed Anchor. Historical settlement
 moves the stream cursor without appending a synthetic traversal action. A
 future landing settles through ordinary Go, writes ordinary history and

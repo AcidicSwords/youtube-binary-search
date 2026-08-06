@@ -126,7 +126,8 @@ and `ghost-smoke.mjs` the gesture in a real browser.
 - acquisition, retarget, observation, completion, cancellation, and source
   replacement change no Current, Neighborhood, Active Span, semantic history,
   or Traversal Trace unless a prospect later settles through ordinary Go;
-- completed batches coexist in append order, Start before End; identity remains
+- completed batches coexist newest first, with End before Start and the last
+  Ripple before every older Ripple; identity remains
   exact under duplicate Addresses, Focus filtering, consumption, and generation
   invalidation;
 - Ghost freezes one stream with future entries after history; preview and Escape

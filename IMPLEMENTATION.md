@@ -1,6 +1,6 @@
 # Video Cartography — Canonical Implementation
 
-This document describes the release behavior implemented by version 9.1.1. It
+This document describes the release behavior implemented by version 9.1.2. It
 is a module and ownership map, not a history of earlier designs.
 
 ## Ownership
@@ -20,7 +20,7 @@ is a module and ownership map, not a history of earlier designs.
 | `panorama.js` | Tail/Lead players, placement, Panorama transitions, Cycle runtime, Freeze/Stretch, and stale-event rejection |
 | `chapters.js` | Parsing offered chapter Addresses into transient candidate extents |
 | `traversal-trace.js` | The append-only encounter ledger and one frozen bidirectional stream with appended Ripple futures |
-| `traversal-prospects.js` | Immutable, transient Ripple endpoint identity, append-order availability, exact consumption, batch removal, and clearing |
+| `traversal-prospects.js` | Immutable, transient Ripple endpoint identity, newest-first availability, exact consumption, batch removal, and clearing |
 | `view.js` | DOM projection, timeline atmosphere and sourceGridLines, Guide rows, operator labels, and accessible state |
 | `app.js` | Composition, interaction acquisition, source generations, persistence, transient ownership, and adapter effects |
 
@@ -274,7 +274,7 @@ different orders, and traversing one is a route through the other.
 
 A gesture resolves one readable stream once, at the moment it begins. Historical
 positions retain encounter order and available Ripple Start/End entries are
-appended to the forward side in acquisition order. The gesture also freezes
+pushed onto the forward side newest first. The gesture also freezes
 active Range, projection, and effective Step Distance. Reversing moves through
 the same stream instead of switching readers or presentations.
 
@@ -299,9 +299,10 @@ identity holds source generation, Observation Address, exact clipped start/end,
 and phase. Repeated acquisition retargets one playing Context and removes only
 the superseded incomplete batch.
 
-`traversal-prospects.js` appends Start then End with unique IDs. Availability
-preserves insertion order and filters generation and active Range without
-deletion. A Ghost gesture appends the returned entries to its one frozen stream.
+`traversal-prospects.js` records Start then End with unique IDs. Availability
+reverses insertion order and filters generation and active Range without
+deletion, so End precedes Start and the last completed Ripple precedes every
+older batch. A Ghost gesture appends that newest-first stack to its one frozen stream.
 During scan, `ghostTraverse()` uses the same Ghost Candidate presentation for
 historical and future positions.
 On release, `goTo()` runs again against accepted Session; successful `accept()`

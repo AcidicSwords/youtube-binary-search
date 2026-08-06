@@ -513,8 +513,8 @@ Each canonical term carries:
 - **Class** operator · observation · **Owner** `app.js` · **Gesture**
   `Shift+click` on bare Timeline ground
 - **Definition** Observe a non-Current Timeline Address through the shared
-  Context transport and append its resolved Context boundaries to the forward
-  side of Ghost's one traversal stream.
+  Context transport and push its resolved Context boundaries onto the
+  newest-first forward side of Ghost's one traversal stream.
 - **Code stem** `ripple` / `rippleObservation` · **UI label** Ripple
 - **Qualifiers** Ripple Observation Address, Ripple Context Window, Ripple Start
   Prospect, Ripple End Prospect.
@@ -656,7 +656,8 @@ Each canonical term carries:
 ### Traversal Prospect
 - **Class** transient object · **Owner** `traversal-prospects.js`
 - **Definition** Known Source Address available to Ghost's forward route that
-  has not yet been committed as Current.
+  has not yet been committed as Current. Availability is newest first: the last
+  completed Ripple is the first Ripple forward Ghost traverses.
 - **Code stem** `traversalProspects` · **UI label** —
 - **Non-effects** Not Traversal Trace, semantic history, Guide structure, or
   persistent state. It has no distinct Timeline marker or Ghost presentation.
@@ -703,7 +704,8 @@ Each canonical term carries:
   wheel
 - **Definition** Operator that moves backward and forward through one frozen
   traversal stream while preserving the current semantic environment during its
-  scan. Available Ripple futures are appended after its historical positions.
+  scan. Available Ripple futures are appended after its historical positions in
+  newest-first order.
 - **Code stem** `ghost` · **UI label** Ghost
 - **Non-effects** Restores no historical Range, Guide, Groups, Section
   Weightings, Focus, or semantic history.

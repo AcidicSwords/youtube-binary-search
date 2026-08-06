@@ -2,7 +2,7 @@
 
 ## 1. Authority
 
-This document specifies Video Cartography package release **9.1.1**. `package.json` is the release-version authority; the final implementation and its release gates are executable proofs of this specification. A contradiction among code, tests, interface text, and this document is a defect, not an alternative product generation.
+This document specifies Video Cartography package release **9.1.2**. `package.json` is the release-version authority; the final implementation and its release gates are executable proofs of this specification. A contradiction among code, tests, interface text, and this document is a defect, not an alternative product generation.
 
 The objective is a stable video-comprehension instrument, not an editing suite or framework. Completion preserves these laws:
 
@@ -569,8 +569,10 @@ Guide, both selections, Section Weightings, weight relaxation, semantic history,
 and Traversal Trace remain unchanged. Ripple draws nothing on the Timeline and
 does not alter its existing layers or geometry.
 
-The Start entry is appended before End, so forward reading offers Start then
-End. Entries carry unique identity, Ripple batch identity, and source
+The Start entry is recorded before End, then availability reverses insertion
+order: forward reading offers End then Start, and every endpoint from the last
+completed Ripple precedes older Ripple batches. Entries carry unique identity,
+Ripple batch identity, and source
 generation; coincident Addresses remain distinct occurrences. Availability is
 filtered by the active Range without deletion. Completion clears active Ripple
 identity and retains both prospects. Retarget, Escape, or source replacement
@@ -662,8 +664,9 @@ Ghost Traversal is held `G` plus the wheel. Arming costs nothing: no Anchor, no
 history, no settled playback. The first wheel quantum settles pending work,
 captures Current as a fixed Anchor, and freezes the projection, effective Step
 Distance, and exactly one readable stream. Historical positions appear in
-encounter order; available Ripple Start and End entries are appended to its
-forward side in acquisition order.
+encounter order; available Ripple Start and End entries are pushed onto its
+forward side newest first. Thus the last completed Ripple is the first Ripple
+forward Ghost traverses.
 
 Backward and forward move a single cursor through that stream. Reversing is
 fluid across the historical/future boundary and never switches reader, action,

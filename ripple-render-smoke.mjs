@@ -76,7 +76,12 @@ try {
   // future entries in the same stream Ghost already reads.
   await mediaClockTo(page, 81);
   await settle(360);
-  assert.match(await page.textContent("#status"), /Ripple added futures/);
+  const completionStatus = await page.textContent("#status");
+  const completedEndpoints = completionStatus.match(
+    /Ripple added futures at ([0-9:.]+) and ([0-9:.]+)\./
+  );
+  assert.ok(completedEndpoints,
+    "Ripple reports the exact Start and End futures it added.");
 
   await page.evaluate(() => document.activeElement?.blur());
   await page.keyboard.down("g");
@@ -92,7 +97,8 @@ try {
   }));
   assert.equal(ghostFuture.medium, "ghost",
     "A future endpoint uses the same Ghost presentation as historical traversal.");
-  assert.match(ghostFuture.current, /Ghost Candidate/);
+  assert.equal(ghostFuture.current, `Ghost Candidate ${completedEndpoints[2]}`,
+    "Forward Ghost offers the most recently appended Ripple endpoint first.");
   assert.equal(ghostFuture.forbiddenCount, 0,
     "Ghost does not reveal a second forward/prospect presentation.");
   assert.equal(ghostFuture.childCount, beforeRipple.childCount,

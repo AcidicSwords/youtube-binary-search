@@ -88,8 +88,9 @@ relation. Detailed behavior remains in `SPEC.md` and `IMPLEMENTATION.md`.
 
 - **Owner** `traversal-prospects.js`
 - **Inputs** Ripple identity, source generation, resolved Context boundaries
-- **Relation** append distinct Start then End occurrences to Ghost's forward
-  side in acquisition order; consume by identity
+- **Relation** push distinct Start then End occurrences onto Ghost's forward
+  side newest first; the last completed Ripple is traversed first; consume by
+  identity
 - **Outputs** Ripple Start Prospect and Ripple End Prospect
 - **Allowed mutations** transient source-scoped prospect collection
 - **Protected non-effects** no persistence, Guide, history, or Traversal Trace

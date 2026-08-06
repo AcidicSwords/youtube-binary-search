@@ -123,11 +123,11 @@ for (let operation = 0; operation < 20_000; operation += 1) {
     entry.generation === generation
     && entry.address >= range.start
     && entry.address <= range.end
-  );
+  ).reverse();
   assert.deepEqual(
     availableTraversalProspects(prospects, { generation, range }),
     expected,
-    "Availability is exactly append-order generation and Range filtering."
+    "Availability is exactly newest-first generation and Range filtering."
   );
 }
 

@@ -48,8 +48,8 @@ assert.deepEqual(
     generation: 4,
     range: { start: 0, end: 100 }
   }).map(entry => entry.kind),
-  [TRAVERSAL_PROSPECT_KIND.RIPPLE_START, TRAVERSAL_PROSPECT_KIND.RIPPLE_END],
-  "Ripple endpoints remain in the order appended to the Trace's forward side."
+  [TRAVERSAL_PROSPECT_KIND.RIPPLE_END, TRAVERSAL_PROSPECT_KIND.RIPPLE_START],
+  "The most recently added endpoint is first on Ghost's forward side."
 );
 
 const second = appendRippleProspects(state, {
@@ -65,12 +65,12 @@ assert.deepEqual(
     range: { start: 0, end: 100 }
   }).map(entry => `${entry.rippleId}:${entry.kind}`),
   [
-    "ripple-1:ripple-start",
-    "ripple-1:ripple-end",
+    "ripple-2:ripple-end",
     "ripple-2:ripple-start",
-    "ripple-2:ripple-end"
+    "ripple-1:ripple-end",
+    "ripple-1:ripple-start"
   ],
-  "Completed batches coexist in append order."
+  "The last completed Ripple is the first forward Ghost batch."
 );
 const later = appendRippleProspects(state, {
   rippleId: "ripple-later",
@@ -80,22 +80,24 @@ const later = appendRippleProspects(state, {
 });
 assert.equal(later.state.entries.length, state.entries.length + 2);
 
-const firstStart = availableTraversalProspects(state, {
+const newestEndpoint = availableTraversalProspects(state, {
   generation: 4,
   range: { start: 0, end: 100 }
 })[0];
-const consumed = consumeTraversalProspect(state, firstStart.id);
+assert.equal(newestEndpoint.rippleId, "ripple-2");
+assert.equal(newestEndpoint.kind, TRAVERSAL_PROSPECT_KIND.RIPPLE_END);
+const consumed = consumeTraversalProspect(state, newestEndpoint.id);
 assert.equal(consumed.changed, true);
-assert.equal(consumed.prospect.id, firstStart.id);
+assert.equal(consumed.prospect.id, newestEndpoint.id);
 state = consumed.state;
 assert.deepEqual(
   state.entries
-    .filter(entry => entry.rippleId === "ripple-1")
+    .filter(entry => entry.rippleId === "ripple-2")
     .map(entry => entry.kind),
-  [TRAVERSAL_PROSPECT_KIND.RIPPLE_END],
+  [TRAVERSAL_PROSPECT_KIND.RIPPLE_START],
   "Consuming one endpoint leaves the other."
 );
-assert.equal(consumeTraversalProspect(state, firstStart.id).changed, false,
+assert.equal(consumeTraversalProspect(state, newestEndpoint.id).changed, false,
   "Consumption is exact and cannot select a coincident entry.");
 
 const duplicates = appendRippleProspects(state, {
@@ -115,7 +117,7 @@ assert.deepEqual(
     generation: 4,
     range: { start: 20, end: 30 }
   }).map(entry => entry.id),
-  duplicateEntries.map(entry => entry.id),
+  duplicateEntries.map(entry => entry.id).reverse(),
   "Focus filters availability without deleting entries."
 );
 assert.equal(state.entries.filter(entry => entry.rippleId === "ripple-3").length, 2);
@@ -130,7 +132,7 @@ assert.equal(
 
 const removed = removeRippleProspects(state, "ripple-1");
 assert.equal(removed.changed, true);
-assert.equal(removed.prospects.length, 1);
+assert.equal(removed.prospects.length, 2);
 assert.equal(removed.state.entries.some(entry => entry.rippleId === "ripple-1"), false);
 assert.equal(removeRippleProspects(removed.state, "missing").changed, false);
 
@@ -152,4 +154,4 @@ assert.equal(
   "Invalid batches cannot manufacture partial prospects."
 );
 
-console.log("Traversal Prospect tests passed: append-order future entries, coexisting batches, exact settlement consumption, duplicate occurrence identity, generation invalidation, Focus filtering without deletion, batch removal, and transient clearing.");
+console.log("Traversal Prospect tests passed: newest-first future entries, last-Ripple-first batches, exact settlement consumption, duplicate occurrence identity, generation invalidation, Focus filtering without deletion, batch removal, and transient clearing.");

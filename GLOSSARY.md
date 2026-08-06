@@ -68,7 +68,7 @@
 - **Ripple Observation Address** — the non-Current Address being observed by active Ripple.
 - **Ripple Context Window** — the exact, independently Range-clipped Context Window around a Ripple Observation Address.
 - **Traversal Prospect** — an internal transient, source-scoped future Address appended to the forward side of Ghost's one stream. It is not a distinct Ghost type or visual channel; successful ordinary Go consumes exactly the selected identity.
-- **Ripple Start Prospect / Ripple End Prospect** — the resolved start/end boundaries of a completed Ripple Context Window, appended Start then End to Ghost's forward side.
+- **Ripple Start Prospect / Ripple End Prospect** — the resolved start/end boundaries of a completed Ripple Context Window. Each completion pushes its newest endpoint to the front, so End precedes Start and the last Ripple precedes older Ripples.
 - **Textured Playback** — the optional Shift playback policy that reads cumulative active Section Weight as a playback texture: each doubling or halving of Weight shifts Center by one playback-rate step, so compressed ground plays faster and expanded ground plays slower. It is a log-compressed reading of the map, not a correction of it, and it retunes as Current or weight relaxation changes.
 - **Load Generation** — the monotonically increasing identity on an immutable source request, used with the adapter’s loaded video identity to reject stale metadata and state events.
 - **Source-transition boundary** — the single operation that settles or cancels all old-source transient owners, persists safe Guide changes, clears source-scoped presentation, and only then chapters the new source.
