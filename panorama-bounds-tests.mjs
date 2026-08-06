@@ -21,8 +21,8 @@ function assertContained(bounds, range) {
   const resolution = { L: 48, C: 50, R: 52 };
   const bounds = derivePanoramaBounds({ current: 50, stepDistance: { backward: 10, forward: 10, linked: true }, range });
   assert.deepEqual(bounds.envelope, { start: 40, end: 60 });
-  assert.ok(bounds.envelope.start < resolution.L, "Panorama may extend behind Resolution.");
-  assert.ok(bounds.envelope.end > resolution.R, "Panorama may extend ahead of Resolution.");
+  assert.ok(bounds.envelope.start < resolution.L, "Panorama may extend behind Current Neighborhood.");
+  assert.ok(bounds.envelope.end > resolution.R, "Panorama may extend ahead of Current Neighborhood.");
   assertContained(bounds, range);
 }
 
@@ -237,7 +237,7 @@ function makeControllerHarness() {
   assert.doesNotMatch(panoramaSource, /transportKind === "loop"/);
   assert.match(panoramaSource, /function resetAtCurrent\(\)[\s\S]*invalidate\(\{ pause: false \}\)/);
   assert.match(app, /resetPanorama[\s\S]*panorama\?\.resetAtCurrent/);
-  assert.doesNotMatch(panoramaSource, /snapshot\.neighborhood/, "Panorama bounds must not depend on Resolution.");
+  assert.doesNotMatch(panoramaSource, /snapshot\.neighborhood/, "Panorama bounds must not depend on Current Neighborhood.");
 }
 
 console.log("Panorama bounds tests passed: Range containment, Context suspension, native playback, Hold, and side Step.");

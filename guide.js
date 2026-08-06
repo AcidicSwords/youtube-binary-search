@@ -56,7 +56,7 @@ function now() {
 // A Group carries two independent relations over its Sections.
 //
 //   visible  -- zero or one Group supplies Sections and endpoint Pins to Timeline
-//   active   -- any number of Groups may contribute deformation
+//   active   -- any number of Groups may contribute topography
 //
 // Nothing is frozen, so nothing can go stale: an active Group contributes to the
 // density product whether or not its landmarks are drawn, and editing a Weight

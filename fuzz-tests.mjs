@@ -62,7 +62,7 @@ function assertSessionInvariant(session) {
       assert.ok(frame.neighborhood.R >= activeSpan.end - EPSILON, `${role} does not contain the Interval end.`);
       assert.ok(Math.abs(frame.neighborhood.C - address) <= EPSILON);
     }
-    assert.deepEqual(activeSpan.arrivalNeighborhood.neighborhood, neighborhood, "The active endpoint frame must match current Resolution.");
+    assert.deepEqual(activeSpan.arrivalNeighborhood.neighborhood, neighborhood, "The active endpoint frame must match current Current Neighborhood.");
     assert.equal(activeSpan.arrivalNeighborhood.neighborhoodBasis, neighborhoodBasis);
   }
 

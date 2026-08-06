@@ -4,7 +4,7 @@
 //   active   — any number of Groups may contribute multiplicative Weight
 //
 // Guide access remains complete regardless of visibility. These tests hold the
-// singular-or-empty Timeline owner, independent deformation stack, Pin visibility law,
+// singular-or-empty Timeline owner, independent topography stack, Pin visibility law,
 // hidden-object navigation, and persistence repair.
 import assert from "node:assert/strict";
 import {
@@ -107,7 +107,7 @@ function build() {
     weighting: 0.5
   });
   assert.equal(second.created, true,
-    "The same retained relation in another Group is a separate deformation layer.");
+    "The same retained relation in another Group is a separate topography layer.");
   assert.notEqual(first.section.id, second.section.id);
   assert.notEqual(first.section.groupId, second.section.groupId);
   assert.equal(createTimelineProjection({ duration: 40, guide }).effectiveWeightAtSource(20), 0.25,
@@ -184,7 +184,7 @@ function build() {
 
   setGroupState(guide, terrain.id, { visible: false });
   assert.equal(extentOf(guide), bothActive,
-    "Changing the visible layer must not change the deformation stack.");
+    "Changing the visible layer must not change the topography stack.");
   assert.deepEqual(orderedPins(guide).map(pin => pin.t), [],
     "Hiding the drawn layer draws nothing rather than promoting another: which layer you want is a choice.");
   assert.equal(guide.shownGroupId, null);
@@ -419,7 +419,7 @@ function build() {
     "A Group is an organizing choice, not an owner.");
   assert.ok(guide.sections.every(section => section.groupId === DEFAULT_GROUP_ID));
   assert.equal(extentOf(guide), DURATION + 40 - 10,
-    "and the deformation its Sections carry is unchanged.");
+    "and the topography its Sections carry is unchanged.");
 }
 
 // --- The default Group is an ordinary Group -------------------------------------
@@ -544,7 +544,7 @@ function build() {
 }
 
 // --- The two states drive two different renderings ------------------------------
-// A gradient shows deformation, so it follows active. A bar is a mark, so it
+// A gradient shows topography, so it follows active. A bar is a mark, so it
 // follows visible. Same object, different attribute, different consequence.
 {
   const { guide, terrain } = build();
@@ -555,13 +555,13 @@ function build() {
   assert.equal(drawnBars().some(section => section.groupId === terrain.id), false,
     "A hidden Group draws no Section bar.");
   assert.equal(gradientSources().some(section => section.groupId === terrain.id), true,
-    "while still contributing the deformation its gradient shows.");
+    "while still contributing the topography its gradient shows.");
 
   setGroupState(guide, terrain.id, { visible: true, weightsEnabled: false });
   assert.equal(drawnBars().some(section => section.groupId === terrain.id), true,
     "An inactive Group still draws its Section bar.");
   assert.equal(gradientSources().some(section => section.groupId === terrain.id), false,
-    "while contributing no deformation, so no gradient.");
+    "while contributing no topography, so no gradient.");
 }
 
 // A Group has no Address, so its name is the only thing that identifies it. A
@@ -592,4 +592,4 @@ function build() {
     "and the transaction names the Group it renamed.");
 }
 
-console.log("Group tests passed: at most one visible Timeline layer, independent active deformation stack, hidden Guide navigation, endpoint visibility, multiplicative layering, non-destructive deletion, and deterministic persistence repair.");
+console.log("Group tests passed: at most one visible Timeline layer, independent active topography stack, hidden Guide navigation, endpoint visibility, multiplicative layering, non-destructive deletion, and deterministic persistence repair.");

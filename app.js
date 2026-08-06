@@ -317,7 +317,7 @@ const state = {
   carryModifier: false,
   // Each surface owns its own one-shot Shift layer. They may coexist and only
   // the owner whose latch supplied a modified action can consume its latch.
-  // One transient, source-scoped deformation bypass. It changes the effective
+  // One transient, source-scoped weight relaxation. It changes the effective
   // projection used by every spatial consumer without editing or persisting
   // Weight. A new source always clears it.
   weightRelaxation: null,
@@ -1640,7 +1640,7 @@ function refine(direction, options = {}) {
     const label = direction === "backward" ? "Backward" : "Forward";
     setStatus(
       reason === "refinement-limit"
-        ? `Cannot Refine ${label}: this side has reached the Resolution limit. Reopen or Step to restore scale.`
+        ? `Cannot Refine ${label}: this side has reached the refinement limit. Reopen or Step to restore scale.`
         : `Cannot Refine ${label}: Current is at the Range ${direction === "backward" ? "start" : "end"}.`
     );
     return;
@@ -1751,7 +1751,7 @@ function validWeightRelaxation() {
 function toggleWeightRelaxation() {
   if (!state.videoLoaded) return false;
   if (directManipulationActive()) {
-    setStatus("Finish or cancel the active Timeline manipulation before toggling deformation.");
+    setStatus("Finish or cancel the active Timeline manipulation before toggling topography.");
     return false;
   }
   // Pending spatial gestures must become exact before their projection changes.
@@ -1769,8 +1769,8 @@ function toggleWeightRelaxation() {
     : null;
   setStatus(restoring
     ? (section
-      ? `Restored deformation for ${sectionName(section)}.`
-      : "Restored deformation for the complete Timeline.")
+      ? `Restored topography for ${sectionName(section)}.`
+      : "Restored topography for the complete Timeline.")
     : (section
       ? `Straightened ${sectionName(section)} without changing its Weight.`
       : "Straightened the complete Timeline without changing stored Weights."));
@@ -4384,7 +4384,7 @@ function settleNudgeGesture() {
 
 // Current is displaced by Step rather than by Go, so a drag or a Nudge extends
 // or shortens the retained traversal instead of replacing it with a new Working
-// Interval and a new Resolution. If a fresh neighbourhood is wanted, that is
+// Interval and a new Current Neighborhood. If a fresh neighbourhood is wanted, that is
 // what clicking the Timeline is for.
 function stepCurrentBySourceDelta(session, sourceDelta, options = {}) {
   const projection = options.projection || timelineProjection();
@@ -6575,7 +6575,7 @@ document.addEventListener("keydown", event => {
     event.preventDefault();
     retainCurrentAsPin(event, { useFormLabel: false });
   }
-  // X transiently bypasses deformation for the acquired Section, or for the
+  // X transiently bypasses topography for the acquired Section, or for the
   // complete map when no Section is acquired. Weight itself remains Guide state.
   else if (plain && key === "x") {
     event.preventDefault();

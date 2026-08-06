@@ -32,7 +32,7 @@ unrelated players.
 
 Each pane's top bar contains only identity, Address, and a local visibility
 action. Center's bar also reports Panorama state. The sole bottom action is the
-centered `Stretch both` / `Hold both` control. Remembered tuning lives in
+centered `Resume Panorama` / `Freeze Panorama` control. Remembered tuning lives in
 State & Settings, not around the video.
 
 Center is the audible ordinary YouTube player. Tail and Lead are muted
@@ -49,7 +49,7 @@ slideshow around Current:
 - Step is the default: Tail and Lead show the exact weighted backward and
   forward Step destinations.
 - Refine shows the next weighted backward and forward midpoints.
-- Reopen shows the midpoints made available by the reopened Resolution.
+- Reopen shows the midpoints made available by the reopened Current Neighborhood.
 - Context fixes Tail and Lead at its source-time window edges while Center
   observes inside it.
 - a retained Section shows Start, weighted midpoint, and End while Current owns
@@ -82,8 +82,8 @@ This is a high-coherence default, not a universal optimum. Wider offsets and
 stronger provided rate pairs remain selectable, and existing saved values remain
 unchanged.
 
-`Hold both` preserves the attained relation and phase while Center continues.
-`Stretch both` resumes from it. A side without enough Range room for the Inner
+`Freeze Panorama` preserves the attained relation and phase while Center continues.
+`Resume Panorama` resumes from it. A side without enough Range room for the Inner
 Offset becomes non-operational rather than crossing Center or silently shrinking
 the configured minimum. Collapsed, hidden, or unavailable panes do not stall the
 other side.
@@ -102,7 +102,7 @@ The Timeline is one weighted map with this visual order:
 
 ```text
 free and shared Pins
-main Range / Resolution / Working-Interval track
+main Range / Current Neighborhood / Working-Interval track
 source ruler
 bounded Section relationship tree
 ```
@@ -118,7 +118,7 @@ A Section's own colour is its identity, and identities may not collide: hues are
 walked by the golden angle, so any number of Sections stay as far apart as they
 can be and the sequence never revisits a hue. A Section's hue derives from its
 identity alone, so it never changes because a neighbour was added, removed,
-reordered or reweighted. Deformation is never drawn in that hue — the atmosphere
+reordered or reweighted. Temporal Topography is never drawn in that hue — the atmosphere
 on the map and the tint on a Guide row both use the violet/teal pair, and their
 direction carries the sign — so one channel is identity and the other is Weight,
 and neither has to be read off the other.
@@ -126,7 +126,7 @@ and neither has to be read off the other.
 The main layers remain distinct without relying on colour alone:
 
 - Range is the admissible ground;
-- Resolution is a quiet local gridLine;
+- Current Neighborhood is a quiet local gridLine;
 - Active Span is the surviving directional relation;
 - Current is the semantic Address and carries its own label;
 - Cursor appears only when physical observation has left Current;
@@ -229,21 +229,21 @@ reports the exact existing Pin or Section.
 ### Release and Focus
 
 Release clears the Active Span and the acquired Timeline operand. It
-preserves Current, Resolution, Range, Focus, Guide focus, retained topology,
-Weights, playback preferences, and deformation-bypass state. Clearing only a
+preserves Current, Current Neighborhood, Range, Focus, Guide focus, retained topology,
+Weights, playback preferences, and topography-bypass state. Clearing only a
 presentation operand creates no history; clearing the semantic interval is
 Undoable.
 
 Focus makes an acquired Section or Active Span the active Range and drawn
 world. Unfocus restores the containing Range. Focus never edits Weight or the
-deformation-bypass scope. While focused, spatial boundary changes that cannot be
+topography-bypass scope. While focused, spatial boundary changes that cannot be
 expressed honestly are refused; exact Guide edits remain available.
 
-### Toggle Deformation
+### Relax Weights
 
 The compact `X` action lives below the square but inside Operators, before
 history. It is not a tenth matrix cell and does not live in the Timeline header.
-Its contextual label is `Straighten Section`, `Restore Section`, `Straighten
+Its contextual label is `Relax Weights`, `Restore Section`, `Relax
 Timeline`, or `Restore Timeline`, with the exact scope shown beside it.
 
 An acquired Timeline Section scopes the action to that Section. With no acquired
@@ -275,7 +275,7 @@ labels reveal their actual Pins in the Pins tab.
 Groups are a flat Section partition. At most one Group is `On Timeline`, and no
 Group drawn is valid. `Active` is independent: any number of Groups may
 contribute Weight while hidden. Hiding the drawn Group removes its Sections and
-endpoint Pins from Timeline but does not deactivate its deformation.
+endpoint Pins from Timeline but does not deactivate its topography.
 
 Every Group can be renamed. The last Group cannot be removed. Removing another
 Group moves its Sections to the real heir named in the confirmation and result;
@@ -318,7 +318,7 @@ State & Settings contains remembered configuration, grouped by the question it
 answers:
 
 - Active Range and Range tools;
-- Resolution state;
+- Current Neighborhood state;
 - manual Step distance or adaptive `1/32`, `1/16`, `1/8` of weighted Range;
 - source-time Fine Nudge distance;
 - source-time Automatic Context duration;
@@ -341,7 +341,7 @@ observation. Changing one setting does not rewrite another dimension.
 | S | Switch End |
 | R | Release |
 | T / Shift+T | Retain Pin / Retain Section |
-| X | Toggle deformation for acquired Section, otherwise complete Timeline |
+| X | Toggle topography for acquired Section, otherwise complete Timeline |
 | F | Focus / Unfocus |
 | Space / Shift+Space | Panorama playback / Center-only Shift playback |
 | Alt + compatible operator | Carry the acquired retained object |
@@ -364,7 +364,7 @@ reader hotkeys work without another Timeline click.
 Every form control has an accessible name and every button declares its type.
 Operator keys are visible and exposed through `aria-keyshortcuts`. Contextual
 disabled states state the missing operand. `aria-pressed` communicates Shift,
-Panorama, Group, and deformation-bypass state.
+Panorama, Group, and topography-bypass state.
 
 Fine and coarse pointers share visual marks but use different hit geometry.
 Coarse Pin and Section targets are at least 48 pixels. The visible Pin or Section

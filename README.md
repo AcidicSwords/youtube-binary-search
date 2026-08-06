@@ -71,7 +71,7 @@ Overlapping active Sections compose by multiplication. Violet atmosphere indicat
 
 All spatial consumers share one effective projection: drawing, sourceGridLines, hit testing, drag conversion, Step, Refine, adaptive Reach, spatial readouts, and the optional dynamic playback policy.
 
-`X` is the auxiliary **Toggle Deformation** action in Operators. With an acquired Timeline Section it temporarily bypasses only that Section; otherwise it bypasses the complete map. Press `X` again on the same scope to restore it. The bypass is source-scoped, transient, absent from Undo and persistence, and never changes the stored Weight. Fixed playback receives no command from `X`; dynamic Shift playback may retune on a later transport tick because that policy explicitly reads the effective map.
+`X` is the auxiliary **Relax Weights** action in Operators. With an acquired Timeline Section it temporarily bypasses only that Section; otherwise it bypasses the complete map. Press `X` again on the same scope to restore it. The bypass is source-scoped, transient, absent from Undo and persistence, and never changes the stored Weight. Fixed playback receives no command from `X`; dynamic Shift playback may retune on a later transport tick because that policy explicitly reads the effective map.
 
 ## Active Span and operators
 
@@ -85,13 +85,13 @@ A  Step Backward      S  Switch End   D  Step Forward
 R  Release            T  Tag               F  Focus / Unfocus
 ```
 
-- `Q/E` choose directional spatial midpoints at finer Resolution while preserving the established residue when possible.
+- `Q/E` choose directional spatial midpoints at finer Current Neighborhood while preserving the established residue when possible.
 - `Shift+Q/E` perform Local Refine and retain only the immediate traversal.
 - `A/D` or `←/→` Step through a configured Timeline distance. A repeated sequence is one transaction; a reversal that returns to its departure retains the positive visited envelope.
 - `Shift+A/D` or `Shift+←/→` Step to the previous or next Pin or Range boundary.
-- `W` restores Range-level Resolution without discarding Current or the Active Span.
+- `W` restores Range-level Current Neighborhood without discarding Current or the Active Span.
 - `S` moves to the opposite endpoint and restores that endpoint’s saved viewpoint.
-- `R` clears the Active Span and the acquired Timeline operand. Current, Guide focus, retained topology, Weight, Focus, and deformation bypass remain.
+- `R` clears the Active Span and the acquired Timeline operand. Current, Guide focus, retained topology, Weight, Focus, and weight relaxation remain.
 - `T` tags Current as a Pin. `Shift+T` tags a positive Active Span as a Section. Plain Tag remains a Pin action even while an Interval exists; an exact duplicate is selected rather than recreated.
 - `F` focuses an acquired Section or the Active Span as Range and viewport; the same action unfocuses to the containing Range.
 
@@ -128,7 +128,7 @@ Nudge is exact source-time adjustment. `Shift`+wheel uses the dominant wheel axi
 | `Shift+A` / `Shift+D`, `Shift+←` / `Shift+→` | Previous / next Pin |
 | `W` / `S` | Reopen / Switch End |
 | `R` / `T` / `Shift+T` / `F` | Release / Retain Pin / Retain Section / Focus |
-| `X` | Toggle deformation for the acquired Section, otherwise the complete Timeline |
+| `X` | Toggle topography for the acquired Section, otherwise the complete Timeline |
 | `Z` / `C` | Undo / Redo |
 | `[` / `]` | Decrease / increase Step Distance preset |
 | `,` / `.` | Nudge backward / forward |

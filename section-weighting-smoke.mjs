@@ -369,7 +369,7 @@ assert.equal(
   "1:40 · 0.975× spatial"
 );
 
-// X bypasses deformation: the complete map is drawn and measured as if the
+// X bypasses topography: the complete map is drawn and measured as if the
 // Weights were neutral while every stored Weight remains untouched.
 const weightsBeforeBypass = descendants(byId.get("sections-list"))
   .filter(node => node.dataset.sectionWeighting !== undefined)
@@ -379,7 +379,7 @@ const historyBeforeBypass = byId.get("return-meta").textContent;
 dispatchDocument("keydown", { key: "x", code: "KeyX" });
 await flush();
 assert.equal(byId.get("duration-time").textContent, "1:40",
-  "A complete deformation bypass draws the map straight.");
+  "A complete weight relaxation draws the map straight.");
 assert.deepEqual(
   descendants(byId.get("sections-list"))
     .filter(node => node.dataset.sectionWeighting !== undefined)
@@ -400,7 +400,7 @@ assert.equal(
 assert.deepEqual(
   playerCommandCounts(),
   commandsBeforeWeight,
-  "Bypassing and restoring deformation issue no player or Panorama command."
+  "Bypassing and restoring topography issue no player or Panorama command."
 );
 
 // Existing Section weights remain editable during source playback without
@@ -424,7 +424,7 @@ assert.deepEqual(
 );
 
 // Weight is assigned in the Guide, and only there. Tag owns the matrix's
-// retention position; deformation bypass is a separate auxiliary operation.
+// retention position; weight relaxation is a separate auxiliary operation.
 {
   const select = () => descendants(byId.get("sections-list"))
     .find(node => node.dataset.sectionWeighting !== undefined);

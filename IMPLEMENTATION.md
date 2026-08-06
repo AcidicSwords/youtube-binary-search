@@ -7,7 +7,7 @@ is a module and ownership map, not a history of earlier designs.
 
 | Owner | Sole responsibility |
 |---|---|
-| `range-geometry.js` | Pure Range, Resolution, Refine, Step-neighborhood, and interval geometry |
+| `range-geometry.js` | Pure Range, Current Neighborhood, Refine, Step-neighborhood, and interval geometry |
 | `session.js` | Canonical semantic model, operator transactions, endpoint frames, Undo/Redo, Focus, and Guide transactions |
 | `guide.js` | Pin graph, Section and Group lifecycle, canonical Weight values, validation, migration, and Group-deletion planning |
 | `operator-grammar.js` | Frozen proof fixture for matrix identities, keys, areas, and shifted meanings |
@@ -31,10 +31,10 @@ constructs `YT.Player`.
 ## Canonical model and transactions
 
 Source time is the only stored temporal coordinate. A Session model contains
-duration, Range, Current within a Resolution, the optional Active Span,
+duration, Range, Current within a Current Neighborhood, the optional Active Span,
 Focus, Step Distance, Guide, and the last semantic operator. Pins and Section
 endpoints are source Addresses. Timeline coordinates, lanes, gradients, hover
-state, open panels, and deformation bypass are never stored in the model.
+state, open panels, and weight relaxation are never stored in the model.
 
 A semantic mutation follows one route:
 
@@ -49,7 +49,7 @@ snapshot the current model
 
 Session history is bounded to 100 entries. A new commit clears the Redo future.
 Presentation-only consequences do not manufacture history: releasing only an
-acquired Timeline operand and toggling deformation bypass are examples.
+acquired Timeline operand and toggling weight relaxation are examples.
 
 The Active Span is the contiguous residue left by excluding alternatives.
 Its compact endpoint representation records bounds, orientation, active side,
@@ -98,7 +98,7 @@ operation:
 
 ```text
 active Groups and their Sections
-→ remove the current deformation-bypass scope
+→ remove the current topography-bypass scope
 → discard neutral 1× contributors
 → split source time at effective Section boundaries
 → multiply covering positive factors per segment
@@ -122,7 +122,7 @@ what counts.
 Focus changes only the drawn viewport. The focused extent fills the timeline,
 but the viewport cannot alter map density or operator arithmetic.
 
-### Deformation bypass
+### Temporal Topography bypass
 
 The application owns one source-scoped transient value:
 
@@ -185,7 +185,7 @@ Guide persistence is source-keyed under version 10. Older version 1–8 records
 are migrated through the Guide kernel; valid current records round-trip without
 changing identity. User preferences have a separate versioned key and include
 Step Distance, Nudge, Context, Shift playback, Panorama settings, and pane
-visibility. Deformation bypass, open surfaces, selections, Chapters, and Panorama
+visibility. Temporal Topography bypass, open surfaces, selections, Chapters, and Panorama
 runtime are transient.
 
 Guide loading returns an explicit recovery result:
@@ -225,7 +225,7 @@ of the old source in one place. It cancels Current, Pin, Section, and Range
 drags to their origins; settles Nudge and pending Step; safely settles active
 Context or Playback; persists settled Guide changes; clears native Go and
 programmatic placement; closes transient dialogs and Pin clusters; clears Chapters,
-selection, Guide focus, Shift latches, Panorama runtime, and deformation bypass;
+selection, Guide focus, Shift latches, Panorama runtime, and weight relaxation;
 then creates a fresh Session and chapters the new source. Player errors use the same
 boundary. No source Address, identity, timer, or history checkpoint may cross it.
 

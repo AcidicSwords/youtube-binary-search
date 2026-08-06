@@ -4,23 +4,23 @@
 - **Source Time** — the coordinate system in which all durable temporal facts are stored. Presentation may be spatially reshaped; source identity, order, and duration do not.
 - **Address** — one finite position in Source Time.
 - **Range** — the contiguous source extent currently admissible to navigation and observation.
-- **Resolution** — the ordered left/Current/right neighborhood that defines the present discrimination scale and its basis.
+- **Current Neighborhood** — the ordered left/Current/right neighborhood that defines the present discrimination scale and its basis.
 - **Current** — the committed semantic Address.
 - **Cursor** — the transient physical Address reported while media is being observed.
 - **Active Span** — the positive contiguous residue left after alternatives have been excluded from Range. It stores bounds, orientation, and endpoint frames, not a persistent path.
-- **Endpoint Frame** — the Resolution and basis associated with one side of a Active Span, restored by Switch End.
+- **Endpoint Frame** — the Current Neighborhood and basis associated with one side of a Active Span, restored by Switch End.
 - **Timeline Space** — the positive, continuous, strictly increasing spatial coordinate derived from Source Time and effective Section factors.
 - **Temporal Topography** — the source projected into navigable Timeline Space, including its sourceGridLines, retained landmarks, and relation wires.
 - **Density** — the product of effective covering Section weights at a source segment; integrating it produces Timeline Space.
-- **Effective Projection** — the single immutable source↔Timeline mapping for one render or operation after Group activity, Weight, and the current deformation bypass have been resolved.
+- **Effective Projection** — the single immutable source↔Timeline mapping for one render or operation after Group activity, Weight, and the current weight relaxation have been resolved.
 - **Spatial midpoint** — the source Address halfway between two endpoints in Timeline Space. It need not equal their arithmetic source-time midpoint.
 - **Stretch factor** — a Timeline extent reported relative to the source span it allocates. At `1×`, Timeline and source extent correspond.
 - **Viewport** — the source extent drawn across the Timeline. Focus changes the viewport; operators still consume the same effective projection.
 - **Weight** — one Section’s positive map-scale factor. It changes Timeline density, not source duration. Fixed playback ignores it; optional Textured Playback explicitly reads its effective composite.
-- **Deformation Atmosphere** — the perceptual violet/teal field derived from effective contributors. It communicates compression or expansion while sourceGridLines communicate exact metric density.
-- **Deformation Bypass / Toggle Deformation** — one transient, source-scoped comparison selected with `X`. It bypasses the acquired Timeline Section or, without one, the complete map; it changes no stored Weight and creates no history.
-- **Acquired Timeline Operand** — the exact visible Pin or Section selected from the Timeline for spatial actions. Bare Timeline ground and Release clear it.
-- **Guide Focus** — the Pin or Section being inspected in Guide. It remains distinct from an acquired Timeline operand and does not by itself scope Toggle Deformation.
+- **Weight Gradient** — the perceptual violet/teal field derived from effective contributors. It communicates compression or expansion while sourceGridLines communicate exact metric density.
+- **Weight Relaxation / Relax Weights** — one transient, source-scoped comparison selected with `X`. It bypasses the acquired Timeline Section or, without one, the complete map; it changes no stored Weight and creates no history.
+- **Timeline Selection** — the exact visible Pin or Section selected from the Timeline for spatial actions. Bare Timeline ground and Release clear it.
+- **Guide Selection** — the Pin or Section being inspected in Guide. It remains distinct from an acquired Timeline operand and does not by itself scope Relax Weights.
 - **Pin** — a retained source landmark with one Address, one identity, and an optional title.
 - **Section** — a retained positive edge between two Pin identities, with an optional title, one Group, and one Weight.
 - **Tag** — the matrix retention operator. `T` is Retain Pin from Current; `Shift+T` is Retain Section from a positive Active Span.
@@ -31,16 +31,16 @@
 - **Active Group** — a Group whose Section weights contribute to the effective projection. Activity is independent of whether the Group is drawn.
 - **Unlink** — give one Section endpoint a new independent Pin identity at the same Address.
 - **Link** — replace one Pin identity with another compatible Pin after an explicit snap has armed, making all references share that endpoint.
-- **Refine Backward / Refine Forward** — select the corresponding spatial midpoint at finer Resolution while retaining the established Active Span anchor when possible.
+- **Refine Backward / Refine Forward** — select the corresponding spatial midpoint at finer Current Neighborhood while retaining the established Active Span anchor when possible.
 - **Local Refine** — the shifted Refine law that retains only the immediate Current-to-midpoint traversal.
-- **Reopen** — restore Resolution to the active Range without changing Current or clearing the Active Span.
+- **Reopen** — restore Current Neighborhood to the active Range without changing Current or clearing the Active Span.
 - **Step Backward / Step Forward** — traverse a configured distance in Timeline Space while retaining a contiguous residue.
 - **Step Reversal** — one coalesced Step sequence whose final Address is its departure but whose transient visited envelope has positive extent; that envelope becomes the Active Span.
 - **Pin traversal** — shifted Step to the previous or next retained landmark or synthetic Range boundary, using Step’s interval law.
 - **Switch End** — make the opposite Active Span side Current and restore that side’s Endpoint Frame.
-- **Release** — clear the Active Span and acquired Timeline operand. It preserves Current, Resolution, Range and Focus, Guide focus, retained topology, Weight, deformation bypass, and playback preferences.
+- **Release** — clear the Active Span and acquired Timeline operand. It preserves Current, Current Neighborhood, Range and Focus, Guide focus, retained topology, Weight, weight relaxation, and playback preferences.
 - **Focus / Unfocus** — install an acquired Section or Active Span as Range and viewport / restore its containing Range.
-- **Go** — move to an exact known Address, seed a movement-scale Resolution, and establish the corresponding contiguous residue.
+- **Go** — move to an exact known Address, seed a movement-scale Current Neighborhood, and establish the corresponding contiguous residue.
 - **Nudge** — precise source-time movement of Current or retained topology through one shared operation. It is called a frame only when the media adapter proves an exact frame duration.
 - **Carry** — translate the acquired Timeline Pin or Section through the same Timeline-space displacement as a navigation action, within its structural boundary.
 - **Panoramic Phase Panorama / Panorama** — Tail, Center, and Lead presented as one local perceptual surface.
@@ -63,8 +63,8 @@
 - **Ghost Traversal** — the auxiliary operator that moves through user time while the semantic world stands still. Holding `G` and scrolling moves a read cursor through the reader's own path; the Address they began at becomes a fixed Anchor and the recalled Address becomes the active endpoint of an ordinary Active Span. It restores no historical Guide, Weight, Group, Focus or Range.
 - **Ghost scan** — the transient wheel movement while `G` is held. It inspects prior user time, may cross many occurrences and reverse direction, and is never written as a path. Where automatic Context is enabled each candidate plays, one window retargeted by the wheel; a window superseded or run out during the scan is search, and only the one still running when the gesture ended is an observation.
 - **Ghost injection** — the one occurrence appended on release: a jump from the live Anchor to the Address re-entered, linked to both. Backward from an injected occurrence follows its live predecessor; forward may resume the historical successors of the occurrence it re-entered.
-- **Textured Playback** — the optional Shift playback policy that reads cumulative active Section Weight as a playback texture: each doubling or halving of Weight shifts Center by one playback-rate step, so compressed ground plays faster and expanded ground plays slower. It is a log-compressed reading of the map, not a correction of it, and it retunes as Current or deformation bypass changes.
+- **Textured Playback** — the optional Shift playback policy that reads cumulative active Section Weight as a playback texture: each doubling or halving of Weight shifts Center by one playback-rate step, so compressed ground plays faster and expanded ground plays slower. It is a log-compressed reading of the map, not a correction of it, and it retunes as Current or weight relaxation changes.
 - **Load Generation** — the monotonically increasing identity on an immutable source request, used with the adapter’s loaded video identity to reject stale metadata and state events.
 - **Source-transition boundary** — the single operation that settles or cancels all old-source transient owners, persists safe Guide changes, clears source-scoped presentation, and only then chapters the new source.
 - **Guide Recovery** — versioned loading that distinguishes an absent Guide from unreadable data, quarantines damaged higher-priority evidence before fallback, and refuses destructive rewrite when preservation fails.
-- **Undo / Redo** — traversal of semantic Session transactions. Transient presentation such as deformation bypass, open panels, Chapters, and Panorama animation phase is outside this history.
+- **Undo / Redo** — traversal of semantic Session transactions. Transient presentation such as weight relaxation, open panels, Chapters, and Panorama animation phase is outside this history.

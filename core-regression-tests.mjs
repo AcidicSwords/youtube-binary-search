@@ -225,7 +225,7 @@ assert.deepEqual(
 );
 
 // Native playback preserves local basis, the opposite Interval endpoint, and
-// the receding Resolution side while translating the approached side.
+// the receding Current Neighborhood side while translating the approached side.
 let continued = createSession({ duration: 480, current: 120 });
 continued = goTo(continued, 180, { operator: "timeline" }).session;
 const continuedReturn = snapshotModel(continued.model);
@@ -391,7 +391,7 @@ assert.match(sessionSource, /export function focusWorkingSection[\s\S]*FOCUS_KIN
 assert.match(appSource, /Left the focused Section and opened Full Video/, "Composite direct Go must disclose its Range escape.");
 assert.match(appSource, /createPlaybackTransport/, "Native playback must own continuous settlement.");
 assert.doesNotMatch(appSource, /startSkim|createSkimTransport|desiredSkimRate/, "Skim must be removed from the runtime.");
-assert.match(viewSource, /neighborhoodBasis === NEIGHBORHOOD_BASIS\.MOVEMENT/, "Resolution presentation must distinguish movement scale.");
+assert.match(viewSource, /neighborhoodBasis === NEIGHBORHOOD_BASIS\.MOVEMENT/, "Current Neighborhood presentation must distinguish movement scale.");
 assert.doesNotMatch(viewSource, /skim/i, "The projection layer must not expose retired Skim controls.");
 assert.match(viewSource, /focused-section-title"\]\.textContent = "—"/, "View must clear stale focused Section text.");
 assert.match(cssSource, /\[hidden\]\s*\{\s*display:\s*none\s*!important;/, "Hidden state must override component display rules.");

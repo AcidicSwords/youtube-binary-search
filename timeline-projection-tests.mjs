@@ -195,7 +195,7 @@ assert.equal(wholeBypass.timelineExtent, 100);
 assert.deepEqual(
   createTimelineProjection({ duration: 100, guide: overlapGuide }).segments,
   overlap.segments,
-  "Restoring deformation reproduces the original projection exactly."
+  "Restoring topography reproduces the original projection exactly."
 );
 
 const staleBypass = createTimelineProjection({
@@ -228,7 +228,7 @@ assert.equal(
 assert.equal(nextPin(guide, before.t, { start: 0, end: 100 }, projection).t, 30);
 assert.equal(previousPin(guide, after.t, { start: 0, end: 100 }, projection).t, 50);
 
-// Weight edits are the only Section deformation mutation.
+// Weight edits are the only Section topography mutation.
 assert.equal(setSectionWeighting(guide, compressed.id, 2).changed, true);
 assert.equal(resolveSection(guide, compressed.id).weighting, 2);
 assert.equal(setSectionWeighting(guide, compressed.id, 3).changed, false);

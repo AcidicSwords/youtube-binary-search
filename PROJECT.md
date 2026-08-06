@@ -40,11 +40,11 @@ The source is never edited. The application changes the environment through whic
 
 ## Source, Range, and the Active Span
 
-Every meaningful temporal value is a source Address. Duration, Range, Current, Cursor, Resolution, Active Span bounds, Pins, Sections, Context, and Panorama positions all remain in source time.
+Every meaningful temporal value is a source Address. Duration, Range, Current, Cursor, Current Neighborhood, Active Span bounds, Pins, Sections, Context, and Panorama positions all remain in source time.
 
 **Range** is the admissible source universe. A chain of navigation or search operations excludes alternatives from the current admissible relation. The **Active Span** is the positive, contiguous residue that survives those exclusions. It carries two source bounds, orientation, and endpoint viewpoints; it is not a persistent record of the traversed path.
 
-**Reopen** restores Range-level discrimination without discarding the residue. **Undo** restores prior semantic state. **Release** clears the active residue and the acquired Timeline operand while preserving Current, retained topology, Guide focus, Focus, Weight, and the current deformation-bypass comparison.
+**Reopen** restores Range-level discrimination without discarding the residue. **Undo** restores prior semantic state. **Release** clears the active residue and the acquired Timeline operand while preserving Current, retained topology, Guide focus, Focus, Weight, and the current topography-bypass comparison.
 
 ## Panoramic Phase Panorama
 
@@ -87,11 +87,11 @@ Every effective factor is positive. Consequently the projection is continuous, s
 
 Weight changes the map allocation of fixed source material. It does not change source duration, identity, or order. Overlapping active Sections compose multiplicatively, so no priority or stored hierarchy is required. `1×` is spatially neutral.
 
-One effective projection compiles Group activity, stored Weight, and the transient deformation bypass. Geometry, Step, Refine, adaptive Reach, drag conversion, hit testing, spatial readouts, atmosphere, sourceGridLines, and explicitly dynamic playback read that same object. Fixed playback does not read Section Weight.
+One effective projection compiles Group activity, stored Weight, and the transient weight relaxation. Geometry, Step, Refine, adaptive Reach, drag conversion, hit testing, spatial readouts, atmosphere, sourceGridLines, and explicitly dynamic playback read that same object. Fixed playback does not read Section Weight.
 
 The Timeline’s violet/teal atmosphere shows the sign and perceptual strength of compression or expansion. Projected source-time sourceGridLines show the exact metric consequence. Focus changes only the viewport through which this map is drawn; it does not define a second map.
 
-**Toggle Deformation** is a comparison, not an edit. `X` bypasses the acquired Timeline Section’s contribution or, with no Section acquired, all deformation. The retained Weight remains visible and exact. The bypass is transient and source-scoped; it creates no history and no persisted setting.
+**Relax Weights** is a comparison, not an edit. `X` bypasses the acquired Timeline Section’s contribution or, with no Section acquired, all topography. The retained Weight remains visible and exact. The bypass is transient and source-scoped; it creates no history and no persisted setting.
 
 ## The reader's own path
 
@@ -166,7 +166,7 @@ load a source and use ordinary playback
 → verify through Context and the Panorama Frame
 → Tag Current as a Pin or the Interval as a Section
 → assign Section Weight in Guide
-→ optionally compare with Toggle Deformation
+→ optionally compare with Relax Weights
 → optionally Focus the relation
 → re-enter the resulting map
 ```

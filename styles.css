@@ -1832,7 +1832,7 @@ kbd {
 .guide-item.snap-source {
   border-color: rgba(246, 200, 110, 0.52);
 }
-/* Deformation is drawn in the deformation colours, never in the Section's own.
+/* Temporal Topography is drawn in the topography colours, never in the Section's own.
    These tints were mixed from --section-color, so one hue said both "this
    Section" and "this Section's Weight" and neither could be read off the other.
    Direction carries the sign — compression gathers toward the middle, expansion

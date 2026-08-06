@@ -83,7 +83,7 @@ assert.ok(Math.abs(composed.model.activeSpan.departure - beforeDirect) <= EPSILO
 assert.ok(Math.abs(composed.model.activeSpan.arrival - 90) <= EPSILON);
 
 // Section endpoints are Pin operands. Previous/Next Pin is linear for
-// Resolution, but each Pin hop records its own traversal Interval rather than
+// Current Neighborhood, but each Pin hop records its own traversal Interval rather than
 // stretching a Active Span across every crossed Pin.
 const guide = createGuide("semantic-composition");
 createSectionFromTimes(guide, 20, 40, { label: "First" });
@@ -111,7 +111,7 @@ assert.deepEqual(
 assertLoopContained(pinComposition);
 
 // Step, playback, and Pin traversal are the linear class. Step guards the
-// approached Resolution midpoint; playback translates the approached endpoint;
+// approached Current Neighborhood midpoint; playback translates the approached endpoint;
 // their Interval ownership remains distinct.
 let linear = createSession({ duration: 200, current: 50 });
 linear = goTo(linear, 70, { operator: "timeline" }).session; // 10—70—110

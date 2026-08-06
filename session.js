@@ -1765,7 +1765,7 @@ export function redo(session) {
 /**
  * Dry-run one navigation transition through the exact semantic operator used
  * for commit. Presentation can therefore preview the resulting Current,
- * Resolution, and Active Span without maintaining a second rule set.
+ * Current Neighborhood, and Active Span without maintaining a second rule set.
  */
 export function previewTransition(session, action, options = {}) {
   switch (action) {

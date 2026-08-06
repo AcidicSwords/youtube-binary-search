@@ -53,7 +53,7 @@ finding(
   }
 );
 
-// Step deformation must reset the old refinement lineage; otherwise
+// Step topography must reset the old refinement lineage; otherwise
 // "N refinements" ceases to describe the displayed grain.
 let refined = createSession({ duration: 100, current: 50 });
 for (let index = 0; index < 10; index += 1) {
@@ -64,7 +64,7 @@ for (let index = 0; index < 10; index += 1) {
 const fineFrame = structuredClone(refined.model.neighborhood);
 refined = step(refined, "forward", 10).session;
 finding(
-  "refinement-level-survives-coarse-step-deformation",
+  "refinement-level-survives-coarse-step-topography",
   refined.model.neighborhood.level === fineFrame.level
     && refined.model.neighborhood.R - refined.model.neighborhood.L
       > (fineFrame.R - fineFrame.L) * 100,

@@ -74,7 +74,7 @@ import { packTimelineSectionLanes } from "./view.js";
 }
 
 // Direct placement gives the new Active Span two equal margins on each
-// side in Timeline Space: the unclipped Resolution is exactly five Interval
+// side in Timeline Space: the unclipped Current Neighborhood is exactly five Interval
 // widths. Range clipping removes only unavailable margin.
 assert.deepEqual(
   seedNeighborhoodFromMovement(40, 50, { start: 0, end: 100 }),
@@ -245,7 +245,7 @@ for (const [action, direct] of [
 }
 
 // Preview and commit receive the same effective projection. In particular, a
-// transient deformation bypass may not leave hover geometry on the stored
+// transient weight relaxation may not leave hover geometry on the stored
 // weighted map while the operator commits on the straightened one.
 {
   const guide = createGuide("bypassed-preview");

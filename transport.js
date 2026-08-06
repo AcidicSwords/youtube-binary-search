@@ -15,7 +15,7 @@ export const OBSERVATION_POLICY = Object.freeze({
 export const RATE_POLICY_KIND = Object.freeze({
   FIXED: "fixed",
   // Cumulative Weight is read as a playback texture, not as a correction. It
-  // does not cancel the map's deformation and must not be named as though it
+  // does not cancel the map's topography and must not be named as though it
   // did: compressed regions play faster and expanded regions play slower, by
   // one rate step per octave, which is a fraction of exact inversion.
   TEXTURED: "textured"

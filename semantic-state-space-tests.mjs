@@ -55,7 +55,7 @@ function assertInvariant(session) {
     assert.ok(
       activeSpan.start >= neighborhood.L - EPSILON
       && activeSpan.end <= neighborhood.R + EPSILON,
-      `Active Interval must remain inside Resolution: ${JSON.stringify({ activeSpan, neighborhood })}`
+      `Active Interval must remain inside Current Neighborhood: ${JSON.stringify({ activeSpan, neighborhood })}`
     );
     assert.ok(Math.abs(activeSpan.arrival - neighborhood.C) <= EPSILON);
     assert.ok(activeSpan.arrival >= activeSpan.start - EPSILON);

@@ -316,7 +316,7 @@ assert.deepEqual(
     bars: drawnBars()
   },
   before,
-  "Reopening the same video restores the Guide, its layers, and the deformation they produce."
+  "Reopening the same video restores the Guide, its layers, and the topography they produce."
 );
 assert.equal(byId.get("return-action").disabled, true,
   "History does not survive the session, because it describes a session.");

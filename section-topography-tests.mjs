@@ -38,7 +38,7 @@ const close = (actual, expected, message) => {
 };
 
 function weightedGuide(...definitions) {
-  const guide = createGuide("section-deformation-tests");
+  const guide = createGuide("section-topography-tests");
   const sections = definitions.map(([start, end, weighting, label = ""]) =>
     createSectionFromTimes(guide, start, end, {
       label,
@@ -106,7 +106,7 @@ function weightedGuide(...definitions) {
   assert.equal(removed.session.model.guide.sections.length, 0);
 }
 
-// Direct Guide Go reaches every interior object without changing deformation.
+// Direct Guide Go reaches every interior object without changing topography.
 {
   const { guide, sections } = weightedGuide([30, 50, 0.25, "Compressed"]);
   const interior = ensurePin(guide, 37, {
@@ -236,4 +236,4 @@ function weightedGuide(...definitions) {
   assert.equal(movePin(guide, interior.id, 31, 100).changed, true);
 }
 
-console.log("Section deformation tests passed.");
+console.log("Section topography tests passed.");

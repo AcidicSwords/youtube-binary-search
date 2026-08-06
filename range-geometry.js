@@ -51,7 +51,7 @@ function assertNeighborhood(neighborhood) {
   }
   const level = neighborhood.level ?? 0;
   if (!Number.isInteger(level) || level < 0) {
-    throw new RangeError("Resolution Level must be a non-negative integer.");
+    throw new RangeError("Refinement Level must be a non-negative integer.");
   }
   neighborhood.level = level;
   return neighborhood;
@@ -225,10 +225,10 @@ export function refineNeighborhood(neighborhood, destination, range) {
  */
 export function seedNeighborhoodFromMovement(departure, arrival, range, metric = null) {
   if (!Number.isFinite(departure) || !Number.isFinite(arrival)) {
-    throw new TypeError("Movement-seeded Resolution requires finite Addresses.");
+    throw new TypeError("Movement-seeded Current Neighborhood requires finite Addresses.");
   }
   if (!range || !Number.isFinite(range.start) || !Number.isFinite(range.end) || range.start > range.end) {
-    throw new TypeError("Movement-seeded Resolution requires a valid Range.");
+    throw new TypeError("Movement-seeded Current Neighborhood requires a valid Range.");
   }
 
   const A = clamp(departure, range.start, range.end);
@@ -353,7 +353,7 @@ export function stepNeighborhood(
     level: neighborhood.level ?? 0
   };
 
-  // Step is linear, but Resolution does not translate with every movement.
+  // Step is linear, but Current Neighborhood does not translate with every movement.
   // The endpoint being left is fixed. The approached endpoint is fixed until
   // the *prospective* directional midpoint is no farther than one Step from
   // Current. From that threshold onward, advance only that endpoint far enough
@@ -433,8 +433,8 @@ export function stepNeighborhood(
  * sole hard boundary, so clipping may compress only the approached side.
  *
  * This is the continuous counterpart to a spatial traversal: playback moves
- * one active endpoint through the existing Resolution rather than opening a
- * new Resolution around its departure and arrival.
+ * one active endpoint through the existing Current Neighborhood rather than opening a
+ * new Current Neighborhood around its departure and arrival.
  */
 export function translateNeighborhood(neighborhood, destination, range, metric = null) {
   assertNeighborhood(neighborhood);

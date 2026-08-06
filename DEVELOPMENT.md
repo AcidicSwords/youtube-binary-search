@@ -53,7 +53,7 @@ runs the same complete `npm run verify` gate before publishing.
 9. Pin identity is graph identity. Coincident Address does not imply identity.
 10. Guide owns exact structure editing; Timeline owns spatial manipulation.
 11. Step Distance, Nudge, Context, Panorama offsets, Section Weight, Playback policy,
-    and deformation bypass have separate owners.
+    and weight relaxation have separate owners.
 12. Ordinary player controls and simple Center-only use must remain complete
     when Guide, Panorama, Weight, or Focus is ignored.
 13. Presentation may preview or reshape the map; it may not invent semantic state.
@@ -64,7 +64,7 @@ runs the same complete `npm run verify` gate before publishing.
 
 | Change | Primary owner | Required neighboring proof |
 |---|---|---|
-| Range, Resolution, Refine, Step geometry | `range-geometry.js` | `session.js` transaction and pure tests |
+| Range, Current Neighborhood, Refine, Step geometry | `range-geometry.js` | `session.js` transaction and pure tests |
 | Active Span, operator consequence, Focus, history | `session.js` | route preview and application smoke |
 | Pin/Section/Group graph, Weight ladder, migration | `guide.js` | Guide validation, persistence, and group tests |
 | Operator identity, key, and shifted label | `operator-grammar.js` | DOM order, runtime branch, CSS area, browser geometry, canonical docs |
@@ -91,7 +91,7 @@ owner. Do not reach through the media adapter from application or Panorama code.
   priority.
 - `projection.weightContributors` is the authority for atmosphere as well as
   geometry.
-- Deformation bypass is passed into projection construction and is never
+- Temporal Topography bypass is passed into projection construction and is never
   written into Guide or history.
 - A focused viewport changes drawing only; operator metrics cannot observe it.
 - Textured Playback may read effective Weight only when its explicit rate policy
@@ -151,15 +151,15 @@ Every executable suite is listed here by the current behavior it protects.
 - `ghost-smoke.mjs` — Ghost in a real browser: the Guide on `I` while Tab stays the browser's, G arming without cost, a wheel notch recalling behind a fixed Anchor, one transaction on release, exact cancellation, wheel ownership between Ghost and Nudge, and Context playing through the recall as one retargeted window whose scan writes no observation.
 - `ghost-tests.mjs` — Ghost Traverse against a live Session: a preserved semantic world, Focus/Range bounds, one Undo per held gesture, the reversal envelope, recorded rather than recomputed Addresses, and a Section retained entirely in the past.
 - `traversal-trace-tests.mjs` — the append-only encounter ledger: records that keep reversals, direction in user time independent of source order, watched spans subdivided by the frozen Step law and clipped to the active Range, a frozen readable stream, and injection with provenance.
-- `section-deformation-tests.mjs` — Section Weight, nested/overlapping Guide geometry, Pin movement, and spatial traversal consequences.
+- `section-topography-tests.mjs` — Section Weight, nested/overlapping Guide geometry, Pin movement, and spatial traversal consequences.
 - `operator-coherence-tests.mjs` — guarded Step, Refine roles, exact previews, weighted navigation, monotonic Playback residue, history, and lane packing.
 - `core-regression-tests.mjs` — kernel guarantees for scale, endpoint frames, Range, Focus, Guide, Playback, and Undo.
-- `endpoint-transposition-tests.mjs` — endpoint-frame involution, Local Refine, Step composition, collapse, and matrix consequence.
+- `active-end-switch-tests.mjs` — endpoint-frame involution, Local Refine, Step composition, collapse, and matrix consequence.
 - `semantic-composition-tests.mjs` — cross-operator interval containment, Local Refine complements, and truthful limits.
 - `semantic-boundary-tests.mjs` — adversarial operator boundaries and semantic-equivalence regressions.
 - `semantic-state-space-tests.mjs` — extended randomized state-space proof across operators, Focus, Guide, and bounds.
 - `fuzz-tests.mjs` — deterministic long sequences preserving Session and Guide invariants.
-- `weight-invariance-tests.mjs` — exact boundary between Weight-aware Timeline operations and Weight-blind source-time dimensions.
+- `weighting-invariance-tests.mjs` — exact boundary between Weight-aware Timeline operations and Weight-blind source-time dimensions.
 - `focus-viewport-tests.mjs` — focused drawing fills the map while operator geometry remains independent of viewport.
 - `guide-session-completion-tests.mjs` — shared Group-deletion plan and sparse Step Reversal settlement.
 
@@ -181,7 +181,7 @@ Every executable suite is listed here by the current behavior it protects.
 
 - `group-tests.mjs` — zero-or-one visible Group, independent Active stack, hidden Guide navigation, Pin visibility, multiplicative layering, and planned deletion.
 - `system-coherence-tests.mjs` — Section reachability, projected midpoints, Chapter extents, flat Group blocks, Focus ownership, and explicit Panorama activation.
-- `group-coherence-tests.mjs` — nullable visible-Group identity, independent activity, hidden-but-active deformation, Group removal, and version-9 migration.
+- `group-coherence-tests.mjs` — nullable visible-Group identity, independent activity, hidden-but-active topography, Group removal, and version-9 migration.
 - `state-integrity-tests.mjs` — Guide validation, repair, round-trip completeness, membership recovery, and impossible source extents.
 - `chapter-tests.mjs` — timestamp parsing and contiguous transient candidate extents without retained side effects.
 - `nudge-tests.mjs` — one wheel route, dominant axis, accumulation, target acquisition, keyboard and Guide convergence, one Undo, and preview parity.
@@ -194,7 +194,7 @@ Every executable suite is listed here by the current behavior it protects.
 - `interaction-smoke.mjs` — matrix Tag routes, retained editing, unlink/link, Timeline manipulation, clusters, Shift traversal, Frame previews, Undo/Redo, and playback focus.
 - `guide-composition-smoke.mjs` — plain Guide selection replaces, Shift/Extend composes monotonically, and the result can be tagged as one parent Section.
 - `chapter-smoke.mjs` — offering and drawing Chapters is inert; navigation, composition, and Retain use canonical routes.
-- `section-weight-smoke.mjs` — Guide-only Weight editing, effective geometry and atmosphere, scoped/whole-map bypass, weighted Step, and exact restoration.
+- `section-weighting-smoke.mjs` — Guide-only Weight editing, effective geometry and atmosphere, scoped/whole-map bypass, weighted Step, and exact restoration.
 - `context-smoke.mjs` — post-traversal Context, Step deferral, replacement, Panorama suspension, reversal naming, Off, and Undo isolation.
 - `step-gesture-smoke.mjs` — captured/fallback release, keyboard hold, and rapid taps settle as one action.
 - `transport-coherence-smoke.mjs` — actual-rate observation, effective dynamic projection, settlement, proper-Range wrap, retry, Panorama rebasing, and history isolation.

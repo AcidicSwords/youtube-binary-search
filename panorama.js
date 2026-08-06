@@ -1791,7 +1791,7 @@ export function createPanoramaController({
       step: "Step",
       refine: "Refine",
       reopen: "Reopen",
-      neighborhood: "Resolution",
+      neighborhood: "Current Neighborhood",
       go: "Go",
       context: "Context",
       current: "Current",

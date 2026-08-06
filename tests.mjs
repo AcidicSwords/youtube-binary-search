@@ -730,7 +730,7 @@ pushedBackward = step(pushedBackward, "backward", 25).session;
 assert.deepEqual(pushedBackward.model.neighborhood, { L: 0, C: 50, R: 100, level: 0 });
 assert.deepEqual(getTargets(pushedBackward.model.neighborhood), { backward: 25, forward: 75 });
 
-// Range deformation preserves the Active Span while rebasing endpoint frames
+// Range topography preserves the Active Span while rebasing endpoint frames
 // to the new hard bound.
 let ranged = createSession({ duration: 100, current: 50 });
 ranged = goTo(ranged, 70, { operator: "timeline", label: "Timeline Click" }).session;
@@ -909,7 +909,7 @@ assert.deepEqual(deletion.model.range, { start: 0, end: 100 });
 assert.equal(deletion.model.guide.sections.length, 0);
 
 // Native playback moves the active Interval endpoint and translates only the
-// approached Resolution side.
+// approached Current Neighborhood side.
 let playback = createSession({ duration: 100, current: 20 });
 playback = goTo(playback, 30, { operator: "timeline", label: "Timeline Click" }).session;
 const playbackUndo = snapshotModel(playback.model);
@@ -928,7 +928,7 @@ assert.deepEqual(
 assert.equal(playback.model.activeSpan.operator, "playback");
 assert.equal(playback.model.neighborhood.level, 0);
 
-// A crossed playback can restore Range-level Resolution even when physical movement is small.
+// A crossed playback can restore Range-level Current Neighborhood even when physical movement is small.
 let fullCycle = createSession({ duration: 100, current: 0 });
 fullCycle = refine(fullCycle, "forward").session;
 const fullCycleReturn = snapshotModel(fullCycle.model);

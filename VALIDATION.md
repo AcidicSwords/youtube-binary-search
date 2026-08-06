@@ -42,7 +42,7 @@ The complete gate must prove all of the following.
   follow Shift state.
 - Guide creation summaries use `T` and `Shift+T`.
 
-### Effective projection and deformation bypass
+### Effective projection and weight relaxation
 
 - Every projection remains positive, continuous, strictly increasing, and
   round-trips source ↔ Timeline within tolerance.
@@ -128,7 +128,7 @@ rewrite-refusal coverage.
 - Request A, then B, then stale A CUED or duration cannot initialize B. Adapter
   identity and current generation must both match.
 - Replacing a source during Nudge, Step, Current/Pin/Section/Range drag,
-  Playback, Context, or deformation bypass leaves no old-source Address,
+  Playback, Context, or weight relaxation leaves no old-source Address,
   identity, timer, Panorama owner, or history checkpoint in the fresh Session.
 - The old semantic Guide is persisted only after pending ownership is resolved.
 - An unreadable current Guide plus valid older fallback preserves the unreadable
@@ -230,7 +230,7 @@ first clicking Timeline.
    Current-to-midpoint half.
 3. Step repeatedly, reverse direction, and return to departure. Confirm one
    `Step Reversal` Undo entry and a positive visited Active Span.
-4. Switch End twice. Current, Resolution, orientation, and endpoint frames
+4. Switch End twice. Current, Current Neighborhood, orientation, and endpoint frames
    must return exactly.
 5. Release. Current and Guide focus stay; Active Span and acquired Timeline
    operand clear.
@@ -256,7 +256,7 @@ Accept when no separate mode is introduced, hidden Guide structure remains
 navigable, and Group visibility changes landmarks without silently changing
 activity.
 
-### Journey D — deformation comparison
+### Journey D — topography comparison
 
 1. Give a Section a non-neutral Weight and acquire it from Timeline.
 2. Press `X`. Its geometry, exact sourceGridLines, atmosphere contribution, Step,
@@ -294,7 +294,7 @@ rate policy remain independent and no preview breaks live Cycle behavior.
 ### Journey F — source and recovery integrity
 
 1. Begin an unsaved Nudge or Step sequence, then load another source. Repeat
-   during a Section drag, Playback, Context, and active deformation bypass.
+   during a Section drag, Playback, Context, and active weight relaxation.
 2. Confirm the fresh source has no old Active Span, Guide identity,
    selection, timer, transport, Panorama preview, Shift latch, or bypass.
 3. Rapidly request source A then source B. Allow late A events to arrive. Only B
@@ -348,7 +348,7 @@ or preservation that did not happen.
 ```text
 Range.start ≤ Current ≤ Range.end
 Active Span ⊆ Range in source time
-Active Span ⊆ Resolution ⊆ Range in effective Timeline Space
+Active Span ⊆ Current Neighborhood ⊆ Range in effective Timeline Space
 every Section has positive source duration and one canonical Weight
 every Section belongs to one existing Group
 zero or one Group is On Timeline; any number may be Active

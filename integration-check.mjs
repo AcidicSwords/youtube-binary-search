@@ -235,7 +235,7 @@ const deckIndex = html.indexOf('class="navigation-deck"');
 const bypassIndex = html.indexOf('id="weight-relaxation-toggle"');
 const historyIndex = html.indexOf('class="history-actions"');
 check(deckIndex >= 0 && deckIndex < bypassIndex && bypassIndex < historyIndex,
-  "Toggle Deformation is outside the matrix and before history inside Operators.");
+  "Relax Weights is outside the matrix and before history inside Operators.");
 has(html, /id="weight-relaxation-toggle"[^>]*aria-pressed="false"/,
   "The auxiliary pointer route exposes resolved pressed state.");
 has(html, /id="weight-relaxation-toggle"[^>]*aria-keyshortcuts="X"/,
@@ -246,7 +246,7 @@ lacks(styles, /\.timeline-normalize\b/, "Dead Timeline Normalize CSS is absent."
 has(appCode, /weightRelaxation:\s*null/, "Composition state explicitly owns weightRelaxation.");
 lacks(appCode, /state\.normalize\b|toggleNormalize\b/, "No parallel normalize state or operation remains.");
 has(appCode, /plain && key === "x"[\s\S]{0,120}?toggleWeightRelaxation\(\)/,
-  "Plain X reaches the same Toggle Deformation consequence as the button.");
+  "Plain X reaches the same Relax Weights consequence as the button.");
 const toggleWeightRelaxation = topLevelFunction(appCode, "toggleWeightRelaxation");
 has(toggleWeightRelaxation, /directManipulationActive\(\)/,
   "X refuses a projection change during direct manipulation.");
@@ -582,7 +582,7 @@ const scriptCorpus = Object.values(pkg.scripts || {}).join(" && ");
 for (const suite of [
   "operator-grammar-tests.mjs",
   "timeline-projection-tests.mjs",
-  "section-weight-smoke.mjs",
+  "section-weighting-smoke.mjs",
   "transport-tests.mjs",
   "youtube-tests.mjs",
   "panorama-cycle-tests.mjs",

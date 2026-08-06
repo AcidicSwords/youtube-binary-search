@@ -479,8 +479,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     renderedPinKey = "";
   }
 
-  // One colour, one meaning. A Section's colour is its identity; deformation is
-  // drawn in the deformation colours below, and the two never borrow from each
+  // One colour, one meaning. A Section's colour is its identity; topography is
+  // drawn in the topography colours below, and the two never borrow from each
   // other.
   //
   // Identity has one requirement, which a palette of six could not meet: two
@@ -529,7 +529,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     return `hsl(${hue.toFixed(1)} 70% 66%)`;
   }
 
-  // Deformation has its own two colours, and they are not identity's. The
+  // Temporal Topography has its own two colours, and they are not identity's. The
   // atmosphere band and the Guide row tints are built from this one table so a
   // compressed Section reads the same wherever it is drawn.
   const WEIGHT_COLORS = {
@@ -612,7 +612,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     );
     // Weight is distributed across the Section's projected footprint. A broad
     // Section therefore reads as a diffuse field; a narrow one concentrates the
-    // same signed deformation around its midpoint.
+    // same signed topography around its midpoint.
     const dilution = clamp(1 / Math.sqrt(1 + spanRatio * 5), 0.38, 1);
     const distance = Math.abs(coordinate - midpoint);
     if (distance <= halfSpan) {
@@ -2225,7 +2225,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "backward-meta",
       "Refine Backward",
       targets.backward === null
-        ? backwardBlock === "refinement-limit" ? "Resolution limit" : "Range start"
+        ? backwardBlock === "refinement-limit" ? "refinement limit" : "Range start"
         : shiftLayer
           ? `draw Current-to-midpoint Interval · to ${formatTime(targets.backward)}`
           : `${classifyRetainedRefineRelation(currentSpan, semanticCurrent, targets.backward) === "full" ? "full movement" : "retain anchor"} · to ${formatTime(targets.backward)}`
@@ -2235,7 +2235,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       "forward-meta",
       "Refine Forward",
       targets.forward === null
-        ? forwardBlock === "refinement-limit" ? "Resolution limit" : "Range end"
+        ? forwardBlock === "refinement-limit" ? "refinement limit" : "Range end"
         : shiftLayer
           ? `draw Current-to-midpoint Interval · to ${formatTime(targets.forward)}`
           : `${classifyRetainedRefineRelation(currentSpan, semanticCurrent, targets.forward) === "full" ? "full movement" : "retain anchor"} · to ${formatTime(targets.forward)}`

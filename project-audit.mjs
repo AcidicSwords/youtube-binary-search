@@ -205,12 +205,12 @@ for (const law of [
 ]) has(docs["PROJECT.md"], law, `PROJECT states design law ${law}.`);
 has(docs["PROJECT.md"], /Q\s+Refine Backward[\s\S]*W\s+Reopen[\s\S]*E\s+Refine Forward[\s\S]*R\s+Release[\s\S]*T\s+Tag[\s\S]*F\s+Focus/,
   "PROJECT states exact QWE / ASD / RTF.");
-has(docs["PROJECT.md"], /Toggle Deformation[\s\S]*transient[\s\S]*source-scoped/i,
-  "PROJECT explains optional deformation comparison without editing Weight.");
+has(docs["PROJECT.md"], /Relax Weights[\s\S]*transient[\s\S]*source-scoped/i,
+  "PROJECT explains optional topography comparison without editing Weight.");
 
 for (const entry of [
   "Tag",
-  "Deformation Bypass / Toggle Deformation",
+  "Weight Relaxation / Relax Weights",
   "Drawn Group",
   "Release",
   "Textured Playback",
@@ -230,7 +230,7 @@ has(docs["GLOSSARY.md"], /Textured Playback[\s\S]{0,400}?Section Weight[\s\S]{0,
 // The law is a log-compressed texture, not a correction of the map. Naming it as
 // an inverse would advertise a relation the implementation does not provide --
 // W = 4 plays at 0.5x, not 0.25x -- and would set the reader up to read the
-// Panorama as a cancellation of deformation rather than a reading of it.
+// Panorama as a cancellation of topography rather than a reading of it.
 lacks(canonicalText, /\binverse of (?:the )?(?:effective |cumulative )?Weight\b|\binverse-Weight\b|\bnormalized playback\b|\bconstant Timeline velocity\b/i,
   "No canonical document describes dynamic playback as inverting the map.");
 lacks(html, /rate the inverse of the map|inverse of (?:the )?weight/i,
@@ -241,7 +241,7 @@ lacks(docs["GLOSSARY.md"], /^\s*- \*\*Chapter\*\*[^\n]*not[^\n]*projected/im,
 for (const law of [
   /### 3\.3 Subtractive Active Span/,
   /### 4\.3 One effective projection/,
-  /### 4\.4 Deformation-bypass law/,
+  /### 4\.4 Temporal Topography-bypass law/,
   /### 5\.1 Exact matrix/,
   /### 5\.7 Release/,
   /### 5\.8 Tag/,
@@ -261,7 +261,7 @@ for (const implementationLaw of [
   /## Ownership/,
   /## Operator routes/,
   /## One effective projection/,
-  /### Deformation bypass/,
+  /### Temporal Topography bypass/,
   /## Persistence and recovery/,
   /## Source-generation boundary/,
   /## Nudge and direct manipulation/,
@@ -283,7 +283,7 @@ for (const interfaceLaw of [
   /## Temporal Topography/,
   /## Operators/,
   /### Tag/,
-  /### Toggle Deformation/,
+  /### Relax Weights/,
   /## Guide/,
   /### Sections/,
   /### Pins/,
@@ -293,7 +293,7 @@ for (const interfaceLaw of [
 ]) has(docs["INTERFACE.md"], interfaceLaw, `INTERFACE describes ${interfaceLaw}.`);
 has(docs["INTERFACE.md"], /physical square[\s\S]{0,100}?QWE \/ ASD \/ RTF/i,
   "INTERFACE states the physical matrix geometry.");
-has(docs["INTERFACE.md"], /Toggle Deformation[\s\S]{0,420}?(?:outside|below) the square|(?:outside|below) the square[\s\S]{0,420}?Toggle Deformation/i,
+has(docs["INTERFACE.md"], /Relax Weights[\s\S]{0,420}?(?:outside|below) the square|(?:outside|below) the square[\s\S]{0,420}?Relax Weights/i,
   "INTERFACE places X as an Operators auxiliary action.");
 has(docs["INTERFACE.md"], /At most one Group[\s\S]{0,180}?(?:none|no\s+Group)/i,
   "INTERFACE states zero-or-one drawn Group.");
@@ -306,7 +306,7 @@ has(docs["DEVELOPMENT.md"], /npm run check[^\n]*(?:not complete|necessary but no
   "DEVELOPMENT explicitly limits the fast gate.");
 for (const heading of [
   /### Matrix and Tag/,
-  /### Effective projection and deformation bypass/,
+  /### Effective projection and weight relaxation/,
   /### Playback and ordinary-player integrity/,
   /### Source and Guide integrity/,
   /### Groups, modifiers, Nudge, and Step reversal/,
@@ -315,7 +315,7 @@ for (const heading of [
 ]) has(docs["VALIDATION.md"], heading, `VALIDATION includes ${heading}.`);
 has(docs["VALIDATION.md"], /npm ci[\s\S]*?npm run verify/,
   "VALIDATION starts from the reproducible complete release gate.");
-for (const journey of ["ordinary player", "operator comprehension", "retain and compose", "deformation comparison", "Panorama", "source and recovery integrity"]) {
+for (const journey of ["ordinary player", "operator comprehension", "retain and compose", "topography comparison", "Panorama", "source and recovery integrity"]) {
   has(docs["VALIDATION.md"], new RegExp(`### Journey [A-F] — ${escapeRegExp(journey)}`, "i"),
     `VALIDATION retains manual journey ${journey}.`);
 }
@@ -394,7 +394,7 @@ has(styles, /\.timeline-pin\.snap-target\.snap-armed::before\s*\{[^}]*outline:/,
   "Transient armed snap state has a separate outline/glow channel.");
 
 // One colour, one meaning. A Section's colour is its identity and nothing else;
-// deformation is drawn in the deformation colours. Two Sections may never look
+// topography is drawn in the topography colours. Two Sections may never look
 // alike, which a fixed palette of six could not promise — it repeated on the
 // seventh, and a repeat reads as a relationship.
 has(view, /function sectionColor\(sectionId\)/,
@@ -406,11 +406,11 @@ has(view, /GOLDEN_ANGLE_DEGREES\s*=\s*137\.5[\s\S]*index \* GOLDEN_ANGLE_DEGREES
 lacks(view, /charCodeAt/,
   "and no colour is drawn from a hash, which would clump however it is mixed.");
 check(count(view, /const WEIGHT_COLORS = \{/) === 1,
-  "Exactly one deformation colour table exists.");
+  "Exactly one topography colour table exists.");
 has(view, /rgba\(WEIGHT_COLORS\.compressed[\s\S]*rgba\(WEIGHT_COLORS\.expanded/,
   "and the atmosphere is built from it.");
 lacks(styles, /\.section-item\.(?:compressed|expanded)\s*\{[^}]*--section-color/,
-  "Deformation tints never borrow the Section's identity colour.");
+  "Temporal Topography tints never borrow the Section's identity colour.");
 has(styles, /\.timeline-key\.key-sections i \{[^}]*linear-gradient\([\s\S]*hsl\(/,
   "The Section key samples the hue sequence rather than naming one Section's colour.");
 

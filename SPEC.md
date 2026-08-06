@@ -27,7 +27,7 @@ A loaded Session owns:
 - source duration;
 - Range;
 - Current;
-- Resolution and Resolution basis;
+- Current Neighborhood and Current Neighborhood basis;
 - an optional Active Span with bounds, orientation, and endpoint frames;
 - optional Focus and its return Range;
 - configured Step Distance;
@@ -61,7 +61,7 @@ The following are intentionally absent from Session history and Guide persistenc
 - selected Timeline operand and Guide focus;
 - selected/aligned Pin indicators;
 - Matrix Shift latch, Guide Extend latch, and physical modifier state;
-- deformation bypass;
+- weight relaxation;
 - offered Chapters and Chapter-lane visibility;
 - open panels, dialogs, cluster menus, hover, focus, and preview state;
 - Panorama Frame transition revision, Panorama Cycle phase, and side-player synchronization.
@@ -86,11 +86,11 @@ Range.start < Range.end, except the empty unloaded state
 
 An interface may clip a pointer candidate as it meets a physical boundary. Exact numeric input does not reinterpret the entered value.
 
-### 3.2 Range, Resolution, Current, and Cursor
+### 3.2 Range, Current Neighborhood, Current, and Cursor
 
 **Range** is the contiguous source universe currently admissible to ordinary navigation. Full Video is `[0, duration]`. A proper Range excludes at least one full-video boundary.
 
-**Resolution** is an ordered neighborhood `{L, C, R}` with a basis of `range` or `movement`:
+**Current Neighborhood** is an ordered neighborhood `{L, C, R}` with a basis of `range` or `movement`:
 
 ```text
 Range.start ≤ L ≤ C ≤ R ≤ Range.end
@@ -152,7 +152,7 @@ Timeline extent is spatial, not temporal duration. A Section with source duratio
 
 Focus installs an acquired Section or Active Span as Range and saves the containing Range for Unfocus. The focused extent also becomes the viewport, so it fills the drawn Timeline at every Weight.
 
-Viewport changes presentation only. It cannot alter source↔Timeline conversion, Step, Refine, Reach, Weight, or deformation-bypass state. Spatial Range-boundary edits that would change the world defining Focus are refused with a reason. Exact editing of a focused saved Section may rebase that Focus through the Guide’s canonical operation.
+Viewport changes presentation only. It cannot alter source↔Timeline conversion, Step, Refine, Reach, Weight, or topography-bypass state. Spatial Range-boundary edits that would change the world defining Focus are refused with a reason. Exact editing of a focused saved Section may rebase that Focus through the Guide’s canonical operation.
 
 ## 4. Retained topology and effective projection
 
@@ -181,7 +181,7 @@ Two independent relations exist:
 - **drawn** — zero or one Group supplies Section wires and endpoint Pins to the Timeline;
 - **active** — any number of Groups may contribute Section Weight.
 
-No Group drawn is valid. Hiding the drawn Group does not promote another Group and does not deactivate it. Therefore landmarks may disappear while their active deformation remains.
+No Group drawn is valid. Hiding the drawn Group does not promote another Group and does not deactivate it. Therefore landmarks may disappear while their active topography remains.
 
 Group deletion uses one plan shared by confirmation, mutation, status, tooltip, and tests:
 
@@ -202,7 +202,7 @@ One immutable projection is built for a render or semantic operation. Its contri
 
 1. Group activity;
 2. canonical Section Weight;
-3. the current deformation bypass.
+3. the current weight relaxation.
 
 The same projection supplies:
 
@@ -215,12 +215,12 @@ The same projection supplies:
 - section and Pin placement;
 - spatial readouts;
 - exact source-time sourceGridLines;
-- deformation atmosphere contributors;
+- topography atmosphere contributors;
 - optional Textured Playback Weight.
 
 An operation or drag captures the projection it begins with. Its geometry cannot change underneath its pointer or repeat sequence. A projection-changing action must wait for, settle, cancel, or refuse an active direct-manipulation owner.
 
-### 4.4 Deformation-bypass law
+### 4.4 Temporal Topography-bypass law
 
 The only transient bypass state is:
 
@@ -231,11 +231,11 @@ type WeightRelaxation =
   | { kind: "section"; sectionId: string };
 ```
 
-`X` invokes **Toggle Deformation**:
+`X` invokes **Relax Weights**:
 
 - an acquired Timeline Section resolves scope `{kind: "section", sectionId}`;
 - any other selection state resolves `{kind: "all"}`;
-- the same resolved active scope restores deformation;
+- the same resolved active scope restores topography;
 - a different scope transfers the single bypass;
 - the command changes no stored Weight, Guide state, player setting, history, or persisted preference.
 
@@ -247,7 +247,7 @@ An active Current, Range, Pin, or Section drag causes `X` to refuse safely. Pend
 
 ### 4.5 Atmosphere and sourceGridLines
 
-The deformation atmosphere is derived only from `projection.weightContributors` or an equivalent effective-contributor output. It never rereads raw active Guide weights independently.
+The topography atmosphere is derived only from `projection.weightContributors` or an equivalent effective-contributor output. It never rereads raw active Guide weights independently.
 
 - Weight below `1×` contributes violet compression influence.
 - Weight above `1×` contributes teal expansion influence.
@@ -289,7 +289,7 @@ The canonical action identities and shifted meanings are:
 | `tag` | `T` | Retain Pin | Retain Section |
 | `focus-toggle` | `F` | Focus / Unfocus | unchanged |
 
-Toggle Deformation is an auxiliary `X` action inside Operators and outside the square matrix. Weight is edited on its Section in Guide.
+Relax Weights is an auxiliary `X` action inside Operators and outside the square matrix. Weight is edited on its Section in Guide.
 
 ### 5.2 Shift ownership
 
@@ -309,7 +309,7 @@ An unrelated plain action preserves both latches. Matrix and Guide cannot consum
 
 ### 5.3 Refine Backward / Refine Forward
 
-Refine targets the Timeline-space midpoint from Current toward the corresponding Resolution side and descends to finer Resolution. It uses the effective projection.
+Refine targets the Timeline-space midpoint from Current toward the corresponding Current Neighborhood side and descends to finer Current Neighborhood. It uses the effective projection.
 
 Plain Refine retains the Active Span departure while the target remains on the same traversed side and the departure remains outside the new Current-to-target movement. A reversal that reaches or crosses the retained departure draws the complete immediate movement instead.
 
@@ -317,7 +317,7 @@ Plain Refine retains the Active Span departure while the target remains on the s
 
 ### 5.4 Reopen
 
-Reopen sets Resolution to `{Range.start, Current, Range.end}` and basis to Range. It preserves Current, Active Span, Focus, Guide, Weight, selection, and deformation bypass. It is unavailable when Resolution already spans Range.
+Reopen sets Current Neighborhood to `{Range.start, Current, Range.end}` and basis to Range. It preserves Current, Active Span, Focus, Guide, Weight, selection, and weight relaxation. It is unavailable when Current Neighborhood already spans Range.
 
 ### 5.5 Step Backward / Step Forward
 
@@ -345,7 +345,7 @@ Release clears:
 - the Active Span, if present;
 - the acquired Timeline operand.
 
-It preserves Current, Resolution, Range and Focus, Guide focus, Pins, Sections, Groups, Weight, deformation bypass, Panorama preferences, and playback preferences.
+It preserves Current, Current Neighborhood, Range and Focus, Guide focus, Pins, Sections, Groups, Weight, weight relaxation, Panorama preferences, and playback preferences.
 
 Clearing a semantic Active Span creates one Undoable Session transaction. Clearing only presentation selection succeeds without history.
 
@@ -371,13 +371,13 @@ Before retention the source object is always called a Active Span. Section names
 
 ### 5.9 Focus / Unfocus
 
-Focus chooses an acquired Timeline Section when available, otherwise a positive Active Span. It installs that extent as Range and viewport and stores the containing Range. Current remains if already inside; otherwise it moves to an effective spatial midpoint. Focus changes neither Weight nor deformation bypass.
+Focus chooses an acquired Timeline Section when available, otherwise a positive Active Span. It installs that extent as Range and viewport and stores the containing Range. Current remains if already inside; otherwise it moves to an effective spatial midpoint. Focus changes neither Weight nor weight relaxation.
 
 Unfocus restores the containing Range and a valid Current. Focused spatial boundary edits that cannot be represented truthfully are refused rather than approximated.
 
 ### 5.10 Go
 
-Go commits an exact known source Address, seeds movement-scale Resolution, and leaves the positive departure-to-arrival residue. Bare Timeline ground performs Go only within Range and clears the acquired Timeline operand first. Pin activation performs the same canonical movement while acquiring that Pin.
+Go commits an exact known source Address, seeds movement-scale Current Neighborhood, and leaves the positive departure-to-arrival residue. Bare Timeline ground performs Go only within Range and clears the acquired Timeline operand first. Pin activation performs the same canonical movement while acquiring that Pin.
 
 A Guide destination outside a focused Range may leave Focus or open Full Video as part of one reported transaction so the exact retained Address becomes admissible. Go to the existing Current is a no-op; Reopen is the explicit way to discard local scale at the same Current.
 
@@ -385,7 +385,7 @@ A Guide destination outside a focused Range may leave Focus or open Full Video a
 
 Every semantic operator commits the smallest complete transaction. Undo restores the checkpoint immediately before it; Redo restores the displaced state. A new semantic transaction clears the Redo future.
 
-Metadata-only presentation, deformation bypass, panel state, previews, Chapters, transport ticks, rate events, Panorama Cycle, and playback wraps do not enter Session history. A changed Guide transaction is persisted after acceptance when recovery permits safe writing.
+Metadata-only presentation, weight relaxation, panel state, previews, Chapters, transport ticks, rate events, Panorama Cycle, and playback wraps do not enter Session history. A changed Guide transaction is persisted after acceptance when recovery permits safe writing.
 
 ## 6. Selection and direct manipulation
 
@@ -484,7 +484,7 @@ Operator Frames use the effective projection:
 
 - Step, Pin, Go, and fallback: the configured backward Step destination, Current, and forward Step destination;
 - Refine Backward/Forward and Local Refine: the next directional Refine targets around Current;
-- Reopen: the directional midpoints available from the reopened Resolution;
+- Reopen: the directional midpoints available from the reopened Current Neighborhood;
 - selected Section: Start, the active midpoint, and End while Current owns that relation.
 
 Direct Pin editing uses the Step neighborhood around its candidate Address. Direct Section endpoint or whole-Section editing uses candidate Start, midpoint, and End.
@@ -612,7 +612,7 @@ A proper-Range wrap:
 
 No stale pre-retune transport object may own the wrap.
 
-Playback settlement uses the transport’s departure, parent Resolution, return model, current Cursor, and completed cycles to commit at most one semantic transaction. Watched coverage extends or preserves existing Active Span coverage and never shortens it. A completed proper-Range cycle covers the Range. Full-video playback stops at source end.
+Playback settlement uses the transport’s departure, parent Current Neighborhood, return model, current Cursor, and completed cycles to commit at most one semantic transaction. Watched coverage extends or preserves existing Active Span coverage and never shortens it. A completed proper-Range cycle covers the Range. Full-video playback stops at source end.
 
 ### 8.4b Ghost Traversal and user time
 
@@ -626,7 +626,7 @@ Ghost Traversal is held `G` plus the wheel. Arming costs nothing: no Anchor, no 
 
 Each quantum moves a read cursor one occurrence backward or forward through user time and applies the recalled Address as an amendment against one captured origin. Backward and forward name directions in user time; either may move either way through source time. Watched spans are subdivided by the frozen Step law, so expanded ground yields finer recall while the watched boundaries stay exact. An Address the active Range excludes is unavailable rather than clamped, and Ghost never leaves Focus, widens Range, or opens Full Video to reach one.
 
-Ghost restores no historical Pins, Sections, Groups, Weights, titles, visibility, Focus, Range, Step Distance, deformation state or Guide selection. What it produces is an ordinary Active Span between the Anchor and the recalled Address, so Switch End, Tag, Release and Focus act on it exactly as they would on any other.
+Ghost restores no historical Pins, Sections, Groups, Weights, titles, visibility, Focus, Range, Step Distance, topography state or Guide selection. What it produces is an ordinary Active Span between the Anchor and the recalled Address, so Switch End, Tag, Release and Focus act on it exactly as they would on any other.
 
 Where automatic Context is enabled, each recalled Address plays: the stop condition for a recall is recognition, and a still frame is a poor thing to recognise a moment from. Successive candidates retarget one Context window rather than opening a new one, so the window follows the wheel instead of being torn down and rebuilt at every notch. A window superseded or run out during the scan is search and writes no observation; only the one still running when the gesture ended was watched, and it joins the path as observed source time on its own terms. Escape stops it with everything else the scan did. With Context off, recall remains a silent frame-by-frame scan.
 
@@ -648,7 +648,7 @@ A focused control keeps only the keys it can act on, which is a question about t
 
 Retain Pin retains Current as an explicit Pin. Retain Section retains a positive Active Span using existing exact endpoint Pins when available or creates endpoint Pins. Duplicate identity is determined canonically, not by visual proximity. Duplicate Tag selects the existing object.
 
-Guide renames, Weight changes, Group changes, Pin moves, Section moves, unlink/link, and deletion are ordinary Session transactions and use the same operations from every surface. Deleting the Section targeted by deformation bypass clears that bypass presentation. Deleting a focused Section leaves Focus through the same containing-Range law as other exits.
+Guide renames, Weight changes, Group changes, Pin moves, Section moves, unlink/link, and deletion are ordinary Session transactions and use the same operations from every surface. Deleting the Section targeted by weight relaxation clears that bypass presentation. Deleting a focused Section leaves Focus through the same containing-Range law as other exits.
 
 ### 9.2 Chapters
 
@@ -722,7 +722,7 @@ Before chaptering a new identity, one boundary resolves every old-source owner:
 - clear native Go, programmatic placement, player-pause claims, and metadata retry;
 - close dialogs and Pin-cluster menus;
 - persist safe settled Guide changes;
-- clear Chapters, Timeline selection, Guide focus, aligned Pins, Shift layers, direct preview, Panorama runtime, and deformation bypass;
+- clear Chapters, Timeline selection, Guide focus, aligned Pins, Shift layers, direct preview, Panorama runtime, and weight relaxation;
 - reset source identity, Session, transport, offers, and physical side sources;
 - only then chapter the new source.
 
@@ -749,11 +749,11 @@ Previews are dry runs or pure projections. They cannot maintain parallel target 
 The following are release invariants:
 
 - source time is the only stored temporal coordinate;
-- Range, Resolution, Active Span, Pins, Sections, Context, and Panorama Frames remain source-contiguous;
+- Range, Current Neighborhood, Active Span, Pins, Sections, Context, and Panorama Frames remain source-contiguous;
 - effective Timeline density is always positive;
 - source↔Timeline mapping is continuous and invertible;
 - at most one Group is drawn, while any number may be active;
-- Section Weight is retained Guide state; deformation bypass is transient comparison state;
+- Section Weight is retained Guide state; weight relaxation is transient comparison state;
 - all effective spatial consumers agree on one projection;
 - the physical matrix has three equal rows and columns, with Tag at row 3 column 2;
 - Tag label, preview, availability, key route, and pointer route agree with Shift state;

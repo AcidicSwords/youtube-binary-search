@@ -2,7 +2,7 @@
 //
 // Every suite beside this one proves one family in isolation. This one crosses
 // them: Groups against Focus, Weight, traversal and the Guide; Chapters against
-// deformation, Focus and history; the Pin routes against composition and the
+// topography, Focus and history; the Pin routes against composition and the
 // Shift layer; and Undo across all of it. The question each block asks is not
 // "does this work" but "does doing this change what that means".
 import assert from "node:assert/strict";
@@ -343,7 +343,7 @@ assert.equal(byId.get("guide-compose-toggle")["aria-pressed"], "false",
 // 7. Unlink from the Pin, under a Group that is hiding it.
 // ==============================================================================
 // Two Sections meeting at one Address share the Pin holding them. The map is
-// flattened first so a pixel means a known Address again -- the deformation is
+// flattened first so a pixel means a known Address again -- the topography is
 // the subject of other blocks, not this one.
 await selectSection(0);
 const flatten = inSections("sectionWeighting")[0];
@@ -524,4 +524,4 @@ assert.deepEqual(
     "and leaving it clears the mark, having moved nothing.");
 }
 
-console.log("Cross-interaction stress passed: Group visibility and activity govern drawing and deformation independently and are observed by traversal but never by the projection; Chapters project through deformation and Focus while staying inert; composition crosses Chapters, Sections and Pins by one law; reveal moves nothing and preserves an armed Shift layer; Unlink works from the Pin under a hidden Group; a Group renames and removes non-destructively; one history stack Undoes and Redoes the whole construction; every Group offers rename and remove with only the last refused; and hovering a Pin row marks its Address on the map.");
+console.log("Cross-interaction stress passed: Group visibility and activity govern drawing and topography independently and are observed by traversal but never by the projection; Chapters project through topography and Focus while staying inert; composition crosses Chapters, Sections and Pins by one law; reveal moves nothing and preserves an armed Shift layer; Unlink works from the Pin under a hidden Group; a Group renames and removes non-destructively; one history stack Undoes and Redoes the whole construction; every Group offers rename and remove with only the last refused; and hovering a Pin row marks its Address on the map.");

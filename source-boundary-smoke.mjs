@@ -98,7 +98,7 @@ await poll();
 assert.equal(currentText(), "Current 1:06");
 assert.equal(byId.get("return-action").disabled, true);
 
-// Build and acquire a Section, bypass its deformation, and start translating
+// Build and acquire a Section, bypass its topography, and start translating
 // its wire. Replacing the source cancels the drag to its origin, clears the
 // bypass and removes every old Guide identity.
 byId.get("context-seconds").value = "0";
@@ -196,4 +196,4 @@ assert.equal(byId.get("return-action").disabled, true);
 assert.equal(tail().videoId, "JJJJJJJJJJJ");
 assert.equal(lead().videoId, "JJJJJJJJJJJ");
 
-console.log("Source boundary smoke passed: load generations reject stale identity, and Nudge, Step, Context, Playback, Section/Current/Pin/Range drags, Guide identity and deformation bypass cannot cross sources.");
+console.log("Source boundary smoke passed: load generations reject stale identity, and Nudge, Step, Context, Playback, Section/Current/Pin/Range drags, Guide identity and weight relaxation cannot cross sources.");

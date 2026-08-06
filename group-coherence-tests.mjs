@@ -422,7 +422,7 @@ const visibleIds = guide => guide.groups
     "A v9 Guide that drew nothing still draws nothing after upgrade.");
 }
 
-// --- 13. Deformation is unchanged by where visibility is recorded -------------
+// --- 13. Temporal Topography is unchanged by where visibility is recorded -------------
 // The whole point of moving the fact is that nothing computed from it moves.
 {
   const { guide } = build();
@@ -592,4 +592,4 @@ const visibleIds = guide => guide.groups
   assert.equal(byId.get("pins-list-count").textContent, before.pins);
 }
 
-console.log("Group coherence tests passed: one nullable visible-Group identity, deterministic default and fallback, independent layer activity, hidden-but-active deformation, standalone and shared Pin visibility, complete Guide partition, non-destructive Group removal, and v8 and v9 saves upgrading to v10 with the drawn Group and Weights intact.");
+console.log("Group coherence tests passed: one nullable visible-Group identity, deterministic default and fallback, independent layer activity, hidden-but-active topography, standalone and shared Pin visibility, complete Guide partition, non-destructive Group removal, and v8 and v9 saves upgrading to v10 with the drawn Group and Weights intact.");

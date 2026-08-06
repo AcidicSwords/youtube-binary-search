@@ -45,7 +45,7 @@ function buildSegments(duration, guide, weightRelaxation = null) {
   // frozen: an inactive Group simply stops contributing to the density product,
   // so toggling it is exact and instantaneous in both directions.
   const source = guide || { sections: [], pins: [], groups: [] };
-  // A deformation bypass changes only the effective projection. Stored Weight
+  // A weight relaxation changes only the effective projection. Stored Weight
   // remains visible and untouched; every consumer receives this same compiled
   // set instead of independently deciding which Sections count.
   const bypass = resolvedWeightRelaxation(source, weightRelaxation);

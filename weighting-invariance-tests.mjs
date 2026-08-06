@@ -74,10 +74,10 @@ function addresses(model) {
   );
 }
 
-// --- Resolution is stored in source time but established spatially -----------
+// --- Current Neighborhood is stored in source time but established spatially -----------
 // Its bounds come from a Timeline Space law, so the same gesture at a different
-// Weight legitimately yields different Resolution Addresses. What Weight may
-// never do is move an already-established Resolution.
+// Weight legitimately yields different Current Neighborhood Addresses. What Weight may
+// never do is move an already-established Current Neighborhood.
 {
   assert.notDeepEqual(
     [neutral.session.model.neighborhood.L, neutral.session.model.neighborhood.R],
@@ -97,7 +97,7 @@ function addresses(model) {
       neighborhood: [edited.session.model.neighborhood.L, edited.session.model.neighborhood.R]
     },
     before,
-    "A Weight edit changes only the metric — not even a derived Resolution bound."
+    "A Weight edit changes only the metric — not even a derived Current Neighborhood bound."
   );
   assert.deepEqual(
     edited.session.model.stepDistance,
@@ -290,4 +290,4 @@ function addresses(model) {
   }
 }
 
-console.log("Weight invariance tests passed: retained Addresses, duration, Nudge displacement, Context and Panorama geometry are Weight-blind; Step, Refine, seeded Resolution and adaptive Reach follow the metric; and editing Weight moves nothing at all.");
+console.log("Weight invariance tests passed: retained Addresses, duration, Nudge displacement, Context and Panorama geometry are Weight-blind; Step, Refine, seeded Current Neighborhood and adaptive Reach follow the metric; and editing Weight moves nothing at all.");
