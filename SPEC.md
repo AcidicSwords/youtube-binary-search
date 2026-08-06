@@ -2,7 +2,7 @@
 
 ## 1. Authority
 
-This document specifies Video Cartography package release **8.0.0**. `package.json` is the release-version authority; the final implementation and its release gates are executable proofs of this specification. A contradiction among code, tests, interface text, and this document is a defect, not an alternative product generation.
+This document specifies Video Cartography package release **9.0.0**. `package.json` is the release-version authority; the final implementation and its release gates are executable proofs of this specification. A contradiction among code, tests, interface text, and this document is a defect, not an alternative product generation.
 
 The objective is a stable video-comprehension instrument, not an editing suite or framework. Completion preserves these laws:
 
