@@ -73,7 +73,7 @@ function stretchFactor(spatialSpan, sourceSpan) {
   return Math.abs(factor - 1) <= STRETCH_TOLERANCE ? null : factor;
 }
 
-function formatStretch(spatialSpan, sourceSpan) {
+function formatStretchFactor(spatialSpan, sourceSpan) {
   const factor = stretchFactor(spatialSpan, sourceSpan);
   return factor === null ? null : `${Number(factor.toFixed(3))}×`;
 }
@@ -1924,9 +1924,9 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["timeline-key-pins"].dataset.active = String(
       Boolean(orderedPins(guide()).length)
     );
-    const overallStretch = formatStretch(projection.timelineExtent, model().duration);
-    elements["duration-time"].textContent = overallStretch
-      ? `${formatTime(model().duration)} · ${overallStretch} spatial`
+    const overallStretchFactor = formatStretchFactor(projection.timelineExtent, model().duration);
+    elements["duration-time"].textContent = overallStretchFactor
+      ? `${formatTime(model().duration)} · ${overallStretchFactor} spatial`
       : formatTime(model().duration);
     elements["range-label"].textContent = loaded ? formatRange(activeRange) : "—";
     const resolutionTimelineExtent = currentNeighborhood
@@ -1935,7 +1935,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     const resolutionSourceDuration = currentNeighborhood
       ? currentNeighborhood.R - currentNeighborhood.L
       : null;
-    const resolutionStretch = formatStretch(
+    const neighborhoodStretchFactor = formatStretchFactor(
       resolutionTimelineExtent,
       resolutionSourceDuration
     );
@@ -1943,7 +1943,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? `${
           formatDuration(resolutionSourceDuration)
         }${
-          resolutionStretch ? ` · ${resolutionStretch} spatial` : ""
+          neighborhoodStretchFactor ? ` · ${neighborhoodStretchFactor} spatial` : ""
         } · ${
           currentState.session.model.neighborhoodBasis === NEIGHBORHOOD_BASIS.MOVEMENT
             ? "Movement scale"
@@ -2241,13 +2241,13 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           : `${classifyRetainedRefineRelation(currentSpan, semanticCurrent, targets.forward) === "full" ? "full movement" : "retain anchor"} · to ${formatTime(targets.forward)}`
     );
     const rangeSourceSpan = activeRange.end - activeRange.start;
-    const rangeStretch = formatStretch(
+    const rangeStretchFactor = formatStretchFactor(
       projection.timelineDistance(activeRange.start, activeRange.end),
       rangeSourceSpan
     );
     elements["reopen-meta"].textContent = actionModel?.reopen
       ? `${formatDuration(rangeSourceSpan)} Range${
-          rangeStretch ? ` · ${rangeStretch} spatial` : ""
+          rangeStretchFactor ? ` · ${rangeStretchFactor} spatial` : ""
         }`
       : "Range-level resolution";
     // Step Reach is a distance on the map, and inside a weighted Section a
