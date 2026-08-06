@@ -1776,7 +1776,7 @@ export function createPanoramaController({
     const bothLabel = availableRoles.length === 1
       ? visibleRoles.length === 1 ? "visible side" : "available side"
       : "both";
-    setText(elements["field-both-toggle-label"], held ? `Stretch ${bothLabel}` : `Hold ${bothLabel}`);
+    setText(elements["field-both-toggle-label"], held ? "Resume Panorama" : "Freeze Panorama");
     elements["field-both-toggle"]?.setAttribute?.("aria-pressed", String(held));
     if (elements["field-both-toggle"]) {
       elements["field-both-toggle"].disabled = runtime.suspended
@@ -1784,7 +1784,7 @@ export function createPanoramaController({
         || !availableRoles.length;
       elements["field-both-toggle"].setAttribute(
         "aria-label",
-        `${held ? "Panorama is held; Stretch" : "Panorama is moving; Hold"} ${bothLabel}`
+        `${held ? "Panorama is frozen; resume" : "Panorama is cycling; freeze"} ${bothLabel}`
       );
     }
     const frameLabel = {

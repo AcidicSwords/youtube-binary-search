@@ -1450,8 +1450,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       const toggles = document.createElement("div");
       toggles.className = "guide-group-toggles";
       for (const [key, text, title] of [
-        ["visible", "On Timeline", "Make this the one Group whose Sections and endpoint Pins are on the Timeline"],
-        ["weightsEnabled", "Active", "Let this Group's Weights change Timeline distance"]
+        ["visible", "Show on Timeline", "Make this the one Group whose Sections and endpoint Pins are on the Timeline"],
+        ["weightsEnabled", "Use Weights", "Use this Group's Section Weightings in Temporal Topography and Textured Playback"]
       ]) {
         const label = document.createElement("label");
         label.className = "guide-group-toggle";
@@ -2011,7 +2011,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : bypass?.kind === "all";
     const weightRelaxationLabel = weightRelaxationScopeActive
       ? weightRelaxationTarget ? "Restore Section" : "Restore Timeline"
-      : weightRelaxationTarget ? "Straighten Section" : "Straighten Timeline";
+      : weightRelaxationTarget ? "Relax Weights" : "Relax Weights";
     const weightRelaxationMeta = weightRelaxationTarget
       ? sectionDisplayName(weightRelaxationTarget)
       : "Complete map";
@@ -2354,7 +2354,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     // gesture started; a Ghost gesture shows the Anchor -- the moment the reader
     // was at when they began looking back, which is the fixed end of the
     // relation and the thing they are measuring against. It is drawn solid,
-    // because unlike the transient Ghost Current it is not moving.
+    // because unlike the transient Ghost Position it is not moving.
     const ghostAnchor = state().ghostGesture?.anchor;
     const departureAddress = Number.isFinite(ghostAnchor)
       ? ghostAnchor

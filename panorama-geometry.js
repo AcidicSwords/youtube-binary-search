@@ -184,7 +184,7 @@ export function restartPanoramaCycle(runtime, cycle = DEFAULT_PANORAMA_CYCLE, st
 export function rebasePanoramaCycle(runtime, startedAt = 0, startingOffset = null) {
   if (!runtime) return runtime;
   // The relation on screen is the one to continue from. A caller that knows
-  // what the sides actually attained -- Hold and Stretch both do -- says so;
+  // what the sides actually attained -- Hold and Resume Panorama do -- says so;
   // otherwise the phase's own last derived offset stands.
   const attained = Number.isFinite(startingOffset)
     ? startingOffset
