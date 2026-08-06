@@ -1,4 +1,4 @@
-// The user-time ledger: what the reader encountered, in the order they met it.
+// The traversal-trace ledger: what the reader encountered, in the order they met it.
 //
 // This suite proves the ledger and its read cursor in isolation. It builds no
 // Session, touches no DOM, and drives no player: everything here is a question
@@ -7,16 +7,16 @@ import assert from "node:assert/strict";
 import {
   TRAVERSAL_KIND,
   UNIT_KIND,
-  createUserTime,
+  createTraversalTrace,
   appendAtomicTraversal,
   appendSequenceTraversal,
-  appendContinuousTraversal,
+  appendObservedPassages,
   beginGhostRead,
   moveGhostRead,
-  appendGhostInjection,
-  latestCursorAtAddress,
-  cursorIsValid
-} from "./user-time.js";
+  appendGhostReturn,
+  latestTracePositionAtAddress,
+  tracePositionIsValid
+} from "./traversal-trace.js";
 import { projectionForModel } from "./timeline-projection.js";
 import { createGuide, createSectionFromTimes } from "./guide.js";
 
@@ -31,7 +31,7 @@ const neutralProjection = projectionForModel({
 });
 const reach = seconds => ({ backward: seconds, forward: seconds });
 
-const read = (userTime, current, options = {}) => beginGhostRead(userTime, {
+const read = (traversalTrace, current, options = {}) => beginGhostRead(traversalTrace, {
   current,
   range: RANGE,
   projection: neutralProjection,
@@ -40,11 +40,11 @@ const read = (userTime, current, options = {}) => beginGhostRead(userTime, {
 });
 
 // Walk a whole direction and collect the Addresses it offers.
-function walk(userTime, ghostRead, direction, limit = 40) {
+function walk(traversalTrace, ghostRead, direction, limit = 40) {
   const seen = [];
   let cursor = ghostRead;
   for (let index = 0; index < limit; index += 1) {
-    const moved = moveGhostRead(userTime, cursor, direction);
+    const moved = moveGhostRead(traversalTrace, cursor, direction);
     if (!moved.changed) break;
     seen.push(moved.address);
     cursor = moved.read;
@@ -56,27 +56,27 @@ function walk(userTime, ghostRead, direction, limit = 40) {
 // Appending
 // ---------------------------------------------------------------------------
 {
-  let userTime = createUserTime(10);
-  assert.equal(userTime.records.length, 0);
-  assert.equal(userTime.latestOccurrence.address, 10, "The ledger opens where the reader arrived.");
+  let traversalTrace = createTraversalTrace(10);
+  assert.equal(traversalTrace.records.length, 0);
+  assert.equal(traversalTrace.latestOccurrence.address, 10, "The ledger opens where the reader arrived.");
 
-  const first = appendAtomicTraversal(userTime, { from: 10, to: 40, cause: "refineForward" });
+  const first = appendAtomicTraversal(traversalTrace, { from: 10, to: 40, cause: "refineForward" });
   assert.equal(first.changed, true);
   assert.equal(first.record.kind, TRAVERSAL_KIND.ATOMIC);
   assert.deepEqual(first.record.units, [{ kind: UNIT_KIND.JUMP, from: 10, to: 40 }]);
-  assert.equal(first.userTime.latestOccurrence.address, 40);
-  userTime = first.userTime;
+  assert.equal(first.traversalTrace.latestOccurrence.address, 40);
+  traversalTrace = first.traversalTrace;
 
   // A movement that moved nothing is not an occurrence: recording it would put a
   // position in the stream the reader never distinguished from the one before.
-  const still = appendAtomicTraversal(userTime, { from: 40, to: 40, cause: "go" });
+  const still = appendAtomicTraversal(traversalTrace, { from: 40, to: 40, cause: "go" });
   assert.equal(still.changed, false, "A movement of nothing is not an encounter.");
-  assert.equal(still.userTime, userTime, "and leaves the ledger untouched.");
+  assert.equal(still.traversalTrace, traversalTrace, "and leaves the ledger untouched.");
 
   // Reversals inside one gesture survive. Collapsing a Step sequence to its
   // extremes would erase going out and coming back, which is the shape a reader
   // actually remembers.
-  const sequence = appendSequenceTraversal(userTime, {
+  const sequence = appendSequenceTraversal(traversalTrace, {
     points: [40, 45, 50, 45],
     cause: "step-sequence"
   });
@@ -91,7 +91,7 @@ function walk(userTime, ghostRead, direction, limit = 40) {
   // Identity is assigned once and never reused.
   const ids = [first.record.id, sequence.record.id];
   assert.equal(new Set(ids).size, ids.length);
-  assert.ok(sequence.userTime.nextRecordId > sequence.record.id);
+  assert.ok(sequence.traversalTrace.nextRecordId > sequence.record.id);
 }
 
 // ---------------------------------------------------------------------------
@@ -101,16 +101,16 @@ function walk(userTime, ghostRead, direction, limit = 40) {
   // The reader went 10 → 40 → 25 → 70. Ghosting backward retraces that, which
   // moves forward through source time on one of its legs and backward on
   // another. Nothing about source order survives the recall.
-  let userTime = createUserTime(10);
+  let traversalTrace = createTraversalTrace(10);
   for (const [from, to] of [[10, 40], [40, 25], [25, 70]]) {
-    userTime = appendAtomicTraversal(userTime, { from, to, cause: "go" }).userTime;
+    traversalTrace = appendAtomicTraversal(traversalTrace, { from, to, cause: "go" }).traversalTrace;
   }
 
-  const backward = walk(userTime, read(userTime, 70), "backward");
+  const backward = walk(traversalTrace, read(traversalTrace, 70), "backward");
   assert.deepEqual(backward.addresses, [25, 40, 10],
     "Ghosting backward reverses the reader's own path, whichever way source time runs.");
 
-  const forward = walk(userTime, read(userTime, 10, { resumeCursor: null }), "forward");
+  const forward = walk(traversalTrace, read(traversalTrace, 10, { continuationPosition: null }), "forward");
   assert.deepEqual(forward.addresses, [40, 25, 70],
     "and forward replays it in the order it happened.");
 
@@ -119,7 +119,7 @@ function walk(userTime, ghostRead, direction, limit = 40) {
     "Backward from the end reaches the beginning.");
 
   // Walking past either end reports rather than wrapping.
-  const exhausted = moveGhostRead(userTime, backward.read, "backward");
+  const exhausted = moveGhostRead(traversalTrace, backward.read, "backward");
   assert.equal(exhausted.changed, false);
   assert.equal(exhausted.reason, "stream-end");
 }
@@ -130,12 +130,12 @@ function walk(userTime, ghostRead, direction, limit = 40) {
 {
   // A jump's arrival and the next jump's departure are the same occurrence seen
   // from either side. Offering it twice would spend a wheel notch going nowhere.
-  let userTime = createUserTime(0);
-  userTime = appendSequenceTraversal(userTime, {
+  let traversalTrace = createTraversalTrace(0);
+  traversalTrace = appendSequenceTraversal(traversalTrace, {
     points: [0, 20, 40, 60],
     cause: "step-sequence"
-  }).userTime;
-  const { addresses } = walk(userTime, read(userTime, 60), "backward");
+  }).traversalTrace;
+  const { addresses } = walk(traversalTrace, read(traversalTrace, 60), "backward");
   assert.deepEqual(addresses, [40, 20, 0],
     "Shared endpoints are one position, so every notch reaches somewhere new.");
 }
@@ -147,25 +147,25 @@ function walk(userTime, ghostRead, direction, limit = 40) {
   // Twenty seconds of playback was genuinely watched, so any Address inside it
   // can be recalled. It is subdivided by the Step law in force when the gesture
   // began, not by a fixed number of source seconds.
-  let userTime = createUserTime(20);
-  userTime = appendContinuousTraversal(userTime, {
+  let traversalTrace = createTraversalTrace(20);
+  traversalTrace = appendObservedPassages(traversalTrace, {
     spans: [{ from: 20, to: 40 }],
     cause: "playback"
-  }).userTime;
+  }).traversalTrace;
 
-  const forward = walk(userTime, read(userTime, 20), "forward");
+  const forward = walk(traversalTrace, read(traversalTrace, 20), "forward");
   assert.deepEqual(forward.addresses, [25, 30, 35, 40],
     "A watched span offers the positions a Step of that size would reach.");
-  const backward = walk(userTime, read(userTime, 40), "backward");
+  const backward = walk(traversalTrace, read(traversalTrace, 40), "backward");
   assert.deepEqual(backward.addresses, [35, 30, 25, 20],
     "and offers them in reverse when recalled backward.");
 
   // The boundary is always reachable even when the span does not divide evenly.
-  let uneven = createUserTime(0);
-  uneven = appendContinuousTraversal(uneven, {
+  let uneven = createTraversalTrace(0);
+  uneven = appendObservedPassages(uneven, {
     spans: [{ from: 0, to: 22 }],
     cause: "playback"
-  }).userTime;
+  }).traversalTrace;
   const partial = walk(uneven, read(uneven, 0), "forward");
   assert.deepEqual(partial.addresses, [5, 10, 15, 20, 22],
     "The last quantum may be short; the end of what was watched is never unreachable.");
@@ -177,12 +177,12 @@ function walk(userTime, ghostRead, direction, limit = 40) {
 {
   // Playback that wrapped, or any transport observed backward, is recalled the
   // way it happened.
-  let userTime = createUserTime(40);
-  userTime = appendContinuousTraversal(userTime, {
+  let traversalTrace = createTraversalTrace(40);
+  traversalTrace = appendObservedPassages(traversalTrace, {
     spans: [{ from: 40, to: 20 }],
     cause: "playback"
-  }).userTime;
-  const backward = walk(userTime, read(userTime, 20), "backward");
+  }).traversalTrace;
+  const backward = walk(traversalTrace, read(traversalTrace, 20), "backward");
   assert.deepEqual(backward.addresses, [25, 30, 35, 40],
     "Recalling a backward-watched span backward in user time moves forward in source time.");
 }
@@ -205,13 +205,13 @@ function walk(userTime, ghostRead, direction, limit = 40) {
     neighborhood: { C: 0 },
     stepReach: null
   });
-  let userTime = createUserTime(20);
-  userTime = appendContinuousTraversal(userTime, {
+  let traversalTrace = createTraversalTrace(20);
+  traversalTrace = appendObservedPassages(traversalTrace, {
     spans: [{ from: 20, to: 40 }],
     cause: "playback"
-  }).userTime;
+  }).traversalTrace;
 
-  const { addresses } = walk(userTime, beginGhostRead(userTime, {
+  const { addresses } = walk(traversalTrace, beginGhostRead(traversalTrace, {
     current: 20,
     range: RANGE,
     projection: weighted,
@@ -238,28 +238,28 @@ function walk(userTime, ghostRead, direction, limit = 40) {
   // Ghost preserves the semantic environment, so it cannot recall a point the
   // current Range excludes, and it must not silently clamp one onto a different
   // point. It reports instead.
-  let userTime = createUserTime(10);
+  let traversalTrace = createTraversalTrace(10);
   for (const [from, to] of [[10, 30], [30, 200], [200, 45]]) {
-    userTime = appendAtomicTraversal(userTime, { from, to, cause: "go" }).userTime;
+    traversalTrace = appendAtomicTraversal(traversalTrace, { from, to, cause: "go" }).traversalTrace;
   }
   const focused = { start: 0, end: 100 };
-  const ghostRead = beginGhostRead(userTime, {
+  const ghostRead = beginGhostRead(traversalTrace, {
     current: 45,
     range: focused,
     projection: neutralProjection,
     stepReach: reach(5)
   });
-  const { addresses } = walk(userTime, ghostRead, "backward");
+  const { addresses } = walk(traversalTrace, ghostRead, "backward");
   assert.deepEqual(addresses, [30, 10],
     "An Address outside the active Range is unavailable, not approximated.");
   assert.equal(ghostRead.blocked, true, "and the gesture can say why it stopped.");
 
   // A span is clipped to what the Range still contains.
-  let spanning = createUserTime(80);
-  spanning = appendContinuousTraversal(spanning, {
+  let spanning = createTraversalTrace(80);
+  spanning = appendObservedPassages(spanning, {
     spans: [{ from: 80, to: 140 }],
     cause: "playback"
-  }).userTime;
+  }).traversalTrace;
   const clipped = beginGhostRead(spanning, {
     current: 80,
     range: focused,
@@ -277,15 +277,15 @@ function walk(userTime, ghostRead, direction, limit = 40) {
 {
   // A gesture reads a stream that cannot change underneath it, so it can never
   // follow its own newly injected output.
-  let userTime = createUserTime(0);
+  let traversalTrace = createTraversalTrace(0);
   for (const [from, to] of [[0, 10], [10, 20], [20, 30]]) {
-    userTime = appendAtomicTraversal(userTime, { from, to, cause: "go" }).userTime;
+    traversalTrace = appendAtomicTraversal(traversalTrace, { from, to, cause: "go" }).traversalTrace;
   }
   // The boundary is where the stream stood when the gesture began. Records
   // beyond it -- including the replay this very gesture is about to append --
   // are not readable, so the cursor can never follow its own output.
-  const boundary = userTime.records.length;
-  const grown = appendAtomicTraversal(userTime, { from: 30, to: 90, cause: "go" }).userTime;
+  const boundary = traversalTrace.records.length;
+  const grown = appendAtomicTraversal(traversalTrace, { from: 30, to: 90, cause: "go" }).traversalTrace;
   const frozen = beginGhostRead(grown, {
     current: 30,
     frozenStreamEnd: boundary,
@@ -314,34 +314,34 @@ function walk(userTime, ghostRead, direction, limit = 40) {
 // Cursor validity
 // ---------------------------------------------------------------------------
 {
-  let userTime = createUserTime(0);
-  userTime = appendAtomicTraversal(userTime, { from: 0, to: 50, cause: "go" }).userTime;
-  userTime = appendContinuousTraversal(userTime, {
+  let traversalTrace = createTraversalTrace(0);
+  traversalTrace = appendAtomicTraversal(traversalTrace, { from: 0, to: 50, cause: "go" }).traversalTrace;
+  traversalTrace = appendObservedPassages(traversalTrace, {
     spans: [{ from: 50, to: 90 }],
     cause: "playback"
-  }).userTime;
-  const [jump, span] = userTime.records;
+  }).traversalTrace;
+  const [jump, span] = traversalTrace.records;
 
-  assert.equal(cursorIsValid(userTime, { recordId: jump.id, unitIndex: 0, address: 50 }, {}), true);
-  assert.equal(cursorIsValid(userTime, { recordId: jump.id, unitIndex: 0, address: 25 }, {}), false,
+  assert.equal(tracePositionIsValid(traversalTrace, { recordId: jump.id, unitIndex: 0, address: 50 }, {}), true);
+  assert.equal(tracePositionIsValid(traversalTrace, { recordId: jump.id, unitIndex: 0, address: 25 }, {}), false,
     "A jump was never occupied between its endpoints.");
-  assert.equal(cursorIsValid(userTime, { recordId: span.id, unitIndex: 0, address: 70 }, {}), true,
+  assert.equal(tracePositionIsValid(traversalTrace, { recordId: span.id, unitIndex: 0, address: 70 }, {}), true,
     "A watched span was occupied throughout.");
-  assert.equal(cursorIsValid(userTime, { recordId: span.id, unitIndex: 0, address: 120 }, {}), false);
-  assert.equal(cursorIsValid(userTime, { recordId: 999, unitIndex: 0, address: 50 }, {}), false);
-  assert.equal(cursorIsValid(userTime, null, {}), false);
+  assert.equal(tracePositionIsValid(traversalTrace, { recordId: span.id, unitIndex: 0, address: 120 }, {}), false);
+  assert.equal(tracePositionIsValid(traversalTrace, { recordId: 999, unitIndex: 0, address: 50 }, {}), false);
+  assert.equal(tracePositionIsValid(traversalTrace, null, {}), false);
   assert.equal(
-    cursorIsValid(userTime, { recordId: span.id, unitIndex: 0, address: 70 }, { range: { start: 0, end: 60 } }),
+    tracePositionIsValid(traversalTrace, { recordId: span.id, unitIndex: 0, address: 70 }, { range: { start: 0, end: 60 } }),
     false,
     "A cursor the active Range excludes is not usable in this world."
   );
 
   assert.equal(
-    latestCursorAtAddress(userTime, 50, { range: RANGE, projection: neutralProjection, stepReach: reach(5) }) >= 0,
+    latestTracePositionAtAddress(traversalTrace, 50, { range: RANGE, projection: neutralProjection, stepReach: reach(5) }) >= 0,
     true
   );
   assert.equal(
-    latestCursorAtAddress(userTime, 12.5, { range: RANGE, projection: neutralProjection, stepReach: reach(5) }),
+    latestTracePositionAtAddress(traversalTrace, 12.5, { range: RANGE, projection: neutralProjection, stepReach: reach(5) }),
     -1,
     "An Address the reader never occupied has no occurrence."
   );
@@ -351,12 +351,12 @@ function walk(userTime, ghostRead, direction, limit = 40) {
 // An empty stream is a boundary, not a crash
 // ---------------------------------------------------------------------------
 {
-  const empty = createUserTime(0);
+  const empty = createTraversalTrace(0);
   const ghostRead = read(empty, 0);
   const moved = moveGhostRead(empty, ghostRead, "backward");
   assert.equal(moved.changed, false);
-  assert.equal(moved.reason, "no-user-time");
-  assert.equal(appendGhostInjection(empty, { anchor: 0, landing: 0 }).changed, false,
+  assert.equal(moved.reason, "no-traversal-trace");
+  assert.equal(appendGhostReturn(empty, { anchor: 0, landing: 0 }).changed, false,
     "A gesture that landed nowhere writes nothing.");
 }
 
@@ -365,37 +365,37 @@ function walk(userTime, ghostRead, direction, limit = 40) {
   // The reader walks A -> B -> C -> D, then recalls back to B and releases.
   // What enters the stream is one occurrence of B, not the search that found it.
   const [A, B, C, D] = [10, 20, 30, 40];
-  let userTime = createUserTime(A);
+  let traversalTrace = createTraversalTrace(A);
   for (const [from, to] of [[A, B], [B, C], [C, D]]) {
-    userTime = appendAtomicTraversal(userTime, { from, to, cause: "go" }).userTime;
+    traversalTrace = appendAtomicTraversal(traversalTrace, { from, to, cause: "go" }).traversalTrace;
   }
-  const beforeRecords = userTime.records.length;
+  const beforeRecords = traversalTrace.records.length;
 
-  let ghostRead = read(userTime, D, { frozenStreamEnd: userTime.records.length });
+  let ghostRead = read(traversalTrace, D, { frozenStreamEnd: traversalTrace.records.length });
   const scanned = [];
   for (let notch = 0; notch < 2; notch += 1) {
-    const moved = moveGhostRead(userTime, ghostRead, "backward");
+    const moved = moveGhostRead(traversalTrace, ghostRead, "backward");
     scanned.push({ address: moved.address, cursor: moved.cursor });
     ghostRead = moved.read;
   }
   assert.deepEqual(scanned.map(entry => entry.address), [C, B],
     "The scan crosses C on the way to B.");
 
-  const injected = appendGhostInjection(userTime, {
+  const injected = appendGhostReturn(traversalTrace, {
     anchor: D,
-    anchorCursor: { recordId: userTime.records.at(-1).id, unitIndex: 0, address: D },
+    anchorPosition: { recordId: traversalTrace.records.at(-1).id, unitIndex: 0, address: D },
     landing: B,
-    recalledCursor: scanned.at(-1).cursor,
+    recalledPosition: scanned.at(-1).cursor,
     scan: { candidateCount: scanned.length, visitedMinimum: B, visitedMaximum: D },
     createdAt: 1
   });
   assert.equal(injected.changed, true);
-  assert.equal(injected.userTime.records.length, beforeRecords + 1,
+  assert.equal(injected.traversalTrace.records.length, beforeRecords + 1,
     "One gesture writes one record,");
   assert.equal(injected.record.units.length, 1,
     "carrying one jump: the Anchor to what was re-entered.");
   assert.deepEqual(injected.record.units[0], { kind: UNIT_KIND.JUMP, from: D, to: B });
-  assert.equal(injected.record.kind, TRAVERSAL_KIND.GHOST_INJECTION);
+  assert.equal(injected.record.kind, TRAVERSAL_KIND.GHOST_RETURN);
 
   // The search is kept as evidence and never as traversal.
   assert.equal(injected.record.provenance.scan.candidateCount, 2);
@@ -404,23 +404,23 @@ function walk(userTime, ghostRead, direction, limit = 40) {
 
   // The landing is readable user time -- the reader really did re-enter B after
   // reaching D, and that fact is worth as much as any other movement.
-  const stream = read(injected.userTime, B);
+  const stream = read(injected.traversalTrace, B);
   assert.deepEqual(stream.positions.map(position => position.address), [A, B, C, D, B],
     "The stream is the journey plus the landing: not the scan, and not nothing.");
-  assert.equal(stream.positions.at(-1).occurrenceKind, "injection",
+  assert.equal(stream.positions.at(-1).occurrenceKind, "ghost-return",
     "and the landing knows it is a re-entry,");
   assert.equal(stream.positions.at(-1).recalledFrom.address, B,
     "linked to the occurrence it re-entered.");
-  assert.equal(injected.userTime.latestOccurrence.address, B);
+  assert.equal(injected.traversalTrace.latestOccurrence.address, B);
 
   // Backward from the injected occurrence follows the live stream: what led to
   // this re-entry. Forward may resume what originally followed the moment.
-  const backward = moveGhostRead(injected.userTime, stream, "backward");
+  const backward = moveGhostRead(injected.traversalTrace, stream, "backward");
   assert.equal(backward.address, D,
     "Backward asks what led here, so the live predecessor comes first.");
 
-  const resumed = read(injected.userTime, B, { resumeCursor: injected.resumeCursor });
-  const forward = walk(injected.userTime, resumed, "forward");
+  const resumed = read(injected.traversalTrace, B, { continuationPosition: injected.continuationPosition });
+  const forward = walk(injected.traversalTrace, resumed, "forward");
   assert.deepEqual(forward.addresses.slice(0, 2), [C, D],
     "Forward asks what originally followed the moment re-entered.");
   // Carrying on past them eventually arrives at the injection itself, which is
@@ -428,19 +428,19 @@ function walk(userTime, ghostRead, direction, limit = 40) {
   assert.equal(forward.addresses.at(-1), B);
 
   // Recalling twice does not accumulate mirrored copies of the search.
-  let twice = appendAtomicTraversal(injected.userTime, {
+  let twice = appendAtomicTraversal(injected.traversalTrace, {
     from: B, to: 90, cause: "go"
-  }).userTime;
-  const second = appendGhostInjection(twice, {
+  }).traversalTrace;
+  const second = appendGhostReturn(twice, {
     anchor: 90,
-    anchorCursor: null,
+    anchorPosition: null,
     landing: B,
-    recalledCursor: scanned.at(-1).cursor,
+    recalledPosition: scanned.at(-1).cursor,
     scan: { candidateCount: 4 },
     createdAt: 2
   });
   assert.deepEqual(
-    read(second.userTime, B).positions.map(position => position.address),
+    read(second.traversalTrace, B).positions.map(position => position.address),
     [A, B, C, D, B, 90, B],
     "Two returns to B remain two occurrences, separated by what happened between."
   );
@@ -451,37 +451,37 @@ function walk(userTime, ghostRead, direction, limit = 40) {
   // The Session may still retain the ground crossed, but a zero-distance
   // occurrence would sit in the stream indistinguishable from its neighbour and
   // cost a future wheel detent to pass.
-  let userTime = createUserTime(0);
-  userTime = appendAtomicTraversal(userTime, { from: 0, to: 50, cause: "go" }).userTime;
-  const unchanged = appendGhostInjection(userTime, {
+  let traversalTrace = createTraversalTrace(0);
+  traversalTrace = appendAtomicTraversal(traversalTrace, { from: 0, to: 50, cause: "go" }).traversalTrace;
+  const unchanged = appendGhostReturn(traversalTrace, {
     anchor: 50,
     landing: 50,
-    recalledCursor: null,
+    recalledPosition: null,
     scan: { candidateCount: 6, visitedMinimum: 10, visitedMaximum: 50 },
     createdAt: 1
   });
   assert.equal(unchanged.changed, false, "A round trip appends no occurrence,");
-  assert.equal(unchanged.userTime, userTime, "and leaves the ledger exactly as it was.");
+  assert.equal(unchanged.traversalTrace, traversalTrace, "and leaves the ledger exactly as it was.");
 }
 
 // A resume cursor describes where the reader is standing
 {
-  let userTime = createUserTime(0);
+  let traversalTrace = createTraversalTrace(0);
   for (const [from, to] of [[0, 10], [10, 20]]) {
-    userTime = appendAtomicTraversal(userTime, { from, to, cause: "go" }).userTime;
+    traversalTrace = appendAtomicTraversal(traversalTrace, { from, to, cause: "go" }).traversalTrace;
   }
-  const cursor = { recordId: userTime.records[0].id, unitIndex: 0, address: 10 };
-  assert.equal(cursorIsValid(userTime, cursor, { current: 10 }), true);
-  assert.equal(cursorIsValid(userTime, cursor, { current: 20 }), false,
+  const cursor = { recordId: traversalTrace.records[0].id, unitIndex: 0, address: 10 };
+  assert.equal(tracePositionIsValid(traversalTrace, cursor, { current: 10 }), true);
+  assert.equal(tracePositionIsValid(traversalTrace, cursor, { current: 20 }), false,
     "A reader who has moved on is no longer standing in the moment it describes.");
 
   // The whole matrix, because a cursor is an offer to replay history and every
   // way it can go stale is a way to replay somebody else's. Each of these is a
   // separate reason, and none of them is covered by the others.
-  const sequence = appendSequenceTraversal(userTime, {
+  const sequence = appendSequenceTraversal(traversalTrace, {
     points: [20, 30, 25],
     cause: "step-sequence"
-  }).userTime;
+  }).traversalTrace;
   const sequenceId = sequence.records.at(-1).id;
   // The two malformed Addresses are aimed at real records whose arithmetic
   // would otherwise accept them: `null` coerces to 0, which the 0 -> 10 jump
@@ -489,7 +489,7 @@ function walk(userTime, ghostRead, direction, limit = 40) {
   // genuinely reaches. Only an Address that is a number gets that far.
   for (const [label, candidate, options] of [
     ["a cursor with no Address at all",
-      { recordId: userTime.records[0].id, unitIndex: 0, address: null }, {}],
+      { recordId: traversalTrace.records[0].id, unitIndex: 0, address: null }, {}],
     ["an Address that is not a number",
       { recordId: sequenceId, unitIndex: 0, address: "30" }, {}],
     ["a record the ledger never held", { recordId: 4096, unitIndex: 0, address: 10 }, {}],
@@ -501,14 +501,14 @@ function walk(userTime, ghostRead, direction, limit = 40) {
     ["a reader standing somewhere else",
       { recordId: sequenceId, unitIndex: 0, address: 30 }, { current: 25 }]
   ]) {
-    assert.equal(cursorIsValid(sequence, candidate, options), false,
+    assert.equal(tracePositionIsValid(sequence, candidate, options), false,
       `A resume cursor is refused for ${label}.`);
   }
 
   // And the same cursor, with nothing wrong with it, is accepted -- so the
   // matrix above is measuring the reasons and not a blanket refusal.
   assert.equal(
-    cursorIsValid(sequence, { recordId: sequenceId, unitIndex: 0, address: 30 }, {
+    tracePositionIsValid(sequence, { recordId: sequenceId, unitIndex: 0, address: 30 }, {
       current: 30,
       range: { start: 0, end: 100 }
     }),

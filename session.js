@@ -1988,7 +1988,7 @@ export function ghostTraverse(session, destination, options = {}) {
 // The same principle Step Reversal already follows: the reader crossed a
 // positive extent, and that extent is what they now have in view, even though
 // their net displacement is nothing. The retained envelope is the source ground
-// crossed -- it does not try to preserve the nonmonotonic user-time path as
+// crossed -- it does not try to preserve the nonmonotonic traversal-trace path as
 // geometry, because a Active Span describes an extent and not a route.
 export function settleGhostSequence(session, gesture) {
   if (!gesture?.changed) return unchanged(session, "no-ghost-sequence");

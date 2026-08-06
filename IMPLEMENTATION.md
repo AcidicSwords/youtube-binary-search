@@ -19,7 +19,7 @@ is a module and ownership map, not a history of earlier designs.
 | `panorama-geometry.js` | Pure Panorama offsets, cycling phases, bounds, and rate pairs |
 | `panorama.js` | Tail/Lead players, placement, Panorama transitions, Cycle runtime, Hold, and stale-event rejection |
 | `cues.js` | Parsing offered chapter Addresses into transient candidate extents |
-| `user-time.js` | The append-only encounter ledger: traversal records, the frozen readable stream, read cursors, and Ghost injection |
+| `traversal-trace.js` | The append-only encounter ledger: traversal records, the frozen readable stream, read cursors, and Ghost injection |
 | `view.js` | DOM projection, timeline atmosphere and sourceGridLines, Guide rows, operator labels, and accessible state |
 | `app.js` | Composition, interaction acquisition, source generations, persistence, transient ownership, and adapter effects |
 
@@ -251,11 +251,11 @@ pointer restores the origin.
 
 ## User time and Ghost Traversal
 
-`user-time.js` is pure: no DOM, no media, no Session, no persistence. It holds
+`traversal-trace.js` is pure: no DOM, no media, no Session, no persistence. It holds
 one append-only ledger per source.
 
 ```js
-{ kind: "atomic" | "sequence" | "continuous" | "ghost-injection",
+{ kind: "atomic" | "sequence" | "continuous" | "ghost-return",
   cause, createdAt,
   units: [{ kind: "jump" | "span", from, to }] }
 ```

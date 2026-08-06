@@ -406,7 +406,7 @@ for (const symbol of [
   "panoramaTriplet"
 ]) has(transportSource, new RegExp(`\\b${symbol}\\b`), `Transport exposes ${symbol}.`);
 // User time is written by the routes that actually move the reader, and by no
-// others. The ledger itself is proven in user-time-tests; what matters here is
+// others. The ledger itself is proven in traversal-trace-tests; what matters here is
 // that the composition root feeds it from the right places -- a recorder wired
 // to the wrong route would produce a plausible stream describing a journey
 // nobody took.

@@ -22,13 +22,13 @@ import { EPSILON } from "./range-geometry.js";
 import { projectionForModel } from "./timeline-projection.js";
 import { createGuide } from "./guide.js";
 import {
-  createUserTime,
+  createTraversalTrace,
   appendAtomicTraversal,
-  appendContinuousTraversal,
+  appendObservedPassages,
   beginGhostRead,
   moveGhostRead,
-  appendGhostInjection
-} from "./user-time.js";
+  appendGhostReturn
+} from "./traversal-trace.js";
 
 const DURATION = 300;
 const RANGE = { start: 0, end: DURATION };
@@ -260,12 +260,12 @@ function worldFingerprint(model) {
   assert.equal(refined.changed, true);
   const recorded = refined.session.model.neighborhood.C;
 
-  let userTime = createUserTime(departure);
-  userTime = appendAtomicTraversal(userTime, {
+  let traversalTrace = createTraversalTrace(departure);
+  traversalTrace = appendAtomicTraversal(traversalTrace, {
     from: departure,
     to: recorded,
     cause: "refineBackward"
-  }).userTime;
+  }).traversalTrace;
 
   // The terrain moves underneath.
   const reweighted = setGuideSectionWeight(refined.session, sectionId, 0.25).session;
@@ -278,13 +278,13 @@ function worldFingerprint(model) {
     "The same operator under the new map would reach somewhere else."
   );
 
-  const ghostRead = beginGhostRead(userTime, {
+  const ghostRead = beginGhostRead(traversalTrace, {
     current: recorded,
     range: RANGE,
     projection: projectionForModel(reweighted.model),
     stepReach: { backward: 5, forward: 5 }
   });
-  const moved = moveGhostRead(userTime, ghostRead, "backward");
+  const moved = moveGhostRead(traversalTrace, ghostRead, "backward");
   assert.equal(moved.changed, true);
   assert.equal(moved.address, departure,
     "Ghost recalls the Address the reader occupied, and never re-executes the operator.");
@@ -300,17 +300,17 @@ function worldFingerprint(model) {
   // without ever dropping a temporary Pin or remembering a timestamp.
   const [A, B, C, D] = [30, 60, 90, 150];
   let session = createSession({ duration: DURATION, guide: createGuide("shape") });
-  let userTime = createUserTime(A);
+  let traversalTrace = createTraversalTrace(A);
   session = goTo(session, A, { operator: "timeline" }).session;
   for (const [from, to] of [[A, B], [B, C], [C, D]]) {
     session = goTo(session, to, { operator: "timeline" }).session;
-    userTime = appendAtomicTraversal(userTime, { from, to, cause: "go" }).userTime;
+    traversalTrace = appendAtomicTraversal(traversalTrace, { from, to, cause: "go" }).traversalTrace;
   }
-  const streamBefore = userTime.records.length;
+  const streamBefore = traversalTrace.records.length;
 
   // Recall backward to A.
-  const frozenEnd = userTime.records.length;
-  let ghostRead = beginGhostRead(userTime, {
+  const frozenEnd = traversalTrace.records.length;
+  let ghostRead = beginGhostRead(traversalTrace, {
     current: D,
     frozenStreamEnd: frozenEnd,
     range: RANGE,
@@ -320,10 +320,10 @@ function worldFingerprint(model) {
   const visited = [];
   let gesturing = session;
   for (const expected of [C, B, A]) {
-    const moved = moveGhostRead(userTime, ghostRead, "backward");
+    const moved = moveGhostRead(traversalTrace, ghostRead, "backward");
     assert.equal(moved.address, expected);
     ghostRead = moved.read;
-    visited.push({ address: moved.address, sourceCursor: moved.cursor });
+    visited.push({ address: moved.address, sourcePosition: moved.cursor });
     gesturing = ghostTraverse(gesturing, moved.address, {
       anchor: D,
       direction: "backward",
@@ -339,22 +339,22 @@ function worldFingerprint(model) {
   // Session settlement and the ledger are different consequences of one gesture.
   // The Session retains the Anchor relation as a Active Span; user time
   // records only where the reader landed.
-  const replay = appendGhostInjection(userTime, {
+  const replay = appendGhostReturn(traversalTrace, {
     anchor: D,
-    anchorCursor: { recordId: userTime.records.at(-1).id, unitIndex: 0, address: D },
+    anchorPosition: { recordId: traversalTrace.records.at(-1).id, unitIndex: 0, address: D },
     landing: A,
-    recalledCursor: visited.at(-1).sourceCursor,
+    recalledPosition: visited.at(-1).sourcePosition,
     scan: { candidateCount: visited.length, visitedMinimum: A, visitedMaximum: D },
     createdAt: 1
   });
-  userTime = replay.userTime;
+  traversalTrace = replay.traversalTrace;
   assert.equal(replay.record.units.length, 1,
     "The ledger keeps one landing, not the scan that found it,");
   assert.equal(gesturing.model.activeSpan.start, A);
   assert.equal(gesturing.model.activeSpan.end, D,
     "while the Session keeps the whole Anchor relation.");
-  assert.equal(userTime.records.length, streamBefore + 1);
-  assert.equal(userTime.records.slice(0, streamBefore).length, streamBefore,
+  assert.equal(traversalTrace.records.length, streamBefore + 1);
+  assert.equal(traversalTrace.records.slice(0, streamBefore).length, streamBefore,
     "Everything that already happened is still there.");
 
   // Sever the present. Current stays; the resume cursor is untouched by this.
@@ -362,15 +362,15 @@ function worldFingerprint(model) {
   assert.equal(severed.model.neighborhood.C, A);
 
   // Replay A's successors, now knowing D.
-  let resumed = beginGhostRead(userTime, {
+  let resumed = beginGhostRead(traversalTrace, {
     current: A,
-    resumeCursor: replay.resumeCursor,
-    frozenStreamEnd: userTime.records.length,
+    continuationPosition: replay.continuationPosition,
+    frozenStreamEnd: traversalTrace.records.length,
     range: RANGE,
     projection: projectionFor(session),
     stepReach: { backward: 5, forward: 5 }
   });
-  const forward = moveGhostRead(userTime, resumed, "forward");
+  const forward = moveGhostRead(traversalTrace, resumed, "forward");
   assert.equal(forward.address, B,
     "Ghosting forward follows what originally came after A, not the replay just written.");
 

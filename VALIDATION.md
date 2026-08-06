@@ -88,7 +88,7 @@ The complete gate must prove all of the following.
 
 ### User time and Ghost Traversal
 
-`user-time-tests.mjs` owns the ledger, `ghost-tests.mjs` the Session operator,
+`traversal-trace-tests.mjs` owns the ledger, `ghost-tests.mjs` the Session operator,
 and `ghost-smoke.mjs` the gesture in a real browser.
 
 - Every route that moves the reader writes one occurrence: Go, Step, Nudge, a

@@ -27,7 +27,7 @@ export const TRAVERSAL_KIND = Object.freeze({
   ATOMIC: "atomic",
   SEQUENCE: "sequence",
   CONTINUOUS: "continuous",
-  GHOST_INJECTION: "ghost-injection"
+  GHOST_RETURN: "ghost-return"
 });
 
 export const UNIT_KIND = Object.freeze({
@@ -35,12 +35,12 @@ export const UNIT_KIND = Object.freeze({
   JUMP: "jump",
   // Source time that was continuously watched, so any Address inside it was
   // genuinely seen and may be recalled.
-  SPAN: "span"
+  PASSAGE: "passage"
 });
 
 const near = (first, second) => Math.abs(first - second) <= EPSILON;
 
-export function createUserTime(initialAddress = 0) {
+export function createTraversalTrace(initialAddress = 0) {
   const address = Number.isFinite(Number(initialAddress)) ? Number(initialAddress) : 0;
   return Object.freeze({
     nextRecordId: 1,
@@ -59,15 +59,15 @@ function positiveUnit(unit) {
     && !near(unit.from, unit.to);
 }
 
-function appendRecord(userTime, { cause, kind, units, createdAt, provenance }) {
+function appendTraceEntry(traversalTrace, { cause, kind, units, createdAt, provenance }) {
   const clean = (Array.isArray(units) ? units : []).filter(positiveUnit).map(unit =>
     Object.freeze({ kind: unit.kind, from: Number(unit.from), to: Number(unit.to) })
   );
   // A movement that moved nothing is not an occurrence. Recording it would put
   // a position in the stream the reader never distinguished from the one before.
-  if (!clean.length) return { userTime, record: null, changed: false };
+  if (!clean.length) return { traversalTrace, record: null, changed: false };
   const record = Object.freeze({
-    id: userTime.nextRecordId,
+    id: traversalTrace.nextRecordId,
     cause: String(cause || "unknown"),
     kind,
     units: Object.freeze(clean),
@@ -78,9 +78,9 @@ function appendRecord(userTime, { cause, kind, units, createdAt, provenance }) {
   return {
     changed: true,
     record,
-    userTime: Object.freeze({
-      nextRecordId: userTime.nextRecordId + 1,
-      records: Object.freeze([...userTime.records, record]),
+    traversalTrace: Object.freeze({
+      nextRecordId: traversalTrace.nextRecordId + 1,
+      records: Object.freeze([...traversalTrace.records, record]),
       latestOccurrence: Object.freeze({
         address: last.to,
         recordId: record.id,
@@ -90,8 +90,8 @@ function appendRecord(userTime, { cause, kind, units, createdAt, provenance }) {
   };
 }
 
-export function appendAtomicTraversal(userTime, { from, to, cause, createdAt } = {}) {
-  return appendRecord(userTime, {
+export function appendAtomicTraversal(traversalTrace, { from, to, cause, createdAt } = {}) {
+  return appendTraceEntry(traversalTrace, {
     cause,
     kind: TRAVERSAL_KIND.ATOMIC,
     createdAt,
@@ -103,7 +103,7 @@ export function appendAtomicTraversal(userTime, { from, to, cause, createdAt } =
 // encounters. The ledger keeps every one of them in order, including reversals:
 // collapsing a Step sequence to its extremes would erase the fact that the
 // reader went out and came back, which is exactly the shape they remember.
-export function appendSequenceTraversal(userTime, { points, cause, createdAt } = {}) {
+export function appendSequenceTraversal(traversalTrace, { points, cause, createdAt } = {}) {
   const ordered = (Array.isArray(points) ? points : [])
     .map(Number)
     .filter(Number.isFinite);
@@ -111,7 +111,7 @@ export function appendSequenceTraversal(userTime, { points, cause, createdAt } =
   for (let index = 1; index < ordered.length; index += 1) {
     units.push({ kind: UNIT_KIND.JUMP, from: ordered[index - 1], to: ordered[index] });
   }
-  return appendRecord(userTime, {
+  return appendTraceEntry(traversalTrace, {
     cause,
     kind: TRAVERSAL_KIND.SEQUENCE,
     createdAt,
@@ -119,13 +119,13 @@ export function appendSequenceTraversal(userTime, { points, cause, createdAt } =
   });
 }
 
-export function appendContinuousTraversal(userTime, { spans, cause, createdAt } = {}) {
+export function appendObservedPassages(traversalTrace, { spans, cause, createdAt } = {}) {
   const units = (Array.isArray(spans) ? spans : []).map(span => ({
-    kind: UNIT_KIND.SPAN,
+    kind: UNIT_KIND.PASSAGE,
     from: Number(span?.from),
     to: Number(span?.to)
   }));
-  return appendRecord(userTime, {
+  return appendTraceEntry(traversalTrace, {
     cause,
     kind: TRAVERSAL_KIND.CONTINUOUS,
     createdAt,
@@ -145,7 +145,7 @@ export function appendContinuousTraversal(userTime, { spans, cause, createdAt } 
 // follow its own newly injected output, a Weight or Step change mid-gesture
 // cannot move candidates the reader has already passed, and the Range that was
 // active at the start is the Range the whole gesture obeys.
-function spanPositions(unit, { range, projection, stepReach }) {
+function passagePositions(unit, { range, projection, stepReach }) {
   const forward = unit.to > unit.from;
   const low = Math.max(Math.min(unit.from, unit.to), range.start);
   const high = Math.min(Math.max(unit.from, unit.to), range.end);
@@ -177,10 +177,10 @@ function spanPositions(unit, { range, projection, stepReach }) {
   return positions;
 }
 
-function readablePositions(userTime, { frozenStreamEnd, range, projection, stepReach }) {
+function readablePositions(traversalTrace, { frozenStreamEnd, range, projection, stepReach }) {
   const limit = Number.isFinite(frozenStreamEnd)
-    ? clamp(frozenStreamEnd, 0, userTime.records.length)
-    : userTime.records.length;
+    ? clamp(frozenStreamEnd, 0, traversalTrace.records.length)
+    : traversalTrace.records.length;
   const bounds = {
     start: Number.isFinite(range?.start) ? range.start : Number.NEGATIVE_INFINITY,
     end: Number.isFinite(range?.end) ? range.end : Number.POSITIVE_INFINITY
@@ -204,7 +204,7 @@ function readablePositions(userTime, { frozenStreamEnd, range, projection, stepR
     }));
   };
   for (let index = 0; index < limit; index += 1) {
-    const record = userTime.records[index];
+    const record = traversalTrace.records[index];
     // A scan is not a journey, but a landing is.
     //
     // The wheel motion used to find a moment is search, and copying it into the
@@ -213,10 +213,10 @@ function readablePositions(userTime, { frozenStreamEnd, range, projection, stepR
     // and it is one jump from the live Anchor to the Address re-entered -- so
     // this contributes exactly one new position, and re-entering a moment stays
     // in the record where it belongs.
-    const injected = record.kind === TRAVERSAL_KIND.GHOST_INJECTION;
+    const injected = record.kind === TRAVERSAL_KIND.GHOST_RETURN;
     record.units.forEach((unit, unitIndex) => {
-      if (unit.kind === UNIT_KIND.SPAN) {
-        const inside = spanPositions(unit, { range: bounds, projection, stepReach });
+      if (unit.kind === UNIT_KIND.PASSAGE) {
+        const inside = passagePositions(unit, { range: bounds, projection, stepReach });
         if (!inside.length) blocked = true;
         for (const address of inside) push(address, record.id, unitIndex);
         return;
@@ -232,7 +232,7 @@ function readablePositions(userTime, { frozenStreamEnd, range, projection, stepR
         const landing = injected && near(address, unit.to);
         push(address, record.id, unitIndex, landing
           ? {
-            occurrenceKind: "injection",
+            occurrenceKind: "ghost-return",
             recalledFrom: record.provenance?.recalledOccurrence || null
           }
           : {});
@@ -242,8 +242,8 @@ function readablePositions(userTime, { frozenStreamEnd, range, projection, stepR
   return { positions: Object.freeze(positions), blocked };
 }
 
-export function latestCursorAtAddress(userTime, address, options = {}) {
-  const { positions } = readablePositions(userTime, {
+export function latestTracePositionAtAddress(traversalTrace, address, options = {}) {
+  const { positions } = readablePositions(traversalTrace, {
     frozenStreamEnd: options.frozenStreamEnd,
     range: options.range,
     projection: options.projection,
@@ -255,14 +255,14 @@ export function latestCursorAtAddress(userTime, address, options = {}) {
   return -1;
 }
 
-export function cursorIsValid(userTime, cursor, options = {}) {
+export function tracePositionIsValid(traversalTrace, cursor, options = {}) {
   if (!cursor || !Number.isFinite(cursor.address)) return false;
   // A resume cursor describes the moment the reader is standing in. If they have
   // since moved, it describes somewhere else and must not be resumed from.
   if (Number.isFinite(options.current) && !near(options.current, cursor.address)) {
     return false;
   }
-  const record = userTime.records.find(entry => entry.id === cursor.recordId);
+  const record = traversalTrace.records.find(entry => entry.id === cursor.recordId);
   if (!record) return false;
   const unit = record.units[cursor.unitIndex];
   if (!unit) return false;
@@ -283,15 +283,15 @@ export function cursorIsValid(userTime, cursor, options = {}) {
 // The read state for one held gesture. Everything it will ever consult is
 // resolved here, so nothing that happens during the gesture can change what it
 // offers.
-export function beginGhostRead(userTime, {
+export function beginGhostRead(traversalTrace, {
   current,
-  resumeCursor = null,
+  continuationPosition = null,
   frozenStreamEnd,
   range,
   projection,
   stepReach
 } = {}) {
-  const frozen = readablePositions(userTime, {
+  const frozen = readablePositions(traversalTrace, {
     frozenStreamEnd,
     range,
     projection,
@@ -304,11 +304,11 @@ export function beginGhostRead(userTime, {
   // the present re-entry, and that is the live stream. The caller decides which,
   // and having decided at activation it does not switch mid-gesture: reversing
   // the wheel retraces the cursor already chosen.
-  if (resumeCursor && cursorIsValid(userTime, resumeCursor, { range, current })) {
+  if (continuationPosition && tracePositionIsValid(traversalTrace, continuationPosition, { range, current })) {
     index = frozen.positions.findIndex(position =>
-      position.recordId === resumeCursor.recordId
-      && position.unitIndex === resumeCursor.unitIndex
-      && near(position.address, resumeCursor.address));
+      position.recordId === continuationPosition.recordId
+      && position.unitIndex === continuationPosition.unitIndex
+      && near(position.address, continuationPosition.address));
   }
   if (index < 0) {
     for (let candidate = frozen.positions.length - 1; candidate >= 0; candidate -= 1) {
@@ -329,9 +329,9 @@ export function beginGhostRead(userTime, {
 
 // One wheel quantum. Backward and forward name a direction in *user* time; the
 // source Address may move either way, because the reader's path did.
-export function moveGhostRead(userTime, ghostRead, direction) {
+export function moveGhostRead(traversalTrace, ghostRead, direction) {
   if (!ghostRead?.positions?.length) {
-    return { changed: false, reason: "no-user-time", read: ghostRead };
+    return { changed: false, reason: "no-traversal-trace", read: ghostRead };
   }
   const step = direction === "backward" ? -1 : 1;
   const from = ghostRead.index;
@@ -375,31 +375,31 @@ export function moveGhostRead(userTime, ghostRead, direction) {
 // asks what originally followed the moment now standing in.
 //
 // A gesture that returns to its Anchor writes nothing, because its one unit
-// spans no distance and `appendRecord` refuses those wherever they come from --
+// spans no distance and `appendTraceEntry` refuses those wherever they come from --
 // a zero-distance occurrence would sit in the stream indistinguishable from its
 // neighbour and cost a future detent to pass. The Session may still retain the
 // ground crossed; that is a different consequence of the same gesture.
-export function appendGhostInjection(userTime, {
+export function appendGhostReturn(traversalTrace, {
   anchor,
-  anchorCursor,
+  anchorPosition,
   landing,
-  recalledCursor,
+  recalledPosition,
   scan,
   createdAt
 } = {}) {
   const from = Number(anchor);
   const to = Number(landing);
   if (!Number.isFinite(from) || !Number.isFinite(to)) {
-    return { userTime, record: null, occurrence: null, resumeCursor: null, changed: false };
+    return { traversalTrace, record: null, occurrence: null, continuationPosition: null, changed: false };
   }
-  const appended = appendRecord(userTime, {
+  const appended = appendTraceEntry(traversalTrace, {
     cause: "ghost",
-    kind: TRAVERSAL_KIND.GHOST_INJECTION,
+    kind: TRAVERSAL_KIND.GHOST_RETURN,
     createdAt,
     units: [{ kind: UNIT_KIND.JUMP, from, to }],
     provenance: {
-      anchorOccurrence: anchorCursor ? Object.freeze({ ...anchorCursor }) : null,
-      recalledOccurrence: recalledCursor ? Object.freeze({ ...recalledCursor }) : null,
+      anchorOccurrence: anchorPosition ? Object.freeze({ ...anchorPosition }) : null,
+      recalledOccurrence: recalledPosition ? Object.freeze({ ...recalledPosition }) : null,
       // The search itself is kept as evidence, never as traversal.
       scan: Object.freeze({
         candidateCount: Number(scan?.candidateCount) || 0,
@@ -410,14 +410,14 @@ export function appendGhostInjection(userTime, {
     }
   });
   if (!appended.changed) {
-    return { userTime, record: null, occurrence: null, resumeCursor: null, changed: false };
+    return { traversalTrace, record: null, occurrence: null, continuationPosition: null, changed: false };
   }
   return {
     ...appended,
-    occurrence: appended.userTime.latestOccurrence,
+    occurrence: appended.traversalTrace.latestOccurrence,
     // The historical occurrence that was re-entered, so an immediately forward
     // gesture can resume its original successors rather than retracing the live
     // stream it has just been added to.
-    resumeCursor: recalledCursor ? Object.freeze({ ...recalledCursor }) : null
+    continuationPosition: recalledPosition ? Object.freeze({ ...recalledPosition }) : null
   };
 }

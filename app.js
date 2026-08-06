@@ -1,14 +1,14 @@
 // Application composition root. Semantic mutations pass through Session; player effects pass through adapters.
 import {
-  createUserTime,
+  createTraversalTrace,
   appendAtomicTraversal,
   appendSequenceTraversal,
-  appendContinuousTraversal,
+  appendObservedPassages,
   beginGhostRead,
   moveGhostRead,
-  appendGhostInjection,
-  cursorIsValid
-} from "./user-time.js";
+  appendGhostReturn,
+  tracePositionIsValid
+} from "./traversal-trace.js";
 import {
   EPSILON,
   clamp,
@@ -343,11 +343,11 @@ const state = {
   // The order in which this reader actually encountered source Addresses. It is
   // not history: history records what the world was, this records where the
   // reader was. Source-scoped and session-local.
-  userTime: createUserTime(0),
+  traversalTrace: createTraversalTrace(0),
   // Where the last Ghost gesture left the historical read cursor, so the next
   // one can continue through the original pattern rather than restarting from
   // the occurrence that gesture itself appended.
-  ghostResumeCursor: null,
+  ghostContinuation: null,
   // Armed by holding G. Holding alone does nothing at all -- no Anchor, no
   // history, no interruption of playback -- because a tap must cost nothing.
   ghostKeyHeld: false,
@@ -1098,18 +1098,18 @@ function recordTraversal(previousModel, options = {}) {
   const from = Number(previousModel?.neighborhood?.C);
   const to = Number(model()?.neighborhood?.C);
   if (!Number.isFinite(from) || !Number.isFinite(to)) return false;
-  const appended = appendAtomicTraversal(state.userTime, {
+  const appended = appendAtomicTraversal(state.traversalTrace, {
     from,
     to,
     cause: options.cause || model()?.lastOperator || "move",
     createdAt: Date.now()
   });
   if (!appended.changed) return false;
-  state.userTime = appended.userTime;
+  state.traversalTrace = appended.traversalTrace;
   // An ordinary traversal ends whatever historical pattern a previous Ghost
   // gesture was following: the reader has gone somewhere of their own accord,
   // so the next recall starts from where they actually are.
-  if (options.preserveGhostResume !== true) state.ghostResumeCursor = null;
+  if (options.preserveGhostContinuation !== true) state.ghostContinuation = null;
   return true;
 }
 
@@ -1118,28 +1118,28 @@ function recordTraversal(previousModel, options = {}) {
 // Address in order -- including the ones they came back through. Collapsing
 // that to its endpoints would erase the shape they remember.
 function recordTraversalSequence(points, cause) {
-  const appended = appendSequenceTraversal(state.userTime, {
+  const appended = appendSequenceTraversal(state.traversalTrace, {
     points,
     cause,
     createdAt: Date.now()
   });
   if (!appended.changed) return false;
-  state.userTime = appended.userTime;
-  state.ghostResumeCursor = null;
+  state.traversalTrace = appended.traversalTrace;
+  state.ghostContinuation = null;
   return true;
 }
 
 // Continuously observed source time. Any Address inside a watched span was
 // genuinely seen, so Ghost may recall it; a jump's interior never was.
 function recordTraversalSpans(spans, cause) {
-  const appended = appendContinuousTraversal(state.userTime, {
+  const appended = appendObservedPassages(state.traversalTrace, {
     spans,
     cause,
     createdAt: Date.now()
   });
   if (!appended.changed) return false;
-  state.userTime = appended.userTime;
-  state.ghostResumeCursor = null;
+  state.traversalTrace = appended.traversalTrace;
+  state.ghostContinuation = null;
   return true;
 }
 
@@ -2922,10 +2922,10 @@ function resetSourceScopedState() {
   // gesture is cancelled against the world it belonged to before that world is
   // discarded, and the ledger starts empty.
   cancelGhostGesture({ restore: false });
-  state.userTime = createUserTime(0);
+  state.traversalTrace = createTraversalTrace(0);
   state.ghostKeyHeld = false;
   state.ghostGesture = null;
-  state.ghostResumeCursor = null;
+  state.ghostContinuation = null;
   state.ghostWheel = null;
   state.field = null;
   view.setPreviewAction(null);
@@ -5160,16 +5160,16 @@ function beginGhostGesture({ initialDirection } = {}) {
   // re-entry, which is the live stream. Reversing the wheel later retraces the
   // cursor already chosen rather than switching streams underneath the reader.
   const resumable = initialDirection === "forward"
-    && cursorIsValid(state.userTime, state.ghostResumeCursor, {
+    && tracePositionIsValid(state.traversalTrace, state.ghostContinuation, {
       current: anchor,
       range: activeRange()
     });
-  const read = beginGhostRead(state.userTime, {
+  const read = beginGhostRead(state.traversalTrace, {
     current: anchor,
-    resumeCursor: resumable ? state.ghostResumeCursor : null,
+    continuationPosition: resumable ? state.ghostContinuation : null,
     // The boundary is where the stream stands now, so the gesture can never
     // read the replay it is itself about to append.
-    frozenStreamEnd: state.userTime.records.length,
+    frozenStreamEnd: state.traversalTrace.records.length,
     range: activeRange(),
     projection,
     stepReach
@@ -5179,7 +5179,7 @@ function beginGhostGesture({ initialDirection } = {}) {
     originModel,
     originHistory: state.session.history,
     originFuture: state.session.future,
-    anchorCursor: read.index >= 0 ? read.positions[read.index] : null,
+    anchorPosition: read.index >= 0 ? read.positions[read.index] : null,
     read,
     projection,
     stepReach,
@@ -5228,7 +5228,7 @@ function handleGhostWheel(event) {
   let moved = false;
   let blocked = null;
   for (let index = 0; index < Math.abs(count); index += 1) {
-    const candidate = moveGhostRead(state.userTime, gesture.read, userDirection);
+    const candidate = moveGhostRead(state.traversalTrace, gesture.read, userDirection);
     if (!candidate.changed) {
       blocked = candidate.reason;
       break;
@@ -5250,7 +5250,7 @@ function handleGhostWheel(event) {
     gesture.read = candidate.read;
     gesture.visited.push({
       address: candidate.address,
-      sourceCursor: candidate.cursor,
+      sourcePosition: candidate.cursor,
       userDirection
     });
     gesture.visitedMinimum = Math.min(gesture.visitedMinimum, candidate.address);
@@ -5326,11 +5326,11 @@ function settleGhostGesture() {
   // so what the reader crossed is still on the record, but it is not a path
   // anybody walked and must not be offered back as one.
   const finalVisit = gesture.visited.at(-1) || null;
-  const injection = appendGhostInjection(state.userTime, {
+  const ghostReturn = appendGhostReturn(state.traversalTrace, {
     anchor: gesture.anchor,
-    anchorCursor: gesture.anchorCursor,
+    anchorPosition: gesture.anchorPosition,
     landing: currentNeighborhood().C,
-    recalledCursor: finalVisit?.sourceCursor || null,
+    recalledPosition: finalVisit?.sourcePosition || null,
     scan: {
       candidateCount: gesture.visited.length,
       visitedMinimum: gesture.visitedMinimum,
@@ -5339,12 +5339,12 @@ function settleGhostGesture() {
     },
     createdAt: Date.now()
   });
-  if (injection.changed) {
-    state.userTime = injection.userTime;
+  if (ghostReturn.changed) {
+    state.traversalTrace = ghostReturn.traversalTrace;
     // The historical occurrence just re-entered, so an immediately forward
     // gesture can resume its original successors. Release may sever the Working
     // Interval afterwards without disturbing it.
-    state.ghostResumeCursor = injection.resumeCursor;
+    state.ghostContinuation = ghostReturn.continuationPosition;
   }
   syncIntervalPinSelection();
   view.renderGuide();
