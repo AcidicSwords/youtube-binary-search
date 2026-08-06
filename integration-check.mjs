@@ -330,14 +330,14 @@ has(topLevelFunction(appCode, "commitNativeGo"), /projection:\s*timelineProjecti
 has(topLevelFunction(appCode, "startNativePlaybackSession"), /projection:\s*timelineProjection\(\)/,
   "Native Play reconciles its starting Address through the effective projection.");
 has(appCode, /texturedRatePolicy|RATE_POLICY_KIND\.DYNAMIC[\s\S]*?timelineProjection\(\)\.effectiveWeightAtSource/,
-  "Explicit dynamic playback reads the effective projection.");
+  "Explicit Textured Playback reads the effective projection.");
 has(topLevelFunction(appCode, "handleTimelineClick"), /state\.timelineSelection = null[\s\S]*?moveToAddress\(/,
   "Bare Timeline Go clears the acquired operand before moving.");
 const release = topLevelFunction(appCode, "releaseActiveSpan");
 has(release, /releaseSessionInterval\(state\.session\)/, "Release delegates semantic residue to Session.");
 has(release, /state\.timelineSelection = null/, "Release also clears the Timeline operand.");
 lacks(release, /guideSelection\s*=\s*null|weightRelaxation\s*=|focus\s*=|setRange/,
-  "Release does not mutate Guide focus, bypass, Focus, or Range.");
+  "Release does not mutate Guide Selection, bypass, Focus, or Range.");
 
 // Playback owns observation, requested policy, and confirmed adapter rate as
 // independent facts. Rebase and retry preserve those policies.
@@ -405,7 +405,7 @@ for (const symbol of [
   "resolveTexturedRate",
   "panoramaTriplet"
 ]) has(transportSource, new RegExp(`\\b${symbol}\\b`), `Transport exposes ${symbol}.`);
-// User time is written by the routes that actually move the reader, and by no
+// Traversal Trace is written by the routes that actually move the reader, and by no
 // others. The ledger itself is proven in traversal-trace-tests; what matters here is
 // that the composition root feeds it from the right places -- a recorder wired
 // to the wrong route would produce a plausible stream describing a journey

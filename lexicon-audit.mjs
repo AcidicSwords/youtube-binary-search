@@ -71,7 +71,7 @@ export const RETIRED_TERMS = [
 
   // Phase 3 — Active Span
   term("Working Interval", "Active Span", { caseInsensitive: true, category: "active-span" }),
-  term("No Interval", "No Active Span", { caseInsensitive: true, category: "active-span" }),
+  term("No Interval", "No Active Span", { category: "active-span" }),
   term("working-section", "active-span", { category: "active-span" }),
   term("positiveWorkingInterval", "positiveActiveSpan", { category: "active-span" }),
   term("releaseWorkingInterval", "releaseActiveSpan", { category: "active-span" }),
@@ -93,15 +93,15 @@ export const RETIRED_TERMS = [
 
   // Phase 4 — Weighting / Topography
   term("SECTION_WEIGHT_VALUES", "SECTION_WEIGHTING_VALUES", { category: "weighting" }),
-  term("DEFAULT_SECTION_WEIGHT", "DEFAULT_SECTION_WEIGHTING", { category: "weighting" }),
-  term("normalizeSectionWeight", "normalizeSectionWeighting", { category: "weighting" }),
-  term("setSectionWeight", "setSectionWeighting", { category: "weighting" }),
+  term("DEFAULT_SECTION_WEIGHT", "DEFAULT_SECTION_WEIGHTING", { word: true, category: "weighting" }),
+  term("normalizeSectionWeight", "normalizeSectionWeighting", { word: true, category: "weighting" }),
+  term("setSectionWeight", "setSectionWeighting", { word: true, category: "weighting" }),
   term("weightedSections", "weightContributors", { category: "weighting" }),
   term("weightAtSource", "effectiveWeightAtSource", { category: "weighting" }),
   term("group.active", "group.weightsEnabled", { category: "weighting" }),
   term("sectionIsActive", "sectionWeightIsUsed", { category: "weighting" }),
-  term("visibleGroupId", "shownGroupId", { category: "weighting" }),
-  term("visibleGroup", "shownGroup", { category: "weighting" }),
+  term("visibleGroupId", "shownGroupId", { word: true, category: "weighting" }),
+  term("visibleGroup", "shownGroup", { word: true, category: "weighting" }),
   term("groupIsVisible", "groupIsShown", { category: "weighting" }),
   term("Deformation", "Temporal Topography / Relax Weights", { word: true, category: "topography" }),
   term("deformationBypass", "weightRelaxation", { category: "topography" }),
@@ -115,7 +115,7 @@ export const RETIRED_TERMS = [
   term("Field Frame", "Panorama Frame", { caseInsensitive: true, category: "panorama" }),
   term("Field Breath", "Panorama Cycle", { caseInsensitive: true, category: "panorama" }),
   term("Breath Rate", "Side Rate Step", { caseInsensitive: true, category: "panorama" }),
-  term("Hold both", "Freeze Panorama", { caseInsensitive: true, category: "panorama" }),
+  term("Hold both", "Freeze Panorama", { category: "panorama" }),
   term("Stretch both", "Resume Panorama", { caseInsensitive: true, category: "panorama" }),
   term("stepField", "panorama", { category: "panorama" }),
   term("STEP_FIELD_PHASE", "PANORAMA_STATE", { category: "panorama" }),
@@ -138,7 +138,7 @@ export const RETIRED_TERMS = [
   term("GHOST_INJECTION", "GHOST_RETURN", { category: "trace" }),
   term("ghost-injection", "ghost-return", { category: "trace" }),
   term("appendGhostInjection", "appendGhostReturn", { category: "trace" }),
-  term("Ghost Injection", "Ghost Return", { caseInsensitive: true, category: "trace" }),
+  term("Ghost Injection", "Ghost Return", { category: "trace" }),
   term("Ghost Current", "Ghost Position", { caseInsensitive: true, category: "trace" }),
 
   // Phase 7 — Chapters
@@ -149,7 +149,7 @@ export const RETIRED_TERMS = [
 
   // Phase 8 / State & Settings
   term("Parameters", "State & Settings", { word: true, category: "surface" }),
-  term("Step Reach", "Step Distance", { caseInsensitive: true, category: "surface" }),
+  term("Step Reach", "Step Distance", { category: "surface" }),
   term("Dynamic Playback", "Textured Playback", { caseInsensitive: true, category: "playback" }),
   term("dynamicRatePolicy", "texturedRatePolicy", { category: "playback" }),
   term("desiredCenterRate", "texturedRateForWeight", { category: "playback" }),
@@ -181,7 +181,14 @@ const perFile = new Map();
 let total = 0;
 
 for (const file of files) {
-  const text = readFileSync(file, "utf8");
+  // A line ending in a `lexicon-allow` marker is a deliberate, documented use of
+  // an old key -- the migration reads that must name a retired field to upgrade
+  // a saved Guide, and the tests that feed one. Those are correct, so they are
+  // exempt; every other occurrence is a defect.
+  const text = readFileSync(file, "utf8")
+    .split("\n")
+    .filter(line => !line.includes("lexicon-allow"))
+    .join("\n");
   const relative = file.slice(ROOT.length);
   for (const entry of RETIRED_TERMS) {
     const matches = text.match(compile(entry));

@@ -58,7 +58,7 @@ assert.deepEqual(
 // Watching starts at the window's own start, not at the Address that anchored
 // it. Without this a Context window is watched and never recorded: settling it
 // asks the transport where the reader entered, and a Context that cannot answer
-// leaves no trace in user time at all.
+// leaves no trace in the Traversal Trace at all.
 assert.equal(context.entry, 47.5);
 assert.equal(
   createContextTransport({ anchor: 0, range: { start: 0, end: 100 }, seconds: 5 }).entry,

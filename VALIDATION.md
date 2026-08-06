@@ -58,7 +58,7 @@ The complete gate must prove all of the following.
 - Deleting the target or replacing the source clears bypass. An active drag
   safely refuses `X`; pending Step/Nudge settles first.
 - `X` issues no direct player command. Fixed Playback and Panorama configuration
-  remain unchanged; only explicitly dynamic Playback may retune from the new
+  remain unchanged; only explicitly Textured Playback may retune from the new
   effective map.
 
 ### Playback and ordinary-player integrity
@@ -86,7 +86,7 @@ The complete gate must prove all of the following.
 - Native seek, captions/settings, volume, and fullscreen hit regions remain
   pointer-accessible while paused and idle.
 
-### User time and Ghost Traversal
+### Traversal Trace and Ghost Traversal
 
 `traversal-trace-tests.mjs` owns the ledger, `ghost-tests.mjs` the Session operator,
 and `ghost-smoke.mjs` the gesture in a real browser.
@@ -232,7 +232,7 @@ first clicking Timeline.
    `Step Reversal` Undo entry and a positive visited Active Span.
 4. Switch End twice. Current, Current Neighborhood, orientation, and endpoint frames
    must return exactly.
-5. Release. Current and Guide focus stay; Active Span and acquired Timeline
+5. Release. Current and Guide Selection stay; Active Span and acquired Timeline
    operand clear.
 6. Undo and Redo, then make a new action after Undo and confirm Redo clears.
 

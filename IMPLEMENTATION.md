@@ -49,7 +49,7 @@ snapshot the current model
 
 Session history is bounded to 100 entries. A new commit clears the Redo future.
 Presentation-only consequences do not manufacture history: releasing only an
-acquired Timeline operand and toggling weight relaxation are examples.
+Timeline Selection and toggling weight relaxation are examples.
 
 The Active Span is the contiguous residue left by excluding alternatives.
 Its compact endpoint representation records bounds, orientation, active side,
@@ -87,9 +87,9 @@ only the latch that supplied the modified action. Alt carries an acquired
 retained object through compatible movement without changing the base operator.
 
 Release clears a semantic Active Span through Session and separately
-clears the acquired Timeline operand. The semantic change is Undoable; a
+clears the Timeline Selection. The semantic change is Undoable; a
 selection-only release is not. Bare Timeline Go clears the acquired operand
-before navigating. Guide focus remains independent in both cases.
+before navigating. Guide Selection remains independent in both cases.
 
 ## One effective projection
 
@@ -115,7 +115,7 @@ The projection exposes its effective `segments`, `weightContributors`, and
 resolved `weightRelaxation`, together with source/timeline conversion,
 distance, midpoint, Step target, Pin-stop ordering, projected extents, and
 `effectiveWeightAtSource()`. Step, Refine, adaptive Reach, hit testing, drag conversion,
-spatial readouts, exact sourceGridLines, atmosphere, and explicitly dynamic Playback
+spatial readouts, exact sourceGridLines, atmosphere, and explicitly Textured Playback
 all consume this same object. No consumer rereads raw Guide Weight to decide
 what counts.
 
@@ -225,7 +225,7 @@ of the old source in one place. It cancels Current, Pin, Section, and Range
 drags to their origins; settles Nudge and pending Step; safely settles active
 Context or Playback; persists settled Guide changes; clears native Go and
 programmatic placement; closes transient dialogs and Pin clusters; clears Chapters,
-selection, Guide focus, Shift latches, Panorama runtime, and weight relaxation;
+selection, Guide Selection, Shift latches, Panorama runtime, and weight relaxation;
 then creates a fresh Session and chapters the new source. Player errors use the same
 boundary. No source Address, identity, timer, or history checkpoint may cross it.
 
@@ -233,7 +233,7 @@ boundary. No source Address, identity, timer, or history checkpoint may cross it
 
 One wheel handler owns Timeline and off-map Shift-wheel. It resolves only the
 target differently: the exact Timeline object under the pointer, or elsewhere
-the acquired Timeline operand and then Current. It chooses the dominant wheel
+the Timeline Selection and then Current. It chooses the dominant wheel
 axis, treats right/up as forward, accumulates high-resolution deltas, calculates
 multiple quanta when earned, and uses one target-keyed settlement timer. Browser
 scroll is prevented only after a valid Shift-Nudge target exists. Form controls
@@ -249,7 +249,7 @@ no additional Timeline node chrome exists. Every gesture snapshots one origin,
 amends it while moving, and checkpoints once on release. Escape or a lost
 pointer restores the origin.
 
-## User time and Ghost Traversal
+## Traversal Trace and Ghost Traversal
 
 `traversal-trace.js` is pure: no DOM, no media, no Session, no persistence. It holds
 one append-only ledger per source.
@@ -267,7 +267,7 @@ the reader remembers; watched source time is continuous, so any Address inside
 it may be recalled. A unit of no extent is refused by the ledger itself, which
 is what keeps an inert operation — a rename, a Weight, an Undo of either — out
 of the stream without every caller having to test for it. Undo and Redo write
-when they move the reader and not otherwise: semantic history and user time are
+when they move the reader and not otherwise: semantic history and the Traversal Trace are
 different orders, and traversing one is a route through the other.
 
 A gesture resolves the whole readable sequence once, at the moment it begins:
@@ -359,4 +359,4 @@ state or preference.
 
 Context, Step Distance, Panorama offsets, and Weight have separate owners. Context and
 live Panorama displacement remain source-time geometry. Weight affects only
-Timeline-derived addresses and explicitly dynamic Playback.
+Timeline-derived addresses and explicitly Textured Playback.

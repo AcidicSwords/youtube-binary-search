@@ -377,8 +377,8 @@ const visibleIds = guide => guide.groups
   );
 }
 
-// --- 12b. v9 to v10: the drawn Group is read from the old visibleGroupId key --
-// v9 named the drawn Group `visibleGroupId` on the Guide; v10 renames it
+// --- 12b. v9 to v10: the drawn Group is read from the old visibleGroupId key -- // lexicon-allow: v9 Guide back-compat
+// v9 named the drawn Group `visibleGroupId` on the Guide; v10 renames it // lexicon-allow: v9 Guide back-compat
 // `shownGroupId`. A v9 save must still open on the Group it drew, and an
 // explicit "draw nothing" must still survive the round trip.
 {
@@ -386,7 +386,7 @@ const visibleIds = guide => guide.groups
     version: 9,
     videoId: "v9",
     updatedAt: 10,
-    visibleGroupId: "group-terrain",
+    visibleGroupId: "group-terrain", // lexicon-allow: v9 Guide back-compat
     groups: [
       { id: DEFAULT_GROUP_ID, label: "Map", active: true, createdAt: 1, updatedAt: 1 },
       { id: "group-terrain", label: "Terrain", active: false, createdAt: 2, updatedAt: 2 }
@@ -403,7 +403,7 @@ const visibleIds = guide => guide.groups
   const migrated = normalizeGuide(JSON.parse(JSON.stringify(v9)), "v9");
   assert.equal(migrated.version, 10, "A v9 Guide upgrades to v10.");
   assert.equal(migrated.shownGroupId, "group-terrain",
-    "The drawn Group is read from the v9 visibleGroupId key.");
+    "The drawn Group is read from the v9 visibleGroupId key."); // lexicon-allow: v9 Guide back-compat
   assert.equal(migrated.groups[0].id, "group-terrain", "and rendered first.");
   assert.deepEqual(
     Object.fromEntries(migrated.groups.map(group => [group.id, group.weightsEnabled])),
@@ -415,7 +415,7 @@ const visibleIds = guide => guide.groups
   // "Draw nothing" is a choice, written as a null id; it survives under either
   // key name.
   const drawnNothing = normalizeGuide(
-    JSON.parse(JSON.stringify({ ...v9, visibleGroupId: null })),
+    JSON.parse(JSON.stringify({ ...v9, visibleGroupId: null })), // lexicon-allow: v9 Guide back-compat
     "v9"
   );
   assert.equal(drawnNothing.shownGroupId, null,

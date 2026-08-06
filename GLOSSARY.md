@@ -20,7 +20,7 @@
 - **Weight Gradient** — the perceptual violet/teal field derived from effective contributors. It communicates compression or expansion while sourceGridLines communicate exact metric density.
 - **Weight Relaxation / Relax Weights** — one transient, source-scoped comparison selected with `X`. It bypasses the acquired Timeline Section or, without one, the complete map; it changes no stored Weight and creates no history.
 - **Timeline Selection** — the exact visible Pin or Section selected from the Timeline for spatial actions. Bare Timeline ground and Release clear it.
-- **Guide Selection** — the Pin or Section being inspected in Guide. It remains distinct from an acquired Timeline operand and does not by itself scope Relax Weights.
+- **Guide Selection** — the Pin or Section being inspected in Guide. It remains distinct from an Timeline Selection and does not by itself scope Relax Weights.
 - **Pin** — a retained source landmark with one Address, one identity, and an optional title.
 - **Section** — a retained positive edge between two Pin identities, with an optional title, one Group, and one Weight.
 - **Tag** — the matrix retention operator. `T` is Retain Pin from Current; `Shift+T` is Retain Section from a positive Active Span.
@@ -38,7 +38,7 @@
 - **Step Reversal** — one coalesced Step sequence whose final Address is its departure but whose transient visited envelope has positive extent; that envelope becomes the Active Span.
 - **Pin traversal** — shifted Step to the previous or next retained landmark or synthetic Range boundary, using Step’s interval law.
 - **Switch End** — make the opposite Active Span side Current and restore that side’s Endpoint Frame.
-- **Release** — clear the Active Span and acquired Timeline operand. It preserves Current, Current Neighborhood, Range and Focus, Guide focus, retained topology, Weight, weight relaxation, and playback preferences.
+- **Release** — clear the Active Span and Timeline Selection. It preserves Current, Current Neighborhood, Range and Focus, Guide Selection, retained topology, Weight, weight relaxation, and playback preferences.
 - **Focus / Unfocus** — install an acquired Section or Active Span as Range and viewport / restore its containing Range.
 - **Go** — move to an exact known Address, seed a movement-scale Current Neighborhood, and establish the corresponding contiguous residue.
 - **Nudge** — precise source-time movement of Current or retained topology through one shared operation. It is called a frame only when the media adapter proves an exact frame duration.
@@ -59,9 +59,9 @@
 - **Rate Policy** — either a fixed stored wish or a dynamic request. It is resolved against the media adapter’s offered rates.
 - **Requested Rate** — the offered rate selected for the current Rate Policy; it is a command candidate, not proof of acceptance.
 - **Actual Rate** — the playback rate confirmed by the media adapter’s rate event and used to decide whether Panorama can remain coherent.
-- **User time** — the order in which the reader actually encountered source Addresses, as distinct from source time, Timeline Space and semantic history. Append-only and source-scoped: recalling an earlier Address writes a new occurrence linked by provenance to the historical one rather than rewinding to it.
-- **Ghost Traversal** — the auxiliary operator that moves through user time while the semantic world stands still. Holding `G` and scrolling moves a read cursor through the reader's own path; the Address they began at becomes a fixed Anchor and the recalled Address becomes the active endpoint of an ordinary Active Span. It restores no historical Guide, Weight, Group, Focus or Range.
-- **Ghost scan** — the transient wheel movement while `G` is held. It inspects prior user time, may cross many occurrences and reverse direction, and is never written as a path. Where automatic Context is enabled each candidate plays, one window retargeted by the wheel; a window superseded or run out during the scan is search, and only the one still running when the gesture ended is an observation.
+- **Traversal Trace** — the order in which the reader actually encountered source Addresses, as distinct from source time, Timeline Space and semantic history. Append-only and source-scoped: recalling an earlier Address writes a new occurrence linked by provenance to the historical one rather than rewinding to it.
+- **Ghost Traversal** — the auxiliary operator that moves through the Traversal Trace while the semantic world stands still. Holding `G` and scrolling moves a read cursor through the reader's own path; the Address they began at becomes a fixed Anchor and the recalled Address becomes the active endpoint of an ordinary Active Span. It restores no historical Guide, Weight, Group, Focus or Range.
+- **Ghost scan** — the transient wheel movement while `G` is held. It inspects prior the Traversal Trace, may cross many occurrences and reverse direction, and is never written as a path. Where automatic Context is enabled each candidate plays, one window retargeted by the wheel; a window superseded or run out during the scan is search, and only the one still running when the gesture ended is an observation.
 - **Ghost injection** — the one occurrence appended on release: a jump from the live Anchor to the Address re-entered, linked to both. Backward from an injected occurrence follows its live predecessor; forward may resume the historical successors of the occurrence it re-entered.
 - **Textured Playback** — the optional Shift playback policy that reads cumulative active Section Weight as a playback texture: each doubling or halving of Weight shifts Center by one playback-rate step, so compressed ground plays faster and expanded ground plays slower. It is a log-compressed reading of the map, not a correction of it, and it retunes as Current or weight relaxation changes.
 - **Load Generation** — the monotonically increasing identity on an immutable source request, used with the adapter’s loaded video identity to reject stale metadata and state events.

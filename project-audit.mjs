@@ -71,8 +71,8 @@ check(pkg.version === "8.0.0", "Completion release is package version 8.0.0.");
 check(pkg.private === true && pkg.type === "module", "The static private ES-module package boundary is explicit.");
 check(pkg.scripts?.verify === "npm run check && npm run test:browser",
   "verify composes the DOM-free and Chromium gates.");
-check(pkg.scripts?.audit === "node integration-check.mjs && node project-audit.mjs",
-  "Both final-law gauges are part of check.");
+check(pkg.scripts?.audit === "node integration-check.mjs && node project-audit.mjs && node lexicon-audit.mjs --strict",
+  "The integration, project, and strict lexicon gauges are all part of check.");
 // Everything that needs a real browser runs from one route, so there is no way
 // to satisfy the release gate while skipping a suite that needs Chromium.
 check(pkg.scripts?.["test:browser"] === "node browser-smoke.mjs && node ghost-smoke.mjs",
@@ -223,7 +223,7 @@ for (const entry of [
 }
 has(docs["GLOSSARY.md"], /Drawn Group[\s\S]{0,240}?At most one Group is drawn[\s\S]{0,100}?no Group/i,
   "Glossary defines zero-or-one drawn Group.");
-has(docs["GLOSSARY.md"], /Release[\s\S]{0,300}?Active Span[\s\S]{0,120}?acquired Timeline operand[\s\S]{0,220}?preserves Current/i,
+has(docs["GLOSSARY.md"], /Release[\s\S]{0,300}?Active Span[\s\S]{0,120}?Timeline Selection[\s\S]{0,220}?preserves Current/i,
   "Glossary defines Release's exact cleared and preserved dimensions.");
 has(docs["GLOSSARY.md"], /Textured Playback[\s\S]{0,400}?Section Weight[\s\S]{0,200}?playback-rate step/i,
   "Glossary qualifies the optional dynamic Weight read-through as one rate step per octave.");
@@ -232,7 +232,7 @@ has(docs["GLOSSARY.md"], /Textured Playback[\s\S]{0,400}?Section Weight[\s\S]{0,
 // W = 4 plays at 0.5x, not 0.25x -- and would set the reader up to read the
 // Panorama as a cancellation of topography rather than a reading of it.
 lacks(canonicalText, /\binverse of (?:the )?(?:effective |cumulative )?Weight\b|\binverse-Weight\b|\bnormalized playback\b|\bconstant Timeline velocity\b/i,
-  "No canonical document describes dynamic playback as inverting the map.");
+  "No canonical document describes Textured Playback as inverting the map.");
 lacks(html, /rate the inverse of the map|inverse of (?:the )?weight/i,
   "and no visible control does either.");
 lacks(docs["GLOSSARY.md"], /^\s*- \*\*Chapter\*\*[^\n]*not[^\n]*projected/im,

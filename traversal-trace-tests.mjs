@@ -95,7 +95,7 @@ function walk(traversalTrace, ghostRead, direction, limit = 40) {
 }
 
 // ---------------------------------------------------------------------------
-// Direction is a direction in user time, not in source time
+// Direction is a direction in the Traversal Trace, not in source time
 // ---------------------------------------------------------------------------
 {
   // The reader went 10 → 40 → 25 → 70. Ghosting backward retraces that, which
@@ -184,7 +184,7 @@ function walk(traversalTrace, ghostRead, direction, limit = 40) {
   }).traversalTrace;
   const backward = walk(traversalTrace, read(traversalTrace, 20), "backward");
   assert.deepEqual(backward.addresses, [25, 30, 35, 40],
-    "Recalling a backward-watched span backward in user time moves forward in source time.");
+    "Recalling a backward-watched span backward in the Traversal Trace moves forward in source time.");
 }
 
 // ---------------------------------------------------------------------------
@@ -402,7 +402,7 @@ function walk(traversalTrace, ghostRead, direction, limit = 40) {
   assert.equal(injected.record.provenance.recalledOccurrence.address, B);
   assert.equal(injected.record.provenance.anchorOccurrence.address, D);
 
-  // The landing is readable user time -- the reader really did re-enter B after
+  // The landing is readable the Traversal Trace -- the reader really did re-enter B after
   // reaching D, and that fact is worth as much as any other movement.
   const stream = read(injected.traversalTrace, B);
   assert.deepEqual(stream.positions.map(position => position.address), [A, B, C, D, B],
@@ -518,4 +518,4 @@ function walk(traversalTrace, ghostRead, direction, limit = 40) {
 }
 
 
-console.log("User time tests passed: append-only records that keep reversals, direction in user time independent of source order, shared endpoints as one position, watched spans subdivided by the frozen Step law and clipped to the active Range, a frozen readable stream, every way a resume cursor can go stale refused for its own reason, and injection that records one landing rather than the search that found it, readable, linked to both the Anchor it came from and the moment it re-enters.");
+console.log("Traversal Trace tests passed: append-only records that keep reversals, direction in the Traversal Trace independent of source order, shared endpoints as one position, watched spans subdivided by the frozen Step law and clipped to the active Range, a frozen readable stream, every way a resume cursor can go stale refused for its own reason, and injection that records one landing rather than the search that found it, readable, linked to both the Anchor it came from and the moment it re-enters.");

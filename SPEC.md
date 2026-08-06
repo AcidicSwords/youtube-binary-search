@@ -58,7 +58,7 @@ The following are intentionally absent from Session history and Guide persistenc
 - requested and confirmed playback-rate runtime;
 - pending Step and Nudge gesture accumulators;
 - Current, Range, Pin, or Section drag state;
-- selected Timeline operand and Guide focus;
+- selected Timeline operand and Guide Selection;
 - selected/aligned Pin indicators;
 - Matrix Shift latch, Guide Extend latch, and physical modifier state;
 - weight relaxation;
@@ -239,11 +239,11 @@ type WeightRelaxation =
 - a different scope transfers the single bypass;
 - the command changes no stored Weight, Guide state, player setting, history, or persisted preference.
 
-Guide focus alone never supplies the Section scope. Bare Timeline Go clears the acquired operand before navigation, making complete-map scope directly reachable.
+Guide Selection alone never supplies the Section scope. Bare Timeline Go clears the acquired operand before navigation, making complete-map scope directly reachable.
 
 The bypass is source-scoped. Source replacement clears it. Deleting its target clears it. An invalid target self-clears. Group visibility or activity changes do not mutate it. Undo and Redo do not own it. Release preserves it.
 
-An active Current, Range, Pin, or Section drag causes `X` to refuse safely. Pending Step and Nudge settle before the projection changes. Active playback continues. `X` issues no direct media command; an explicitly dynamic playback may request a new rate later because its policy reads the changed effective projection.
+An active Current, Range, Pin, or Section drag causes `X` to refuse safely. Pending Step and Nudge settle before the projection changes. Active playback continues. `X` issues no direct media command; an explicitly Textured Playback may request a new rate later because its policy reads the changed effective projection.
 
 ### 4.5 Atmosphere and sourceGridLines
 
@@ -343,9 +343,9 @@ Switch End requires a Active Span. It makes the opposite bound Current, flips th
 Release clears:
 
 - the Active Span, if present;
-- the acquired Timeline operand.
+- the Timeline Selection.
 
-It preserves Current, Current Neighborhood, Range and Focus, Guide focus, Pins, Sections, Groups, Weight, weight relaxation, Panorama preferences, and playback preferences.
+It preserves Current, Current Neighborhood, Range and Focus, Guide Selection, Pins, Sections, Groups, Weight, weight relaxation, Panorama preferences, and playback preferences.
 
 Clearing a semantic Active Span creates one Undoable Session transaction. Clearing only presentation selection succeeds without history.
 
@@ -377,7 +377,7 @@ Unfocus restores the containing Range and a valid Current. Focused spatial bound
 
 ### 5.10 Go
 
-Go commits an exact known source Address, seeds movement-scale Current Neighborhood, and leaves the positive departure-to-arrival residue. Bare Timeline ground performs Go only within Range and clears the acquired Timeline operand first. Pin activation performs the same canonical movement while acquiring that Pin.
+Go commits an exact known source Address, seeds movement-scale Current Neighborhood, and leaves the positive departure-to-arrival residue. Bare Timeline ground performs Go only within Range and clears the Timeline Selection first. Pin activation performs the same canonical movement while acquiring that Pin.
 
 A Guide destination outside a focused Range may leave Focus or open Full Video as part of one reported transaction so the exact retained Address becomes admissible. Go to the existing Current is a no-op; Reopen is the explicit way to discard local scale at the same Current.
 
@@ -391,14 +391,14 @@ Metadata-only presentation, weight relaxation, panel state, previews, Chapters, 
 
 ### 6.1 Selection domains
 
-`timelineSelection` is the acquired Timeline operand. `guideSelection` is Guide focus. Timeline acquisition also focuses the matching Guide row; Guide focus alone does not manufacture a spatial operand.
+`timelineSelection` is the Timeline Selection. `guideSelection` is Guide Selection. Timeline acquisition also focuses the matching Guide row; Guide Selection alone does not manufacture a spatial operand.
 
 If a Active Span’s endpoints align with Pins, every visible aligned Pin is indicated. If the acquired exact Section supplies the extent, its two endpoint identities are known and selected. Geometry alone never chooses one identity arbitrarily from coincident Pins.
 
 Visual channels remain independent:
 
 - quiet marker for identity;
-- background fill for acquired Timeline operand;
+- background fill for Timeline Selection;
 - inset edge for Active Span relation;
 - focus ring for keyboard focus;
 - outline/glow for transient snap source, target, and armed state.
@@ -436,7 +436,7 @@ Nudge is one source-time operation reached by Timeline wheel, off-map wheel, key
 The target rule is:
 
 - over Timeline, the exact Pin or Section under the pointer; bare map targets Current;
-- elsewhere outside form controls, the acquired Timeline operand; absent one, Current.
+- elsewhere outside form controls, the Timeline Selection; absent one, Current.
 
 Shift-wheel selects the dominant of `deltaX` and `deltaY`. Wheel right or up moves forward; left or down moves backward. High-resolution deltas accumulate until the quantum threshold is crossed, and one event may produce multiple quanta. Browser default is prevented only after a valid target is acquired.
 
@@ -614,23 +614,23 @@ No stale pre-retune transport object may own the wrap.
 
 Playback settlement uses the transport’s departure, parent Current Neighborhood, return model, current Cursor, and completed cycles to commit at most one semantic transaction. Watched coverage extends or preserves existing Active Span coverage and never shortens it. A completed proper-Range cycle covers the Range. Full-video playback stops at source end.
 
-### 8.4b Ghost Traversal and user time
+### 8.4b Ghost Traversal and the Traversal Trace
 
-Video Cartography distinguishes four temporal orders: source time, Timeline Space, semantic history, and user time — the order in which the reader actually encountered source Addresses. Only the fourth records where the reader has been, as opposed to what the world was.
+Video Cartography distinguishes four temporal orders: source time, Timeline Space, semantic history, and the Traversal Trace — the order in which the reader actually encountered source Addresses. Only the fourth records where the reader has been, as opposed to what the world was.
 
-User time is an append-only, source-scoped ledger of traversal records. A record holds directed units: a jump has only the two Addresses occupied, while a span was continuously observed and may be recalled at any Address inside it. A route writes to it when the reader comes to occupy a different Address; editing the world without moving — renaming, reweighting, creating a Pin, toggling a Group — writes nothing, and programmatic placement never writes.
+Traversal Trace is an append-only, source-scoped ledger of traversal records. A record holds directed units: a jump has only the two Addresses occupied, while a span was continuously observed and may be recalled at any Address inside it. A route writes to it when the reader comes to occupy a different Address; editing the world without moving — renaming, reweighting, creating a Pin, toggling a Group — writes nothing, and programmatic placement never writes.
 
-Semantic history and user time are different orders, and traversing one is a route through the other: an Undo or Redo that puts the reader at a different Address writes one occurrence like any other movement, and one that only changes the world writes nothing. A held or coalesced gesture writes one sequence that keeps its reversals, because collapsing a Step run to its endpoints erases the shape the reader remembers. A Current drag writes one movement: the ground under the pointer is a search for a place, exactly as a Ghost scan is, and only the release is an arrival.
+Semantic history and the Traversal Trace are different orders, and traversing one is a route through the other: an Undo or Redo that puts the reader at a different Address writes one occurrence like any other movement, and one that only changes the world writes nothing. A held or coalesced gesture writes one sequence that keeps its reversals, because collapsing a Step run to its endpoints erases the shape the reader remembers. A Current drag writes one movement: the ground under the pointer is a search for a place, exactly as a Ghost scan is, and only the release is an arrival.
 
 Ghost Traversal is held `G` plus the wheel. Arming costs nothing: no Anchor, no history, no settled playback. The first wheel quantum settles pending work, captures Current as a fixed Anchor, and freezes the projection, the effective Step Distance and the readable extent of the stream, so the gesture reads a world that cannot change underneath it and can never follow its own output.
 
-Each quantum moves a read cursor one occurrence backward or forward through user time and applies the recalled Address as an amendment against one captured origin. Backward and forward name directions in user time; either may move either way through source time. Watched spans are subdivided by the frozen Step law, so expanded ground yields finer recall while the watched boundaries stay exact. An Address the active Range excludes is unavailable rather than clamped, and Ghost never leaves Focus, widens Range, or opens Full Video to reach one.
+Each quantum moves a read cursor one occurrence backward or forward through the Traversal Trace and applies the recalled Address as an amendment against one captured origin. Backward and forward name directions in the Traversal Trace; either may move either way through source time. Watched spans are subdivided by the frozen Step law, so expanded ground yields finer recall while the watched boundaries stay exact. An Address the active Range excludes is unavailable rather than clamped, and Ghost never leaves Focus, widens Range, or opens Full Video to reach one.
 
 Ghost restores no historical Pins, Sections, Groups, Weights, titles, visibility, Focus, Range, Step Distance, topography state or Guide selection. What it produces is an ordinary Active Span between the Anchor and the recalled Address, so Switch End, Tag, Release and Focus act on it exactly as they would on any other.
 
 Where automatic Context is enabled, each recalled Address plays: the stop condition for a recall is recognition, and a still frame is a poor thing to recognise a moment from. Successive candidates retarget one Context window rather than opening a new one, so the window follows the wheel instead of being torn down and rebuilt at every notch. A window superseded or run out during the scan is search and writes no observation; only the one still running when the gesture ended was watched, and it joins the path as observed source time on its own terms. Escape stops it with everything else the scan did. With Context off, recall remains a silent frame-by-frame scan.
 
-Scanning and injection are different events. The scan is transient: it inspects prior user time and is never written as a path, because copying the search motion into the stream mirrors paths already in it. Releasing appends exactly one occurrence — a jump from the live Anchor to the Address re-entered — carrying provenance to the Anchor occurrence, to the historical occurrence re-entered, and to the scan as evidence. A gesture that returns to its Anchor appends nothing, though the Session may still retain the ground crossed. The whole gesture commits as one semantic transaction; one Undo returns to the Anchor with all structure intact.
+Scanning and injection are different events. The scan is transient: it inspects prior the Traversal Trace and is never written as a path, because copying the search motion into the stream mirrors paths already in it. Releasing appends exactly one occurrence — a jump from the live Anchor to the Address re-entered — carrying provenance to the Anchor occurrence, to the historical occurrence re-entered, and to the scan as evidence. A gesture that returns to its Anchor appends nothing, though the Session may still retain the ground crossed. The whole gesture commits as one semantic transaction; one Undo returns to the Anchor with all structure intact.
 
 An injected occurrence has two relations, and direction chooses between them. Backward follows the live predecessor and asks what led to this re-entry. Forward may resume the historical successors of the occurrence re-entered and asks what originally followed it. The choice is made once, from the direction the gesture opens with, and reversing the wheel afterwards retraces the cursor already chosen rather than switching streams mid-gesture. A gesture begins only once a whole wheel quantum is earned, so input below the threshold settles nothing and captures no Anchor. A gesture that returns to its Anchor retains the positive extent it crossed, on the same principle as Step Reversal. The historical read cursor survives Release, so severing the Active Span and Ghosting forward replays the recalled point's original successors as a newly informed traversal.
 
@@ -722,7 +722,7 @@ Before chaptering a new identity, one boundary resolves every old-source owner:
 - clear native Go, programmatic placement, player-pause claims, and metadata retry;
 - close dialogs and Pin-cluster menus;
 - persist safe settled Guide changes;
-- clear Chapters, Timeline selection, Guide focus, aligned Pins, Shift layers, direct preview, Panorama runtime, and weight relaxation;
+- clear Chapters, Timeline selection, Guide Selection, aligned Pins, Shift layers, direct preview, Panorama runtime, and weight relaxation;
 - reset source identity, Session, transport, offers, and physical side sources;
 - only then chapter the new source.
 
@@ -757,7 +757,7 @@ The following are release invariants:
 - all effective spatial consumers agree on one projection;
 - the physical matrix has three equal rows and columns, with Tag at row 3 column 2;
 - Tag label, preview, availability, key route, and pointer route agree with Shift state;
-- Release clears both the semantic residue and acquired Timeline operand without collateral mutation;
+- Release clears both the semantic residue and Timeline Selection without collateral mutation;
 - observation policy is explicit and independent from rate;
 - actual playback rate comes from the media adapter;
 - Panorama suspension never prevents ordinary Center playback or native controls;

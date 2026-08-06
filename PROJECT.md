@@ -44,7 +44,7 @@ Every meaningful temporal value is a source Address. Duration, Range, Current, C
 
 **Range** is the admissible source universe. A chain of navigation or search operations excludes alternatives from the current admissible relation. The **Active Span** is the positive, contiguous residue that survives those exclusions. It carries two source bounds, orientation, and endpoint viewpoints; it is not a persistent record of the traversed path.
 
-**Reopen** restores Range-level discrimination without discarding the residue. **Undo** restores prior semantic state. **Release** clears the active residue and the acquired Timeline operand while preserving Current, retained topology, Guide focus, Focus, Weight, and the current topography-bypass comparison.
+**Reopen** restores Range-level discrimination without discarding the residue. **Undo** restores prior semantic state. **Release** clears the active residue and the Timeline Selection while preserving Current, retained topology, Guide Selection, Focus, Weight, and the current topography-bypass comparison.
 
 ## Panoramic Phase Panorama
 
@@ -87,7 +87,7 @@ Every effective factor is positive. Consequently the projection is continuous, s
 
 Weight changes the map allocation of fixed source material. It does not change source duration, identity, or order. Overlapping active Sections compose multiplicatively, so no priority or stored hierarchy is required. `1×` is spatially neutral.
 
-One effective projection compiles Group activity, stored Weight, and the transient weight relaxation. Geometry, Step, Refine, adaptive Reach, drag conversion, hit testing, spatial readouts, atmosphere, sourceGridLines, and explicitly dynamic playback read that same object. Fixed playback does not read Section Weight.
+One effective projection compiles Group activity, stored Weight, and the transient weight relaxation. Geometry, Step, Refine, adaptive Reach, drag conversion, hit testing, spatial readouts, atmosphere, sourceGridLines, and explicitly Textured Playback read that same object. Fixed playback does not read Section Weight.
 
 The Timeline’s violet/teal atmosphere shows the sign and perceptual strength of compression or expansion. Projected source-time sourceGridLines show the exact metric consequence. Focus changes only the viewport through which this map is drawn; it does not define a second map.
 
@@ -95,7 +95,7 @@ The Timeline’s violet/teal atmosphere shows the sign and perceptual strength o
 
 ## The reader's own path
 
-There are four temporal orders here, and only three of them are about the work. Source time is what the video is. Timeline Space is what the map makes of it. Semantic history is what the reader did to the map. **User time** is the fourth: the order in which the reader actually encountered source Addresses. It is the only one that records where they have been, as opposed to what the world was.
+There are four temporal orders here, and only three of them are about the work. Source time is what the video is. Timeline Space is what the map makes of it. Semantic history is what the reader did to the map. **Traversal Trace** is the fourth: the order in which the reader actually encountered source Addresses. It is the only one that records where they have been, as opposed to what the world was.
 
 It is an append-only, source-scoped ledger. A record holds directed units: a **jump** was a movement between two Addresses and only those two were occupied; a **span** was watched continuously and any Address inside it was genuinely seen. Every route that moves the reader writes one — Go, Step, Nudge, a Current drag, Playback, an automatic Context window watched to its end, and an Undo or Redo that puts them somewhere else. Editing the world without moving writes nothing: a rename, a Weight, a new Pin, a Group toggled, an Undo of any of those. Programmatic placement never writes, because the player being told where to sit is a consequence of a movement rather than a movement of its own.
 
@@ -111,7 +111,7 @@ A **Pin** owns one source Address. A **Section** owns an edge between two Pin id
 
 Every Section belongs to exactly one ordinary Group. At most one Group is drawn on the Timeline, and no Group drawn is valid. Group activity is independent: any number of active Groups may contribute Weight while hidden. The last Group cannot be deleted, and a Group deletion reports the actual surviving Group that receives its Sections.
 
-Guide focus is inspection. An acquired Timeline operand is spatial selection. The distinction matters: focusing a hidden Guide row does not silently scope `X`; acquiring a visible Timeline Section does.
+Guide Selection is inspection. An Timeline Selection is spatial selection. The distinction matters: focusing a hidden Guide row does not silently scope `X`; acquiring a visible Timeline Section does.
 
 Chapters are offered source Addresses or extents, such as parsed creator chapters. They remain transient candidates until the reader explicitly navigates, composes, or Tags them into ordinary retained structure.
 

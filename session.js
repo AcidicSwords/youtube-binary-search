@@ -1878,7 +1878,7 @@ export function relabelLastAction(session, label) {
 // transient visited envelope. Settlement turns that sparse evidence into the
 // same positive contiguous Active Span every route understands, then
 // discards it with the caller's pending object. No Path enters durable state.
-// Ghost Traverse: move through user time while the semantic world stands still.
+// Ghost Traverse: move through the Traversal Trace while the semantic world stands still.
 //
 // Every other movement operator answers a question about source time or about
 // the map. This one answers "where was I before this moment?", and the whole
@@ -1889,7 +1889,7 @@ export function relabelLastAction(session, label) {
 //
 // What it produces is an ordinary Active Span. The Address the reader was
 // at when the gesture began is the fixed Anchor; the recalled Address is the
-// active endpoint. Nothing downstream needs to know it came from user time --
+// active endpoint. Nothing downstream needs to know it came from the Traversal Trace --
 // Switch End, Tag, Release and Focus all act on it as they would on any
 // other Interval -- which is why there is no second interval type.
 export function ghostTraverse(session, destination, options = {}) {

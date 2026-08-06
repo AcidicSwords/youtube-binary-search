@@ -330,13 +330,13 @@ assert.equal(rateSelect.value, "2",
   await poll(); await flush(2);
   assert.equal(center.rate, insideRate);
   assert.ok(sidePlays() >= sidePlaysAtNeutral,
-    "The Panorama continues across the whole dynamic playback rather than folding at boundaries.");
+    "The Panorama continues across the whole Textured Playback rather than folding at boundaries.");
 
   dispatchDocument("keydown", { key: " ", code: "Space", shiftKey: true });
   await settle();
   assert.equal(center.rate, insideRate,
     "Ending playback pauses its transport without issuing an unrelated native-rate command.");
-  assert.equal(center.state, 2, "Ending dynamic playback still pauses Center exactly.");
+  assert.equal(center.state, 2, "Ending Textured Playback still pauses Center exactly.");
 }
 
 console.log("Transport coherence smoke passed: live projection, exact settlement, Focus-owned proper-Range looping, one-pass Panorama rebasing, wrap history isolation, Unfocus restoration, full-video completion, a fixed Shift rate that stays Center-only, and a rate that follows Section weight across the map while the Panorama cycles one rung either side of it.");

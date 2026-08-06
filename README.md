@@ -69,7 +69,7 @@ The canonical Section Weight ladder is:
 
 Overlapping active Sections compose by multiplication. Violet atmosphere indicates compression below `1×`; teal indicates expansion above `1×`; projected source-time sourceGridLines expose the exact spatial density. The atmosphere is perceptual, while the mapping and sourceGridLines are metric.
 
-All spatial consumers share one effective projection: drawing, sourceGridLines, hit testing, drag conversion, Step, Refine, adaptive Reach, spatial readouts, and the optional dynamic playback policy.
+All spatial consumers share one effective projection: drawing, sourceGridLines, hit testing, drag conversion, Step, Refine, adaptive Reach, spatial readouts, and the optional Textured Playback policy.
 
 `X` is the auxiliary **Relax Weights** action in Operators. With an acquired Timeline Section it temporarily bypasses only that Section; otherwise it bypasses the complete map. Press `X` again on the same scope to restore it. The bypass is source-scoped, transient, absent from Undo and persistence, and never changes the stored Weight. Fixed playback receives no command from `X`; dynamic Shift playback may retune on a later transport tick because that policy explicitly reads the effective map.
 
@@ -91,7 +91,7 @@ R  Release            T  Tag               F  Focus / Unfocus
 - `Shift+A/D` or `Shift+←/→` Step to the previous or next Pin or Range boundary.
 - `W` restores Range-level Current Neighborhood without discarding Current or the Active Span.
 - `S` moves to the opposite endpoint and restores that endpoint’s saved viewpoint.
-- `R` clears the Active Span and the acquired Timeline operand. Current, Guide focus, retained topology, Weight, Focus, and weight relaxation remain.
+- `R` clears the Active Span and the Timeline Selection. Current, Guide Selection, retained topology, Weight, Focus, and weight relaxation remain.
 - `T` tags Current as a Pin. `Shift+T` tags a positive Active Span as a Section. Plain Tag remains a Pin action even while an Interval exists; an exact duplicate is selected rather than recreated.
 - `F` focuses an acquired Section or the Active Span as Range and viewport; the same action unfocuses to the containing Range.
 
@@ -114,14 +114,14 @@ Every Section belongs to one ordinary Group. At most one Group is drawn on the T
 
 The Timeline is the spatial manipulation surface. Drag Current to perform one Step gesture; drag a Pin to update every Section that shares it; drag a Section’s end region to move that endpoint or its middle to translate the whole Section. There is no extra endpoint-node chrome. Bare Timeline ground clears the retained Timeline operand and performs ordinary Go.
 
-Nudge is exact source-time adjustment. `Shift`+wheel uses the dominant wheel axis: up/right is forward and down/left is backward. High-resolution deltas accumulate into discrete quanta, and a wheel series or held repeat creates one Undo transaction. Over the Timeline, the object under the pointer owns the gesture; elsewhere, the acquired Timeline operand owns it, falling back to Current. Guide Address input accepts seconds or timecode and rejects a value outside the active Range or invalid topology instead of silently changing it.
+Nudge is exact source-time adjustment. `Shift`+wheel uses the dominant wheel axis: up/right is forward and down/left is backward. High-resolution deltas accumulate into discrete quanta, and a wheel series or held repeat creates one Undo transaction. Over the Timeline, the object under the pointer owns the gesture; elsewhere, the Timeline Selection owns it, falling back to Current. Guide Address input accepts seconds or timecode and rejects a value outside the active Range or invalid topology instead of silently changing it.
 
 ## Shortcuts
 
 | Keys | Action |
 | --- | --- |
 | `Space` | Play/pause `1×` Panorama |
-| `Shift+Space` | Play/pause Center-only fixed or dynamic playback |
+| `Shift+Space` | Play/pause Center-only fixed or Textured Playback |
 | `Q` / `E` | Refine backward / forward |
 | `Shift+Q` / `Shift+E` | Local Refine backward / forward |
 | `A` / `D`, `←` / `→` | Step backward / forward |

@@ -109,7 +109,7 @@ owner. Do not reach through the media adapter from application or Panorama code.
   Shift consumes neither.
 - Exact Address input rejects malformed, out-of-Range, or structurally invalid
   values instead of silently clamping.
-- Release, bare Timeline Go, Guide focus, and Timeline acquisition must preserve
+- Release, bare Timeline Go, Guide Selection, and Timeline acquisition must preserve
   their distinct selection consequences.
 
 ### Playback and Panorama
@@ -150,7 +150,7 @@ Every executable suite is listed here by the current behavior it protects.
 - `timeline-projection-tests.mjs` — positive factors, overlap products, forward/inverse round trips, effective contributors, bypass scope, Pin order, and migration.
 - `ghost-smoke.mjs` — Ghost in a real browser: the Guide on `I` while Tab stays the browser's, G arming without cost, a wheel notch recalling behind a fixed Anchor, one transaction on release, exact cancellation, wheel ownership between Ghost and Nudge, and Context playing through the recall as one retargeted window whose scan writes no observation.
 - `ghost-tests.mjs` — Ghost Traverse against a live Session: a preserved semantic world, Focus/Range bounds, one Undo per held gesture, the reversal envelope, recorded rather than recomputed Addresses, and a Section retained entirely in the past.
-- `traversal-trace-tests.mjs` — the append-only encounter ledger: records that keep reversals, direction in user time independent of source order, watched spans subdivided by the frozen Step law and clipped to the active Range, a frozen readable stream, and injection with provenance.
+- `traversal-trace-tests.mjs` — the append-only encounter ledger: records that keep reversals, direction in the Traversal Trace independent of source order, watched spans subdivided by the frozen Step law and clipped to the active Range, a frozen readable stream, and injection with provenance.
 - `section-topography-tests.mjs` — Section Weight, nested/overlapping Guide geometry, Pin movement, and spatial traversal consequences.
 - `operator-coherence-tests.mjs` — guarded Step, Refine roles, exact previews, weighted navigation, monotonic Playback residue, history, and lane packing.
 - `core-regression-tests.mjs` — kernel guarantees for scale, endpoint frames, Range, Focus, Guide, Playback, and Undo.

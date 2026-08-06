@@ -1006,12 +1006,12 @@ export function normalizeGuide(parsed, videoId) {
   // every retained identity cross unchanged: only where visibility is written
   // down has changed.
   const sourceGroups = Array.isArray(parsed?.groups) ? parsed.groups : [];
-  // v10 names the drawn Group `shownGroupId`; v9 wrote `visibleGroupId`, and v8
+  // v10 names the drawn Group `shownGroupId`; v9 wrote `visibleGroupId`, and v8 // lexicon-allow: v9 Guide back-compat
   // marked one Group `visible`. All three are read so no saved Guide loses which
   // Group it drew.
   const storedShownId = parsed?.shownGroupId !== undefined
     ? parsed.shownGroupId
-    : parsed?.visibleGroupId;
+    : parsed?.visibleGroupId; // lexicon-allow: v9 Guide back-compat
   const persistedVisibleId = (
     typeof storedShownId === "string"
       && sourceGroups.some(source => source?.id === storedShownId)
@@ -1255,7 +1255,7 @@ export function sanitizeGuide(input, videoId, duration) {
   // Same v10 / v9 / v8 back-compat as normalizeGuide (see there).
   const storedShownId = source.shownGroupId !== undefined
     ? source.shownGroupId
-    : source.visibleGroupId;
+    : source.visibleGroupId; // lexicon-allow: v9 Guide back-compat
   const persistedVisibleId = (
     typeof storedShownId === "string"
       && sourceGroups.some(group => group?.id === storedShownId)

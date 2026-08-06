@@ -307,7 +307,7 @@ const state = {
   programmaticPlacement: null,
   guideDialog: null,
   // Timeline operand selection is spatial: only currently drawn retained
-  // objects may occupy it. Guide focus is independent so hidden structure can
+  // objects may occupy it. Guide Selection is independent so hidden structure can
   // remain inspectable and navigable without becoming a Timeline operand.
   timelineSelection: null,
   guideSelection: null,
@@ -1590,7 +1590,7 @@ function moveToAddress(destination, options = {}) {
   if (!result.changed) {
     locateAddress(departure);
     setStatus(options.unchangedStatus || `Already at ${formatTime(departure)}.`);
-    // Guide focus is not Current and is not Timeline operand selection. A
+    // Guide Selection is not Current and is not Timeline operand selection. A
     // Guide navigation whose Address is already Current still needs its Guide
     // render so the requested retained row remains inspectable.
     if (options.renderGuide === true) view.renderGuide();
@@ -1701,7 +1701,7 @@ function releaseActiveSpan() {
       state.selectedPinIds = [];
       view.renderGuide();
       view.render();
-      setStatus("Released the acquired Timeline operand; Current and Guide focus are unchanged.");
+      setStatus("Released the Timeline Selection; Current and Guide Selection are unchanged.");
       return true;
     }
     setStatus("There is no Active Span to release.");
@@ -1756,7 +1756,7 @@ function toggleWeightRelaxation() {
   }
   // Pending spatial gestures must become exact before their projection changes.
   // Playback deliberately continues: X issues no player command, though a
-  // dynamic playback may read the new effective map on its next tick.
+  // Textured Playback may read the new effective map on its next tick.
   settleBeforeAction({ transport: false });
   const scope = resolvedWeightRelaxationScope();
   const restoring = sameWeightRelaxation(validWeightRelaxation(), scope);
@@ -1815,7 +1815,7 @@ function traverseHistory(transform, emptyMessage, completedVerb, cause) {
     return false;
   }
   state.session = result.session;
-  // Semantic history and user time are different orders, and traversing one
+  // Semantic history and the Traversal Trace are different orders, and traversing one
   // moves through the other. An Undo that puts the reader somewhere else is a
   // route they took: they now occupy that Address, and the moment they came
   // from is the one they were just in. Leaving it unwritten made Ghost answer
@@ -2917,7 +2917,7 @@ function resetSourceScopedState() {
   if (state.nudgeGesture?.timer) window.clearTimeout(state.nudgeGesture.timer);
   state.nudgeGesture = null;
   state.nudgeWheel = null;
-  // User time is the reader's path through one video. No Address, read cursor,
+  // Traversal Trace is the reader's path through one video. No Address, read cursor,
   // Anchor, provenance or watched span may cross source identity, so the old
   // gesture is cancelled against the world it belonged to before that world is
   // discarded, and the ledger starts empty.
@@ -3258,7 +3258,7 @@ function pollPlayer() {
   let transport = state.transport;
   const programmaticPlacementActive = programmaticPlacementOwns(now);
 
-  // A dynamic playback reads its rate off the map it is crossing, so the rate
+  // A Textured Playback reads its rate off the map it is crossing, so the rate
   // is re-derived from the Address actually being watched. Only a bucket change
   // reaches the player: the ladder is coarse on purpose, and asking for a rate
   // it already has would be a command per poll.
@@ -5312,7 +5312,7 @@ function handleGhostWheel(event) {
   return true;
 }
 
-// Releasing writes the recalled path into the live end of user time and commits
+// Releasing writes the recalled path into the live end of the Traversal Trace and commits
 // the whole gesture as one semantic transaction.
 function settleGhostGesture() {
   const gesture = state.ghostGesture;

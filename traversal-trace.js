@@ -1,4 +1,4 @@
-// User time: the order in which a reader actually encountered source Addresses.
+// Traversal Trace: the order in which a reader actually encountered source Addresses.
 //
 // This is the fourth temporal order in the project and the only one that was
 // missing. Source time is the video's own order. Timeline Space is the weighted
@@ -8,7 +8,7 @@
 // here.
 //
 // Undo answers "what was the world before this transaction?" and to answer it
-// it must restore that world. User time answers "where was I before this
+// it must restore that world. Traversal Trace answers "where was I before this
 // moment?", which is a different question and must not disturb anything: the
 // Pins, Sections, Weights and Focus established since then are exactly what
 // makes returning worth doing.
@@ -363,7 +363,7 @@ export function moveGhostRead(traversalTrace, ghostRead, direction) {
 // Releasing at a recalled Address injects that landing, and nothing else.
 //
 // The scan and the landing are different events. Scrolling while G is held
-// inspects prior user time; it may cross many occurrences and reverse direction,
+// inspects prior the Traversal Trace; it may cross many occurrences and reverse direction,
 // and none of that is a journey the reader took -- it is the search they used to
 // find one moment. Writing it down made the stream a palindrome and spent later
 // wheel detents crossing the reader's own search motion.

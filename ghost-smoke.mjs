@@ -754,7 +754,7 @@ try {
   // =========================================================================
   // 15. Undo is a route the reader took
   // =========================================================================
-  // Semantic history and user time are different orders, and traversing one
+  // Semantic history and the Traversal Trace are different orders, and traversing one
   // moves through the other. An Undo that puts the reader somewhere else is a
   // movement like any other: they now occupy that Address, and the moment they
   // came from is the one they were just in. Left unwritten, Ghost answered

@@ -339,7 +339,7 @@ await flush();
 assert.equal(pinAddress(), "1:07");
 
 // A Guide row is off-map inspection, not a spatial wheel acquisition surface.
-// With no acquired Timeline operand it must leave that row's Pin untouched and
+// With no Timeline Selection it must leave that row's Pin untouched and
 // fall back to Current.
 const guidePinRow = descendants(byId.get("pins-list"))
   .find(node => node.dataset.pinGo === pinId);

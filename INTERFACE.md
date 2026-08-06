@@ -228,8 +228,8 @@ reports the exact existing Pin or Section.
 
 ### Release and Focus
 
-Release clears the Active Span and the acquired Timeline operand. It
-preserves Current, Current Neighborhood, Range, Focus, Guide focus, retained topology,
+Release clears the Active Span and the Timeline Selection. It
+preserves Current, Current Neighborhood, Range, Focus, Guide Selection, retained topology,
 Weights, playback preferences, and topography-bypass state. Clearing only a
 presentation operand creates no history; clearing the semantic interval is
 Undoable.
@@ -248,13 +248,13 @@ Timeline`, or `Restore Timeline`, with the exact scope shown beside it.
 
 An acquired Timeline Section scopes the action to that Section. With no acquired
 Section, it scopes the complete map. It changes geometry, sourceGridLines, atmosphere,
-Step, Refine, adaptive Reach, hit testing, and explicitly dynamic Playback
+Step, Refine, adaptive Reach, hit testing, and explicitly Textured Playback
 together, while the stored Weight display remains unchanged. It creates no
 history entry and sends no direct player command.
 
 ## Guide
 
-Guide focus is inspection and exact editing. Timeline acquisition is the
+Guide Selection is inspection and exact editing. Timeline acquisition is the
 spatial operand for `X`, Nudge, Carry, and direct manipulation. A Guide click and
 a Timeline click can establish the same Active Span, but only the latter
 acquires the Timeline object. Clicking bare Timeline ground clears that
