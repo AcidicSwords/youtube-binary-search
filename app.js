@@ -363,6 +363,9 @@ const state = {
   // Known future Addresses contributed by completed Ripple observations.
   // Transient, source-scoped, and deliberately outside Session/history/Trace.
   traversalProspects: createTraversalProspects(),
+  // The loaded source identity exposed to presentation and prospect filtering.
+  // This is lifecycle state, not semantic Session state.
+  sourceGeneration: null,
   // Identity and presentation for the one Ripple currently being observed.
   // Context remains the transport owner; this state never replaces it.
   rippleObservation: null,
@@ -3046,6 +3049,7 @@ function resetSourceScopedState() {
   cancelGhostGesture({ restore: false });
   state.traversalTrace = createTraversalTrace(0);
   state.traversalProspects = clearTraversalProspects();
+  state.sourceGeneration = null;
   state.rippleObservation = null;
   state.ghostKeyHeld = false;
   state.ghostGesture = null;
@@ -3159,6 +3163,7 @@ function initializeVideo(request = pendingLoad) {
     guide: recovery.guide,
     stepDistance: preferences.stepDistance
   });
+  state.sourceGeneration = request.generation;
   state.videoLoaded = true;
   centerPauseRequest = null;
   state.transport = idleTransport();
