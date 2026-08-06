@@ -79,7 +79,7 @@ function defaultPreferences() {
 }
 
 function snapshotReach(snapshot) {
-  return normalizePanoramaReach(snapshot?.stepReach);
+  return normalizePanoramaReach(snapshot?.stepDistance);
 }
 
 // The configured cycling relation. A snapshot without an explicit Panorama
@@ -948,7 +948,7 @@ export function createPanoramaController({
       linked: false
     };
     // A direct-manipulation preview may momentarily collapse onto either
-    // endpoint. Step Reach is strictly positive, so keep its geometry contract
+    // endpoint. Step Distance is strictly positive, so keep its geometry contract
     // intact while sideStates below preserve the collapsed side truthfully.
     const targets = derivePanorama(
       preview.center,
@@ -1905,7 +1905,7 @@ export function createPanoramaController({
       }
     } else if (!centerRunning && centerWasRunning) {
       // Native pause freezes the visible Panorama once. It does not write Session
-      // Interval or Step Reach; the next Play refolds and stretches anew.
+      // Interval or Step Distance; the next Play refolds and stretches anew.
       pauseSides({ center, freeze: true });
     }
     runtime.centerWasRunning = centerRunning && !runtime.suspended;

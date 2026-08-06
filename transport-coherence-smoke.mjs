@@ -77,7 +77,7 @@ await flush();
 assert.equal(byId.get("range-label").textContent, "0:25–0:58");
 assert.equal(byId.get("focus-toggle-label").textContent, "Unfocus");
 
-byId.get("switch-endpoint").click();
+byId.get("switch-end").click();
 await flush();
 assert.equal(currentText(), "Current 0:25");
 

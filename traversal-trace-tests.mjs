@@ -27,7 +27,7 @@ const neutralProjection = projectionForModel({
   guide: createGuide("neutral"),
   range: RANGE,
   neighborhood: { C: 0 },
-  stepReach: null
+  stepDistance: null
 });
 const reach = seconds => ({ backward: seconds, forward: seconds });
 
@@ -35,7 +35,7 @@ const read = (traversalTrace, current, options = {}) => beginGhostRead(traversal
   current,
   range: RANGE,
   projection: neutralProjection,
-  stepReach: reach(5),
+  stepDistance: reach(5),
   ...options
 });
 
@@ -203,7 +203,7 @@ function walk(traversalTrace, ghostRead, direction, limit = 40) {
     guide,
     range: RANGE,
     neighborhood: { C: 0 },
-    stepReach: null
+    stepDistance: null
   });
   let traversalTrace = createTraversalTrace(20);
   traversalTrace = appendObservedPassages(traversalTrace, {
@@ -215,7 +215,7 @@ function walk(traversalTrace, ghostRead, direction, limit = 40) {
     current: 20,
     range: RANGE,
     projection: weighted,
-    stepReach: reach(5)
+    stepDistance: reach(5)
   }), "forward");
 
   assert.equal(addresses.at(-1), 40, "The watched boundary is exact whatever the terrain.");
@@ -247,7 +247,7 @@ function walk(traversalTrace, ghostRead, direction, limit = 40) {
     current: 45,
     range: focused,
     projection: neutralProjection,
-    stepReach: reach(5)
+    stepDistance: reach(5)
   });
   const { addresses } = walk(traversalTrace, ghostRead, "backward");
   assert.deepEqual(addresses, [30, 10],
@@ -264,7 +264,7 @@ function walk(traversalTrace, ghostRead, direction, limit = 40) {
     current: 80,
     range: focused,
     projection: neutralProjection,
-    stepReach: reach(5)
+    stepDistance: reach(5)
   });
   const inside = walk(spanning, clipped, "forward");
   assert.equal(inside.addresses.at(-1), 100, "A watched span stops at the edge of the Range.");
@@ -291,7 +291,7 @@ function walk(traversalTrace, ghostRead, direction, limit = 40) {
     frozenStreamEnd: boundary,
     range: RANGE,
     projection: neutralProjection,
-    stepReach: reach(5)
+    stepDistance: reach(5)
   });
   assert.equal(frozen.positions.some(position => position.address === 90), false,
     "A record appended after the boundary is invisible to the gesture.");
@@ -305,7 +305,7 @@ function walk(traversalTrace, ghostRead, direction, limit = 40) {
     current: 90,
     range: RANGE,
     projection: neutralProjection,
-    stepReach: reach(5)
+    stepDistance: reach(5)
   });
   assert.equal(unfrozen.positions.some(position => position.address === 90), true);
 }
@@ -337,11 +337,11 @@ function walk(traversalTrace, ghostRead, direction, limit = 40) {
   );
 
   assert.equal(
-    latestTracePositionAtAddress(traversalTrace, 50, { range: RANGE, projection: neutralProjection, stepReach: reach(5) }) >= 0,
+    latestTracePositionAtAddress(traversalTrace, 50, { range: RANGE, projection: neutralProjection, stepDistance: reach(5) }) >= 0,
     true
   );
   assert.equal(
-    latestTracePositionAtAddress(traversalTrace, 12.5, { range: RANGE, projection: neutralProjection, stepReach: reach(5) }),
+    latestTracePositionAtAddress(traversalTrace, 12.5, { range: RANGE, projection: neutralProjection, stepDistance: reach(5) }),
     -1,
     "An Address the reader never occupied has no occurrence."
   );

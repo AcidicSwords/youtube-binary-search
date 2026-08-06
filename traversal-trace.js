@@ -145,7 +145,7 @@ export function appendObservedPassages(traversalTrace, { spans, cause, createdAt
 // follow its own newly injected output, a Weight or Step change mid-gesture
 // cannot move candidates the reader has already passed, and the Range that was
 // active at the start is the Range the whole gesture obeys.
-function passagePositions(unit, { range, projection, stepReach }) {
+function passagePositions(unit, { range, projection, stepDistance }) {
   const forward = unit.to > unit.from;
   const low = Math.max(Math.min(unit.from, unit.to), range.start);
   const high = Math.min(Math.max(unit.from, unit.to), range.end);
@@ -156,7 +156,7 @@ function passagePositions(unit, { range, projection, stepReach }) {
   const first = forward ? low : high;
   const last = forward ? high : low;
   const direction = forward ? "forward" : "backward";
-  const reach = Number(stepReach?.[direction]);
+  const reach = Number(stepDistance?.[direction]);
   const positions = [first];
   if (!(reach > 0) || !projection?.stepTarget) return [...positions, last];
 
@@ -177,7 +177,7 @@ function passagePositions(unit, { range, projection, stepReach }) {
   return positions;
 }
 
-function readablePositions(traversalTrace, { frozenStreamEnd, range, projection, stepReach }) {
+function readablePositions(traversalTrace, { frozenStreamEnd, range, projection, stepDistance }) {
   const limit = Number.isFinite(frozenStreamEnd)
     ? clamp(frozenStreamEnd, 0, traversalTrace.records.length)
     : traversalTrace.records.length;
@@ -216,7 +216,7 @@ function readablePositions(traversalTrace, { frozenStreamEnd, range, projection,
     const injected = record.kind === TRAVERSAL_KIND.GHOST_RETURN;
     record.units.forEach((unit, unitIndex) => {
       if (unit.kind === UNIT_KIND.PASSAGE) {
-        const inside = passagePositions(unit, { range: bounds, projection, stepReach });
+        const inside = passagePositions(unit, { range: bounds, projection, stepDistance });
         if (!inside.length) blocked = true;
         for (const address of inside) push(address, record.id, unitIndex);
         return;
@@ -247,7 +247,7 @@ export function latestTracePositionAtAddress(traversalTrace, address, options = 
     frozenStreamEnd: options.frozenStreamEnd,
     range: options.range,
     projection: options.projection,
-    stepReach: options.stepReach
+    stepDistance: options.stepDistance
   });
   for (let index = positions.length - 1; index >= 0; index -= 1) {
     if (near(positions[index].address, address)) return index;
@@ -289,13 +289,13 @@ export function beginGhostRead(traversalTrace, {
   frozenStreamEnd,
   range,
   projection,
-  stepReach
+  stepDistance
 } = {}) {
   const frozen = readablePositions(traversalTrace, {
     frozenStreamEnd,
     range,
     projection,
-    stepReach
+    stepDistance
   });
   let index = -1;
   // The resume cursor is the historical occurrence a previous landing re-entered.

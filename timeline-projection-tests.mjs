@@ -318,7 +318,7 @@ assert.equal("collapsed" in migrated.sections[1], false);
   createSectionFromTimes(nested, 102.56, 126.8, { weighting: 4 });
   createSectionFromTimes(nested, 103.37, 123.23, { weighting: 4 });
   const projection = projectionForModel({
-    duration, guide: nested, range, neighborhood: { C: 0 }, stepReach: null
+    duration, guide: nested, range, neighborhood: { C: 0 }, stepDistance: null
   });
 
   let worstIdentity = 0;

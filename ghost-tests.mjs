@@ -63,7 +63,7 @@ function worldFingerprint(model) {
     shownGroupId: model.guide.shownGroupId,
     range: [model.range.start, model.range.end],
     focus: model.focus ? [model.focus.kind, model.focus.sectionId || null] : null,
-    stepReach: model.stepReach,
+    stepDistance: model.stepDistance,
     duration: model.duration
   });
 }
@@ -282,7 +282,7 @@ function worldFingerprint(model) {
     current: recorded,
     range: RANGE,
     projection: projectionForModel(reweighted.model),
-    stepReach: { backward: 5, forward: 5 }
+    stepDistance: { backward: 5, forward: 5 }
   });
   const moved = moveGhostRead(traversalTrace, ghostRead, "backward");
   assert.equal(moved.changed, true);
@@ -315,7 +315,7 @@ function worldFingerprint(model) {
     frozenStreamEnd: frozenEnd,
     range: RANGE,
     projection: projectionFor(session),
-    stepReach: { backward: 5, forward: 5 }
+    stepDistance: { backward: 5, forward: 5 }
   });
   const visited = [];
   let gesturing = session;
@@ -368,7 +368,7 @@ function worldFingerprint(model) {
     frozenStreamEnd: traversalTrace.records.length,
     range: RANGE,
     projection: projectionFor(session),
-    stepReach: { backward: 5, forward: 5 }
+    stepDistance: { backward: 5, forward: 5 }
   });
   const forward = moveGhostRead(traversalTrace, resumed, "forward");
   assert.equal(forward.address, B,

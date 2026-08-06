@@ -35,7 +35,7 @@ import {
 } from "./guide.js";
 import {
   MIN_RANGE_SECONDS,
-  STEP_REACH_MODE,
+  STEP_DISTANCE_MODE,
   focusOwnsRangeBoundaries,
   createSession,
   copy,
@@ -54,9 +54,9 @@ import {
   localRefine as localRefineSession,
   step as stepSession,
   stepToPin as stepToPinSession,
-  setStepReach as setSessionStepReach,
-  normalizeStepReach,
-  effectiveStepReach,
+  setStepDistance as setSessionStepDistance,
+  normalizeStepDistance,
+  effectiveStepDistance,
   reopen as reopenSession,
   switchActiveEnd as switchSessionEndpoint,
   releaseInterval as releaseSessionInterval,
@@ -242,7 +242,7 @@ function readPreferences() {
       : 10;
     return {
       contextSeconds: normalizeContextSeconds(value?.contextSeconds),
-      stepReach: normalizeStepReach(value?.stepReach ?? legacyStep),
+      stepDistance: normalizeStepDistance(value?.stepDistance ?? legacyStep),
       // One bounded cycling relation replaces the two independent side
       // Offsets. A legacy pair migrates once: its widest side becomes the outer
       // offset and its saved rates become the nearest symmetric cycling pair.
@@ -257,7 +257,7 @@ function readPreferences() {
   } catch {
     return {
       contextSeconds: 5,
-      stepReach: normalizeStepReach(10),
+      stepDistance: normalizeStepDistance(10),
       panoramaCycle: { ...DEFAULT_PANORAMA_CYCLE },
       nudgeSeconds: DEFAULT_NUDGE_SECONDS,
       playbackRate: DEFAULT_PLAYBACK_RATE,
@@ -272,7 +272,7 @@ function readPreferences() {
 
 const preferences = readPreferences();
 const state = {
-  session: createSession({ stepReach: preferences.stepReach }),
+  session: createSession({ stepDistance: preferences.stepDistance }),
   playerReady: false,
   videoLoaded: false,
   videoId: null,
@@ -391,16 +391,16 @@ function activePanoramaRange() {
   return transportPanoramaRange(state.transport, activeRange()) || activeRange();
 }
 
-function currentStepReach() {
-  const configured = normalizeStepReach(
-    model()?.stepReach ?? preferences.stepReach
+function currentStepDistance() {
+  const configured = normalizeStepDistance(
+    model()?.stepDistance ?? preferences.stepDistance
   );
   if (!model()?.range) return configured;
-  return effectiveStepReach(configured, activeRange(), timelineProjection());
+  return effectiveStepDistance(configured, activeRange(), timelineProjection());
 }
 
-function configuredStepReach() {
-  return normalizeStepReach(model()?.stepReach ?? preferences.stepReach);
+function configuredStepDistance() {
+  return normalizeStepDistance(model()?.stepDistance ?? preferences.stepDistance);
 }
 
 function currentPanoramaCycle() {
@@ -408,19 +408,19 @@ function currentPanoramaCycle() {
 }
 
 // Panorama Offsets remain physical observation settings that are independent from
-// the semantic Step Reach. The outer offset is the Panorama's cycling bound.
+// the semantic Step Distance. The outer offset is the Panorama's cycling bound.
 function currentPanoramaOffsets() {
   const cycle = currentPanoramaCycle();
-  return normalizeStepReach({
+  return normalizeStepDistance({
     backward: cycle.outer,
     forward: cycle.outer,
     linked: true,
-    mode: STEP_REACH_MODE.FIXED
+    mode: STEP_DISTANCE_MODE.FIXED
   });
 }
 
 function panoramaStepPreview(center, kind = "step") {
-  const reach = currentStepReach();
+  const reach = currentStepDistance();
   const projection = timelineProjection();
   return {
     kind,
@@ -586,7 +586,7 @@ function panoramaOperatorPreview() {
 }
 
 function reachFor(direction) {
-  return currentStepReach()[direction];
+  return currentStepDistance()[direction];
 }
 
 function guide() {
@@ -737,9 +737,9 @@ function persistGuide() {
 
 function persistPreferences() {
   try {
-    preferences.stepReach = normalizeStepReach(
-      model()?.stepReach ?? preferences.stepReach,
-      preferences.stepReach
+    preferences.stepDistance = normalizeStepDistance(
+      model()?.stepDistance ?? preferences.stepDistance,
+      preferences.stepDistance
     );
     preferences.panoramaCycle = normalizePanoramaCycle(state.panoramaCycle);
     preferences.nudgeSeconds = normalizeNudgeSeconds(state.nudgeSeconds);
@@ -752,7 +752,7 @@ function persistPreferences() {
 
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify({
       contextSeconds: preferences.contextSeconds,
-      stepReach: preferences.stepReach,
+      stepDistance: preferences.stepDistance,
       panoramaCycle: preferences.panoramaCycle,
       nudgeSeconds: preferences.nudgeSeconds,
       playbackRate: preferences.playbackRate,
@@ -2989,7 +2989,7 @@ function transitionSourceBoundary() {
   state.videoLoaded = false;
   state.videoId = null;
   panorama?.resetSources?.();
-  state.session = createSession({ stepReach: preferences.stepReach });
+  state.session = createSession({ stepDistance: preferences.stepDistance });
   view.invalidateTimelinePins();
   view.renderGuide();
   view.render();
@@ -3033,7 +3033,7 @@ function initializeVideo(request = pendingLoad) {
     duration,
     current: requestedStart,
     guide: recovery.guide,
-    stepReach: preferences.stepReach
+    stepDistance: preferences.stepDistance
   });
   state.videoLoaded = true;
   centerPauseRequest = null;
@@ -4122,76 +4122,76 @@ function presetStep(value, delta) {
   return STEP_PRESETS.find(item => item > current + EPSILON) ?? STEP_PRESETS.at(-1);
 }
 
-function commitStepReach(nextReach, label, options = {}) {
+function commitStepDistance(nextReach, label, options = {}) {
   if (!state.videoLoaded) {
-    preferences.stepReach = normalizeStepReach(nextReach);
-    state.session = createSession({ stepReach: preferences.stepReach });
+    preferences.stepDistance = normalizeStepDistance(nextReach);
+    state.session = createSession({ stepDistance: preferences.stepDistance });
     persistPreferences();
     view.render();
     return false;
   }
   if (options.settle !== false) settleBeforeAction({ replacingContext: true });
-  const result = setSessionStepReach(state.session, nextReach, label);
+  const result = setSessionStepDistance(state.session, nextReach, label);
   if (!result.changed) {
     view.render();
     return false;
   }
   state.session = result.session;
   persistPreferences();
-  const effective = currentStepReach();
+  const effective = currentStepDistance();
   setStatus(
-    result.stepReach.mode === STEP_REACH_MODE.ADAPTIVE
-      ? `${label}: 1/${Math.round(1 / result.stepReach.fraction)} of active Range (${effective.forward.toFixed(2)} Timeline units).`
-      : `${label}: ${result.stepReach.forward} Timeline units.`
+    result.stepDistance.mode === STEP_DISTANCE_MODE.ADAPTIVE
+      ? `${label}: 1/${Math.round(1 / result.stepDistance.fraction)} of active Range (${effective.forward.toFixed(2)} Timeline units).`
+      : `${label}: ${result.stepDistance.forward} Timeline units.`
   );
   view.render();
   return true;
 }
 
 function adjustStepPreset(direction) {
-  const current = configuredStepReach();
-  if (current.mode === STEP_REACH_MODE.ADAPTIVE) {
+  const current = configuredStepDistance();
+  if (current.mode === STEP_DISTANCE_MODE.ADAPTIVE) {
     const index = STEP_FRACTIONS.findIndex(value =>
       Math.abs(value - current.fraction) <= Number.EPSILON
     );
     const start = index >= 0 ? index : 1;
     const nextIndex = clamp(start + direction, 0, STEP_FRACTIONS.length - 1);
-    commitStepReach({
+    commitStepDistance({
       ...current,
       fraction: STEP_FRACTIONS[nextIndex]
     }, direction < 0 ? "Decrease Adaptive Step" : "Increase Adaptive Step");
     return;
   }
   const amount = presetStep(current.forward, direction);
-  commitStepReach({
+  commitStepDistance({
     ...current,
     backward: amount,
     forward: amount,
     linked: true
-  }, direction < 0 ? "Decrease Step Reach" : "Increase Step Reach");
+  }, direction < 0 ? "Decrease Step Distance" : "Increase Step Distance");
 }
 
 function changeStepSeconds(value) {
   const amount = clamp(Number(value), 0.25, 300);
   if (!Number.isFinite(amount)) return;
-  const current = configuredStepReach();
-  commitStepReach({
+  const current = configuredStepDistance();
+  commitStepDistance({
     ...current,
     backward: amount,
     forward: amount,
     linked: true,
-    mode: STEP_REACH_MODE.FIXED
-  }, "Set Step Reach");
+    mode: STEP_DISTANCE_MODE.FIXED
+  }, "Set Step Distance");
 }
 
 function setStepMode(mode) {
-  const current = configuredStepReach();
-  const nextMode = mode === STEP_REACH_MODE.ADAPTIVE
-    ? STEP_REACH_MODE.ADAPTIVE
-    : STEP_REACH_MODE.FIXED;
-  commitStepReach(
+  const current = configuredStepDistance();
+  const nextMode = mode === STEP_DISTANCE_MODE.ADAPTIVE
+    ? STEP_DISTANCE_MODE.ADAPTIVE
+    : STEP_DISTANCE_MODE.FIXED;
+  commitStepDistance(
     { ...current, mode: nextMode },
-    nextMode === STEP_REACH_MODE.ADAPTIVE
+    nextMode === STEP_DISTANCE_MODE.ADAPTIVE
       ? "Use Range-relative Step"
       : "Use Manual Step"
   );
@@ -4200,9 +4200,9 @@ function setStepMode(mode) {
 function setStepFraction(value) {
   const fraction = Number(value);
   if (!STEP_FRACTIONS.some(item => Math.abs(item - fraction) <= Number.EPSILON)) return;
-  commitStepReach({
-    ...configuredStepReach(),
-    mode: STEP_REACH_MODE.ADAPTIVE,
+  commitStepDistance({
+    ...configuredStepDistance(),
+    mode: STEP_DISTANCE_MODE.ADAPTIVE,
     fraction
   }, `Set Adaptive Step to 1/${Math.round(1 / fraction)}`);
 }
@@ -5038,8 +5038,8 @@ function initializePlayerApi() {
       current: currentNeighborhood()?.C || 0,
       range: activePanoramaRange(),
       // Step Panorama offsets are physical observation settings. They are
-      // intentionally independent from the semantic Step Reach.
-      stepReach: currentPanoramaOffsets(),
+      // intentionally independent from the semantic Step Distance.
+      stepDistance: currentPanoramaOffsets(),
       panoramaCycle: currentPanoramaCycle(),
       // The application resolves the ambient Frame owner and supplies exact
       // source Addresses. The Panorama controller never imports timeline
@@ -5153,7 +5153,7 @@ function beginGhostGesture({ initialDirection } = {}) {
   const anchor = currentNeighborhood().C;
   const originModel = snapshotModel(model());
   const projection = timelineProjection();
-  const stepReach = effectiveStepReach(model().stepReach, activeRange(), projection);
+  const stepDistance = effectiveStepDistance(model().stepDistance, activeRange(), projection);
   // Which stream this gesture reads is decided once, by the direction it opens
   // with. Forward from a re-entered moment asks what originally followed it, so
   // it resumes the historical occurrence. Backward asks what led to the present
@@ -5172,7 +5172,7 @@ function beginGhostGesture({ initialDirection } = {}) {
     frozenStreamEnd: state.traversalTrace.records.length,
     range: activeRange(),
     projection,
-    stepReach
+    stepDistance
   });
   state.ghostGesture = {
     anchor,
@@ -5182,7 +5182,7 @@ function beginGhostGesture({ initialDirection } = {}) {
     anchorPosition: read.index >= 0 ? read.positions[read.index] : null,
     read,
     projection,
-    stepReach,
+    stepDistance,
     initialDirection,
     readOrigin: resumable ? "historical-successor" : "live-occurrence",
     visited: [],
@@ -5646,7 +5646,7 @@ elements["refine-forward"].addEventListener("click", event => {
   if (latchedMatrix) consumeShiftLayer("matrix");
 });
 elements.reopen.addEventListener("click", reopenFully);
-elements["switch-endpoint"].addEventListener("click", event => {
+elements["switch-end"].addEventListener("click", event => {
   switchActiveEnd({
     carryRetained: event.altKey === true
   });
@@ -5860,14 +5860,14 @@ elements["nudge-seconds"].addEventListener("change", event => {
   setStatus(`Nudge set to ${formatQuantum(state.nudgeSeconds)}.`);
   view.render();
 });
-elements["step-size-seconds"].addEventListener("change", event => {
+elements["step-distance"].addEventListener("change", event => {
   changeStepSeconds(event.target.value);
 });
 elements["step-mode-fixed"].addEventListener("click", () => {
-  setStepMode(STEP_REACH_MODE.FIXED);
+  setStepMode(STEP_DISTANCE_MODE.FIXED);
 });
 elements["step-mode-adaptive"].addEventListener("click", () => {
-  setStepMode(STEP_REACH_MODE.ADAPTIVE);
+  setStepMode(STEP_DISTANCE_MODE.ADAPTIVE);
 });
 for (const control of document.querySelectorAll("[data-step-fraction]")) {
   control.addEventListener("click", () => {
@@ -6479,7 +6479,7 @@ document.addEventListener("keydown", event => {
     return;
   }
   // The rail holds two surfaces: I opens Guide; O opens Operators together with
-  // Parameters. Both match the physical key as well as the character, so a
+  // State & Settings. Both match the physical key as well as the character, so a
   // layout that does not produce "i" or "o" there still reaches them.
   if (spatialKey("o")) {
     event.preventDefault();

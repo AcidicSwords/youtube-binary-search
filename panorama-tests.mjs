@@ -21,7 +21,7 @@ import {
 {
   const bounds = derivePanoramaBounds({
     current: 50,
-    stepReach: { backward: 10, forward: 10, linked: true },
+    stepDistance: { backward: 10, forward: 10, linked: true },
     range: { start: 0, end: 100 }
   });
   assert.deepEqual(bounds, {
@@ -195,14 +195,14 @@ assert.equal(resolvePanoramaPhase({
     "YouTube side iframes must not be covered by a transparent action element.");
   assert.match(html, /id="tail-player-surface"[\s\S]*role="button"[\s\S]*id="player-tail"/);
   assert.match(html, /id="lead-player-surface"[\s\S]*role="button"[\s\S]*id="player-lead"/);
-  // Settings have one home: Parameters owns what is remembered, and the surface
+  // Settings have one home: State & Settings owns what is remembered, and the surface
   // owns what is momentary. The Panorama's offsets and cycling pair persist,
-  // so they are Parameters; showing the Panorama, collapsing a side and holding
+  // so they are State & Settings; showing the Panorama, collapsing a side and holding
   // a span act on what you are looking at, so they stay on it.
   assert.match(
     html,
     /id="parameter-panel"[\s\S]*id="field-inner-offset"[\s\S]*id="field-outer-offset"[\s\S]*id="field-cycle-rate"/,
-    "Persisted Panorama tuning belongs to Parameters."
+    "Persisted Panorama tuning belongs to State & Settings."
   );
   assert.match(
     html,
@@ -210,7 +210,7 @@ assert.equal(resolvePanoramaPhase({
     "and the momentary Panorama controls stay on the Panorama."
   );
   assert.doesNotMatch(html, /class="field-settings-popover"/,
-    "The Tune popover is gone: its contents are Parameters now.");
+    "The Tune popover is gone: its contents are State & Settings now.");
   assert.doesNotMatch(html, /id="(?:tail|lead)-step-button"/,
     "The side video surfaces already own Step; duplicate footer buttons must not return.");
   assert.match(css, /\.side-player-surface iframe[\s\S]*pointer-events:\s*none/,

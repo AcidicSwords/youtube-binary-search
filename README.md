@@ -130,9 +130,9 @@ Nudge is exact source-time adjustment. `Shift`+wheel uses the dominant wheel axi
 | `R` / `T` / `Shift+T` / `F` | Release / Retain Pin / Retain Section / Focus |
 | `X` | Toggle deformation for the acquired Section, otherwise the complete Timeline |
 | `Z` / `C` | Undo / Redo |
-| `[` / `]` | Decrease / increase Step Reach preset |
+| `[` / `]` | Decrease / increase Step Distance preset |
 | `,` / `.` | Nudge backward / forward |
-| `I` / `O` | Open Guide / Operators and Parameters |
+| `I` / `O` | Open Guide / Operators and State & Settings |
 | Hold `G` + wheel | Ghost Traversal: backward and forward through the order you encountered Addresses in |
 | `Alt+Q/W/E/A/S/D` or `Alt` + an arrow Step | Carry the acquired retained object with Current |
 | `Esc` | Cancel the active manipulation or close the transient surface |

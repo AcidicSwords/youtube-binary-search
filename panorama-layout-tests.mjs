@@ -83,7 +83,7 @@ for (const id of [
   "field-inner-offset", "field-outer-offset", "field-cycle-rate",
   "section-retain-form", "section-source", "pin-retain-form", "pin-current",
   "release", "retain", "focus-toggle", "shift-layer-toggle",
-  "step-size-seconds", "step-mode-fixed", "step-mode-adaptive"
+  "step-distance", "step-mode-fixed", "step-mode-adaptive"
 ]) assert.match(html, new RegExp(`id=["']${id}["']`), `Missing Panorama/Guide control: ${id}`);
 
 assert.match(app, /function applyPlayerEffect\(result[\s\S]*result\?\.activeSpan[\s\S]*startContext\(destination\)/,

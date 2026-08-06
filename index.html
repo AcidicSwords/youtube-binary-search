@@ -171,7 +171,7 @@
             <div class="panel-heading compact-heading">
               <div>
                 <span class="eyebrow">Inputs and state</span>
-                <h2 id="parameters-heading">Parameters</h2>
+                <h2 id="parameters-heading">State & Settings</h2>
               </div>
               <p>Values entered here alter the operands used by the centered operators.</p>
             </div>
@@ -191,10 +191,10 @@
                   <button id="step-mode-fixed" type="button" aria-pressed="true">Manual</button>
                   <button id="step-mode-adaptive" type="button" aria-pressed="false">Range-relative</button>
                 </div>
-                <label class="compact-setting" for="step-size-seconds">
+                <label class="compact-setting" for="step-distance">
                   <span>Manual distance</span>
                   <span class="number-with-unit">
-                    <input id="step-size-seconds" type="number" min="0.25" max="300" step="0.25"
+                    <input id="step-distance" type="number" min="0.25" max="300" step="0.25"
                       value="10" inputmode="decimal" disabled>
                     <span>units</span>
                   </span>
@@ -305,7 +305,7 @@
                 <span><kbd>T</kbd> Retain Pin</span>
                 <span><kbd>Space</kbd> Native play/pause</span>
                 <span><kbd>Shift</kbd>+<kbd>Space</kbd> Play at the Shift rate, Panorama suspended</span>
-                <span><kbd>O</kbd> Operators and Parameters</span>
+                <span><kbd>O</kbd> Operators and State & Settings</span>
                 <span><kbd>⇧T</kbd> Retain Section</span>
                 <span><kbd>I</kbd> Guide</span>
                 <span>Hold <kbd>G</kbd> + wheel Ghost Traversal</span>
@@ -352,9 +352,9 @@
                 <span class="action-name"><kbd>A</kbd> <span id="step-backward-label" class="action-label">Step Backward</span></span>
                 <span id="step-backward-meta" class="action-meta">—</span>
               </button>
-              <button id="switch-endpoint" class="nav-action endpoint-action" type="button" data-preview-action="switchActiveEnd" aria-keyshortcuts="S" disabled>
+              <button id="switch-end" class="nav-action endpoint-action" type="button" data-preview-action="switchActiveEnd" aria-keyshortcuts="S" disabled>
                 <span class="action-name"><kbd>S</kbd> <span class="action-label">Switch End</span></span>
-                <span id="switch-endpoint-meta" class="action-meta">No Active Span</span>
+                <span id="switch-end-meta" class="action-meta">No Active Span</span>
               </button>
               <button id="step-forward" class="nav-action direction forward" type="button" data-preview-action="stepForward" aria-keyshortcuts="D ArrowRight Shift+D Shift+ArrowRight" disabled>
                 <span class="action-name"><kbd>D</kbd> <span id="step-forward-label" class="action-label">Step Forward</span></span>

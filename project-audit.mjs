@@ -150,7 +150,7 @@ if (existsSync(new URL("./operator-grammar.js", import.meta.url))) {
   const grammar = read("operator-grammar.js");
   has(grammar, /\[\s*Object\.freeze\(\{ id: "refine-backward"[\s\S]*?id: "reopen"[\s\S]*?id: "refine-forward"/,
     "Grammar fixture states the QWE row.");
-  has(grammar, /id: "step-backward"[\s\S]*?id: "switch-endpoint"[\s\S]*?id: "step-forward"/,
+  has(grammar, /id: "step-backward"[\s\S]*?id: "switch-end"[\s\S]*?id: "step-forward"/,
     "Grammar fixture states the ASD row.");
   has(grammar, /id: "release"[\s\S]*?id: "retain"[\s\S]*?id: "focus-toggle"/,
     "Grammar fixture states the RTF row.");
@@ -288,7 +288,7 @@ for (const interfaceLaw of [
   /### Sections/,
   /### Pins/,
   /### Chapters/,
-  /## Parameters/,
+  /## State & Settings/,
   /## Keyboard and modifier reference/
 ]) has(docs["INTERFACE.md"], interfaceLaw, `INTERFACE describes ${interfaceLaw}.`);
 has(docs["INTERFACE.md"], /physical square[\s\S]{0,100}?QWE \/ ASD \/ RTF/i,

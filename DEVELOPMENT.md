@@ -52,7 +52,7 @@ runs the same complete `npm run verify` gate before publishing.
 8. Current, Cursor, and media position are different authorities.
 9. Pin identity is graph identity. Coincident Address does not imply identity.
 10. Guide owns exact structure editing; Timeline owns spatial manipulation.
-11. Step Reach, Nudge, Context, Panorama offsets, Section Weight, Playback policy,
+11. Step Distance, Nudge, Context, Panorama offsets, Section Weight, Playback policy,
     and deformation bypass have separate owners.
 12. Ordinary player controls and simple Center-only use must remain complete
     when Guide, Panorama, Weight, or Focus is ignored.
@@ -125,7 +125,7 @@ owner. Do not reach through the media adapter from application or Panorama code.
   not a numeric shortcut.
 - Panorama Cycle defaults to `0.25–2.5 s` and `0.75× / 1× / 1.25×`, while saved
   valid preferences and wider available settings remain valid.
-- Hold/Stretch changes neither preferences, Guide, Step Reach, nor history.
+- Hold/Stretch changes neither preferences, Guide, Step Distance, nor history.
 
 ### Source and persistence
 
@@ -171,7 +171,7 @@ Every executable suite is listed here by the current behavior it protects.
 - `panorama-tests.mjs` — Panorama geometry, suspension, Hold/Stretch, side activation, user activation, and panoramic layout contracts.
 - `panorama-bounds-tests.mjs` — Range-contained side geometry, unavailable sides, Context suspension, and side Step.
 - `panorama-cycle-tests.mjs` — conservative defaults, symmetric rates, expansion/contraction, Range clipping, synchronization, Hold, and resume.
-- `panorama-coherence-tests.mjs` — semantic Step Reach and physical Panorama offsets remain independent.
+- `panorama-coherence-tests.mjs` — semantic Step Distance and physical Panorama offsets remain independent.
 - `panorama-frame-tests.mjs` — Frame ownership priority, stable identity, direction, Context edges, and direct-frame validation.
 - `panorama-layout-tests.mjs` — Panorama UI ownership and the separation of Context, Hold/Stretch, Range loop, side Step, and Guide retention.
 - `panorama-runtime-tests.mjs` — real controller placement, proportional cycling, dormant panes, stale events, rate fallback, direct previews, and boundary recovery.

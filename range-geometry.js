@@ -491,7 +491,7 @@ export function getActionRanges(
   range,
   interval = null,
   current = neighborhood.C,
-  stepReach = 10,
+  stepDistance = 10,
   metric = null
 ) {
   assertNeighborhood(neighborhood);
@@ -503,7 +503,7 @@ export function getActionRanges(
     ? null
     : descend(neighborhood, "forward", targets.forward, range);
   const reopened = canReopen(neighborhood, range) ? reopenToRange(current, range) : null;
-  const reach = normalizeDirectionalReach(stepReach);
+  const reach = normalizeDirectionalReach(stepDistance);
   const stepBackward = stepTarget(neighborhood.C, reach.backward, "backward", range, metric);
   const stepForward = stepTarget(neighborhood.C, reach.forward, "forward", range, metric);
   const currentCoordinate = metricCoordinate(metric, neighborhood.C);

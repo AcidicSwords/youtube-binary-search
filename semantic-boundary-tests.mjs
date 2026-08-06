@@ -5,7 +5,7 @@ import {
   goTo,
   refine,
   reopen,
-  setStepReach,
+  setStepDistance,
   step,
   undo
 } from "./session.js";
@@ -42,7 +42,7 @@ const reopenPresentation = getActionRanges(
   session.model.range,
   session.model.activeSpan,
   session.model.neighborhood.C,
-  session.model.stepReach
+  session.model.stepDistance
 ).reopen;
 finding(
   "reopen-kernel-view-disagreement",
@@ -106,16 +106,16 @@ finding(
   { before: beforeCaseCount, after: afterCaseCount }
 );
 
-// An explicit Step Reach edit can commit while a playback transaction is open.
+// An explicit Step Distance edit can commit while a playback transaction is open.
 // Playback settlement must not make Undo skip that intervening semantic edit.
 let playback = createSession({ duration: 100, current: 20 });
 const playbackReturn = structuredClone(playback.model);
-playback = setStepReach(
+playback = setStepDistance(
   playback,
   { backward: 7, forward: 9, linked: false },
-  "Set Step Reach During Playback"
+  "Set Step Distance During Playback"
 ).session;
-const reachBeforeSettlement = structuredClone(playback.model.stepReach);
+const reachBeforeSettlement = structuredClone(playback.model.stepDistance);
 playback = completePlayback(playback, {
   current: 30,
   departure: 20,
@@ -125,13 +125,13 @@ playback = completePlayback(playback, {
 }).session;
 const playbackUndone = undo(playback).session;
 finding(
-  "playback-undo-skips-intervening-step-reach",
+  "playback-undo-skips-intervening-step-distance",
   reachBeforeSettlement.backward === 7
-    && playbackUndone.model.stepReach.backward === 10
-    && playbackUndone.history.at(-1)?.label === "Set Step Reach During Playback",
+    && playbackUndone.model.stepDistance.backward === 10
+    && playbackUndone.history.at(-1)?.label === "Set Step Distance During Playback",
   {
     reachBeforeSettlement,
-    reachAfterOneUndo: playbackUndone.model.stepReach,
+    reachAfterOneUndo: playbackUndone.model.stepDistance,
     remainingHistoryLabel: playbackUndone.history.at(-1)?.label
   }
 );

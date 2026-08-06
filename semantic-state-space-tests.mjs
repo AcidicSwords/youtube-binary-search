@@ -14,7 +14,7 @@ import {
   reopen,
   retainSpanAsSection,
   setRange,
-  setStepReach,
+  setStepDistance,
   step,
   switchActiveEnd,
   undo
@@ -32,15 +32,15 @@ function random() {
 
 function assertInvariant(session) {
   const { model, history } = session;
-  const { duration, range, neighborhood, activeSpan, focus, guide, stepReach } = model;
+  const { duration, range, neighborhood, activeSpan, focus, guide, stepDistance } = model;
   assert.ok(range.start >= -EPSILON && range.end <= duration + EPSILON);
   assert.ok(range.start <= neighborhood.L + EPSILON);
   assert.ok(neighborhood.L <= neighborhood.C && neighborhood.C <= neighborhood.R);
   assert.ok(neighborhood.R <= range.end + EPSILON);
   assert.ok(Number.isInteger(neighborhood.level) && neighborhood.level >= 0);
   assert.ok(["range", "movement"].includes(model.neighborhoodBasis));
-  assert.ok(stepReach.backward >= 0.25 && stepReach.backward <= 300);
-  assert.ok(stepReach.forward >= 0.25 && stepReach.forward <= 300);
+  assert.ok(stepDistance.backward >= 0.25 && stepDistance.backward <= 300);
+  assert.ok(stepDistance.forward >= 0.25 && stepDistance.forward <= 300);
   assert.ok(history.length <= 100);
   assert.equal(validateGuide(guide, duration), true);
 
@@ -136,7 +136,7 @@ for (let run = 0; run < RUNS; run += 1) {
       if (start > end) [start, end] = [end, start];
       result = setRange(session, start, end, session.model.neighborhood.C);
     } else if (operation === 9) {
-      result = setStepReach(session, {
+      result = setStepDistance(session, {
         backward: 0.25 + random() * 299.75,
         forward: 0.25 + random() * 299.75,
         linked: false

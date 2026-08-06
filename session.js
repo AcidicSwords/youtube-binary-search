@@ -55,9 +55,9 @@ import { projectionForModel } from "./timeline-projection.js";
 
 const HISTORY_LIMIT = 100;
 export const MIN_RANGE_SECONDS = 0.25;
-export const MIN_STEP_REACH_SECONDS = 0.25;
-export const MAX_STEP_REACH_SECONDS = 300;
-export const STEP_REACH_MODE = Object.freeze({
+export const MIN_STEP_DISTANCE = 0.25;
+export const MAX_STEP_DISTANCE = 300;
+export const STEP_DISTANCE_MODE = Object.freeze({
   FIXED: "fixed",
   ADAPTIVE: "adaptive"
 });
@@ -75,49 +75,49 @@ export function focusOwnsRangeBoundaries(model) {
   return Boolean(model?.focus);
 }
 
-const DEFAULT_STEP_REACH = Object.freeze({
+const DEFAULT_STEP_DISTANCE = Object.freeze({
   backward: 10,
   forward: 10,
   linked: true,
-  mode: STEP_REACH_MODE.FIXED,
+  mode: STEP_DISTANCE_MODE.FIXED,
   fraction: DEFAULT_STEP_FRACTION
 });
 
-function normalizeReachSeconds(value, fallback) {
+function clampStepDistance(value, fallback) {
   const fallbackValue = Number.isFinite(Number(fallback)) ? Number(fallback) : 10;
   const candidate = Number(value);
   return clamp(
     Number.isFinite(candidate) && candidate > 0 ? candidate : fallbackValue,
-    MIN_STEP_REACH_SECONDS,
-    MAX_STEP_REACH_SECONDS
+    MIN_STEP_DISTANCE,
+    MAX_STEP_DISTANCE
   );
 }
 
-export function normalizeStepReach(value, fallback = DEFAULT_STEP_REACH) {
+export function normalizeStepDistance(value, fallback = DEFAULT_STEP_DISTANCE) {
   const fallbackSource = Number.isFinite(Number(fallback))
     ? { backward: Number(fallback), forward: Number(fallback), linked: true }
     : fallback && typeof fallback === "object"
       ? fallback
-      : DEFAULT_STEP_REACH;
-  const fallbackBackward = normalizeReachSeconds(fallbackSource.backward, 10);
-  const fallbackForward = normalizeReachSeconds(fallbackSource.forward, fallbackBackward);
+      : DEFAULT_STEP_DISTANCE;
+  const fallbackBackward = clampStepDistance(fallbackSource.backward, 10);
+  const fallbackForward = clampStepDistance(fallbackSource.forward, fallbackBackward);
 
   if (Number.isFinite(Number(value))) {
-    const reach = normalizeReachSeconds(value, fallbackForward);
+    const reach = clampStepDistance(value, fallbackForward);
     return {
       backward: reach,
       forward: reach,
       linked: true,
-      mode: STEP_REACH_MODE.FIXED,
+      mode: STEP_DISTANCE_MODE.FIXED,
       fraction: DEFAULT_STEP_FRACTION
     };
   }
 
   const source = value && typeof value === "object" ? value : fallbackSource;
   const linked = source.linked !== false;
-  const mode = source.mode === STEP_REACH_MODE.ADAPTIVE
-    ? STEP_REACH_MODE.ADAPTIVE
-    : STEP_REACH_MODE.FIXED;
+  const mode = source.mode === STEP_DISTANCE_MODE.ADAPTIVE
+    ? STEP_DISTANCE_MODE.ADAPTIVE
+    : STEP_DISTANCE_MODE.FIXED;
   const candidateFraction = Number(source.fraction);
   const fallbackFraction = Number(fallbackSource.fraction);
   const fraction = clamp(
@@ -129,15 +129,15 @@ export function normalizeStepReach(value, fallback = DEFAULT_STEP_REACH) {
     1 / 128,
     1
   );
-  let backward = normalizeReachSeconds(source.backward, fallbackBackward);
-  let forward = normalizeReachSeconds(source.forward, fallbackForward);
+  let backward = clampStepDistance(source.backward, fallbackBackward);
+  let forward = clampStepDistance(source.forward, fallbackForward);
 
   // Linked Reach has one value. Forward is used only to salvage malformed
   // persisted objects; normal UI linking supplies equal directional values.
   if (linked) {
     const reach = Number.isFinite(Number(source.forward))
-      ? normalizeReachSeconds(source.forward, fallbackForward)
-      : normalizeReachSeconds(source.backward, fallbackBackward);
+      ? clampStepDistance(source.forward, fallbackForward)
+      : clampStepDistance(source.backward, fallbackBackward);
     backward = reach;
     forward = reach;
   }
@@ -145,17 +145,17 @@ export function normalizeStepReach(value, fallback = DEFAULT_STEP_REACH) {
   return { backward, forward, linked, mode, fraction };
 }
 
-export function effectiveStepReach(value, range, projection = null) {
-  const configured = normalizeStepReach(value);
-  if (configured.mode !== STEP_REACH_MODE.ADAPTIVE) return configured;
+export function effectiveStepDistance(value, range, projection = null) {
+  const configured = normalizeStepDistance(value);
+  if (configured.mode !== STEP_DISTANCE_MODE.ADAPTIVE) return configured;
   const width = projection?.timelineDistance
     ? projection.timelineDistance(range.start, range.end)
     : Math.abs(range.end - range.start);
   const candidate = width * configured.fraction;
   const amount = clamp(
     Number.isFinite(candidate) ? candidate : configured.forward,
-    MIN_STEP_REACH_SECONDS,
-    MAX_STEP_REACH_SECONDS
+    MIN_STEP_DISTANCE,
+    MAX_STEP_DISTANCE
   );
   return {
     ...configured,
@@ -365,7 +365,7 @@ function stepIntervalAnchor(model, sourceInterval = model.activeSpan) {
   return sourceInterval.departure;
 }
 
-export function createSession({ duration = 0, current = 0, guide = createGuide(), stepReach = DEFAULT_STEP_REACH } = {}) {
+export function createSession({ duration = 0, current = 0, guide = createGuide(), stepDistance = DEFAULT_STEP_DISTANCE } = {}) {
   const end = Math.max(0, Number(duration) || 0);
   const C = clamp(Number(current) || 0, 0, end);
   return {
@@ -377,7 +377,7 @@ export function createSession({ duration = 0, current = 0, guide = createGuide()
       lastOperator: null,
       focus: null,
       activeSpan: null,
-      stepReach: normalizeStepReach(stepReach),
+      stepDistance: normalizeStepDistance(stepDistance),
       guide
     },
     history: [],
@@ -394,7 +394,7 @@ export function snapshotModel(model, options = {}) {
     lastOperator: model.lastOperator || null,
     focus: clone(model.focus),
     activeSpan: clone(model.activeSpan),
-    stepReach: normalizeStepReach(model.stepReach),
+    stepDistance: normalizeStepDistance(model.stepDistance),
     guide: options.cloneGuide ? clone(model.guide) : model.guide
   };
 }
@@ -842,8 +842,8 @@ export function refine(session, direction, options = {}) {
 
 export function step(session, direction, seconds = null, options = {}) {
   const projection = options.projection || projectionForModel(session.model);
-  const configured = effectiveStepReach(
-    session.model.stepReach,
+  const configured = effectiveStepDistance(
+    session.model.stepDistance,
     session.model.range,
     projection
   );
@@ -890,8 +890,8 @@ export function stepToPin(session, destination, direction, options = {}) {
   if (!Number.isFinite(destination)) return unchanged(session, "no-destination");
   const backward = direction === "backward";
   const projection = options.projection || projectionForModel(session.model);
-  const configured = effectiveStepReach(
-    session.model.stepReach,
+  const configured = effectiveStepDistance(
+    session.model.stepDistance,
     session.model.range,
     projection
   );
@@ -916,19 +916,19 @@ export function stepToPin(session, destination, direction, options = {}) {
   });
 }
 
-export function setStepReach(session, nextReach, label = "Set Step Reach") {
-  const current = normalizeStepReach(session.model.stepReach);
-  const next = normalizeStepReach(nextReach, current);
+export function setStepDistance(session, nextReach, label = "Set Step Distance") {
+  const current = normalizeStepDistance(session.model.stepDistance);
+  const next = normalizeStepDistance(nextReach, current);
   const unchangedReach = Math.abs(current.backward - next.backward) <= EPSILON
     && Math.abs(current.forward - next.forward) <= EPSILON
     && current.linked === next.linked
     && current.mode === next.mode
     && Math.abs(current.fraction - next.fraction) <= Number.EPSILON;
-  if (unchangedReach) return unchanged(session, "unchanged-step-reach", { stepReach: current });
+  if (unchangedReach) return unchanged(session, "unchanged-step-distance", { stepDistance: current });
 
   return commit(session, label, draft => {
-    draft.stepReach = next;
-    return { changed: true, stepReach: next };
+    draft.stepDistance = next;
+    return { changed: true, stepDistance: next };
   });
 }
 
@@ -1232,10 +1232,10 @@ export function completePlayback(session, options) {
 
   const playbackCheckpoint = snapshotModel(options.returnModel || session.model);
   // Playback owns the spatial path captured when it started. Semantic values
-  // that may legitimately change while it runs (Step Reach and retained Guide
+  // that may legitimately change while it runs (Step Distance and retained Guide
   // edits) must remain in the checkpoint immediately before
   // settlement so Undo does not skip those intervening transactions.
-  playbackCheckpoint.stepReach = normalizeStepReach(session.model.stepReach);
+  playbackCheckpoint.stepDistance = normalizeStepDistance(session.model.stepDistance);
   playbackCheckpoint.guide = session.model.guide;
   return commit(session, options.label || "Playback", draft => {
     draft.neighborhood = clone(projection.model.neighborhood);

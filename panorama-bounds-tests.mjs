@@ -19,7 +19,7 @@ function assertContained(bounds, range) {
 {
   const range = { start: 0, end: 100 };
   const resolution = { L: 48, C: 50, R: 52 };
-  const bounds = derivePanoramaBounds({ current: 50, stepReach: { backward: 10, forward: 10, linked: true }, range });
+  const bounds = derivePanoramaBounds({ current: 50, stepDistance: { backward: 10, forward: 10, linked: true }, range });
   assert.deepEqual(bounds.envelope, { start: 40, end: 60 });
   assert.ok(bounds.envelope.start < resolution.L, "Panorama may extend behind Resolution.");
   assert.ok(bounds.envelope.end > resolution.R, "Panorama may extend ahead of Resolution.");
@@ -28,21 +28,21 @@ function assertContained(bounds, range) {
 
 for (const current of [0, 1, 4, 25, 50, 96, 99, 100]) {
   const range = { start: 0, end: 100 };
-  assertContained(derivePanoramaBounds({ current, stepReach: { backward: 10, forward: 10, linked: true }, range }), range);
+  assertContained(derivePanoramaBounds({ current, stepDistance: { backward: 10, forward: 10, linked: true }, range }), range);
 }
 
 {
-  const bounds = derivePanoramaBounds({ current: 4, stepReach: { backward: 10, forward: 10, linked: true }, range: { start: 0, end: 100 } });
+  const bounds = derivePanoramaBounds({ current: 4, stepDistance: { backward: 10, forward: 10, linked: true }, range: { start: 0, end: 100 } });
   assert.deepEqual(bounds.tail, { target: 0, reach: 4, constrained: true });
   assert.equal(bounds.constraint, "start");
 }
 {
-  const bounds = derivePanoramaBounds({ current: 96, stepReach: { backward: 10, forward: 10, linked: true }, range: { start: 0, end: 100 } });
+  const bounds = derivePanoramaBounds({ current: 96, stepDistance: { backward: 10, forward: 10, linked: true }, range: { start: 0, end: 100 } });
   assert.deepEqual(bounds.lead, { target: 100, reach: 4, constrained: true });
   assert.equal(bounds.constraint, "end");
 }
 {
-  const bounds = derivePanoramaBounds({ current: 4, stepReach: { backward: 10, forward: 10, linked: true }, range: { start: 0, end: 12 } });
+  const bounds = derivePanoramaBounds({ current: 4, stepDistance: { backward: 10, forward: 10, linked: true }, range: { start: 0, end: 12 } });
   assert.deepEqual(bounds.envelope, { start: 0, end: 12 });
   assert.equal(bounds.constraint, "both");
 }
@@ -90,7 +90,7 @@ function makeControllerHarness() {
     videoId: "bounds-test",
     current: 50,
     range: { start: 0, end: 100 },
-    stepReach: { backward: 10, forward: 10, linked: true },
+    stepDistance: { backward: 10, forward: 10, linked: true },
     panoramaCycle: { inner: 2, outer: 10, rate: 0.5 },
     transportKind: "idle",
     pendingStep: false,

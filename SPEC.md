@@ -30,7 +30,7 @@ A loaded Session owns:
 - Resolution and Resolution basis;
 - an optional Active Span with bounds, orientation, and endpoint frames;
 - optional Focus and its return Range;
-- configured Step Reach;
+- configured Step Distance;
 - Guide version 9 Groups, Pins, Sections, labels, membership, activity, drawn Group, and Section Weight;
 - bounded Undo history and Redo future.
 
@@ -41,7 +41,7 @@ The application owns the loaded source identity and the current Session. Guide p
 Preferences may persist independently from a source:
 
 - Context duration;
-- Step Reach mode and values;
+- Step Distance mode and values;
 - Panorama Inner Offset, Outer Offset, and cycling-rate spread;
 - Nudge quantum when no exact media frame is available;
 - Shift playback fixed wish and dynamic-policy choice;
@@ -283,7 +283,7 @@ The canonical action identities and shifted meanings are:
 | `reopen` | `W` | Reopen | unchanged |
 | `refine-forward` | `E` | Refine Forward | Local Refine Forward |
 | `step-backward` | `A` | Step Backward | Previous Pin |
-| `switch-endpoint` | `S` | Switch End | unchanged |
+| `switch-end` | `S` | Switch End | unchanged |
 | `step-forward` | `D` | Step Forward | Next Pin |
 | `release` | `R` | Release | unchanged |
 | `tag` | `T` | Retain Pin | Retain Section |
@@ -622,11 +622,11 @@ User time is an append-only, source-scoped ledger of traversal records. A record
 
 Semantic history and user time are different orders, and traversing one is a route through the other: an Undo or Redo that puts the reader at a different Address writes one occurrence like any other movement, and one that only changes the world writes nothing. A held or coalesced gesture writes one sequence that keeps its reversals, because collapsing a Step run to its endpoints erases the shape the reader remembers. A Current drag writes one movement: the ground under the pointer is a search for a place, exactly as a Ghost scan is, and only the release is an arrival.
 
-Ghost Traversal is held `G` plus the wheel. Arming costs nothing: no Anchor, no history, no settled playback. The first wheel quantum settles pending work, captures Current as a fixed Anchor, and freezes the projection, the effective Step Reach and the readable extent of the stream, so the gesture reads a world that cannot change underneath it and can never follow its own output.
+Ghost Traversal is held `G` plus the wheel. Arming costs nothing: no Anchor, no history, no settled playback. The first wheel quantum settles pending work, captures Current as a fixed Anchor, and freezes the projection, the effective Step Distance and the readable extent of the stream, so the gesture reads a world that cannot change underneath it and can never follow its own output.
 
 Each quantum moves a read cursor one occurrence backward or forward through user time and applies the recalled Address as an amendment against one captured origin. Backward and forward name directions in user time; either may move either way through source time. Watched spans are subdivided by the frozen Step law, so expanded ground yields finer recall while the watched boundaries stay exact. An Address the active Range excludes is unavailable rather than clamped, and Ghost never leaves Focus, widens Range, or opens Full Video to reach one.
 
-Ghost restores no historical Pins, Sections, Groups, Weights, titles, visibility, Focus, Range, Step Reach, deformation state or Guide selection. What it produces is an ordinary Active Span between the Anchor and the recalled Address, so Switch End, Tag, Release and Focus act on it exactly as they would on any other.
+Ghost restores no historical Pins, Sections, Groups, Weights, titles, visibility, Focus, Range, Step Distance, deformation state or Guide selection. What it produces is an ordinary Active Span between the Anchor and the recalled Address, so Switch End, Tag, Release and Focus act on it exactly as they would on any other.
 
 Where automatic Context is enabled, each recalled Address plays: the stop condition for a recall is recognition, and a still frame is a poor thing to recognise a moment from. Successive candidates retarget one Context window rather than opening a new one, so the window follows the wheel instead of being torn down and rebuilt at every notch. A window superseded or run out during the scan is search and writes no observation; only the one still running when the gesture ended was watched, and it joins the path as observed source time on its own terms. Escape stops it with everything else the scan did. With Context off, recall remains a silent frame-by-frame scan.
 

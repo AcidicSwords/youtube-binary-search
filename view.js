@@ -39,9 +39,9 @@ import {
   isTransportActive
 } from "./transport.js";
 import {
-  STEP_REACH_MODE,
+  STEP_DISTANCE_MODE,
   focusOwnsRangeBoundaries,
-  effectiveStepReach,
+  effectiveStepDistance,
   projectPlayback,
   previewTransition
 } from "./session.js";
@@ -1802,8 +1802,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? { start: field.span.start, end: field.span.end }
       : null;
     const semanticCurrent = currentNeighborhood?.C ?? 0;
-    const configuredReach = model().stepReach;
-    const effectiveReach = effectiveStepReach(
+    const configuredReach = model().stepDistance;
+    const effectiveReach = effectiveStepDistance(
       configuredReach,
       activeRange,
       projection
@@ -1972,8 +1972,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements["nudge-seconds"].value = String(
       Number((currentState.nudgeSeconds ?? 1 / 24).toFixed(3))
     );
-    elements["step-size-seconds"].value = String(configuredReach.forward);
-    const adaptiveStep = configuredReach.mode === STEP_REACH_MODE.ADAPTIVE;
+    elements["step-distance"].value = String(configuredReach.forward);
+    const adaptiveStep = configuredReach.mode === STEP_DISTANCE_MODE.ADAPTIVE;
     // Adaptive Reach derives a live map distance from the weighted Range, so it
     // is reported as the source time the next forward Step would actually
     // cross rather than as its raw map size.
@@ -1994,7 +1994,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       : `${Number(Number(configuredReach.forward).toFixed(3))} units · manual`;
     elements["step-mode-fixed"].setAttribute("aria-pressed", String(!adaptiveStep));
     elements["step-mode-adaptive"].setAttribute("aria-pressed", String(adaptiveStep));
-    elements["step-size-seconds"].disabled = adaptiveStep || !loaded;
+    elements["step-distance"].disabled = adaptiveStep || !loaded;
     for (const control of document.querySelectorAll("[data-step-fraction]")) {
       const selected = Math.abs(
         Number(control.dataset.stepFraction) - configuredReach.fraction
@@ -2142,7 +2142,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
     elements.reopen.disabled = interactionLocked || !actionModel?.reopen;
     elements["return-action"].disabled = !loaded || !currentState.session.history.length;
     elements["redo-action"].disabled = !loaded || !(currentState.session.future || []).length;
-    elements["switch-endpoint"].disabled = interactionLocked || !currentSpan;
+    elements["switch-end"].disabled = interactionLocked || !currentSpan;
     elements["step-backward"].disabled = interactionLocked
       || (shiftLayer ? !previous : !actionModel?.stepBackward);
     elements["step-forward"].disabled = interactionLocked
@@ -2207,8 +2207,8 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
       ? formatDuration(destinationFrame.neighborhood.R - destinationFrame.neighborhood.L)
       : null;
     setActionMeta(
-      "switch-endpoint",
-      "switch-endpoint-meta",
+      "switch-end",
+      "switch-end-meta",
       "Switch End",
       currentSpan
         ? `to ${formatTime(currentSpan.departure)}${destinationScale ? ` · ${destinationScale} ${destinationFrame.neighborhoodBasis === NEIGHBORHOOD_BASIS.RANGE ? "Range" : "movement"} scale` : ""}`
@@ -2250,7 +2250,7 @@ export function createView({ document, getState, getPlayerTime, minRangeSeconds 
           rangeStretchFactor ? ` · ${rangeStretchFactor} spatial` : ""
         }`
       : "Range-level resolution";
-    // Step Reach is a distance on the map, and inside a weighted Section a
+    // Step Distance is a distance on the map, and inside a weighted Section a
     // given map distance covers less or more source time. Every readout that
     // announces a movement states the source time that movement actually
     // crosses, so "10s · to 0:43" can never appear beside a Current of 0:38.

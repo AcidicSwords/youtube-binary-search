@@ -163,8 +163,8 @@ byId.get("timeline").dispatch("click", {
 });
 await flush();
 byId.get("release").click();
-byId.get("step-size-seconds").value = "1";
-byId.get("step-size-seconds").dispatch("change");
+byId.get("step-distance").value = "1";
+byId.get("step-distance").dispatch("change");
 byId.get("step-forward").click();
 await delay(180);
 await flush();
@@ -440,7 +440,7 @@ assert.deepEqual(
 }
 
 
-// Presentation law: Step Reach is a distance on the map, so inside a weighted
+// Presentation law: Step Distance is a distance on the map, so inside a weighted
 // Section a given map distance covers a different amount of source time. Every
 // readout that announces a movement must state the source time it will actually
 // cross, or the interface reads "10s · to 0:43" beside a Current of 0:38.
@@ -448,8 +448,8 @@ assert.deepEqual(
   byId.get("context-seconds").value = "0";
   byId.get("context-seconds").dispatch("change");
   byId.get("step-mode-fixed").dispatch("click", { detail: 1 });
-  byId.get("step-size-seconds").value = "10";
-  byId.get("step-size-seconds").dispatch("change");
+  byId.get("step-distance").value = "10";
+  byId.get("step-distance").dispatch("change");
   await flush();
   const readout = id => byId.get(id).textContent;
   const spanOf = text => text.split("·")[0].trim();

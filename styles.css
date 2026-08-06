@@ -1214,7 +1214,7 @@ kbd {
   font: 600 0.64rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-/* Parameters | operators | retained structure */
+/* State & Settings | operators | retained structure */
 .command-workspace {
   display: grid;
   gap: var(--content-gap);
@@ -1453,7 +1453,7 @@ kbd {
   grid-template-rows: repeat(3, minmax(0, 1fr));
   grid-template-areas:
     "refine-backward reopen refine-forward"
-    "step-backward switch-endpoint step-forward"
+    "step-backward switch-end step-forward"
     "release retain focus";
   gap: 8px;
   align-items: stretch;
@@ -1465,7 +1465,7 @@ kbd {
 #refine-backward { grid-area: refine-backward; }
 #refine-forward { grid-area: refine-forward; }
 #step-backward { grid-area: step-backward; }
-#switch-endpoint { grid-area: switch-endpoint; }
+#switch-end { grid-area: switch-end; }
 #step-forward { grid-area: step-forward; }
 #release { grid-area: release; }
 #retain { grid-area: retain; }
@@ -2125,7 +2125,7 @@ kbd {
   /* The rail hides overflow so it can slide, but expanding several disclosures
      makes the controls taller than it. Without a scroll of their own the ones
      at the bottom were simply unreachable -- measured at 1062px past the edge
-     with every Parameters disclosure open. */
+     with every State & Settings disclosure open. */
   .command-workspace.mode-controls {
     overflow-x: hidden;
     overflow-y: auto;

@@ -156,7 +156,7 @@ export async function loadVideo(page, url = "https://youtu.be/dQw4w9WgXcQ") {
   );
   // Context observation would otherwise start after every traversal and make
   // timing the subject of tests that are about something else. It is set
-  // directly rather than through the control, which lives in the Parameters
+  // directly rather than through the control, which lives in the State & Settings
   // panel and is genuinely not visible while the rail is showing Guide -- a
   // fact the DOM-free harness cannot represent and these tests should not
   // work around by opening panels they are not testing.

@@ -15,7 +15,7 @@ assert.deepEqual(
   OPERATOR_MATRIX.map(row => row.map(cell => cell.id)),
   [
     ["refine-backward", "reopen", "refine-forward"],
-    ["step-backward", "switch-endpoint", "step-forward"],
+    ["step-backward", "switch-end", "step-forward"],
     ["release", "retain", "focus-toggle"]
   ]
 );

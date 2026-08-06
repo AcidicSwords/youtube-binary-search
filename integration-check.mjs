@@ -134,7 +134,7 @@ for (const id of domReferences) {
 // The matrix grammar is frozen, shared, and physically proved in Chromium.
 const expectedMatrix = [
   ["refine-backward", "reopen", "refine-forward"],
-  ["step-backward", "switch-endpoint", "step-forward"],
+  ["step-backward", "switch-end", "step-forward"],
   ["release", "retain", "focus-toggle"]
 ];
 const expectedKeys = ["Q", "W", "E", "A", "S", "D", "R", "T", "F"];
@@ -168,7 +168,7 @@ same(
   [...areaBlock.matchAll(/"([^"]+)"/g)].map(match => match[1].trim().split(/\s+/)),
   [
     ["refine-backward", "reopen", "refine-forward"],
-    ["step-backward", "switch-endpoint", "step-forward"],
+    ["step-backward", "switch-end", "step-forward"],
     ["release", "retain", "focus"]
   ],
   "CSS areas express the same three rows."

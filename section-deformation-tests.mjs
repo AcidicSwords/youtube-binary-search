@@ -13,10 +13,10 @@ import {
   validateGuide
 } from "./guide.js";
 import {
-  STEP_REACH_MODE,
+  STEP_DISTANCE_MODE,
   createSession,
   deleteGuidePin,
-  effectiveStepReach,
+  effectiveStepDistance,
   goTo,
   goToGuidePin,
   retainSpanAsSection,
@@ -151,11 +151,11 @@ function weightedGuide(...definitions) {
   const { guide } = weightedGuide([30, 50, 0.5, "Compressed"]);
   const model = createSession({ duration: 100, guide }).model;
   const projection = projectionForModel(model);
-  const adaptive = effectiveStepReach({
+  const adaptive = effectiveStepDistance({
     backward: 10,
     forward: 10,
     linked: true,
-    mode: STEP_REACH_MODE.ADAPTIVE,
+    mode: STEP_DISTANCE_MODE.ADAPTIVE,
     fraction: 1 / 16
   }, model.range, projection);
   close(adaptive.forward, 90 / 16, "Adaptive Reach");

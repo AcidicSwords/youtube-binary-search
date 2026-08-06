@@ -251,7 +251,7 @@ const app = readFileSync(new URL("./app.js", import.meta.url), "utf8");
 const styles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
 assert.match(
   html,
-  /id="refine-backward"[\s\S]*id="reopen"[\s\S]*id="refine-forward"[\s\S]*id="step-backward"[\s\S]*id="switch-endpoint"[\s\S]*id="step-forward"[\s\S]*id="release"[\s\S]*id="retain"[\s\S]*id="focus-toggle"/
+  /id="refine-backward"[\s\S]*id="reopen"[\s\S]*id="refine-forward"[\s\S]*id="step-backward"[\s\S]*id="switch-end"[\s\S]*id="step-forward"[\s\S]*id="release"[\s\S]*id="retain"[\s\S]*id="focus-toggle"/
 );
 assert.match(html, /id="return-action"[^>]*aria-keyshortcuts="Z"/);
 assert.match(html, /id="redo-action"[^>]*aria-keyshortcuts="C"/);
@@ -265,7 +265,7 @@ assert.doesNotMatch(
   "Switch End must remain one exact involution without projection-specific modes."
 );
 assert.match(styles, /"refine-backward reopen refine-forward"/);
-assert.match(styles, /"step-backward switch-endpoint step-forward"/);
+assert.match(styles, /"step-backward switch-end step-forward"/);
 assert.match(styles, /"release retain focus"/);
 
 console.log("Endpoint Transposition tests passed: endpoint frames, involution, Local Refine drawing, Step composition, collapse, Undo separation, and matrix wiring.");

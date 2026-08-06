@@ -47,7 +47,7 @@ function makeHarness({ deferredChapter = false, reducedMotion = false } = {}) {
     videoId: "slideshow",
     current: 50,
     range: { start: 0, end: 200 },
-    stepReach: { backward: 10, forward: 10, linked: true },
+    stepDistance: { backward: 10, forward: 10, linked: true },
     panoramaCycle: { inner: 2, outer: 10, rate: 0.5 },
     transportKind: "idle",
     pendingStep: false,

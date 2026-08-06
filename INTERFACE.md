@@ -14,9 +14,9 @@ The persistent reading surface is vertically ordered:
 4. the optional command rail.
 
 On a wide desktop the Viewer and Timeline remain visible while the rail shows
-either the full-height Guide or Operators followed by Parameters. The rail can
+either the full-height Guide or Operators followed by State & Settings. The rail can
 collapse completely, releasing its width to the panoramic surface. `I` opens or
-closes Guide; `O` opens or closes Operators and Parameters. Switching the rail
+closes Guide; `O` opens or closes Operators and State & Settings. Switching the rail
 changes presentation only.
 
 On compact layouts Guide becomes a modal sheet with a scrim and focus trap. The
@@ -33,7 +33,7 @@ unrelated players.
 Each pane's top bar contains only identity, Address, and a local visibility
 action. Center's bar also reports Panorama state. The sole bottom action is the
 centered `Stretch both` / `Hold both` control. Remembered tuning lives in
-Parameters, not around the video.
+State & Settings, not around the video.
 
 Center is the audible ordinary YouTube player. Tail and Lead are muted
 projections. A non-blocking overlay contains one compact parent-owned Play
@@ -312,9 +312,9 @@ silently changed. The adjacent minus/plus buttons repeat while held and settle
 as one Nudge transaction. Spatial drag and exact input show the same Panorama
 preview and reach the same canonical mutation.
 
-## Parameters
+## State & Settings
 
-Parameters contains remembered configuration, grouped by the question it
+State & Settings contains remembered configuration, grouped by the question it
 answers:
 
 - Active Range and Range tools;
@@ -350,7 +350,7 @@ observation. Changing one setting does not rewrite another dimension.
 | Shift+drag | Precision direct manipulation |
 | [ / ] | Previous / next Step preset |
 | Z / C | Undo / Redo |
-| G / O | Guide / Operators and Parameters |
+| G / O | Guide / Operators and State & Settings |
 | ? | Keyboard reference |
 | Escape | Cancel active gesture, then stop or close the topmost transient layer |
 

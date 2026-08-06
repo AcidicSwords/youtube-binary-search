@@ -10,11 +10,11 @@ import {
   goTo,
   step,
   refine,
-  setStepReach,
-  effectiveStepReach,
+  setStepDistance,
+  effectiveStepDistance,
   setGuideSectionWeight,
   saveExtentAsSection,
-  STEP_REACH_MODE
+  STEP_DISTANCE_MODE
 } from "./session.js";
 import { projectionForModel } from "./timeline-projection.js";
 import { deriveContextWindow, createContextTransport } from "./transport.js";
@@ -100,9 +100,9 @@ function addresses(model) {
     "A Weight edit changes only the metric — not even a derived Resolution bound."
   );
   assert.deepEqual(
-    edited.session.model.stepReach,
-    neutral.session.model.stepReach,
-    "A Weight edit never rewrites stored Step Reach."
+    edited.session.model.stepDistance,
+    neutral.session.model.stepDistance,
+    "A Weight edit never rewrites stored Step Distance."
   );
 }
 
@@ -146,14 +146,14 @@ function addresses(model) {
     "A spatial midpoint must move when the metric changes.");
 
   // Adaptive Reach is a fraction of weighted Range width, so it follows Weight.
-  const adaptive = { mode: STEP_REACH_MODE.ADAPTIVE, fraction: 1 / 16 };
-  const plainAdaptive = effectiveStepReach(
-    setStepReach(neutral.session, adaptive).session.model.stepReach,
+  const adaptive = { mode: STEP_DISTANCE_MODE.ADAPTIVE, fraction: 1 / 16 };
+  const plainAdaptive = effectiveStepDistance(
+    setStepDistance(neutral.session, adaptive).session.model.stepDistance,
     RANGE,
     projectionForModel(neutral.session.model)
   );
-  const scaledAdaptive = effectiveStepReach(
-    setStepReach(weighted.session, adaptive).session.model.stepReach,
+  const scaledAdaptive = effectiveStepDistance(
+    setStepDistance(weighted.session, adaptive).session.model.stepDistance,
     RANGE,
     projectionForModel(weighted.session.model)
   );
@@ -161,15 +161,15 @@ function addresses(model) {
     "Adaptive Reach follows the weighted Range width.");
 
   // Fixed Reach is stored, not derived, so it does not.
-  const fixed = { mode: STEP_REACH_MODE.FIXED, backward: 10, forward: 10 };
+  const fixed = { mode: STEP_DISTANCE_MODE.FIXED, backward: 10, forward: 10 };
   assert.deepEqual(
-    effectiveStepReach(
-      setStepReach(neutral.session, fixed).session.model.stepReach,
+    effectiveStepDistance(
+      setStepDistance(neutral.session, fixed).session.model.stepDistance,
       RANGE,
       projectionForModel(neutral.session.model)
     ),
-    effectiveStepReach(
-      setStepReach(weighted.session, fixed).session.model.stepReach,
+    effectiveStepDistance(
+      setStepDistance(weighted.session, fixed).session.model.stepDistance,
       RANGE,
       projectionForModel(weighted.session.model)
     ),

@@ -32,7 +32,7 @@ constructs `YT.Player`.
 
 Source time is the only stored temporal coordinate. A Session model contains
 duration, Range, Current within a Resolution, the optional Active Span,
-Focus, Step Reach, Guide, and the last semantic operator. Pins and Section
+Focus, Step Distance, Guide, and the last semantic operator. Pins and Section
 endpoints are source Addresses. Timeline coordinates, lanes, gradients, hover
 state, open panels, and deformation bypass are never stored in the model.
 
@@ -184,7 +184,7 @@ Spatial dragging remains on Timeline.
 Guide persistence is source-keyed under version 10. Older version 1–8 records
 are migrated through the Guide kernel; valid current records round-trip without
 changing identity. User preferences have a separate versioned key and include
-Step Reach, Nudge, Context, Shift playback, Panorama settings, and pane
+Step Distance, Nudge, Context, Shift playback, Panorama settings, and pane
 visibility. Deformation bypass, open surfaces, selections, Chapters, and Panorama
 runtime are transient.
 
@@ -357,6 +357,6 @@ synchronization barrier, reverses only after every operational side arrives,
 and preserves phase through deliberate Hold/Stretch. Hold changes no semantic
 state or preference.
 
-Context, Step Reach, Panorama offsets, and Weight have separate owners. Context and
+Context, Step Distance, Panorama offsets, and Weight have separate owners. Context and
 live Panorama displacement remain source-time geometry. Weight affects only
 Timeline-derived addresses and explicitly dynamic Playback.

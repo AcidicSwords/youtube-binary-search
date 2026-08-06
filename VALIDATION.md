@@ -103,7 +103,7 @@ and `ghost-smoke.mjs` the gesture in a real browser.
 - Arming `G` costs nothing: no Anchor, no history, no settled playback, until a
   whole wheel quantum is earned. One turn of the wheel recalls exactly one
   moment whatever the device reports for a detent.
-- A gesture freezes the readable stream, Range, projection, and Step Reach at
+- A gesture freezes the readable stream, Range, projection, and Step Distance at
   its start, so it can never follow its own output and no mid-gesture change
   moves a candidate already passed.
 - The scan is transient in both directions: a backward scan that crosses many
@@ -181,7 +181,7 @@ rewrite-refusal coverage.
   depending on how much wall clock has passed since the resume.
 - Panorama Off, collapsed panes, Center-only Playback, Context, and incompatible
   actual rate keep side players dormant. Hold/Stretch changes no preference,
-  Guide, Step Reach, Weight, or history.
+  Guide, Step Distance, Weight, or history.
 
 ### Documentation and gauges
 
@@ -274,7 +274,7 @@ Operators outside the matrix, and no Timeline-header control duplicates it.
 
 ### Journey E — Panorama
 
-1. Confirm the initial Parameters read `0.25–2.5 s` and
+1. Confirm the initial State & Settings read `0.25–2.5 s` and
    `0.75× / 1× / 1.25×`.
 2. Start plain playback. Tail must remain behind, Lead ahead, and both must
    cycle through a complete expansion/contraction cycle.
@@ -288,7 +288,7 @@ Operators outside the matrix, and no Timeline-header control duplicates it.
    the configured ambient owner: Context edges while Context is enabled, and the
    last applicable operator frame after Context is turned off.
 
-Accept when Context duration, Step Reach, Panorama offsets, Weight, and playback
+Accept when Context duration, Step Distance, Panorama offsets, Weight, and playback
 rate policy remain independent and no preview breaks live Cycle behavior.
 
 ### Journey F — source and recovery integrity
@@ -331,7 +331,7 @@ or preservation that did not happen.
 - Open a dense Pin cluster. It lists choices vertically, scrolls by wheel, stays
   anchored, supports arrow/Home/End/Escape, and allows both exact click and drag.
 - At 1440p, confirm Viewer and Timeline remain visible beside full-height Guide
-  or Operators plus Parameters without page scrolling. Collapse the rail and
+  or Operators plus State & Settings without page scrolling. Collapse the rail and
   confirm the panoramic surface receives the released width.
 - With more than five overlapping Sections, confirm the Section tree scrolls
   within a bounded band and all wires remain individually reachable.

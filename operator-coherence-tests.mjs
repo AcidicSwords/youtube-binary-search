@@ -323,7 +323,7 @@ let weightedWalk = createSession({
   duration: 100,
   current: 29,
   guide: weightedGuide,
-  stepReach: 1
+  stepDistance: 1
 });
 weightedWalk = step(weightedWalk, "forward", 1).session;
 assert.equal(weightedWalk.model.neighborhood.C, 30);
@@ -351,7 +351,7 @@ let pinWalk = createSession({
   duration: 100,
   current: 29,
   guide: weightedGuide,
-  stepReach: 1
+  stepDistance: 1
 });
 pinWalk = stepToPin(pinWalk, sectionStart.t, "forward", { stepSeconds: 1 }).session;
 pinWalk = stepToPin(pinWalk, sectionEnd.t, "forward", { stepSeconds: 1 }).session;

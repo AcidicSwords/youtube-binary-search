@@ -39,7 +39,7 @@ try {
   const matrix = await page.evaluate(() => {
     const ids = [
       ["refine-backward", "reopen", "refine-forward"],
-      ["step-backward", "switch-endpoint", "step-forward"],
+      ["step-backward", "switch-end", "step-forward"],
       ["release", "retain", "focus-toggle"]
     ];
     const deck = document.querySelector(".navigation-deck").getBoundingClientRect();
@@ -520,7 +520,7 @@ try {
 
   // Layout faults that only exist at a real viewport, each measured before it was
 // fixed: a third Guide tab stranded on its own row; the controls rail hiding
-// 1062px of expanded Parameters with no way to scroll to them; and the rail's
+// 1062px of expanded State & Settings with no way to scroll to them; and the rail's
 // min-height, distributed across the two rows it spans, pushing the Timeline
 // 310px away from the viewer on a short window.
 for (const [width, height] of [[1920, 1080], [1600, 720]]) {
@@ -552,7 +552,7 @@ for (const [width, height] of [[1920, 1080], [1600, 720]]) {
     return !overflows || scrolls || pageScrolls;
   });
   assert.ok(reachable,
-    `Expanded Parameters must be reachable at ${width}x${height}, by the rail scrolling or the page.`);
+    `Expanded State & Settings must be reachable at ${width}x${height}, by the rail scrolling or the page.`);
   await page.click("#guide-toggle");
   await page.waitForTimeout(200);
 }

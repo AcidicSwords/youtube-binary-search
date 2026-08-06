@@ -51,7 +51,7 @@ function makeHarness({
     videoId: "field-state-test",
     current: 50,
     range: { start: 0, end: 100 },
-    stepReach: { backward: 10, forward: 10, linked: true },
+    stepDistance: { backward: 10, forward: 10, linked: true },
     panoramaCycle: { inner: 2, outer: 10, rate: 0.5 },
     pendingStep: false,
     dragging: false,

@@ -6,13 +6,13 @@ import {
   workFromExtent,
   refine,
   reopen,
-  setStepReach,
+  setStepDistance,
   step,
   redo,
   undo,
-  normalizeStepReach,
-  MIN_STEP_REACH_SECONDS,
-  MAX_STEP_REACH_SECONDS
+  normalizeStepDistance,
+  MIN_STEP_DISTANCE,
+  MAX_STEP_DISTANCE
 } from "./session.js";
 import { getActionRanges, normalizeDirectionalReach } from "./range-geometry.js";
 import {
@@ -22,7 +22,7 @@ import {
 } from "./panorama.js";
 import { chooseNearestRate, sideRateStepFromResponse } from "./panorama-geometry.js";
 
-assert.deepEqual(normalizeStepReach(8), {
+assert.deepEqual(normalizeStepDistance(8), {
   backward: 8,
   forward: 8,
   linked: true,
@@ -32,12 +32,12 @@ assert.deepEqual(normalizeStepReach(8), {
 assert.deepEqual(normalizeDirectionalReach({ backward: 5, forward: 15, linked: false }), {
   backward: 5, forward: 15, linked: false
 });
-assert.deepEqual(normalizeStepReach({ backward: 5, forward: 15, linked: true }), {
+assert.deepEqual(normalizeStepDistance({ backward: 5, forward: 15, linked: true }), {
   backward: 15, forward: 15, linked: true, mode: "fixed", fraction: 1 / 16
 });
-assert.deepEqual(normalizeStepReach({ backward: 0.01, forward: 900, linked: false }), {
-  backward: MIN_STEP_REACH_SECONDS,
-  forward: MAX_STEP_REACH_SECONDS,
+assert.deepEqual(normalizeStepDistance({ backward: 0.01, forward: 900, linked: false }), {
+  backward: MIN_STEP_DISTANCE,
+  forward: MAX_STEP_DISTANCE,
   linked: false,
   mode: "fixed",
   fraction: 1 / 16
@@ -54,19 +54,19 @@ assert.equal(sideRateStepFromResponse({ tailRate: 0.75, leadRate: 1.25 }), 0.25)
 assert.equal(sideRateStepFromResponse({ tailRate: 0.5, leadRate: 2 }), 0.75);
 
 {
-  let session = createSession({ duration: 200, current: 100, stepReach: { backward: 5, forward: 15, linked: false } });
+  let session = createSession({ duration: 200, current: 100, stepDistance: { backward: 5, forward: 15, linked: false } });
   let result = step(session, "forward");
   assert.equal(result.destination, 115);
   session = result.session;
   result = step(session, "backward");
   assert.equal(result.destination, 110, "Directional Steps form an explicit ratchet when offsets differ.");
 
-  result = setStepReach(session, { backward: 10, forward: 10, linked: true });
-  assert.deepEqual(result.session.model.stepReach, {
+  result = setStepDistance(session, { backward: 10, forward: 10, linked: true });
+  assert.deepEqual(result.session.model.stepDistance, {
     backward: 10, forward: 10, linked: true, mode: "fixed", fraction: 1 / 16
   });
   const restored = undo(result.session);
-  assert.deepEqual(restored.session.model.stepReach, {
+  assert.deepEqual(restored.session.model.stepDistance, {
     backward: 5, forward: 15, linked: false, mode: "fixed", fraction: 1 / 16
   });
 }
@@ -109,7 +109,7 @@ assert.equal(sideRateStepFromResponse({ tailRate: 0.5, leadRate: 2 }), 0.75);
 {
   const bounds = derivePanoramaBounds({
     current: 50,
-    stepReach: { backward: 5, forward: 15, linked: false },
+    stepDistance: { backward: 5, forward: 15, linked: false },
     range: { start: 0, end: 100 }
   });
   assert.deepEqual(bounds.tail, { target: 45, reach: 5, constrained: false });
@@ -161,7 +161,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
       videoId: "single-player-contract",
       current: 50,
       range: { start: 0, end: 100 },
-      stepReach: { backward: 10, forward: 10, linked: true },
+      stepDistance: { backward: 10, forward: 10, linked: true },
       transportKind: "playback",
       center: { time: 50, rate: 1, state: 1, availableRates: [0.5, 1, 2] }
     }),
@@ -211,13 +211,13 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
     /\.pane-field-controls\s*\{[\s\S]*display:\s*flex[\s\S]*justify-content:\s*center/
   );
   // The Nudge quantum and the Panorama's offsets are both remembered settings,
-  // so both are Parameters. They used to be split across a Tune popover on the
-  // Panorama and the Parameters panel, which meant the answer to "where is the
+  // so both are State & Settings. They used to be split across a Tune popover on the
+  // Panorama and the State & Settings panel, which meant the answer to "where is the
   // setting?" depended on which setting.
   assert.match(
     html,
     /id="parameter-panel"[\s\S]*id="nudge-seconds"[\s\S]*id="field-inner-offset"[\s\S]*id="field-outer-offset"[\s\S]*id="field-cycle-rate"/,
-    "Every remembered setting lives in Parameters."
+    "Every remembered setting lives in State & Settings."
   );
   assert.doesNotMatch(html, /center-field-settings/,
     "The Panorama keeps no settings popover of its own.");
@@ -237,8 +237,8 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
     /\.center-transport-surface:hover:not\(:disabled\),[\s\S]*background:\s*transparent[\s\S]*transform:\s*none/,
     "Center hover may emphasize its transport icon but must not dim or shift the primary frame."
   );
-  assert.match(app, /setStepReach as setSessionStepReach/);
-  assert.match(app, /stepReach: currentPanoramaOffsets\(\)/);
+  assert.match(app, /setStepDistance as setSessionStepDistance/);
+  assert.match(app, /stepDistance: currentPanoramaOffsets\(\)/);
   assert.match(app, /panoramaFrame:\s*panoramaOperatorPreview\(\)/);
   assert.match(
     app,
@@ -273,7 +273,7 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
   );
   assert.doesNotMatch(
     app,
-    /lastStepReachEdited|stepReachLastEdited/,
+    /lastStepDistanceEdited|stepDistanceLastEdited/,
     "Panorama tuning must not write a dead or cross-owned Step direction preference."
   );
   assert.match(
@@ -290,11 +290,11 @@ assert.equal(chooseNearestRate([1], 0.5), 1);
     "Playback must refold and prime each side at 1× before directional divergence.");
   assert.match(field, /function driveSide\(role, center, snapshot, centerRunning, cycleSide, participation\)[\s\S]*requestSideRateStep\(side, cycleSide\.rate\)/,
     "A cycling side must reconcile to the nearest supported rate for its current phase.");
-  assert.match(view, /effectiveStepReach/);
-  assert.match(app, /preferences\.stepReach = normalizeStepReach/);
+  assert.match(view, /effectiveStepDistance/);
+  assert.match(app, /preferences\.stepDistance = normalizeStepDistance/);
   assert.match(implementation, /^# Video Cartography — Canonical Implementation/m);
   assert.doesNotMatch(readme, /Application Continue/);
-  assert.match(readme, /Step Reach/);
+  assert.match(readme, /Step Distance/);
 }
 
-console.log("Panorama coherence tests passed: semantic Step Reach and physical Panorama offsets remain independent.");
+console.log("Panorama coherence tests passed: semantic Step Distance and physical Panorama offsets remain independent.");

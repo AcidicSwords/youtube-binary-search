@@ -383,11 +383,11 @@ export function normalizePanoramaReach(value) {
   return { backward, forward, linked };
 }
 
-function validatePanoramaInputs(current, stepReach, range) {
+function validatePanoramaInputs(current, stepDistance, range) {
   if (!Number.isFinite(current)) {
     throw new TypeError("Step Panorama requires a finite Current.");
   }
-  normalizePanoramaReach(stepReach);
+  normalizePanoramaReach(stepDistance);
   if (
     !range
     || !Number.isFinite(range.start)
@@ -398,8 +398,8 @@ function validatePanoramaInputs(current, stepReach, range) {
   }
 }
 
-export function derivePanoramaBounds({ current, stepReach, range }) {
-  const requested = normalizePanoramaReach(stepReach);
+export function derivePanoramaBounds({ current, stepDistance, range }) {
+  const requested = normalizePanoramaReach(stepDistance);
   validatePanoramaInputs(current, requested, range);
 
   const center = clamp(current, range.start, range.end);
@@ -439,8 +439,8 @@ export function derivePanoramaBounds({ current, stepReach, range }) {
   };
 }
 
-export function derivePanorama(current, stepReach, range) {
-  const bounds = derivePanoramaBounds({ current, stepReach, range });
+export function derivePanorama(current, stepDistance, range) {
+  const bounds = derivePanoramaBounds({ current, stepDistance, range });
   return {
     center: bounds.current,
     requestedReach: bounds.requestedReach,

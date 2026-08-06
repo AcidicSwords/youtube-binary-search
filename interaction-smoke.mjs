@@ -233,10 +233,10 @@ assert.match(byId.get("backward-meta").textContent, /^draw Current-to-midpoint I
   "Shift+Refine meta must disclose the new Current-to-midpoint extent before invocation.");
 byId.get("shift-layer-toggle").click();
 await flush();
-byId.get("switch-endpoint").click();
+byId.get("switch-end").click();
 await flush();
 assert.equal(currentText(), "Current 0:25");
-byId.get("switch-endpoint").click();
+byId.get("switch-end").click();
 await flush();
 assert.equal(currentText(), "Current 0:50");
 
@@ -257,11 +257,11 @@ assert.match(byId.get("return-meta").textContent, /Step Reversal/);
 // Switch End preserves the ordered Interval while transposing its active
 // endpoint and retained search frame. S owns the same operator; Undo remains a
 // separate plain-Z history action outside the matrix.
-byId.get("switch-endpoint").click();
+byId.get("switch-end").click();
 await flush();
 assert.equal(currentText(), "Current 1:00");
 assert.match(byId.get("section-window").textContent, /0:50–1:00/);
-assert.match(byId.get("switch-endpoint-meta").textContent, /0:50/);
+assert.match(byId.get("switch-end-meta").textContent, /0:50/);
 dispatchDocument("keydown", { key: "s", code: "KeyS" });
 await flush();
 assert.equal(currentText(), "Current 0:50");
@@ -813,9 +813,9 @@ assert.equal(byId.get("field-both-toggle-label").textContent, "Stretch both");
 assert.equal(byId.get("field-transport-state").textContent, "Held");
 assert.equal(byId.get("field-outer-offset").value, "10", "Hold must not overwrite the configured Outer Offset.");
 assert.equal(byId.get("field-inner-offset").value, "2.5", "Hold must not overwrite the configured Inner Offset.");
-assert.equal(byId.get("step-size-seconds").value, "10", "Hold must not overwrite semantic Step size.");
+assert.equal(byId.get("step-distance").value, "10", "Hold must not overwrite semantic Step size.");
 assert.equal(byId.get("section-window").textContent, intervalBeforeStretch,
-  "Hold must update neither semantic Step Reach nor Interval.");
+  "Hold must update neither semantic Step Distance nor Interval.");
 
 // Native pause settles playback, preserves its attained relation internally,
 // then returns the panes to the exact semantic Step preview.
@@ -836,11 +836,11 @@ assert.equal(lead.state, 2);
 
 // Playback settlement must not strand Switch End on the short physical
 // playback segment. It still transposes the preserved Interval endpoints exactly.
-byId.get("switch-endpoint").click();
+byId.get("switch-end").click();
 await flush();
 assert.equal(currentText(), "Current 0:25");
 assert.match(byId.get("section-window").textContent, /0:25–0:58/);
-byId.get("switch-endpoint").click();
+byId.get("switch-end").click();
 await flush();
 assert.equal(currentText(), "Current 0:58");
 assert.match(byId.get("section-window").textContent, /0:25–0:58/);
